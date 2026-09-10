@@ -266,6 +266,49 @@ public sealed class AepConformanceTests
     }
 
     [TestMethod]
+    public async Task PairingUnenrollmentInvalidatesTheCredentialAndCanBeRetried()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"aep-pairing-unenrollment-{Guid.NewGuid():N}");
+        var stateFile = Path.Combine(directory, "state.json");
+        var instanceId = Guid.NewGuid();
+        var clientId = "agentstration:unenrollment-test";
+        var token = AepStaticBearerCredentials.Generate(clientId).AccessToken;
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(stateFile, JsonSerializer.Serialize(new
+        {
+            InstanceId = instanceId,
+            Status = "paired",
+            ClientId = clientId,
+            TokenDigest = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(token)))
+        }));
+        try
+        {
+            await using var factory = PairingFactory(stateFile);
+            using var client = factory.CreateClient();
+            client.DefaultRequestHeaders.Authorization = new("Bearer", token);
+
+            Assert.AreEqual(HttpStatusCode.OK,
+                (await client.PostAsync(AepEnrollmentProtocol.UnenrollmentPath, null)).StatusCode);
+            Assert.AreEqual(HttpStatusCode.OK,
+                (await client.PostAsync(AepEnrollmentProtocol.UnenrollmentPath, null)).StatusCode);
+            Assert.AreEqual(HttpStatusCode.Unauthorized,
+                (await client.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
+
+            using var pairingForm = await client.GetAsync(AepEnrollmentProtocol.PairingPath);
+            Assert.AreEqual(HttpStatusCode.OK, pairingForm.StatusCode);
+            StringAssert.Contains(await pairingForm.Content.ReadAsStringAsync(), "name=\"code\"");
+            using var state = JsonDocument.Parse(await File.ReadAllTextAsync(stateFile));
+            Assert.AreEqual(instanceId.ToString("D"), state.RootElement.GetProperty("InstanceId").GetString());
+            Assert.AreEqual("unpaired", state.RootElement.GetProperty("Status").GetString());
+            Assert.AreEqual(1, state.RootElement.GetProperty("RevokedTokenDigests").GetArrayLength());
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public async Task SharedKeyFileEnrollmentAuthenticatesDiscovery()
     {
         var path = Path.GetTempFileName();

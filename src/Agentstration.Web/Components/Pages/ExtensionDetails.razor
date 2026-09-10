@@ -124,7 +124,13 @@ else
                     <dt>@T("Registration")</dt><dd>@(enrollment.Definition.RegistrationName ?? "—")</dd>
                     <dt>@T("Outcome")</dt><dd>@(enrollment.Definition.Outcome ?? "—")</dd>
                 </dl>
-                <div class="panel-actions"><a class="button-primary" href="/extensions?tab=enrollments">@T("ManageEnrollment")</a></div>
+                <div class="panel-actions">
+                    <a class="button-primary" href="/extensions?tab=enrollments">@T("ManageEnrollment")</a>
+                    @if (CanAdminister && CanUnenroll(enrollment.Definition.State))
+                    {
+                        <button class="button-danger" @onclick="() => confirmUnenroll = true">@T("UnenrollExtension")</button>
+                    }
+                </div>
             }
             else if (item.EnrollmentInstanceId is { } instanceId)
             {
@@ -199,6 +205,7 @@ else
 }
 
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteExtensionRegistration")" Message="@T("DeleteRegistrationMessage", item?.RegistrationNamespace ?? string.Empty, item?.RegistrationName ?? string.Empty)" ConfirmLabel="@T("DeleteRegistration")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+<ConfirmationDialog IsOpen="@confirmUnenroll" Title="@T("UnenrollExtension")" Message="@T("UnenrollExtensionMessage")" ConfirmLabel="@T("ConfirmUnenrollExtension")" OnConfirm="UnenrollAsync" OnCancel="() => confirmUnenroll = false" />
 
 @code {
     private static readonly JsonSerializerOptions IndentedJsonOptions = new() { WriteIndented = true };
@@ -214,6 +221,7 @@ else
     private bool editing;
     private bool saving;
     private bool confirmDelete;
+    private bool confirmUnenroll;
     private bool migrating;
     private ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>? migrationPreview;
     private RegistrationEditForm form = new();
@@ -277,6 +285,18 @@ else
         try { await Client.DeleteRegistrationAsync(registration.Value.Namespace, registration.Value.Name, registration.ETag, cancellation.Token); Navigation.NavigateTo("/extensions"); }
         catch (AgentstrationApiException exception) { error = exception; confirmDelete = false; }
     }
+    private async Task UnenrollAsync()
+    {
+        if (enrollment is null) return;
+        try
+        {
+            await Client.UnenrollExtensionAsync(enrollment.Definition.InstanceId, cancellation.Token);
+            confirmUnenroll = false;
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("ExtensionUnenrolled"), T("ExtensionUnenrolled.Description"), DateTimeOffset.Now, UiStatus.Success));
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; confirmUnenroll = false; }
+    }
     private async Task PreviewMigrationAsync(ExtensionOptionUsageResponse usage, string targetVersion)
     {
         migrating = true;
@@ -305,7 +325,8 @@ else
         while (pending.TryDequeue(out var current)) foreach (var migration in optionSet.Migrations.Where(value => string.Equals(value.FromVersion, current, StringComparison.Ordinal))) { if (string.Equals(migration.ToVersion, optionSet.PreferredVersion, StringComparison.Ordinal)) return optionSet.PreferredVersion; if (visited.Add(migration.ToVersion)) pending.Enqueue(migration.ToVersion); }
         return null;
     }
-    private static UiStatus EnrollmentStatus(AepEnrollmentState state) => state switch { AepEnrollmentState.Available => UiStatus.Success, AepEnrollmentState.CodeIssued or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying => UiStatus.Warning, AepEnrollmentState.Rejected or AepEnrollmentState.Cancelled or AepEnrollmentState.Expired or AepEnrollmentState.AttemptsExceeded or AepEnrollmentState.VerificationFailed or AepEnrollmentState.Revoked => UiStatus.Danger, _ => UiStatus.Neutral };
+    private static bool CanUnenroll(AepEnrollmentState state) => state is AepEnrollmentState.Available or AepEnrollmentState.Disabled or AepEnrollmentState.VerificationFailed or AepEnrollmentState.Unenrolling;
+    private static UiStatus EnrollmentStatus(AepEnrollmentState state) => state switch { AepEnrollmentState.Available => UiStatus.Success, AepEnrollmentState.CodeIssued or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying or AepEnrollmentState.Unenrolling => UiStatus.Warning, AepEnrollmentState.Rejected or AepEnrollmentState.Cancelled or AepEnrollmentState.Expired or AepEnrollmentState.AttemptsExceeded or AepEnrollmentState.VerificationFailed or AepEnrollmentState.Revoked => UiStatus.Danger, _ => UiStatus.Neutral };
     private static string FormatDate(DateTimeOffset value) => value.ToLocalTime().ToString("g");
     private static string FormatDate(DateTimeOffset? value) => value is { } date ? FormatDate(date) : "—";
     private static string ProfileUrl(ExtensionOptionUsageResponse usage) => $"/modelprofiles/{Uri.EscapeDataString(usage.ProfileName)}?namespace={Uri.EscapeDataString(usage.ProfileNamespace)}";

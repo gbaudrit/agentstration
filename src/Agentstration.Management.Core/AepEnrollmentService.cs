@@ -131,9 +131,9 @@ public sealed class AepEnrollmentService(
             throw new ResourceScopeAccessDeniedException(ResourceScopeRef.Instance);
         if (stored.Value.Definition.TargetScopeRef is { } existing)
         {
-            if (existing != targetScopeRef)
+            if (existing != targetScopeRef && stored.Value.Definition.State != AepEnrollmentState.Unpaired)
                 throw new AepEnrollmentException("scope_already_assigned", "The enrollment request is already assigned to another scope.", 409);
-            return;
+            if (stored.Value.Definition.State != AepEnrollmentState.Unpaired) return;
         }
         var registrationName = await scopeOperations.WriteAsync(ResourceKinds.ExtensionRegistration, targetScopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
@@ -352,6 +352,54 @@ public sealed class AepEnrollmentService(
         await AuditAsync(SecurityAuditActions.AepCredentialRevoked, stored.Value, null, cancellationToken);
     }
 
+    public async Task UnenrollAsync(RequestContext context, Guid requestId, CancellationToken cancellationToken)
+    {
+        using var scopeContext = RequestScopes().Push(context);
+        await AuthorizeAsync(context, cancellationToken);
+        var stored = await GetAssignedAsync(context, requestId, cancellationToken);
+        if (stored.Value.Definition.State == AepEnrollmentState.Unpaired) return;
+        if (stored.Value.Definition.State is not (AepEnrollmentState.Available
+            or AepEnrollmentState.Disabled
+            or AepEnrollmentState.VerificationFailed
+            or AepEnrollmentState.Unenrolling))
+            throw new AepEnrollmentException("enrollment_not_active", "The extension enrollment cannot be reset from its current state.", 409);
+
+        if (stored.Value.Definition.State != AepEnrollmentState.Unenrolling)
+        {
+            stored = await UpdateAsync(stored, stored.Value.Definition with
+            {
+                State = AepEnrollmentState.Unenrolling,
+                Outcome = "unenrollment_started"
+            }, cancellationToken);
+        }
+
+        if (stored.Value.Definition.EnrollmentMode == AepEnrollmentMode.PairingCode
+            && !string.Equals(stored.Value.Definition.Outcome, "extension_unenrolled", StringComparison.Ordinal))
+        {
+            var token = await ReadTokenAsync(stored.Value, cancellationToken);
+            await SendLifecycleAsync(stored.Value, AepEnrollmentProtocol.UnenrollmentPath, token, null, cancellationToken);
+            stored = await UpdateAsync(stored, stored.Value.Definition with { Outcome = "extension_unenrolled" }, cancellationToken);
+        }
+
+        if (stored.Value.Definition.EnrollmentMode == AepEnrollmentMode.PairingCode)
+            await DeleteTokenAndDisableRegistrationAsync(stored.Value, cancellationToken);
+        else
+            await DisableRegistrationAsync(stored.Value, cancellationToken);
+
+        _ = await UpdateAsync(stored, stored.Value.Definition with
+        {
+            State = AepEnrollmentState.Unpaired,
+            CodeIssuedAt = null,
+            CodeExpiresAt = null,
+            AttemptCount = 0,
+            CodeSalt = null,
+            CodeDigest = null,
+            CompletionDigest = null,
+            Outcome = "unenrolled"
+        }, cancellationToken);
+        await AuditAsync(SecurityAuditActions.AepEnrollmentUnenrolled, stored.Value, null, cancellationToken);
+    }
+
     private async Task<(string Secret, string Registration)> PersistCredentialAndRegistrationAsync(AepEnrollmentRequestResource request, string token, CancellationToken cancellationToken)
     {
         var scope = TargetScope(request.Definition);
@@ -402,7 +450,18 @@ public sealed class AepEnrollmentService(
         finally { CryptographicOperations.ZeroMemory(tokenBytes); }
         var registrationName = $"paired-{request.Definition.InstanceId:N}";
         var registrationAddress = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ResourceKinds.ExtensionRegistration, registrationName);
-        if (await store.GetExactAsync<ExtensionRegistrationResource>(registrationAddress, cancellationToken) is null)
+        var registrationDefinition = new ExtensionRegistrationProperties
+        {
+            DisplayName = request.Definition.ExtensionName,
+            Endpoint = request.Definition.Endpoint,
+            ExpectedExtensionId = request.Definition.ExtensionId,
+            Source = ExtensionRegistrationSource.Manual,
+            AuthenticationMode = AepTransportAuthenticationMode.StaticBearer,
+            EnrollmentMode = AepEnrollmentMode.PairingCode,
+            Credential = new ResourceReference(secretName, scope, ResourceNamespace.Default)
+        };
+        var existingRegistration = await store.GetExactAsync<ExtensionRegistrationResource>(registrationAddress, cancellationToken);
+        if (existingRegistration is null)
         {
             _ = await store.PutExactAsync(scope, new ExtensionRegistrationResource
             {
@@ -412,17 +471,17 @@ public sealed class AepEnrollmentService(
                 ScopeRef = scope,
                 Generation = 1,
                 Status = Succeeded(),
-                Definition = new ExtensionRegistrationProperties
-                {
-                    DisplayName = request.Definition.ExtensionName,
-                    Endpoint = request.Definition.Endpoint,
-                    ExpectedExtensionId = request.Definition.ExtensionId,
-                    Source = ExtensionRegistrationSource.Manual,
-                    AuthenticationMode = AepTransportAuthenticationMode.StaticBearer,
-                    EnrollmentMode = AepEnrollmentMode.PairingCode,
-                    Credential = new ResourceReference(secretName, scope, ResourceNamespace.Default)
-                }
+                Definition = registrationDefinition
             }, null, true, cancellationToken);
+        }
+        else if (existingRegistration.Value.Definition != registrationDefinition)
+        {
+            _ = await store.PutExactAsync(scope, existingRegistration.Value with
+            {
+                Generation = checked(existingRegistration.Value.Generation + 1),
+                Status = Succeeded(),
+                Definition = registrationDefinition
+            }, existingRegistration.ETag, false, cancellationToken);
         }
         return (secretName, registrationName);
     }
@@ -456,18 +515,31 @@ public sealed class AepEnrollmentService(
     private async Task DeleteTokenAndDisableRegistrationAsync(AepEnrollmentRequestResource request, CancellationToken cancellationToken)
     {
         await EnrollmentVaultProvider().DeleteAsync(EnrollmentVaultContext(request), CredentialName(request), cancellationToken);
+        await DisableRegistrationAsync(request, cancellationToken);
+    }
+
+    private async Task DisableRegistrationAsync(AepEnrollmentRequestResource request, CancellationToken cancellationToken)
+    {
         var scope = TargetScope(request.Definition);
         var registrationName = request.Definition.RegistrationName
             ?? throw new InvalidOperationException("The enrollment registration reference is unavailable.");
-        var address = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ResourceKinds.ExtensionRegistration, registrationName);
-        var registration = await store.GetExactAsync<ExtensionRegistrationResource>(address, cancellationToken)
-            ?? throw new InvalidOperationException("The enrollment registration is unavailable.");
-        if (registration.Value.Definition.Enabled)
-            _ = await store.PutExactAsync(scope, registration.Value with
+        await scopeOperations.WriteAsync(
+            ResourceKinds.ExtensionRegistration,
+            scope,
+            AuthorizationPermissions.ResourcesWrite,
+            async token =>
             {
-                Generation = checked(registration.Value.Generation + 1),
-                Definition = registration.Value.Definition with { Enabled = false }
-            }, registration.ETag, false, cancellationToken);
+                var address = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ResourceKinds.ExtensionRegistration, registrationName);
+                var registration = await store.GetExactAsync<ExtensionRegistrationResource>(address, token);
+                if (registration is null || !registration.Value.Definition.Enabled) return true;
+                _ = await store.PutExactAsync(scope, registration.Value with
+                {
+                    Generation = checked(registration.Value.Generation + 1),
+                    Definition = registration.Value.Definition with { Enabled = false }
+                }, registration.ETag, false, token);
+                return true;
+            },
+            cancellationToken);
     }
 
     private async Task VerifyAsync(AepEnrollmentRequestResource request, string token, CancellationToken cancellationToken)

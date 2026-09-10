@@ -224,11 +224,43 @@ public sealed class ExtensionsConsoleTests
     }
 
     [TestMethod]
-    public async Task PairingCodeEnrollmentStartsDirectlyFromTheInventory()
+    public async Task ExtensionDetailsConfirmUnenrollmentAndRefreshItsState()
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
-        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeExtensionsClient(configured: false, availableEnrollment: true);
+        context.Services.AddSingleton<IExtensionsClient>(client);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var contextState = new ConsoleContextState(new WritableContextProvider());
+        await contextState.LoadAsync(default);
+        context.Services.AddSingleton(contextState);
+
+        var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters => parameters
+            .Add(value => value.RegistrationName, "llama-cpp-local"));
+        var tabs = rendered.WaitForElements("[role='tab']");
+        await tabs[2].ClickAsync(new());
+        var unenroll = rendered.WaitForElement("section.resource-section .panel-actions button.button-danger");
+        Assert.AreEqual("Désenrôler l’extension", unenroll.TextContent.Trim());
+
+        await unenroll.ClickAsync(new());
+        var dialog = rendered.Find("[role='alertdialog']");
+        StringAssert.Contains(dialog.TextContent, "L’identifiant actuel sera invalidé");
+        await dialog.QuerySelector("button.button-danger")!.ClickAsync(new());
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(1, client.UnenrollmentCalls);
+            StringAssert.Contains(rendered.Markup, "En attente");
+        });
+    }
+
+    [TestMethod]
+    public async Task PairingCodeEnrollmentIsNotStartedFromTheInventoryWithoutAScopeChoice()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false);
         context.Services.AddSingleton<IExtensionsClient>(client);
@@ -240,12 +272,98 @@ public sealed class ExtensionsConsoleTests
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
         await rendered.Find("[data-testid='extensions-tab-catalog']").ClickAsync(new());
 
-        await rendered.Find("tbody button.text-button").ClickAsync(new());
+        rendered.WaitForAssertion(() =>
+        {
+            var enrollmentCell = rendered.Find("tbody .enrollment-cell");
+            StringAssert.Contains(enrollmentCell.TextContent, "En attente");
+            Assert.IsEmpty(enrollmentCell.QuerySelectorAll("button"));
+            Assert.AreEqual(0, client.RotateCalls);
+        });
+    }
+
+    [TestMethod]
+    public async Task AvailableEnrollmentOffersUnenrollmentAfterCredentialRevocation()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeExtensionsClient(configured: false, availableEnrollment: true);
+        context.Services.AddSingleton<IExtensionsClient>(client);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var contextState = new ConsoleContextState(new WritableContextProvider());
+        await contextState.LoadAsync(default);
+        context.Services.AddSingleton(contextState);
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
+
+        var actions = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions button");
+        Assert.HasCount(3, actions);
+        Assert.AreEqual("Renouveler l’identifiant", actions[0].TextContent.Trim());
+        Assert.AreEqual("Révoquer l’identifiant", actions[1].TextContent.Trim());
+        Assert.AreEqual("Désenrôler", actions[2].TextContent.Trim());
+
+        await actions[2].ClickAsync(new());
+        var dialog = rendered.Find("[role='alertdialog']");
+        StringAssert.Contains(dialog.TextContent, "L’identifiant actuel sera invalidé");
+        await dialog.QuerySelector("button.button-danger")!.ClickAsync(new());
+
+        rendered.WaitForAssertion(() => Assert.AreEqual(1, client.UnenrollmentCalls));
+    }
+
+    [TestMethod]
+    public async Task UnpairedEnrollmentLooksPendingAndShowsTheScopeSelectorAgain()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeExtensionsClient(configured: false, availableEnrollment: true);
+        context.Services.AddSingleton<IExtensionsClient>(client);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var contextState = new ConsoleContextState(new WritableContextProvider());
+        await contextState.LoadAsync(default);
+        context.Services.AddSingleton(contextState);
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
+        var unenroll = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions button")[2];
+        await unenroll.ClickAsync(new());
+        await rendered.Find("[role='alertdialog'] button.button-danger").ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {
-            Assert.AreEqual(1, client.RotateCalls);
-            Assert.IsTrue(context.JSInterop.Invocations.Any(value => value.Identifier == "agentstrationEnrollment.copyAndOpen"));
+            var card = rendered.Find("[data-testid='enrollment-card']");
+            StringAssert.Contains(card.TextContent, "En attente");
+            Assert.IsNotNull(card.QuerySelector(".enrollment-scope select"));
+            Assert.IsNull(card.QuerySelector(".resource-scope-badge"));
+        });
+    }
+
+    [TestMethod]
+    public async Task EnrollmentSummaryCountsOnlyItemsInTheQueue()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: false, availableEnrollment: true));
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var contextState = new ConsoleContextState(new WritableContextProvider());
+        await contextState.LoadAsync(default);
+        context.Services.AddSingleton(contextState);
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
+        var unenroll = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions button")[2];
+        await unenroll.ClickAsync(new());
+        await rendered.Find("[role='alertdialog'] button.button-danger").ClickAsync(new());
+        await rendered.Find("[data-testid='extensions-tab-summary']").ClickAsync(new());
+
+        rendered.WaitForAssertion(() =>
+        {
+            var enrollmentMetric = rendered.FindAll("#extensions-panel-summary .metric-card-link")[1];
+            StringAssert.Contains(enrollmentMetric.TextContent, "Enrôlements");
+            StringAssert.Contains(enrollmentMetric.TextContent, "1 en cours");
+            Assert.AreEqual("1", enrollmentMetric.QuerySelector("strong")?.TextContent.Trim());
         });
     }
 
@@ -270,14 +388,16 @@ public sealed class ExtensionsConsoleTests
         });
     }
 
-    private sealed class FakeExtensionsClient(bool configured, AepEnrollmentSettingsSnapshot? settings = null, bool completesPairing = false, bool source = false) : IExtensionsClient
+    private sealed class FakeExtensionsClient(bool configured, AepEnrollmentSettingsSnapshot? settings = null, bool completesPairing = false, bool source = false, bool availableEnrollment = false) : IExtensionsClient
     {
         private readonly Guid enrollmentId = Guid.NewGuid();
         private bool codeRotated;
+        private bool unenrolled;
         private int postRotateReads;
         public int EnrollmentCalls { get; private set; }
         public int RotateCalls { get; private set; }
         public int ExtensionCalls { get; private set; }
+        public int UnenrollmentCalls { get; private set; }
 
         public Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken)
         {
@@ -301,7 +421,7 @@ public sealed class ExtensionsConsoleTests
                 "pairingCode",
                 true,
                 extension.Status,
-                AepEnrollmentState.Pending,
+                unenrolled ? AepEnrollmentState.Unpaired : availableEnrollment ? AepEnrollmentState.Available : AepEnrollmentState.Pending,
                 DateTimeOffset.UtcNow,
                 extension,
                 [new ExtensionInventoryConnectionResponse(
@@ -338,9 +458,11 @@ public sealed class ExtensionsConsoleTests
         public Task<IReadOnlyList<AepEnrollmentRequestResource>> GetEnrollmentsAsync(CancellationToken cancellationToken)
         {
             EnrollmentCalls++;
-            var state = codeRotated
+            var state = unenrolled
+                ? AepEnrollmentState.Unpaired
+                : codeRotated
                 ? ++postRotateReads >= 2 && completesPairing ? AepEnrollmentState.Available : AepEnrollmentState.CodeIssued
-                : AepEnrollmentState.Pending;
+                : availableEnrollment ? AepEnrollmentState.Available : AepEnrollmentState.Pending;
             return Task.FromResult<IReadOnlyList<AepEnrollmentRequestResource>>([Enrollment(state)]);
         }
 
@@ -350,6 +472,13 @@ public sealed class ExtensionsConsoleTests
             codeRotated = true;
             postRotateReads = 0;
             return Task.FromResult(new AepPairingCodeResult(enrollmentId, "123456789", DateTimeOffset.UtcNow.AddMinutes(1)));
+        }
+
+        public Task UnenrollExtensionAsync(Guid requestId, CancellationToken cancellationToken)
+        {
+            UnenrollmentCalls++;
+            unenrolled = true;
+            return Task.CompletedTask;
         }
 
         private AepEnrollmentRequestResource Enrollment(AepEnrollmentState state) => new()

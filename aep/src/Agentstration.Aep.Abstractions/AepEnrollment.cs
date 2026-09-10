@@ -14,6 +14,7 @@ public static class AepEnrollmentProtocol
     public const string CredentialRotationPath = "/aep/enrollment/credentials/rotate";
     public const string PreviousCredentialRevocationPath = "/aep/enrollment/credentials/revoke-previous";
     public const string CredentialRevocationPath = "/aep/enrollment/credentials/revoke";
+    public const string UnenrollmentPath = "/aep/enrollment/unenroll";
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<AepEnrollmentMethod>))]

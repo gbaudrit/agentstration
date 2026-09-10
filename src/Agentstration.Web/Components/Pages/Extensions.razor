@@ -38,7 +38,7 @@
             <MetricCard Label="@T("Tab.Extensions")" Value="@(inventory?.Count.ToString() ?? "—")" Detail="@T("AvailableExtensions", AvailableExtensionCount)" Status="@(AvailableExtensionCount > 0 ? UiStatus.Success : UiStatus.Neutral)" Url="/extensions?tab=catalog" />
             @if (CanAdministerEnrollments)
             {
-                <MetricCard Label="@T("Tab.Enrollments")" Value="@(enrollments?.Count.ToString() ?? "—")" Detail="@T("ActiveEnrollments", ActiveEnrollmentCount)" Status="@(ActiveEnrollmentCount > 0 ? UiStatus.Warning : UiStatus.Success)" Url="/extensions?tab=enrollments" />
+                <MetricCard Label="@T("Tab.Enrollments")" Value="@(enrollments is null ? "—" : ActiveEnrollmentCount.ToString())" Detail="@T("ActiveEnrollments", ActiveEnrollmentCount)" Status="@(ActiveEnrollmentCount > 0 ? UiStatus.Warning : UiStatus.Success)" Url="/extensions?tab=enrollments" />
             }
             <MetricCard Label="@T("Connections")" Value="@(registrations?.Count.ToString() ?? "—")" Detail="@T("EnabledEndpoints", EnabledRegistrationCount)" Status="@(EnabledRegistrationCount > 0 ? UiStatus.Info : UiStatus.Neutral)" Url="/extensions?tab=catalog" />
             @if (CanAdministerEnrollments)
@@ -99,7 +99,7 @@
             <div class="enrollment-list">
                 @foreach (var enrollment in enrollments)
                 {
-                    var requiresScope = enrollment.Definition.TargetScopeRef is null;
+                    var requiresScope = enrollment.Definition.TargetScopeRef is null || enrollment.Definition.State == AepEnrollmentState.Unpaired;
                     <article class="enrollment-card" data-testid="enrollment-card">
                         <div class="enrollment-card-summary">
                             <div class="enrollment-identity">
@@ -108,7 +108,7 @@
                                 <small>@T("AnnouncedAgo", EnrollmentAge(enrollment))</small>
                             </div>
                             <div class="enrollment-status"><StatusBadge Text="@EnrollmentStatusLabel(enrollment.Definition.State)" Status="@EnrollmentStatus(enrollment.Definition.State)" />
-                                @if (enrollment.Definition.TargetScopeRef is { } enrollmentScope)
+                                @if (enrollment.Definition.TargetScopeRef is { } enrollmentScope && enrollment.Definition.State != AepEnrollmentState.Unpaired)
                                 { <ResourceScopeBadge ScopeRef="enrollmentScope" Compact /> }
                                 @if (enrollment.Definition.CodeExpiresAt is { } expires && enrollment.Definition.State == AepEnrollmentState.CodeIssued)
                                 { <small>@T("CodeExpiresIn", SecondsRemaining(expires))</small> }
@@ -129,13 +129,18 @@
                             {
                                 <div class="enrollment-actions"><button class="button-primary" @onclick="() => CopyAndOpenAsync(enrollment)" disabled="@pairingBusy">@T("EnrollExtension")</button><button class="button-secondary" @onclick="() => RejectAsync(enrollment)" disabled="@pairingBusy">@T("Reject")</button><button class="button-secondary" @onclick="() => CancelEnrollmentAsync(enrollment)" disabled="@pairingBusy">@T("Cancel")</button></div>
                             }
-                            else if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile && requiresScope)
+                            else if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile
+                                && (requiresScope || enrollment.Definition.State == AepEnrollmentState.Unpaired))
                             {
-                                <div class="enrollment-actions"><button class="button-primary" @onclick="() => AssignSharedKeyAsync(enrollment)" disabled="@pairingBusy">@T("EnrollExtension")</button><button class="button-secondary" @onclick="() => RejectAsync(enrollment)" disabled="@pairingBusy">@T("Reject")</button></div>
+                                <div class="enrollment-actions"><button class="button-primary" @onclick="() => AssignSharedKeyAsync(enrollment)" disabled="@pairingBusy">@T("EnrollExtension")</button>@if (requiresScope) { <button class="button-secondary" @onclick="() => RejectAsync(enrollment)" disabled="@pairingBusy">@T("Reject")</button> }</div>
                             }
                             else if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.PairingCode && enrollment.Definition.State == AepEnrollmentState.Available)
                             {
-                                <div class="enrollment-actions enrollment-management-actions"><button class="button-secondary" @onclick="() => RotateCredentialAsync(enrollment)" disabled="@pairingBusy">@T("RotateCredential")</button><button class="button-danger" @onclick="() => RevokeCredentialAsync(enrollment)" disabled="@pairingBusy">@T("RevokeCredential")</button></div>
+                                <div class="enrollment-actions enrollment-management-actions"><button class="button-secondary" @onclick="() => RotateCredentialAsync(enrollment)" disabled="@pairingBusy">@T("RotateCredential")</button><button class="button-danger" @onclick="() => RevokeCredentialAsync(enrollment)" disabled="@pairingBusy">@T("RevokeCredential")</button><button class="button-danger" @onclick="() => RequestUnenrollment(enrollment)" disabled="@pairingBusy">@T("ConfirmUnenrollExtension")</button></div>
+                            }
+                            else if (CanUnenroll(enrollment.Definition.State))
+                            {
+                                <div class="enrollment-actions enrollment-management-actions"><button class="button-danger" @onclick="() => RequestUnenrollment(enrollment)" disabled="@pairingBusy">@T("ConfirmUnenrollExtension")</button></div>
                             }
                         </div>
                     </article>
@@ -225,7 +230,7 @@
             <Row Context="item"><tr>
                 <td><a class="text-button" href="@DetailUrl(item)">@item.DisplayName</a> <small>@(item.Version ?? "—")</small><br /><code>@item.ExtensionId</code></td>
                 <td><a href="@item.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@item.Endpoint</a><br /><small>@SourceLabel(item.RegistrationSource) · @T("ConnectionCount", item.Connections.Count)@if (item.RegistrationName is not null) { <text> · @item.RegistrationNamespace/@item.RegistrationName</text> }</small></td>
-                <td><div class="enrollment-cell">@if (item.EnrollmentStatus is { } enrollmentState) { <StatusBadge Text="@EnrollmentStatusLabel(enrollmentState)" Status="@EnrollmentStatus(enrollmentState)" /> @if (CanAdministerEnrollments && CanRotate(enrollmentState) && IsPairingCode(item)) { <button class="text-button" @onclick="() => EnrollAsync(item)" disabled="@pairingBusy">@T("Enroll")</button> } } else { <span>—</span> }</div></td>
+                <td><div class="enrollment-cell">@if (item.EnrollmentStatus is { } enrollmentState) { <StatusBadge Text="@EnrollmentStatusLabel(enrollmentState)" Status="@EnrollmentStatus(enrollmentState)" /> } else { <span>—</span> }</div></td>
                 <td><StatusBadge Text="@StatusLabel(item.AvailabilityStatus)" Status="@ModelManagementUi.Status(item.AvailabilityStatus)" /></td>
                 <td>
                     @ContributionSummary(item)
@@ -260,3 +265,5 @@
     }
 </div>
 }
+
+<ConfirmationDialog IsOpen="@(pendingUnenrollment is not null)" Title="@T("UnenrollExtension")" Message="@T("UnenrollExtensionMessage")" ConfirmLabel="@T("ConfirmUnenrollExtension")" OnConfirm="UnenrollAsync" OnCancel="CancelUnenrollment" />

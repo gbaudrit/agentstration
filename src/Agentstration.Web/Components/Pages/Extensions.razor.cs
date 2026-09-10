@@ -56,6 +56,7 @@ public partial class Extensions
     private Guid? activeEnrollmentId;
     private bool clipboardFallback;
     private bool refreshingEnrollmentState;
+    private AepEnrollmentRequestResource? pendingUnenrollment;
     private readonly Dictionary<Guid, ResourceScopeRef?> enrollmentScopes = [];
     [Parameter, SupplyParameterFromQuery(Name = "tab")]
     public string? RequestedTab { get; set; }
@@ -72,7 +73,7 @@ public partial class Extensions
     private int AvailableExtensionCount => inventory?.Count(value => string.Equals(value.AvailabilityStatus, "available", StringComparison.OrdinalIgnoreCase)) ?? 0;
     private int EnabledRegistrationCount => registrations?.Count(value => value.Definition.Enabled) ?? 0;
     private int ActiveEnrollmentCount => enrollments?.Count(value => value.Definition.State is AepEnrollmentState.Pending
-        or AepEnrollmentState.CodeIssued or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying) ?? 0;
+        or AepEnrollmentState.Unpaired or AepEnrollmentState.CodeIssued or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying) ?? 0;
     private int EnabledEnrollmentModeCount => (pairingCodeEnabled ? 1 : 0) + (sharedKeyFileEnabled ? 1 : 0);
     private IReadOnlyList<ExtensionInventoryItemResponse> FilteredInventory => (inventory ?? [])
         .Where(value => string.IsNullOrWhiteSpace(search)
@@ -203,15 +204,16 @@ public partial class Extensions
     }
 
     private ResourceScopeRef? EnrollmentScope(AepEnrollmentRequestResource enrollment) =>
-        enrollment.Definition.TargetScopeRef
-        ?? (enrollmentScopes.TryGetValue(enrollment.Definition.InstanceId, out var scope) ? scope : null);
+        enrollmentScopes.TryGetValue(enrollment.Definition.InstanceId, out var scope)
+            ? scope
+            : enrollment.Definition.TargetScopeRef;
 
     private void SetEnrollmentScope(AepEnrollmentRequestResource enrollment, ResourceScopeRef? scope) =>
         enrollmentScopes[enrollment.Definition.InstanceId] = scope;
 
     private async Task<bool> AssignIfRequiredAsync(AepEnrollmentRequestResource enrollment)
     {
-        if (enrollment.Definition.TargetScopeRef is not null) return true;
+        if (enrollment.Definition.TargetScopeRef is not null && enrollment.Definition.State != AepEnrollmentState.Unpaired) return true;
         var scope = EnrollmentScope(enrollment);
         if (scope is null) return false;
         await Client.AssignEnrollmentAsync(enrollment.Definition.InstanceId, scope.Value, cancellation.Token);
@@ -224,7 +226,10 @@ public partial class Extensions
         error = null;
         try
         {
-            if (await AssignIfRequiredAsync(enrollment)) await LoadAsync();
+            var scope = EnrollmentScope(enrollment);
+            if (scope is null) return;
+            await Client.AssignEnrollmentAsync(enrollment.Definition.InstanceId, scope.Value, cancellation.Token);
+            await LoadAsync();
         }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { pairingBusy = false; }
@@ -271,6 +276,25 @@ public partial class Extensions
         pairingBusy = true;
         try { await Client.RevokeEnrollmentCredentialAsync(enrollment.Definition.InstanceId, cancellation.Token); await LoadAsync(); }
         catch (AgentstrationApiException exception) { error = exception; }
+        finally { pairingBusy = false; }
+    }
+
+    private void RequestUnenrollment(AepEnrollmentRequestResource enrollment) => pendingUnenrollment = enrollment;
+    private void CancelUnenrollment() => pendingUnenrollment = null;
+
+    private async Task UnenrollAsync()
+    {
+        var enrollment = pendingUnenrollment;
+        if (enrollment is null) return;
+        pairingBusy = true;
+        try
+        {
+            await Client.UnenrollExtensionAsync(enrollment.Definition.InstanceId, cancellation.Token);
+            pendingUnenrollment = null;
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("ExtensionUnenrolled"), T("ExtensionUnenrolled.Description"), DateTimeOffset.Now, UiStatus.Success));
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; pendingUnenrollment = null; }
         finally { pairingBusy = false; }
     }
 
@@ -329,13 +353,15 @@ public partial class Extensions
 
     private static bool CanRotate(AepEnrollmentState state) => state is AepEnrollmentState.Pending
         or AepEnrollmentState.CodeIssued or AepEnrollmentState.Expired or AepEnrollmentState.AttemptsExceeded
-        or AepEnrollmentState.VerificationFailed;
+        or AepEnrollmentState.VerificationFailed or AepEnrollmentState.Unpaired;
+    private static bool CanUnenroll(AepEnrollmentState state) => state is AepEnrollmentState.Available
+        or AepEnrollmentState.Disabled or AepEnrollmentState.VerificationFailed or AepEnrollmentState.Unenrolling;
     private static UiStatus EnrollmentStatus(AepEnrollmentState state) => state switch
     {
         AepEnrollmentState.Available => UiStatus.Success,
         AepEnrollmentState.Disabled => UiStatus.Neutral,
         AepEnrollmentState.Rejected or AepEnrollmentState.Cancelled or AepEnrollmentState.Expired or AepEnrollmentState.AttemptsExceeded or AepEnrollmentState.VerificationFailed or AepEnrollmentState.Revoked => UiStatus.Danger,
-        AepEnrollmentState.CodeIssued or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying => UiStatus.Warning,
+        AepEnrollmentState.CodeIssued or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying or AepEnrollmentState.Unenrolling => UiStatus.Warning,
         _ => UiStatus.Neutral
     };
     private static long SecondsRemaining(DateTimeOffset expires) => Math.Max(0, (long)Math.Ceiling((expires - DateTimeOffset.UtcNow).TotalSeconds));
@@ -435,16 +461,6 @@ public partial class Extensions
     }
 
     private void CancelEdit() => editing = false;
-
-    private async Task EnrollAsync(ExtensionInventoryItemResponse item)
-    {
-        var enrollment = enrollments?.SingleOrDefault(value => value.Definition.InstanceId == item.EnrollmentInstanceId);
-        if (enrollment is not null) await CopyAndOpenAsync(enrollment);
-    }
-
-    private static bool IsPairingCode(ExtensionInventoryItemResponse item) =>
-        item.Extension?.EnrollmentMode == AepEnrollmentMode.PairingCode
-        || string.Equals(item.RegistrationSource, "pairingCode", StringComparison.OrdinalIgnoreCase);
 
     private string SourceLabel(string source) => T($"Source.{source}");
     private static string ContributionSummary(ExtensionInventoryItemResponse item) => item.Extension?.Contributions.Count > 0

@@ -129,3 +129,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 97. [ADR-0097 — Source and Channel refresh are scheduled independently](0097-source-and-channel-refresh-are-scheduled-independently.md)
 98. [ADR-0098 — Source registry registrations are instance-owned policies](0098-source-registry-registrations-are-instance-owned.md)
 99. [ADR-0099 — Provider-specific Compose owns inference services](0099-provider-specific-compose-owns-inference-services.md)
+100. [ADR-0100 — AEP unenrollment is an explicit recoverable transition](0100-aep-unenrollment-is-an-explicit-recoverable-transition.md)

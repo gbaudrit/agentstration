@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
+using Agentstration.Aep.Abstractions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -121,13 +122,17 @@ internal sealed class AepStaticBearerAuthenticationHandler(
                 matched = candidate;
         }
         CryptographicOperations.ZeroMemory(suppliedDigest);
-        if (dynamicMatch == AepDynamicCredentialMatch.Revoked || matched is null && dynamicClientId is null)
+        var isUnenrollmentRetry = dynamicMatch == AepDynamicCredentialMatch.Revoked
+            && string.Equals(Request.Path.Value, AepEnrollmentProtocol.UnenrollmentPath, StringComparison.Ordinal);
+        if (dynamicMatch == AepDynamicCredentialMatch.Revoked && !isUnenrollmentRetry
+            || matched is null && dynamicClientId is null && !isUnenrollmentRetry)
             return Task.FromResult(AuthenticateResult.Fail("Invalid AEP workload credential."));
 
+        var clientId = matched?.ClientId ?? dynamicClientId ?? "agentstration:unenrollment-retry";
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, matched?.ClientId ?? dynamicClientId!),
-            new(AepAuthenticationDefaults.ClientIdClaim, matched?.ClientId ?? dynamicClientId!),
+            new(ClaimTypes.NameIdentifier, clientId),
+            new(AepAuthenticationDefaults.ClientIdClaim, clientId),
             new("aep:token_id", matched?.TokenId ?? "pairing-code")
         };
         claims.AddRange((matched?.Permissions ?? [AepAuthenticationDefaults.InvokePermission])
