@@ -86,6 +86,7 @@ public enum AepEnrollmentState
     [JsonStringEnumMemberName("rejected")] Rejected,
     [JsonStringEnumMemberName("cancelled")] Cancelled,
     [JsonStringEnumMemberName("verificationFailed")] VerificationFailed,
+    [JsonStringEnumMemberName("unenrolling")] Unenrolling,
     [JsonStringEnumMemberName("revoked")] Revoked,
     [JsonStringEnumMemberName("disabled")] Disabled
 }

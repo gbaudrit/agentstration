@@ -136,6 +136,37 @@ internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
         }
     }
 
+    public bool TryUnenroll(string? accessToken)
+    {
+        if (string.IsNullOrWhiteSpace(accessToken)) return false;
+        var digest = TokenDigest(accessToken);
+        try
+        {
+            lock (sync)
+            {
+                var matchesActive = IsPaired
+                    && (Matches(state.TokenDigest, digest) | Matches(state.PreviousTokenDigest, digest));
+                var matchesCompletedRequest = string.Equals(state.Status, "unpaired", StringComparison.Ordinal)
+                    && (state.RevokedTokenDigests ?? []).Any(value => Matches(value, digest));
+                if (!matchesActive && !matchesCompletedRequest) return false;
+                if (matchesActive)
+                {
+                    state = state with
+                    {
+                        Status = "unpaired",
+                        ClientId = null,
+                        RevokedTokenDigests = AppendRevoked(state.RevokedTokenDigests, state.TokenDigest, state.PreviousTokenDigest),
+                        TokenDigest = null,
+                        PreviousTokenDigest = null
+                    };
+                    WriteAtomic(path, state);
+                }
+                return true;
+            }
+        }
+        finally { CryptographicOperations.ZeroMemory(digest); }
+    }
+
     public static void Reset(string stateFile)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(stateFile);

@@ -61,6 +61,10 @@ public static class AepEnrollmentEndpoints
             ExecuteNoContentAsync(() => service.RevokeCredentialAsync(current.Current, requestId, token)))
             .Produces(StatusCodes.Status204NoContent)
             .WithSummary("Revoke an active AEP credential");
+        administration.MapPost("/{requestId:guid}/unenroll", (Guid requestId, ICurrentRequestContext current, AepEnrollmentService service, CancellationToken token) =>
+            ExecuteNoContentAsync(() => service.UnenrollAsync(current.Current, requestId, token)))
+            .Produces(StatusCodes.Status204NoContent)
+            .WithSummary("Unenroll an AEP extension so it can be enrolled again");
         return endpoints;
     }
 

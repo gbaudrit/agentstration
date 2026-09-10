@@ -89,6 +89,8 @@ The public endpoint and pairing URI must have the exact same origin. In **Extens
 
 After pairing, the same inbox can rotate or revoke the workload credential. Rotation overlaps the old and replacement digests until the replacement Secret and identity-pinned manifest are verified. Revocation closes the extension on its next request, deletes the vault value, disables the registration, and does not reopen enrollment. Back up the control-plane database, Local Vault master key/data, and extension `StateFile` together. To recover from an intentional full reset, stop the extension and invoke `AepPairingLifecycle.ResetToUnpaired(stateFile)` locally before restarting and approving a new request; authentication failures never trigger this operation automatically.
 
+For planned maintenance, use **Unenroll extension** from the extension detail screen instead of revocation. PairingCode unenrollment invalidates the active credential on both sides, preserves the stable installation identity and disables its existing registration. The same extension can then receive a new code and re-enable that registration without creating another inventory row. SharedKeyFile unenrollment disables the scoped registration but does not modify the orchestrator-owned key file; selecting **Enroll extension** provisions the same announced instance again. Revocation remains the terminal response when trust must stay closed.
+
 For an intentional Compose service name or private HTTPS extension, add the exact DNS host to the narrowest applicable list. An HTTP service must be present in both lists when it resolves to a private address:
 
 ```json

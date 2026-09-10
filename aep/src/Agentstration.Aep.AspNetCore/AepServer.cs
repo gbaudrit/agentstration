@@ -111,6 +111,20 @@ public static class AepServerExtensions
                     state.Revoke();
                     return Results.Ok(new AepCredentialLifecycleResponse("revoked"));
                 }));
+            protocolEndpoints.Add(endpoints.MapPost(AepEnrollmentProtocol.UnenrollmentPath,
+                (HttpRequest request, AepPairingStateStore state) =>
+                {
+                    const string prefix = "Bearer ";
+                    var authorization = request.Headers.Authorization.ToString();
+                    var token = authorization.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                        ? authorization[prefix.Length..].Trim()
+                        : null;
+                    return state.TryUnenroll(token)
+                        ? Results.Ok(new AepCredentialLifecycleResponse("unenrolled"))
+                        : Results.Json(
+                            new { error = new AepEnrollmentError("authentication_failed", "A valid current enrollment credential is required.") },
+                            statusCode: StatusCodes.Status401Unauthorized);
+                }));
         }
         endpoints.MapHealthChecks("/health").AllowAnonymous();
         if (endpoints.ServiceProvider.GetService<AepPairingCoordinator>() is { } pairing)
