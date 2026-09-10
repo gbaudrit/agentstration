@@ -13,6 +13,7 @@ using Agentstration.Infrastructure.Sources;
 using Agentstration.Infrastructure.Triggers;
 using Agentstration.Infrastructure.Work;
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.PostgreSql;
 using Agentstration.Management.Storage.Sqlite;
@@ -50,7 +51,8 @@ public static class DependencyInjection
         string? runtimeConnectionString = null,
         AgentstrationStorageOptions? storageOptions = null,
         bool enableHostedServices = true,
-        SourceVerificationIndexOptions? sourceVerificationIndexOptions = null)
+        SourceVerificationIndexOptions? sourceVerificationIndexOptions = null,
+        SourceRegistryTransportOptions? sourceRegistryTransportOptions = null)
     {
         services.AddSingleton(TimeProvider.System);
         services.TryAddSingleton<LocalBootstrapOptions>();
@@ -197,6 +199,19 @@ public static class DependencyInjection
         services.AddSingleton<SourceChannelSnapshotService>();
         services.AddSingleton<SourceCatalogService>();
         services.AddSingleton<SourcePackInstallationService>();
+        services.AddSingleton<ISourceRegistryIndexReader, SourceRegistryIndexReader>();
+        services.AddSingleton<ISourceRegistryReader, SourceRegistryReader>();
+        services.AddSingleton<ISourceRegistryReferenceResolver, SourceRegistryRuntimeReferenceResolver>();
+        sourceRegistryTransportOptions ??= new();
+        sourceRegistryTransportOptions.Validate();
+        services.AddSingleton(sourceRegistryTransportOptions);
+        services.AddHttpClient<ISourceRegistryDocumentRetriever, HttpSourceRegistryDocumentRetriever>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(sourceRegistryTransportOptions.TimeoutSeconds);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Agentstration-Source-Registry/1.0");
+        }).ConfigurePrimaryHttpMessageHandler(() => HttpSourceRegistryDocumentRetriever.CreatePrimaryHandler(sourceRegistryTransportOptions));
+        services.AddSingleton<ISourceRegistryCacheStore>(_ => new FileSystemSourceRegistryCacheStore(Path.Combine(dataDirectory, "source-registry-cache")));
+        services.AddSingleton<SourceRegistryManagementService>();
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();

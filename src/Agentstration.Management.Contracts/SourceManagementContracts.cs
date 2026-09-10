@@ -7,6 +7,10 @@ public sealed record ImportSourceYamlRequest(string Manifest, ResourceScopeRef? 
 public sealed record ImportSourceUrlRequest(string Url, ResourceScopeRef? ScopeRef = null);
 public sealed record UpdateSourceDisplayNameRequest(string DisplayName);
 public sealed record ConfigureSourceBindingsRequest(IReadOnlyList<SourceBindingSelection> Bindings);
+public sealed record UpdateOfficialSourceRegistryRequest(string IndexUrl, bool Enabled);
+public sealed record SourceRegistryRefreshHistoryResponse(
+    IReadOnlyList<SourceRegistryRefreshRecordResource> Value,
+    int Count);
 
 public sealed record CreateSourceProviderRequest(
     string Name,

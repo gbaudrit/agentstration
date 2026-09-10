@@ -37,6 +37,8 @@ public static class SecurityAuditActions
     public const string AepCredentialRotated = "aep-enrollment.credential-rotated";
     public const string AepCredentialRevoked = "aep-enrollment.credential-revoked";
     public const string AepEnrollmentFailed = "aep-enrollment.failed";
+    public const string SourceRegistryConfigurationUpdated = "source-registry.configuration-updated";
+    public const string SourceRegistryRefreshed = "source-registry.refreshed";
 }
 
 public sealed record SecurityAuditEvent(

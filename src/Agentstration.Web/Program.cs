@@ -98,6 +98,9 @@ var runtimeConnectionString = BuildSqliteConnectionString("Data:RuntimePath", "r
 var sourceVerificationIndexOptions = builder.Configuration
     .GetSection(Agentstration.Infrastructure.Sources.SourceVerificationIndexOptions.SectionName)
     .Get<Agentstration.Infrastructure.Sources.SourceVerificationIndexOptions>() ?? new();
+var sourceRegistryTransportOptions = builder.Configuration
+    .GetSection(Agentstration.Infrastructure.Sources.SourceRegistryTransportOptions.SectionName)
+    .Get<Agentstration.Infrastructure.Sources.SourceRegistryTransportOptions>() ?? new();
 builder.Services.AddAgentstration(
     dataDirectory,
     aiOptions,
@@ -107,7 +110,8 @@ builder.Services.AddAgentstration(
     runtimeConnectionString,
     storageOptions,
     enableHostedServices: hostedServicesEnabled,
-    sourceVerificationIndexOptions: sourceVerificationIndexOptions);
+    sourceVerificationIndexOptions: sourceVerificationIndexOptions,
+    sourceRegistryTransportOptions: sourceRegistryTransportOptions);
 builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,
     useManagedProfileResolver);
@@ -286,6 +290,7 @@ try
     {
         await app.Services.GetRequiredService<IAgentstrationStorageInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+        await app.Services.GetRequiredService<SourceRegistryManagementService>().EnsureOfficialAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<LocalIdentityDatabaseInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
         if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
             bootstrapContext = await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
