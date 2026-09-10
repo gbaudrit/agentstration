@@ -168,6 +168,20 @@ public sealed class SourceConsoleManagementService(
             scopeRef, publisher, name, displayName, etag, cancellationToken);
     }
 
+    public async Task UpdateRefreshConfigurationAsync(
+        ResourceScopeRef scopeRef,
+        string publisher,
+        string name,
+        SourceRefreshConfiguration refresh,
+        string etag,
+        Guid actorPrincipalId,
+        CancellationToken cancellationToken)
+    {
+        await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
+        _ = await sources.UpdateRefreshConfigurationExactAsync(
+            scopeRef, publisher, name, refresh, etag, cancellationToken);
+    }
+
     public async Task DeleteSourceAsync(
         ResourceScopeRef scopeRef,
         string publisher,
@@ -255,12 +269,8 @@ public sealed class SourceConsoleManagementService(
         CancellationToken cancellationToken)
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
-        var source = await sources.GetExactAsync(scopeRef, publisher, name, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
-        var origin = source.Configuration.Definition.Origin?.Url;
-        if (!Uri.TryCreate(origin, UriKind.Absolute, out var url))
-            throw new SourceValidationException("source_origin_missing", "A pasted-only Source has no HTTP(S) origin to refresh.");
-        return await sources.ImportUrlAsync(url, scopeRef, cancellationToken);
+        return await sources.RefreshExactAsync(
+            scopeRef, publisher, name, SourceRefreshTrigger.Manual, cancellationToken);
     }
 
     private async Task EnsurePlatformAdministratorAsync(Guid actorPrincipalId, CancellationToken cancellationToken)

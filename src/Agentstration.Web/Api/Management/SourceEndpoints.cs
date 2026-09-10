@@ -19,6 +19,8 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         sources.MapGet("", ListAsync);
         sources.MapGet("/{publisher}/{name}", GetAsync);
         sources.MapDelete("/{publisher}/{name}", DeleteAsync);
+        sources.MapPost("/{publisher}/{name}/refresh", RefreshSourceAsync);
+        sources.MapPut("/{publisher}/{name}/refresh-policy", UpdateRefreshPolicyAsync);
         sources.MapGet("/{publisher}/{name}/versions", ListVersionsAsync);
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}", GetVersionAsync);
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/verification", GetVersionVerificationAsync);
@@ -166,6 +168,41 @@ internal sealed class SourceEndpoints : IManagementEndpoint
                 ifMatch,
                 cancellationToken);
             return Results.NoContent();
+        });
+
+    private static Task<IResult> RefreshSourceAsync(
+        string publisher,
+        string name,
+        string? scopeRef,
+        HttpResponse response,
+        SourceManagementService service,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var scope = await ResolveScopeAsync(scopeRef, publisher, name, service, cancellationToken);
+            var result = await service.RefreshExactAsync(
+                scope, publisher, name, SourceRefreshTrigger.Manual, cancellationToken);
+            SetImportLocation(response, result);
+            return Results.Ok(result);
+        });
+
+    private static Task<IResult> UpdateRefreshPolicyAsync(
+        string publisher,
+        string name,
+        string? scopeRef,
+        UpdateSourceRefreshConfigurationRequest request,
+        HttpRequest httpRequest,
+        HttpResponse response,
+        SourceManagementService service,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var ifMatch = ManagementHttp.IfMatch(httpRequest)
+                ?? throw new ControlPlaneConcurrencyException("Updating Source refresh policy requires If-Match.");
+            var scope = await ResolveScopeAsync(scopeRef, publisher, name, service, cancellationToken);
+            var updated = await service.UpdateRefreshConfigurationExactAsync(
+                scope, publisher, name, request.Refresh, ifMatch, cancellationToken);
+            return ManagementHttp.ResourceResult(updated, response, StatusCodes.Status200OK);
         });
 
     private static Task<IResult> ListVersionsAsync(

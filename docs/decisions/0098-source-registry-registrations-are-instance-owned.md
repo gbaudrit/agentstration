@@ -1,4 +1,4 @@
-# ADR-0097 — Source registry registrations are instance-owned policies
+# ADR-0098 — Source registry registrations are instance-owned policies
 
 ## Status
 

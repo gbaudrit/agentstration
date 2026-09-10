@@ -12,6 +12,7 @@ public sealed record PutSourceRegistryRequest(SourceRegistryRegistrationProperti
 public sealed record SourceRegistryRefreshHistoryResponse(
     IReadOnlyList<SourceRegistryRefreshRecordResource> Value,
     int Count);
+public sealed record UpdateSourceRefreshConfigurationRequest(SourceRefreshConfiguration Refresh);
 
 public sealed record CreateSourceProviderRequest(
     string Name,

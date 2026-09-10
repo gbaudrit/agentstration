@@ -242,6 +242,11 @@ internal static class OpenApiSuccessResponseCatalog
                 return Json<SourceImportResult>(201, "Import a Source Version");
             if (path.EndsWith("/display-name", StringComparison.OrdinalIgnoreCase))
                 return Json<SourceConfigurationResource>(200, "Update a Source display name");
+            if (path.EndsWith("/refresh-policy", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceConfigurationResource>(200, "Update independent Source and Channel refresh policies");
+            if (path.EndsWith("/refresh", StringComparison.OrdinalIgnoreCase)
+                && !path.Contains("/channels/", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceImportResult>(200, "Refresh a Source definition from its retained origin");
             if (path.EndsWith("/bindings", StringComparison.OrdinalIgnoreCase))
                 return method == "PUT"
                     ? Json<SourceBindingConfigurationResult>(200, "Configure Source Provider bindings")

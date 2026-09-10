@@ -22,7 +22,8 @@ public static class ResourceScopePolicy
             or ResourceKinds.SourceRegistryObservedState or ResourceKinds.SourceRegistryRefreshRecord => InstanceOnly,
         ResourceKinds.Source or ResourceKinds.SourceVersion or ResourceKinds.SourceConfiguration
             or ResourceKinds.SourceObservedState or ResourceKinds.SourceImportRecord
-            or ResourceKinds.SourceChannelSnapshot or ResourceKinds.SourceChannelObservedState => InstanceTenantWorkspace,
+            or ResourceKinds.SourceChannelSnapshot or ResourceKinds.SourceChannelObservedState
+            or ResourceKinds.SourceChannelRefreshRecord => InstanceTenantWorkspace,
         ResourceKinds.Vault or ResourceKinds.Secret => InstanceTenantWorkspace,
         ResourceKinds.ToolProvider or ResourceKinds.Tool or ResourceKinds.ToolExecutionHook => WorkspaceOnly,
         ResourceKinds.Agent or ResourceKinds.AgentRevision or ResourceKinds.AgentDeployment or ResourceKinds.Trigger => WorkspaceOnly,

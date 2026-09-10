@@ -252,6 +252,34 @@ public sealed record SourceConfigurationProperties
     public required string DisplayName { get; init; }
     public SourceManifestOrigin? Origin { get; init; }
     public IReadOnlyList<SourceBindingSelection> Bindings { get; init; } = [];
+    public SourceRefreshConfiguration Refresh { get; init; } = new();
+}
+
+public sealed record SourceRefreshConfiguration
+{
+    public SourceRefreshPolicy Source { get; init; } = new();
+    public SourceRefreshPolicy Channels { get; init; } = new();
+    public IReadOnlyDictionary<string, SourceRefreshPolicy> ChannelOverrides { get; init; }
+        = new Dictionary<string, SourceRefreshPolicy>(StringComparer.Ordinal);
+}
+
+public sealed record SourceRefreshPolicy
+{
+    public bool Enabled { get; init; }
+    public int IntervalSeconds { get; init; } = 21_600;
+    public int TimeoutSeconds { get; init; } = 30;
+    public int MaximumAttempts { get; init; } = 3;
+    public int InitialBackoffSeconds { get; init; } = 30;
+    public int MaximumBackoffSeconds { get; init; } = 900;
+    public int JitterSeconds { get; init; } = 15;
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<SourceRefreshTrigger>))]
+public enum SourceRefreshTrigger
+{
+    [JsonStringEnumMemberName("import")] Import,
+    [JsonStringEnumMemberName("manual")] Manual,
+    [JsonStringEnumMemberName("scheduled")] Scheduled
 }
 
 public sealed record SourceBindingSelection
@@ -283,6 +311,8 @@ public sealed record SourceObservedProperties
     public DateTimeOffset? LastSuccessfulAt { get; init; }
     public string? ErrorCode { get; init; }
     public string? ErrorMessage { get; init; }
+    public SourceRefreshTrigger LastTrigger { get; init; } = SourceRefreshTrigger.Import;
+    public int ConsecutiveFailures { get; init; }
 }
 
 public sealed record SourceObservedResource : Resource
@@ -295,6 +325,7 @@ public sealed record SourceImportRecordProperties
     public required Guid SourceUid { get; init; }
     public required DateTimeOffset AttemptedAt { get; init; }
     public required SourceImportOutcome Outcome { get; init; }
+    public SourceRefreshTrigger Trigger { get; init; } = SourceRefreshTrigger.Import;
     public string? DeclaredVersion { get; init; }
     public string? ManifestDigest { get; init; }
     public Guid? SourceVersionUid { get; init; }
@@ -352,7 +383,8 @@ public enum SourceChannelRefreshOutcome
 {
     [JsonStringEnumMemberName("created")] Created,
     [JsonStringEnumMemberName("unchanged")] Unchanged,
-    [JsonStringEnumMemberName("failed")] Failed
+    [JsonStringEnumMemberName("failed")] Failed,
+    [JsonStringEnumMemberName("skipped")] Skipped
 }
 
 public sealed record SourceChannelObservedProperties
@@ -369,11 +401,32 @@ public sealed record SourceChannelObservedProperties
     public DateTimeOffset? LastSuccessfulAt { get; init; }
     public string? ErrorCode { get; init; }
     public string? ErrorMessage { get; init; }
+    public SourceRefreshTrigger LastTrigger { get; init; } = SourceRefreshTrigger.Manual;
+    public int ConsecutiveFailures { get; init; }
 }
 
 public sealed record SourceChannelObservedResource : Resource
 {
     public required SourceChannelObservedProperties Definition { get; init; }
+}
+
+public sealed record SourceChannelRefreshRecordProperties
+{
+    public required Guid SourceUid { get; init; }
+    public required Guid SourceVersionUid { get; init; }
+    public required string Channel { get; init; }
+    public required DateTimeOffset AttemptedAt { get; init; }
+    public required SourceChannelRefreshOutcome Outcome { get; init; }
+    public required SourceRefreshTrigger Trigger { get; init; }
+    public Guid? SnapshotUid { get; init; }
+    public string? ResolvedRevision { get; init; }
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+
+public sealed record SourceChannelRefreshRecordResource : Resource
+{
+    public required SourceChannelRefreshRecordProperties Definition { get; init; }
 }
 
 public sealed record SourceChannelSnapshotReference(
@@ -624,7 +677,10 @@ public sealed record ParsedSourceManifest(
 
 public sealed record RetrievedSourceManifest(
     string Content,
-    SourceManifestOrigin Origin);
+    SourceManifestOrigin Origin)
+{
+    public bool NotModified { get; init; }
+}
 
 public interface ISourceManifestReader
 {
@@ -634,6 +690,11 @@ public interface ISourceManifestReader
 public interface ISourceManifestRetriever
 {
     Task<RetrievedSourceManifest> RetrieveAsync(Uri source, CancellationToken cancellationToken);
+
+    Task<RetrievedSourceManifest> RetrieveAsync(
+        Uri source,
+        SourceManifestOrigin? previousOrigin,
+        CancellationToken cancellationToken) => RetrieveAsync(source, cancellationToken);
 }
 
 public sealed record SourceView(
