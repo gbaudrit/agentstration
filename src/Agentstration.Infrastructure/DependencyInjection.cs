@@ -7,6 +7,7 @@ using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.Events;
 using Agentstration.Infrastructure.Flows;
+using Agentstration.Infrastructure.Notifications;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Sources;
@@ -287,6 +288,13 @@ public static class DependencyInjection
         services.AddSingleton<ILocalWorkExecutionQueue>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
         services.AddSingleton<WorkItemService>();
         services.AddSingleton<WorkplaceService>();
+        services.AddSingleton<WorkNotificationMcpToolDefinitionProvider>();
+        services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<WorkNotificationMcpToolDefinitionProvider>());
+        services.AddSingleton<WorkNotificationMcpTool>();
+        services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<WorkNotificationMcpTool>());
+        services.AddSingleton<InternalMcpToolProjectionService>();
+        services.AddSingleton(provider => new Lazy<IEnumerable<IInternalMcpToolHandler>>(
+            () => provider.GetServices<IInternalMcpToolHandler>()));
         services.AddSingleton<WorkTaskDeletionService>();
         services.AddSingleton<IWorkTaskEventSink, WorkplaceProjectionSink>();
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)

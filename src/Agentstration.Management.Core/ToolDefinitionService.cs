@@ -13,7 +13,8 @@ public sealed class ToolDefinitionValidationException(string code, string messag
 public sealed class ToolDefinitionService(
     IControlPlaneStore store,
     IToolDefinitionFlowResolver flows,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IEnumerable<IInternalMcpToolDefinitionProvider>? internalTools = null)
 {
     public Task<IReadOnlyList<StoredResource<ToolDefinitionResource>>> ListAsync(CancellationToken cancellationToken) =>
         store.ListAllAsync<ToolDefinitionResource>(ResourceKinds.ToolDefinition, cancellationToken);
@@ -31,6 +32,8 @@ public sealed class ToolDefinitionService(
         CancellationToken cancellationToken)
     {
         Validate(resource);
+        if ((internalTools ?? []).Any(value => string.Equals(value.Definition.Name, resource.Name, StringComparison.Ordinal)))
+            throw new ToolDefinitionValidationException("tool_definition_name_reserved", $"ToolDefinition name '{resource.Name}' is reserved by an internal Agentstration MCP Tool.");
         var scopeRef = resource.ScopeRef!.Value;
         var resolved = await flows.ResolveAsync(scopeRef, resource.Namespace, resource.Definition.Flow, cancellationToken);
         ValidateContract(resource.Definition, resolved);
