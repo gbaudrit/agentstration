@@ -138,6 +138,9 @@ public static class AepServerExtensions
             endpoints.MapGet(AepPairingBrand.LightLockupPath, () =>
                 Results.Stream(AepPairingBrand.OpenLightLockup(), "image/png"))
                 .AllowAnonymous();
+            endpoints.MapGet(AepPairingBrand.CloseScriptPath, () =>
+                Results.Text(AepPairingBrand.CloseScript, "text/javascript; charset=utf-8"))
+                .AllowAnonymous();
             endpoints.MapGet(AepEnrollmentProtocol.PairingPath, (HttpRequest request, HttpResponse response) =>
             {
                 ProtectPairingResponse(response);
@@ -147,7 +150,9 @@ public static class AepServerExtensions
             {
                 ProtectPairingResponse(response);
                 var form = await request.ReadFormAsync(token);
-                var result = await pairing.PairAsync(form["code"].ToString(), request.Headers.AcceptLanguage, request.Query["theme"], token);
+                var theme = form["theme"].ToString();
+                if (string.IsNullOrWhiteSpace(theme)) theme = request.Query["theme"];
+                var result = await pairing.PairAsync(form["code"].ToString(), request.Headers.AcceptLanguage, theme, token);
                 return Results.Content(result.Html, "text/html; charset=utf-8", statusCode: result.Status);
             }).AllowAnonymous();
         }
@@ -162,7 +167,7 @@ public static class AepServerExtensions
     private static void ProtectPairingResponse(HttpResponse response)
     {
         response.Headers.CacheControl = "no-store";
-        response.Headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
+        response.Headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
         response.Headers["Referrer-Policy"] = "no-referrer";
     }
 
