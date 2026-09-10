@@ -106,14 +106,14 @@ public sealed class FlowDesignerReadOnlyTests
             StringAssert.Contains(rendered.Markup, "summary");
         });
 
-        rendered.Find("[data-testid='flow-input-source']").Change("input");
+        rendered.Find("[data-testid='flow-pass-transition-output']").Change(true);
         var call = Assert.IsInstanceOfType<FlowCallStepDefinition>(context.Services.GetRequiredService<FlowEditorStore>()
             .State.Resource!.Definition.Steps.Single(step => step.Type() == "flow"));
         Assert.AreEqual(JsonValueKind.String, call.InputMapping?.ValueKind);
-        Assert.AreEqual("${input}", call.InputMapping?.GetString());
-        StringAssert.Contains(rendered.Markup, "Initial Flow input");
+        Assert.AreEqual("${transition.output}", call.InputMapping?.GetString());
+        StringAssert.Contains(rendered.Markup, "Pass incoming transition output");
 
-        rendered.Find("[data-testid='flow-input-source']").Change(string.Empty);
+        rendered.Find("[data-testid='flow-pass-transition-output']").Change(false);
         call = Assert.IsInstanceOfType<FlowCallStepDefinition>(context.Services.GetRequiredService<FlowEditorStore>()
             .State.Resource!.Definition.Steps.Single(step => step.Type() == "flow"));
         Assert.AreEqual(JsonValueKind.Object, call.InputMapping?.ValueKind);
@@ -188,8 +188,8 @@ public sealed class FlowDesignerReadOnlyTests
         var canvas = rendered.FindComponent<FlowCanvas>();
         await rendered.InvokeAsync(() => canvas.Instance.SelectedStepChanged.InvokeAsync("deliver"));
 
-        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='flow-input-source']")));
-        rendered.Find("[data-testid='flow-input-source']").Change("transition");
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='flow-pass-transition-output']")));
+        rendered.Find("[data-testid='flow-pass-transition-output']").Change(true);
         var call = Assert.IsInstanceOfType<FlowCallStepDefinition>(context.Services.GetRequiredService<FlowEditorStore>()
             .State.Resource!.Definition.Steps.Single(step => step.Name == "deliver"));
         Assert.AreEqual("${transition.output}", call.InputMapping?.GetString());
