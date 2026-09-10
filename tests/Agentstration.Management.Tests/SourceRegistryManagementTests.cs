@@ -27,6 +27,8 @@ public sealed class SourceRegistryManagementTests
         var forbidden = await client.GetAsync("/api/sourceregistries");
         Assert.AreEqual(HttpStatusCode.Forbidden, forbidden.StatusCode);
         Assert.AreEqual(HttpStatusCode.Forbidden,
+            (await client.GetAsync("/api/sourceregistries/discovery")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Forbidden,
             (await client.GetAsync($"/api/sourceregistries/{SourceRegistryWellKnown.OfficialName}/trust")).StatusCode);
         var context = await client.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
         Assert.IsNotNull(context);
@@ -38,6 +40,9 @@ public sealed class SourceRegistryManagementTests
         var official = list!.Value.Single();
         Assert.AreEqual(SourceRegistryWellKnown.OfficialIndexUrl, official.Registration.Definition.IndexUrl.AbsoluteUri);
         Assert.AreEqual(SourceRegistryObservedStatus.NeverFetched, official.Observed.Definition.Status);
+        var discovery = await client.GetFromJsonAsync<SourceRegistryDiscoveryPage>("/api/sourceregistries/discovery");
+        Assert.IsNotNull(discovery);
+        Assert.AreEqual(0, discovery.Total);
         var originTrust = await client.GetFromJsonAsync<SourceRegistryOriginTrustView>(
             $"/api/sourceregistries/{SourceRegistryWellKnown.OfficialName}/trust");
         Assert.IsNotNull(originTrust);
@@ -774,6 +779,103 @@ public sealed class SourceRegistryManagementTests
         Assert.IsEmpty(fixture.Documents.Requests);
     }
 
+    [TestMethod]
+    public async Task DiscoveryMergesEqualObservationsAndReportsDigestConflicts()
+    {
+        using var fixture = new Fixture();
+        await AddAndRefreshAsync(fixture, "trusted-a", "https://a.example/v1",
+            SourceRegistryTrustPolicy.Trusted, SourceRegistryPublisherStatuses.Verified, RegistryManifestDigest);
+        await AddAndRefreshAsync(fixture, "trusted-b", "https://b.example/v1",
+            SourceRegistryTrustPolicy.Trusted, SourceRegistryPublisherStatuses.Verified, RegistryManifestDigest);
+
+        var merged = await fixture.Discovery.SearchAsync(new(), default);
+
+        Assert.AreEqual(1, merged.Total);
+        Assert.AreEqual(2, merged.Value.Single().Versions.Single().Observations.Count);
+        Assert.IsFalse(merged.Value.Single().Versions.Single().Conflicted);
+        Assert.IsTrue(merged.Value.Single().Versions.Single().Observations.All(value => value.IsCatalogLatest));
+
+        await AddAndRefreshAsync(fixture, "conflicting", "https://c.example/v1",
+            SourceRegistryTrustPolicy.Trusted, SourceRegistryPublisherStatuses.Verified,
+            "sha256:1111111111111111111111111111111111111111111111111111111111111111");
+        var conflict = await fixture.Discovery.SearchAsync(new() { ConflictsOnly = true }, default);
+
+        Assert.AreEqual(1, conflict.Total);
+        Assert.IsTrue(conflict.Value.Single().Versions.Single().Conflicted);
+        Assert.AreEqual(3, conflict.Value.Single().Versions.Single().Observations.Count);
+    }
+
+    [TestMethod]
+    public async Task ExactObservationImportIsIdempotentAndRetainsRegistryProvenance()
+    {
+        using var fixture = new Fixture();
+        var manifest = SourceManifest();
+        var digest = new SourceManifestReader().Read(manifest).Digest;
+        await AddAndRefreshAsync(fixture, "trusted", "https://registry.example/v1",
+            SourceRegistryTrustPolicy.Trusted, SourceRegistryPublisherStatuses.Verified, digest);
+        var selection = (await fixture.Discovery.SearchAsync(new(), default)).Value
+            .Single().Versions.Single().Observations.Single().Selection;
+        fixture.Documents.Enqueue(Document(
+            "https://registry.example/v1/sources/agentstration/sample/1/source.yaml",
+            "source.yaml", manifest, "\"manifest-1\""));
+
+        var imported = await fixture.Discovery.ImportAsync(selection, ResourceScopeRef.Instance, default);
+
+        Assert.AreEqual(SourceImportOutcome.Created, imported.Outcome);
+        Assert.AreEqual(selection, imported.Version.Definition.Origin!.Registry!.Selection);
+        Assert.IsTrue(string.Equals(digest,
+            imported.Version.Definition.Origin.Registry.ExpectedManifestDigest, StringComparison.Ordinal));
+        Assert.AreEqual("\"manifest-1\"", imported.Version.Definition.Origin.Registry.ManifestETag);
+
+        fixture.Documents.Enqueue(Document(
+            "https://registry.example/v1/sources/agentstration/sample/1/source.yaml",
+            "source.yaml", manifest, "\"manifest-1\""));
+        var repeated = await fixture.Discovery.ImportAsync(selection, ResourceScopeRef.Instance, default);
+
+        Assert.AreEqual(SourceImportOutcome.Unchanged, repeated.Outcome);
+        Assert.AreEqual(imported.Version.Uid, repeated.Version.Uid);
+        Assert.AreEqual(imported.Source.Configuration.ETag, repeated.Source.Configuration.ETag);
+        Assert.AreEqual(1, (await fixture.Sources.ListVersionsExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "sample", default)).Count);
+        var refresh = await Assert.ThrowsAsync<SourceValidationException>(() => fixture.Sources.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "sample", SourceRefreshTrigger.Manual, default));
+        Assert.AreEqual("source_registry_origin_requires_exact_import", refresh.Code);
+        Assert.AreEqual(2, fixture.Audit.Entries.Count(value =>
+            value.Action == SecurityAuditActions.SourceRegistrySourceImported
+            && value.Outcome == SecurityAuditOutcome.Succeeded));
+    }
+
+    [TestMethod]
+    public async Task ExactImportRejectsUntrustedConflictedAndEvictedSelections()
+    {
+        using var fixture = new Fixture();
+        await AddAndRefreshAsync(fixture, "untrusted", "https://untrusted.example/v1",
+            SourceRegistryTrustPolicy.Untrusted, SourceRegistryPublisherStatuses.Verified, RegistryManifestDigest);
+        var untrusted = (await fixture.Discovery.SearchAsync(new(), default)).Value
+            .Single().Versions.Single().Observations.Single().Selection;
+        var denied = await Assert.ThrowsAsync<SourceRegistryOperationException>(() =>
+            fixture.Discovery.ImportAsync(untrusted, ResourceScopeRef.Instance, default));
+        Assert.AreEqual("source_registry_selection_policy_denied", denied.Code);
+
+        using var conflictFixture = new Fixture();
+        await AddAndRefreshAsync(conflictFixture, "trusted-a", "https://a.example/v1",
+            SourceRegistryTrustPolicy.Trusted, SourceRegistryPublisherStatuses.Verified, RegistryManifestDigest);
+        await AddAndRefreshAsync(conflictFixture, "trusted-b", "https://b.example/v1",
+            SourceRegistryTrustPolicy.Trusted, SourceRegistryPublisherStatuses.Verified,
+            "sha256:1111111111111111111111111111111111111111111111111111111111111111");
+        var conflict = (await conflictFixture.Discovery.SearchAsync(new(), default)).Value
+            .Single().Versions.Single().Observations.First().Selection;
+        var rejected = await Assert.ThrowsAsync<SourceRegistryOperationException>(() =>
+            conflictFixture.Discovery.ImportAsync(conflict, ResourceScopeRef.Instance, default));
+        Assert.AreEqual("source_registry_selection_conflicted", rejected.Code);
+
+        var observation = (await conflictFixture.Service.GetAsync("trusted-a", default))!.Observed.Definition.Current!;
+        await conflictFixture.Cache.RemoveAsync(observation.Id, default);
+        var evicted = await Assert.ThrowsAsync<SourceRegistryOperationException>(() =>
+            conflictFixture.Discovery.ImportAsync(conflict, ResourceScopeRef.Instance, default));
+        Assert.AreEqual("source_registry_selection_evicted", evicted.Code);
+    }
+
     private static RetrievedSourceRegistryDocument Document(
         string url,
         string fileName,
@@ -783,6 +885,21 @@ public sealed class SourceRegistryManagementTests
         new(new(url), new(url), fileName, etag, lastModified, false, content);
 
     private const string RegistryManifestDigest = "sha256:4b2aa0694ee27bc2b53b49cd52e5c221838f9ceed304fbd15c42ae26e2273b7d";
+
+    private static string SourceManifest() => """
+        apiVersion: agentstration.io/v1
+        kind: SourceVersion
+        metadata:
+          name: sample
+        definition:
+          version: '1'
+          displayName: Sample
+          publisher:
+            name: agentstration
+          bindings: []
+          channels: []
+          catalogs: []
+        """;
 
     private static string RegistryJson(string name) => RegistryJson(name, SourceRegistryPublisherStatuses.Official, RegistryManifestDigest);
 
@@ -921,6 +1038,11 @@ public sealed class SourceRegistryManagementTests
                 timeProvider ?? TimeProvider.System,
                 NullLogger<SourceRegistryManagementService>.Instance);
             Trust = new(Store, Cache, new SourceRegistryReader(), timeProvider ?? TimeProvider.System);
+            var verification = new SourceVerificationService(new EmptyVerificationIndex(), [Trust]);
+            Sources = new(Store, context, new SourceManifestReader(), new NullSourceRetriever(),
+                timeProvider ?? TimeProvider.System, operations, verification);
+            Discovery = new(Store, Cache, new SourceRegistryIndexReader(), new SourceRegistryReader(), new SourceRegistryRuntimeReferenceResolver(),
+                Documents, Version, Trust, Sources, context, Audit, timeProvider ?? TimeProvider.System);
             Scheduler = new SourceRefreshScheduler(null!, null!, context, timeProvider ?? TimeProvider.System, Service);
         }
 
@@ -931,6 +1053,8 @@ public sealed class SourceRegistryManagementTests
         public FakeAudit Audit { get; }
         public SourceRegistryManagementService Service { get; }
         public SourceRegistryTrustEvaluationService Trust { get; }
+        public SourceManagementService Sources { get; }
+        public SourceRegistryDiscoveryService Discovery { get; }
         public SourceRefreshScheduler Scheduler { get; }
         public void EnqueueSuccessfulRefresh(string baseUrl, string name = "compatible")
         {
@@ -940,6 +1064,12 @@ public sealed class SourceRegistryManagementTests
             Documents.Enqueue(Document($"{baseUrl}/registry-compatible.json", "registry-compatible.json", shard));
         }
         public void Dispose() => systemScope.Dispose();
+    }
+
+    private sealed class NullSourceRetriever : ISourceManifestRetriever
+    {
+        public Task<RetrievedSourceManifest> RetrieveAsync(Uri source, CancellationToken cancellationToken) =>
+            Task.FromException<RetrievedSourceManifest>(new AssertFailedException("The registry import must use the registry retriever."));
     }
 
     private sealed class FakeDocuments : ISourceRegistryDocumentRetriever

@@ -133,3 +133,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 101. [ADR-0101 — Source registry refresh joins the shared local scheduling lifecycle](0101-source-registry-refresh-joins-the-shared-local-scheduling-lifecycle.md)
 102. [ADR-0102 — Source Providers follow hierarchical resource visibility](0102-source-providers-follow-hierarchical-resource-visibility.md)
 103. [ADR-0103 — Source registry trust evaluates independent evidence dimensions](0103-source-registry-trust-evaluates-independent-evidence-dimensions.md)
+104. [ADR-0104 — Source registry discovery imports retained observations exactly](0104-source-registry-discovery-imports-retained-observations.md)

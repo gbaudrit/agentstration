@@ -317,6 +317,10 @@ internal static class OpenApiSuccessResponseCatalog
         if (path.StartsWith("/api/sourceregistries", StringComparison.OrdinalIgnoreCase))
         {
             if (path == "/api/sourceregistries") return Json<ValueResponse<SourceRegistryRegistrationView>>(200, "List Source registries");
+            if (path == "/api/sourceregistries/discovery") return Json<SourceRegistryDiscoveryPage>(200, "Discover Sources across registries");
+            if (path == "/api/sourceregistries/discovery/publishers") return Json<ValueResponse<SourceRegistryDiscoveryPublisher>>(200, "List discovered publishers");
+            if (path == "/api/sourceregistries/discovery/imports") return Json<SourceImportResult>(200, "Import an exact registry observation");
+            if (path.Contains("/discovery/sources/", StringComparison.OrdinalIgnoreCase)) return Json<SourceRegistryDiscoverySource>(200, "Get discovered Source observations");
             if (path.Contains("/trust/sources/", StringComparison.OrdinalIgnoreCase)) return Json<SourceRegistrySourceTrustView>(200, "Evaluate Source registry evidence");
             if (path.EndsWith("/trust", StringComparison.OrdinalIgnoreCase)) return Json<SourceRegistryOriginTrustView>(200, "Evaluate Source registry origin trust");
             if (path.EndsWith("/refreshes", StringComparison.OrdinalIgnoreCase)) return Json<SourceRegistryRefreshHistoryResponse>(200, "List Source registry refreshes");

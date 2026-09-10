@@ -91,7 +91,8 @@ public sealed class SourceBootstrapProfileLoader(
                 catalog.Provenance.CatalogPath,
                 entry.Name,
                 entry.ResolvedLocale,
-                entry.ResolvedPath);
+                entry.ResolvedPath,
+                version.Definition.Origin?.Registry);
 
             return await MaterializeAsync(snapshot.Definition.Artifact, entry, provenance, cancellationToken);
         }

@@ -225,6 +225,14 @@ public sealed class DeclarativeBootstrapService(
                 source.Channel, source.ProviderRevision, source.SnapshotUid.ToString("D"), source.SnapshotDigest,
                 source.CatalogKind, source.CatalogName, source.CatalogPath, source.EntryName, source.Locale, source.Path
             ]);
+            if (source.Registry is { } registry)
+            {
+                lines.AddRange([
+                    registry.Selection.RegistrationUid.ToString("D"), registry.Selection.ObservationId.ToString("D"),
+                    registry.Selection.CatalogName, registry.IndexDigest, registry.CatalogDigest,
+                    registry.ExpectedManifestDigest, registry.FinalManifestUrl.AbsoluteUri
+                ]);
+            }
         }
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', lines)))).ToLowerInvariant();
     }

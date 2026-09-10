@@ -56,6 +56,39 @@ public sealed partial class SourceManagementService(
             cancellationToken);
     }
 
+    public async Task<SourceImportResult> ImportRegistryAsync(
+        string rawManifest,
+        SourceRegistryImportProvenance provenance,
+        ResourceScopeRef? scopeRef,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(provenance);
+        var targetScopeRef = scopeRef ?? scopeOperations.DefaultScopeRef(ResourceKinds.Source);
+        return await scopeOperations.WriteAsync(
+            ResourceKinds.Source,
+            targetScopeRef,
+            AuthorizationPermissions.ResourcesWrite,
+            async token =>
+            {
+                var parsed = manifests.Read(rawManifest);
+                if (!string.Equals(parsed.Manifest.Definition.Publisher.Name, provenance.Selection.Publisher, StringComparison.Ordinal)
+                    || !string.Equals(parsed.Manifest.Metadata.Name, provenance.Selection.SourceName, StringComparison.Ordinal)
+                    || !string.Equals(parsed.Manifest.Definition.Version, provenance.Selection.Version, StringComparison.Ordinal))
+                    throw Invalid("source_registry_manifest_identity_mismatch", "The retrieved SourceVersion manifest does not match the selected registry identity and version.");
+                if (!string.Equals(parsed.Digest, provenance.ExpectedManifestDigest, StringComparison.Ordinal))
+                    throw Invalid("source_registry_manifest_digest_mismatch", "The retrieved SourceVersion manifest does not match the selected registry canonical digest.");
+                var origin = new SourceManifestOrigin
+                {
+                    Url = provenance.FinalManifestUrl.AbsoluteUri,
+                    ETag = provenance.ManifestETag,
+                    LastModified = provenance.ManifestLastModified,
+                    Registry = provenance
+                };
+                return await ImportCoreAsync(parsed, origin, targetScopeRef, SourceRefreshTrigger.Import, token);
+            },
+            cancellationToken);
+    }
+
     public async Task<SourceImportResult> RefreshExactAsync(
         ResourceScopeRef scopeRef,
         string publisher,
@@ -412,7 +445,7 @@ public sealed partial class SourceManagementService(
             }, null, true, cancellationToken);
         }
 
-        else if (origin is not null && configuration.Value.Definition.Origin != origin)
+        else if (origin is not null && !EquivalentOrigin(configuration.Value.Definition.Origin, origin))
         {
             configuration = await store.PutExactAsync(scopeRef, configuration.Value with
             {
@@ -530,6 +563,8 @@ public sealed partial class SourceManagementService(
         if (configuration.Value.Definition.Origin is not { } origin
             || !Uri.TryCreate(origin.Url, UriKind.Absolute, out var uri))
             throw Invalid("source_origin_missing", "The Source has no associated HTTP(S) origin.");
+        if (origin.Registry is not null)
+            throw Invalid("source_registry_origin_requires_exact_import", "A Source imported from a registry can only change through another exact registry observation import.");
 
         RetrievedSourceManifest retrieved;
         try
@@ -628,6 +663,16 @@ public sealed partial class SourceManagementService(
 
     private static ResourceScopeRef RequireScope(Resource resource) =>
         resource.ScopeRef ?? throw new InvalidOperationException($"Resource '{resource.Address}' has no ownership scope.");
+
+    private static bool EquivalentOrigin(SourceManifestOrigin? current, SourceManifestOrigin candidate)
+    {
+        if (current is null) return false;
+        if (current.Registry is null || candidate.Registry is null) return current == candidate;
+        return current.Registry.Selection == candidate.Registry.Selection
+            && string.Equals(current.Registry.ExpectedManifestDigest,
+                candidate.Registry.ExpectedManifestDigest, StringComparison.Ordinal)
+            && current.Registry.FinalManifestUrl == candidate.Registry.FinalManifestUrl;
+    }
 
     private static void ValidatePortableName(string value, string field)
     {

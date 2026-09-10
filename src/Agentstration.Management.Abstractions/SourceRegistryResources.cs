@@ -121,6 +121,7 @@ public interface ISourceRegistryReader
 public interface ISourceRegistryReferenceResolver
 {
     string ResolveRegistryPublicationPath(Uri baseUri, string registryUrl);
+    Uri ResolveManifestUrl(Uri finalIndexUrl, string manifestUrl);
 }
 
 public static class SourceRegistryWellKnown
@@ -387,6 +388,7 @@ public sealed record SourceRegistryRefreshRecordProperties
     public int RetryCount { get; init; }
     public long DurationMilliseconds { get; init; }
     public string? CorrelationId { get; init; }
+    public SourceRegistryObservation? Observation { get; init; }
 }
 
 public sealed record SourceRegistryRefreshRecordResource : Resource
@@ -435,4 +437,99 @@ public interface ISourceRegistryCacheStore
     Task StoreAsync(SourceRegistryCachedPublication publication, CancellationToken cancellationToken);
     Task<SourceRegistryCachedPublication?> GetAsync(Guid observationId, CancellationToken cancellationToken);
     Task RemoveAsync(Guid observationId, CancellationToken cancellationToken);
+}
+
+public sealed record SourceRegistryObservationSelection(
+    Guid RegistrationUid,
+    Guid ObservationId,
+    string CatalogName,
+    string Publisher,
+    string SourceName,
+    string Version);
+
+public sealed record SourceRegistryDiscoveryQuery
+{
+    public string? Search { get; init; }
+    public string? Publisher { get; init; }
+    public string? Registry { get; init; }
+    public bool CompatibleOnly { get; init; } = true;
+    public bool FreshOnly { get; init; }
+    public bool ConflictsOnly { get; init; }
+    public SourceRegistryTrustPolicy? TrustPolicy { get; init; }
+    public SourceRegistryPublisherStatus? PublisherStatus { get; init; }
+    public SourceVerificationStatus? VerificationStatus { get; init; }
+    public int Skip { get; init; }
+    public int Take { get; init; } = 50;
+}
+
+public sealed record SourceRegistryDiscoveryObservation
+{
+    public required SourceRegistryObservationSelection Selection { get; init; }
+    public required string RegistrationName { get; init; }
+    public required string RegistrationDisplayName { get; init; }
+    public required SourceRegistryTrustPolicy TrustPolicy { get; init; }
+    public required SourceRegistryObservedStatus Freshness { get; init; }
+    public required SourceRegistryOriginClassification OriginClassification { get; init; }
+    public required string IndexDigest { get; init; }
+    public required string CatalogDigest { get; init; }
+    public required SourceCompatibility Compatibility { get; init; }
+    public required DateTimeOffset FetchedAt { get; init; }
+    public required SourceRegistryPublisher Publisher { get; init; }
+    public required string ManifestUrl { get; init; }
+    public required string ManifestDigest { get; init; }
+    public bool IsCatalogLatest { get; init; }
+}
+
+public sealed record SourceRegistryDiscoveryVersion(
+    string Version,
+    bool Conflicted,
+    SourceVerificationStatus VerificationStatus,
+    string VerificationReasonCode,
+    IReadOnlyList<SourceRegistryDiscoveryObservation> Observations);
+
+public sealed record SourceRegistryDiscoverySource(
+    string Publisher,
+    string Name,
+    string? DisplayName,
+    string? Description,
+    IReadOnlyList<SourceRegistryDiscoveryVersion> Versions);
+
+public sealed record SourceRegistryDiscoveryPage(
+    IReadOnlyList<SourceRegistryDiscoverySource> Value,
+    int Count,
+    int Total,
+    int Skip,
+    int Take);
+
+public sealed record SourceRegistryDiscoveryPublisher(
+    string Name,
+    string? DisplayName,
+    string? Url,
+    SourceRegistryPublisherStatus EffectiveStatus,
+    int SourceCount,
+    int ObservationCount);
+
+public sealed record SourceRegistryImportProvenance
+{
+    public required SourceRegistryObservationSelection Selection { get; init; }
+    public required string RegistrationName { get; init; }
+    public required Uri ConfiguredIndexUrl { get; init; }
+    public required Uri RequestedIndexUrl { get; init; }
+    public required Uri FinalIndexUrl { get; init; }
+    public required string IndexDigest { get; init; }
+    public required string CatalogDigest { get; init; }
+    public required string CatalogRegistryUrl { get; init; }
+    public required SourceRegistryCatalogObservation Catalog { get; init; }
+    public required DateTimeOffset FetchedAt { get; init; }
+    public string? IndexETag { get; init; }
+    public DateTimeOffset? IndexLastModified { get; init; }
+    public required SourceRegistryPublisher Publisher { get; init; }
+    public required SourceRegistrySource Source { get; init; }
+    public required SourceRegistryVersion Version { get; init; }
+    public required string ManifestUrl { get; init; }
+    public required Uri FinalManifestUrl { get; init; }
+    public string? ManifestETag { get; init; }
+    public DateTimeOffset? ManifestLastModified { get; init; }
+    public required string ExpectedManifestDigest { get; init; }
+    public required SourceRegistrySourceTrustView Trust { get; init; }
 }
