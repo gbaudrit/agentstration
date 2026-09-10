@@ -145,6 +145,7 @@ public sealed partial class ModelManagementApiTests
         Assert.IsNotNull(delivery);
         Assert.AreEqual("notification-delivery", delivery.Value.FlowId.Value);
         Assert.AreEqual("1.0.0", delivery.Value.FlowVersion);
+        Assert.AreEqual(arguments.GetRawText(), delivery.Value.Input.GetRawText());
         var notification = (await factory.Services.GetRequiredService<IWorkplaceRepository>()
             .ListNotificationsAsync(workspaceId, null, default)).Single();
         Assert.AreEqual(delivery.Value.Id, notification.SourceRunId);

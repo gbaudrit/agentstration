@@ -113,15 +113,21 @@ else
                                 @foreach (var version in flowVersions) { <option value="@version.Version">@version.Version</option> }
                             </select></label>
                         }
-                        @if (SelectedFlowVersion?.InputSchema is { ValueKind: JsonValueKind.Object } inputSchema
-                            && inputSchema.TryGetProperty("properties", out var inputProperties)
-                            && inputProperties.ValueKind == JsonValueKind.Object)
+                        @if (SelectedFlowVersion is not null)
                         {
                             <fieldset class="flow-mapping-editor"><legend>@T("InputMapping")</legend>
-                                @foreach (var property in inputProperties.EnumerateObject())
+                                <label><input data-testid="flow-pass-complete-input" type="checkbox" disabled="@ReadOnly" checked="@PassesCompleteInput(flowCall.InputMapping)" @onchange="UpdateFlowPassthroughAsync" />@T("PassCompleteInput")</label>
+                                <small>@T("PassCompleteInputHelp")</small>
+                                @if (!PassesCompleteInput(flowCall.InputMapping)
+                                    && SelectedFlowVersion.InputSchema is { ValueKind: JsonValueKind.Object } inputSchema
+                                    && inputSchema.TryGetProperty("properties", out var inputProperties)
+                                    && inputProperties.ValueKind == JsonValueKind.Object)
                                 {
-                                    var propertyName = property.Name;
-                                    <label>@propertyName<input disabled="@ReadOnly" value="@MappingValue(flowCall.InputMapping, propertyName)" @onchange="e => UpdateFlowMappingAsync(propertyName, e)" /></label>
+                                    @foreach (var property in inputProperties.EnumerateObject())
+                                    {
+                                        var propertyName = property.Name;
+                                        <label>@propertyName<input disabled="@ReadOnly" value="@MappingValue(flowCall.InputMapping, propertyName)" @onchange="e => UpdateFlowMappingAsync(propertyName, e)" /></label>
+                                    }
                                 }
                             </fieldset>
                         }
@@ -395,6 +401,15 @@ else
         mapping[propertyName] = JsonSerializer.SerializeToElement(Text(e));
         return UpdateSelectedAsync(call with { InputMapping = JsonSerializer.SerializeToElement(mapping) });
     }
+    private Task UpdateFlowPassthroughAsync(ChangeEventArgs e)
+    {
+        if (SelectedStep is not FlowCallStepDefinition call) return Task.CompletedTask;
+        var enabled = e.Value is bool value && value;
+        var mapping = enabled
+            ? JsonSerializer.SerializeToElement("${input}")
+            : JsonSerializer.SerializeToElement(new { });
+        return UpdateSelectedAsync(call with { InputMapping = mapping });
+    }
     private Task UpdateToolTargetAsync(ChangeEventArgs e)
     {
         if (SelectedStep is not ToolFlowStepDefinition tool || !TryParseToolKey(Text(e), out var target)) return Task.CompletedTask;
@@ -456,6 +471,8 @@ else
     private static string MappingValue(JsonElement? mapping, string propertyName) => mapping is { ValueKind: JsonValueKind.Object } value && value.TryGetProperty(propertyName, out var property)
         ? property.ValueKind == JsonValueKind.String ? property.GetString() ?? string.Empty : property.GetRawText()
         : string.Empty;
+    private static bool PassesCompleteInput(JsonElement? mapping) => mapping is { ValueKind: JsonValueKind.String } value
+        && string.Equals(value.GetString(), "${input}", StringComparison.Ordinal);
     private static string Text(ChangeEventArgs e) => e.Value?.ToString()?.Trim() ?? string.Empty;
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
     private static string NextVersion(string value) { var parts = value.Split('.'); return parts.Length == 3 && int.TryParse(parts[2], out var patch) ? $"{parts[0]}.{parts[1]}.{patch + 1}" : "1.0.0"; }

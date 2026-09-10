@@ -209,6 +209,8 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
     private static void ValidateMappingAgainstSchema(FlowCallStepDefinition step, JsonElement? schema, List<FlowValidationIssue> issues)
     {
         if (schema is not { ValueKind: JsonValueKind.Object } value) return;
+        if (step.InputMapping is { ValueKind: JsonValueKind.String } mapping
+            && string.Equals(mapping.GetString(), "${input}", StringComparison.Ordinal)) return;
         ValidateMappingAgainstSchema(step.Name, "inputMapping", step.InputMapping, value, "flow_input_mapping", issues);
     }
 

@@ -105,6 +105,19 @@ public sealed class FlowDesignerReadOnlyTests
             StringAssert.Contains(rendered.Markup, "article");
             StringAssert.Contains(rendered.Markup, "summary");
         });
+
+        rendered.Find("[data-testid='flow-pass-complete-input']").Change(true);
+        var call = Assert.IsInstanceOfType<FlowCallStepDefinition>(context.Services.GetRequiredService<FlowEditorStore>()
+            .State.Resource!.Definition.Steps.Single(step => step.Type() == "flow"));
+        Assert.AreEqual(JsonValueKind.String, call.InputMapping?.ValueKind);
+        Assert.AreEqual("${input}", call.InputMapping?.GetString());
+        StringAssert.Contains(rendered.Markup, "Pass the complete input");
+
+        rendered.Find("[data-testid='flow-pass-complete-input']").Change(false);
+        call = Assert.IsInstanceOfType<FlowCallStepDefinition>(context.Services.GetRequiredService<FlowEditorStore>()
+            .State.Resource!.Definition.Steps.Single(step => step.Type() == "flow"));
+        Assert.AreEqual(JsonValueKind.Object, call.InputMapping?.ValueKind);
+        rendered.WaitForAssertion(() => StringAssert.Contains(rendered.Markup, "article"));
     }
 
     [TestMethod]

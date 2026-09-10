@@ -24,7 +24,7 @@
   <data name="Agent"><value>Agent</value></data><data name="RouterOutput"><value>Sortie du routeur</value></data>
   <data name="CalledFlow"><value>Flow appelé</value></data><data name="VersionStrategy"><value>Stratégie de version</value></data>
   <data name="VersionStrategy.Active"><value>Version active</value></data><data name="VersionStrategy.Exact"><value>Version exacte</value></data>
-  <data name="ExactVersion"><value>Version exacte</value></data><data name="InputMapping"><value>Mappage d’entrée</value></data><data name="AvailableOutput"><value>Propriétés de sortie disponibles</value></data>
+  <data name="ExactVersion"><value>Version exacte</value></data><data name="InputMapping"><value>Mappage d’entrée</value></data><data name="PassCompleteInput"><value>Transmettre l’entrée complète</value></data><data name="PassCompleteInputHelp"><value>Le Flow enfant reçoit l’entrée complète du parent sans modification.</value></data><data name="AvailableOutput"><value>Propriétés de sortie disponibles</value></data>
   <data name="CalledTool"><value>Tool appelé</value></data><data name="ArgumentsMapping"><value>Mappage des arguments</value></data>
   <data name="ToolDisabled"><value>Ce Tool est désactivé.</value></data><data name="ToolUnavailable"><value>Ce Tool est indisponible auprès de son fournisseur.</value></data><data name="ToolApprovalRequired"><value>Ce Tool nécessite une approbation avant son appel.</value></data>
   <data name="LoadAgents"><value>Charger les agents</value></data><data name="AddAll"><value>Tout ajouter</value></data>
