@@ -261,7 +261,9 @@ public sealed class SourceTests
             ("profiles/solution-discovery/fr-FR/10-recording.yaml", RecordingResource("accueil-fr")),
             ("profiles/solution-discovery/en-US/profile.yaml", BootstrapProfileWithoutBindings("instance")),
             ("profiles/solution-discovery/en-US/10-recording.yaml", RecordingResource("welcome-en")));
-        var imported = await fixture.Service.ImportYamlAsync(ManifestWithCatalog("1"), default);
+        var manifest = ManifestWithCatalog("1");
+        var imported = await fixture.Service.ImportRegistryAsync(
+            manifest, RegistryProvenance(manifest), ResourceScopeRef.Instance, default);
         _ = await fixture.Bindings.ConfigureAsync(
             "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
         var refreshed = await fixture.Snapshots.RefreshExactAsync(
@@ -320,6 +322,8 @@ public sealed class SourceTests
         Assert.AreEqual("solution-discovery", provenance.EntryName);
         Assert.AreEqual("fr-FR", provenance.Locale);
         Assert.AreEqual("profiles/solution-discovery/fr-FR", provenance.Path);
+        Assert.IsNotNull(provenance.Registry);
+        Assert.AreEqual(imported.Version.Definition.Origin!.Registry!.Selection, provenance.Registry.Selection);
         CollectionAssert.AreEqual(new[] { "accueil-fr" }, handler.Applied.ToArray());
 
         var mismatch = await Assert.ThrowsExactlyAsync<DeclarativeBootstrapException>(() =>
@@ -413,8 +417,9 @@ public sealed class SourceTests
         fixture.Materializer.Content = CatalogArchiveBytes(
             ("catalogs/packs.yaml", Encoding.UTF8.GetBytes(PackCatalog())),
             ("catalogs/packs/who-am-i.zip", pack));
-        var imported = await fixture.Service.ImportYamlAsync(
-            ManifestWithCatalog("1", SourceCatalogKinds.Pack, "catalogs/packs.yaml"), default);
+        var manifest = ManifestWithCatalog("1", SourceCatalogKinds.Pack, "catalogs/packs.yaml");
+        var imported = await fixture.Service.ImportRegistryAsync(
+            manifest, RegistryProvenance(manifest), ResourceScopeRef.Instance, default);
         _ = await fixture.Bindings.ConfigureAsync(
             "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
         var first = await fixture.Snapshots.RefreshExactAsync(
@@ -430,6 +435,7 @@ public sealed class SourceTests
         Assert.AreEqual(imported.Version.Definition.ManifestDigest, preview.Pin.ManifestDigest);
         Assert.AreEqual(first.Snapshot.Uid, preview.Pin.SnapshotUid);
         StringAssert.StartsWith(preview.Pin.PackArchiveDigest, "sha256:");
+        Assert.IsNotNull(preview.Pin.Registry);
         StringAssert.StartsWith(preview.PreviewDigest, "sha256:");
 
         var replacementPreview = await fixture.SourcePacks.PreviewAsync(
@@ -458,6 +464,7 @@ public sealed class SourceTests
         Assert.AreEqual("official-packs", provenance.CatalogName);
         Assert.AreEqual("who-am-i", provenance.EntryName);
         Assert.AreEqual("catalogs/packs/who-am-i.zip", provenance.EntryPath);
+        Assert.AreEqual(imported.Version.Definition.Origin!.Registry!.Selection, provenance.Registry!.Selection);
         Assert.AreEqual("welcome", installed.Value.Definition.ManagedResources.Single().Name);
 
         await fixture.Service.DeleteExactAsync(
@@ -1326,6 +1333,79 @@ public sealed class SourceTests
         string kind = SourceCatalogKinds.Bootstrap,
         string path = "catalog.yaml") => Manifest(version, "Published name", includeChannel: true)
         .Replace("catalogs: []", $"catalogs:\n    - kind: {kind}\n      path: {path}", StringComparison.Ordinal);
+
+    private static SourceRegistryImportProvenance RegistryProvenance(string manifest)
+    {
+        var parsed = new SourceManifestReader().Read(manifest);
+        var registrationUid = Guid.NewGuid();
+        var observationId = Guid.NewGuid();
+        var selection = new SourceRegistryObservationSelection(
+            registrationUid, observationId, "agentstration-0.2", "agentstration", "official-samples", "1");
+        var evidence = new SourceRegistryEvidence
+        {
+            EvidenceSource = "registry",
+            RegistrationUid = registrationUid,
+            RegistrationName = "trusted",
+            ObservationId = observationId,
+            IndexDigest = "sha256:index",
+            CatalogName = selection.CatalogName,
+            CatalogDigest = "sha256:catalog",
+            ObservedAt = DateTimeOffset.UnixEpoch
+        };
+        var publisher = new SourceRegistryPublisher
+        {
+            Name = "agentstration",
+            Status = SourceRegistryPublisherStatuses.Verified
+        };
+        var version = new SourceRegistryVersion
+        {
+            Version = "1",
+            ManifestUrl = "sources/agentstration/official-samples/1/source.yaml",
+            ManifestDigest = parsed.Digest
+        };
+        var source = new SourceRegistrySource
+        {
+            Publisher = "agentstration",
+            Name = "official-samples",
+            Latest = "1",
+            Versions = [version]
+        };
+        var publisherTrust = new SourceRegistryPublisherTrustView(
+            "agentstration", SourceRegistryPublisherStatus.Verified,
+            "source_registry_publisher_verified", DateTimeOffset.UnixEpoch, []);
+        return new SourceRegistryImportProvenance
+        {
+            Selection = selection,
+            RegistrationName = "trusted",
+            ConfiguredIndexUrl = new("https://registry.example/v1/index.json"),
+            RequestedIndexUrl = new("https://registry.example/v1/index.json"),
+            FinalIndexUrl = new("https://registry.example/v1/index.json"),
+            IndexDigest = evidence.IndexDigest,
+            CatalogDigest = evidence.CatalogDigest,
+            CatalogRegistryUrl = "registry-agentstration-0.2.json",
+            Catalog = new SourceRegistryCatalogObservation
+            {
+                Name = selection.CatalogName,
+                Compatibility = new SourceCompatibility
+                {
+                    Agentstration = new SourceCompatibilityBounds { MinVersion = "0.2.0-alpha.1" }
+                },
+                RegistryUrl = "registry-agentstration-0.2.json",
+                RegistryDigest = evidence.CatalogDigest,
+                CachePath = "registry-agentstration-0.2.json"
+            },
+            FetchedAt = DateTimeOffset.UnixEpoch,
+            Publisher = publisher,
+            Source = source,
+            Version = version,
+            ManifestUrl = version.ManifestUrl,
+            FinalManifestUrl = new("https://registry.example/v1/sources/agentstration/official-samples/1/source.yaml"),
+            ExpectedManifestDigest = parsed.Digest,
+            Trust = new SourceRegistrySourceTrustView(
+                publisherTrust, SourceVerificationStatus.Verified, "source_definition_verified_by_registry",
+                parsed.Digest, DateTimeOffset.UnixEpoch, [])
+        };
+    }
 
     private static string BootstrapCatalog() => """
         apiVersion: agentstration.io/v1

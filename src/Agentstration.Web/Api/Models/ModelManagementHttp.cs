@@ -34,6 +34,8 @@ internal static class ModelManagementHttp
             var status = exception.Code == "source_registry_disabled" ? 409 : exception.Unavailable ? 503 : 422;
             return Problem(exception.Code.Replace('_', '-'), "Source registry operation failed", status, exception.Message);
         }
+        catch (SourceValidationException exception) { return Problem(exception.Code.Replace('_', '-'), "Invalid Source", 422, exception.Message); }
+        catch (SourceVersionConflictException exception) { return Problem("source-version-conflict", "Source version conflict", 409, exception.Message); }
         catch (ExtensionRegistrationNotFoundException exception) { return Problem("extension-registration-not-found", "Extension registration not found", 404, exception.Message); }
         catch (ExtensionRegistrationInUseException exception) { return Problem("extension-registration-in-use", "Extension registration in use", 409, exception.Message); }
         catch (ExtensionRegistrationValidationException exception) { return Problem("extension-registration-invalid", "Invalid extension registration", 422, exception.Message); }

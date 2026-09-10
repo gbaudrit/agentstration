@@ -78,7 +78,8 @@ public sealed record BootstrapSourceProvenance(
     string CatalogPath,
     string EntryName,
     string Locale,
-    string Path);
+    string Path,
+    SourceRegistryImportProvenance? Registry = null);
 
 public sealed record BootstrapBindingSelection(
     string Profile,

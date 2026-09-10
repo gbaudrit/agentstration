@@ -153,6 +153,7 @@ public sealed record SourceManifestOrigin
     public required string Url { get; init; }
     public string? ETag { get; init; }
     public DateTimeOffset? LastModified { get; init; }
+    public SourceRegistryImportProvenance? Registry { get; init; }
 }
 
 public static class SourceVerificationKinds
@@ -638,7 +639,8 @@ public sealed record SourcePackInstallationPin(
     string CatalogPath,
     string EntryName,
     string EntryPath,
-    string PackArchiveDigest);
+    string PackArchiveDigest,
+    SourceRegistryImportProvenance? Registry = null);
 
 public sealed record SourcePackInstallationPreview(
     PackInstallationPreview Pack,

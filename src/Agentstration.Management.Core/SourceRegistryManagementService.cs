@@ -607,7 +607,8 @@ public sealed partial class SourceRegistryManagementService(
                 Trigger = trigger,
                 RetryCount = retryCount,
                 DurationMilliseconds = durationMilliseconds,
-                CorrelationId = correlationId
+                CorrelationId = correlationId,
+                Observation = observation
             }
         }, cancellationToken);
 
