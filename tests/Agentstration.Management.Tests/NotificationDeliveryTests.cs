@@ -183,19 +183,19 @@ public sealed partial class ModelManagementApiTests
         string flow,
         ResourceScopeRef scope,
         (JsonElement Input, JsonElement Output) schemas) => new()
-    {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.ToolDefinition,
-        Metadata = new ResourceMetadata { Name = name },
-        ScopeRef = scope,
-        Definition = new ToolDefinitionProperties
         {
-            DisplayName = name,
-            InputSchema = schemas.Input.Clone(),
-            OutputSchema = schemas.Output.Clone(),
-            Flow = new ToolDefinitionFlowTarget { Name = flow, UseActiveVersion = true }
-        }
-    };
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.ToolDefinition,
+            Metadata = new ResourceMetadata { Name = name },
+            ScopeRef = scope,
+            Definition = new ToolDefinitionProperties
+            {
+                DisplayName = name,
+                InputSchema = schemas.Input.Clone(),
+                OutputSchema = schemas.Output.Clone(),
+                Flow = new ToolDefinitionFlowTarget { Name = flow, UseActiveVersion = true }
+            }
+        };
 
     private static FlowGraphDefinition DeliveryGraph(JsonElement input, JsonElement output, string? toolResourceId = null) => new()
     {
