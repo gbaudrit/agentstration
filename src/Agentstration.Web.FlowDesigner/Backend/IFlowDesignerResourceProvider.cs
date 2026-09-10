@@ -6,6 +6,15 @@ namespace Agentstration.Web.FlowDesigner.Backend;
 public sealed record FlowDesignerAgent(string Name, string DisplayName);
 public sealed record FlowDesignerFlow(string Name, string DisplayName, ResourceNamespace Namespace, string? ActiveVersion);
 public sealed record FlowDesignerFlowVersion(string Version, JsonElement? InputSchema, JsonElement? OutputSchema);
+public sealed record FlowDesignerTool(
+    string Name,
+    string DisplayName,
+    ResourceNamespace Namespace,
+    JsonElement InputSchema,
+    JsonElement? OutputSchema,
+    bool Enabled,
+    bool Available,
+    bool RequiresApproval);
 
 public interface IFlowDesignerResourceProvider
 {
@@ -14,4 +23,6 @@ public interface IFlowDesignerResourceProvider
         Task.FromResult<IReadOnlyList<FlowDesignerFlow>>([]);
     Task<IReadOnlyList<FlowDesignerFlowVersion>> GetFlowVersionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<FlowDesignerFlowVersion>>([]);
+    Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<FlowDesignerTool>>([]);
 }

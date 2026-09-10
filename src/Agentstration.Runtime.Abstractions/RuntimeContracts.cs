@@ -268,13 +268,16 @@ public sealed record ToolExecutionContext
     public required string ToolCallId { get; init; }
     public required string InvocationId { get; init; }
     public required string ToolId { get; init; }
+    public ResourceNamespace? ToolNamespace { get; init; }
     public required string ToolName { get; init; }
     public string? ToolProviderId { get; init; }
+    public ResourceNamespace? ToolProviderNamespace { get; init; }
     public string? ExternalToolId { get; init; }
     public Guid? TenantId { get; init; }
     public WorkspaceId? WorkspaceId { get; init; }
     public Guid? PrincipalId { get; init; }
     public string? RunId { get; init; }
+    public string? FlowStepId { get; init; }
     public string? AgentId { get; init; }
     public long? AgentVersion { get; init; }
     public long? AgentGeneration { get; init; }

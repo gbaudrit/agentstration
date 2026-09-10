@@ -60,6 +60,32 @@ public sealed partial class FlowRunService
                         ? await EvaluateExpressionAsync(transform.Expression!, context, runToken)
                         : transform.Mapping is null ? JsonSerializer.SerializeToElement(new { }) : await ResolveJsonAsync(transform.Mapping.Value, context, runToken);
                     eventName = "completed"; break;
+                case ToolFlowStepDefinition tool:
+                    var arguments = tool.ArgumentsMapping is null
+                        ? JsonSerializer.SerializeToElement(new { })
+                        : await ResolveJsonAsync(tool.ArgumentsMapping.Value, context, runToken);
+                    try
+                    {
+                        output = await toolExecutor.ExecuteAsync(new FlowToolExecutionRequest(
+                            stored.Value.Scope,
+                            stored.Value.Id,
+                            stored.Value.FlowId,
+                            step.Name,
+                            stored.Value.Steps.Single(item => item.StepName == step.Name).Attempt,
+                            stored.Value.CorrelationId!,
+                            tool.Tool,
+                            arguments), runToken);
+                        eventName = "completed";
+                    }
+                    catch (Exception exception) when (exception is not OperationCanceledException)
+                    {
+                        output = JsonSerializer.SerializeToElement(new { error = exception.Message });
+                        eventName = "failed";
+                        stepError = exception is FlowValidationException validation
+                            ? new FlowRunError(validation.Code, "The Tool step failed.", validation.Message)
+                            : new FlowRunError("tool_step_failed", "The Tool step failed.", exception.Message);
+                    }
+                    break;
                 case OutputFlowStepDefinition terminal:
                     output = terminal.OutputMapping is null ? outputs.Values.LastOrDefault(value => value is not null)?.Clone() : await ResolveJsonAsync(terminal.OutputMapping.Value, context, runToken);
                     finalOutput = output; eventName = "completed"; break;
@@ -187,6 +213,6 @@ public sealed partial class FlowRunService
         return value.Clone();
     }
 
-    private static JsonElement? StepDeclaredInput(FlowStepDefinition step) => step switch { AgentFlowStepDefinition agent => agent.InputMapping?.Clone(), FlowCallStepDefinition flow => flow.InputMapping?.Clone(), TransformFlowStepDefinition transform => transform.Mapping?.Clone(), OutputFlowStepDefinition output => output.OutputMapping?.Clone(), _ => null };
+    private static JsonElement? StepDeclaredInput(FlowStepDefinition step) => step switch { AgentFlowStepDefinition agent => agent.InputMapping?.Clone(), FlowCallStepDefinition flow => flow.InputMapping?.Clone(), ToolFlowStepDefinition tool => tool.ArgumentsMapping?.Clone(), TransformFlowStepDefinition transform => transform.Mapping?.Clone(), OutputFlowStepDefinition output => output.OutputMapping?.Clone(), _ => null };
 }
 

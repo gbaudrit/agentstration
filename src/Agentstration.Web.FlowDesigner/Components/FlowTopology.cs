@@ -444,6 +444,7 @@ public static class FlowTopologyProjector
         ConditionFlowStepDefinition condition => condition.Mode,
         TransformFlowStepDefinition transform => transform.Mode,
         FlowCallStepDefinition flow => flow.Flow.VersionStrategy == FlowCallVersionStrategy.Exact ? $"{flow.Flow.ResourceId} · {flow.Flow.Version}" : $"{flow.Flow.ResourceId} · active",
+        ToolFlowStepDefinition tool => tool.Tool.ResourceId,
         FailureFlowStepDefinition failure => failure.Code,
         _ => null
     };

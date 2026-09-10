@@ -528,11 +528,12 @@ public sealed class ToolExecutionLifecycleTests
                 [new FlowToolExecutionEventSink(repository, published)],
                 new AdvancingTimeProvider());
 
-            await pipeline.ExecuteAsync(Context() with { OwnerKind = ToolExecutionOwnerKind.FlowRun }, default);
+            await pipeline.ExecuteAsync(Context() with { OwnerKind = ToolExecutionOwnerKind.FlowRun, FlowStepId = "notify" }, default);
 
             var events = await repository.ListRunEventsAsync(Workspace, "run-1", 0, default);
             Assert.HasCount(3, events);
             Assert.AreEqual(FlowRunEventType.ToolCallStarted, events[0].Type);
+            Assert.AreEqual("notify", events[0].StepId);
             Assert.AreEqual(FlowRunEventType.ToolCallGovernanceEvaluated, events[1].Type);
             Assert.AreEqual(FlowRunEventType.ToolCallCompleted, events[2].Type);
             Assert.HasCount(3, published.Events);

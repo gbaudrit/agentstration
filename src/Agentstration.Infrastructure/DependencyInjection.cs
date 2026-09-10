@@ -271,6 +271,7 @@ public static class DependencyInjection
         services.AddSingleton<IToolExecutionHookResolver, ManagementToolExecutionHookResolver>();
         services.AddSingleton<IToolGovernanceAuditReader, ToolGovernanceAuditReader>();
         services.AddSingleton<IToolExecutionPipeline, ToolExecutionPipeline>();
+        services.AddSingleton<IFlowToolExecutor, ManagedFlowToolExecutor>();
         services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
             services.AddPostgreSqlWorkPlane(storageOptions.ConnectionString!);

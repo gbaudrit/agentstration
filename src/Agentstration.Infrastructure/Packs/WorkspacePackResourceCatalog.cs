@@ -333,6 +333,14 @@ public sealed class WorkspacePackResourceCatalog(
             {
                 yield return IncludeDependency(flowCall.Flow.ResourceId, flowCall.Flow.Namespace ?? flow.Id.Namespace, ResourceKinds.Flow, "graphFlow");
             }
+            else if (step is ToolFlowStepDefinition tool)
+            {
+                yield return UnsupportedDependency(
+                    new ResourceReference(tool.Tool.ResourceId, @namespace: tool.Tool.Namespace),
+                    flow.Id.Namespace,
+                    ResourceKinds.Tool,
+                    "graphTool");
+            }
         }
     }
 
