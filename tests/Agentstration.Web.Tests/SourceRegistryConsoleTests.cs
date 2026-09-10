@@ -7,8 +7,8 @@ using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
-using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
@@ -154,8 +154,12 @@ public sealed class SourceRegistryConsoleTests
         var uid = Guid.NewGuid();
         var registration = new SourceRegistryRegistrationResource
         {
-            Uid = uid, ApiVersion = ManagementApiVersions.CoreV1, Kind = ResourceKinds.SourceRegistryRegistration,
-            Metadata = new() { Name = name }, ScopeRef = ResourceScopeRef.Instance, ETag = "\"etag\"",
+            Uid = uid,
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.SourceRegistryRegistration,
+            Metadata = new() { Name = name },
+            ScopeRef = ResourceScopeRef.Instance,
+            ETag = "\"etag\"",
             Definition = new()
             {
                 DisplayName = displayName,
@@ -170,9 +174,19 @@ public sealed class SourceRegistryConsoleTests
         };
         var observed = new SourceRegistryObservedStateResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1, Kind = ResourceKinds.SourceRegistryObservedState,
-            Metadata = new() { Name = name }, ScopeRef = ResourceScopeRef.Instance,
-            Definition = new() { RegistrationUid = uid, Status = status, LastAttemptedAt = ObservedAt, LastSuccessfulRefreshAt = status == SourceRegistryObservedStatus.Fresh ? ObservedAt : null, LastOutcome = status == SourceRegistryObservedStatus.Fresh ? SourceRegistryRefreshOutcome.Succeeded : SourceRegistryRefreshOutcome.Unavailable, LastErrorMessage = status == SourceRegistryObservedStatus.RefreshFailed ? "Connection failed" : null }
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.SourceRegistryObservedState,
+            Metadata = new() { Name = name },
+            ScopeRef = ResourceScopeRef.Instance,
+            Definition = new()
+            {
+                RegistrationUid = uid,
+                Status = status,
+                LastAttemptedAt = ObservedAt,
+                LastSuccessfulRefreshAt = status == SourceRegistryObservedStatus.Fresh ? ObservedAt : null,
+                LastOutcome = status == SourceRegistryObservedStatus.Fresh ? SourceRegistryRefreshOutcome.Succeeded : SourceRegistryRefreshOutcome.Unavailable,
+                LastErrorMessage = status == SourceRegistryObservedStatus.RefreshFailed ? "Connection failed" : null
+            }
         };
         return new(registration, observed);
     }
@@ -180,20 +194,29 @@ public sealed class SourceRegistryConsoleTests
     private static SourceRegistryDiscoveryObservation Observation() => new()
     {
         Selection = new(Guid.Parse("11111111-1111-1111-1111-111111111111"), Guid.Parse("22222222-2222-2222-2222-222222222222"), "agentstration-0.2", "contoso", "assistants", "2026.09"),
-        RegistrationName = "contoso", RegistrationDisplayName = "Contoso Registry",
-        TrustPolicy = SourceRegistryTrustPolicy.Trusted, Freshness = SourceRegistryObservedStatus.Fresh,
+        RegistrationName = "contoso",
+        RegistrationDisplayName = "Contoso Registry",
+        TrustPolicy = SourceRegistryTrustPolicy.Trusted,
+        Freshness = SourceRegistryObservedStatus.Fresh,
         OriginClassification = SourceRegistryOriginClassification.External,
-        IndexDigest = "sha256:index", CatalogDigest = "sha256:catalog", Compatibility = new(),
+        IndexDigest = "sha256:index",
+        CatalogDigest = "sha256:catalog",
+        Compatibility = new(),
         FetchedAt = ObservedAt,
         Publisher = new() { Name = "contoso", DisplayName = "Contoso", Status = SourceRegistryPublisherStatuses.Verified },
-        ManifestUrl = "sources/contoso-assistants-2026.09.yaml", ManifestDigest = "sha256:manifest", IsCatalogLatest = true
+        ManifestUrl = "sources/contoso-assistants-2026.09.yaml",
+        ManifestDigest = "sha256:manifest",
+        IsCatalogLatest = true
     };
 
     private static readonly DateTimeOffset ObservedAt = new(2026, 9, 10, 10, 0, 0, TimeSpan.Zero);
 
     private static SecretResponse Secret(string name, string displayName, ResourceScopeRef scopeRef) => new(new SecretResource
     {
-        ApiVersion = ManagementApiVersions.CoreV1, Kind = ResourceKinds.Secret, Metadata = new() { Name = name }, ScopeRef = scopeRef,
+        ApiVersion = ManagementApiVersions.CoreV1,
+        Kind = ResourceKinds.Secret,
+        Metadata = new() { Name = name },
+        ScopeRef = scopeRef,
         Definition = new() { DisplayName = displayName, Vault = new("local", scopeRef), Key = name }
     }, "Configured", true);
 
