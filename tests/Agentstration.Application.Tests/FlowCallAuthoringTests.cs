@@ -68,7 +68,9 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
-    public async Task FlowCallValidationAcceptsCompleteInputPassthrough()
+    [DataRow("${input}")]
+    [DataRow("${transition.output}")]
+    public async Task FlowCallValidationAcceptsCompleteInputPassthrough(string inputMapping)
     {
         var inputSchema = JsonSerializer.SerializeToElement(new
         {
@@ -81,7 +83,7 @@ public sealed partial class FlowTests
         {
             Name = "analyze",
             Flow = new("analysis"),
-            InputMapping = JsonSerializer.SerializeToElement("${input}")
+            InputMapping = JsonSerializer.SerializeToElement(inputMapping)
         });
 
         var result = await new FlowGraphValidator(resolver).ValidateAsync(

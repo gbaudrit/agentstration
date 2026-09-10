@@ -116,9 +116,13 @@ else
                         @if (SelectedFlowVersion is not null)
                         {
                             <fieldset class="flow-mapping-editor"><legend>@T("InputMapping")</legend>
-                                <label><input data-testid="flow-pass-complete-input" type="checkbox" disabled="@ReadOnly" checked="@PassesCompleteInput(flowCall.InputMapping)" @onchange="UpdateFlowPassthroughAsync" />@T("PassCompleteInput")</label>
-                                <small>@T("PassCompleteInputHelp")</small>
-                                @if (!PassesCompleteInput(flowCall.InputMapping)
+                                <label>@T("InputSource")<select data-testid="flow-input-source" disabled="@ReadOnly" value="@CompleteInputSource(flowCall)" @onchange="UpdateFlowInputSourceAsync">
+                                    <option value="">@T("ExplicitPropertyMapping")</option>
+                                    <option value="input">@T("InitialFlowInput")</option>
+                                    <option value="transition">@T("IncomingTransitionOutput")</option>
+                                </select></label>
+                                <small>@T("InputSourceHelp")</small>
+                                @if (!UsesCompleteInputSource(flowCall)
                                     && SelectedFlowVersion.InputSchema is { ValueKind: JsonValueKind.Object } inputSchema
                                     && inputSchema.TryGetProperty("properties", out var inputProperties)
                                     && inputProperties.ValueKind == JsonValueKind.Object)
@@ -406,13 +410,16 @@ else
         mapping[propertyName] = JsonSerializer.SerializeToElement(Text(e));
         return UpdateSelectedAsync(call with { InputMapping = JsonSerializer.SerializeToElement(mapping) });
     }
-    private Task UpdateFlowPassthroughAsync(ChangeEventArgs e)
+    private Task UpdateFlowInputSourceAsync(ChangeEventArgs e)
     {
         if (SelectedStep is not FlowCallStepDefinition call) return Task.CompletedTask;
-        var enabled = e.Value is bool value && value;
-        var mapping = enabled
-            ? JsonSerializer.SerializeToElement("${input}")
-            : JsonSerializer.SerializeToElement(new { });
+        var source = Text(e);
+        var mapping = source switch
+        {
+            "input" => JsonSerializer.SerializeToElement("${input}"),
+            "transition" => JsonSerializer.SerializeToElement("${transition.output}"),
+            _ => JsonSerializer.SerializeToElement(new { })
+        };
         return UpdateSelectedAsync(call with { InputMapping = mapping });
     }
     private Task UpdateToolTargetAsync(ChangeEventArgs e)
@@ -476,8 +483,15 @@ else
     private static string MappingValue(JsonElement? mapping, string propertyName) => mapping is { ValueKind: JsonValueKind.Object } value && value.TryGetProperty(propertyName, out var property)
         ? property.ValueKind == JsonValueKind.String ? property.GetString() ?? string.Empty : property.GetRawText()
         : string.Empty;
-    private static bool PassesCompleteInput(JsonElement? mapping) => mapping is { ValueKind: JsonValueKind.String } value
-        && string.Equals(value.GetString(), "${input}", StringComparison.Ordinal);
+    private static string CompleteInputSource(FlowCallStepDefinition call)
+    {
+        if (call.InputMapping is not { ValueKind: JsonValueKind.String } mapping) return string.Empty;
+        var expression = mapping.GetString();
+        if (string.Equals(expression, "${input}", StringComparison.Ordinal)) return "input";
+        if (string.Equals(expression, "${transition.output}", StringComparison.Ordinal)) return "transition";
+        return string.Empty;
+    }
+    private static bool UsesCompleteInputSource(FlowCallStepDefinition call) => !string.IsNullOrEmpty(CompleteInputSource(call));
     private static string Text(ChangeEventArgs e) => e.Value?.ToString()?.Trim() ?? string.Empty;
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
     private static string NextVersion(string value) { var parts = value.Split('.'); return parts.Length == 3 && int.TryParse(parts[2], out var patch) ? $"{parts[0]}.{parts[1]}.{patch + 1}" : "1.0.0"; }

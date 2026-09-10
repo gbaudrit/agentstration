@@ -106,14 +106,14 @@ public sealed class FlowDesignerReadOnlyTests
             StringAssert.Contains(rendered.Markup, "summary");
         });
 
-        rendered.Find("[data-testid='flow-pass-complete-input']").Change(true);
+        rendered.Find("[data-testid='flow-input-source']").Change("input");
         var call = Assert.IsInstanceOfType<FlowCallStepDefinition>(context.Services.GetRequiredService<FlowEditorStore>()
             .State.Resource!.Definition.Steps.Single(step => step.Type() == "flow"));
         Assert.AreEqual(JsonValueKind.String, call.InputMapping?.ValueKind);
         Assert.AreEqual("${input}", call.InputMapping?.GetString());
-        StringAssert.Contains(rendered.Markup, "Pass the complete input");
+        StringAssert.Contains(rendered.Markup, "Initial Flow input");
 
-        rendered.Find("[data-testid='flow-pass-complete-input']").Change(false);
+        rendered.Find("[data-testid='flow-input-source']").Change(string.Empty);
         call = Assert.IsInstanceOfType<FlowCallStepDefinition>(context.Services.GetRequiredService<FlowEditorStore>()
             .State.Resource!.Definition.Steps.Single(step => step.Type() == "flow"));
         Assert.AreEqual(JsonValueKind.Object, call.InputMapping?.ValueKind);
@@ -161,6 +161,7 @@ public sealed class FlowDesignerReadOnlyTests
             Steps =
             [
                 new InputFlowStepDefinition { Name = "input" },
+                new AgentFlowStepDefinition { Name = "analyze", DisplayName = "Analyze news", Agent = new("news-agent") },
                 new FlowCallStepDefinition
                 {
                     Name = "deliver",
@@ -168,7 +169,11 @@ public sealed class FlowDesignerReadOnlyTests
                     InputMapping = JsonSerializer.SerializeToElement(new { })
                 }
             ],
-            Transitions = [new("input-deliver", "input", "completed", "deliver")]
+            Transitions =
+            [
+                new("input-analyze", "input", "completed", "analyze"),
+                new("analyze-deliver", "analyze", "completed", "deliver")
+            ]
         };
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
         context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
@@ -183,11 +188,11 @@ public sealed class FlowDesignerReadOnlyTests
         var canvas = rendered.FindComponent<FlowCanvas>();
         await rendered.InvokeAsync(() => canvas.Instance.SelectedStepChanged.InvokeAsync("deliver"));
 
-        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='flow-pass-complete-input']")));
-        rendered.Find("[data-testid='flow-pass-complete-input']").Change(true);
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='flow-input-source']")));
+        rendered.Find("[data-testid='flow-input-source']").Change("transition");
         var call = Assert.IsInstanceOfType<FlowCallStepDefinition>(context.Services.GetRequiredService<FlowEditorStore>()
             .State.Resource!.Definition.Steps.Single(step => step.Name == "deliver"));
-        Assert.AreEqual("${input}", call.InputMapping?.GetString());
+        Assert.AreEqual("${transition.output}", call.InputMapping?.GetString());
     }
 
     private sealed class ResourceProviderStub : IFlowDesignerResourceProvider
