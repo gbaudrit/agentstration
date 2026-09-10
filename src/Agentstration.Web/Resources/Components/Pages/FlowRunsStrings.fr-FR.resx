@@ -26,6 +26,7 @@
   <data name="Status.Pending"><value>En attente</value></data>
   <data name="Status.Running"><value>En cours</value></data>
   <data name="Status.WaitingForInput"><value>En attente d’une saisie</value></data>
+  <data name="Status.WaitingForChild"><value>En attente d’un Flow enfant</value></data>
   <data name="Status.Succeeded"><value>Réussie</value></data>
   <data name="Status.Failed"><value>Échouée</value></data>
   <data name="Status.Cancelled"><value>Annulée</value></data>

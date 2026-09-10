@@ -172,7 +172,7 @@ public sealed class PlatformDashboardService(
     public static UiStatus ToStatus(string status) => status.ToLowerInvariant() switch
     {
         "operational" or "healthy" or "ready" or "active" or "running" or "completed" => UiStatus.Success,
-        "attention required" or "degraded" or "waiting" or "needsinput" or "actionrequired" or "paused" or "queued" or "draft" => UiStatus.Warning,
+        "attention required" or "degraded" or "waiting" or "waitingforinput" or "waitingforchild" or "needsinput" or "actionrequired" or "paused" or "queued" or "draft" => UiStatus.Warning,
         "partially unavailable" or "failed" or "error" or "unavailable" or "cancelled" or "canceled" => UiStatus.Danger,
         "no active deployments" => UiStatus.Info,
         _ => UiStatus.Neutral
