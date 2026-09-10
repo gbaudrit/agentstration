@@ -109,6 +109,7 @@ public sealed class DependencyInjectionCompositionTests
             configuration,
             string.Equals(aiProvider, "Managed", StringComparison.Ordinal));
         services.AddAgentstrationModelManagement();
+        services.AddScoped<ILocalAccountPrincipalResolver, StubLocalAccountPrincipalResolver>();
         return services;
     }
 
@@ -128,4 +129,12 @@ public sealed class DependencyInjectionCompositionTests
 
     private static int Count<TService>(IServiceCollection services) =>
         services.Count(descriptor => descriptor.ServiceType == typeof(TService));
+
+    private sealed class StubLocalAccountPrincipalResolver : ILocalAccountPrincipalResolver
+    {
+        public Task<Principal?> ResolveByUserNameAsync(
+            string userName,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<Principal?>(null);
+    }
 }
