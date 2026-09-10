@@ -150,6 +150,46 @@ public sealed class FlowDesignerReadOnlyTests
         });
     }
 
+    [TestMethod]
+    public async Task ExistingFlowCardLoadsItsContractWhenSelectedAndPersistsPassthrough()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = new BunitContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new FlowCallStepDefinition
+                {
+                    Name = "deliver",
+                    Flow = new("analysis", Namespace: new("pack.news")),
+                    InputMapping = JsonSerializer.SerializeToElement(new { })
+                }
+            ],
+            Transitions = [new("input-deliver", "input", "completed", "deliver")]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "parent"));
+        var canvas = rendered.FindComponent<FlowCanvas>();
+        await rendered.InvokeAsync(() => canvas.Instance.SelectedStepChanged.InvokeAsync("deliver"));
+
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='flow-pass-complete-input']")));
+        rendered.Find("[data-testid='flow-pass-complete-input']").Change(true);
+        var call = Assert.IsInstanceOfType<FlowCallStepDefinition>(context.Services.GetRequiredService<FlowEditorStore>()
+            .State.Resource!.Definition.Steps.Single(step => step.Name == "deliver"));
+        Assert.AreEqual("${input}", call.InputMapping?.GetString());
+    }
+
     private sealed class ResourceProviderStub : IFlowDesignerResourceProvider
     {
         public Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(CancellationToken cancellationToken) =>
@@ -175,8 +215,12 @@ public sealed class FlowDesignerReadOnlyTests
     private sealed class BackendStub : IFlowDesignerBackend
     {
         private readonly bool readOnly;
-        private readonly FlowDraftResponse draft = CreateDraft();
-        public BackendStub(bool readOnly = true) => this.readOnly = readOnly;
+        private readonly FlowDraftResponse draft;
+        public BackendStub(bool readOnly = true, FlowGraphDefinition? definition = null)
+        {
+            this.readOnly = readOnly;
+            draft = CreateDraft(definition);
+        }
         public int SaveCount { get; private set; }
         public FlowDesignerTarget? LoadedTarget { get; private set; }
         public Task<FlowDesignerLoadResult> LoadAsync(FlowDesignerTarget target, CancellationToken cancellationToken)
@@ -192,10 +236,10 @@ public sealed class FlowDesignerReadOnlyTests
         public Task<FlowVersionResponse> PublishAsync(FlowDesignerTarget target, PublishFlowDraftRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowRun> RunDraftAsync(FlowDesignerTarget target, CreateFlowRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
 
-        private static FlowDraftResponse CreateDraft()
+        private static FlowDraftResponse CreateDraft(FlowGraphDefinition? definition = null)
         {
             var now = DateTimeOffset.Parse("2026-08-05T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
-            var definition = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] };
+            definition ??= new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] };
             return new(new FlowDraft { WorkspaceId = WorkspaceId, Id = "draft", FlowId = new("sample"), DisplayName = "Sample", Definition = definition, CreatedAt = now, UpdatedAt = now }, "\"etag\"");
         }
 

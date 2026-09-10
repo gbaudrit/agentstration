@@ -69,7 +69,7 @@ else
 
             <div class="flow-canvas-wrap">
                 <FlowCanvas @ref="canvas" Document="Editor.State.Diagram" Revision="Editor.State.LocalRevision" FitRevision="layoutRevision"
-                            IsReadOnly="ReadOnly" SelectedStepChanged="Editor.SelectStep"
+                            IsReadOnly="ReadOnly" SelectedStepChanged="SelectStepAsync"
                             StepMoved="MoveStepAsync" TransitionCreated="CreateTransitionAsync"
                             TransitionRemoved="RemoveTransitionAsync" />
             </div>
@@ -321,6 +321,11 @@ else
     private Task MoveStepAsync(MoveStepCommand command) => DispatchAsync(command);
     private Task CreateTransitionAsync(FlowTransitionDefinition transition) => DispatchAsync(new AddTransitionCommand(transition));
     private Task RemoveTransitionAsync(string id) => DispatchAsync(new RemoveTransitionCommand(id));
+    private async Task SelectStepAsync(string? name)
+    {
+        Editor.SelectStep(name);
+        if (SelectedStep is FlowCallStepDefinition call) await LoadFlowVersionsAsync(call.Flow);
+    }
     private async Task LayoutAsync(bool vertical)
     {
         await DispatchAsync(new ApplyAutoLayoutCommand(vertical));
