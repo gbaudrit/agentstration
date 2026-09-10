@@ -17,6 +17,9 @@ public static class SourceRegistryEndpoints
         registries.MapDelete("/{registryName}", DeleteAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         registries.MapPost("/{registryName}/refresh", RefreshAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         registries.MapGet("/{registryName}/refreshes", ListRefreshesAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        registries.MapGet("/{registryName}/trust", GetOriginTrustAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        registries.MapGet("/trust/sources/{publisher}/{sourceName}/versions/{version}", GetSourceTrustAsync)
+            .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
     }
 
     private static Task<IResult> ListAsync(SourceRegistryManagementService service, CancellationToken cancellationToken) =>
@@ -99,4 +102,25 @@ public static class SourceRegistryEndpoints
             var records = await service.ListRefreshesAsync(registryName, take ?? 50, cancellationToken);
             return Results.Ok(new SourceRegistryRefreshHistoryResponse(records, records.Count));
         });
+
+    private static Task<IResult> GetOriginTrustAsync(
+        string registryName,
+        SourceRegistryTrustEvaluationService trust,
+        CancellationToken cancellationToken) =>
+        ModelManagementHttp.ExecuteAsync(async () =>
+        {
+            var result = await trust.EvaluateOriginAsync(registryName, cancellationToken)
+                ?? throw new SourceRegistryNotFoundException(registryName);
+            return Results.Ok(result);
+        });
+
+    private static Task<IResult> GetSourceTrustAsync(
+        string publisher,
+        string sourceName,
+        string version,
+        string? manifestDigest,
+        SourceRegistryTrustEvaluationService trust,
+        CancellationToken cancellationToken) =>
+        ModelManagementHttp.ExecuteAsync(async () => Results.Ok(
+            await trust.EvaluateSourceAsync(publisher, sourceName, version, manifestDigest, cancellationToken)));
 }
