@@ -1,4 +1,4 @@
-# ADR-0096 — Provider-specific Compose owns inference services
+# ADR-0099 — Provider-specific Compose owns inference services
 
 ## Status
 
