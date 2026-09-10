@@ -1,4 +1,4 @@
-# ADR-0101 — Source Providers follow hierarchical resource visibility
+# ADR-0102 — Source Providers follow hierarchical resource visibility
 
 ## Status
 

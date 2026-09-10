@@ -192,6 +192,12 @@ public sealed record SourceRegistryRefreshPolicy
 {
     public bool PeriodicEnabled { get; init; }
     public TimeSpan Interval { get; init; } = TimeSpan.FromHours(24);
+    public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(30);
+    public int MaximumAttempts { get; init; } = 3;
+    public TimeSpan InitialBackoff { get; init; } = TimeSpan.FromSeconds(30);
+    public TimeSpan MaximumBackoff { get; init; } = TimeSpan.FromMinutes(15);
+    public TimeSpan Jitter { get; init; } = TimeSpan.FromSeconds(15);
+    public TimeSpan StaleAfter { get; init; } = TimeSpan.FromDays(2);
 }
 
 public sealed record SourceRegistryCachePolicy
@@ -227,7 +233,15 @@ public enum SourceRegistryObservedStatus
     [JsonStringEnumMemberName("refreshFailed")] RefreshFailed,
     [JsonStringEnumMemberName("invalid")] Invalid,
     [JsonStringEnumMemberName("noCompatibleCatalog")] NoCompatibleCatalog,
-    [JsonStringEnumMemberName("policyDenied")] PolicyDenied
+    [JsonStringEnumMemberName("policyDenied")] PolicyDenied,
+    [JsonStringEnumMemberName("recovered")] Recovered
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<SourceRegistryRefreshTrigger>))]
+public enum SourceRegistryRefreshTrigger
+{
+    [JsonStringEnumMemberName("manual")] Manual,
+    [JsonStringEnumMemberName("scheduled")] Scheduled
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<SourceRegistryRefreshOutcome>))]
@@ -274,6 +288,11 @@ public sealed record SourceRegistryObservedStateProperties
     public string? LastErrorCode { get; init; }
     public string? LastErrorMessage { get; init; }
     public SourceRegistryObservation? Current { get; init; }
+    public SourceRegistryRefreshTrigger LastTrigger { get; init; } = SourceRegistryRefreshTrigger.Manual;
+    public int ConsecutiveFailures { get; init; }
+    public int LastRetryCount { get; init; }
+    public long LastDurationMilliseconds { get; init; }
+    public DateTimeOffset? LastRecoveredAt { get; init; }
 }
 
 public sealed record SourceRegistryObservedStateResource : Resource
@@ -291,6 +310,10 @@ public sealed record SourceRegistryRefreshRecordProperties
     public string? ErrorMessage { get; init; }
     public Guid? ObservationId { get; init; }
     public string? IndexDigest { get; init; }
+    public SourceRegistryRefreshTrigger Trigger { get; init; } = SourceRegistryRefreshTrigger.Manual;
+    public int RetryCount { get; init; }
+    public long DurationMilliseconds { get; init; }
+    public string? CorrelationId { get; init; }
 }
 
 public sealed record SourceRegistryRefreshRecordResource : Resource
@@ -338,4 +361,5 @@ public interface ISourceRegistryCacheStore
 {
     Task StoreAsync(SourceRegistryCachedPublication publication, CancellationToken cancellationToken);
     Task<SourceRegistryCachedPublication?> GetAsync(Guid observationId, CancellationToken cancellationToken);
+    Task RemoveAsync(Guid observationId, CancellationToken cancellationToken);
 }

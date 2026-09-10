@@ -4,7 +4,7 @@
 
 Accepted
 
-The instance-ownership restriction is superseded by [ADR-0101](0101-source-providers-follow-hierarchical-resource-visibility.md).
+The instance-ownership restriction is superseded by [ADR-0102](0102-source-providers-follow-hierarchical-resource-visibility.md).
 
 ## Context
 
