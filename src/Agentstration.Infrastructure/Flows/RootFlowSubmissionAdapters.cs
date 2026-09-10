@@ -35,6 +35,7 @@ public sealed class RootFlowRunGateway(FlowRunService runs) : IRootFlowRunGatewa
             request.CorrelationId,
             request.Input,
             request.WorkItemId.Value.ToString("D"),
+            request.ResolvedFromActiveReference,
             request.ParentFlowRunId,
             request.InteractionId,
             request.WorkTaskId,

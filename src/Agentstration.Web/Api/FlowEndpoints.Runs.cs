@@ -86,6 +86,23 @@ public static partial class FlowEndpoints
         return Results.Ok(stored.Value);
     });
 
+    private static Task<IResult> GetRunCausalityAsync(
+        string runId,
+        int? skip,
+        int? top,
+        FlowRunService service,
+        ICurrentRequestContext requestContext,
+        CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var actualSkip = Math.Max(0, skip ?? 0);
+        var actualTop = Math.Clamp(top ?? 25, 1, 100);
+        var page = await service.GetCausalityAsync(runId, actualSkip, actualTop, CurrentScope(requestContext), token);
+        var next = page.HasMore
+            ? $"/api/flowRuns/{Uri.EscapeDataString(runId)}/causality?skip={actualSkip + page.Items.Count}&top={actualTop}"
+            : null;
+        return Results.Ok(new FlowRunCausalityPageResponse(page.Origin, page.Items, page.TotalCount, next));
+    });
+
     private static Task<IResult> DeleteRunAsync(string runId, HttpRequest request, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
         var expectedETag = request.Headers.IfMatch.FirstOrDefault()

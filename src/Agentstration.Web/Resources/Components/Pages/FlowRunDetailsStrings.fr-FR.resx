@@ -159,4 +159,20 @@
   <data name="Origin.Mcp"><value>MCP</value></data>
   <data name="Origin.Agent"><value>Agent</value></data>
   <data name="Origin.Console"><value>Console</value></data>
+  <data name="Causality"><value>Causalité</value></data>
+  <data name="CausalityAriaLabel"><value>Arbre causal d’exécution du Flow Run</value></data>
+  <data name="CausalityLoading"><value>Chargement du diagnostic causal…</value></data>
+  <data name="CausalityUnavailable"><value>Le diagnostic causal est temporairement indisponible.</value></data>
+  <data name="InvocationOrigin"><value>Origine de l’appel</value></data>
+  <data name="FlowRuns"><value>Flow Runs</value></data>
+  <data name="Origin"><value>Origine</value></data>
+  <data name="Trigger"><value>Déclencheur</value></data>
+  <data name="Caller"><value>Appelant</value></data>
+  <data name="ResolvedFromActive"><value>Résolu depuis la version active</value></data>
+  <data name="ExactReference"><value>Référence de version exacte</value></data>
+  <data name="CalledByStep"><value>Appelé par l’étape {0}</value></data>
+  <data name="AgentExecutions"><value>Exécutions d’agents</value></data>
+  <data name="ToolCalls"><value>Appels de tools</value></data>
+  <data name="LogicalCall"><value>Appel logique</value></data>
+  <data name="GovernanceEvaluations"><value>Gouvernance ({0})</value></data>
 </root>

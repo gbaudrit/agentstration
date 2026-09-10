@@ -89,6 +89,60 @@ public sealed class FlowDetailsDesignerTests
     }
 
     [TestMethod]
+    public void FlowRunCausalityTabShowsVersionsAttemptsAndGovernanceDeepLink()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var flowId = new FlowId("news-analysis");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "analyst"));
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "flowrun-news",
+            FlowId = flowId,
+            FlowVersion = "2.0.0",
+            ResolvedFromActiveReference = true,
+            Status = FlowRunStatus.Succeeded,
+            InvocationOrigin = FlowInvocationOrigin.Trigger,
+            Trigger = FlowRunTrigger.Event,
+            CallerId = "news-watcher",
+            CorrelationId = "news-42",
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "2.0.0", null, definition, new Dictionary<string, string>(), FlowClientStub.Now)
+        };
+        const string logicalCallId = "flow:flowrun-news:step:notify";
+        const string invocationId = "flow:flowrun-news:step:notify:attempt:1";
+        var node = new FlowRunCausalityNode(
+            run.Id, flowId, run.FlowVersion, true, FlowDefinitionState.Published, run.Status, null, null, 0,
+            run.CreatedAt, run.StartedAt, run.CompletedAt, null, [],
+            [new(logicalCallId, "notify", "notification.send", "agentstration", "notification.send", "agentstration.internal", "agentstration", "work.notification.create", "succeeded", run.CorrelationId,
+                [new(invocationId, 1, "succeeded", run.CreatedAt, run.CreatedAt.AddMilliseconds(12), 12, null, null, 1)])]);
+        var causality = new FlowRunCausalityPageResponse(
+            new(run.Id, FlowInvocationOrigin.Trigger, FlowRunTrigger.Event, "news-watcher", "news-item-42", "news-42", Guid.NewGuid().ToString("D")),
+            [node], 1, null);
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run, causality: causality));
+        context.Services.AddSingleton(new ConsoleRealtimeSession(new HttpContextAccessor(), new UninitializedRequestContext()));
+        context.Services.AddSingleton(TimeProvider.System);
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
+
+        var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Causality"].Value).Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Markup, "news-analysis · 2.0.0");
+            StringAssert.Contains(rendered.Markup, strings["ResolvedFromActive"].Value);
+            StringAssert.Contains(rendered.Markup, "notification.send");
+            var link = rendered.Find(".tool-attempts a");
+            StringAssert.Contains(link.GetAttribute("href"), "toolCallId=flow%3Aflowrun-news%3Astep%3Anotify");
+            StringAssert.Contains(link.GetAttribute("href"), "invocationId=flow%3Aflowrun-news%3Astep%3Anotify%3Aattempt%3A1");
+        });
+    }
+
+    [TestMethod]
     public void MissingFlowRunRendersNotFoundStateInsteadOfThrowing()
     {
         using var context = new BunitContext();
@@ -108,12 +162,19 @@ public sealed class FlowDetailsDesignerTests
 
     private sealed class FlowClientStub : IFlowApiClient
     {
-        private static readonly DateTimeOffset Now = DateTimeOffset.Parse("2026-08-15T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        public static readonly DateTimeOffset Now = DateTimeOffset.Parse("2026-08-15T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
         private static readonly FlowGraphDefinition Graph = new() { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] };
         private readonly FlowDefinition definition;
-        public FlowClientStub(bool orchestration = false) => definition = orchestration
-            ? new OrchestrationFlowDefinition([new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")], new SequentialOrchestrationPattern())
-            : new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
+        private readonly FlowRun? run;
+        private readonly FlowRunCausalityPageResponse? causality;
+        public FlowClientStub(bool orchestration = false, FlowRun? run = null, FlowRunCausalityPageResponse? causality = null)
+        {
+            definition = orchestration
+                ? new OrchestrationFlowDefinition([new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")], new SequentialOrchestrationPattern())
+                : new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
+            this.run = run;
+            this.causality = causality;
+        }
         public ResourceNamespace RequestedNamespace { get; private set; }
 
         public Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken)
@@ -134,11 +195,16 @@ public sealed class FlowDetailsDesignerTests
         public Task<FlowVersionResponse> CreateFlowVersionAsync(string flowId, CreateFlowVersionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken) =>
-            throw new AgentstrationApiException("The Flow Run was not found.", "missing-flow-run", System.Net.HttpStatusCode.NotFound, "flow_run_not_found");
+        public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken) => run is not null && run.Id == runId
+            ? Task.FromResult(run)
+            : throw new AgentstrationApiException("The Flow Run was not found.", "missing-flow-run", System.Net.HttpStatusCode.NotFound, "flow_run_not_found");
+        public Task<FlowRunCausalityPageResponse> GetFlowRunCausalityAsync(string runId, CancellationToken cancellationToken) => causality is not null
+            ? Task.FromResult(causality)
+            : throw new NotSupportedException();
         public Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<InputRequest> RespondToFlowRunInputAsync(string runId, string inputId, JsonElement value, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<FlowRunEvent>>([]);
         public Task<FlowRun> CreateFlowRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public async IAsyncEnumerable<FlowRun> ObserveFlowRunAsync(string runId, [EnumeratorCancellation] CancellationToken cancellationToken) { await Task.CompletedTask; yield break; }

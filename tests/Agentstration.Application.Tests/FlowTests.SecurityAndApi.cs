@@ -280,11 +280,20 @@ public sealed partial class FlowTests
         Assert.IsTrue(global!.Value.Any(item => item.Id == run.Id));
         var scoped = await client.GetFromJsonAsync<FlowRunPageResponse>("/api/flows/api-run-flow/runs", JsonOptions);
         Assert.IsTrue(scoped!.Value.Any(item => item.Id == run.Id));
+        var causality = await client.GetFromJsonAsync<FlowRunCausalityPageResponse>($"/api/flowRuns/{run.Id}/causality?top=1", JsonOptions);
+        Assert.IsNotNull(causality);
+        Assert.AreEqual(run.Id, causality.Origin.RootFlowRunId);
+        Assert.AreEqual(FlowInvocationOrigin.Api, causality.Origin.InvocationOrigin);
+        Assert.AreEqual(1, causality.TotalCount);
+        Assert.HasCount(1, causality.Value);
+        Assert.IsTrue(causality.Value[0].ResolvedFromActiveReference);
+        Assert.IsNull(causality.NextLink);
         var routes = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
             .OfType<RouteEndpoint>()
             .Select(endpoint => endpoint.RoutePattern.RawText)
             .ToArray();
         Assert.Contains("/api/flowRuns/{runId}", routes);
+        Assert.Contains("/api/flowRuns/{runId}/causality", routes);
         Assert.DoesNotContain("/flowRuns/{runId}", routes);
     }
 

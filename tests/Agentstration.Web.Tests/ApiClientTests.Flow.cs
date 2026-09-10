@@ -292,6 +292,46 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task FlowClientLoadsEveryCausalityPageWithoutDroppingDescendants()
+    {
+        var rootRun = CreateFlowRun("root");
+        var root = new FlowRunCausalityNode(rootRun.Id, rootRun.FlowId, rootRun.FlowVersion, true, FlowDefinitionState.Published,
+            FlowRunStatus.WaitingForChild, null, null, 0, rootRun.CreatedAt, null, null, null, [], []);
+        var child = root with { FlowRunId = "child", ParentFlowRunId = root.FlowRunId, ParentStepName = "analyze", NestingDepth = 1 };
+        var origin = new FlowRunCausalityOrigin(root.FlowRunId, FlowInvocationOrigin.Trigger, FlowRunTrigger.Event, "watcher", "news-42", "correlation-42", null);
+        var requests = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            var path = request.RequestUri!.PathAndQuery;
+            requests.Add(path);
+            return path switch
+            {
+                "/api/flowRuns/child/causality?top=100" => new(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new FlowRunCausalityPageResponse(origin, [root], 2, "/api/flowRuns/child/causality?skip=1&top=100"))
+                },
+                "/api/flowRuns/child/causality?skip=1&top=100" => new(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new FlowRunCausalityPageResponse(origin, [child], 2, null))
+                },
+                _ => new(HttpStatusCode.NotFound)
+            };
+        })) { BaseAddress = new Uri("http://localhost/") };
+
+        var page = await new FlowApiClient(httpClient).GetFlowRunCausalityAsync("child", default);
+
+        CollectionAssert.AreEqual(new[] { "root", "child" }, page.Value.Select(value => value.FlowRunId).ToArray());
+        Assert.AreEqual("analyze", page.Value[1].ParentStepName);
+        Assert.AreEqual(2, page.TotalCount);
+        Assert.IsNull(page.NextLink);
+        CollectionAssert.AreEqual(new[]
+        {
+            "/api/flowRuns/child/causality?top=100",
+            "/api/flowRuns/child/causality?skip=1&top=100"
+        }, requests);
+    }
+
+    [TestMethod]
     [DataRow("https://example.test/api/flowRuns?skip=1&top=200")]
     [DataRow("//example.test/api/flowRuns?skip=1&top=200")]
     public async Task FlowClientRejectsExternalRunPaginationLinks(string nextLink)

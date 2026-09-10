@@ -30,7 +30,7 @@ else
     <nav class="section-tabs flow-run-page-tabs" role="tablist" aria-label="@T("RunViewsAriaLabel")">
         @foreach (var tab in AvailableTabs)
         {
-            <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="flow-run-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@TabLabel(tab)</button>
+            <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="flow-run-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => SelectTabAsync(tab)">@TabLabel(tab)</button>
         }
     </nav>
     @if (run.Error is not null)
@@ -107,6 +107,50 @@ else
                 </section>
             </article>
         }
+        else if (activeTab == RunTab.Causality)
+        {
+            @if (causality is null)
+            {
+                <article class="panel"><p class="muted">@(causalityError ?? T("CausalityLoading"))</p></article>
+            }
+            else
+            {
+                <section class="causality-view" aria-label="@T("CausalityAriaLabel")">
+                    <article class="panel causality-origin">
+                        <div class="panel-header"><h2>@T("InvocationOrigin")</h2><span>@causality.TotalCount @T("FlowRuns")</span></div>
+                        <dl class="details-list"><dt>@T("Origin")</dt><dd>@(causality.Origin.InvocationOrigin is { } origin ? OriginLabel(origin) : "—")</dd><dt>@T("Trigger")</dt><dd>@TriggerLabel(causality.Origin.Trigger)</dd><dt>@T("Caller")</dt><dd>@(causality.Origin.CallerId ?? "—")</dd><dt>@T("CausationId")</dt><dd><code>@(causality.Origin.CausationId ?? "—")</code></dd><dt>@T("CorrelationId")</dt><dd><code>@(causality.Origin.CorrelationId ?? "—")</code></dd></dl>
+                    </article>
+                    <ol class="causality-tree">
+                        @foreach (var node in causality.Value)
+                        {
+                            <li style="--causality-depth:@node.NestingDepth">
+                                <article class="panel causality-node">
+                                    <div class="panel-header"><h2><a href="@ConsoleResourceUrls.Flow(node.FlowId)">@node.FlowId.Value · @node.FlowVersion</a></h2><StatusBadge Text="@StatusLabel(node.Status)" Status="@PlatformDashboardService.ToStatus(node.Status.ToString())" /></div>
+                                    <div class="causality-meta"><code>@node.FlowRunId</code><span>@(node.ResolvedFromActiveReference ? T("ResolvedFromActive") : T("ExactReference"))</span>@if (node.ParentStepName is { } parentStep) { <span>@T("CalledByStep", parentStep)</span> }</div>
+                                    @if (node.AgentExecutions.Count > 0)
+                                    {
+                                        <h3>@T("AgentExecutions")</h3>
+                                        <ul class="causality-details">@foreach (var agent in node.AgentExecutions) { <li><strong>@agent.StepName</strong><span>@agent.AgentResourceId @if (agent.AgentVersion is { } version) { <text>· v@version</text> }</span><span>@StepStatusLabel(agent.Status) · @(agent.Provider ?? "—")</span></li> }</ul>
+                                    }
+                                    @if (node.ToolCalls.Count > 0)
+                                    {
+                                        <h3>@T("ToolCalls")</h3>
+                                        <ul class="causality-details">
+                                            @foreach (var tool in node.ToolCalls)
+                                            {
+                                                <li><strong>@if (tool.ToolId is { } toolId) { <a href="@($"/tools/{Uri.EscapeDataString(toolId)}")">@(tool.ToolName ?? toolId)</a> } else { <text>@(tool.ToolName ?? tool.LogicalCallId)</text> }</strong><span>@T("LogicalCall") <a href="@GovernanceUrl(node.FlowRunId, tool.LogicalCallId)"><code>@tool.LogicalCallId</code></a></span><span>@T("Provider"): @if (tool.ProviderId is { } providerId) { <a href="@($"/tools/providers/{Uri.EscapeDataString(providerId)}")">@providerId</a> } else { <text>—</text> } · @tool.Status</span>
+                                                    <ul class="tool-attempts">@foreach (var attempt in tool.Attempts) { <li><span>@T("Attempt") @attempt.Attempt · @attempt.Status</span><a href="@GovernanceUrl(node.FlowRunId, tool.LogicalCallId, attempt.InvocationId)">@T("GovernanceEvaluations", attempt.GovernanceEvaluationCount)</a></li> }</ul>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                </article>
+                            </li>
+                        }
+                    </ol>
+                </section>
+            }
+        }
         else if (activeTab == RunTab.InputOutput)
         {
             <section class="flow-run-io-panels" aria-label="@T("RunInputAndOutput")">
@@ -133,6 +177,8 @@ else
     private readonly CancellationTokenSource cancellation = new();
     private readonly FlowRunEventBuffer eventBuffer = new();
     private FlowRun? run;
+    private FlowRunCausalityPageResponse? causality;
+    private string? causalityError;
     private InputRequest? pendingInput;
     private FlowStepRun? selected;
     private Microsoft.AspNetCore.SignalR.Client.HubConnection? hub;
@@ -152,8 +198,8 @@ else
     private IReadOnlyList<FlowRunEvent>? replayEvents;
     private CancellationTokenSource? replayCancellation;
     private RunTab activeTab;
-    private static readonly RunTab[] StandardTabs = [RunTab.Summary, RunTab.Activity, RunTab.InputOutput, RunTab.RawEvents];
-    private static readonly RunTab[] HandoffTabs = [RunTab.Summary, RunTab.Activity, RunTab.Handoffs, RunTab.InputOutput, RunTab.RawEvents];
+    private static readonly RunTab[] StandardTabs = [RunTab.Summary, RunTab.Causality, RunTab.Activity, RunTab.InputOutput, RunTab.RawEvents];
+    private static readonly RunTab[] HandoffTabs = [RunTab.Summary, RunTab.Causality, RunTab.Activity, RunTab.Handoffs, RunTab.InputOutput, RunTab.RawEvents];
     private IReadOnlyList<RunTab> AvailableTabs => IsHandoffRun ? HandoffTabs : StandardTabs;
     private IReadOnlyDictionary<string, string> ParticipantUrls => BuildParticipantUrls();
     private FlowRunTimeline.TimelineView SelectedTimelineView => activeTab switch
@@ -173,6 +219,7 @@ else
     private string TabLabel(RunTab tab) => T(tab switch
     {
         RunTab.Summary => "Summary",
+        RunTab.Causality => "Causality",
         RunTab.Activity => "Activity",
         RunTab.Handoffs => "Handoffs",
         RunTab.InputOutput => "InputOutputTab",
@@ -222,6 +269,7 @@ else
             return;
         }
         await RefreshInputAsync();
+        await RefreshCausalityAsync();
         if (!IsHandoffRun && activeTab == RunTab.Handoffs) activeTab = RunTab.Summary;
         selected = run.Steps.FirstOrDefault();
         eventBuffer.Clear();
@@ -292,7 +340,35 @@ else
         run = await Client.GetFlowRunAsync(RunId, cancellation.Token);
         await RefreshInputAsync();
         if (selected is not null) selected = run.Steps.FirstOrDefault(value => value.StepName == selected.StepName);
+        await RefreshCausalityAsync();
     }
+
+    private async Task RefreshCausalityAsync()
+    {
+        try
+        {
+            causality = await Client.GetFlowRunCausalityAsync(RunId, cancellation.Token);
+            causalityError = null;
+        }
+        catch (NotSupportedException) { causality = null; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogWarning(exception, "Flow Run causality is unavailable for {FlowRunId}", RunId);
+            causality = null;
+            causalityError = T("CausalityUnavailable");
+        }
+    }
+
+    private async Task SelectTabAsync(RunTab tab)
+    {
+        activeTab = tab;
+        if (tab == RunTab.Causality && causality is null) await RefreshCausalityAsync();
+    }
+
+    private static string GovernanceUrl(string flowRunId, string toolCallId, string? invocationId = null) =>
+        $"/tool-governance/flow/{Uri.EscapeDataString(flowRunId)}?toolCallId={Uri.EscapeDataString(toolCallId)}"
+        + (invocationId is null ? string.Empty : $"&invocationId={Uri.EscapeDataString(invocationId)}");
 
     private async Task RefreshInputAsync()
     {
@@ -469,5 +545,5 @@ else
         cancellation.Dispose();
     }
 
-    private enum RunTab { Summary, Activity, Handoffs, InputOutput, RawEvents }
+    private enum RunTab { Summary, Causality, Activity, Handoffs, InputOutput, RawEvents }
 }

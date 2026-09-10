@@ -30,6 +30,7 @@ public sealed record RootFlowRunRequest(
     string CorrelationId,
     JsonElement Input,
     WorkItemId WorkItemId,
+    bool ResolvedFromActiveReference,
     string? ParentFlowRunId,
     string? InteractionId,
     string? WorkTaskId,
@@ -87,6 +88,7 @@ public sealed class RootFlowSubmissionService(
     public const string CausationMetadata = "flowInvocation.causationId";
     public const string IdempotencyMetadata = "flowInvocation.idempotencyKey";
     public const string InputHashMetadata = "flowInvocation.inputHash";
+    public const string ActiveReferenceMetadata = "flowInvocation.resolvedFromActiveReference";
 
     public Task<RootFlowSubmission> SubmitAsync(SubmitRootFlowCommand command, CancellationToken cancellationToken) =>
         SubmitAsync(command, null, cancellationToken);
@@ -114,7 +116,7 @@ public sealed class RootFlowSubmissionService(
         if (existing is not null)
         {
             ValidateExisting(existing.Value, command, runId, inputHash);
-            var recoveredRun = await EnsureRunAsync(existing.Value, command, scope, runId, cancellationToken);
+            var recoveredRun = await EnsureRunAsync(existing.Value, command, scope, runId, command.Target.UseActiveVersion, cancellationToken);
             return new(existing, recoveredRun, true);
         }
 
@@ -130,6 +132,7 @@ public sealed class RootFlowSubmissionService(
         metadata[TriggerMetadata] = command.Trigger.ToString();
         metadata[CallerMetadata] = command.CallerId;
         metadata[InputHashMetadata] = inputHash;
+        metadata[ActiveReferenceMetadata] = command.Target.UseActiveVersion.ToString();
         if (!string.IsNullOrWhiteSpace(command.CausationId)) metadata[CausationMetadata] = command.CausationId;
         if (!string.IsNullOrWhiteSpace(command.IdempotencyKey)) metadata[IdempotencyMetadata] = command.IdempotencyKey;
 
@@ -162,7 +165,7 @@ public sealed class RootFlowSubmissionService(
             ValidateExisting(stored.Value, command, runId, inputHash);
         }
 
-        var rootRun = await EnsureRunAsync(stored.Value, command with { Target = resolved.Reference, CorrelationId = correlation }, scope, runId, cancellationToken);
+        var rootRun = await EnsureRunAsync(stored.Value, command with { Target = resolved.Reference, CorrelationId = correlation }, scope, runId, command.Target.UseActiveVersion, cancellationToken);
         return new(stored, rootRun, false);
     }
 
@@ -171,6 +174,7 @@ public sealed class RootFlowSubmissionService(
         SubmitRootFlowCommand command,
         FlowRunScope scope,
         string runId,
+        bool resolvedFromActiveReference,
         CancellationToken cancellationToken)
     {
         var target = item.Flow ?? throw new WorkValidationException("flow_invocation_target_missing", "The WorkItem has no root Flow target.");
@@ -185,6 +189,7 @@ public sealed class RootFlowSubmissionService(
             command.CorrelationId ?? item.CorrelationId.Value,
             command.Input,
             item.Id,
+            resolvedFromActiveReference,
             item.Metadata.GetValueOrDefault("workplace.parentFlowRunId"),
             command.InteractionId ?? item.Metadata.GetValueOrDefault("workplace.interactionId"),
             command.WorkTaskId ?? item.Metadata.GetValueOrDefault("workplace.taskId") ?? item.Id.Value.ToString("D"),
