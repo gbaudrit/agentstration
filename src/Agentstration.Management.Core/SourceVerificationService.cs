@@ -2,14 +2,37 @@ using Agentstration.Management.Abstractions;
 
 namespace Agentstration.Management.Core;
 
-public sealed class SourceVerificationService(ISourceVerificationIndexProvider indexes)
+public sealed class SourceVerificationService(
+    ISourceVerificationIndexProvider indexes,
+    IEnumerable<ISourceVerificationEvidenceProvider> evidenceProviders)
 {
     public async Task<SourceDefinitionVerificationView> VerifyDefinitionAsync(
         SourceVersionResource version,
         CancellationToken cancellationToken)
     {
         var loaded = await LoadAsync(cancellationToken);
-        return VerifyDefinition(version, loaded.Index, loaded.Unavailable);
+        return await VerifyDefinitionAsync(version, loaded, cancellationToken);
+    }
+
+    private async Task<SourceDefinitionVerificationView> VerifyDefinitionAsync(
+        SourceVersionResource version,
+        LoadedIndex loaded,
+        CancellationToken cancellationToken)
+    {
+        var current = VerifyDefinition(version, loaded.Index, loaded.Unavailable);
+        foreach (var provider in evidenceProviders)
+        {
+            var candidate = await provider.VerifyDefinitionAsync(version, cancellationToken);
+            if (candidate is null) continue;
+            if (candidate.Status is SourceVerificationStatus.Revoked or SourceVerificationStatus.Conflict)
+                return candidate;
+            if (candidate.Status == SourceVerificationStatus.Verified)
+                current = candidate;
+            else if (current.Status != SourceVerificationStatus.Verified
+                && candidate.Status != SourceVerificationStatus.Unverified)
+                current = candidate;
+        }
+        return current;
     }
 
     public async Task<SourceChannelSnapshotVerificationView> VerifySnapshotAsync(
@@ -21,7 +44,7 @@ public sealed class SourceVerificationService(ISourceVerificationIndexProvider i
             throw new SourceValidationException("source_snapshot_version_mismatch", "The snapshot does not belong to the requested Source Version.");
 
         var loaded = await LoadAsync(cancellationToken);
-        var definition = VerifyDefinition(version, loaded.Index, loaded.Unavailable);
+        var definition = await VerifyDefinitionAsync(version, loaded, cancellationToken);
         if (definition.Status != SourceVerificationStatus.Verified)
         {
             return new(
@@ -36,7 +59,7 @@ public sealed class SourceVerificationService(ISourceVerificationIndexProvider i
                 null);
         }
 
-        var entry = ExactDefinition(version, loaded.Index!);
+        var entry = loaded.Index is null ? null : ExactDefinition(version, loaded.Index);
         var channel = entry?.Channels.SingleOrDefault(candidate =>
             string.Equals(candidate.Name, snapshot.Definition.Channel, StringComparison.Ordinal)
             && string.Equals(candidate.Revision, snapshot.Definition.ResolvedRevision, StringComparison.Ordinal)

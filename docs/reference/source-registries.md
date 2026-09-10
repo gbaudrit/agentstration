@@ -7,6 +7,8 @@ The API supports:
 - `GET /api/sourceregistries` and `GET /api/sourceregistries/{name}`;
 - `POST /api/sourceregistries` and ETag-protected `PUT`/`DELETE` operations;
 - `POST /api/sourceregistries/{name}/refresh` and refresh history.
+- `GET /api/sourceregistries/{name}/trust` for current origin classification and local policy;
+- `GET /api/sourceregistries/trust/sources/{publisher}/{source}/versions/{version}?manifestDigest=sha256:...` for publisher and exact-version evidence.
 
 The official `agentstration-official` registration is created only when absent. Local changes survive restart and product upgrades. It can be disabled or reconfigured but not deleted.
 
@@ -60,3 +62,14 @@ Each scheduled attempt has a finite timeout. Failures retain the last-known-good
 Index requests reuse the cached `ETag` and `Last-Modified` validators. HTTP 304 is a successful validation of the existing observation. Refresh history records the registration UID, manual or scheduled trigger, outcome, duration, retry count, correlation ID, digest, and error code without storing credentials or response payloads.
 
 Successful publications retain the configured number of complete cache observations. Cleanup never removes the current observation and does not delete immutable refresh history. Deleting a registration preserves its existing cache and history for provenance; disabling it prevents future scheduled work. Source and Channel refresh/materialization are separate lifecycles.
+
+## Four independent evidence dimensions
+
+Registry trust is not one boolean:
+
+1. **Origin classification** describes where an observation came from. The exact persisted built-in `agentstration-official` registration is classified as official by local identity. Boundary-safe HTTPS matching for `agentstration.io` and its subdomains is informational only; it never grants trust, publisher status, or byte verification. External and private/internal origins remain explicit.
+2. **Publisher status** is asserted by each shard as `Declared`, `Verified`, `Official`, or `Revoked`, then gated by the local registration policy. An untrusted registration contributes only declared evidence; trusted registrations may verify an editor; only an authoritative registration may contribute official status. An accepted revocation dominates other assertions.
+3. **SourceVersion verification** still requires an exact publisher, Source name, opaque version, and canonical manifest digest match through the existing Source verification service. Equal observations retain all provenance. Different accepted digests for one identity/version produce a blocking conflict.
+4. **Snapshot verification** independently requires the exact Channel, resolved revision, and materialized archive digest. A verified SourceVersion never verifies current or future mutable Channel content.
+
+Trust policy changes are ETag-protected Platform-administrator mutations and are audited with the existing registration configuration action. Evaluation is recomputed from current policy, so downgrade, disablement, removal, or revocation changes the current answer without modifying the cached observation or historical refresh record. Evidence responses contain registration and observation identifiers, canonical index/catalog digests, asserted and accepted states, reason codes, and evaluation time; they never contain credentials or cached documents.

@@ -26,6 +26,8 @@ public sealed class SourceRegistryManagementTests
 
         var forbidden = await client.GetAsync("/api/sourceregistries");
         Assert.AreEqual(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Forbidden,
+            (await client.GetAsync($"/api/sourceregistries/{SourceRegistryWellKnown.OfficialName}/trust")).StatusCode);
         var context = await client.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
         Assert.IsNotNull(context);
         await factory.Services.GetRequiredService<IIdentityStore>().AddPlatformAdministratorAsync(
@@ -36,6 +38,14 @@ public sealed class SourceRegistryManagementTests
         var official = list!.Value.Single();
         Assert.AreEqual(SourceRegistryWellKnown.OfficialIndexUrl, official.Registration.Definition.IndexUrl.AbsoluteUri);
         Assert.AreEqual(SourceRegistryObservedStatus.NeverFetched, official.Observed.Definition.Status);
+        var originTrust = await client.GetFromJsonAsync<SourceRegistryOriginTrustView>(
+            $"/api/sourceregistries/{SourceRegistryWellKnown.OfficialName}/trust");
+        Assert.IsNotNull(originTrust);
+        Assert.AreEqual(SourceRegistryOriginClassification.Official, originTrust.Classification);
+        var sourceTrust = await client.GetFromJsonAsync<SourceRegistrySourceTrustView>(
+            "/api/sourceregistries/trust/sources/agentstration/sample/versions/1");
+        Assert.IsNotNull(sourceTrust);
+        Assert.AreEqual(SourceVerificationStatus.Unverified, sourceTrust.VersionStatus);
 
         using var update = new HttpRequestMessage(HttpMethod.Put, $"/api/sourceregistries/{SourceRegistryWellKnown.OfficialName}")
         {
@@ -157,6 +167,120 @@ public sealed class SourceRegistryManagementTests
             default);
         Assert.AreEqual(SourceRegistryAuthenticationMode.StaticBearer, created.Value.Definition.AuthenticationMode);
         Assert.AreEqual("registry-token", created.Value.Definition.Credential!.Name);
+    }
+
+    [TestMethod]
+    public void AgentstrationOriginClassificationIsBoundarySafeAndInformational()
+    {
+        var registration = RegistrationResource("community", "https://registry.agentstration.io/v1/index.json");
+
+        Assert.AreEqual(SourceRegistryOriginClassification.AgentstrationOwned,
+            SourceRegistryTrustEvaluationService.ClassifyOrigin(registration, registration.Definition.IndexUrl));
+        Assert.IsTrue(SourceRegistryTrustEvaluationService.IsAgentstrationOwnedHttpsOrigin(new("https://agentstration.io/v1/index.json")));
+        Assert.IsTrue(SourceRegistryTrustEvaluationService.IsAgentstrationOwnedHttpsOrigin(new("https://a.b.agentstration.io/v1/index.json")));
+        Assert.IsFalse(SourceRegistryTrustEvaluationService.IsAgentstrationOwnedHttpsOrigin(new("https://agentstration.io.example/v1/index.json")));
+        Assert.IsFalse(SourceRegistryTrustEvaluationService.IsAgentstrationOwnedHttpsOrigin(new("https://notagentstration.io/v1/index.json")));
+        Assert.IsFalse(SourceRegistryTrustEvaluationService.IsAgentstrationOwnedHttpsOrigin(new("https://xn--agentstratin-f7a.io/v1/index.json")));
+        Assert.IsFalse(SourceRegistryTrustEvaluationService.IsAgentstrationOwnedHttpsOrigin(new("https://agentstratíon.io/v1/index.json")));
+        Assert.IsTrue(SourceRegistryTrustEvaluationService.IsAgentstrationOwnedHttpsOrigin(new("https://registry.agentstration.io:443/v1/index.json")));
+        Assert.IsFalse(SourceRegistryTrustEvaluationService.IsAgentstrationOwnedHttpsOrigin(new("https://registry.agentstration.io:8443/v1/index.json")));
+        Assert.IsFalse(SourceRegistryTrustEvaluationService.IsAgentstrationOwnedHttpsOrigin(new("http://registry.agentstration.io/v1/index.json")));
+        Assert.IsFalse(Uri.TryCreate("https://registry..agentstration.io/v1/index.json", UriKind.Absolute, out _));
+
+        var official = registration with
+        {
+            Uid = Guid.NewGuid(),
+            Metadata = new ResourceMetadata
+            {
+                Name = SourceRegistryWellKnown.OfficialName,
+                Annotations = new Dictionary<string, string> { [ResourceProvenanceAnnotations.BuiltIn] = "true" }
+            },
+            Definition = registration.Definition with { IndexUrl = new("https://registry.example/v1/index.json") }
+        };
+        Assert.AreEqual(SourceRegistryOriginClassification.Official,
+            SourceRegistryTrustEvaluationService.ClassifyOrigin(official, official.Definition.IndexUrl));
+        Assert.AreEqual(SourceRegistryOriginClassification.External,
+            SourceRegistryTrustEvaluationService.ClassifyOrigin(
+                official with { Metadata = official.Metadata with { Annotations = new Dictionary<string, string>() } },
+                official.Definition.IndexUrl));
+        Assert.AreEqual(SourceRegistryOriginClassification.Internal,
+            SourceRegistryTrustEvaluationService.ClassifyOrigin(
+                RegistrationResource("private", "https://127.0.0.1/v1/index.json"),
+                new("https://127.0.0.1/v1/index.json")));
+        Assert.AreEqual(SourceRegistryOriginClassification.AgentstrationOwned,
+            SourceRegistryTrustEvaluationService.ClassifyOrigin(
+                registration with
+                {
+                    Definition = registration.Definition with
+                    {
+                        EndpointPolicy = new SourceRegistryEndpointPolicy { AllowPrivateNetwork = true }
+                    }
+                },
+                registration.Definition.IndexUrl));
+    }
+
+    [TestMethod]
+    public async Task TrustPolicyReevaluatesPublisherAndExactVersionWithoutRewritingObservationAsync()
+    {
+        using var fixture = new Fixture();
+        var seeded = await fixture.Service.EnsureOfficialAsync(default);
+        fixture.EnqueueSuccessfulRefresh("https://registry.agentstration.io/v1");
+        var refreshed = await fixture.Service.RefreshOfficialAsync(default);
+        var digest = RegistryManifestDigest;
+
+        var trusted = await fixture.Trust.EvaluateSourceAsync("agentstration", "sample", "1", digest, default);
+
+        Assert.AreEqual(SourceRegistryPublisherStatus.Official, trusted.Publisher.EffectiveStatus);
+        Assert.AreEqual(SourceVerificationStatus.Verified, trusted.VersionStatus);
+        Assert.HasCount(1, trusted.Evidence);
+        Assert.AreEqual(refreshed.Observed.Definition.Current!.Id, trusted.Evidence[0].Evidence.ObservationId);
+        var verification = new SourceVerificationService(new EmptyVerificationIndex(), [fixture.Trust]);
+        var version = SourceVersion(RegistryManifestDigest);
+        Assert.AreEqual(SourceVerificationStatus.Verified,
+            (await verification.VerifyDefinitionAsync(version, default)).Status);
+        Assert.AreEqual(SourceVerificationStatus.Unverified,
+            (await fixture.Trust.EvaluateSourceAsync(
+                "agentstration", "sample", "1", $"sha256:{new string('f', 64)}", default)).VersionStatus);
+
+        _ = await fixture.Service.UpdateAsync(
+            SourceRegistryWellKnown.OfficialName,
+            seeded.Registration.Definition with { TrustPolicy = SourceRegistryTrustPolicy.Untrusted },
+            seeded.Registration.ETag,
+            default);
+        var downgraded = await fixture.Trust.EvaluateSourceAsync("agentstration", "sample", "1", digest, default);
+
+        Assert.AreEqual(SourceRegistryPublisherStatus.Declared, downgraded.Publisher.EffectiveStatus);
+        Assert.AreEqual(SourceVerificationStatus.Unverified, downgraded.VersionStatus);
+        Assert.AreEqual(SourceVerificationStatus.Unverified,
+            (await verification.VerifyDefinitionAsync(version, default)).Status);
+        Assert.AreEqual(refreshed.Observed.Definition.Current.Id, downgraded.Evidence[0].Evidence.ObservationId);
+        Assert.IsNotNull(await fixture.Cache.GetAsync(refreshed.Observed.Definition.Current.Id, default));
+    }
+
+    [TestMethod]
+    public async Task RevocationAndConflictingTrustedDigestsFailClosedWhileRetainingEvidenceAsync()
+    {
+        using var fixture = new Fixture();
+        await AddAndRefreshAsync(fixture, "first", "https://first.example/v1", SourceRegistryTrustPolicy.Trusted,
+            SourceRegistryPublisherStatuses.Verified, RegistryManifestDigest);
+        await AddAndRefreshAsync(fixture, "second", "https://second.example/v1", SourceRegistryTrustPolicy.Trusted,
+            SourceRegistryPublisherStatuses.Verified, $"sha256:{new string('a', 64)}");
+
+        var conflict = await fixture.Trust.EvaluateSourceAsync(
+            "agentstration", "sample", "1", RegistryManifestDigest, default);
+
+        Assert.AreEqual(SourceVerificationStatus.Conflict, conflict.VersionStatus);
+        Assert.HasCount(2, conflict.Evidence);
+        Assert.HasCount(2, conflict.Publisher.Evidence);
+
+        await AddAndRefreshAsync(fixture, "revocations", "https://revoked.example/v1", SourceRegistryTrustPolicy.Trusted,
+            SourceRegistryPublisherStatuses.Revoked, RegistryManifestDigest);
+        var revoked = await fixture.Trust.EvaluateSourceAsync(
+            "agentstration", "sample", "1", RegistryManifestDigest, default);
+
+        Assert.AreEqual(SourceRegistryPublisherStatus.Revoked, revoked.Publisher.EffectiveStatus);
+        Assert.AreEqual(SourceVerificationStatus.Revoked, revoked.VersionStatus);
+        Assert.HasCount(3, revoked.Evidence);
     }
 
     [TestMethod]
@@ -658,9 +782,63 @@ public sealed class SourceRegistryManagementTests
         DateTimeOffset? lastModified = null) =>
         new(new(url), new(url), fileName, etag, lastModified, false, content);
 
-    private static string RegistryJson(string name) => """
+    private const string RegistryManifestDigest = "sha256:4b2aa0694ee27bc2b53b49cd52e5c221838f9ceed304fbd15c42ae26e2273b7d";
+
+    private static string RegistryJson(string name) => RegistryJson(name, SourceRegistryPublisherStatuses.Official, RegistryManifestDigest);
+
+    private static string RegistryJson(string name, string publisherStatus, string manifestDigest) => """
         {"apiVersion":"agentstration.io/v1","kind":"SourceRegistry","metadata":{"name":"$NAME$"},"definition":{"publishers":[{"name":"agentstration","status":"Official"}],"sources":[{"publisher":"agentstration","name":"sample","latest":"1","versions":[{"version":"1","manifestUrl":"sources/agentstration/sample/1/source.yaml","manifestDigest":"sha256:4b2aa0694ee27bc2b53b49cd52e5c221838f9ceed304fbd15c42ae26e2273b7d"}]}]}}
-        """.Replace("$NAME$", name, StringComparison.Ordinal);
+        """.Replace("$NAME$", name, StringComparison.Ordinal)
+            .Replace("\"status\":\"Official\"", $"\"status\":\"{publisherStatus}\"", StringComparison.Ordinal)
+            .Replace(RegistryManifestDigest, manifestDigest, StringComparison.Ordinal);
+
+    private static SourceRegistryRegistrationResource RegistrationResource(string name, string indexUrl) => new()
+    {
+        Uid = Guid.NewGuid(),
+        ApiVersion = ManagementApiVersions.CoreV1,
+        Kind = ResourceKinds.SourceRegistryRegistration,
+        Metadata = new ResourceMetadata { Name = name },
+        ScopeRef = ResourceScopeRef.Instance,
+        Definition = Registration(indexUrl)
+    };
+
+    private static SourceVersionResource SourceVersion(string digest) => new()
+    {
+        ApiVersion = ManagementApiVersions.CoreV1,
+        Kind = ResourceKinds.SourceVersion,
+        Metadata = new ResourceMetadata { Name = "sample-1" },
+        Definition = new SourceVersionProperties
+        {
+            SourceUid = Guid.NewGuid(),
+            SourceName = "sample",
+            Publisher = "agentstration",
+            Version = "1",
+            ManifestDigest = digest,
+            RawManifest = "test",
+            ImportedAt = DateTimeOffset.UnixEpoch,
+            PublishedDefinition = new PublishedSourceVersionDefinition
+            {
+                Version = "1",
+                Publisher = new SourcePublisher { Name = "agentstration" }
+            }
+        }
+    };
+
+    private static async Task AddAndRefreshAsync(
+        Fixture fixture,
+        string name,
+        string baseUrl,
+        SourceRegistryTrustPolicy policy,
+        string publisherStatus,
+        string manifestDigest)
+    {
+        _ = await fixture.Service.CreateAsync(name, Registration($"{baseUrl}/index.json") with { TrustPolicy = policy }, default);
+        var shard = RegistryJson(name, publisherStatus, manifestDigest);
+        var digest = new SourceRegistryReader().Read(shard, "registry-compatible.json").RegistryDigest;
+        fixture.Documents.Enqueue(Document($"{baseUrl}/index.json", "index.json", IndexJson(digest)));
+        fixture.Documents.Enqueue(Document($"{baseUrl}/registry-compatible.json", "registry-compatible.json", shard));
+        _ = await fixture.Service.RefreshAsync(name, default);
+    }
 
     private static string RegistryYaml(string name) => $$"""
         apiVersion: agentstration.io/v1
@@ -742,6 +920,7 @@ public sealed class SourceRegistryManagementTests
                 Audit,
                 timeProvider ?? TimeProvider.System,
                 NullLogger<SourceRegistryManagementService>.Instance);
+            Trust = new(Store, Cache, new SourceRegistryReader(), timeProvider ?? TimeProvider.System);
             Scheduler = new SourceRefreshScheduler(null!, null!, context, timeProvider ?? TimeProvider.System, Service);
         }
 
@@ -751,6 +930,7 @@ public sealed class SourceRegistryManagementTests
         public FakeVersion Version { get; }
         public FakeAudit Audit { get; }
         public SourceRegistryManagementService Service { get; }
+        public SourceRegistryTrustEvaluationService Trust { get; }
         public SourceRefreshScheduler Scheduler { get; }
         public void EnqueueSuccessfulRefresh(string baseUrl, string name = "compatible")
         {
@@ -879,6 +1059,11 @@ public sealed class SourceRegistryManagementTests
     private sealed class FakeVersion : IAgentstrationVersionProvider
     {
         public string? CurrentVersion { get; set; } = "0.2.0";
+    }
+
+    private sealed class EmptyVerificationIndex : ISourceVerificationIndexProvider
+    {
+        public Task<VerifiedSourceIndexManifest?> GetAsync(CancellationToken cancellationToken) => Task.FromResult<VerifiedSourceIndexManifest?>(null);
     }
 
     private sealed class FakeAudit : ISecurityAuditWriter

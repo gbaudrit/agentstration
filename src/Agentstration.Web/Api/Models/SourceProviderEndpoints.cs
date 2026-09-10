@@ -26,7 +26,9 @@ public static class SourceProviderEndpoints
             var providers = await service.ListAsync(cancellationToken);
             var values = await Task.WhenAll(providers.Select(async provider =>
             {
-                var status = await service.GetStatusAsync(provider.Value.Namespace, provider.Value.Name, cancellationToken);
+                var scopeRef = provider.Value.ScopeRef
+                    ?? throw new SourceProviderValidationException("The Source Provider has no ownership scope.");
+                var status = await service.GetStatusExactAsync(scopeRef, provider.Value.Namespace, provider.Value.Name, cancellationToken);
                 return Map(provider.Value, status);
             }));
             return Results.Ok(new ValueResponse<SourceProviderSummaryResponse>(values));
@@ -35,12 +37,14 @@ public static class SourceProviderEndpoints
     private static Task<IResult> GetAsync(
         string providerName,
         string? resourceNamespace,
+        string? scopeRef,
         HttpResponse response,
         SourceProviderManagementService service,
         CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var stored = await service.GetAsync(ModelManagementHttp.Namespace(resourceNamespace), providerName, cancellationToken)
+            var targetScopeRef = Scope(scopeRef);
+            var stored = await service.GetExactAsync(targetScopeRef, ModelManagementHttp.Namespace(resourceNamespace), providerName, cancellationToken)
                 ?? throw new SourceProviderNotFoundException(new(ModelManagementHttp.Namespace(resourceNamespace), ResourceKinds.SourceProvider, providerName));
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
@@ -48,25 +52,28 @@ public static class SourceProviderEndpoints
     private static Task<IResult> GetStatusAsync(
         string providerName,
         string? resourceNamespace,
+        string? scopeRef,
         SourceProviderManagementService service,
         CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var status = await service.GetStatusAsync(ModelManagementHttp.Namespace(resourceNamespace), providerName, cancellationToken);
+            var status = await service.GetStatusExactAsync(Scope(scopeRef), ModelManagementHttp.Namespace(resourceNamespace), providerName, cancellationToken);
             return Results.Ok(new SourceProviderStatusResponse(status.Provider, status.Status, status.CheckedAt, status.Details));
         });
 
     private static Task<IResult> GetUsagesAsync(
         string providerName,
         string? resourceNamespace,
+        string? scopeRef,
         SourceProviderManagementService service,
         CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
             var @namespace = ModelManagementHttp.Namespace(resourceNamespace);
-            _ = await service.GetAsync(@namespace, providerName, cancellationToken)
+            var targetScopeRef = Scope(scopeRef);
+            _ = await service.GetExactAsync(targetScopeRef, @namespace, providerName, cancellationToken)
                 ?? throw new SourceProviderNotFoundException(new(@namespace, ResourceKinds.SourceProvider, providerName));
-            var usages = (await service.GetUsagesAsync(@namespace, providerName, cancellationToken))
+            var usages = (await service.GetUsagesExactAsync(targetScopeRef, @namespace, providerName, cancellationToken))
                 .Select(value => new SourceProviderUsageResponse(value.SourceScopeRef, value.Publisher, value.SourceName, value.BindingName))
                 .ToArray();
             return Results.Ok(new SourceProviderUsagesResponse(usages, usages.Length));
@@ -85,34 +92,36 @@ public static class SourceProviderEndpoints
                 Kind = ResourceKinds.SourceProvider,
                 ApiVersion = ManagementApiVersions.CoreV1,
                 Definition = body.Properties,
-                ScopeRef = ResourceScopeRef.Instance
+                ScopeRef = body.ScopeRef
             }, cancellationToken);
-            response.Headers.Location = $"/api/sourceproviders/{Uri.EscapeDataString(stored.Value.Name)}?resourceNamespace={Uri.EscapeDataString(stored.Value.Namespace.Value)}";
+            response.Headers.Location = $"/api/sourceproviders/{Uri.EscapeDataString(stored.Value.Name)}?resourceNamespace={Uri.EscapeDataString(stored.Value.Namespace.Value)}&scopeRef={Uri.EscapeDataString(stored.Value.ScopeRef!.Value.Value)}";
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status201Created);
         });
 
     private static Task<IResult> PutAsync(
         string providerName,
         string? resourceNamespace,
+        string? scopeRef,
         PutSourceProviderRequest body,
         HttpRequest request,
         HttpResponse response,
         SourceProviderManagementService service,
         CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () => ModelManagementHttp.ResourceResult(
-            await service.PutAsync(ModelManagementHttp.Namespace(resourceNamespace), providerName, body.Properties, ModelManagementHttp.IfMatch(request), cancellationToken),
+            await service.PutExactAsync(Scope(scopeRef), ModelManagementHttp.Namespace(resourceNamespace), providerName, body.Properties, ModelManagementHttp.IfMatch(request), cancellationToken),
             response,
             StatusCodes.Status200OK));
 
     private static Task<IResult> DeleteAsync(
         string providerName,
         string? resourceNamespace,
+        string? scopeRef,
         HttpRequest request,
         SourceProviderManagementService service,
         CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            await service.DeleteAsync(ModelManagementHttp.Namespace(resourceNamespace), providerName, ModelManagementHttp.IfMatch(request), cancellationToken);
+            await service.DeleteExactAsync(Scope(scopeRef), ModelManagementHttp.Namespace(resourceNamespace), providerName, ModelManagementHttp.IfMatch(request), cancellationToken);
             return Results.NoContent();
         });
 
@@ -129,6 +138,10 @@ public static class SourceProviderEndpoints
             status.Status,
             status.Details,
             provider.Namespace.Value,
-            provider.ScopeRef);
+            provider.ScopeRef,
+            provider.Definition.Extension.ScopeRef);
     }
+
+    private static ResourceScopeRef Scope(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? ResourceScopeRef.Instance : ResourceScopeRef.Parse(value);
 }

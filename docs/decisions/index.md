@@ -131,3 +131,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 99. [ADR-0099 — Provider-specific Compose owns inference services](0099-provider-specific-compose-owns-inference-services.md)
 100. [ADR-0100 — AEP unenrollment is an explicit recoverable transition](0100-aep-unenrollment-is-an-explicit-recoverable-transition.md)
 101. [ADR-0101 — Source registry refresh joins the shared local scheduling lifecycle](0101-source-registry-refresh-joins-the-shared-local-scheduling-lifecycle.md)
+102. [ADR-0102 — Source Providers follow hierarchical resource visibility](0102-source-providers-follow-hierarchical-resource-visibility.md)
+103. [ADR-0103 — Source registry trust evaluates independent evidence dimensions](0103-source-registry-trust-evaluates-independent-evidence-dimensions.md)
