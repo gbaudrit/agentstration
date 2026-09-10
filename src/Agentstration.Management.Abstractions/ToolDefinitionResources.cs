@@ -85,3 +85,38 @@ public sealed class ToolDefinitionInvocationException(string code, string messag
 {
     public string Code { get; } = code;
 }
+
+public sealed record InternalMcpToolDefinition(
+    string Name,
+    string DisplayName,
+    string? Description,
+    JsonElement InputSchema,
+    JsonElement? OutputSchema = null,
+    bool RequiresApproval = false);
+
+public sealed record InternalMcpToolInvocation(
+    Guid TenantId,
+    WorkspaceId WorkspaceId,
+    Guid PrincipalId,
+    string CallId,
+    string? CorrelationId,
+    JsonElement Arguments,
+    ToolDefinitionCallerKind CallerKind,
+    string? CallerId = null,
+    string? RunId = null,
+    string? FlowStepId = null);
+
+public interface IInternalMcpToolDefinitionProvider
+{
+    InternalMcpToolDefinition Definition { get; }
+}
+
+public interface IInternalMcpToolHandler : IInternalMcpToolDefinitionProvider
+{
+    Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken);
+}
+
+public static class AgentstrationInternalTools
+{
+    public const string NotificationCreate = "work.notification.create";
+}

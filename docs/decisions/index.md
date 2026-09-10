@@ -130,3 +130,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 98. [ADR-0098 — Source registry registrations are instance-owned policies](0098-source-registry-registrations-are-instance-owned.md)
 99. [ADR-0099 — Flows compose reusable Flows and governed Tools](0099-flows-compose-flows-and-governed-tools.md)
 100. [ADR-0100 — ToolDefinitions publish Flow-backed MCP Tools](0100-tool-definitions-publish-flow-backed-mcp-tools.md)
+101. [ADR-0101 — Notification channels are delivery Flows](0101-notification-channels-are-delivery-flows.md)
