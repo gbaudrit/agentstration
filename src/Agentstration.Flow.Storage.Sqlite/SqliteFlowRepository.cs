@@ -221,7 +221,7 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var documents = await context.Documents.AsNoTracking().Where(value => value.Kind == RunKind)
             .OrderBy(value => value.UpdatedAt).Skip(skip).Take(Math.Min(take, 1000)).ToArrayAsync(cancellationToken);
-        return documents.Select(ToRun).Where(value => value.Value.Status is FlowRunStatus.Pending or FlowRunStatus.Running or FlowRunStatus.WaitingForInput)
+        return documents.Select(ToRun).Where(value => value.Value.Status is FlowRunStatus.Pending or FlowRunStatus.Running or FlowRunStatus.WaitingForInput or FlowRunStatus.WaitingForChild)
             .Select(value => new FlowRunKey(value.Value.WorkspaceId, value.Value.Id)).ToArray();
     }
 

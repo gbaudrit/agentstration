@@ -95,6 +95,8 @@ public sealed record FlowRunExecutionOptions
     public TimeSpan OrchestrationTimeout { get; init; } = TimeSpan.FromMinutes(10);
     public TimeSpan InputRequestTimeout { get; init; } = TimeSpan.FromDays(7);
     public TimeSpan ExecutionLeaseDuration { get; init; } = TimeSpan.FromMinutes(15);
+    public int MaximumNestingDepth { get; init; } = 16;
+    public int MaximumDescendantRuns { get; init; } = 256;
 }
 
 public sealed record FlowRevisionUsage(
@@ -135,6 +137,8 @@ public sealed partial class FlowRunService(
         : executionOptions.OrchestrationTimeout > TimeSpan.Zero
           && executionOptions.InputRequestTimeout > TimeSpan.Zero
           && executionOptions.ExecutionLeaseDuration > executionOptions.OrchestrationTimeout
+          && executionOptions.MaximumNestingDepth is >= 1 and <= 64
+          && executionOptions.MaximumDescendantRuns is >= 1 and <= 4096
             ? executionOptions
             : throw new ArgumentOutOfRangeException(nameof(executionOptions), "Execution and input timeouts must be positive, and the execution lease must exceed the orchestration timeout.");
     private readonly IFlowToolExecutor toolExecutor = configuredToolExecutor ?? UnsupportedFlowToolExecutor.Instance;

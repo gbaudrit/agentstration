@@ -36,6 +36,28 @@ public sealed partial class FlowRunService
                         await queue.EnqueueAsync(new(run.Value.Id, run.Value.Scope), cancellationToken);
                     continue;
                 }
+                if (run.Value.Status == FlowRunStatus.WaitingForChild)
+                {
+                    var childRunId = run.Value.Steps.SingleOrDefault(step =>
+                        step.Status == FlowStepRunStatus.Running && step.ChildFlowRunId is not null)?.ChildFlowRunId;
+                    var child = childRunId is null
+                        ? null
+                        : await repository.GetRunAsync(key.WorkspaceId, childRunId, cancellationToken);
+                    if (child is null)
+                    {
+                        try
+                        {
+                            var pending = await repository.UpdateRunAsync(run.Value with { Status = FlowRunStatus.Pending }, run.ETag, cancellationToken);
+                            await queue.EnqueueAsync(new(pending.Value.Id, pending.Value.Scope), cancellationToken);
+                        }
+                        catch (FlowConcurrencyException) { }
+                    }
+                    else if (child.Value.Status.IsTerminal())
+                    {
+                        await ResumeParentAfterChildAsync(child.Value, cancellationToken);
+                    }
+                    continue;
+                }
                 if (run.Value.Status == FlowRunStatus.Pending
                     || run.Value.Status == FlowRunStatus.Running && run.Value.ExecutionLeaseExpiresAt <= now)
                     await queue.EnqueueAsync(new(run.Value.Id, run.Value.Scope), cancellationToken);
@@ -240,7 +262,16 @@ public sealed partial class FlowRunService
     {
         var stored = await RequiredAsync(runId, scope, cancellationToken);
         if (stored.Value.Status.IsTerminal()) return stored;
-        cancellations.Cancel(new FlowRunKey(scope.WorkspaceId, runId));
+        var cancelled = await CancelSingleAsync(stored, cancellationToken);
+        foreach (var descendant in await ListActiveDescendantsAsync(cancelled.Value, cancellationToken))
+            await CancelSingleAsync(descendant, cancellationToken);
+        return cancelled;
+    }
+
+    private async Task<StoredFlowRun> CancelSingleAsync(StoredFlowRun stored, CancellationToken cancellationToken)
+    {
+        if (stored.Value.Status.IsTerminal()) return stored;
+        cancellations.Cancel(new FlowRunKey(stored.Value.WorkspaceId, stored.Value.Id));
         var now = timeProvider.GetUtcNow();
         var steps = stored.Value.Steps.Select(step => step.Status is FlowStepRunStatus.NotStarted or FlowStepRunStatus.Running
             ? step with { Status = FlowStepRunStatus.Cancelled, CompletedAt = now }
@@ -254,9 +285,9 @@ public sealed partial class FlowRunService
             ExecutionLeaseId = null,
             ExecutionLeaseExpiresAt = null
         }, stored.ETag, cancellationToken);
-        foreach (var input in await repository.ListInputRequestsAsync(scope.WorkspaceId, runId, InputRequestStatus.Pending, cancellationToken))
+        foreach (var input in await repository.ListInputRequestsAsync(stored.Value.WorkspaceId, stored.Value.Id, InputRequestStatus.Pending, cancellationToken))
             await repository.UpdateInputRequestAsync(input.Value with { Status = InputRequestStatus.Cancelled }, input.ETag, cancellationToken);
-        await EmitAsync(scope.WorkspaceId, runId, FlowRunEventType.FlowRunCancelled, null, null, cancellationToken);
+        await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.FlowRunCancelled, null, null, cancellationToken);
         return cancelled;
     }
 

@@ -44,6 +44,7 @@ public sealed record FlowStepRun
     public IReadOnlyList<string> Logs { get; init; } = [];
     public FlowStepRunUsage? Usage { get; init; }
     public FlowRunError? Error { get; init; }
+    public string? ChildFlowRunId { get; init; }
 }
 
 public sealed record FlowRun
@@ -63,6 +64,8 @@ public sealed record FlowRun
     public string? CorrelationId { get; init; }
     public string? WorkItemResourceId { get; init; }
     public string? ParentFlowRunId { get; init; }
+    public string? RootFlowRunId { get; init; }
+    public int NestingDepth { get; init; }
     public string? InteractionId { get; init; }
     public string? WorkTaskId { get; init; }
     public string? TriggerMessageId { get; init; }

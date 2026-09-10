@@ -49,10 +49,12 @@
   <data name="Status.Pending"><value>En attente</value></data>
   <data name="Status.Running"><value>En cours</value></data>
   <data name="Status.WaitingForInput"><value>En attente d’une saisie</value></data>
+  <data name="Status.WaitingForChild"><value>En attente d’un Flow enfant</value></data>
   <data name="Status.Succeeded"><value>Réussie</value></data>
   <data name="Status.Failed"><value>Échouée</value></data>
   <data name="Status.Cancelled"><value>Annulée</value></data>
   <data name="Status.TimedOut"><value>Délai dépassé</value></data>
+  <data name="ChildFlowRun"><value>Exécution du Flow enfant</value></data>
   <data name="Trigger.Manual"><value>Manuel</value></data>
   <data name="Trigger.Api"><value>API</value></data>
   <data name="Trigger.WorkItem"><value>Élément de travail</value></data>
