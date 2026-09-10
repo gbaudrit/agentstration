@@ -1,6 +1,7 @@
 using Agentstration.Infrastructure.Agents;
 using Agentstration.Infrastructure.Events;
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Core;
 using Agentstration.ModelProviders;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
