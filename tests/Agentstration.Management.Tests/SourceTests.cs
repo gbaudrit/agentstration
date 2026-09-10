@@ -510,7 +510,8 @@ public sealed class SourceTests
             ResourceKinds.SourceObservedState,
             ResourceKinds.SourceImportRecord,
             ResourceKinds.SourceChannelSnapshot,
-            ResourceKinds.SourceChannelObservedState
+            ResourceKinds.SourceChannelObservedState,
+            ResourceKinds.SourceChannelRefreshRecord
         };
 
         foreach (var kind in kinds)
@@ -592,6 +593,7 @@ public sealed class SourceTests
         Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceImportRecordResource>(ResourceScopeRef.Instance, ResourceKinds.SourceImportRecord, 0, int.MaxValue, default));
         Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceChannelSnapshotResource>(ResourceScopeRef.Instance, ResourceKinds.SourceChannelSnapshot, 0, int.MaxValue, default));
         Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceChannelObservedResource>(ResourceScopeRef.Instance, ResourceKinds.SourceChannelObservedState, 0, int.MaxValue, default));
+        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceChannelRefreshRecordResource>(ResourceScopeRef.Instance, ResourceKinds.SourceChannelRefreshRecord, 0, int.MaxValue, default));
 
         var reimported = await fixture.Service.ImportYamlAsync(
             Manifest("1", "Published name", includeChannel: true)
@@ -946,6 +948,196 @@ public sealed class SourceTests
     }
 
     [TestMethod]
+    public async Task HttpRetrieverUsesValidatorsAndAcceptsNotModifiedAsync()
+    {
+        HttpRequestMessage? captured = null;
+        var handler = new StubHttpHandler(request =>
+        {
+            captured = request;
+            return new HttpResponseMessage(HttpStatusCode.NotModified);
+        });
+        using var client = new HttpClient(handler);
+        var previous = new SourceManifestOrigin
+        {
+            Url = "https://sources.example/source.yaml",
+            ETag = "\"manifest-1\"",
+            LastModified = DateTimeOffset.Parse("2026-09-06T20:00:00Z", System.Globalization.CultureInfo.InvariantCulture)
+        };
+
+        var retrieved = await new HttpSourceManifestRetriever(client).RetrieveAsync(
+            new Uri(previous.Url), previous, default);
+
+        Assert.IsTrue(retrieved.NotModified);
+        Assert.AreEqual("\"manifest-1\"", captured!.Headers.IfNoneMatch.Single().ToString());
+        Assert.AreEqual(previous.LastModified, captured.Headers.IfModifiedSince);
+        Assert.AreEqual(previous, retrieved.Origin);
+    }
+
+    [TestMethod]
+    public async Task NotModifiedSourceRefreshRetainsVersionAndRecordsTheAttemptAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        fixture.Retriever.Content = Manifest("1", "Published name", includeChannel: false);
+        var imported = await fixture.Service.ImportUrlAsync(
+            new Uri("https://sources.example/source.yaml"), ResourceScopeRef.Instance, default);
+        fixture.Retriever.NotModified = true;
+
+        var refreshed = await fixture.Service.RefreshExactAsync(ResourceScopeRef.Instance,
+            "agentstration", "official-samples", SourceRefreshTrigger.Manual, default);
+
+        Assert.AreEqual(SourceImportOutcome.Unchanged, refreshed.Outcome);
+        Assert.AreEqual(imported.Version.Uid, refreshed.Version.Uid);
+        Assert.AreEqual(SourceRefreshTrigger.Manual, refreshed.Source.Observed.Definition.LastTrigger);
+        Assert.AreEqual(1, fixture.Retriever.RetrieveCount);
+        var versions = await fixture.Store.ListExactAsync<SourceVersionResource>(ResourceScopeRef.Instance,
+            ResourceKinds.SourceVersion, 0, int.MaxValue, default);
+        Assert.HasCount(1, versions);
+        var records = await fixture.Store.ListExactAsync<SourceImportRecordResource>(ResourceScopeRef.Instance,
+            ResourceKinds.SourceImportRecord, 0, int.MaxValue, default);
+        Assert.HasCount(2, records);
+        Assert.HasCount(1, records.Where(value => value.Value.Definition.Trigger == SourceRefreshTrigger.Manual));
+    }
+
+    [TestMethod]
+    public async Task RefreshPolicyIsValidatedAndScheduledSourceRefreshSurvivesRestartAsync()
+    {
+        var database = Path.Combine(Path.GetTempPath(), $"agentstration-source-schedule-{Guid.NewGuid():N}.db");
+        var clock = new MutableTimeProvider(DateTimeOffset.Parse("2026-09-10T08:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
+        try
+        {
+            await using (var first = await Fixture.CreateAsync(database, clock))
+            {
+                using var system = first.Context.PushSystem();
+                first.Retriever.Content = Manifest("1", "Published name", includeChannel: false);
+                var imported = await first.Service.ImportUrlAsync(new Uri("https://sources.example/source.yaml"), ResourceScopeRef.Instance, default);
+                var refresh = new SourceRefreshConfiguration
+                {
+                    Source = new() { Enabled = true, IntervalSeconds = 60, JitterSeconds = 0 },
+                    Channels = new()
+                };
+                var updated = await first.Service.UpdateRefreshConfigurationExactAsync(ResourceScopeRef.Instance,
+                    "agentstration", "official-samples", refresh, imported.Source.Configuration.ETag!, default);
+                Assert.IsTrue(updated.Value.Definition.Refresh.Source.Enabled);
+
+                var invalid = refresh with { Source = refresh.Source with { IntervalSeconds = 59 } };
+                var error = await Assert.ThrowsExactlyAsync<SourceValidationException>(() => first.Service.UpdateRefreshConfigurationExactAsync(
+                    ResourceScopeRef.Instance, "agentstration", "official-samples", invalid, updated.ETag, default));
+                Assert.AreEqual("source_refresh_interval_invalid", error.Code);
+            }
+
+            clock.Advance(TimeSpan.FromSeconds(60));
+            await using (var restarted = await Fixture.CreateAsync(database, clock))
+            {
+                restarted.Retriever.Content = Manifest("1", "Published name", includeChannel: false);
+                await restarted.Scheduler.RunDueAsync(default);
+                var refreshed = await restarted.Service.GetExactAsync(
+                    ResourceScopeRef.Instance, "agentstration", "official-samples", default);
+                Assert.IsNotNull(refreshed);
+                Assert.AreEqual(SourceRefreshTrigger.Scheduled, refreshed.Observed.Definition.LastTrigger);
+                Assert.AreEqual(SourceImportOutcome.Unchanged, refreshed.Observed.Definition.LastOutcome);
+                Assert.AreEqual(1, restarted.Retriever.RetrieveCount);
+            }
+        }
+        finally
+        {
+            using var cleanup = new SqliteConnection($"Data Source={database}");
+            SqliteConnection.ClearPool(cleanup);
+            File.Delete(database);
+        }
+    }
+
+    [TestMethod]
+    public async Task ChannelOverrideSchedulesCompatibleChannelAndSkipRetainsSnapshotAsync()
+    {
+        var clock = new MutableTimeProvider(DateTimeOffset.Parse("2026-09-10T08:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
+        await using var fixture = await Fixture.CreateAsync(timeProvider: clock);
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        var imported = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: true), default);
+        var configured = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+        var policy = new SourceRefreshPolicy { Enabled = true, IntervalSeconds = 60, JitterSeconds = 0 };
+        _ = await fixture.Service.UpdateRefreshConfigurationExactAsync(ResourceScopeRef.Instance,
+            "agentstration", "official-samples", new SourceRefreshConfiguration
+            {
+                Source = new(),
+                Channels = new(),
+                ChannelOverrides = new Dictionary<string, SourceRefreshPolicy>(StringComparer.Ordinal) { ["stable"] = policy }
+            }, configured.Configuration.ETag!, default);
+
+        await fixture.Scheduler.RunDueAsync(default);
+        var created = await fixture.Snapshots.GetObservedAsync(ResourceScopeRef.Instance,
+            "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+        Assert.IsNotNull(created);
+        Assert.AreEqual(SourceChannelRefreshOutcome.Created, created.Definition.LastOutcome);
+        Assert.AreEqual(SourceRefreshTrigger.Scheduled, created.Definition.LastTrigger);
+        var snapshotUid = created.Definition.CurrentSnapshotUid;
+
+        fixture.Versions.CurrentVersion = "0.1.0";
+        clock.Advance(TimeSpan.FromSeconds(60));
+        await fixture.Scheduler.RunDueAsync(default);
+        var skipped = await fixture.Snapshots.GetObservedAsync(ResourceScopeRef.Instance,
+            "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+        Assert.IsNotNull(skipped);
+        Assert.AreEqual(SourceChannelRefreshOutcome.Skipped, skipped.Definition.LastOutcome);
+        Assert.AreEqual("source_running_version_below_minimum", skipped.Definition.ErrorCode);
+        Assert.AreEqual(snapshotUid, skipped.Definition.CurrentSnapshotUid);
+        Assert.AreEqual(1, fixture.Materializer.MaterializeCount);
+        var history = await fixture.Store.ListExactAsync<SourceChannelRefreshRecordResource>(
+            ResourceScopeRef.Instance, ResourceKinds.SourceChannelRefreshRecord, 0, int.MaxValue, default);
+        CollectionAssert.AreEqual(new[] { SourceChannelRefreshOutcome.Created, SourceChannelRefreshOutcome.Skipped },
+            history.OrderBy(value => value.Value.Definition.AttemptedAt)
+                .Select(value => value.Value.Definition.Outcome).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ScheduledFailuresUsePersistedBackoffAndPastedSourceIsNotFetchedAsync()
+    {
+        var clock = new MutableTimeProvider(DateTimeOffset.Parse("2026-09-10T08:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
+        await using var fixture = await Fixture.CreateAsync(timeProvider: clock);
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        var imported = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: true), default);
+        var configured = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+        var policy = new SourceRefreshPolicy
+        {
+            Enabled = true,
+            IntervalSeconds = 600,
+            InitialBackoffSeconds = 30,
+            MaximumBackoffSeconds = 120,
+            MaximumAttempts = 3,
+            JitterSeconds = 0
+        };
+        _ = await fixture.Service.UpdateRefreshConfigurationExactAsync(ResourceScopeRef.Instance,
+            "agentstration", "official-samples", new SourceRefreshConfiguration
+            {
+                Source = policy,
+                Channels = policy
+            }, configured.Configuration.ETag!, default);
+        fixture.Materializer.Failure = new SourceRetrievalException("provider_failed", "Provider failed.");
+
+        await fixture.Scheduler.RunDueAsync(default);
+        clock.Advance(TimeSpan.FromSeconds(29));
+        await fixture.Scheduler.RunDueAsync(default);
+        var firstWindow = await fixture.Store.ListExactAsync<SourceChannelRefreshRecordResource>(
+            ResourceScopeRef.Instance, ResourceKinds.SourceChannelRefreshRecord, 0, int.MaxValue, default);
+        Assert.HasCount(1, firstWindow);
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await fixture.Scheduler.RunDueAsync(default);
+        var secondWindow = await fixture.Store.ListExactAsync<SourceChannelRefreshRecordResource>(
+            ResourceScopeRef.Instance, ResourceKinds.SourceChannelRefreshRecord, 0, int.MaxValue, default);
+        Assert.HasCount(2, secondWindow);
+        var observed = await fixture.Snapshots.GetObservedAsync(ResourceScopeRef.Instance, "agentstration",
+            "official-samples", imported.Version.Uid, "stable", default);
+        Assert.IsNotNull(observed);
+        Assert.AreEqual(2, observed.Definition.ConsecutiveFailures);
+        Assert.AreEqual(0, fixture.Retriever.RetrieveCount);
+    }
+
+    [TestMethod]
     public async Task VerificationIndexProviderIsOptionalAndRequiresHttpsAsync()
     {
         using var client = new HttpClient(new StubHttpHandler(_ => throw new AssertFailedException("No request was expected.")));
@@ -1012,6 +1204,29 @@ public sealed class SourceTests
         var updated = await updatedResponse.Content.ReadFromJsonAsync<SourceConfigurationResource>();
         Assert.AreEqual("Local name", updated?.Definition.DisplayName);
 
+        var refreshConfiguration = new SourceRefreshConfiguration
+        {
+            Source = new() { Enabled = true, IntervalSeconds = 300 },
+            Channels = new() { Enabled = true, IntervalSeconds = 900 },
+            ChannelOverrides = new Dictionary<string, SourceRefreshPolicy>(StringComparer.Ordinal)
+            {
+                ["stable"] = new() { Enabled = false, IntervalSeconds = 1800 }
+            }
+        };
+        using var refreshPolicy = new HttpRequestMessage(HttpMethod.Put,
+            $"/api/sources/agentstration/{name}/refresh-policy?scopeRef={Uri.EscapeDataString(workspaceScope.ToString())}")
+        {
+            Content = JsonContent.Create(new UpdateSourceRefreshConfigurationRequest(refreshConfiguration))
+        };
+        refreshPolicy.Headers.TryAddWithoutValidation("If-Match", updated!.ETag);
+        var refreshPolicyResponse = await client.SendAsync(refreshPolicy);
+        refreshPolicyResponse.EnsureSuccessStatusCode();
+        var savedRefreshPolicy = await refreshPolicyResponse.Content.ReadFromJsonAsync<SourceConfigurationResource>();
+        Assert.IsNotNull(savedRefreshPolicy);
+        Assert.AreEqual(300, savedRefreshPolicy.Definition.Refresh.Source.IntervalSeconds);
+        Assert.AreEqual(900, savedRefreshPolicy.Definition.Refresh.Channels.IntervalSeconds);
+        Assert.IsFalse(savedRefreshPolicy.Definition.Refresh.ChannelOverrides["stable"].Enabled);
+
         var providerName = $"git-{name}";
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
         {
@@ -1053,7 +1268,7 @@ public sealed class SourceTests
                 Target = new(providerName, ResourceScopeRef.Instance, ResourceNamespace.Default)
             }]))
         };
-        configure.Headers.TryAddWithoutValidation("If-Match", updated?.ETag);
+        configure.Headers.TryAddWithoutValidation("If-Match", savedRefreshPolicy.ETag);
         var configureResponse = await client.SendAsync(configure);
         Assert.AreEqual(HttpStatusCode.OK, configureResponse.StatusCode, await configureResponse.Content.ReadAsStringAsync());
         var bindingResult = await configureResponse.Content.ReadFromJsonAsync<SourceBindingConfigurationResult>();
@@ -1285,11 +1500,31 @@ public sealed class SourceTests
     private sealed class StubRetriever : ISourceManifestRetriever
     {
         public string? Content { get; set; }
+        public bool NotModified { get; set; }
+        public int RetrieveCount { get; private set; }
 
         public Task<RetrievedSourceManifest> RetrieveAsync(Uri source, CancellationToken cancellationToken) =>
             Content is null
                 ? throw new SourceRetrievalException("not_configured", "No test HTTP source is configured.")
                 : Task.FromResult(new RetrievedSourceManifest(Content, new SourceManifestOrigin { Url = source.AbsoluteUri }));
+
+        public Task<RetrievedSourceManifest> RetrieveAsync(
+            Uri source,
+            SourceManifestOrigin? previousOrigin,
+            CancellationToken cancellationToken)
+        {
+            RetrieveCount++;
+            if (Content is null)
+                throw new SourceRetrievalException("not_configured", "No test HTTP source is configured.");
+            return Task.FromResult(new RetrievedSourceManifest(NotModified ? string.Empty : Content,
+                previousOrigin ?? new SourceManifestOrigin { Url = source.AbsoluteUri }) { NotModified = NotModified });
+        }
+    }
+
+    private sealed class MutableTimeProvider(DateTimeOffset value) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => value;
+        public void Advance(TimeSpan duration) => value += duration;
     }
 
     private sealed class FakeSourceVerificationIndexProvider : ISourceVerificationIndexProvider
@@ -1314,6 +1549,7 @@ public sealed class SourceTests
         public IControlPlaneStore Store => services.GetRequiredService<IControlPlaneStore>();
         public SourceBindingManagementService Bindings => services.GetRequiredService<SourceBindingManagementService>();
         public SourceChannelSnapshotService Snapshots => services.GetRequiredService<SourceChannelSnapshotService>();
+        public SourceRefreshScheduler Scheduler => services.GetRequiredService<SourceRefreshScheduler>();
         public SourceCatalogService Catalogs => services.GetRequiredService<SourceCatalogService>();
         public SourcePackInstallationService SourcePacks => services.GetRequiredService<SourcePackInstallationService>();
         public ISourceSnapshotContentReader ContentReader => services.GetRequiredService<ISourceSnapshotContentReader>();
@@ -1331,12 +1567,12 @@ public sealed class SourceTests
             this.ownsDatabase = ownsDatabase;
         }
 
-        public static async Task<Fixture> CreateAsync(string? database = null)
+        public static async Task<Fixture> CreateAsync(string? database = null, TimeProvider? timeProvider = null)
         {
             var ownsDatabase = database is null;
             database ??= Path.Combine(Path.GetTempPath(), $"agentstration-source-{Guid.NewGuid():N}.db");
             var collection = new ServiceCollection();
-            collection.AddSingleton(TimeProvider.System);
+            collection.AddSingleton(timeProvider ?? TimeProvider.System);
             collection.AddSingleton<CurrentRequestContext>();
             collection.AddSingleton<ICurrentRequestContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
             collection.AddSingleton<IRequestContextScopeFactory>(provider => provider.GetRequiredService<CurrentRequestContext>());
@@ -1372,6 +1608,7 @@ public sealed class SourceTests
             collection.AddSingleton<ISourceCatalogManifestReader, SourceCatalogManifestReader>();
             collection.AddSingleton(new SourceMaterializationLimits());
             collection.AddSingleton<SourceChannelSnapshotService>();
+            collection.AddSingleton<SourceRefreshScheduler>();
             collection.AddSingleton<SourceCatalogService>();
             collection.AddSingleton<IPackArchiveReader, ZipPackArchiveReader>();
             collection.AddSingleton<IPackResourceHandler, SourcePackRecordingHandler>();

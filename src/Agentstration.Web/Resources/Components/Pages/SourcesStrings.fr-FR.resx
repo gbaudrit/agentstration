@@ -33,4 +33,34 @@
   <data name="Channel" xml:space="preserve"><value>Channel</value></data>
   <data name="SelectChannel" xml:space="preserve"><value>Sélectionner un Channel</value></data>
   <data name="PinnedSourceSelectionMessage" xml:space="preserve"><value>Source Version {0} ({1}), Channel {2}, Snapshot {3}, entrée de catalogue {4}. Cette sélection exacte reste épinglée jusqu’à l’installation.</value></data>
+  <data name="Tab.Scheduling" xml:space="preserve"><value>Planification</value></data>
+  <data name="Automation" xml:space="preserve"><value>Automatisation</value></data>
+  <data name="RefreshScheduling" xml:space="preserve"><value>Planification des actualisations</value></data>
+  <data name="RefreshSchedulingDescription" xml:space="preserve"><value>Planifiez indépendamment la récupération de la définition et la matérialisation des Channels.</value></data>
+  <data name="SourceDefinitionRefresh" xml:space="preserve"><value>Définition de la Source</value></data>
+  <data name="SourceDefinitionRefreshDescription" xml:space="preserve"><value>Récupère le manifeste HTTP(S) associé et importe une nouvelle version immuable uniquement s’il change.</value></data>
+  <data name="ChannelRefreshDefaults" xml:space="preserve"><value>Valeurs par défaut des Channels</value></data>
+  <data name="ChannelRefreshDefaultsDescription" xml:space="preserve"><value>Résout et matérialise les Channels compatibles avec cette politique par défaut.</value></data>
+  <data name="Enabled" xml:space="preserve"><value>Activé</value></data>
+  <data name="IntervalMinutes" xml:space="preserve"><value>Intervalle (minutes)</value></data>
+  <data name="TimeoutSeconds" xml:space="preserve"><value>Délai maximal (secondes)</value></data>
+  <data name="MaximumAttempts" xml:space="preserve"><value>Tentatives</value></data>
+  <data name="InitialBackoffSeconds" xml:space="preserve"><value>Attente initiale (secondes)</value></data>
+  <data name="MaximumBackoffSeconds" xml:space="preserve"><value>Attente maximale (secondes)</value></data>
+  <data name="JitterSeconds" xml:space="preserve"><value>Décalage aléatoire (secondes)</value></data>
+  <data name="PastedSourceCannotSchedule" xml:space="preserve"><value>Associez une origine HTTP(S) avant d’activer l’actualisation de la définition.</value></data>
+  <data name="ChannelOverrides" xml:space="preserve"><value>Exceptions par Channel</value></data>
+  <data name="ChannelOverridesDescription" xml:space="preserve"><value>Modifiez la cadence par défaut ou désactivez certains Channels.</value></data>
+  <data name="CustomPolicy" xml:space="preserve"><value>Politique spécifique</value></data>
+  <data name="SaveScheduling" xml:space="preserve"><value>Enregistrer la planification</value></data>
+  <data name="SchedulingUpdated" xml:space="preserve"><value>Planification mise à jour</value></data>
+  <data name="SchedulingSaved" xml:space="preserve"><value>Les politiques indépendantes de la Source et des Channels ont été enregistrées.</value></data>
+  <data name="RefreshOutcome.Skipped" xml:space="preserve"><value>Ignoré</value></data>
+  <data name="LastSourceRefreshStatus" xml:space="preserve"><value>Dernière tentative : {0} · {1}</value></data>
+  <data name="RefreshError.source_running_version_below_minimum" xml:space="preserve"><value>Ce Channel nécessite une version plus récente d’Agentstration.</value></data>
+  <data name="RefreshError.source_running_version_at_or_above_maximum" xml:space="preserve"><value>Ce Channel ne prend pas en charge la version actuelle d’Agentstration.</value></data>
+  <data name="RefreshError.source_running_version_unknown" xml:space="preserve"><value>La version actuelle d’Agentstration n’a pas pu être évaluée.</value></data>
+  <data name="RefreshError.source_compatibility_definition_invalid" xml:space="preserve"><value>L’intervalle de compatibilité du Channel est invalide.</value></data>
+  <data name="RefreshError.source_refresh_timeout" xml:space="preserve"><value>L’actualisation planifiée de la Source a dépassé son délai configuré.</value></data>
+  <data name="RefreshError.source_channel_refresh_timeout" xml:space="preserve"><value>L’actualisation planifiée du Channel a dépassé son délai configuré.</value></data>
 </root>

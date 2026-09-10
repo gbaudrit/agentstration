@@ -165,6 +165,38 @@ else
         }
         </section>
     }
+    else if (activeTab == PageTab.Scheduling)
+    {
+        <section class="panel">
+        <div class="panel-header"><div><p class="eyebrow">@T("Automation")</p><h2>@T("RefreshScheduling")</h2><p>@T("RefreshSchedulingDescription")</p></div></div>
+        <div class="refresh-policy-grid">
+            <article class="refresh-policy-card">
+                <header><div><h3>@T("SourceDefinitionRefresh")</h3><p>@T("SourceDefinitionRefreshDescription")</p></div><label class="switch-field"><input type="checkbox" @bind="sourceRefresh.Enabled" disabled="@(busy || detail.Source.Configuration.Definition.Origin is null)" /><span>@T("Enabled")</span></label></header>
+                @if (detail.Source.Configuration.Definition.Origin is null) { <p class="inline-warning">@T("PastedSourceCannotSchedule")</p> }
+                <p class="refresh-observed">@F("LastSourceRefreshStatus", detail.Source.Observed.Definition.LastAttemptAt.ToLocalTime().ToString("g"), ImportOutcome(detail.Source.Observed.Definition.LastOutcome))</p>
+                @if (detail.Source.Observed.Definition.ErrorMessage is { } sourceRefreshError) { <p class="inline-warning">@RefreshError(detail.Source.Observed.Definition.ErrorCode, sourceRefreshError)</p> }
+                <div class="refresh-policy-fields"><label><span>@T("IntervalMinutes")</span><input type="number" min="1" max="10080" @bind="sourceRefresh.IntervalMinutes" disabled="@busy" /></label><label><span>@T("TimeoutSeconds")</span><input type="number" min="1" max="300" @bind="sourceRefresh.TimeoutSeconds" disabled="@busy" /></label><label><span>@T("MaximumAttempts")</span><input type="number" min="1" max="10" @bind="sourceRefresh.MaximumAttempts" disabled="@busy" /></label><label><span>@T("InitialBackoffSeconds")</span><input type="number" min="1" max="3600" @bind="sourceRefresh.InitialBackoffSeconds" disabled="@busy" /></label><label><span>@T("MaximumBackoffSeconds")</span><input type="number" min="1" max="86400" @bind="sourceRefresh.MaximumBackoffSeconds" disabled="@busy" /></label><label><span>@T("JitterSeconds")</span><input type="number" min="0" max="3600" @bind="sourceRefresh.JitterSeconds" disabled="@busy" /></label></div>
+            </article>
+            <article class="refresh-policy-card">
+                <header><div><h3>@T("ChannelRefreshDefaults")</h3><p>@T("ChannelRefreshDefaultsDescription")</p></div><label class="switch-field"><input type="checkbox" @bind="channelRefresh.Enabled" disabled="@busy" /><span>@T("Enabled")</span></label></header>
+                <div class="refresh-policy-fields"><label><span>@T("IntervalMinutes")</span><input type="number" min="1" max="10080" @bind="channelRefresh.IntervalMinutes" disabled="@busy" /></label><label><span>@T("TimeoutSeconds")</span><input type="number" min="1" max="300" @bind="channelRefresh.TimeoutSeconds" disabled="@busy" /></label><label><span>@T("MaximumAttempts")</span><input type="number" min="1" max="10" @bind="channelRefresh.MaximumAttempts" disabled="@busy" /></label><label><span>@T("InitialBackoffSeconds")</span><input type="number" min="1" max="3600" @bind="channelRefresh.InitialBackoffSeconds" disabled="@busy" /></label><label><span>@T("MaximumBackoffSeconds")</span><input type="number" min="1" max="86400" @bind="channelRefresh.MaximumBackoffSeconds" disabled="@busy" /></label><label><span>@T("JitterSeconds")</span><input type="number" min="0" max="3600" @bind="channelRefresh.JitterSeconds" disabled="@busy" /></label></div>
+            </article>
+        </div>
+        @if (detail.SelectedVersion.Definition.PublishedDefinition.Channels.Count > 0)
+        {
+            <div class="channel-overrides"><div><h3>@T("ChannelOverrides")</h3><p>@T("ChannelOverridesDescription")</p></div>
+            @foreach (var channel in detail.SelectedVersion.Definition.PublishedDefinition.Channels)
+            {
+                var editor = channelRefreshOverrides[channel.Name];
+                <article class="channel-override-card"><header><strong>@channel.Name</strong><label class="switch-field"><input type="checkbox" @bind="editor.Custom" disabled="@busy" /><span>@T("CustomPolicy")</span></label></header>
+                @if (editor.Custom) { <div class="refresh-policy-fields compact"><label class="switch-field"><input type="checkbox" @bind="editor.Enabled" disabled="@busy" /><span>@T("Enabled")</span></label><label><span>@T("IntervalMinutes")</span><input type="number" min="1" max="10080" @bind="editor.IntervalMinutes" disabled="@busy" /></label><label><span>@T("TimeoutSeconds")</span><input type="number" min="1" max="300" @bind="editor.TimeoutSeconds" disabled="@busy" /></label><label><span>@T("MaximumAttempts")</span><input type="number" min="1" max="10" @bind="editor.MaximumAttempts" disabled="@busy" /></label><label><span>@T("InitialBackoffSeconds")</span><input type="number" min="1" max="3600" @bind="editor.InitialBackoffSeconds" disabled="@busy" /></label><label><span>@T("MaximumBackoffSeconds")</span><input type="number" min="1" max="86400" @bind="editor.MaximumBackoffSeconds" disabled="@busy" /></label><label><span>@T("JitterSeconds")</span><input type="number" min="0" max="3600" @bind="editor.JitterSeconds" disabled="@busy" /></label></div> }
+                </article>
+            }
+            </div>
+        }
+        <div class="panel-actions"><button class="button-primary" disabled="@busy" @onclick="SaveRefreshPolicyAsync">@T("SaveScheduling")</button></div>
+        </section>
+    }
     @if (activeTab == PageTab.Overview)
     {
 
@@ -176,7 +208,7 @@ else
             <article class="channel-card">
                 <header><div>@if (detail.Channels.Count > 1) { <label class="channel-selector"><span>@T("Channel")</span><select value="@selectedChannelName" @onchange="SelectChannel" aria-label="@T("SelectChannel")">@foreach (var option in detail.Channels) { <option value="@option.Definition.Name">@option.Definition.Name</option> }</select></label> } else { <h3>@channel.Definition.Name</h3> }<p><code>@channel.Definition.Provider.Binding</code> · @channel.Definition.Configuration.OptionSet@@@channel.Definition.Configuration.Version</p></div><div class="channel-actions"><StatusBadge Text="@CompatibilityLabel(channel.Status.Compatibility.Status)" Status="@CompatibilityTone(channel.Status.Compatibility.Status)" /><button class="button-secondary" disabled="@(busy || channel.Status.Compatibility.Status != SourceChannelCompatibilityStatus.Compatible || !detail.Bindings.Ready)" @onclick="() => RefreshChannelAsync(channel.Definition.Name)">@T("RefreshChannel")</button></div></header>
                 <dl class="resource-details"><dt>@T("LastRefresh")</dt><dd>@(channel.Status.Refresh is null ? T("Never") : channel.Status.Refresh.Definition.LastAttemptAt.ToLocalTime().ToString("g"))</dd><dt>@T("Result")</dt><dd>@(channel.Status.Refresh is null ? "—" : RefreshOutcome(channel.Status.Refresh.Definition.LastOutcome))</dd><dt>@T("Snapshot")</dt><dd>@(channel.Status.Refresh?.Definition.CurrentSnapshotUid?.ToString("D") ?? "—")</dd><dt>@T("Verified")</dt><dd>@(channel.Verification is null ? "—" : VerificationLabel(channel.Verification.Status))</dd></dl>
-                @if (channel.Status.Refresh?.Definition.ErrorMessage is { } refreshError) { <p class="inline-warning">@refreshError</p> }
+                @if (channel.Status.Refresh?.Definition.ErrorMessage is { } refreshError) { <p class="inline-warning">@RefreshError(channel.Status.Refresh.Definition.ErrorCode, refreshError)</p> }
                 @if (channel.CatalogFailure is { } catalogFailure)
                 {
                     <div class="catalog-failure" role="alert">
@@ -266,6 +298,9 @@ else
     private readonly Dictionary<string, SourceConsoleBindingSelection> bindingSelections = new(StringComparer.Ordinal);
     private string search = string.Empty;
     private string displayName = string.Empty;
+    private RefreshPolicyForm sourceRefresh = new();
+    private RefreshPolicyForm channelRefresh = new();
+    private readonly Dictionary<string, RefreshPolicyForm> channelRefreshOverrides = new(StringComparer.Ordinal);
     private string catalogLocale = CultureInfo.CurrentUICulture.Name is "fr-FR" ? "fr-FR" : "en-US";
     private string importMode = "url";
     private string importUrl = string.Empty;
@@ -319,6 +354,14 @@ else
                 if (!detail.Channels.Any(channel => channel.Definition.Name == selectedChannelName))
                     selectedChannelName = detail.Channels.FirstOrDefault()?.Definition.Name;
                 displayName = detail.Source.Configuration.Definition.DisplayName;
+                sourceRefresh = RefreshPolicyForm.From(detail.Source.Configuration.Definition.Refresh.Source);
+                channelRefresh = RefreshPolicyForm.From(detail.Source.Configuration.Definition.Refresh.Channels);
+                channelRefreshOverrides.Clear();
+                foreach (var channel in detail.SelectedVersion.Definition.PublishedDefinition.Channels)
+                {
+                    var custom = detail.Source.Configuration.Definition.Refresh.ChannelOverrides.TryGetValue(channel.Name, out var policy);
+                    channelRefreshOverrides[channel.Name] = RefreshPolicyForm.From(policy ?? detail.Source.Configuration.Definition.Refresh.Channels) with { Custom = custom };
+                }
                 bindingSelections.Clear();
                 foreach (var binding in detail.Bindings.Bindings.Where(value => value.Target is not null)) bindingSelections[binding.Name] = new(binding.Name, binding.TargetKind, binding.Target, null);
                 activeTab = Enum.TryParse<PageTab>(View, true, out var requestedTab) ? requestedTab : PageTab.Overview;
@@ -350,6 +393,20 @@ else
     }
 
     private async Task SaveDisplayNameAsync() => await RunAsync(async () => { await Service.UpdateDisplayNameAsync(ScopeRef(), Publisher!, Name!, displayName, detail!.Source.Configuration.ETag!, RequestContext.Current.PrincipalId, lifetime.Token); Notify("SourceUpdated", T("DisplayNameSaved")); await LoadAsync(); });
+    private async Task SaveRefreshPolicyAsync() => await RunAsync(async () =>
+    {
+        var refresh = new SourceRefreshConfiguration
+        {
+            Source = sourceRefresh.ToPolicy(),
+            Channels = channelRefresh.ToPolicy(),
+            ChannelOverrides = channelRefreshOverrides.Where(value => value.Value.Custom)
+                .ToDictionary(value => value.Key, value => value.Value.ToPolicy(), StringComparer.Ordinal)
+        };
+        await Service.UpdateRefreshConfigurationAsync(ScopeRef(), Publisher!, Name!, refresh,
+            detail!.Source.Configuration.ETag!, RequestContext.Current.PrincipalId, lifetime.Token);
+        Notify("SchedulingUpdated", T("SchedulingSaved"));
+        await LoadAsync();
+    });
     private async Task SaveBindingsAsync() => await RunAsync(async () => { await Service.ConfigureBindingsAsync(ScopeRef(), Publisher!, Name!, detail!.SelectedVersion.Uid, bindingSelections.Values.ToArray(), detail.Bindings.ConfigurationETag, RequestContext.Current.PrincipalId, lifetime.Token); Notify("BindingsUpdated", T("BindingsSaved")); await LoadAsync(); });
     private async Task RefreshChannelAsync(string channel) => await RunAsync(async () => { await Service.RefreshChannelAsync(ScopeRef(), Publisher!, Name!, detail!.SelectedVersion.Uid, channel, RequestContext.Current.PrincipalId, lifetime.Token); Notify("ChannelRefreshed", F("ChannelRefreshedMessage", channel)); await LoadAsync(); });
     private async Task RefreshSourceAsync() => await RunAsync(async () => { var result = await Service.RefreshSourceAsync(ScopeRef(), Publisher!, Name!, RequestContext.Current.PrincipalId, lifetime.Token); Notify("SourceRefreshed", F("SourceRefreshedMessage", result.Version.Definition.Version)); await LoadAsync(); });
@@ -513,6 +570,12 @@ else
     private static string PublisherLabel(SourcePublisher value) => value.DisplayName is null ? value.Name : $"{value.DisplayName} ({value.Name})";
     private string ImportOutcome(SourceImportOutcome value) => T($"ImportOutcome.{value}");
     private string RefreshOutcome(SourceChannelRefreshOutcome value) => T($"RefreshOutcome.{value}");
+    private string RefreshError(string? code, string fallback)
+    {
+        if (code is null) return fallback;
+        var localized = Localizer[$"RefreshError.{code}"];
+        return localized.ResourceNotFound ? fallback : localized.Value;
+    }
     private string VerificationLabel(SourceVerificationStatus value) => T($"Verification.{value}");
     private string CompatibilityLabel(SourceChannelCompatibilityStatus value) => T($"Compatibility.{value}");
     private static UiStatus VerificationTone(SourceVerificationStatus value) => value switch { SourceVerificationStatus.Verified => UiStatus.Success, SourceVerificationStatus.Unavailable => UiStatus.Warning, _ => UiStatus.Neutral };
@@ -522,6 +585,37 @@ else
     private string T(string key) => Localizer[key];
     private string F(string key, params object[] arguments) => Localizer[key, arguments];
     private void Notify(string titleKey, string message) => Notifications.Add(new(Guid.NewGuid(), T(titleKey), message, DateTimeOffset.Now, UiStatus.Success));
-    private enum PageTab { Overview, Versions, Bindings }
+    private enum PageTab { Overview, Versions, Bindings, Scheduling }
+    private sealed record RefreshPolicyForm
+    {
+        public bool Custom { get; set; }
+        public bool Enabled { get; set; }
+        public int IntervalMinutes { get; set; } = 360;
+        public int TimeoutSeconds { get; set; } = 30;
+        public int MaximumAttempts { get; set; } = 3;
+        public int InitialBackoffSeconds { get; set; } = 30;
+        public int MaximumBackoffSeconds { get; set; } = 900;
+        public int JitterSeconds { get; set; } = 15;
+        public static RefreshPolicyForm From(SourceRefreshPolicy policy) => new()
+        {
+            Enabled = policy.Enabled,
+            IntervalMinutes = Math.Max(1, policy.IntervalSeconds / 60),
+            TimeoutSeconds = policy.TimeoutSeconds,
+            MaximumAttempts = policy.MaximumAttempts,
+            InitialBackoffSeconds = policy.InitialBackoffSeconds,
+            MaximumBackoffSeconds = policy.MaximumBackoffSeconds,
+            JitterSeconds = policy.JitterSeconds
+        };
+        public SourceRefreshPolicy ToPolicy() => new()
+        {
+            Enabled = Enabled,
+            IntervalSeconds = checked(IntervalMinutes * 60),
+            TimeoutSeconds = TimeoutSeconds,
+            MaximumAttempts = MaximumAttempts,
+            InitialBackoffSeconds = InitialBackoffSeconds,
+            MaximumBackoffSeconds = MaximumBackoffSeconds,
+            JitterSeconds = JitterSeconds
+        };
+    }
     public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
 }

@@ -33,4 +33,34 @@
   <data name="Channel" xml:space="preserve"><value>Channel</value></data>
   <data name="SelectChannel" xml:space="preserve"><value>Select a Channel</value></data>
   <data name="PinnedSourceSelectionMessage" xml:space="preserve"><value>Source Version {0} ({1}), Channel {2}, Snapshot {3}, catalog entry {4}. This exact selection is pinned until installation.</value></data>
+  <data name="Tab.Scheduling" xml:space="preserve"><value>Scheduling</value></data>
+  <data name="Automation" xml:space="preserve"><value>Automation</value></data>
+  <data name="RefreshScheduling" xml:space="preserve"><value>Refresh scheduling</value></data>
+  <data name="RefreshSchedulingDescription" xml:space="preserve"><value>Schedule Source definition fetches and Channel materialization independently.</value></data>
+  <data name="SourceDefinitionRefresh" xml:space="preserve"><value>Source definition</value></data>
+  <data name="SourceDefinitionRefreshDescription" xml:space="preserve"><value>Fetch the associated HTTP(S) manifest and import a new immutable version only when it changes.</value></data>
+  <data name="ChannelRefreshDefaults" xml:space="preserve"><value>Channel defaults</value></data>
+  <data name="ChannelRefreshDefaultsDescription" xml:space="preserve"><value>Resolve and materialize compatible Channels using this default policy.</value></data>
+  <data name="Enabled" xml:space="preserve"><value>Enabled</value></data>
+  <data name="IntervalMinutes" xml:space="preserve"><value>Interval (minutes)</value></data>
+  <data name="TimeoutSeconds" xml:space="preserve"><value>Timeout (seconds)</value></data>
+  <data name="MaximumAttempts" xml:space="preserve"><value>Retry attempts</value></data>
+  <data name="InitialBackoffSeconds" xml:space="preserve"><value>Initial backoff (seconds)</value></data>
+  <data name="MaximumBackoffSeconds" xml:space="preserve"><value>Maximum backoff (seconds)</value></data>
+  <data name="JitterSeconds" xml:space="preserve"><value>Jitter (seconds)</value></data>
+  <data name="PastedSourceCannotSchedule" xml:space="preserve"><value>Associate an HTTP(S) origin before enabling definition refresh.</value></data>
+  <data name="ChannelOverrides" xml:space="preserve"><value>Channel overrides</value></data>
+  <data name="ChannelOverridesDescription" xml:space="preserve"><value>Override the default cadence or disable individual Channels.</value></data>
+  <data name="CustomPolicy" xml:space="preserve"><value>Custom policy</value></data>
+  <data name="SaveScheduling" xml:space="preserve"><value>Save scheduling</value></data>
+  <data name="SchedulingUpdated" xml:space="preserve"><value>Scheduling updated</value></data>
+  <data name="SchedulingSaved" xml:space="preserve"><value>The independent Source and Channel refresh policies were saved.</value></data>
+  <data name="RefreshOutcome.Skipped" xml:space="preserve"><value>Skipped</value></data>
+  <data name="LastSourceRefreshStatus" xml:space="preserve"><value>Last attempt: {0} · {1}</value></data>
+  <data name="RefreshError.source_running_version_below_minimum" xml:space="preserve"><value>This Channel requires a newer Agentstration version.</value></data>
+  <data name="RefreshError.source_running_version_at_or_above_maximum" xml:space="preserve"><value>This Channel does not support the running Agentstration version.</value></data>
+  <data name="RefreshError.source_running_version_unknown" xml:space="preserve"><value>The running Agentstration version could not be evaluated.</value></data>
+  <data name="RefreshError.source_compatibility_definition_invalid" xml:space="preserve"><value>The Channel compatibility interval is invalid.</value></data>
+  <data name="RefreshError.source_refresh_timeout" xml:space="preserve"><value>The scheduled Source refresh exceeded its configured timeout.</value></data>
+  <data name="RefreshError.source_channel_refresh_timeout" xml:space="preserve"><value>The scheduled Channel refresh exceeded its configured timeout.</value></data>
 </root>

@@ -43,6 +43,20 @@
 .binding-channels code { padding: .2rem .5rem; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: .72rem; }
 .binding-card label,
 .binding-card select { width: 100%; min-width: 0; }
+.refresh-policy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.refresh-policy-card, .channel-override-card { padding: 1rem; border: 1px solid var(--border); border-radius: .8rem; background: var(--surface-2); }
+.refresh-policy-card > header, .channel-override-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.refresh-policy-card h3, .channel-overrides h3 { margin: 0; }
+.refresh-policy-card p, .channel-overrides p { margin: .3rem 0 0; color: var(--muted); }
+.refresh-policy-card .refresh-observed { margin-top: .9rem; font-size: .82rem; }
+.refresh-policy-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin-top: 1rem; }
+.refresh-policy-fields label { display: grid; align-content: start; gap: .35rem; min-width: 0; }
+.refresh-policy-fields label > span { color: var(--muted); font-size: .78rem; }
+.refresh-policy-fields input[type="number"] { width: 100%; min-width: 0; }
+.switch-field { display: flex !important; align-items: center; grid-auto-flow: column; justify-content: start; gap: .45rem !important; white-space: nowrap; }
+.switch-field input { width: auto; }
+.channel-overrides { display: grid; gap: .75rem; margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
+.refresh-policy-fields.compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .channel-card { margin-top: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: .9rem; background: var(--surface-2); }
 .channel-card > header, .channel-actions, .catalog-toolbar, .catalog-entry { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .channel-card h3, .channel-card h4 { margin: 0; }
@@ -91,7 +105,8 @@
 .source-pack-resources article + article { border-top: 1px solid var(--border); }
 .source-pack-resources article > span { min-width: 0; }
 @media (max-width: 760px) {
-    .source-metrics, .source-detail-grid { grid-template-columns: 1fr; }
+    .source-metrics, .source-detail-grid, .refresh-policy-grid { grid-template-columns: 1fr; }
+    .refresh-policy-fields, .refresh-policy-fields.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .source-heading, .channel-card > header, .catalog-entry { align-items: stretch; flex-direction: column; }
     .catalog-entry-actions { justify-content: flex-start; }
     .channel-selector { align-items: stretch; flex-direction: column; }
