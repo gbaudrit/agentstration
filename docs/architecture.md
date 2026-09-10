@@ -360,6 +360,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 40. **Delivered Source Pack installation increment:** compatible Pack catalog entries from an exact pinned Source snapshot are resolved server-side, previewed, and installed through the existing Pack lifecycle. Confirmation supplies a digest over the complete pin, Pack identity, bindings, target, options, and conflict state; the server rebuilds the preview and rejects stale confirmation. Complete Source and Pack provenance is retained independently, and local archive installation remains unchanged. See ADR-0095.
 41. **Delivered independent Source and Channel refresh increment:** mutable local policies schedule Source-definition HTTP fetch and per-Channel materialization independently, with disabled offline defaults, exact Channel overrides, conditional requests, deterministic jitter, bounded timeout and retry/backoff, persisted observed outcomes, and keyed concurrency. Compatibility-unknown or incompatible Channels are skipped without losing their last snapshot; Registry refresh remains a separate concern. See ADR-0097.
 42. **Delivered Source registry lifecycle increment:** Platform administrators manage independent official, community, and private Registry endpoints as instance-owned, ETag-protected registrations with explicit trust, network, authentication, refresh, and cache policies. Opt-in periodic refresh reuses the Source scheduling worker with persisted timeout/backoff/jitter, last-known-good, staleness, recovery, and bounded cache-retention state. Credentials remain instance-scoped Secret references resolved only for same-origin requests, while deletion preserves retained observations for provenance. See ADR-0098 and ADR-0101.
+43. **Delivered Source registry trust increment:** Registry origin, publisher assertion, exact SourceVersion verification, and Snapshot verification remain independent decisions. Current trust is recalculated from local registration policy and immutable cached observations; revocation and conflicting accepted digests fail closed, while every contributing observation remains exposed as provenance. Agentstration-owned HTTPS host classification is informational, and only the stable built-in official registration receives official-origin classification. See ADR-0103.
 
 ## ADR catalog
 
@@ -427,6 +428,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0097: Source and Channel refresh are scheduled independently
 - ADR-0098: Source registry registrations are instance-owned policies
 - ADR-0101: Source registry refresh joins the shared local scheduling lifecycle
+- ADR-0103: Source registry trust evaluates independent evidence dimensions
 - ADR-0086: Source catalogs resolve inside pinned snapshots
 - ADR-0087: Source Channel compatibility uses Semantic Version intervals
 - ADR-0088: Source verification binds exact definitions and snapshots
