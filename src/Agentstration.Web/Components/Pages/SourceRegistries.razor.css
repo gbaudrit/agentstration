@@ -1,0 +1,25 @@
+.registry-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 1rem; }
+.registry-list-panel { overflow: hidden; }
+.registry-table { min-width: 0; overflow-x: auto; }
+.registry-table ::deep .data-grid { min-width: 72rem; white-space: normal; }
+.registry-table ::deep td { vertical-align: top; }
+.registry-table small, .registry-kind-note { display: block; margin-top: .25rem; color: var(--muted); }
+.registry-table .registry-kind-note { color: var(--primary); font-weight: 700; }
+.registry-table .registry-error, .registry-history .registry-error { color: var(--danger); max-width: 18rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.registry-official { background: color-mix(in srgb, var(--primary) 5%, transparent); }
+.registry-row-actions { display: flex; align-items: flex-start; gap: .7rem; flex-wrap: wrap; }
+.switch-button { display: inline-flex; align-items: center; gap: .45rem; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.switch-button > span { width: 2rem; height: 1.1rem; padding: .14rem; border-radius: 999px; background: var(--border-strong, var(--border)); }
+.switch-button > span::after { content: ""; display: block; width: .82rem; height: .82rem; border-radius: 50%; background: white; transition: transform .15s ease; }
+.switch-button[aria-checked="true"] > span { background: var(--primary); }
+.switch-button[aria-checked="true"] > span::after { transform: translateX(.9rem); }
+.registry-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
+.registry-history { display: grid; }
+.registry-history article { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; padding: .8rem 0; border-top: 1px solid var(--border); }
+.registry-history article:first-child { border-top: 0; }
+.registry-history small { display: block; margin-top: .2rem; color: var(--muted); }
+.registry-destructive-actions { justify-content: flex-end; }
+@media (max-width: 800px) {
+    .registry-summary, .registry-detail-grid { grid-template-columns: 1fr; }
+    .registry-history article { grid-template-columns: 1fr; }
+}

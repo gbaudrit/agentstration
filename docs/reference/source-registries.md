@@ -14,6 +14,16 @@ The API supports:
 
 The official `agentstration-official` registration is created only when absent. Local changes survive restart and product upgrades. It can be disabled or reconfigured but not deleted.
 
+## Console workflow
+
+Platform administrators can use **System > Source registries** (`/settings/source-registries`) instead of calling these APIs directly. The registration list separates the well-known official registration from endpoints trusted by local policy and shows enabled state, endpoint type, freshness, last outcome, next scheduled refresh, and actionable errors. Each detail page provides ETag-protected editing, manual refresh, retained refresh history, and the current origin-trust explanation. A concurrency conflict must be resolved by reloading the latest server version before saving again.
+
+Private registrations select an existing instance-scoped Secret by reference. The Console uses the authorized Secret inventory and never requests, renders, or logs its value. Secret creation and value management remain in the canonical **Secrets** experience.
+
+Use the **Discover Sources** tab (`/settings/source-registries/discovery`) to apply the bounded server-side filters and inspect grouped portable identities. Every exact version retains all Registry observations and displays four independent dimensions: Registry origin trust, publisher evidence, SourceVersion verification, and Snapshot verification. Snapshot verification is explicitly not evaluated until a Channel is materialized. Shard-local `latest` markers never become a global latest version.
+
+Selecting an observation opens a confirmation that repeats the Registry registration, observation ID, shard, opaque version, and expected manifest digest. The server revalidates that retained tuple on confirmation. Conflicted, revoked, untrusted, or otherwise policy-denied choices remain unavailable; stale choices carry an explicit warning. A successful import opens the ordinary Source detail page and does not create or refresh Channels.
+
 ## Private enterprise example
 
 Create an instance-scoped Vault and Secret through the normal Secret APIs, store the Bearer token through the write-only Secret value endpoint, and retain only this reference in the registration:

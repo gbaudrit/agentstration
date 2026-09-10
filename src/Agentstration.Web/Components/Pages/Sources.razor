@@ -22,6 +22,7 @@
         }
         else
         {
+            <a class="button-secondary" href="/settings/source-registries/discovery">@T("DiscoverFromRegistries")</a>
             <button class="button-primary" disabled="@busy" @onclick="() => importing = !importing">@T("ImportSource")</button>
         }
     </Actions>
