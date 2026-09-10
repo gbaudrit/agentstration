@@ -187,7 +187,7 @@ public sealed class SecretManagementService(
         var name = secret.Name;
         var scopeRef = RequireScope(secret);
         if ((await GetSecretUsagesAsync(scopeRef, name, cancellationToken)).Count > 0)
-            throw new SecretManagementException($"Secret '{name}' is referenced by an extension registration.");
+            throw new SecretManagementException($"Secret '{name}' is referenced by a managed resource.");
         await DeleteValueAsync(secret, cancellationToken);
         await scopeOperations.WriteAsync(ResourceKinds.Secret, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
@@ -217,6 +217,20 @@ public sealed class SecretManagementService(
                 registrationScope,
                 cancellationToken);
             if (resolved?.Value.ScopeRef == scopeRef)
+                usages.Add(new(registration.Value.Kind, registration.Value.Name, registration.Value.Definition.DisplayName));
+        }
+        foreach (var registration in await store.ListExactAsync<SourceRegistryRegistrationResource>(
+                     ResourceScopeRef.Instance,
+                     ResourceKinds.SourceRegistryRegistration,
+                     0,
+                     1000,
+                     cancellationToken))
+        {
+            var credential = registration.Value.Definition.Credential;
+            if (scopeRef != ResourceScopeRef.Instance || credential is null
+                || !string.Equals(credential.Name, name, StringComparison.Ordinal)) continue;
+            var address = credential.Resolve(registration.Value.Namespace, ResourceKinds.Secret);
+            if (address.Namespace == ResourceNamespace.Default)
                 usages.Add(new(registration.Value.Kind, registration.Value.Name, registration.Value.Definition.DisplayName));
         }
         return usages;

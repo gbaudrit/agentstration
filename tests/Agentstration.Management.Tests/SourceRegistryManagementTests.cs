@@ -36,9 +36,12 @@ public sealed class SourceRegistryManagementTests
 
         using var update = new HttpRequestMessage(HttpMethod.Put, $"/api/sourceregistries/{SourceRegistryWellKnown.OfficialName}")
         {
-            Content = JsonContent.Create(new UpdateOfficialSourceRegistryRequest(
-                "https://registry.example/v1/index.json",
-                false))
+            Content = JsonContent.Create(new PutSourceRegistryRequest(
+                official.Registration.Definition with
+                {
+                    IndexUrl = new Uri("https://registry.example/v1/index.json"),
+                    Enabled = false
+                }))
         };
         update.Headers.TryAddWithoutValidation("If-Match", official.Registration.ETag);
         using var response = await client.SendAsync(update);
@@ -48,9 +51,143 @@ public sealed class SourceRegistryManagementTests
         Assert.IsFalse(changed.Registration.Definition.Enabled);
         Assert.AreEqual(SourceRegistryObservedStatus.Disabled, changed.Observed.Definition.Status);
 
+        using var create = await client.PostAsJsonAsync("/api/sourceregistries", new CreateSourceRegistryRequest(
+            "community",
+            new SourceRegistryRegistrationProperties
+            {
+                DisplayName = "Community registry",
+                IndexUrl = new Uri("https://registry.community.example/v1/index.json"),
+                TrustPolicy = SourceRegistryTrustPolicy.Untrusted
+            }));
+        Assert.AreEqual(HttpStatusCode.Created, create.StatusCode, await create.Content.ReadAsStringAsync());
+        var community = await create.Content.ReadFromJsonAsync<SourceRegistryRegistrationView>();
+        Assert.IsNotNull(community);
+
+        using var put = new HttpRequestMessage(HttpMethod.Put, "/api/sourceregistries/community")
+        {
+            Content = JsonContent.Create(new PutSourceRegistryRequest(
+                community.Registration.Definition with { DisplayName = "Community registry updated", Enabled = false }))
+        };
+        put.Headers.TryAddWithoutValidation("If-Match", community.Registration.ETag);
+        using var putResponse = await client.SendAsync(put);
+        Assert.AreEqual(HttpStatusCode.OK, putResponse.StatusCode, await putResponse.Content.ReadAsStringAsync());
+        var updatedCommunity = await putResponse.Content.ReadFromJsonAsync<SourceRegistryRegistrationView>();
+        Assert.IsNotNull(updatedCommunity);
+
+        using var stale = new HttpRequestMessage(HttpMethod.Put, "/api/sourceregistries/community")
+        {
+            Content = JsonContent.Create(new PutSourceRegistryRequest(community.Registration.Definition))
+        };
+        stale.Headers.TryAddWithoutValidation("If-Match", community.Registration.ETag);
+        using var staleResponse = await client.SendAsync(stale);
+        Assert.AreEqual(HttpStatusCode.Conflict, staleResponse.StatusCode);
+
+        using var delete = new HttpRequestMessage(HttpMethod.Delete, "/api/sourceregistries/community");
+        delete.Headers.TryAddWithoutValidation("If-Match", updatedCommunity.Registration.ETag);
+        using var deleteResponse = await client.SendAsync(delete);
+        Assert.AreEqual(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+        Assert.AreEqual(HttpStatusCode.NotFound, (await client.GetAsync("/api/sourceregistries/community")).StatusCode);
+
         var audits = await factory.Services.GetRequiredService<ISecurityAuditStore>().ListLatestAsync(20, default);
         Assert.IsTrue(audits.Any(value => value.Action == SecurityAuditActions.SourceRegistryConfigurationUpdated
             && value.ActorPrincipalId == context.Context.PrincipalId));
+        Assert.IsTrue(audits.Any(value => value.Action == SecurityAuditActions.SourceRegistryCreated));
+        Assert.IsTrue(audits.Any(value => value.Action == SecurityAuditActions.SourceRegistryDeleted));
+    }
+
+    [TestMethod]
+    public async Task EndpointAndCredentialPoliciesAreExplicitAndInstanceScoped()
+    {
+        using var fixture = new Fixture();
+        var privateFailure = await Assert.ThrowsAsync<SourceRegistryOperationException>(() => fixture.Service.CreateAsync(
+            "private-denied",
+            Registration("https://127.0.0.1/v1/index.json"),
+            default));
+        Assert.AreEqual("source_registry_endpoint_policy_denied", privateFailure.Code);
+
+        var httpFailure = await Assert.ThrowsAsync<SourceRegistryOperationException>(() => fixture.Service.CreateAsync(
+            "http-denied",
+            Registration("http://registry.internal/v1/index.json"),
+            default));
+        Assert.AreEqual("source_registry_index_url_invalid", httpFailure.Code);
+
+        _ = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, new VaultResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.Vault,
+            Metadata = new ResourceMetadata { Name = "registry-vault" },
+            ScopeRef = ResourceScopeRef.Instance,
+            Definition = new VaultProperties { DisplayName = "Registry vault", ProviderType = "local" }
+        }, null, true, default);
+        _ = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, new SecretResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.Secret,
+            Metadata = new ResourceMetadata { Name = "registry-token" },
+            ScopeRef = ResourceScopeRef.Instance,
+            Definition = new SecretProperties
+            {
+                DisplayName = "Registry token",
+                Key = "registry-token",
+                Vault = new ResourceReference("registry-vault", ResourceScopeRef.Instance)
+            }
+        }, null, true, default);
+
+        var scopeFailure = await Assert.ThrowsAsync<SourceRegistryOperationException>(() => fixture.Service.CreateAsync(
+            "wrong-scope",
+            Registration("https://registry.example/v1/index.json") with
+            {
+                AuthenticationMode = SourceRegistryAuthenticationMode.StaticBearer,
+                Credential = new ResourceReference("registry-token")
+            },
+            default));
+        Assert.AreEqual("source_registry_credential_scope_invalid", scopeFailure.Code);
+
+        var created = await fixture.Service.CreateAsync(
+            "private-registry",
+            Registration("http://127.0.0.1/v1/index.json") with
+            {
+                EndpointPolicy = new SourceRegistryEndpointPolicy { AllowHttp = true, AllowPrivateNetwork = true },
+                AuthenticationMode = SourceRegistryAuthenticationMode.StaticBearer,
+                Credential = new ResourceReference("registry-token", ResourceScopeRef.Instance)
+            },
+            default);
+        Assert.AreEqual(SourceRegistryAuthenticationMode.StaticBearer, created.Value.Definition.AuthenticationMode);
+        Assert.AreEqual("registry-token", created.Value.Definition.Credential!.Name);
+    }
+
+    private static SourceRegistryRegistrationProperties Registration(string indexUrl) => new()
+    {
+        DisplayName = "Test registry",
+        IndexUrl = new Uri(indexUrl)
+    };
+
+    [TestMethod]
+    public async Task DeletingRegistrationPreservesRefreshHistoryAndCachedObservation()
+    {
+        using var fixture = new Fixture();
+        var created = await fixture.Service.CreateAsync(
+            "community-history",
+            Registration("https://registry.example/v1/index.json"),
+            default);
+        var shard = RegistryJson("compatible");
+        var digest = new SourceRegistryReader().Read(shard, "registry-compatible.json").RegistryDigest;
+        fixture.Documents.Enqueue(Document("https://registry.example/v1/index.json", "index.json", IndexJson(digest)));
+        fixture.Documents.Enqueue(Document("https://registry.example/v1/registry-compatible.json", "registry-compatible.json", shard));
+        var refreshed = await fixture.Service.RefreshAsync("community-history", default);
+        var observationId = refreshed.Observed.Definition.Current!.Id;
+
+        await fixture.Service.DeleteAsync("community-history", created.ETag, default);
+
+        Assert.IsNull(await fixture.Service.GetAsync("community-history", default));
+        Assert.IsNotNull(await fixture.Cache.GetAsync(observationId, default));
+        var history = await fixture.Store.ListExactAsync<SourceRegistryRefreshRecordResource>(
+            ResourceScopeRef.Instance,
+            ResourceKinds.SourceRegistryRefreshRecord,
+            0,
+            100,
+            default);
+        Assert.IsTrue(history.Any(value => value.Value.Definition.RegistrationUid == created.Value.Uid));
     }
 
     [TestMethod]
@@ -330,7 +467,7 @@ public sealed class SourceRegistryManagementTests
         public Exception? Failure { get; set; }
         public void Enqueue(RetrievedSourceRegistryDocument response) => responses.Enqueue(response);
 
-        public Task<RetrievedSourceRegistryDocument> RetrieveAsync(Uri source, string? etag, DateTimeOffset? lastModified, int maximumBytes, CancellationToken cancellationToken)
+        public Task<RetrievedSourceRegistryDocument> RetrieveAsync(Uri source, string? etag, DateTimeOffset? lastModified, int maximumBytes, SourceRegistryRetrievalContext context, CancellationToken cancellationToken)
         {
             Requests.Add((source, etag, lastModified));
             if (Failure is not null) throw Failure;

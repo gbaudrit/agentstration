@@ -4,13 +4,16 @@ using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Text;
 using Agentstration.Management.Abstractions;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Infrastructure.Sources;
 
 public sealed class HttpSourceRegistryDocumentRetriever(
     HttpClient client,
-    SourceRegistryTransportOptions options) : ISourceRegistryDocumentRetriever
+    SourceRegistryTransportOptions options,
+    ISecretResolver? secrets = null) : ISourceRegistryDocumentRetriever
 {
+    private static readonly HttpRequestOptionsKey<SourceRegistryEndpointPolicy> EndpointPolicyKey = new("Agentstration.SourceRegistry.EndpointPolicy");
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly HashSet<string> AllowedMediaTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -25,9 +28,11 @@ public sealed class HttpSourceRegistryDocumentRetriever(
         string? etag,
         DateTimeOffset? lastModified,
         int maximumBytes,
+        SourceRegistryRetrievalContext context,
         CancellationToken cancellationToken)
     {
-        ValidateEndpoint(source);
+        ArgumentNullException.ThrowIfNull(context);
+        ValidateEndpoint(source, context.EndpointPolicy);
         if (maximumBytes is < 1 or > SourceRegistryLimits.MaximumDocumentBytes)
             throw new ArgumentOutOfRangeException(nameof(maximumBytes));
 
@@ -35,6 +40,8 @@ public sealed class HttpSourceRegistryDocumentRetriever(
         for (var redirect = 0; ; redirect++)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, current);
+            request.Options.Set(EndpointPolicyKey, context.EndpointPolicy);
+            request.Headers.ConnectionClose = true;
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/yaml"));
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/x-yaml"));
@@ -47,6 +54,20 @@ public sealed class HttpSourceRegistryDocumentRetriever(
             }
             if (lastModified is not null) request.Headers.IfModifiedSince = lastModified;
 
+            using var credential = await ResolveCredentialAsync(context, cancellationToken);
+            if (credential is not null)
+            {
+                string token;
+                try { token = StrictUtf8.GetString(credential.Value.AccessValue().Span); }
+                catch (DecoderFallbackException exception)
+                {
+                    throw new SourceRetrievalException("source_registry_credential_invalid", "The registry credential is not a valid Bearer token.", exception);
+                }
+                if (token.Length is < 1 or > 8192 || token.Any(char.IsWhiteSpace) || token.Any(char.IsControl))
+                    throw new SourceRetrievalException("source_registry_credential_invalid", "The registry credential is not a valid Bearer token.");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
             using var response = await SendAsync(request, cancellationToken);
             if (IsRedirect(response.StatusCode))
             {
@@ -57,7 +78,7 @@ public sealed class HttpSourceRegistryDocumentRetriever(
                 var next = response.Headers.Location.IsAbsoluteUri
                     ? response.Headers.Location
                     : new Uri(current, response.Headers.Location);
-                ValidateEndpoint(next);
+                ValidateEndpoint(next, context.EndpointPolicy);
                 if (!SameOrigin(source, next))
                     throw new SourceRetrievalException("source_registry_redirect_origin_invalid", "Registry redirects must remain on the configured origin.");
                 current = next;
@@ -93,18 +114,21 @@ public sealed class HttpSourceRegistryDocumentRetriever(
             AllowAutoRedirect = false,
             ConnectTimeout = TimeSpan.FromSeconds(options.ConnectTimeoutSeconds),
             PooledConnectionLifetime = TimeSpan.FromSeconds(options.PooledConnectionLifetimeSeconds),
-            ConnectCallback = ConnectPublicAsync
+            ConnectCallback = ConnectAllowedAsync
         };
     }
 
-    private static async ValueTask<Stream> ConnectPublicAsync(
+    private static async ValueTask<Stream> ConnectAllowedAsync(
         SocketsHttpConnectionContext context,
         CancellationToken cancellationToken)
     {
+        var policy = context.InitialRequestMessage.Options.TryGetValue(EndpointPolicyKey, out var requestPolicy)
+            ? requestPolicy
+            : new SourceRegistryEndpointPolicy();
         var addresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
-        var allowed = addresses.Where(IsPublicAddress).ToArray();
+        var allowed = addresses.Where(address => SourceRegistryNetworkPolicy.IsAddressAllowed(address, policy.AllowPrivateNetwork)).ToArray();
         if (allowed.Length == 0)
-            throw new HttpRequestException("The registry resolved only to blocked network addresses.");
+            throw new SourceRegistryEndpointPolicyException();
         Exception? lastError = null;
         foreach (var address in allowed)
         {
@@ -131,9 +155,39 @@ public sealed class HttpSourceRegistryDocumentRetriever(
         {
             throw new SourceRetrievalException("source_registry_timeout", "The registry request timed out.");
         }
+        catch (HttpRequestException exception) when (ContainsEndpointPolicyFailure(exception))
+        {
+            throw new SourceRetrievalException("source_registry_endpoint_policy_denied", "The registry resolved only to addresses denied by its endpoint policy.", exception);
+        }
         catch (HttpRequestException exception)
         {
             throw new SourceRetrievalException("source_registry_unavailable", "The registry request failed.", exception);
+        }
+    }
+
+    private async Task<ResolvedSecret?> ResolveCredentialAsync(
+        SourceRegistryRetrievalContext context,
+        CancellationToken cancellationToken)
+    {
+        if (context.AuthenticationMode == SourceRegistryAuthenticationMode.None) return null;
+        if (context.AuthenticationMode != SourceRegistryAuthenticationMode.StaticBearer
+            || context.Credential is not { } credential
+            || secrets is null)
+            throw new SourceRetrievalException("source_registry_credential_unavailable", "The registry credential is unavailable.");
+        try
+        {
+            var address = credential.Resolve(context.Consumer.Namespace, ResourceKinds.Secret);
+            return await secrets.ResolveAsync(
+                new SecretReference(address, credential.ScopeRef),
+                new SecretResolutionContext(context.ConsumerScopeRef, context.Consumer),
+                cancellationToken)
+                ?? throw new SourceRetrievalException("source_registry_credential_unavailable", "The registry credential is unavailable.");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (SourceRetrievalException) { throw; }
+        catch (Exception exception)
+        {
+            throw new SourceRetrievalException("source_registry_credential_unavailable", "The registry credential is unavailable.", exception);
         }
     }
 
@@ -173,15 +227,18 @@ public sealed class HttpSourceRegistryDocumentRetriever(
         throw new SourceRetrievalException("source_registry_media_type_invalid", "The registry response media type is not supported.");
     }
 
-    private static void ValidateEndpoint(Uri endpoint)
+    private static void ValidateEndpoint(Uri endpoint, SourceRegistryEndpointPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
-        if (!endpoint.IsAbsoluteUri || endpoint.Scheme != Uri.UriSchemeHttps
+        var permittedScheme = endpoint.Scheme == Uri.UriSchemeHttps
+            || policy.AllowHttp && endpoint.Scheme == Uri.UriSchemeHttp;
+        if (!endpoint.IsAbsoluteUri || !permittedScheme
             || !string.IsNullOrEmpty(endpoint.UserInfo) || !string.IsNullOrEmpty(endpoint.Query)
             || !string.IsNullOrEmpty(endpoint.Fragment) || endpoint.AbsolutePath.Contains('%'))
-            throw new SourceRetrievalException("source_registry_url_invalid", "Registry URLs must be absolute HTTPS without credentials, query, fragment, or percent-encoding.");
-        if (IPAddress.TryParse(endpoint.IdnHost, out var address) && !IsPublicAddress(address))
-            throw new SourceRetrievalException("source_registry_address_blocked", "The registry URL targets a blocked network address.");
+            throw new SourceRetrievalException("source_registry_url_invalid", "Registry URLs must use an authorized HTTP(S) origin without credentials, query, fragment, or percent-encoding.");
+        if (IPAddress.TryParse(endpoint.IdnHost, out var address)
+            && !SourceRegistryNetworkPolicy.IsAddressAllowed(address, policy.AllowPrivateNetwork))
+            throw new SourceRetrievalException("source_registry_endpoint_policy_denied", "The registry URL targets an address denied by its endpoint policy.");
         if (!SupportedSuffix(endpoint))
             throw new SourceRetrievalException("source_registry_file_name_invalid", "Registry URLs must end in .json, .yaml, or .yml.");
     }
@@ -196,26 +253,14 @@ public sealed class HttpSourceRegistryDocumentRetriever(
         or HttpStatusCode.Redirect or HttpStatusCode.RedirectMethod or HttpStatusCode.TemporaryRedirect
         or HttpStatusCode.PermanentRedirect;
 
-    private static bool IsPublicAddress(IPAddress address)
+    private static bool ContainsEndpointPolicyFailure(Exception exception)
     {
-        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
-        if (address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any) || address.Equals(IPAddress.Broadcast)
-            || IPAddress.IsLoopback(address) || address.IsIPv6Multicast || address.IsIPv6LinkLocal)
-            return false;
-        if (address.AddressFamily == AddressFamily.InterNetworkV6)
-            return (address.GetAddressBytes()[0] & 0xfe) != 0xfc;
-        var bytes = address.GetAddressBytes();
-        return bytes[0] != 0
-            && bytes[0] != 10
-            && bytes[0] != 127
-            && !(bytes[0] == 100 && bytes[1] is >= 64 and <= 127)
-            && !(bytes[0] == 172 && bytes[1] is >= 16 and <= 31)
-            && !(bytes[0] == 192 && bytes[1] == 168)
-            && !(bytes[0] == 192 && bytes[1] == 0)
-            && !(bytes[0] == 169 && bytes[1] == 254)
-            && !(bytes[0] == 198 && bytes[1] is 18 or 19)
-            && !(bytes[0] == 198 && bytes[1] == 51 && bytes[2] == 100)
-            && !(bytes[0] == 203 && bytes[1] == 0 && bytes[2] == 113)
-            && bytes[0] < 224;
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+            if (current is SourceRegistryEndpointPolicyException) return true;
+        return false;
     }
+
+    private sealed class SourceRegistryEndpointPolicyException()
+        : Exception("The registry endpoint is denied by policy.");
+
 }

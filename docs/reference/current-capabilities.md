@@ -38,7 +38,7 @@ flowchart LR
 
 The management plane is the source of truth for agent definitions and desired state; runtime `AIAgent` instances are reconstructible. The Work Plane owns the functional lifecycle, interactions, history, and result of each `WorkItem`. Its architectural principle is **Microsoft-first, provider-neutral, cloud-optional**.
 
-The official static Source registry is available as an optional instance-owned discovery input. Platform administrators can inspect, disable or override its stable registration and trigger a bounded manual refresh. A refresh retrieves only compatible Registry v1 shards, validates canonical digests, and atomically retains a last-known-good observation with HTTP validators and refresh history. It never imports SourceVersion manifests or makes startup depend on the public network. See [Sources](../concepts/sources.md#official-source-registry).
+The official static Source registry is available as an optional instance-owned discovery input, and Platform administrators can add independent community or private enterprise registrations. Registrations have ETag-protected CRUD, explicit trust/network/refresh/cache policies, and optional instance Secret references resolved only for exact same-origin requests. A bounded manual refresh retrieves only compatible Registry v1 shards, validates canonical digests, and atomically retains a last-known-good observation with HTTP validators and refresh history. It never imports SourceVersion manifests or makes startup depend on the public network. See [Source registry registrations](source-registries.md).
 
 ## Schedule Triggers
 

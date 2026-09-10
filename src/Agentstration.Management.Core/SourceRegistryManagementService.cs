@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 
@@ -13,7 +14,7 @@ public sealed class SourceRegistryOperationException(string code, string message
     public bool Unavailable { get; } = unavailable;
 }
 
-public sealed class SourceRegistryManagementService(
+public sealed partial class SourceRegistryManagementService(
     IControlPlaneStore store,
     ISourceRegistryIndexReader indexReader,
     ISourceRegistryReader registryReader,
@@ -55,7 +56,8 @@ public sealed class SourceRegistryManagementService(
                     {
                         DisplayName = SourceRegistryWellKnown.OfficialDisplayName,
                         IndexUrl = new Uri(SourceRegistryWellKnown.OfficialIndexUrl),
-                        Enabled = true
+                        Enabled = true,
+                        TrustPolicy = SourceRegistryTrustPolicy.Authoritative
                     },
                     Status = SucceededStatus()
                 }, null, true, cancellationToken);
@@ -101,18 +103,72 @@ public sealed class SourceRegistryManagementService(
         string? ifMatch,
         CancellationToken cancellationToken)
     {
-        ValidateIndexUrl(indexUrl);
-        var actor = ActorPrincipalId();
         var existing = await GetRegistrationStoredAsync(SourceRegistryWellKnown.OfficialName, cancellationToken)
             ?? throw new SourceRegistryNotFoundException(SourceRegistryWellKnown.OfficialName);
+        return await UpdateAsync(
+            SourceRegistryWellKnown.OfficialName,
+            existing.Value.Definition with { IndexUrl = indexUrl, Enabled = enabled },
+            ifMatch,
+            cancellationToken);
+    }
+
+    public async Task<StoredResource<SourceRegistryRegistrationResource>> CreateAsync(
+        string name,
+        SourceRegistryRegistrationProperties definition,
+        CancellationToken cancellationToken)
+    {
+        var actor = ActorPrincipalId();
         try
         {
+            await ValidateDefinitionAsync(name, definition, cancellationToken);
+            var created = await scopeOperations.WriteAsync(
+                ResourceKinds.SourceRegistryRegistration,
+                ResourceScopeRef.Instance,
+                AuthorizationPermissions.ResourcesWrite,
+                async token =>
+                {
+                    var stored = await store.PutExactAsync(ResourceScopeRef.Instance, new SourceRegistryRegistrationResource
+                    {
+                        ApiVersion = ManagementApiVersions.CoreV1,
+                        Kind = ResourceKinds.SourceRegistryRegistration,
+                        Metadata = new ResourceMetadata { Name = name },
+                        ScopeRef = ResourceScopeRef.Instance,
+                        Generation = 1,
+                        Definition = definition with { DisplayName = definition.DisplayName.Trim() },
+                        Status = SucceededStatus()
+                    }, null, true, token);
+                    _ = await EnsureObservedAsync(stored.Value, token);
+                    return stored;
+                },
+                cancellationToken);
+            await audit.WriteAsync(new(SecurityAuditActions.SourceRegistryCreated, ActorPrincipalId: actor), cancellationToken);
+            return created;
+        }
+        catch
+        {
+            await AuditFailureAsync(SecurityAuditActions.SourceRegistryCreated, "source_registry_create_failed", actor, cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task<StoredResource<SourceRegistryRegistrationResource>> UpdateAsync(
+        string name,
+        SourceRegistryRegistrationProperties definition,
+        string? ifMatch,
+        CancellationToken cancellationToken)
+    {
+        var actor = ActorPrincipalId();
+        try
+        {
+            await ValidateDefinitionAsync(name, definition, cancellationToken);
+            var existing = await GetRegistrationStoredAsync(name, cancellationToken)
+                ?? throw new SourceRegistryNotFoundException(name);
             var updated = await scopeOperations.WriteAsync(existing.Value, ResourceScopeRef.Instance, AuthorizationPermissions.ResourcesWrite, async token =>
             {
                 var stored = await store.PutExactAsync(ResourceScopeRef.Instance, existing.Value with
                 {
                     Generation = checked(existing.Value.Generation + 1),
-                    Definition = existing.Value.Definition with { IndexUrl = indexUrl, Enabled = enabled },
+                    Definition = definition with { DisplayName = definition.DisplayName.Trim() },
                     Status = SucceededStatus()
                 }, ifMatch, false, token);
                 var observed = await EnsureObservedAsync(stored.Value, token);
@@ -131,23 +187,48 @@ public sealed class SourceRegistryManagementService(
         }
         catch
         {
-            await audit.WriteAsync(new(
-                SecurityAuditActions.SourceRegistryConfigurationUpdated,
-                SecurityAuditOutcome.Failed,
-                ActorPrincipalId: actor,
-                ReasonCode: "source_registry_update_failed"), cancellationToken);
+            await AuditFailureAsync(SecurityAuditActions.SourceRegistryConfigurationUpdated, "source_registry_update_failed", actor, cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task DeleteAsync(string name, string? ifMatch, CancellationToken cancellationToken)
+    {
+        var actor = ActorPrincipalId();
+        try
+        {
+            if (string.Equals(name, SourceRegistryWellKnown.OfficialName, StringComparison.Ordinal))
+                throw new SourceRegistryOperationException("source_registry_official_delete_forbidden", "The official Source registry can be disabled but not deleted.");
+            var existing = await GetRegistrationStoredAsync(name, cancellationToken)
+                ?? throw new SourceRegistryNotFoundException(name);
+            await scopeOperations.WriteAsync(existing.Value, ResourceScopeRef.Instance, AuthorizationPermissions.ResourcesDelete, async token =>
+            {
+                await store.DeleteExactAsync(
+                    ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default, ResourceKinds.SourceRegistryRegistration, name),
+                    ifMatch,
+                    token);
+                return true;
+            }, cancellationToken);
+            await audit.WriteAsync(new(SecurityAuditActions.SourceRegistryDeleted, ActorPrincipalId: actor), cancellationToken);
+        }
+        catch
+        {
+            await AuditFailureAsync(SecurityAuditActions.SourceRegistryDeleted, "source_registry_delete_failed", actor, cancellationToken);
             throw;
         }
     }
 
     public async Task<SourceRegistryRegistrationView> RefreshOfficialAsync(CancellationToken cancellationToken)
+        => await RefreshAsync(SourceRegistryWellKnown.OfficialName, cancellationToken);
+
+    public async Task<SourceRegistryRegistrationView> RefreshAsync(string name, CancellationToken cancellationToken)
     {
         var actor = ActorPrincipalId();
         return await scopeOperations.WriteAsync(
             ResourceKinds.SourceRegistryRegistration,
             ResourceScopeRef.Instance,
             AuthorizationPermissions.ResourcesWrite,
-            token => RefreshCoreAsync(SourceRegistryWellKnown.OfficialName, actor, token),
+            token => RefreshCoreAsync(name, actor, token),
             cancellationToken);
     }
 
@@ -181,7 +262,7 @@ public sealed class SourceRegistryManagementService(
             var attemptedAt = timeProvider.GetUtcNow();
             if (!registration.Value.Definition.Enabled)
             {
-                var disabled = new SourceRegistryOperationException("source_registry_disabled", "The official Source registry is disabled.");
+                var disabled = new SourceRegistryOperationException("source_registry_disabled", $"Source registry '{name}' is disabled.");
                 await RecordFailureAsync(registration.Value, observed, attemptedAt, SourceRegistryRefreshOutcome.Disabled, disabled, actor, cancellationToken);
                 throw disabled;
             }
@@ -194,6 +275,7 @@ public sealed class SourceRegistryManagementService(
                     current?.ETag,
                     current?.LastModified,
                     SourceRegistryLimits.MaximumIndexDocumentBytes,
+                    RetrievalContext(registration.Value),
                     cancellationToken);
                 if (retrievedIndex.NotModified)
                 {
@@ -237,6 +319,7 @@ public sealed class SourceRegistryManagementService(
                         null,
                         null,
                         SourceRegistryLimits.MaximumDocumentBytes,
+                        RetrievalContext(registration.Value),
                         cancellationToken);
                     if (retrievedShard.NotModified || retrievedShard.Content is null)
                         throw new SourceRegistryOperationException("source_registry_catalog_empty", $"Registry catalogue '{catalog.Name}' returned no content.");
@@ -352,6 +435,7 @@ public sealed class SourceRegistryManagementService(
                 SourceRegistryRefreshOutcome.Invalid => SourceRegistryObservedStatus.Invalid,
                 SourceRegistryRefreshOutcome.NoCompatibleCatalog => SourceRegistryObservedStatus.NoCompatibleCatalog,
                 SourceRegistryRefreshOutcome.Disabled => SourceRegistryObservedStatus.Disabled,
+                SourceRegistryRefreshOutcome.PolicyDenied => SourceRegistryObservedStatus.PolicyDenied,
                 _ => SourceRegistryObservedStatus.RefreshFailed
             };
         _ = await store.PutExactAsync(ResourceScopeRef.Instance, observed.Value with
@@ -418,7 +502,7 @@ public sealed class SourceRegistryManagementService(
         CancellationToken cancellationToken)
     {
         var existing = await GetObservedStoredAsync(registration.Name, cancellationToken);
-        if (existing is not null) return existing;
+        if (existing is not null && existing.Value.Definition.RegistrationUid == registration.Uid) return existing;
         try
         {
             return await store.PutExactAsync(ResourceScopeRef.Instance, new SourceRegistryObservedStateResource
@@ -436,7 +520,7 @@ public sealed class SourceRegistryManagementService(
                         : SourceRegistryObservedStatus.Disabled
                 },
                 Status = SucceededStatus()
-            }, null, true, cancellationToken);
+            }, existing?.ETag, existing is null, cancellationToken);
         }
         catch (ControlPlaneConcurrencyException)
         {
@@ -498,13 +582,67 @@ public sealed class SourceRegistryManagementService(
         return new Uri(indexUrl, ".");
     }
 
-    private static void ValidateIndexUrl(Uri indexUrl)
+    private async Task ValidateDefinitionAsync(
+        string name,
+        SourceRegistryRegistrationProperties definition,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        if (!RegistryNamePattern().IsMatch(name))
+            throw new SourceRegistryOperationException("source_registry_identity_invalid", "The registry name must be a canonical lowercase portable name.");
+        if (string.IsNullOrWhiteSpace(definition.DisplayName) || definition.DisplayName.Trim().Length > 256)
+            throw new SourceRegistryOperationException("source_registry_display_name_invalid", "The registry display name must contain 1 to 256 characters.");
+        if (!Enum.IsDefined(definition.TrustPolicy) || !Enum.IsDefined(definition.AuthenticationMode))
+            throw new SourceRegistryOperationException("source_registry_policy_invalid", "The registry policy contains an unsupported value.");
+        if (definition.RefreshPolicy.Interval < TimeSpan.FromMinutes(1)
+            || definition.RefreshPolicy.Interval > TimeSpan.FromDays(30))
+            throw new SourceRegistryOperationException("source_registry_refresh_policy_invalid", "The registry refresh interval must be between one minute and 30 days.");
+        if (definition.CachePolicy.RetainedObservations is < 1 or > 100)
+            throw new SourceRegistryOperationException("source_registry_cache_policy_invalid", "The registry cache must retain between 1 and 100 observations.");
+        ValidateIndexUrl(definition.IndexUrl, definition.EndpointPolicy);
+        await ValidateCredentialAsync(definition, cancellationToken);
+    }
+
+    private async Task ValidateCredentialAsync(
+        SourceRegistryRegistrationProperties definition,
+        CancellationToken cancellationToken)
+    {
+        if (definition.AuthenticationMode == SourceRegistryAuthenticationMode.None && definition.Credential is not null)
+            throw new SourceRegistryOperationException("source_registry_credential_invalid", "A registry credential requires staticBearer authentication.");
+        if (definition.AuthenticationMode == SourceRegistryAuthenticationMode.StaticBearer && definition.Credential is null)
+            throw new SourceRegistryOperationException("source_registry_credential_invalid", "Static Bearer authentication requires an instance Secret reference.");
+        if (definition.Credential is not { } credential) return;
+        if (credential.ScopeRef is not { } credentialScope || credentialScope != ResourceScopeRef.Instance)
+            throw new SourceRegistryOperationException("source_registry_credential_scope_invalid", "The registry credential must explicitly reference an instance-scoped Secret.");
+        var secretAddress = credential.Resolve(ResourceNamespace.Default, ResourceKinds.Secret);
+        var secret = (await store.GetExactAsync<SecretResource>(
+            ScopedResourceAddress.Create(ResourceScopeRef.Instance, secretAddress.Namespace, ResourceKinds.Secret, secretAddress.Name),
+            cancellationToken))?.Value;
+        if (secret is null)
+            throw new SourceRegistryOperationException("source_registry_credential_not_found", "The referenced registry credential Secret was not found.");
+        var vaultReference = secret.Definition.Vault;
+        if (vaultReference.ScopeRef is { } vaultScope && vaultScope != ResourceScopeRef.Instance)
+            throw new SourceRegistryOperationException("source_registry_credential_scope_invalid", "The registry credential Vault must be instance-scoped.");
+        var vaultAddress = vaultReference.Resolve(secret.Namespace, ResourceKinds.Vault);
+        if (await store.GetExactAsync<VaultResource>(
+                ScopedResourceAddress.Create(ResourceScopeRef.Instance, vaultAddress.Namespace, ResourceKinds.Vault, vaultAddress.Name),
+                cancellationToken) is null)
+            throw new SourceRegistryOperationException("source_registry_credential_vault_not_found", "The registry credential Vault was not found in the instance scope.");
+    }
+
+    private static void ValidateIndexUrl(Uri indexUrl, SourceRegistryEndpointPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(indexUrl);
-        if (!indexUrl.IsAbsoluteUri || indexUrl.Scheme != Uri.UriSchemeHttps
+        ArgumentNullException.ThrowIfNull(policy);
+        var permittedScheme = indexUrl.Scheme == Uri.UriSchemeHttps
+            || policy.AllowHttp && indexUrl.Scheme == Uri.UriSchemeHttp;
+        if (!indexUrl.IsAbsoluteUri || !permittedScheme
             || !string.IsNullOrEmpty(indexUrl.UserInfo) || !string.IsNullOrEmpty(indexUrl.Query)
-            || !string.IsNullOrEmpty(indexUrl.Fragment))
-            throw new SourceRegistryOperationException("source_registry_index_url_invalid", "The registry index URL must be absolute HTTPS without credentials, query, or fragment.");
+            || !string.IsNullOrEmpty(indexUrl.Fragment) || indexUrl.AbsolutePath.Contains('%'))
+            throw new SourceRegistryOperationException("source_registry_index_url_invalid", "The registry index URL must use an authorized HTTP(S) origin without credentials, query, fragment, or percent-encoding.");
+        if (System.Net.IPAddress.TryParse(indexUrl.IdnHost, out var address)
+            && !SourceRegistryNetworkPolicy.IsAddressAllowed(address, policy.AllowPrivateNetwork))
+            throw new SourceRegistryOperationException("source_registry_endpoint_policy_denied", "The registry endpoint is not allowed by its private-network policy.");
         _ = PublicationBase(indexUrl);
     }
 
@@ -524,11 +662,27 @@ public sealed class SourceRegistryManagementService(
     private static SourceRegistryRefreshOutcome Outcome(SourceRegistryOperationException exception) =>
         exception.Code == "no_compatible_registry_catalog"
             ? SourceRegistryRefreshOutcome.NoCompatibleCatalog
+            : exception.Code is "source_registry_endpoint_policy_denied" or "source_registry_address_blocked"
+                ? SourceRegistryRefreshOutcome.PolicyDenied
             : exception.Unavailable
                 ? SourceRegistryRefreshOutcome.Unavailable
                 : SourceRegistryRefreshOutcome.Invalid;
 
+    private static SourceRegistryRetrievalContext RetrievalContext(SourceRegistryRegistrationResource registration) =>
+        new(
+            ResourceScopeRef.Instance,
+            registration.Address,
+            registration.Definition.EndpointPolicy,
+            registration.Definition.AuthenticationMode,
+            registration.Definition.Credential);
+
+    private Task AuditFailureAsync(string action, string reason, Guid? actor, CancellationToken cancellationToken) =>
+        audit.WriteAsync(new(action, SecurityAuditOutcome.Failed, ActorPrincipalId: actor, ReasonCode: reason), cancellationToken);
+
     private Guid? ActorPrincipalId() => requestContext.IsInitialized ? requestContext.Current.PrincipalId : null;
 
     private static ResourceStatus SucceededStatus() => new() { ProvisioningState = ProvisioningState.Succeeded };
+
+    [GeneratedRegex("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$", RegexOptions.CultureInvariant)]
+    private static partial Regex RegistryNamePattern();
 }

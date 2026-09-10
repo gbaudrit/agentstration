@@ -87,15 +87,17 @@ List Sources with `GET /api/sources`, inspect their versions with `GET /api/sour
 
 The published `publisher/name` pair is immutable and cannot be changed by refreshing a Source. Renaming that identity requires deleting the local Source and importing the manifest under its new identity. The ETag-protected `DELETE /api/sources/{publisher}/{name}?scopeRef=...` operation removes the Source definition, versions, local configuration, import history, and Channel snapshot metadata. It does not uninstall Packs already installed from the Source, delete their retained provenance, or modify the external registry.
 
-## Official Source registry
+## Source registries
 
 Every installation seeds the instance-owned `agentstration-official` registration, pointing to `https://registry.agentstration.io/v1/index.json`, only when that registration is absent. A Platform administrator can change that URL or disable the registration with an ETag-protected `PUT /api/sourceregistries/agentstration-official`; startup never overwrites the persisted choice.
 
-`POST /api/sourceregistries/agentstration-official/refresh` performs the only refresh in this increment. It retrieves the index, selects every shard whose Agentstration Semantic Version interval contains the running version, validates each shard's canonical digest, and writes the complete publication to a new cache observation before making it current. It does not retrieve SourceVersion manifests, create Sources or Channels, merge another registry, schedule another refresh, or make a trust decision.
+Platform administrators can also create independent community and private enterprise registrations through `POST /api/sourceregistries`, then update, enable, disable, refresh, or delete them through the same canonical API. Every registration stores independent trust, endpoint, authentication, refresh, and cache policies. Private authentication retains only an explicitly instance-scoped Secret reference; the Bearer value is resolved immediately before a request and is never included in Registry resources, observations, cache, errors, logs, or audit records. HTTPS and public network destinations are required unless the exact registration explicitly opts into HTTP or private-network access.
+
+`POST /api/sourceregistries/{name}/refresh` retrieves the selected registry index, selects every shard whose Agentstration Semantic Version interval contains the running version, validates each shard's canonical digest, and writes the complete publication to a new cache observation before making it current. It does not retrieve SourceVersion manifests, create Sources or Channels, merge registries, schedule another refresh, or evaluate trust evidence.
 
 Configured state, observed state, immutable refresh history, and cached bytes remain separate. `GET /api/sourceregistries` and `GET /api/sourceregistries/agentstration-official` expose disabled, never-fetched, fresh, stale, invalid, and no-compatible-catalog states; `GET /api/sourceregistries/agentstration-official/refreshes` exposes bounded history. ETag and Last-Modified validators are reused on subsequent index requests. HTTP 304 keeps the exact current observation and catalogue provenance. Any invalid or unavailable replacement records an actionable error while retaining the previous last-known-good observation.
 
-Startup only ensures the local registration and observed-state records; it performs no network request. Registry availability therefore has no effect on direct Source imports or on already imported Sources, snapshots, Bootstrap Profiles, and Packs.
+Startup only ensures the local official registration and observed-state records; it performs no network request. Deleting an external registration removes desired configuration but preserves immutable refresh history and retained cache bytes for later provenance and retention processing. Registry availability therefore has no effect on direct Source imports or on already imported Sources, snapshots, Bootstrap Profiles, and Packs. See the [registration reference](../reference/source-registries.md) for the complete API and enterprise example.
 
 ## Optional verification index
 
