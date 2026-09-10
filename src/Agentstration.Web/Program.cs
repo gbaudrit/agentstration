@@ -1,18 +1,13 @@
-using System.Threading.RateLimiting;
-using Agentstration.Aep.Abstractions;
 using Agentstration.Application.Work;
 using Agentstration.Flow.Application;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Agents;
-using Agentstration.Infrastructure.Flows;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Security.AspNetCoreIdentity;
-using Agentstration.Security.AspNetCoreIdentity.PostgreSql;
 using Agentstration.Web;
 using Agentstration.Web.Api;
 using Agentstration.Web.Components;
@@ -21,13 +16,7 @@ using Agentstration.Web.Configuration;
 using Agentstration.Web.Features.Flows;
 using Agentstration.Web.Features.Workplace;
 using Agentstration.Web.Hosting;
-using Agentstration.Work;
-using Microsoft.AspNetCore.RateLimiting;
 using ModelContextProtocol.AspNetCore;
-using OpenTelemetry.Logs;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 var bootstrapOptions = new LocalBootstrapOptions();
@@ -38,12 +27,10 @@ if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration
     bootstrapOptions.ExternalIdentitySubject = configuredAuthentication.DevelopmentSubject;
     bootstrapOptions.PrincipalDisplayName = configuredAuthentication.DevelopmentDisplayName;
 }
-builder.Services.AddSingleton(bootstrapOptions);
 var genAiObservability = builder.Configuration.GetSection(GenAiObservabilityOptions.SectionName).Get<GenAiObservabilityOptions>() ?? new();
 genAiObservability.Validate(builder.Environment.IsDevelopment());
 var toolExecutionCapture = builder.Configuration.GetSection("Agentstration:ToolExecution").Get<ToolExecutionCaptureOptions>() ?? new();
 toolExecutionCapture.Validate();
-builder.Services.AddSingleton(toolExecutionCapture);
 var isTesting = builder.Environment.IsEnvironment("Testing");
 var hostedServicesEnabled = !isTesting
     || builder.Configuration.GetValue("Agentstration:Testing:HostedServicesEnabled", false);
@@ -98,84 +85,20 @@ var runtimeConnectionString = BuildSqliteConnectionString("Data:RuntimePath", "r
 var sourceVerificationIndexOptions = builder.Configuration
     .GetSection(Agentstration.Infrastructure.Sources.SourceVerificationIndexOptions.SectionName)
     .Get<Agentstration.Infrastructure.Sources.SourceVerificationIndexOptions>() ?? new();
-builder.Services.AddAgentstration(
-    dataDirectory,
-    aiOptions,
-    controlPlaneConnectionString,
-    workPlaneConnectionString,
-    flowConnectionString,
-    runtimeConnectionString,
-    storageOptions,
-    enableHostedServices: hostedServicesEnabled,
-    sourceVerificationIndexOptions: sourceVerificationIndexOptions);
-builder.Services.AddAgentstrationModelProviders(
-    builder.Configuration,
-    useManagedProfileResolver);
-builder.Services.AddSingleton(builder.Configuration
-    .GetSection(AepEnrollmentPolicyOptions.SectionName)
-    .Get<AepEnrollmentPolicyOptions>() ?? new());
-builder.Services.AddAgentstrationModelManagement();
-builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
-builder.Services.AddSingleton<IAepEnrollmentAnnouncementProvisioner>(provider => provider.GetRequiredService<ExtensionSourceDiscoveryService>());
-builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
-builder.Services.AddProblemDetails();
-builder.Services.AddRateLimiter(options =>
+var platformRegistrationOptions = new AgentstrationServiceRegistrationOptions
 {
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.OnRejected = static async (context, token) =>
-        await context.HttpContext.Response.WriteAsJsonAsync(
-            new { error = new AepEnrollmentError("rate_limited", "Too many enrollment requests; retry later.") }, token);
-    options.AddPolicy("aep-enrollment-public", context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 30,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            }));
-});
-builder.Services.AddAgentstrationOpenApi();
-builder.Services.AddRazorPages();
-builder.Services.AddRazorComponents().AddInteractiveServerComponents();
-builder.Services.AddAgentstrationLocalization(builder.Configuration);
-builder.Services.AddSignalR();
-if (storageProvider == AgentstrationStorageProvider.PostgreSql)
-    builder.Services.AddAgentstrationPostgreSqlIdentity(
-        identityConnectionString,
-        dataProtectionKeysPath,
-        useDevelopmentPasswordPolicy: builder.Environment.IsDevelopment());
-else
-    builder.Services.AddAgentstrationLocalIdentity(
-        identityConnectionString,
-        dataProtectionKeysPath,
-        useDevelopmentPasswordPolicy: builder.Environment.IsDevelopment());
-builder.Services.AddScoped<DeclarativeBootstrapService>();
-builder.Services.AddSingleton<BootstrapProfileCatalog>();
-builder.Services.AddSingleton<SourceBootstrapProfileLoader>();
-builder.Services.AddSingleton<BootstrapApplicationLock>();
-builder.Services.AddScoped<BootstrapProfileManagementService>();
-builder.Services.AddSingleton<SignalRFlowRunEventSink>();
-builder.Services.AddSingleton<WorkplaceFlowConversationProjectionSink>();
-builder.Services.AddSingleton<IFlowRunEventSink>(provider => new CompositeFlowRunEventSink(
-[
-    provider.GetRequiredService<WorkplaceFlowConversationProjectionSink>(),
-    provider.GetRequiredService<SignalRFlowRunEventSink>()
-]));
-builder.Services.AddSingleton<IWorkplaceEventSink, SignalRWorkplaceEventSink>();
-builder.Services.AddAgentstrationWebConsole(builder.Configuration, builder.Environment);
-builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();
-if (hostedServicesEnabled)
-{
-    builder.Services.AddHostedService<AgentDeploymentReconciliationWorker>();
-    builder.Services.AddHostedService<LocalWorkExecutionWorker>();
-    builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
-    builder.Services.AddHostedService<FlowRunExecutionWorker>();
-    builder.Services.AddHostedService<FlowRunRecoveryWorker>();
-}
-if (testingStorageDirectory is not null)
-{
-    var sqliteConnectionStrings = storageProvider == AgentstrationStorageProvider.Sqlite
+    DataDirectory = dataDirectory,
+    AiOptions = aiOptions,
+    ControlPlaneConnectionString = controlPlaneConnectionString,
+    WorkPlaneConnectionString = workPlaneConnectionString,
+    FlowConnectionString = flowConnectionString,
+    RuntimeConnectionString = runtimeConnectionString,
+    StorageOptions = storageOptions,
+    EnableHostedServices = hostedServicesEnabled,
+    SourceVerificationIndexOptions = sourceVerificationIndexOptions
+};
+var testingSqliteConnectionStrings = testingStorageDirectory is not null
+    && storageProvider == AgentstrationStorageProvider.Sqlite
         ? new[]
         {
             identityConnectionString,
@@ -185,51 +108,20 @@ if (testingStorageDirectory is not null)
             runtimeConnectionString!
         }
         : [];
-    builder.Services.AddSingleton(provider => new TestingDataDirectoryCleanup(
+builder.Services.AddAgentstrationWebHost(
+    builder.Configuration,
+    builder.Environment,
+    new WebHostServiceRegistrationOptions(
+        bootstrapOptions,
+        toolExecutionCapture,
+        platformRegistrationOptions,
+        storageProvider,
+        identityConnectionString,
+        dataProtectionKeysPath,
         testingStorageDirectory,
-        sqliteConnectionStrings,
-        provider.GetRequiredService<ILogger<TestingDataDirectoryCleanup>>()));
-}
-
-if (openTelemetryEnabled)
-{
-    var otlpEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-    builder.Logging.AddOpenTelemetry(logging =>
-    {
-        logging.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("Agentstration.Web"));
-        logging.IncludeScopes = true;
-        logging.IncludeFormattedMessage = true;
-        if (otlpEnabled) logging.AddOtlpExporter();
-    });
-    builder.Services.AddOpenTelemetry()
-        .ConfigureResource(resource => resource.AddService("Agentstration.Web"))
-        .WithTracing(tracing =>
-        {
-            tracing
-            .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddSource(
-                    WorkItemService.ActivitySource.Name,
-                    RuntimeRunService.ActivitySource.Name,
-                    FlowRunService.ActivitySource.Name,
-                    AgentFrameworkRuntimeFactory.TelemetrySourceName,
-                    GenAiObservabilityOptions.ChatClientSourceName,
-                    GenAiHttpPayloadCaptureHandler.TelemetrySourceName);
-            if (otlpEnabled) tracing.AddOtlpExporter();
-        })
-        .WithMetrics(metrics =>
-        {
-            metrics
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddMeter(
-                    WorkItemService.Meter.Name,
-                    FlowRunService.Meter.Name,
-                    AgentFrameworkRuntimeFactory.TelemetrySourceName,
-                    GenAiObservabilityOptions.ChatClientSourceName);
-            if (otlpEnabled) metrics.AddOtlpExporter();
-        });
-}
+        testingSqliteConnectionStrings,
+        useManagedProfileResolver));
+builder.AddAgentstrationObservability(openTelemetryEnabled);
 
 var app = builder.Build();
 var testingDataDirectoryCleanup = testingStorageDirectory is not null

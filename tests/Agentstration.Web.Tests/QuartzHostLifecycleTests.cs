@@ -4,12 +4,35 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Agentstration.Flow.Application;
+using Agentstration.Management.Abstractions;
+using Agentstration.ModelProviders;
+using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Web.Tests;
 
 [TestClass]
 public sealed class QuartzHostLifecycleTests
 {
+    [TestMethod]
+    public void StandardHostResolvesExactlyOneOfEachSingleServiceContract()
+    {
+        using var factory = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        });
+
+        _ = factory.CreateClient();
+
+        Assert.AreEqual(1, factory.Services.GetServices<TimeProvider>().Count());
+        Assert.AreEqual(1, factory.Services.GetServices<GenAiObservabilityOptions>().Count());
+        Assert.AreEqual(1, factory.Services.GetServices<GenAiHttpPayloadCaptureHandler>().Count());
+        Assert.AreEqual(1, factory.Services.GetServices<IModelProfileReferenceValidator>().Count());
+        Assert.AreEqual(1, factory.Services.GetServices<IRuntimeRunExecutionScope>().Count());
+        Assert.AreEqual(1, factory.Services.GetServices<IFlowRunEventSink>().Count());
+    }
+
     [TestMethod]
     public async Task DefaultTestingDataDirectoryIsRemovedAfterHostShutdown()
     {

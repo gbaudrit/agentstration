@@ -35,6 +35,61 @@ namespace Agentstration.ArchitectureTests;
 public sealed class DependencyTests
 {
     [TestMethod]
+    public void ExecutableCompositionRootsDelegateServiceRegistration()
+    {
+        var root = FindRepositoryRoot();
+        var programs = new[]
+        {
+            Path.Combine(root, "src", "Agentstration.Web", "Program.cs"),
+            Path.Combine(root, "src", "Agentstration.Workplace.Web", "Program.cs")
+        };
+
+        var directRegistrations = new[]
+        {
+            "builder.Services.AddSingleton",
+            "builder.Services.AddScoped",
+            "builder.Services.AddTransient",
+            "builder.Services.AddHostedService",
+            "builder.Services.AddHttpClient"
+        };
+        var violations = programs
+            .Where(path =>
+            {
+                var source = File.ReadAllText(path);
+                return directRegistrations.Any(value => source.Contains(value, StringComparison.Ordinal));
+            })
+            .Select(path => Path.GetRelativePath(root, path))
+            .ToArray();
+
+        Assert.IsEmpty(
+            violations,
+            $"Executable composition roots must delegate service registration: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
+    public void InfrastructureCompositionFacadeContainsNoConcreteRegistrations()
+    {
+        var path = Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Agentstration.Infrastructure",
+            "DependencyInjection.cs");
+        var source = File.ReadAllText(path);
+        var registrationCalls = new[]
+        {
+            ".AddSingleton",
+            ".AddScoped",
+            ".AddTransient",
+            ".AddHostedService",
+            ".AddHttpClient"
+        };
+
+        Assert.IsFalse(
+            registrationCalls.Any(value => source.Contains(value, StringComparison.Ordinal)),
+            "AddAgentstration must remain a composition facade over focused registration extensions.");
+    }
+
+    [TestMethod]
     public void WorkplaceRealtimeClientIsScopedPerBlazorCircuit()
     {
         var services = new ServiceCollection();
