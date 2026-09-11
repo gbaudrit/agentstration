@@ -1,5 +1,5 @@
 @page "/settings/organization/access"
-@inject Agentstration.Management.Core.IdentityAdministrationService Service
+@inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
 <PageTitle>@T("AccessControl") · @T("Organization") · Agentstration</PageTitle>
@@ -14,9 +14,9 @@ else
     </DataGrid>
 }
 @code {
-    private sealed record AccessRow(Agentstration.Management.Core.MemberAdministrationView Member, Agentstration.Management.Core.AssignedRoleView Assignment);
-    private Agentstration.Management.Core.TenantAdministrationView? view;
+    private sealed record AccessRow(Agentstration.Management.Contracts.OrganizationMemberResponse Member, Agentstration.Management.Contracts.AssignedRoleResponse Assignment);
+    private Agentstration.Management.Contracts.OrganizationAdministrationResponse? view;
     private string T(string key) => Localizer[key].Value;
     private IReadOnlyList<AccessRow> Rows => view?.Members.SelectMany(member => member.Roles.Select(role => new AccessRow(member, role))).ToArray() ?? [];
-    protected override async Task OnInitializedAsync() => view = await Service.GetCurrentAsync(default);
+    protected override async Task OnInitializedAsync() => view = await Client.GetOrganizationAsync(default);
 }

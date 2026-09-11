@@ -1,5 +1,5 @@
 @page "/settings/organization"
-@inject Agentstration.Management.Core.IdentityAdministrationService Service
+@inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
 <PageTitle>@T("Organization") · Agentstration</PageTitle>
@@ -43,7 +43,7 @@ else
 }
 
 @code {
-    private Agentstration.Management.Core.TenantAdministrationView? view;
+    private Agentstration.Management.Contracts.OrganizationAdministrationResponse? view;
     private string T(string key) => Localizer[key].Value;
-    protected override async Task OnInitializedAsync() => view = await Service.GetCurrentAsync(CancellationToken.None);
+    protected override async Task OnInitializedAsync() => view = await Client.GetOrganizationAsync(CancellationToken.None);
 }

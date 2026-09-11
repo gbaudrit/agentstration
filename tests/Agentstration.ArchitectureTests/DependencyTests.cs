@@ -60,6 +60,26 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void OrganizationComponentsUseTheIdentityHttpClientBoundary()
+    {
+        var pages = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Web", "Components", "Pages");
+        var forbidden = new[]
+        {
+            "Agentstration.Management.Core",
+            "Agentstration.Security.AspNetCoreIdentity",
+            "ICurrentRequestContext",
+            "IPlatformAuthorizationService",
+            "AgentstrationWebOptions"
+        };
+        var violations = Directory.EnumerateFiles(pages, "Organization*.razor")
+            .Where(path => forbidden.Any(value => File.ReadAllText(path).Contains(value, StringComparison.Ordinal)))
+            .Select(Path.GetFileName)
+            .ToArray();
+
+        Assert.IsEmpty(violations, $"Organization components must use IIdentityAdministrationApiClient: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
     public void WorkplaceRealtimeClientIsScopedPerBlazorCircuit()
     {
         var services = new ServiceCollection();

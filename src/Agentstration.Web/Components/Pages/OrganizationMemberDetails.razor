@@ -1,10 +1,6 @@
 @page "/settings/organization/members/{UserId:guid}"
-@inject Agentstration.Management.Core.IdentityAdministrationService Service
-@inject Agentstration.Management.Core.WorkspaceMembershipAdministrationService Memberships
-@inject Agentstration.Management.Core.PlatformAdministratorAdministrationService PlatformAdministrators
-@inject Agentstration.Management.Core.ExternalIdentityAdministrationService ExternalIdentities
-@inject Agentstration.Management.Abstractions.ICurrentRequestContext RequestContext
-@inject Agentstration.Management.Abstractions.IPlatformAuthorizationService PlatformAuthorization
+@inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
+@inject ConsoleContextState ContextState
 @inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
 <PageTitle>@T("MemberAccess") · Agentstration</PageTitle>
@@ -21,7 +17,7 @@ else
     <section class="panel" style="margin-top:18px">
         <div class="panel-header"><div><h2>@T("CurrentWorkspaceMembership")</h2><p class="muted">@T("WorkspaceMembershipHelp")</p></div></div>
         @if (!string.IsNullOrWhiteSpace(message)) { <p class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")">@message</p> }
-        <div class="form-grid"><label><span>@T("Role")</span><select @bind="selectedRole">@foreach(var role in Agentstration.Management.Core.BuiltInIdentityRoles.Names){<option value="@role">@role</option>}</select></label></div>
+        <div class="form-grid"><label><span>@T("Role")</span><select @bind="selectedRole">@foreach(var role in Agentstration.Management.Contracts.BuiltInIdentityRoleNames.All){<option value="@role">@role</option>}</select></label></div>
         <div class="form-actions"><button class="button-primary" @onclick="SaveMembershipAsync">@T("SaveRole")</button>@if(workspaceMembership is not null){<button class="button-secondary" @onclick="RemoveMembershipAsync">@T("RemoveFromWorkspace")</button>}</div>
     </section>
     @if (canManagePlatformAdministrators)
@@ -48,7 +44,7 @@ else
             <div class="form-actions">
                 @if (targetIsPlatformAdministrator)
                 {
-                    <button class="button-secondary" @onclick="RevokePlatformAdministratorAsync" disabled="@(UserId == RequestContext.Current.PrincipalId)">@T("RevokePlatformAdmin")</button>
+                    <button class="button-secondary" @onclick="RevokePlatformAdministratorAsync" disabled="@(UserId == ContextState.Current?.UserId)">@T("RevokePlatformAdmin")</button>
                 }
                 else
                 {
@@ -61,60 +57,62 @@ else
 
 @code {
     [Parameter] public Guid UserId { get; set; }
-    private Agentstration.Management.Core.MemberAdministrationView? member;
-    private Agentstration.Management.Core.WorkspaceMemberView? workspaceMembership; private string selectedRole = Agentstration.Management.Core.BuiltInIdentityRoles.Viewer; private string? message; private bool hasError;
+    private Agentstration.Management.Contracts.OrganizationMemberResponse? member;
+    private Agentstration.Management.Contracts.WorkspaceMemberResponse? workspaceMembership; private string selectedRole = Agentstration.Management.Contracts.BuiltInIdentityRoleNames.Viewer; private string? message; private bool hasError;
     private bool canManagePlatformAdministrators; private bool targetIsPlatformAdministrator; private string? platformMessage; private bool platformError;
     private string newIssuer = ""; private string newSubject = ""; private string? identityMessage; private bool identityError;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     protected override async Task OnParametersSetAsync()
     {
-        member = (await Service.GetCurrentAsync(default)).Members.SingleOrDefault(value => value.Principal.Id == UserId);
-        workspaceMembership = (await Memberships.ListAsync(RequestContext.Current.WorkspaceId, default)).SingleOrDefault(value => value.Principal.Id == UserId);
-        selectedRole = workspaceMembership?.Role ?? Agentstration.Management.Core.BuiltInIdentityRoles.Viewer;
-        canManagePlatformAdministrators = await PlatformAuthorization.IsPlatformAdministratorAsync(RequestContext.Current.PrincipalId, default);
+        if (ContextState.Current is null) await ContextState.LoadAsync(default);
+        var workspaceId = ContextState.Current?.WorkspaceId ?? throw new InvalidOperationException("The Console context is unavailable.");
+        member = (await Client.GetOrganizationAsync(default)).Members.SingleOrDefault(value => value.Principal.Id == UserId);
+        workspaceMembership = (await Client.GetWorkspaceMembersAsync(workspaceId, default)).SingleOrDefault(value => value.Principal.Id == UserId);
+        selectedRole = workspaceMembership?.Role ?? Agentstration.Management.Contracts.BuiltInIdentityRoleNames.Viewer;
+        canManagePlatformAdministrators = (await Client.GetCapabilitiesAsync(default)).IsPlatformAdministrator;
         if (canManagePlatformAdministrators)
-            targetIsPlatformAdministrator = (await PlatformAdministrators.ListAsync(default)).Any(value => value.Principal.Id == UserId);
+            targetIsPlatformAdministrator = (await Client.GetPlatformAdministratorsAsync(default)).Any(value => value.Principal.Id == UserId);
     }
     private async Task SaveMembershipAsync()
     {
-        try { workspaceMembership = await Memberships.SetAsync(RequestContext.Current.WorkspaceId, UserId, selectedRole, default); hasError = false; message = T("WorkspaceRoleUpdated"); }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { hasError = true; message = exception.Message; }
+        try { workspaceMembership = await Client.SetWorkspaceMembershipAsync(ContextState.Current!.WorkspaceId, UserId, selectedRole, default); hasError = false; message = T("WorkspaceRoleUpdated"); }
+        catch (Agentstration.Web.Console.AgentstrationApiException exception) { hasError = true; message = exception.Message; }
     }
     private async Task RemoveMembershipAsync()
     {
-        try { await Memberships.RemoveAsync(RequestContext.Current.WorkspaceId, UserId, default); workspaceMembership = null; hasError = false; message = T("PrincipalRemoved"); }
-        catch (InvalidOperationException exception) { hasError = true; message = exception.Message; }
+        try { await Client.RemoveWorkspaceMembershipAsync(ContextState.Current!.WorkspaceId, UserId, default); workspaceMembership = null; hasError = false; message = T("PrincipalRemoved"); }
+        catch (Agentstration.Web.Console.AgentstrationApiException exception) { hasError = true; message = exception.Message; }
     }
     private async Task GrantPlatformAdministratorAsync()
     {
-        try { await PlatformAdministrators.GrantAsync(UserId, default); targetIsPlatformAdministrator = true; platformError = false; platformMessage = T("PlatformAdminGranted"); }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { platformError = true; platformMessage = exception.Message; }
+        try { await Client.GrantPlatformAdministratorAsync(UserId, default); targetIsPlatformAdministrator = true; platformError = false; platformMessage = T("PlatformAdminGranted"); }
+        catch (Agentstration.Web.Console.AgentstrationApiException exception) { platformError = true; platformMessage = exception.Message; }
     }
     private async Task RevokePlatformAdministratorAsync()
     {
-        try { await PlatformAdministrators.RevokeAsync(UserId, default); targetIsPlatformAdministrator = false; platformError = false; platformMessage = T("PlatformAdminRevoked"); }
-        catch (InvalidOperationException exception) { platformError = true; platformMessage = exception.Message; }
+        try { await Client.RevokePlatformAdministratorAsync(UserId, default); targetIsPlatformAdministrator = false; platformError = false; platformMessage = T("PlatformAdminRevoked"); }
+        catch (Agentstration.Web.Console.AgentstrationApiException exception) { platformError = true; platformMessage = exception.Message; }
     }
     private async Task LinkExternalIdentityAsync()
     {
         try
         {
-            await ExternalIdentities.LinkAsync(UserId, newIssuer, newSubject, default);
-            member = (await Service.GetCurrentAsync(default)).Members.Single(value => value.Principal.Id == UserId);
+            await Client.LinkExternalIdentityAsync(UserId, newIssuer, newSubject, default);
+            member = (await Client.GetOrganizationAsync(default)).Members.Single(value => value.Principal.Id == UserId);
             newIssuer = newSubject = ""; identityError = false; identityMessage = T("ExternalIdentityLinked");
         }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or ControlPlaneConcurrencyException)
+        catch (Agentstration.Web.Console.AgentstrationApiException exception)
         { identityError = true; identityMessage = exception.Message; }
     }
     private async Task UnlinkExternalIdentityAsync(Guid externalIdentityId)
     {
         try
         {
-            await ExternalIdentities.UnlinkAsync(UserId, externalIdentityId, default);
-            member = (await Service.GetCurrentAsync(default)).Members.Single(value => value.Principal.Id == UserId);
+            await Client.UnlinkExternalIdentityAsync(UserId, externalIdentityId, default);
+            member = (await Client.GetOrganizationAsync(default)).Members.Single(value => value.Principal.Id == UserId);
             identityError = false; identityMessage = T("ExternalIdentityUnlinked");
         }
-        catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException)
+        catch (Agentstration.Web.Console.AgentstrationApiException exception)
         { identityError = true; identityMessage = exception.Message; }
     }
 }

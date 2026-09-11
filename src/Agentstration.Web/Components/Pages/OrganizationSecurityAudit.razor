@@ -1,5 +1,5 @@
 @page "/settings/organization/security-audit"
-@inject Agentstration.Management.Core.SecurityAuditService Audit
+@inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
 <PageTitle>@T("SecurityAudit") · @T("Organization") · Agentstration</PageTitle>
@@ -42,8 +42,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        try { events = await Audit.ListLatestAsync(200, default); }
-        catch (AuthorizationDeniedException) { denied = true; }
+        try { events = await Client.GetSecurityAuditEventsAsync(200, default); }
+        catch (Agentstration.Web.Console.AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Forbidden) { denied = true; }
         finally { loading = false; }
     }
 

@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Contracts;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
@@ -9,13 +10,6 @@ public sealed record AepEnrollmentPolicyOptions
     public bool PairingCodeAllowed { get; init; } = true;
     public bool SharedKeyFileAllowed { get; init; } = true;
 }
-
-public sealed record AepEnrollmentSettingsSnapshot(
-    bool PairingCodeEnabled,
-    bool SharedKeyFileEnabled,
-    bool PairingCodeConfigurable,
-    bool SharedKeyFileConfigurable,
-    string? ETag);
 
 public sealed class AepEnrollmentSettingsService(
     IControlPlaneStore store,
