@@ -1,21 +1,9 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Contracts;
 using Agentstration.Web.Hosting;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web;
-
-public sealed record BootstrapProfilePreviewRequest(
-    IReadOnlyList<string> Profiles,
-    BootstrapApplicationTarget? Target = null,
-    IReadOnlyList<BootstrapBindingSelection>? Bindings = null,
-    BootstrapSourceProfileSelection? Source = null);
-
-public sealed record ApplyBootstrapProfilesRequest(
-    IReadOnlyList<string> Profiles,
-    string ExpectedDigest,
-    BootstrapApplicationTarget? Target = null,
-    IReadOnlyList<BootstrapBindingSelection>? Bindings = null,
-    BootstrapSourceProfileSelection? Source = null);
 
 public static class BootstrapProfileEndpoints
 {
@@ -23,11 +11,33 @@ public static class BootstrapProfileEndpoints
     {
         var group = endpoints.MapGroup("/api/bootstrap").RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         group.MapGet("/profiles", GetAsync);
+        group.MapPost("/source-profile", GetSourceProfileAsync);
+        group.MapPost("/binding-targets", GetBindingTargetsAsync);
         group.MapPost("/profiles/preview", PreviewAsync);
         group.MapPost("/applications", ApplyAsync);
         group.MapGet("/applications/{applicationId}", GetApplicationAsync);
         return endpoints;
     }
+
+    private static async Task<IResult> GetSourceProfileAsync(
+        BootstrapSourceProfileSelection request,
+        BootstrapProfileManagementService service,
+        ICurrentRequestContext requestContext,
+        CancellationToken cancellationToken) =>
+        await ExecuteAsync(async () => Results.Ok(await service.GetSourceProfileAsync(request, requestContext.Current.PrincipalId, cancellationToken)));
+
+    private static async Task<IResult> GetBindingTargetsAsync(
+        BootstrapBindingTargetsRequest request,
+        BootstrapProfileManagementService service,
+        ICurrentRequestContext requestContext,
+        CancellationToken cancellationToken) =>
+        await ExecuteAsync(async () => Results.Ok(await service.GetBindingTargetsAsync(
+            request.Target,
+            request.TargetKind,
+            request.Profiles ?? [],
+            requestContext.Current.PrincipalId,
+            cancellationToken,
+            request.Source)));
 
     private static async Task<IResult> GetAsync(
         BootstrapProfileManagementService service,

@@ -1,29 +1,8 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Contracts;
 using Agentstration.Resources;
 
 namespace Agentstration.Web.Hosting;
-
-public sealed record BootstrapTargetWorkspace(
-    Guid TenantId,
-    string TenantName,
-    string TenantDisplayName,
-    Guid WorkspaceId,
-    string WorkspaceName,
-    string WorkspaceDisplayName);
-
-public sealed record BootstrapTargetTenant(Guid Id, string Name, string DisplayName);
-
-public sealed record BootstrapBindingTargetOption(
-    string Name,
-    string Namespace,
-    string DisplayName,
-    bool Planned = false);
-
-public sealed record BootstrapManagementView(
-    BootstrapCatalogSnapshot Catalog,
-    IReadOnlyList<BootstrapTargetTenant> Tenants,
-    IReadOnlyList<BootstrapTargetWorkspace> Workspaces,
-    IReadOnlyList<BootstrapApplicationResource> Applications);
 
 public sealed class BootstrapApplicationLock
 {

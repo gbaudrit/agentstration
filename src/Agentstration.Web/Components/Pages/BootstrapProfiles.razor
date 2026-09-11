@@ -1,7 +1,6 @@
 @page "/settings/bootstrap"
 @implements IDisposable
-@inject BootstrapProfileManagementService Service
-@inject ICurrentRequestContext RequestContext
+@inject IBootstrapProfilesApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
@@ -239,17 +238,17 @@ else
         busy = true; error = null;
         try
         {
-            view = await Service.GetAsync(RequestContext.Current.PrincipalId, lifetime.Token);
+            view = await Client.GetAsync(lifetime.Token);
             if (TrySourceSelection() is { } selection)
             {
                 sourceSelection = selection;
-                sourceProfile = await Service.GetSourceProfileAsync(selection, RequestContext.Current.PrincipalId, lifetime.Token);
+                sourceProfile = await Client.GetSourceProfileAsync(selection, lifetime.Token);
                 selectedProfiles.Clear();
                 selectedProfiles.Add(sourceProfile.Name);
                 SyncBindings();
             }
         }
-        catch (AuthorizationDeniedException) { denied = true; }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Forbidden) { denied = true; }
         catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; }
         finally { busy = false; }
     }
@@ -272,13 +271,9 @@ else
         try
         {
             foreach (var kind in SelectedBindings.Select(item => item.Binding.TargetKind).Distinct())
-                bindingOptions[kind] = await Service.GetBindingTargetsAsync(
-                    Target(),
-                    kind,
-                    selectedProfiles,
-                    RequestContext.Current.PrincipalId,
-                    lifetime.Token,
-                    sourceSelection);
+                bindingOptions[kind] = await Client.GetBindingTargetsAsync(
+                    new(Target(), kind, selectedProfiles, sourceSelection),
+                    lifetime.Token);
             foreach (var item in SelectedBindings)
             {
                 var input = bindingTargets[BindingKey(item.Profile, item.Binding.Name)];
@@ -305,7 +300,7 @@ else
     {
         if (!CanPreview) return;
         busy = previewing = true; error = null; lastApplication = null;
-        try { preview = await Service.PreviewAsync(Selection(), RequestContext.Current.PrincipalId, lifetime.Token); }
+        try { preview = await Client.PreviewAsync(Selection(), lifetime.Token); }
         catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; }
         finally { busy = previewing = false; }
     }
@@ -316,10 +311,10 @@ else
         busy = applying = true; error = null;
         try
         {
-            lastApplication = await Service.ApplyAsync(Selection(), preview.Digest, RequestContext.Current.PrincipalId, lifetime.Token);
+            lastApplication = await Client.ApplyAsync(Selection(), preview.Digest, lifetime.Token);
             selectedApplication = lastApplication;
             confirmApply = false; preview = null;
-            view = await Service.GetAsync(RequestContext.Current.PrincipalId, lifetime.Token);
+            view = await Client.GetAsync(lifetime.Token);
         }
         catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; confirmApply = false; }
         finally { busy = applying = false; }
@@ -328,7 +323,7 @@ else
     private async Task ShowApplicationAsync(string applicationId)
     {
         busy = true; error = null;
-        try { selectedApplication = await Service.GetApplicationAsync(applicationId, RequestContext.Current.PrincipalId, lifetime.Token); }
+        try { selectedApplication = await Client.GetApplicationAsync(applicationId, lifetime.Token); }
         catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; }
         finally { busy = false; }
     }

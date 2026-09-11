@@ -6,33 +6,6 @@ using Agentstration.Management.Contracts;
 
 namespace Agentstration.Web.Hosting;
 
-public sealed record BootstrapProfileSummary(
-    string Name,
-    string DisplayName,
-    string? Description,
-    BootstrapProfileScope Scope,
-    int FileCount,
-    int ResourceCount,
-    string Digest,
-    IReadOnlyList<BootstrapProfileBinding> Bindings,
-    bool Valid = true,
-    string? Error = null);
-
-public sealed record BootstrapProfileBinding(
-    string Name,
-    BootstrapBindingTargetKind TargetKind,
-    string DisplayName,
-    string? Description,
-    bool Required,
-    ResourceReference? DefaultTarget = null);
-
-public sealed record BootstrapCatalogSnapshot(
-    string? Path,
-    bool InitialBootstrapEnabled,
-    IReadOnlyList<string> InitialProfiles,
-    IReadOnlyList<BootstrapProfileSummary> Profiles,
-    string? Error = null);
-
 internal sealed record BootstrapResourceSource(
     BootstrapResourceDocument Resource,
     string Location);
