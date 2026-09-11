@@ -188,7 +188,7 @@ function runDotnet(project: string, logFile: string, environment: NodeJS.Process
     '--configuration', process.env.AGENTSTRATION_PLAYWRIGHT_CONFIGURATION ?? 'Release',
     '--no-launch-profile',
   ];
-  if (process.env.AGENTSTRATION_PLAYWRIGHT_NO_BUILD === 'true') argumentsList.push('--no-build');
+  if (process.env.AGENTSTRATION_PLAYWRIGHT_NO_BUILD === 'true') argumentsList.push('--no-build', '--no-restore');
   if (applicationArguments.length > 0) argumentsList.push('--', ...applicationArguments);
 
   const child = spawn('dotnet', argumentsList, {

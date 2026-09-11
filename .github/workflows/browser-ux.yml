@@ -61,6 +61,12 @@ jobs:
           dotnet restore src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
           dotnet restore src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
           dotnet restore src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
+      - name: Build browser hosts
+        run: |
+          dotnet build src/Agentstration.Web/Agentstration.Web.csproj --configuration Release --no-restore
+          dotnet build src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj --configuration Release --no-restore
+          dotnet build src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj --configuration Release --no-restore
+          dotnet build src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj --configuration Release --no-restore
       - name: Install browser automation dependencies
         working-directory: automation/playwright
         run: npm ci
@@ -72,6 +78,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run browser UX smoke tests
         working-directory: automation/playwright
+        env:
+          AGENTSTRATION_PLAYWRIGHT_NO_BUILD: true
         run: npm run test:smoke
       - name: Upload browser diagnostics
         if: failure()
