@@ -62,4 +62,11 @@ export const Checkpoints = {
     agentRun: 'flow-observability-agent-run',
     events: 'flow-observability-events',
   },
+  consoleAdministration: {
+    organization: 'console-admin-organization',
+    member: 'console-admin-member',
+    preferences: 'console-admin-preferences',
+    token: 'console-admin-token',
+    navigation: 'console-admin-navigation',
+  },
 } as const;

@@ -5,6 +5,7 @@
 <PageTitle>@T("AccessControl") · @T("Organization") · Agentstration</PageTitle>
 <PageHeader Title="@T("AccessControl")" Description="@T("Access.Description")" />
 <OrganizationSettingsNav />
+<div data-testid="console-admin-organization-access">
 @if (view is null) { <LoadingState Message="@T("LoadingAccess")" /> }
 else
 {
@@ -13,6 +14,7 @@ else
         <Row Context="row"><tr><td>@row.Member.Principal.DisplayName</td><td><strong>@row.Assignment.Role.DisplayName</strong></td><td><code>@row.Assignment.Scope</code></td><td>@if(row.Assignment.Scope.StartsWith("/tenants/",StringComparison.Ordinal)){<StatusBadge Text="@T("Inherited")" Status="UiStatus.Info" />}else{<span>@T("Explicit")</span>}</td></tr></Row>
     </DataGrid>
 }
+</div>
 @code {
     private sealed record AccessRow(Agentstration.Management.Core.MemberAdministrationView Member, Agentstration.Management.Core.AssignedRoleView Assignment);
     private Agentstration.Management.Core.TenantAdministrationView? view;

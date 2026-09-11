@@ -4,7 +4,7 @@
     ViewData["Title"] = Auth["PersonalAccessTokens"];
 }
 
-<header class="auth-heading">
+<header class="auth-heading" data-testid="console-admin-account-pat">
     <p class="eyebrow">@Auth["Account"]</p>
     <h1>@Auth["PersonalAccessTokens"]</h1>
     <p>@Auth["TokensDescription"]</p>
@@ -21,10 +21,10 @@
 
 <section class="security-section">
     <h2>@Auth["CreateToken"]</h2>
-    <form method="post" asp-page-handler="Create" class="auth-form">
+    <form method="post" asp-page-handler="Create" class="auth-form" data-testid="pat-create-form">
         <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
         <label asp-for="Input.Name">@Auth["Name"]</label>
-        <input asp-for="Input.Name" autocomplete="off" placeholder="@Auth["TokenNamePlaceholder"]" />
+        <input asp-for="Input.Name" autocomplete="off" placeholder="@Auth["TokenNamePlaceholder"]" data-testid="pat-name" />
         <span asp-validation-for="Input.Name" class="field-error"></span>
 
         <label asp-for="Input.WorkspaceId">@Auth["Workspace"]</label>
@@ -48,13 +48,13 @@
             @foreach (var permission in Model.SupportedPermissions.Order(StringComparer.Ordinal))
             {
                 <label>
-                    <input type="checkbox" name="Input.Permissions" value="@permission" checked="@Model.Input.Permissions.Contains(permission, StringComparer.Ordinal)" />
+                    <input type="checkbox" name="Input.Permissions" value="@permission" checked="@Model.Input.Permissions.Contains(permission, StringComparer.Ordinal)" data-testid="pat-permission" />
                     <span>@permission</span>
                 </label>
             }
         </fieldset>
         <span asp-validation-for="Input.Permissions" class="field-error"></span>
-        <button type="submit" class="primary-action">@Auth["CreateToken"]</button>
+        <button type="submit" class="primary-action" data-testid="pat-create">@Auth["CreateToken"]</button>
     </form>
 </section>
 
@@ -82,7 +82,7 @@
             @foreach (var token in Model.Tokens)
             {
                 var status = Model.Status(token);
-                <article class="token-row">
+                <article class="token-row" data-testid="pat-token-row">
                     <div>
                         <strong>@token.Name</strong>
                         <code>@token.TokenPrefix…</code>
@@ -92,7 +92,7 @@
                     {
                         <form method="post" asp-page-handler="Revoke">
                             <input type="hidden" name="tokenId" value="@token.Id" />
-                            <button type="submit" class="danger-action">@Auth["Revoke"]</button>
+                            <button type="submit" class="danger-action" data-testid="pat-revoke">@Auth["Revoke"]</button>
                         </form>
                     }
                 </article>

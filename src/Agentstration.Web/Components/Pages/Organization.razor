@@ -5,6 +5,7 @@
 <PageTitle>@T("Organization") · Agentstration</PageTitle>
 <PageHeader Title="@T("Organization")" Description="@T("Organization.Description")" />
 <OrganizationSettingsNav />
+<div data-testid="console-admin-organization">
 
 @if (view is null)
 {
@@ -41,6 +42,7 @@ else
         }
     </section>
 }
+</div>
 
 @code {
     private Agentstration.Management.Core.TenantAdministrationView? view;

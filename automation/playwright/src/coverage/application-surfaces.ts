@@ -71,6 +71,20 @@ function coveredFlow(
   };
 }
 
+function coveredConsoleAdministration(
+  id: string,
+  source: string,
+  routes: readonly string[],
+  fixtureKeys: readonly string[] = [],
+  journey = 'inspect-console-administration',
+): ApplicationSurface {
+  return {
+    id, host: 'console', source, routes, fixtureKeys,
+    pageObject: 'src/pages/console-administration.page.ts', journey,
+    specification: 'tests/console-administration.spec.ts', coverage: 'covered',
+  };
+}
+
 export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
     id: 'console-home', host: 'console', source: `${consolePages}/Home.razor`, routes: ['/'], fixtureKeys: [],
@@ -111,10 +125,10 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   },
 
   planned('access-denied', `${razorPages}/AccessDenied.cshtml`, ['/access-denied'], 290),
-  planned('account-pat', `${razorPages}/Account/Pat.cshtml`, ['/account/pat'], 289),
-  planned('account-security', `${razorPages}/Account/Security.cshtml`, ['/account/security'], 289),
-  planned('bootstrap-account', `${razorPages}/Bootstrap.cshtml`, ['/bootstrap'], 289),
-  planned('logout', `${razorPages}/Logout.cshtml`, ['/logout'], 289),
+  coveredConsoleAdministration('account-pat', `${razorPages}/Account/Pat.cshtml`, ['/account/pat']),
+  coveredConsoleAdministration('account-security', `${razorPages}/Account/Security.cshtml`, ['/account/security']),
+  coveredConsoleAdministration('bootstrap-account', `${razorPages}/Bootstrap.cshtml`, ['/bootstrap']),
+  coveredConsoleAdministration('logout', `${razorPages}/Logout.cshtml`, ['/logout']),
 
   planned('agents', `${consolePages}/Agents.razor`, ['/agents'], 291),
   coveredFlow('agent-runner', `${consolePages}/AgentRunner.razor`, ['/agents/{Name}/run', '/runs/{RunId}'], ['name', 'runId'], 'inspect-flow-observability'),
@@ -169,14 +183,14 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
 
   planned('management', `${consolePages}/Management.razor`, ['/management'], 290),
   planned('cleanup', `${consolePages}/Cleanup.razor`, ['/cleanup'], 290),
-  planned('settings', `${consolePages}/Settings.razor`, ['/settings'], 289),
-  planned('profile-settings', `${consolePages}/ProfileSettings.razor`, ['/settings/profile'], 289),
-  planned('organization', `${consolePages}/Organization.razor`, ['/settings/organization'], 289),
-  planned('organization-access', `${consolePages}/OrganizationAccess.razor`, ['/settings/organization/access'], 289),
-  planned('organization-members', `${consolePages}/OrganizationMembers.razor`, ['/settings/organization/members'], 289),
-  planned('organization-member-details', `${consolePages}/OrganizationMemberDetails.razor`, ['/settings/organization/members/{UserId:guid}'], 289, ['userId']),
-  planned('organization-security-audit', `${consolePages}/OrganizationSecurityAudit.razor`, ['/settings/organization/security-audit'], 289),
-  planned('workspaces', `${consolePages}/Workspaces.razor`, ['/workspaces'], 289),
+  coveredConsoleAdministration('settings', `${consolePages}/Settings.razor`, ['/settings']),
+  coveredConsoleAdministration('profile-settings', `${consolePages}/ProfileSettings.razor`, ['/settings/profile']),
+  coveredConsoleAdministration('organization', `${consolePages}/Organization.razor`, ['/settings/organization']),
+  coveredConsoleAdministration('organization-access', `${consolePages}/OrganizationAccess.razor`, ['/settings/organization/access']),
+  coveredConsoleAdministration('organization-members', `${consolePages}/OrganizationMembers.razor`, ['/settings/organization/members']),
+  coveredConsoleAdministration('organization-member-details', `${consolePages}/OrganizationMemberDetails.razor`, ['/settings/organization/members/{UserId:guid}'], ['userId']),
+  coveredConsoleAdministration('organization-security-audit', `${consolePages}/OrganizationSecurityAudit.razor`, ['/settings/organization/security-audit']),
+  coveredConsoleAdministration('workspaces', `${consolePages}/Workspaces.razor`, ['/workspaces']),
 
   {
     id: 'workplace-home', host: 'workplace', source: `${workplacePages}/Home.razor`,

@@ -12,7 +12,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<MainLayoutStrings> Localizer
 
 <div class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")" data-testid="console-shell" data-preferences-ready="@(Preferences.IsLoaded && themeReady ? "true" : "false")" data-workspace-id="@ContextState.Current?.WorkspaceId" data-workspace-name="@ContextState.Current?.WorkspaceName">
-    <aside class="sidebar" aria-label="@T("MainNavigation")">
+    <aside class="sidebar" aria-label="@T("MainNavigation")" data-testid="console-sidebar">
         <a class="brand-lockup" href="/" aria-label="@T("ControlPlaneHome")">
             <span class="brand-mark brand-mark-compact" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" width="38" height="38" /></span>
             <img class="brand-lockup-logo" src="_content/Agentstration.Web.Components/images/agentstration-lockup-dark.png" alt="" width="204" height="41" />
@@ -43,10 +43,10 @@
     <div class="workspace">
         <header class="topbar">
             <div class="topbar-start">
-                <button class="icon-button" @onclick="Navigation.ToggleSidebar" aria-label="@T("ToggleNavigation")" aria-expanded="@(!Navigation.IsSidebarCollapsed)">☰</button>
-                <nav class="breadcrumb" aria-label="@T("CurrentOrganizationWorkspace")"><a href="/settings/organization">@(ContextState.Current?.TenantDisplayName ?? T("OrganizationFallback"))</a><span>/</span><strong>@CurrentSection</strong></nav>
+                <button class="icon-button" @onclick="Navigation.ToggleSidebar" aria-label="@T("ToggleNavigation")" aria-expanded="@(!Navigation.IsSidebarCollapsed)" data-testid="console-sidebar-toggle">☰</button>
+                <nav class="breadcrumb" aria-label="@T("CurrentOrganizationWorkspace")" data-testid="console-breadcrumb"><a href="/settings/organization">@(ContextState.Current?.TenantDisplayName ?? T("OrganizationFallback"))</a><span>/</span><strong>@CurrentSection</strong></nav>
             </div>
-            <button class="command-palette-trigger" type="button" @onclick="OpenCommandPalette" aria-keyshortcuts="Control+K" aria-haspopup="dialog" aria-expanded="@commandPaletteOpen" title="@T("OpenCommandPalette")">
+            <button class="command-palette-trigger" type="button" @onclick="OpenCommandPalette" aria-keyshortcuts="Control+K" aria-haspopup="dialog" aria-expanded="@commandPaletteOpen" title="@T("OpenCommandPalette")" data-testid="console-command-trigger">
                 <span aria-hidden="true">⌕</span><span>@T("SearchPagesCommands")</span><kbd>Ctrl K</kbd>
             </button>
             <div class="topbar-actions">
@@ -68,7 +68,7 @@
                 }
                 <EnvironmentSwitcher />
                 <button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="@T("ToggleColorTheme")" data-testid="theme-toggle" title="@(Preferences.Error ?? F("ThemeValue", Preferences.Theme))"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button>
-                <button class="icon-button notification-button" @onclick="Notifications.TogglePanel" aria-label="@T("Notifications")"><span aria-hidden="true">♢</span>@if (Notifications.UnreadCount > 0) { <span class="notification-count">@Notifications.UnreadCount</span> }</button>
+                <button class="icon-button notification-button" @onclick="Notifications.TogglePanel" aria-label="@T("Notifications")" data-testid="console-notifications-trigger"><span aria-hidden="true">♢</span>@if (Notifications.UnreadCount > 0) { <span class="notification-count">@Notifications.UnreadCount</span> }</button>
                 <a class="icon-button" href="/account/security" aria-label="@T("AccountSecurity")" title="@T("AccountSecurity")"><UiIcon Name="shield-check" /></a>
                 <a class="icon-button" href="/logout" aria-label="@T("SignOut")" title="@T("SignOut")"><UiIcon Name="log-out" /></a>
             </div>
@@ -78,7 +78,7 @@
 
     @if (Notifications.IsPanelOpen)
     {
-        <aside class="notification-panel" aria-label="@T("Notifications")">
+        <aside class="notification-panel" aria-label="@T("Notifications")" data-testid="console-notifications-panel">
             <header><div><p class="eyebrow">@T("Activity")</p><h2>@T("Notifications")</h2></div><button class="icon-button" @onclick="Notifications.TogglePanel" aria-label="@T("CloseNotifications")">×</button></header>
             @if (Notifications.Items.Count == 0) { <EmptyState Title="@T("AllQuiet")" Message="@T("OperationalNotices")" /> }
             else { <button class="text-button" @onclick="Notifications.MarkAllRead">@T("MarkAllRead")</button>@foreach (var item in Notifications.Items) { <article class="notification-item"><StatusIndicator Text="@item.Title" Status="@item.Status" /><p>@item.Message</p><time datetime="@item.Timestamp.ToString("O")">@item.Timestamp.LocalDateTime.ToString("g")</time></article> } }
@@ -88,10 +88,10 @@
     @if (commandPaletteOpen)
     {
         <div class="command-palette-backdrop" @onclick="CloseCommandPalette">
-            <section class="command-palette" role="dialog" aria-modal="true" aria-label="@T("CommandPalette")" @onclick:stopPropagation="true">
+            <section class="command-palette" role="dialog" aria-modal="true" aria-label="@T("CommandPalette")" @onclick:stopPropagation="true" data-testid="console-command-palette">
                 <header>
                     <span aria-hidden="true">⌕</span>
-                    <input @ref="commandInput" value="@commandQuery" @oninput="UpdateCommandQuery" @onkeydown="HandleCommandKeyDown" placeholder="@T("SearchPagesCommands")" aria-label="@T("SearchPagesCommandsAria")" autocomplete="off" />
+                    <input @ref="commandInput" value="@commandQuery" @oninput="UpdateCommandQuery" @onkeydown="HandleCommandKeyDown" placeholder="@T("SearchPagesCommands")" aria-label="@T("SearchPagesCommandsAria")" autocomplete="off" data-testid="console-command-input" />
                     <button class="command-palette-close" type="button" @onclick="CloseCommandPalette" aria-label="@T("CloseCommandPalette")">Esc</button>
                 </header>
                 <div class="command-results" role="listbox" aria-label="@T("MatchingDestinations")" aria-busy="@searchingResources">

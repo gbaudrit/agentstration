@@ -9,6 +9,7 @@
 <PageTitle>@T("Members") · @T("Organization") · Agentstration</PageTitle>
 <PageHeader Title="@T("Members")" Description="@T("Members.Description")" />
 <OrganizationSettingsNav />
+<div data-testid="console-admin-organization-members">
 
 @if (canManageLocalAccounts)
 {
@@ -43,6 +44,7 @@ else
         <Row Context="member"><tr><td><a href="@($"/settings/organization/members/{member.Principal.Id:D}")"><strong>@member.Principal.DisplayName</strong></a><br /><small>@(member.Principal.Email ?? T("NoEmail"))</small></td><td>@(member.ExternalIdentities.Count == 0 ? T("Unlinked") : T("ExternalIdentityCount", member.ExternalIdentities.Count))</td><td><StatusBadge Text="@T($"Status.{member.Membership.Status}")" Status="UiStatus.Success" /></td><td>@if(member.Roles.Count == 0){<span>@T("None")</span>}else{@foreach(var assigned in member.Roles){<div><strong>@assigned.Role.DisplayName</strong> <small>@ScopeLabel(assigned.Scope)</small></div>}}</td></tr></Row>
     </DataGrid>
 }
+</div>
 
 @code {
     private Agentstration.Management.Core.TenantAdministrationView? view;
