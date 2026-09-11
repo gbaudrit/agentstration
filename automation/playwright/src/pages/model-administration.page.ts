@@ -24,7 +24,9 @@ export class ModelAdministrationPage {
     await this.page.waitForURL(url => url.pathname === `/modelproviders/${definition.providerName}`);
     const marker = this.page.getByTestId(TestIds.resourceAdministration.modelProviderEditor);
     await marker.waitFor({ state: 'visible' });
+    const testResponse = this.waitForApiResponse('POST', `/api/modelproviders/${encodeURIComponent(definition.providerName)}/test`);
     await this.page.getByTestId(TestIds.modelAdministration.providerTest).click();
+    await testResponse;
     await this.page.getByTestId(TestIds.modelAdministration.providerStatus).waitFor({ state: 'visible' });
     return marker;
   }
@@ -54,6 +56,7 @@ export class ModelAdministrationPage {
       this.page.getByTestId(TestIds.modelAdministration.providerDisplayName),
       this.page.getByTestId(TestIds.modelAdministration.providerSave),
       value,
+      '/api/modelproviders/',
     );
   }
 
@@ -62,6 +65,7 @@ export class ModelAdministrationPage {
       this.page.getByTestId(TestIds.modelAdministration.runtimeDisplayName),
       this.page.getByTestId(TestIds.modelAdministration.runtimeSave),
       value,
+      '/api/runtimeprofiles/',
     );
   }
 
@@ -70,6 +74,7 @@ export class ModelAdministrationPage {
       this.page.getByTestId(TestIds.modelAdministration.profileDisplayName),
       this.page.getByTestId(TestIds.modelAdministration.profileSave),
       value,
+      '/api/modelprofiles/',
     );
   }
 
@@ -93,11 +98,19 @@ export class ModelAdministrationPage {
     await this.deleteCurrent(TestIds.modelAdministration.providerDelete, TestIds.modelAdministration.providerDeleteConfirm, '/modelproviders');
   }
 
-  private async updateDisplayName(input: Locator, save: Locator, value: string): Promise<void> {
+  private async updateDisplayName(input: Locator, save: Locator, value: string, apiPath: string): Promise<void> {
     await fillAndCommit(input, value);
-    const response = this.page.waitForResponse(candidate => candidate.request().method() === 'PUT' && candidate.ok());
+    const response = this.waitForApiResponse('PUT', apiPath);
     await save.click();
     await response;
+  }
+
+  private async waitForApiResponse(method: string, apiPath: string): Promise<void> {
+    const response = await this.page.waitForResponse(candidate =>
+      candidate.request().method() === method && new URL(candidate.url()).pathname.includes(apiPath));
+    if (!response.ok()) {
+      throw new Error(`${method} ${new URL(response.url()).pathname} returned HTTP ${response.status()}.`);
+    }
   }
 
   private async deleteCurrent(deleteButtonId: string, confirmButtonId: string, listPath: string): Promise<void> {
