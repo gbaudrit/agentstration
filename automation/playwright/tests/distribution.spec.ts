@@ -20,7 +20,9 @@ test('the local Git extension can back an explicitly configured Source Provider 
   await authenticateConsole(context, {});
   await pages.distribution.open(product.consoleUrl, '/sourceproviders', 'sourceProviders');
   await pages.distribution.createSourceProvider(product.consoleUrl, 'playwright-git', 'Playwright Git provider');
-  await expect(page).toHaveURL(/\/sourceproviders\/playwright-git$/);
+  await expect(page).toHaveURL(url => url.pathname === '/sourceproviders/playwright-git'
+    && url.searchParams.get('namespace') === 'default'
+    && url.searchParams.has('scopeRef'));
 });
 
 test('Source Registry list, editor, retained official state, and discovery render offline @smoke', async ({ page, product }) => {

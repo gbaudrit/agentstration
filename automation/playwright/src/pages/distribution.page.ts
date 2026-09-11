@@ -52,7 +52,7 @@ export class DistributionPage {
     await this.open(consoleUrl, '/settings/sources', 'sources');
     await this.page.getByTestId(TestIds.distribution.sourceImportOpen).click();
     await this.page.getByTestId(TestIds.distribution.sourceImportYamlMode).click();
-    await this.page.getByTestId(TestIds.distribution.sourceImportYaml).fill(yaml);
+    await fillAndCommit(this.page.getByTestId(TestIds.distribution.sourceImportYaml), yaml);
     await Promise.all([
       this.page.waitForURL(url => url.pathname === `/settings/sources/${encodeURIComponent(publisher)}/${encodeURIComponent(name)}`),
       this.page.getByTestId(TestIds.distribution.sourceImportSubmit).click(),
@@ -66,7 +66,7 @@ export class DistributionPage {
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectName), project.name);
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectVersion), project.version);
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectDisplayName), project.displayName);
-    const add = this.page.locator('[data-resource-kind="Entry"][data-resource-name="quick-answer"]')
+    const add = this.page.locator('[data-resource-kind="Flow"][data-resource-name="system-direct-agent-dotnet-expert"]')
       .getByTestId(TestIds.distribution.packProjectAddResource);
     await add.waitFor({ state: 'visible' });
     await add.click();
