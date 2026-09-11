@@ -159,8 +159,57 @@ jobs:
           name: functional-code-coverage
           path: artifacts/coverage
           if-no-files-found: error
-      - name: Capture hosted module diagnostics
+      - name: Smoke-test Source Registry tool package
         if: needs.changes.outputs.dotnet == 'true'
+        shell: pwsh
+        run: ./scripts/ci/test-source-registry-tool-package.ps1 -Configuration Release -NoBuild
+      - name: Build complete AEP SDK
+        if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
+        run: dotnet build aep/Aep.slnx --configuration Release --no-restore
+      - name: Test complete AEP SDK
+        if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
+        working-directory: aep
+        run: dotnet test --solution Aep.slnx --configuration Release --no-build --minimum-expected-tests 33 --max-parallel-test-modules 2
+
+  hosted-module-diagnostics:
+    name: hosted-module-diagnostics
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.dotnet == 'true'
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Cache NuGet packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+      - name: Restore Agentstration
+        run: dotnet restore Agentstration.slnx -p:NuGetAudit=true -p:NuGetAuditMode=all
+      - name: Build hosted test modules
+        shell: pwsh
+        run: |
+          $modules = @(
+            'Agentstration.Management.Api.Tests',
+            'Agentstration.Management.Bootstrap.Tests',
+            'Agentstration.Management.Security.Tests',
+            'Agentstration.Management.Aep.Tests',
+            'Agentstration.Management.Sources.Tests'
+          )
+          foreach ($module in $modules) {
+            dotnet build "tests/$module/$module.csproj" --configuration Release --no-restore
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not build hosted test module '$module'."
+            }
+          }
+      - name: Capture hosted module diagnostics
         shell: pwsh
         run: |
           @(
@@ -185,23 +234,12 @@ jobs:
               -FailureWorkingSetMiB $module.Failure
           }
       - name: Upload hosted module diagnostics
-        if: always() && needs.changes.outputs.dotnet == 'true'
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: hosted-test-module-diagnostics
           path: artifacts/test-diagnostics/*.json
           if-no-files-found: warn
-      - name: Smoke-test Source Registry tool package
-        if: needs.changes.outputs.dotnet == 'true'
-        shell: pwsh
-        run: ./scripts/ci/test-source-registry-tool-package.ps1 -Configuration Release -NoBuild
-      - name: Build complete AEP SDK
-        if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
-        run: dotnet build aep/Aep.slnx --configuration Release --no-restore
-      - name: Test complete AEP SDK
-        if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
-        working-directory: aep
-        run: dotnet test --solution Aep.slnx --configuration Release --no-build --minimum-expected-tests 33 --max-parallel-test-modules 2
 
   postgresql-storage:
     name: postgresql-storage
