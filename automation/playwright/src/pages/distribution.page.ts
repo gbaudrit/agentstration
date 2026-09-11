@@ -34,13 +34,13 @@ export class DistributionPage {
 
   public async createSourceProvider(consoleUrl: string, name: string, displayName: string): Promise<void> {
     await this.open(consoleUrl, '/sourceproviders/new', 'sourceProviderDetails');
-    await fillAndCommit(this.page.getByTestId(TestIds.distribution.providerName), name);
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.providerDisplayName), displayName);
     const extension = this.page.getByTestId(TestIds.distribution.providerExtension);
     await extension.selectOption({ index: 1 });
     const contribution = this.page.getByTestId(TestIds.distribution.providerContribution);
     await expect(contribution.locator('option')).toHaveCount(2);
     await contribution.selectOption({ index: 1 });
+    await fillAndCommit(this.page.getByTestId(TestIds.distribution.providerName), name);
     await Promise.all([
       this.page.waitForURL(url => url.pathname === `/sourceproviders/${encodeURIComponent(name)}`),
       this.page.getByTestId(TestIds.distribution.providerSubmit).click(),
@@ -66,7 +66,8 @@ export class DistributionPage {
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectName), project.name);
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectVersion), project.version);
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectDisplayName), project.displayName);
-    const add = this.page.getByTestId(TestIds.distribution.packProjectAddResource).first();
+    const add = this.page.locator('[data-resource-kind="Entry"][data-resource-name="quick-answer"]')
+      .getByTestId(TestIds.distribution.packProjectAddResource);
     await add.waitFor({ state: 'visible' });
     await add.click();
     const create = this.page.getByTestId(TestIds.distribution.packProjectCreate);

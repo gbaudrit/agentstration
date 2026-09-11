@@ -48,6 +48,18 @@ public sealed class IdentityFoundationTests
     }
 
     [TestMethod]
+    public async Task DevelopmentBootstrapCanGrantStablePlatformAdministration()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync(grantPlatformAdministrator: true);
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+
+        Assert.IsTrue(await store.IsPlatformAdministratorAsync(fixture.InitialContext.PrincipalId, default));
+
+        await fixture.Bootstrap.EnsureInitializedAsync(default);
+        Assert.AreEqual(1, (await store.ListPlatformAdministratorsAsync(default)).Count);
+    }
+
+    [TestMethod]
     public async Task PrincipalPreferencesArePersistedPerPrincipal()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
@@ -376,12 +388,16 @@ public sealed class IdentityFoundationTests
         public ILocalEnvironmentBootstrapper Bootstrap => Services.GetRequiredService<ILocalEnvironmentBootstrapper>();
         public IDisposable OpenScope() => Context.Push(InitialContext);
 
-        public static async Task<IdentityFixture> CreateAsync()
+        public static async Task<IdentityFixture> CreateAsync(bool grantPlatformAdministrator = false)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-identity-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
             var services = new ServiceCollection();
             services.AddLogging();
+            services.AddSingleton(new LocalBootstrapOptions
+            {
+                GrantPlatformAdministrator = grantPlatformAdministrator
+            });
             services.AddAgentstration(
                 directory,
                 controlPlaneConnectionString: $"Data Source={Path.Combine(directory, "control-plane.db")}");

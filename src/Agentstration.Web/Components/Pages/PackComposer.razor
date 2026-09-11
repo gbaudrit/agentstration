@@ -67,7 +67,7 @@ else
                     @foreach (var item in AvailableResources)
                     {
                         var selectable = item.Availability == PackCompositionAvailability.Selectable;
-                        <div class="composer-resource @(!selectable ? "unavailable" : null)" @key="item.Resource.Address">
+                            <div class="composer-resource @(!selectable ? "unavailable" : null)" @key="item.Resource.Address" data-resource-kind="@item.Resource.Kind" data-resource-name="@item.Resource.Name">
                             <div class="composer-resource-main">
                                 <div class="composer-resource-heading"><span class="composer-kind">@item.Resource.Kind</span><strong>@item.DisplayName</strong></div>
                                 <div class="composer-resource-copy">
