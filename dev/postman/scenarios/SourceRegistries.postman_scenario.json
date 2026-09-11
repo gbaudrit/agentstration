@@ -1,14 +1,14 @@
 {
   "info": {
     "_postman_id": "a7a8cdde-0ad5-46fd-b239-ecb8cc9defc2",
-    "name": "Agentstration - Source Registries",
-    "description": "Local smoke-test collection for Source Registry registration, discovery, trust, and exact Source import. Run the requests in order. The login establishes the authentication cookie and the scripts retain ETags and an optional discovery selection.",
+    "name": "Source Registry lifecycle",
+    "description": "Curated local scenario for Source Registry registration, discovery, trust, and exact Source import. Run the requests in order. The login establishes the authentication cookie and the scripts retain ETags and an optional discovery selection.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:5100", "type": "string" },
     { "key": "userName", "value": "admin", "type": "string" },
-    { "key": "password", "value": "admin", "type": "string" },
+    { "key": "password", "value": "", "type": "string" },
     { "key": "registryName", "value": "postman-test", "type": "string" },
     { "key": "registryIndexUrl", "value": "https://registry.example/v1/index.json", "type": "string" },
     { "key": "officialRegistryName", "value": "agentstration-official", "type": "string" },

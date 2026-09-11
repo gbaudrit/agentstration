@@ -278,9 +278,12 @@ public static class OpenApiConfiguration
     private static string TagFor(string path)
     {
         var value = path.ToLowerInvariant();
-        if (value == "/health") return "System";
+        if (value == "/health" || value.StartsWith("/health/", StringComparison.Ordinal)) return "System";
         if (value.StartsWith("/api/auth", StringComparison.Ordinal)) return "Authentication";
         if (value.StartsWith("/api/identity", StringComparison.Ordinal)) return "Identity";
+        if (value.StartsWith("/api/aep/enrollments", StringComparison.Ordinal)) return "AEP enrollment";
+        if (value.StartsWith("/api/bootstrap", StringComparison.Ordinal)) return "Bootstrap";
+        if (value.StartsWith("/api/resource-scopes", StringComparison.Ordinal)) return "Resource scopes";
         if (value.StartsWith("/api/workplace", StringComparison.Ordinal)) return "Workplace";
         if (value.StartsWith("/api/work/workitems", StringComparison.Ordinal)) return "Work";
         if (value.StartsWith("/api/tasks", StringComparison.Ordinal)) return "Work operations";
@@ -292,6 +295,9 @@ public static class OpenApiConfiguration
         if (value.StartsWith("/api/model", StringComparison.Ordinal)
             || value.StartsWith("/api/runtimeprofiles", StringComparison.Ordinal)) return "Model management";
         if (value.StartsWith("/api/extensions", StringComparison.Ordinal)) return "Extensions";
+        if (value.StartsWith("/api/sourceproviders", StringComparison.Ordinal)) return "Source providers";
+        if (value.StartsWith("/api/sourceregistries", StringComparison.Ordinal)) return "Source registries";
+        if (value.StartsWith("/api/sources", StringComparison.Ordinal)) return "Sources";
         if (value.StartsWith("/api/vaults", StringComparison.Ordinal)
             || value.StartsWith("/api/secrets", StringComparison.Ordinal)) return "Secrets";
         if (value.StartsWith("/api/toolproviders", StringComparison.Ordinal)

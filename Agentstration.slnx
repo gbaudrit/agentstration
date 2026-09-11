@@ -67,4 +67,7 @@
     <Project Path="tests/Agentstration.Workplace.Components.Tests/Agentstration.Workplace.Components.Tests.csproj" />
     <Project Path="tests/Agentstration.Workplace.Web.Tests/Agentstration.Workplace.Web.Tests.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Agentstration.Postman/Agentstration.Postman.csproj" />
+  </Folder>
 </Solution>
