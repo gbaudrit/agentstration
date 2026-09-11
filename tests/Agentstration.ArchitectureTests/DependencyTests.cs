@@ -141,6 +141,49 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void StandaloneProgramIsThinAndComposesEachTransportAndWorkerOnce()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var hostRoot = Path.Combine(repositoryRoot, "src", "Agentstration.Web");
+        var apiRoot = Path.Combine(repositoryRoot, "src", "Agentstration.Api");
+        var program = File.ReadAllText(Path.Combine(hostRoot, "Program.cs"));
+        var composition = File.ReadAllText(Path.Combine(hostRoot, "Hosting", "StandaloneHostComposition.cs"));
+        var apiTransport = string.Join(Environment.NewLine, Directory
+            .EnumerateFiles(apiRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Select(File.ReadAllText));
+
+        Assert.IsLessThanOrEqualTo(15, program.Split('\n').Length);
+        Assert.Contains("AddAgentstrationStandaloneHost()", program, StringComparison.Ordinal);
+        Assert.Contains("ConfigureAgentstrationStandaloneHost(composition)", program, StringComparison.Ordinal);
+        Assert.Contains("InitializeAgentstrationStandaloneHostAsync(composition)", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddHostedService", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("MapAgentstrationApi", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("InitializeAsync", program, StringComparison.Ordinal);
+
+        Assert.AreEqual(1, CountOccurrences(composition, "AddAgentstrationApi("));
+        Assert.AreEqual(1, CountOccurrences(composition, "AddAgentstrationWebConsole("));
+        Assert.AreEqual(1, CountOccurrences(composition, "MapAgentstrationApi("));
+        foreach (var worker in new[]
+                 {
+                     "AgentDeploymentReconciliationWorker",
+                     "LocalWorkExecutionWorker",
+                     "RuntimeRunExecutionWorker",
+                     "FlowRunExecutionWorker",
+                     "FlowRunRecoveryWorker",
+                     "SourceRefreshWorker"
+                 })
+        {
+            Assert.AreEqual(1, CountOccurrences(composition, $"AddHostedService<{worker}>") , worker);
+        }
+
+        Assert.AreEqual(1, CountOccurrences(apiTransport, "AddSignalR("));
+        Assert.AreEqual(1, CountOccurrences(apiTransport, "AddMcpServer("));
+        Assert.AreEqual(2, CountOccurrences(apiTransport, "MapHub<"));
+        Assert.AreEqual(1, CountOccurrences(apiTransport, "MapMcp("));
+    }
+
+    [TestMethod]
     public void ConsoleComponentsDoNotUseServerImplementationNamespaces()
     {
         var components = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Console.Components");
@@ -622,6 +665,9 @@ public sealed class DependencyTests
 
         throw new InvalidOperationException("Could not locate the Agentstration repository root.");
     }
+
+    private static int CountOccurrences(string source, string value) =>
+        source.Split(value, StringSplitOptions.None).Length - 1;
 
     [TestMethod]
     public void ConsoleWorkOperationsClientDependsOnlyOnHttpAndPublicContracts()

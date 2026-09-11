@@ -10,7 +10,7 @@ Agentstration keeps explicit Management Plane, Runtime Plane, and Work Plane bou
 src/
   Agentstration.AppHost/          Aspire orchestration and dashboard
   Agentstration.Api/              REST, OpenAPI, MCP, SignalR and HTTP security transport
-  Agentstration.Web/              authoritative standalone composition root, UI and workers
+  Agentstration.Web/              authoritative standalone composition, lifecycle, Razor shell and workers
   Agentstration.Console.Client/   typed operations Console HTTP and SignalR clients
   Agentstration.Console.Components/ operations Console routes, presentation state and localization
   Agentstration.Web.Components/   reusable Razor components and console design system
@@ -86,6 +86,8 @@ Runtime.Core -> Runtime.Abstractions
 Runtime.Storage.Sqlite -> Runtime.Abstractions + EF Core SQLite
 Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 ```
+
+`Agentstration.Web/Program.cs` is deliberately limited to creating the builder, applying the standalone composition, initializing it, and running it. `StandaloneHostComposition` remains in the executable project and is the single place that selects storage and identity providers, registers concrete adapters and workers, configures observability, orders startup initialization, and assembles `Agentstration.Api` with the Console libraries. This is code separation only: direct launch, Aspire, and the Docker image still start one authoritative ASP.NET Core process with one set of stores, queues, schedulers, and workers.
 
 Canonical Management resources and provider-neutral ports live in `Management.Abstractions`; validation and use cases live in `Management.Core`. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
 
