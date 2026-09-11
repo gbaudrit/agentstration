@@ -201,10 +201,11 @@ Aspire starts Agentstration's AEP extensions against existing inference servers.
 
 ```powershell
 dotnet build Agentstration.slnx --configuration Release
-dotnet test Agentstration.slnx --configuration Release
+dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 1
+dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 1
 ```
 
-Warnings are treated as errors, .NET analyzers are enabled and NuGet audit findings fail restore. The default tests are designed to remain offline and cost-free; real-provider smoke tests are opt-in.
+Warnings are treated as errors, .NET analyzers are enabled and NuGet audit findings fail restore. The fast and integration lanes together provide complete required functional validation while remaining offline and cost-free; real-provider and performance workloads are opt-in. See the [test lane guide](docs/contributing/testing.md) for project classification and focused commands.
 
 ## Documentation
 

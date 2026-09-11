@@ -23,16 +23,18 @@ public sealed partial class SecurityApiTests
     private const string LocalPassword = "A-strong-local-password-42!";
     private const string ChangedLocalPassword = "A-changed-local-password-84!";
 
-    private static WebApplicationFactory<Program> Factory(string mode)
+    private static WebApplicationFactory<Program> Factory(string mode) => new SecurityWebApplicationFactory(mode);
+
+    private sealed class SecurityWebApplicationFactory(string mode) : WebApplicationFactory<Program>
     {
-        WebApplicationFactory<Program>? factory = null;
-        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Authentication:Mode", mode);
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
             builder.ConfigureTestServices(services =>
             {
-                Func<HttpMessageHandler> handlerFactory = () => factory!.Server.CreateHandler();
+                Func<HttpMessageHandler> handlerFactory = () => Server.CreateHandler();
                 RouteThroughTestServer<IUserPreferencesClient>(services, handlerFactory);
                 RouteThroughTestServer<IIdentityAdministrationApiClient>(services, handlerFactory);
                 RouteThroughTestServer<IManagementApiClient>(services, handlerFactory);
@@ -41,8 +43,7 @@ public sealed partial class SecurityApiTests
                 RouteThroughTestServer<IRuntimeApiClient>(services, handlerFactory);
                 RouteThroughTestServer<IWorkApiClient>(services, handlerFactory);
             });
-        });
-        return factory;
+        }
     }
 
     private static void RouteThroughTestServer<TClient>(

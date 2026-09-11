@@ -100,6 +100,7 @@ const sidebars = {
       items: [
         'contributing/overview',
         'contributing/development-slots',
+        'contributing/testing',
         'contributing/documentation',
         'contributing/github-governance',
       ],

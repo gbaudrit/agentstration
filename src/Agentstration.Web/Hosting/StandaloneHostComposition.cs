@@ -27,7 +27,8 @@ namespace Agentstration.Web.Hosting;
 internal sealed record StandaloneHostComposition(
     ApiAuthenticationOptions Authentication,
     GenAiObservabilityOptions GenAiObservability,
-    string? TestingDataDirectory);
+    string? TestingDataDirectory,
+    bool ApiOnlyTesting);
 
 internal static class StandaloneHostCompositionExtensions
 {
@@ -50,6 +51,8 @@ internal static class StandaloneHostCompositionExtensions
         builder.Services.AddSingleton(toolExecutionCapture);
 
         var isTesting = builder.Environment.IsEnvironment("Testing");
+        var apiOnlyTesting = isTesting
+            && builder.Configuration.GetValue("Agentstration:Testing:ApiOnly", false);
         var hostedServicesEnabled = !isTesting
             || builder.Configuration.GetValue("Agentstration:Testing:HostedServicesEnabled", false);
         var openTelemetryEnabled = !isTesting
@@ -132,8 +135,11 @@ internal static class StandaloneHostCompositionExtensions
         builder.Services.AddSingleton<IAepEnrollmentAnnouncementProvisioner>(provider => provider.GetRequiredService<ExtensionSourceDiscoveryService>());
         builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
         builder.Services.AddAgentstrationApi(builder.Configuration, builder.Environment);
-        builder.Services.AddRazorPages();
-        builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+        if (!apiOnlyTesting)
+        {
+            builder.Services.AddRazorPages();
+            builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+        }
         builder.Services.AddAgentstrationLocalization(builder.Configuration);
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
             builder.Services.AddAgentstrationPostgreSqlIdentity(
@@ -178,7 +184,7 @@ internal static class StandaloneHostCompositionExtensions
 
         if (openTelemetryEnabled) AddOpenTelemetry(builder);
 
-        return new(configuredAuthentication, genAiObservability, testingStorageDirectory);
+        return new(configuredAuthentication, genAiObservability, testingStorageDirectory, apiOnlyTesting);
     }
 
     internal static void ConfigureAgentstrationStandaloneHost(
@@ -201,15 +207,18 @@ internal static class StandaloneHostCompositionExtensions
         app.UseMiddleware<RequestContextMiddleware>();
         app.UseMiddleware<StandardManagementDataMiddleware>();
         app.UseAuthorization();
-        app.UseAntiforgery();
+        if (!composition.ApiOnlyTesting) app.UseAntiforgery();
         app.MapAgentstrationApi();
         app.MapAgentstrationCultureEndpoint().AllowAnonymous();
-        app.MapStaticAssets().AllowAnonymous();
-        app.MapRazorPages();
-        app.MapRazorComponents<App>()
-            .AddAdditionalAssemblies(typeof(ConsoleRouteAssembly).Assembly, typeof(MainLayout).Assembly)
-            .AddInteractiveServerRenderMode()
-            .RequireAuthorization(AgentstrationPolicies.Authenticated);
+        if (!composition.ApiOnlyTesting)
+        {
+            app.MapStaticAssets().AllowAnonymous();
+            app.MapRazorPages();
+            app.MapRazorComponents<App>()
+                .AddAdditionalAssemblies(typeof(ConsoleRouteAssembly).Assembly, typeof(MainLayout).Assembly)
+                .AddInteractiveServerRenderMode()
+                .RequireAuthorization(AgentstrationPolicies.Authenticated);
+        }
     }
 
     internal static async Task InitializeAgentstrationStandaloneHostAsync(

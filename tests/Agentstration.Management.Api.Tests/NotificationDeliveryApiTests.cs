@@ -16,7 +16,8 @@ using ModelContextProtocol.Client;
 
 namespace Agentstration.Management.Tests;
 
-public sealed partial class ModelManagementApiTests
+[TestClass]
+public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
     public void NotificationDeliverySamplesUseOnlyGenericFlowAndToolSteps()

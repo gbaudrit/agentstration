@@ -48,7 +48,14 @@ src/
 tests/
   Agentstration.Application.Tests/
   Agentstration.ArchitectureTests/
-  Agentstration.Management.Tests/
+  Agentstration.Management.Core.Tests/
+  Agentstration.Management.Storage.Tests/
+  Agentstration.Management.Sources.Tests/
+  Agentstration.Management.Api.Tests/
+  Agentstration.Management.Bootstrap.Tests/
+  Agentstration.Management.Security.Tests/
+  Agentstration.Management.Aep.Tests/
+  Agentstration.Performance.Tests/
 docs/
   architecture.md
   decisions/
@@ -180,10 +187,18 @@ Run from the repository root:
 ```powershell
 dotnet restore Agentstration.slnx
 dotnet build Agentstration.slnx --configuration Release --no-restore
-dotnet test Agentstration.slnx --configuration Release --no-build
+dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 139 --max-parallel-test-modules 4
+dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 692 --max-parallel-test-modules 2
 ```
 
-For a focused iteration, run the affected test project first, then run the full build and test suite before handoff. Do not suppress warnings or disable analyzers to make a change pass.
+The two test solutions together form the required deterministic, offline functional suite. Performance and live-provider workloads are explicit opt-ins documented in `docs/contributing/testing.md`. For a focused iteration, run the affected test project first, then run both functional lanes before handoff. Do not suppress warnings or disable analyzers to make a change pass.
+
+When changing coverage collection or its CI workflow, restore the pinned repository tool and reproduce the consolidated report after the Release build:
+
+```powershell
+dotnet tool restore
+./scripts/ci/run-functional-coverage.ps1 -Configuration Release -NoBuild
+```
 
 To smoke-test the executable default with the Development bootstrap when startup behavior changes:
 

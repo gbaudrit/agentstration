@@ -16,7 +16,7 @@ AEP is an autonomous, versioned protocol and .NET SDK for discovering, validatin
 ```powershell
 dotnet restore Aep.slnx
 dotnet build Aep.slnx --configuration Release --no-restore
-dotnet test Aep.slnx --configuration Release --no-build
+dotnet test --solution Aep.slnx --configuration Release --no-build --minimum-expected-tests 1
 ```
 
 Run a generic sample and Inspector independently:

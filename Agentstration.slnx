@@ -58,8 +58,15 @@
   <Folder Name="/tests/">
     <Project Path="tests/Agentstration.Application.Tests/Agentstration.Application.Tests.csproj" />
     <Project Path="tests/Agentstration.ArchitectureTests/Agentstration.ArchitectureTests.csproj" />
-    <Project Path="tests/Agentstration.Management.Tests/Agentstration.Management.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Core.Tests/Agentstration.Management.Core.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Storage.Tests/Agentstration.Management.Storage.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Sources.Tests/Agentstration.Management.Sources.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Api.Tests/Agentstration.Management.Api.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Bootstrap.Tests/Agentstration.Management.Bootstrap.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Security.Tests/Agentstration.Management.Security.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Aep.Tests/Agentstration.Management.Aep.Tests.csproj" />
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
+    <Project Path="tests/Agentstration.Performance.Tests/Agentstration.Performance.Tests.csproj" />
     <Project Path="tests/Agentstration.SourceProviders.Git.Tests/Agentstration.SourceProviders.Git.Tests.csproj" />
     <Project Path="tests/Agentstration.Tools.SourceRegistry.Tests/Agentstration.Tools.SourceRegistry.Tests.csproj" />
     <Project Path="tests/Agentstration.Runtime.Tests/Agentstration.Runtime.Tests.csproj" />
