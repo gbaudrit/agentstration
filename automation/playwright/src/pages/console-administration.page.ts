@@ -49,11 +49,8 @@ export class ConsoleAdministrationPage {
   public async selectTheme(theme: 'system' | 'light' | 'dark'): Promise<void> {
     const option = this.page.locator(`[data-testid="${TestIds.consoleAdministration.profileThemeOption}"][data-theme="${theme}"]`);
     await option.click();
-    await this.page.waitForFunction(
-      ({ testId, selectedTheme }) => document.querySelector(`[data-testid="${testId}"][data-theme="${selectedTheme}"]`)
-        ?.getAttribute('aria-checked')?.toLowerCase() === 'true',
-      { testId: TestIds.consoleAdministration.profileThemeOption, selectedTheme: theme },
-    );
+    const effectiveTheme = theme === 'system' ? 'dark' : theme;
+    await this.page.locator(`[data-testid="${TestIds.console.shell}"].theme-${effectiveTheme}`).waitFor({ state: 'visible' });
   }
 
   public async selectLanguage(language: 'auto' | 'en-US' | 'fr-FR'): Promise<void> {
@@ -94,7 +91,7 @@ export class ConsoleAdministrationPage {
 
   public async signOut(): Promise<void> {
     await Promise.all([
-      this.page.waitForEvent('framenavigated'),
+      this.page.waitForURL(url => url.pathname !== '/logout'),
       this.page.getByTestId(TestIds.consoleAdministration.logoutSubmit).click(),
     ]);
     const path = new URL(this.page.url()).pathname;
