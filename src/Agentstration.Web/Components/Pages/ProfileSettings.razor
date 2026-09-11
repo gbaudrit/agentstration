@@ -8,7 +8,7 @@
 <PageTitle>@Localizer["PageTitle"]</PageTitle>
 <PageHeader Eyebrow="@Localizer["PersonalSettings"]" Title="@Localizer["ProfileSettings"]" Description="@Localizer["PageDescription"]" />
 
-<section class="profile-settings-layout">
+<section class="profile-settings-layout" data-testid="console-admin-profile-settings">
     <article class="panel profile-settings-panel">
         <div class="profile-heading">
             <span class="profile-avatar" aria-hidden="true">@ProfileInitial</span>
@@ -33,7 +33,7 @@
         <div class="theme-options" role="radiogroup" aria-label="@Localizer["ColorTheme"]">
             @foreach (var option in ThemeOptions)
             {
-                <button type="button"
+                <button type="button" data-testid="profile-theme-option" data-theme="@option.CssName"
                         class="theme-option @(Preferences.Theme == option.Theme ? "selected" : null)"
                         role="radio"
                         aria-checked="@(Preferences.Theme == option.Theme)"
@@ -54,7 +54,7 @@
         <div class="profile-language">
             <label for="profile-language"><strong>@Localizer["Language"]</strong></label>
             <p>@Localizer["LanguageDescription"]</p>
-            <select id="profile-language" value="@(Preferences.Language ?? "auto")" @onchange="SelectLanguageAsync" disabled="@Preferences.IsSaving">
+            <select id="profile-language" data-testid="profile-language" value="@(Preferences.Language ?? "auto")" @onchange="SelectLanguageAsync" disabled="@Preferences.IsSaving">
                 <option value="auto">@Localizer["LanguageAutomatic"]</option>
                 <option value="en-US">English</option>
                 <option value="fr-FR">Français</option>

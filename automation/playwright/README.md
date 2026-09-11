@@ -64,6 +64,14 @@ npm run capture -- --plan examples/inspect-flow-observability.capture-plan.json 
 
 The local plan uses the seeded `prepare-report` Entry. An external target must provide that Entry and a compatible published Flow in the selected Workspace.
 
+Console identity and administration can be captured across organization context, member access, profile preferences, personal access token lifecycle, and shell navigation:
+
+```powershell
+npm run capture -- --plan examples/inspect-console-administration.capture-plan.json --output .work/console-administration
+```
+
+The journey creates and immediately revokes its personal access token. Run it against a disposable instance or a dedicated campaign Workspace when targeting an external Console.
+
 The solution-discovery video Flow and Entry are captured with:
 
 ```powershell

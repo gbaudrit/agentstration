@@ -8,6 +8,7 @@ import { exposeEntryOnDashboard, type ExposeEntryOnDashboardInput } from './expo
 import { importSource, type ImportSourceInput } from './import-source.journey.js';
 import { createPackProject, type CreatePackProjectInput } from './create-pack-project.journey.js';
 import { inspectFlowObservability, type InspectFlowObservabilityInput } from './inspect-flow-observability.journey.js';
+import { inspectConsoleAdministration, type InspectConsoleAdministrationInput } from './inspect-console-administration.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -21,4 +22,5 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'import-source': (context, input) => importSource(context, input as unknown as ImportSourceInput),
   'create-pack-project': (context, input) => createPackProject(context, input as unknown as CreatePackProjectInput),
   'inspect-flow-observability': (context, input) => inspectFlowObservability(context, input as unknown as InspectFlowObservabilityInput),
+  'inspect-console-administration': (context, input) => inspectConsoleAdministration(context, input as unknown as InspectConsoleAdministrationInput),
 };

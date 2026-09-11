@@ -8,6 +8,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
 <PageTitle>@T("MemberAccess") · Agentstration</PageTitle>
+<div data-testid="console-admin-organization-member-details" data-member-id="@UserId">
 @if (member is null) { <LoadingState Message="@T("LoadingMemberAccess")" /> }
 else
 {
@@ -58,6 +59,7 @@ else
         </section>
     }
 }
+</div>
 
 @code {
     [Parameter] public Guid UserId { get; set; }
