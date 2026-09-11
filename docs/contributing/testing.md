@@ -37,12 +37,15 @@ The current Web storage workload remains a mixed-project boundary until #303 mov
 | Test project | Lane | Boundary or rationale |
 | --- | --- | --- |
 | `Agentstration.ArchitectureTests` | Fast | Assembly dependency rules |
+| `Agentstration.Management.Core.Tests` | Fast | Pure Management validation and in-memory use cases |
 | `Agentstration.Tools.SourceRegistry.Tests` | Fast | In-process CLI and manifest validation |
 | `Agentstration.Web.Components.Tests` | Fast | bUnit component behavior |
 | `Agentstration.Web.FlowDesigner.Tests` | Fast | bUnit and graph projection behavior |
 | `Agentstration.Workplace.Components.Tests` | Fast | bUnit component behavior |
 | `Agentstration.Application.Tests` | Integration | Includes SQLite Flow and Work storage contracts |
-| `Agentstration.Management.Tests` | Integration, mixed | Hosted, SQLite, Identity, source, and pure tests; split by #301 and #302 |
+| `Agentstration.Management.Storage.Tests` | Integration | SQLite control-plane, Identity persistence, secrets, audit, and trigger storage |
+| `Agentstration.Management.Sources.Tests` | Integration | Source, registry, provider, and Pack distribution boundaries |
+| `Agentstration.Management.Tests` | Integration, mixed | Remaining hosted API, Security, bootstrap, and AEP tests; split by #302 |
 | `Agentstration.ModelProviders.Tests` | Integration, provider-optional | AEP test hosts plus opt-in live-provider checks |
 | `Agentstration.Runtime.Tests` | Integration | SQLite reconstruction and hosted runtime endpoints |
 | `Agentstration.SourceProviders.Git.Tests` | Integration | Real Git processes and file-system repositories |

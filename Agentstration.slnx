@@ -55,6 +55,9 @@
   <Folder Name="/tests/">
     <Project Path="tests/Agentstration.Application.Tests/Agentstration.Application.Tests.csproj" />
     <Project Path="tests/Agentstration.ArchitectureTests/Agentstration.ArchitectureTests.csproj" />
+    <Project Path="tests/Agentstration.Management.Core.Tests/Agentstration.Management.Core.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Storage.Tests/Agentstration.Management.Storage.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Sources.Tests/Agentstration.Management.Sources.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Tests/Agentstration.Management.Tests.csproj" />
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
     <Project Path="tests/Agentstration.SourceProviders.Git.Tests/Agentstration.SourceProviders.Git.Tests.csproj" />
