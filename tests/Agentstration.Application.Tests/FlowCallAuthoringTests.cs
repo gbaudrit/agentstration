@@ -68,6 +68,33 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    [DataRow("${input}")]
+    [DataRow("${transition.output}")]
+    public async Task FlowCallValidationAcceptsCompleteInputPassthrough(string inputMapping)
+    {
+        var inputSchema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { article = new { type = "string" } },
+            required = new[] { "article" }
+        });
+        var resolver = new FlowCallResolverStub(new(new("analysis"), "3.0.0", inputSchema, JsonSerializer.SerializeToElement(new { type = "object" })));
+        var graph = Graph(new FlowCallStepDefinition
+        {
+            Name = "analyze",
+            Flow = new("analysis"),
+            InputMapping = JsonSerializer.SerializeToElement(inputMapping)
+        });
+
+        var result = await new FlowGraphValidator(resolver).ValidateAsync(
+            graph,
+            new FlowValidationContext(true, TestScope.WorkspaceId, new("parent")),
+            default);
+
+        Assert.IsTrue(result.IsValid, string.Join(Environment.NewLine, result.Issues.Select(issue => issue.Message)));
+    }
+
+    [TestMethod]
     public async Task RepositoryResolverFindsNamespacedPublishedVersionsAndIndirectCycles()
     {
         await using var fixture = await FlowFixture.CreateAsync();

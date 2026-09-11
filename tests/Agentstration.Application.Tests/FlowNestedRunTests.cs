@@ -60,6 +60,28 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task FlowCallPassesTheIncomingTransitionOutputToTheChild()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        await CreatePublishedGraphAsync(fixture, "child", ChildGraph());
+        var parent = await CreatePublishedGraphAsync(fixture, "parent", AgentThenFlowGraph());
+        var runs = Service(fixture, new TestFlowRunQueue(), agents: new StructuredAgentExecutor());
+        using var input = JsonDocument.Parse("""{"article":"original item"}""");
+
+        var pending = await runs.CreateAsync(
+            parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "agent-child-input",
+            input.RootElement, TestScope, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
+
+        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
+        var childId = waiting.Steps.Single(step => step.StepName == "deliver").ChildFlowRunId;
+        Assert.IsNotNull(childId);
+        var child = (await runs.GetAsync(TestScope.WorkspaceId, childId, default))!.Value;
+        Assert.AreEqual("analyzed item", child.Input.GetProperty("article").GetString());
+        Assert.AreEqual(0.9, child.Input.GetProperty("confidence").GetDouble());
+    }
+
+    [TestMethod]
     public async Task CancellingAWaitingParentPropagatesToItsActiveChild()
     {
         await using var fixture = await FlowFixture.CreateAsync();
@@ -213,14 +235,15 @@ public sealed partial class FlowTests
         FlowFixture fixture,
         TestFlowRunQueue queue,
         FlowRunExecutionOptions? options = null,
-        IFlowOrchestrationEngine? orchestration = null)
+        IFlowOrchestrationEngine? orchestration = null,
+        IFlowAgentExecutor? agents = null)
     {
         var expressions = new FlowExpressionParser();
         return new FlowRunService(
             fixture.Repository,
             queue,
             new TestCancellationRegistry(),
-            new TestAgentExecutor(),
+            agents ?? new TestAgentExecutor(),
             orchestration ?? new UnsupportedFlowOrchestrationEngine(),
             expressions,
             expressions,
@@ -327,4 +350,43 @@ public sealed partial class FlowTests
             new("analyze-cancelled", "analyze", "cancelled", "failure")
         ]
     };
+
+    private static FlowGraphDefinition AgentThenFlowGraph() => new()
+    {
+        EntryStep = "input",
+        Steps =
+        [
+            new InputFlowStepDefinition { Name = "input" },
+            new AgentFlowStepDefinition { Name = "analyze", Agent = new("news-agent") },
+            new FlowCallStepDefinition
+            {
+                Name = "deliver",
+                Flow = new("child", FlowCallVersionStrategy.Exact, "1.0.0"),
+                InputMapping = JsonSerializer.SerializeToElement("${transition.output}")
+            }
+        ],
+        Transitions =
+        [
+            new("input-analyze", "input", "completed", "analyze"),
+            new("analyze-deliver", "analyze", "completed", "deliver")
+        ]
+    };
+
+    private sealed class StructuredAgentExecutor : IFlowAgentExecutor
+    {
+        public Task<FlowAgentExecutionResult> ExecuteAsync(
+            FlowTargetReference target,
+            JsonElement input,
+            string correlationId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new FlowAgentExecutionResult(
+                JsonSerializer.SerializeToElement(new { article = "analyzed item", confidence = 0.9 }),
+                $"/agents/{target.Id}",
+                3,
+                "/profiles/default",
+                "Deterministic",
+                null,
+                [],
+                []));
+    }
 }

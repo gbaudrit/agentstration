@@ -30,7 +30,7 @@
   <data name="Agent"><value>Agent</value></data><data name="RouterOutput"><value>Router output</value></data>
   <data name="CalledFlow"><value>Called Flow</value></data><data name="VersionStrategy"><value>Version strategy</value></data>
   <data name="VersionStrategy.Active"><value>Active version</value></data><data name="VersionStrategy.Exact"><value>Exact version</value></data>
-  <data name="ExactVersion"><value>Exact version</value></data><data name="InputMapping"><value>Input mapping</value></data><data name="AvailableOutput"><value>Available output properties</value></data>
+  <data name="ExactVersion"><value>Exact version</value></data><data name="InputMapping"><value>Input mapping</value></data><data name="PassIncomingTransitionOutput"><value>Pass incoming transition output</value></data><data name="PassIncomingTransitionOutputHelp"><value>The child Flow receives the complete output carried by the transition taken into this step.</value></data><data name="AvailableOutput"><value>Available output properties</value></data>
   <data name="CalledTool"><value>Called Tool</value></data><data name="ArgumentsMapping"><value>Arguments mapping</value></data>
   <data name="ToolDisabled"><value>This Tool is disabled.</value></data><data name="ToolUnavailable"><value>This Tool is unavailable from its provider.</value></data><data name="ToolApprovalRequired"><value>This Tool requires approval before invocation.</value></data>
   <data name="LoadAgents"><value>Load agents</value></data><data name="AddAll"><value>Add all</value></data>

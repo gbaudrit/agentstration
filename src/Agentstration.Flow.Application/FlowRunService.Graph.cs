@@ -19,6 +19,9 @@ public sealed partial class FlowRunService
         var resumedChildStep = stored.Value.Steps.SingleOrDefault(step =>
             step.Status == FlowStepRunStatus.Running && step.ChildFlowRunId is not null);
         var currentName = resumedChildStep?.StepName ?? graph.EntryStep;
+        var incomingTransition = resumedChildStep is null
+            ? null
+            : SelectedIncomingTransition(graph, stored.Value, currentName);
         var executed = stored.Value.Steps
             .Where(step => step.Status is FlowStepRunStatus.Succeeded or FlowStepRunStatus.Failed)
             .Select(step => step.StepName)
@@ -32,7 +35,10 @@ public sealed partial class FlowRunService
             if (resumedChildStep?.StepName != step.Name)
                 stored = await StartStepAsync(stored, step.Name, runToken);
             resumedChildStep = null;
-            var context = new FlowExecutionContext(stored.Value.Input, outputs);
+            var transitionOutput = incomingTransition is null
+                ? null
+                : outputs.GetValueOrDefault(incomingTransition.FromStep)?.Clone();
+            var context = new FlowExecutionContext(stored.Value.Input, outputs, transitionOutput);
             JsonElement? output;
             string eventName;
             FlowAgentExecutionResult? agentResult = null;
@@ -149,6 +155,7 @@ public sealed partial class FlowRunService
             if (transition is null && stepError is not null)
                 throw new FlowValidationException(stepError.Code, stepError.Details ?? stepError.Message);
             if (transition is null) throw new FlowValidationException("flow_transition_missing", $"No '{eventName}' transition leaves step '{step.Name}'.");
+            incomingTransition = transition;
             currentName = transition.ToStep;
         }
         if (finalOutput is null) throw new FlowValidationException("flow_output_missing", "The Flow completed without reaching an Output step.");
@@ -166,6 +173,16 @@ public sealed partial class FlowRunService
         RecordCompletion(stored.Value.CreatedAt, now, stored.Value.DefinitionState);
         await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.FlowRunCompleted, null, null, stoppingToken);
     }
+
+    private static FlowTransitionDefinition? SelectedIncomingTransition(
+        FlowGraphDefinition graph,
+        FlowRun run,
+        string stepName) =>
+        graph.Transitions.FirstOrDefault(transition =>
+            transition.ToStep == stepName
+            && run.Steps.Any(step =>
+                step.StepName == transition.FromStep
+                && step.SelectedTransition == transition.Id));
 
     private async Task<StoredFlowRun> FinishGraphStepAsync(StoredFlowRun stored, string name, JsonElement? output, string? transition, CancellationToken token)
     {

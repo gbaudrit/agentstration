@@ -209,8 +209,18 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
     private static void ValidateMappingAgainstSchema(FlowCallStepDefinition step, JsonElement? schema, List<FlowValidationIssue> issues)
     {
         if (schema is not { ValueKind: JsonValueKind.Object } value) return;
+        if (step.InputMapping is { ValueKind: JsonValueKind.String } mapping
+            && FlowExpressionParser.TryParse(mapping.GetString()!, out var expression, out _)
+            && IsCompleteObjectReference(expression.Body)) return;
         ValidateMappingAgainstSchema(step.Name, "inputMapping", step.InputMapping, value, "flow_input_mapping", issues);
     }
+
+    private static bool IsCompleteObjectReference(string expression) =>
+        string.Equals(expression, "input", StringComparison.Ordinal)
+        || string.Equals(expression, "transition.output", StringComparison.Ordinal)
+        || (expression.StartsWith("steps.", StringComparison.Ordinal)
+            && expression.EndsWith(".output", StringComparison.Ordinal)
+            && expression.Count(character => character == '.') == 2);
 
     private static void ValidateMappingAgainstSchema(
         string stepName,
@@ -314,7 +324,10 @@ public sealed record ParsedExpression(string Source, string Body);
 public sealed record ExpressionParseResult(ParsedExpression? Expression, string? Error) { public bool IsValid => Expression is not null; }
 public sealed record ExpressionValidationResult(bool IsValid, string? Error = null);
 public sealed record FlowExpressionContext(IReadOnlyCollection<string> StepNames);
-public sealed record FlowExecutionContext(JsonElement Input, IReadOnlyDictionary<string, JsonElement?> StepOutputs);
+public sealed record FlowExecutionContext(
+    JsonElement Input,
+    IReadOnlyDictionary<string, JsonElement?> StepOutputs,
+    JsonElement? TransitionOutput = null);
 
 public interface IExpressionParser { ExpressionParseResult Parse(string expression); }
 public interface IExpressionValidator { ExpressionValidationResult Validate(ParsedExpression expression, FlowExpressionContext context); }
@@ -353,7 +366,13 @@ public sealed class FlowExpressionParser : IExpressionParser, IExpressionValidat
         var body = expression[2..^1].Trim();
         if (body.Length == 0 || body.Contains(';') || body.Contains('(') || body.Contains(')')) { error = "The expression contains unsupported syntax."; return false; }
         var first = ComparisonParts(body)[0];
-        if (!first.StartsWith("input", StringComparison.Ordinal) && !first.StartsWith("steps.", StringComparison.Ordinal)) { error = "Expressions may reference only input or step outputs."; return false; }
+        if (!first.StartsWith("input", StringComparison.Ordinal)
+            && !first.StartsWith("steps.", StringComparison.Ordinal)
+            && !first.StartsWith("transition.output", StringComparison.Ordinal))
+        {
+            error = "Expressions may reference only input, the incoming transition output, or step outputs.";
+            return false;
+        }
         parsed = new ParsedExpression(expression, body); return true;
     }
 
@@ -372,6 +391,7 @@ public sealed class FlowExpressionParser : IExpressionParser, IExpressionValidat
         var segments = path.Split('.'); JsonElement? current;
         var offset = 1;
         if (segments[0] == "input") current = context.Input;
+        else if (segments[0] == "transition") { current = context.TransitionOutput; offset = 2; }
         else { if (segments.Length < 3 || !context.StepOutputs.TryGetValue(segments[1], out current)) return null; offset = segments[2] == "output" ? 3 : 2; }
         for (var index = offset; index < segments.Length; index++)
         {
