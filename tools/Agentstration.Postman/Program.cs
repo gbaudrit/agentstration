@@ -303,7 +303,7 @@ internal static partial class PostmanProgram
             if (schema.TryGetProperty(keyword, out var choices) && choices.GetArrayLength() > 0)
                 return Example(openApi, choices[0], depth + 1, references);
 
-        var type = schema.TryGetProperty("type", out var typeValue) ? typeValue.GetString() : null;
+        var type = SchemaType(schema);
         if (type == "object" || schema.TryGetProperty("properties", out _))
         {
             var result = new JsonObject();
@@ -332,6 +332,17 @@ internal static partial class PostmanProgram
             };
         }
         return string.Empty;
+    }
+
+    private static string? SchemaType(JsonElement schema)
+    {
+        if (!schema.TryGetProperty("type", out var type)) return null;
+        if (type.ValueKind == JsonValueKind.String) return type.GetString();
+        if (type.ValueKind != JsonValueKind.Array) return null;
+        return type.EnumerateArray()
+            .Where(value => value.ValueKind == JsonValueKind.String)
+            .Select(value => value.GetString())
+            .FirstOrDefault(value => value is not null && !value.Equals("null", StringComparison.Ordinal));
     }
 
     private static JsonElement ResolveReference(JsonElement openApi, string reference)
