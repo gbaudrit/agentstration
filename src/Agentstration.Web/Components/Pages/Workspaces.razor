@@ -30,7 +30,7 @@ else
     @if (selected is null) { <EmptyState Title="@T("NoDashboard")" Message="@T("NoDashboardMessage")" /> }
     else
     {
-        <div class="workspace-editor-grid">
+        <div class="workspace-editor-grid" data-testid="dashboard-editor">
             <section class="panel form-section workspace-settings" aria-labelledby="dashboard-settings-title">
                 <div class="panel-header">
                     <div><p class="eyebrow">@T("Details")</p><h2 id="dashboard-settings-title">@T("DashboardSettings")</h2><p>@T("DashboardSettingsHelp")</p></div>
@@ -78,8 +78,8 @@ else
                                     @foreach (var entry in roleEntries)
                                     {
                                         var configured = composition.Single(value => value.EntryResourceId == EntryId(entry));
-                                        <article @key="EntryId(entry)" class="workspace-entry-row included">
-                                            <label class="workspace-entry-toggle"><input type="checkbox" checked @onchange="args => ToggleEntry(entry, args)" /><span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · @T("EntryVersion", entry.Version)</small></span></label>
+                                        <article @key="EntryId(entry)" class="workspace-entry-row included" data-testid="dashboard-entry-row" data-entry-id="@entry.Id" data-entry-namespace="@entry.Namespace.Value">
+                                            <label class="workspace-entry-toggle"><input type="checkbox" data-testid="dashboard-entry-toggle" checked @onchange="args => ToggleEntry(entry, args)" /><span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · @T("EntryVersion", entry.Version)</small></span></label>
                                             <div class="workspace-entry-config @(role == DashboardItemRole.Primary ? "without-order" : null)">
                                                 <label><span>@T("Role")</span><select data-testid="dashboard-entry-role" value="@configured.Role" @onchange="args => ChangeRole(entry, args)" title="@T("OnlyOnePrimaryEntry")"><option value="Primary">@T("Role.Primary")</option><option value="Featured">@T("Role.Featured")</option><option value="Standard">@T("Role.Standard")</option></select></label>
                                                 @if (role != DashboardItemRole.Primary)
@@ -101,8 +101,8 @@ else
                                 <div class="workspace-entry-group-header"><div><strong>@T("NotShown")</strong><small>@T("DashboardRole.Excluded.Help")</small></div><span>@ExcludedEntries.Count</span></div>
                                 @foreach (var entry in ExcludedEntries)
                                 {
-                                    <article @key="EntryId(entry)" class="workspace-entry-row excluded">
-                                        <label class="workspace-entry-toggle"><input type="checkbox" @onchange="args => ToggleEntry(entry, args)" /><span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · @T("EntryVersion", entry.Version)</small></span></label>
+                                    <article @key="EntryId(entry)" class="workspace-entry-row excluded" data-testid="dashboard-entry-row" data-entry-id="@entry.Id" data-entry-namespace="@entry.Namespace.Value">
+                                        <label class="workspace-entry-toggle"><input type="checkbox" data-testid="dashboard-entry-toggle" @onchange="args => ToggleEntry(entry, args)" /><span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · @T("EntryVersion", entry.Version)</small></span></label>
                                         <span class="workspace-entry-excluded">@T("NotShown")</span>
                                     </article>
                                 }
@@ -113,9 +113,9 @@ else
             </section>
         </div>
         <section class="workspace-action-bar" aria-label="@T("DashboardActions")">
-            <div class="workspace-action-feedback">@if (!string.IsNullOrWhiteSpace(message)) { <p role="@(error ? "alert" : "status")" class="@(error ? "inline-warning" : "resource-hint")">@message</p> } else { <p class="resource-hint">@T("DashboardActionHelp")</p> }</div>
+            <div class="workspace-action-feedback">@if (!string.IsNullOrWhiteSpace(message)) { <p role="@(error ? "alert" : "status")" class="@(error ? "inline-warning" : "resource-hint")" data-testid="dashboard-status" data-state="@(error ? "error" : "success")">@message</p> } else { <p class="resource-hint">@T("DashboardActionHelp")</p> }</div>
             @if (!creating && !isDefault) { <button class="workspace-delete-button" type="button" @onclick="DeleteAsync" disabled="@busy">@T("DeleteDashboard")</button> }
-            <div class="workspace-primary-actions"><button class="button-secondary" type="button" @onclick="SaveAsync" disabled="@busy">@T("SaveDraft")</button><button class="button-primary" type="button" @onclick="PublishAsync" disabled="@busy"><UiIcon Name="send" />@T("PublishDashboard")</button></div>
+            <div class="workspace-primary-actions"><button class="button-secondary" type="button" @onclick="SaveAsync" disabled="@busy">@T("SaveDraft")</button><button class="button-primary" type="button" @onclick="PublishAsync" disabled="@busy" data-testid="dashboard-publish"><UiIcon Name="send" />@T("PublishDashboard")</button></div>
         </section>
     }
 }

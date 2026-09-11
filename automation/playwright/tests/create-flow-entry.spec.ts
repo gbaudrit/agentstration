@@ -50,9 +50,10 @@ const flow: CreateHandoffFlowInput = {
   enabled: true,
   participants: agents.map(agent => agent.name),
   initialParticipant: agents[0]!.name,
-  routes: agents.flatMap(source => agents
-    .filter(target => target.name !== source.name)
-    .map(target => ({ from: source.name, to: target.name }))),
+  routes: agents.map((source, index) => ({
+    from: source.name,
+    to: agents[(index + 1) % agents.length]!.name,
+  })),
   autonomous: true,
   maximumTurnsPerParticipant: 2,
   terminationPhrase: '[[DONE]]',

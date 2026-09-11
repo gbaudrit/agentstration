@@ -1,2 +1,2 @@
-<span class="realtime-status @(Connected ? "connected" : "disconnected")" role="status"><span class="status-dot"></span>@(Connected ? Localizer["Live"] : Localizer["Reconnecting"])</span>
+<span class="realtime-status @(Connected ? "connected" : "disconnected")" role="status" data-testid="workplace-realtime-status" data-connected="@Connected.ToString().ToLowerInvariant()"><span class="status-dot"></span>@(Connected ? Localizer["Live"] : Localizer["Reconnecting"])</span>
 @code { [Parameter] public bool Connected { get; set; } }

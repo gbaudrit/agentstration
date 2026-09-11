@@ -29,7 +29,8 @@ export interface EntryDefinition {
   taskDisplay: 'Auto' | 'Hidden' | 'Visible';
   resultsDisplay: 'Auto' | 'Hidden' | 'Visible';
   field: EntryFieldDefinition;
-  targetFlow: string;
+  targetFlow?: string;
+  targetAgent?: string;
   targetNamespace?: string;
   taskCreationMode: 'Automatic' | 'OnDemand' | 'Never';
   allowConversation: boolean;
@@ -84,10 +85,18 @@ export class EntryEditorPage {
   }
 
   public async bindToFlow(flowName: string, namespace = 'default'): Promise<void> {
-    await this.page.getByTestId(TestIds.entryEditor.targetKind).selectOption('Flow');
+    await this.bindTarget('Flow', flowName, namespace);
+  }
+
+  public async bindToAgent(agentName: string, namespace = 'default'): Promise<void> {
+    await this.bindTarget('Agent', agentName, namespace);
+  }
+
+  private async bindTarget(kind: 'Agent' | 'Flow', resourceName: string, namespace: string): Promise<void> {
+    await this.page.getByTestId(TestIds.entryEditor.targetKind).selectOption(kind);
     const target = this.page.getByTestId(TestIds.entryEditor.targetResource);
     await target.locator('option').nth(1).waitFor({ state: 'attached' });
-    await selectFirstAvailable(target, [`${namespace}:${flowName}`, flowName], 'Entry target Flow');
+    await selectFirstAvailable(target, [`${namespace}:${resourceName}`, resourceName], `Entry target ${kind}`);
   }
 
   public async configureBehavior(entry: Pick<EntryDefinition, 'taskCreationMode' | 'allowConversation' | 'streamResponse'>): Promise<void> {

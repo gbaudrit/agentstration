@@ -24,7 +24,8 @@ export const createEntry: Journey<CreateEntryInput> = async (context, input) => 
   await context.checkpoint({ name: Checkpoints.createEntry.interactionComplete, page: context.pages.page, target: editor.interactionSection });
   await editor.configurePrimaryField(input.field);
   await context.checkpoint({ name: Checkpoints.createEntry.fieldComplete, page: context.pages.page, target: editor.fieldsSection });
-  await editor.bindToFlow(input.targetFlow, input.targetNamespace);
+  if (input.targetAgent) await editor.bindToAgent(input.targetAgent, input.targetNamespace);
+  else await editor.bindToFlow(input.targetFlow!, input.targetNamespace);
   await context.checkpoint({ name: Checkpoints.createEntry.bindingComplete, page: context.pages.page, target: editor.bindingSection });
   await editor.configureBehavior(input);
   await context.checkpoint({ name: Checkpoints.createEntry.behaviorComplete, page: context.pages.page, target: editor.behaviorSection });
@@ -36,8 +37,11 @@ export const createEntry: Journey<CreateEntryInput> = async (context, input) => 
 };
 
 function validate(input: CreateEntryInput): void {
-  for (const property of ['name', 'displayName', 'description', 'placeholder', 'targetFlow'] as const) {
+  for (const property of ['name', 'displayName', 'description', 'placeholder'] as const) {
     if (!input[property]?.trim()) throw new Error(`Create Entry input '${property}' is required.`);
+  }
+  if (Boolean(input.targetFlow?.trim()) === Boolean(input.targetAgent?.trim())) {
+    throw new Error("Create Entry input requires exactly one of 'targetFlow' or 'targetAgent'.");
   }
   for (const property of ['name', 'label', 'description', 'placeholder'] as const) {
     if (!input.field[property]?.trim()) throw new Error(`Create Entry primary field '${property}' is required.`);

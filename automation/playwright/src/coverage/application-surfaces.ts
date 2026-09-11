@@ -146,11 +146,34 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   planned('organization-security-audit', `${consolePages}/OrganizationSecurityAudit.razor`, ['/settings/organization/security-audit'], 289),
   planned('workspaces', `${consolePages}/Workspaces.razor`, ['/workspaces'], 289),
 
-  planned('workplace-home', `${workplacePages}/Home.razor`, ['/', '/w/{WorkspaceName}', '/w/{WorkspaceName}/d/{DashboardName}', '/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}'], 286, ['workspaceName', 'dashboardName', 'conversationId'], 'workplace'),
-  planned('workplace-entry-start', `${workplacePages}/EntryStart.razor`, ['/w/{WorkspaceName}/d/{DashboardName}/start/{EntryNamespace}/{EntryName}'], 286, ['workspaceName', 'dashboardName', 'entryNamespace', 'entryName'], 'workplace'),
-  planned('workplace-notifications', `${workplacePages}/Notifications.razor`, ['/w/{WorkspaceName}/notifications'], 286, ['workspaceName'], 'workplace'),
-  planned('workplace-tasks', `${workplacePages}/Tasks.razor`, ['/w/{WorkspaceName}/tasks'], 286, ['workspaceName'], 'workplace'),
-  planned('workplace-task-details', `${workplacePages}/TaskDetails.razor`, ['/w/{WorkspaceName}/tasks/{TaskId:guid}'], 286, ['workspaceName', 'taskId'], 'workplace'),
+  {
+    id: 'workplace-home', host: 'workplace', source: `${workplacePages}/Home.razor`,
+    routes: ['/', '/w/{WorkspaceName}', '/w/{WorkspaceName}/d/{DashboardName}', '/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}'],
+    fixtureKeys: ['workspaceName', 'dashboardName', 'conversationId'], pageObject: 'src/pages/workplace.page.ts',
+    journey: 'submit-workplace-prompt', specification: 'tests/workplace.spec.ts', coverage: 'covered',
+  },
+  {
+    id: 'workplace-entry-start', host: 'workplace', source: `${workplacePages}/EntryStart.razor`,
+    routes: ['/w/{WorkspaceName}/d/{DashboardName}/start/{EntryNamespace}/{EntryName}'],
+    fixtureKeys: ['workspaceName', 'dashboardName', 'entryNamespace', 'entryName'], pageObject: 'src/pages/workplace.page.ts',
+    journey: 'submit-workplace-prompt', specification: 'tests/workplace.spec.ts', coverage: 'covered',
+  },
+  {
+    id: 'workplace-notifications', host: 'workplace', source: `${workplacePages}/Notifications.razor`,
+    routes: ['/w/{WorkspaceName}/notifications'], fixtureKeys: ['workspaceName'], pageObject: 'src/pages/workplace.page.ts',
+    journey: 'submit-workplace-prompt', specification: 'tests/workplace.spec.ts', coverage: 'covered',
+  },
+  {
+    id: 'workplace-tasks', host: 'workplace', source: `${workplacePages}/Tasks.razor`, routes: ['/w/{WorkspaceName}/tasks'],
+    fixtureKeys: ['workspaceName'], pageObject: 'src/pages/workplace.page.ts', journey: 'submit-workplace-prompt',
+    specification: 'tests/workplace.spec.ts', coverage: 'covered',
+  },
+  {
+    id: 'workplace-task-details', host: 'workplace', source: `${workplacePages}/TaskDetails.razor`,
+    routes: ['/w/{WorkspaceName}/tasks/{TaskId:guid}'], fixtureKeys: ['workspaceName', 'taskId'],
+    pageObject: 'src/pages/workplace.page.ts', journey: 'submit-workplace-prompt',
+    specification: 'tests/workplace.spec.ts', coverage: 'covered',
+  },
 ] as const;
 
 export interface CoverageSummary {

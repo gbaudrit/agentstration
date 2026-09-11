@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit } from './controls.js';
 
@@ -64,14 +64,33 @@ export class FlowEditorPage {
     await this.page.getByTestId(TestIds.flowEditor.initialParticipant).selectOption(flow.initialParticipant);
 
     const routes = this.page.getByTestId(TestIds.flowEditor.route);
-    while (await routes.count() < flow.routes.length) await this.page.getByTestId(TestIds.flowEditor.addRoute).click();
-    while (await routes.count() > flow.routes.length) {
-      await routes.last().getByTestId(TestIds.flowEditor.removeRoute).click();
+    while (await routes.count() < flow.routes.length) {
+      const expectedCount = await routes.count() + 1;
+      await this.page.getByTestId(TestIds.flowEditor.addRoute).click();
+      await expect(routes).toHaveCount(expectedCount);
     }
+    while (await routes.count() > flow.routes.length) {
+      const expectedCount = await routes.count() - 1;
+      await routes.last().getByTestId(TestIds.flowEditor.removeRoute).click();
+      await expect(routes).toHaveCount(expectedCount);
+    }
+    await expect(routes).toHaveCount(flow.routes.length);
     for (let index = 0; index < flow.routes.length; index++) {
       const route = routes.nth(index);
-      await route.getByTestId(TestIds.flowEditor.routeFrom).selectOption(flow.routes[index]!.from);
-      await route.getByTestId(TestIds.flowEditor.routeTo).selectOption(flow.routes[index]!.to);
+      const from = route.getByTestId(TestIds.flowEditor.routeFrom);
+      const to = route.getByTestId(TestIds.flowEditor.routeTo);
+      const desired = flow.routes[index]!;
+      if (await to.inputValue() === desired.from) {
+        await to.selectOption(desired.to);
+        await expect(to).toHaveValue(desired.to);
+        await from.selectOption(desired.from);
+        await expect(from).toHaveValue(desired.from);
+      } else {
+        await from.selectOption(desired.from);
+        await expect(from).toHaveValue(desired.from);
+        await to.selectOption(desired.to);
+        await expect(to).toHaveValue(desired.to);
+      }
     }
 
     await this.page.getByTestId(TestIds.flowEditor.autonomous).setChecked(flow.autonomous);

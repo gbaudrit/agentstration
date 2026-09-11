@@ -6,7 +6,7 @@
             <EntryFieldRenderer Definition="field" Value="GetValue(field)" ValueChanged="value => values[field.Name] = value" Disabled="@(Disabled || Busy || submitting)" />
         }
     </div>
-    <button class="entry-submit" type="submit" disabled="@(Disabled || Busy || submitting)"><UiIcon Name="send" /> @(Busy || submitting ? Localizer["Sending"] : Localizer["Continue"])</button>
+    <button class="entry-submit" type="submit" disabled="@(Disabled || Busy || submitting)" data-testid="workplace-form-submit"><UiIcon Name="send" /> @(Busy || submitting ? Localizer["Sending"] : Localizer["Continue"])</button>
     @if (error is not null) { <p class="entry-error" role="alert">@error</p> }
 </form>
 

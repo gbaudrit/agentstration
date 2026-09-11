@@ -5,6 +5,8 @@ import { FlowEditorPage } from './flow-editor.page.js';
 import { EntryEditorPage } from './entry-editor.page.js';
 import { LoginPage } from './login.page.js';
 import { OrganizationWorkspacesPage } from './organization-workspaces.page.js';
+import { WorkplacePage } from './workplace.page.js';
+import { DashboardEditorPage } from './dashboard-editor.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -12,6 +14,8 @@ export class ProductPages {
   public readonly entryEditor: EntryEditorPage;
   public readonly login: LoginPage;
   public readonly organizationWorkspaces: OrganizationWorkspacesPage;
+  public readonly workplace: WorkplacePage;
+  public readonly dashboardEditor: DashboardEditorPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -19,6 +23,8 @@ export class ProductPages {
     this.entryEditor = new EntryEditorPage(page);
     this.login = new LoginPage(page);
     this.organizationWorkspaces = new OrganizationWorkspacesPage(page);
+    this.workplace = new WorkplacePage(page);
+    this.dashboardEditor = new DashboardEditorPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

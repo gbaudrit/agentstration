@@ -27,7 +27,7 @@
                 }
                 else
                 {
-                    <NavLink href="@TasksUrl">
+                    <NavLink href="@TasksUrl" data-testid="workplace-activity-link">
                         <span class="nav-icon nav-icon-desktop" aria-hidden="true"><UiIcon Name="tasks" /></span><span class="nav-icon nav-icon-mobile" aria-hidden="true"><UiIcon Name="activity" /></span><span class="nav-label">@T("Activity")</span>
                     </NavLink>
                 }
@@ -37,7 +37,7 @@
                         <h3>@T("RecentConversations")</h3>
                         @foreach (var conversation in recentConversations)
                         {
-                            <NavLink href="@conversation.Url"><span aria-hidden="true"><UiIcon Name="message" /></span><span>@conversation.Title</span></NavLink>
+                            <NavLink href="@conversation.Url" data-testid="workplace-recent-conversation"><span aria-hidden="true"><UiIcon Name="message" /></span><span>@conversation.Title</span></NavLink>
                         }
                     </div>
                 }
@@ -47,13 +47,13 @@
         <div class="sidebar-footer"><strong>@WorkspaceDisplayName</strong><small>@OrganizationDisplayName</small></div>
     </aside>
     <div class="workspace">
-        <header class="mobile-appbar">
+        <header class="mobile-appbar" data-testid="workplace-mobile-appbar">
             <a class="mobile-brand" href="@HomeUrl" aria-label="@T("WorkplaceHome")">
                 <img class="mobile-brand-logo" src="_content/Agentstration.Web.Components/images/agentstration-workplace-lockup-dark.png" alt="" />
             </a>
-            <a class="mobile-notifications" href="@NotificationsUrl" aria-label="@T("OpenNotifications")"><UiIcon Name="notifications" /></a>
+            <a class="mobile-notifications" href="@NotificationsUrl" aria-label="@T("OpenNotifications")" data-testid="workplace-notifications-link"><UiIcon Name="notifications" /></a>
         </header>
-        <header class="topbar"><div class="topbar-start"><nav class="breadcrumb" aria-label="@T("CurrentOrganizationWorkspace")"><span>@OrganizationDisplayName</span><span>/</span><a href="@HomeUrl">@F("NamedWorkplace", WorkspaceDisplayName)</a></nav></div><div class="topbar-actions"><button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="@T("ToggleColorTheme")" title="@(Preferences.Error ?? F("ThemeValue", Preferences.Theme))"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button><a class="icon-button" href="@NotificationsUrl" aria-label="@T("OpenNotifications")"><UiIcon Name="notifications" /></a></div></header><main class="content">@Body</main>
+        <header class="topbar"><div class="topbar-start"><nav class="breadcrumb" aria-label="@T("CurrentOrganizationWorkspace")"><span>@OrganizationDisplayName</span><span>/</span><a href="@HomeUrl">@F("NamedWorkplace", WorkspaceDisplayName)</a></nav></div><div class="topbar-actions"><button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="@T("ToggleColorTheme")" title="@(Preferences.Error ?? F("ThemeValue", Preferences.Theme))" data-testid="workplace-theme-toggle"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button><a class="icon-button" href="@NotificationsUrl" aria-label="@T("OpenNotifications")" data-testid="workplace-notifications-link"><UiIcon Name="notifications" /></a></div></header><main class="content">@Body</main>
     </div>
 </div>
 

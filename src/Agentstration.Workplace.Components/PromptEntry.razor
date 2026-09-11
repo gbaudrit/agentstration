@@ -7,8 +7,8 @@
     </div>
     <div class="prompt-composer">
         <span class="composer-core" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /></span>
-        <textarea @bind="request" @bind:event="oninput" @onkeydown="HandleKeyDown" placeholder="@Definition.Presentation.Placeholder" aria-label="@Definition.DisplayName" aria-describedby="prompt-help prompt-error" disabled="@(Disabled || Busy || submitting)"></textarea>
-        <button class="prompt-submit" type="submit" aria-label="@Localizer["SendRequest"]" disabled="@(Disabled || Busy || submitting || string.IsNullOrWhiteSpace(request))">
+        <textarea @bind="request" @bind:event="oninput" @onkeydown="HandleKeyDown" placeholder="@Definition.Presentation.Placeholder" aria-label="@Definition.DisplayName" aria-describedby="prompt-help prompt-error" disabled="@(Disabled || Busy || submitting)" data-testid="workplace-prompt-input"></textarea>
+        <button class="prompt-submit" type="submit" aria-label="@Localizer["SendRequest"]" disabled="@(Disabled || Busy || submitting || string.IsNullOrWhiteSpace(request))" data-testid="workplace-prompt-submit">
             <UiIcon Name="send" /><span>@(Busy || submitting ? Localizer["Sending"] : Localizer["SendRequest"])</span>
         </button>
     </div>

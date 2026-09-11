@@ -39,6 +39,14 @@ Create and select a dedicated campaign workspace with:
 npm run capture -- --plan examples/create-campaign-workspace.capture-plan.json --output .work/campaign-workspace
 ```
 
+The Workplace prompt journey reuses the same page objects and checkpoints as the end-user browser suite:
+
+```powershell
+npm run capture -- --plan examples/submit-workplace-prompt.capture-plan.json --output .work/workplace-prompt
+```
+
+The local fixture provides the deterministic `default` Workspace, `home` dashboard, and `quick-answer` Entry. For an external instance, prepare those resources explicitly or replace them in the capture plan.
+
 The solution-discovery video Flow and Entry are captured with:
 
 ```powershell
