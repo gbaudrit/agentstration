@@ -38,6 +38,15 @@ export const TestIds = {
     patRevoke: 'pat-revoke',
     logoutSubmit: 'logout-submit',
   },
+  operations: {
+    accessDenied: 'operations-access-denied',
+    management: 'operations-management',
+    cleanup: 'operations-cleanup',
+    cleanupOpenConfirmation: 'open-cleanup-confirmation',
+    cleanupAcknowledgement: 'cleanup-acknowledgement',
+    cleanupConfirm: 'confirm-cleanup',
+    cleanupCancel: 'cancel-cleanup',
+  },
   login: {
     username: 'login-username',
     password: 'login-password',

@@ -32,8 +32,7 @@ test('all Console administration routes render deterministic states @smoke', asy
   await administration.open(product.consoleUrl, '/logout', 'logout');
 });
 
-test('Console navigation adapts to a mobile viewport @smoke', async ({ page, product }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+test('Console navigation adapts to a mobile viewport @smoke @responsive', async ({ page, product }) => {
   const pages = new ProductPages(page);
   await authenticateConsole({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
   await pages.consoleAdministration.open(product.consoleUrl, '/settings', 'settings');

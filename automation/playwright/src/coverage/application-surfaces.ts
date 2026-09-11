@@ -85,6 +85,14 @@ function coveredConsoleAdministration(
   };
 }
 
+function coveredOperations(id: string, source: string, routes: readonly string[]): ApplicationSurface {
+  return {
+    id, host: 'console', source, routes, fixtureKeys: [],
+    pageObject: 'src/pages/operations.page.ts',
+    specification: 'tests/operations.spec.ts', coverage: 'covered',
+  };
+}
+
 export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
     id: 'console-home', host: 'console', source: `${consolePages}/Home.razor`, routes: ['/'], fixtureKeys: [],
@@ -124,7 +132,7 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
     specification: 'tests/create-flow-entry.spec.ts', coverage: 'partial', trackingIssue: 291,
   },
 
-  planned('access-denied', `${razorPages}/AccessDenied.cshtml`, ['/access-denied'], 290),
+  coveredOperations('access-denied', `${razorPages}/AccessDenied.cshtml`, ['/access-denied']),
   coveredConsoleAdministration('account-pat', `${razorPages}/Account/Pat.cshtml`, ['/account/pat']),
   coveredConsoleAdministration('account-security', `${razorPages}/Account/Security.cshtml`, ['/account/security']),
   coveredConsoleAdministration('bootstrap-account', `${razorPages}/Bootstrap.cshtml`, ['/bootstrap']),
@@ -181,8 +189,8 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   coveredDistribution('pack-project-details', `${consolePages}/PackProjectDetails.razor`, ['/pack-projects/{ProjectId:guid}'], ['projectId'], 'create-pack-project'),
   coveredDistribution('resource-scopes', `${consolePages}/ResourceScopes.razor`, ['/settings/resource-scopes']),
 
-  planned('management', `${consolePages}/Management.razor`, ['/management'], 290),
-  planned('cleanup', `${consolePages}/Cleanup.razor`, ['/cleanup'], 290),
+  coveredOperations('management', `${consolePages}/Management.razor`, ['/management']),
+  coveredOperations('cleanup', `${consolePages}/Cleanup.razor`, ['/cleanup']),
   coveredConsoleAdministration('settings', `${consolePages}/Settings.razor`, ['/settings']),
   coveredConsoleAdministration('profile-settings', `${consolePages}/ProfileSettings.razor`, ['/settings/profile']),
   coveredConsoleAdministration('organization', `${consolePages}/Organization.razor`, ['/settings/organization']),

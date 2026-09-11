@@ -12,6 +12,7 @@
     <Metadata><span>@T("WorkspaceScope")</span>@if (inventory is not null) { <span>@T("AvailableCount", inventory.All.Count)</span> }</Metadata>
     <Actions><button class="button-secondary" type="button" @onclick="() => LoadAsync(true)" disabled="@(loading || deleting)">@T("Refresh")</button></Actions>
 </PageHeader>
+<div data-testid="operations-cleanup">
 
 @if (ContextState.IsLoading || loading && inventory is null)
 {
@@ -110,6 +111,7 @@ else if (inventory is not null)
         <button class="button-danger" type="button" data-testid="open-cleanup-confirmation" @onclick="OpenConfirmation" disabled="@(SelectedCount == 0 || deleting)">@T("DeleteSelected")</button>
     </footer>
 }
+</div>
 
 @if (confirming)
 {
@@ -124,8 +126,8 @@ else if (inventory is not null)
                     <div><dt>@T($"Kind.{summary.Kind}")</dt><dd>@summary.Count</dd></div>
                 }
             </dl>
-            <label class="cleanup-acknowledgement"><input type="checkbox" @bind="acknowledged" /> <span>@T("Acknowledge")</span></label>
-            <div class="dialog-actions"><button class="button-secondary" type="button" @onclick="CloseConfirmation">@T("Cancel")</button><button class="button-danger" type="button" data-testid="confirm-cleanup" @onclick="DeleteSelectedAsync" disabled="@(!acknowledged)">@T("ConfirmDelete")</button></div>
+            <label class="cleanup-acknowledgement"><input type="checkbox" @bind="acknowledged" data-testid="cleanup-acknowledgement" /> <span>@T("Acknowledge")</span></label>
+            <div class="dialog-actions"><button class="button-secondary" type="button" @onclick="CloseConfirmation" data-testid="cancel-cleanup">@T("Cancel")</button><button class="button-danger" type="button" data-testid="confirm-cleanup" @onclick="DeleteSelectedAsync" disabled="@(!acknowledged)">@T("ConfirmDelete")</button></div>
         </section>
     </div>
 }

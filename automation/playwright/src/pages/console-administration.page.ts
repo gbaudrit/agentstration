@@ -1,6 +1,7 @@
 import { type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit } from './controls.js';
+import type { ExpectedText } from '../locales/expected-text.js';
 
 type AdministrationMarker = keyof Pick<typeof TestIds.consoleAdministration,
   'settings' | 'profileSettings' | 'organization' | 'organizationAccess' |
@@ -71,6 +72,13 @@ export class ConsoleAdministrationPage {
       waitUntil: 'domcontentloaded',
     });
     await this.page.locator(`html[lang="${language}"]`).waitFor({ state: 'attached' });
+  }
+
+  public async assertNavigationLocale(expected: ExpectedText['navigation']): Promise<void> {
+    const navigation = this.page.getByTestId(TestIds.console.sidebar).filter({ has: this.page.locator('.side-nav') });
+    await navigation.and(this.page.locator(`[aria-label="${expected.main}"]`)).waitFor({ state: 'visible' });
+    await navigation.getByRole('link', { name: expected.overview, exact: true }).waitFor({ state: 'visible' });
+    await navigation.getByRole('link', { name: expected.settings, exact: true }).waitFor({ state: 'visible' });
   }
 
   public async createAndRevokeToken(name: string): Promise<void> {
