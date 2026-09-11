@@ -97,7 +97,7 @@ jobs:
       - name: Build web tests
         run: dotnet build tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj --configuration Release --no-restore
       - name: Verify Windows host lifecycle
-        run: dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "FullyQualifiedName~QuartzHostLifecycleTests|FullyQualifiedName~StartupDoesNotCreateLegacyDataJson" --progress off
+        run: dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "FullyQualifiedName~QuartzHostLifecycleTests|FullyQualifiedName~StartupDoesNotCreateLegacyDataJson" --minimum-expected-tests 2 --progress off
 
   build-and-test:
     name: build-and-test
@@ -141,7 +141,7 @@ jobs:
         run: dotnet build Agentstration.slnx --configuration Release --no-restore
       - name: Test Agentstration
         if: needs.changes.outputs.dotnet == 'true'
-        run: dotnet test Agentstration.slnx --configuration Release --no-build
+        run: dotnet test --solution Agentstration.slnx --configuration Release --no-build --minimum-expected-tests 1
       - name: Smoke-test Source Registry tool package
         if: needs.changes.outputs.dotnet == 'true'
         shell: pwsh
@@ -151,7 +151,8 @@ jobs:
         run: dotnet build aep/Aep.slnx --configuration Release --no-restore
       - name: Test complete AEP SDK
         if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
-        run: dotnet test aep/Aep.slnx --configuration Release --no-build
+        working-directory: aep
+        run: dotnet test --solution Aep.slnx --configuration Release --no-build --minimum-expected-tests 1
 
   postgresql-storage:
     name: postgresql-storage
@@ -185,7 +186,7 @@ jobs:
       - name: Build PostgreSQL integration tests
         run: dotnet build tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj --configuration Release --no-restore
       - name: Run PostgreSQL migration and restart test
-        run: dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "Name=EmptyDatabaseMigratesAndRemainsReadyAfterRestart" --progress off
+        run: dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "Name=EmptyDatabaseMigratesAndRemainsReadyAfterRestart" --minimum-expected-tests 1 --progress off
       - name: Run PostgreSQL storage concurrency benchmark
         env:
           AGENTSTRATION_STORAGE_BENCHMARK_PROVIDER: PostgreSql
@@ -193,7 +194,7 @@ jobs:
           AGENTSTRATION_STORAGE_BENCHMARK_CONCURRENCY: 8
           AGENTSTRATION_STORAGE_BENCHMARK_REPORT: ${{ runner.temp }}/agentstration-storage-benchmark-postgresql.json
         run: |
-          dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "Name=ReportsConcurrentRelationalWriteMetrics" --progress off
+          dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "Name=ReportsConcurrentRelationalWriteMetrics" --minimum-expected-tests 1 --progress off
           cat "$AGENTSTRATION_STORAGE_BENCHMARK_REPORT"
 
   container:

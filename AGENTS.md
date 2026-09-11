@@ -180,7 +180,7 @@ Run from the repository root:
 ```powershell
 dotnet restore Agentstration.slnx
 dotnet build Agentstration.slnx --configuration Release --no-restore
-dotnet test Agentstration.slnx --configuration Release --no-build
+dotnet test --solution Agentstration.slnx --configuration Release --no-build --minimum-expected-tests 1
 ```
 
 For a focused iteration, run the affected test project first, then run the full build and test suite before handoff. Do not suppress warnings or disable analyzers to make a change pass.

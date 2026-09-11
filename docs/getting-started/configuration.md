@@ -156,11 +156,11 @@ $env:AGENTSTRATION_STORAGE_BENCHMARK_PROVIDER = "Sqlite"
 $env:AGENTSTRATION_STORAGE_BENCHMARK_OPERATIONS = "100"
 $env:AGENTSTRATION_STORAGE_BENCHMARK_CONCURRENCY = "8"
 $env:AGENTSTRATION_STORAGE_BENCHMARK_REPORT = "$env:TEMP\agentstration-storage-benchmark.json"
-dotnet test tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj --configuration Release --filter "Name=ReportsConcurrentRelationalWriteMetrics" --logger "console;verbosity=detailed"
+dotnet test --project tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj --configuration Release --filter "Name=ReportsConcurrentRelationalWriteMetrics" --minimum-expected-tests 1 --logger "console;verbosity=detailed"
 
 $env:AGENTSTRATION_STORAGE_BENCHMARK_PROVIDER = "PostgreSql"
 $env:AGENTSTRATION_TEST_POSTGRES = "Host=localhost;Database=agentstration;Username=agentstration;Password=<development-only-password>"
-dotnet test tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj --configuration Release --filter "Name=ReportsConcurrentRelationalWriteMetrics" --logger "console;verbosity=detailed"
+dotnet test --project tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj --configuration Release --filter "Name=ReportsConcurrentRelationalWriteMetrics" --minimum-expected-tests 1 --logger "console;verbosity=detailed"
 ```
 
 ## Backup and restore

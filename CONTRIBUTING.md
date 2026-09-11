@@ -22,7 +22,7 @@ Use MSTest for behavior changes and keep the default test suite deterministic an
 ```powershell
 dotnet restore Agentstration.slnx
 dotnet build Agentstration.slnx --configuration Release --no-restore
-dotnet test Agentstration.slnx --configuration Release --no-build
+dotnet test --solution Agentstration.slnx --configuration Release --no-build --minimum-expected-tests 1
 ./scripts/ci/verify-dotnet-format.ps1 -BaseRevision "origin/main"
 ```
 
