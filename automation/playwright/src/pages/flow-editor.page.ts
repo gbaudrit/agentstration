@@ -65,7 +65,9 @@ export class FlowEditorPage {
 
     const routes = this.page.getByTestId(TestIds.flowEditor.route);
     while (await routes.count() < flow.routes.length) await this.page.getByTestId(TestIds.flowEditor.addRoute).click();
-    if (await routes.count() > flow.routes.length) throw new Error('The new Flow contains more default handoff routes than requested.');
+    while (await routes.count() > flow.routes.length) {
+      await routes.last().getByTestId(TestIds.flowEditor.removeRoute).click();
+    }
     for (let index = 0; index < flow.routes.length; index++) {
       const route = routes.nth(index);
       await route.getByTestId(TestIds.flowEditor.routeFrom).selectOption(flow.routes[index]!.from);

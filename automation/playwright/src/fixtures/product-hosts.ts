@@ -75,8 +75,11 @@ export async function startProductHosts(): Promise<ProductHosts> {
     Agentstration__WorkApi__BaseAddress: `${consoleUrl}/`,
     Agentstration__FlowApi__BaseAddress: `${consoleUrl}/`,
     Agentstration__WorkplaceBaseUrl: `${workplaceUrl}/`,
-    Agentstration__Extensions__DiscoverOnStartup: 'false',
-  }, [`--Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint=${extensionUrl}`]);
+    Agentstration__Extensions__DiscoverOnStartup: 'true',
+  }, [
+    '--Agentstration:Extensions:Agentstration.Extensions.Ollama:RegistrationName=ollama-extension',
+    `--Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint=${extensionUrl}`,
+  ]);
 
   let workplaceHost: ManagedProcess | undefined;
   try {

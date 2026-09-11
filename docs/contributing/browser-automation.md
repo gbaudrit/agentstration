@@ -1,5 +1,7 @@
 # Browser automation
 
+The measurable route and journey coverage target is defined in [Browser coverage model](browser-coverage.md).
+
 Agentstration owns reusable Playwright journeys for browser-level UX validation and deterministic external capture. The workspace is independent from the .NET solution and lives under `automation/playwright`.
 
 ## Setup

@@ -74,7 +74,7 @@
                                     <InputSelect @bind-Value="route.From" data-testid="flow-handoff-from">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</InputSelect>
                                     <span>→</span>
                                     <InputSelect @bind-Value="route.To" data-testid="flow-handoff-to">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</InputSelect>
-                                    <button type="button" class="button-danger" @onclick="() => Model.Handoffs.Remove(route)" aria-label="@T("DeleteRoute")">×</button>
+                                    <button type="button" class="button-danger" @onclick="() => Model.Handoffs.Remove(route)" aria-label="@T("DeleteRoute")" data-testid="flow-remove-route">×</button>
                                 </div>
                             }
                             <label class="check-option"><InputCheckbox @bind-Value="Model.Autonomous" data-testid="flow-autonomous-handoffs" /><span><strong>@T("AutonomousHandoffs")</strong></span></label>

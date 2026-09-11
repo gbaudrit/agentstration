@@ -14,3 +14,4 @@ Read [Working on the documentation](documentation.md) for the local Docusaurus w
 Read [GitHub governance](github-governance.md) for branches, checks, security automation, and `main` protection.
 Read [Development slots](development-slots.md) to run multiple Git worktrees as isolated local Aspire instances.
 Read [Browser automation](browser-automation.md) to run or extend product-owned Playwright journeys and deterministic captures.
+Read [Browser coverage model](browser-coverage.md) for the executable route inventory, ownership rules, and progress report.
