@@ -80,9 +80,13 @@ public sealed class PostmanCollectionTests
             ["/api/aep/enrollments"] = "AEP enrollment",
             ["/api/bootstrap/profiles"] = "Bootstrap",
             ["/api/resource-scopes"] = "Resource scopes",
+            ["/api/resources"] = "Resources",
+            ["/api/entries"] = "Workplace",
+            ["/api/extensionregistrations"] = "Extensions",
             ["/api/sourceproviders"] = "Source providers",
             ["/api/sourceregistries"] = "Source registries",
             ["/api/sources"] = "Sources",
+            ["/api/tooldefinitions"] = "Tools",
             ["/health/ready"] = "System"
         };
 

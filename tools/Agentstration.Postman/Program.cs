@@ -17,7 +17,7 @@ internal static partial class PostmanProgram
     private static readonly string[] HttpMethods = ["get", "post", "put", "patch", "delete", "head", "options", "trace"];
     private static readonly string[] PreferredTagOrder =
     [
-        "System", "Authentication", "Identity", "AEP enrollment", "Bootstrap", "Resource scopes",
+        "System", "Authentication", "Identity", "AEP enrollment", "Bootstrap", "Resource scopes", "Resources",
         "Management", "Flows", "Runtime", "Work", "Work operations", "Workplace", "Model management",
         "Extensions", "Source providers", "Sources", "Source registries", "Packs", "Tools", "Tool governance",
         "Secrets", "Triggers", "Diagnostics", "API"
@@ -78,7 +78,9 @@ internal static partial class PostmanProgram
         var folders = new Dictionary<string, JsonArray>(StringComparer.Ordinal);
         var paths = openApi.GetProperty("paths");
 
-        foreach (var pathProperty in paths.EnumerateObject().OrderBy(value => value.Name, StringComparer.Ordinal))
+        foreach (var pathProperty in paths.EnumerateObject()
+                     .Where(value => IsApiPath(value.Name))
+                     .OrderBy(value => value.Name, StringComparer.Ordinal))
         {
             foreach (var operationProperty in pathProperty.Value.EnumerateObject()
                          .Where(value => HttpMethods.Contains(value.Name, StringComparer.Ordinal))
@@ -464,6 +466,10 @@ internal static partial class PostmanProgram
         var index = Array.IndexOf(PreferredTagOrder, tag);
         return index >= 0 ? index : PreferredTagOrder.Length;
     }
+
+    private static bool IsApiPath(string path) => path.Equals("/health", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/health/", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase);
 
     private static string Serialize(JsonNode node) => node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine;
 
