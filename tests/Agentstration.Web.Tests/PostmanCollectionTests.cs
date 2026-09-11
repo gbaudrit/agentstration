@@ -65,7 +65,7 @@ public sealed class PostmanCollectionTests
         var requests = ReferenceRequests(collection.RootElement).ToArray();
         var operations = requests.Select(RequestKey).ToArray();
 
-        Assert.IsTrue(requests.All(request => RawUrl(request).StartsWith("{{baseUrl}}/", StringComparison.Ordinal)));
+        Assert.IsTrue(requests.All(item => RawUrl(item.GetProperty("request")).StartsWith("{{baseUrl}}/", StringComparison.Ordinal)));
         Assert.HasCount(operations.Length, operations.Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
     }
 
@@ -178,6 +178,7 @@ public sealed class PostmanCollectionTests
 
     private static bool IsApiRoute(string? route) => route is not null
         && (route.Equals("health", StringComparison.OrdinalIgnoreCase)
+            || route.Equals("/health", StringComparison.OrdinalIgnoreCase)
             || route.StartsWith("health/", StringComparison.OrdinalIgnoreCase)
             || route.StartsWith("/health/", StringComparison.OrdinalIgnoreCase)
             || route.StartsWith("api/", StringComparison.OrdinalIgnoreCase)
