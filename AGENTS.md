@@ -203,6 +203,16 @@ Use `--launch-profile http-NoBootstrap` instead when the test must preserve or e
 5. Add an ADR under `docs/decisions/` for a significant architectural choice; do not rewrite an accepted ADR to hide a new decision.
 6. Build and test after meaningful increments, and report any validation that could not be run.
 
+## HTTP API and Postman Contract
+
+OpenAPI is the source of truth for the HTTP API reference. `dev/postman/Agentstration.postman_collection.json` is a generated consumer artifact and must remain synchronized with it.
+
+- When adding, changing, or removing an HTTP route, request or response contract, parameter, media type, authentication rule, or other observable HTTP behavior, run `dotnet run --project tools/Agentstration.Postman` and commit the regenerated Postman artifacts in the same change.
+- Update the relevant curated file under `dev/postman/scenarios/` when an API behavior change affects an executable workflow, captured identifier, ETag, assertion, or cleanup step.
+- Do not edit the generated `API Reference` folder directly. Improve endpoint OpenAPI metadata or the generator instead.
+- Before handoff, run `dotnet run --project tools/Agentstration.Postman -- --check` and report the result in the pull request. If the command is not applicable because no HTTP API or Postman input changed, state that explicitly.
+- Keep committed environments free of credentials, tokens, cookies, secret values, and machine-specific identifiers. Use separate `scheme`, `host`, and `port` variables for endpoint configuration.
+
 ## Issue Creation
 
 When creating or updating a GitHub issue, treat the forms under `.github/ISSUE_TEMPLATE/` as the canonical structure, including when using the GitHub API:

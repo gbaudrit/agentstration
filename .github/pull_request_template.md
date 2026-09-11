@@ -13,6 +13,7 @@
 - Build succeeds
 - Tests pass
 - Relevant documentation updated
+- Postman artifacts regenerated, or no HTTP API/Postman input changed
 - No unnecessary breaking change introduced
 - Desktop and mobile smoke test completed against the local executable
 

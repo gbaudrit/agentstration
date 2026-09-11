@@ -94,8 +94,14 @@ jobs:
             nuget-${{ runner.os }}-
       - name: Restore web tests
         run: dotnet restore tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
+      - name: Restore Postman generator
+        run: dotnet restore tools/Agentstration.Postman/Agentstration.Postman.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
       - name: Build web tests
         run: dotnet build tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj --configuration Release --no-restore
+      - name: Build Postman generator
+        run: dotnet build tools/Agentstration.Postman/Agentstration.Postman.csproj --configuration Release --no-restore
+      - name: Verify generated Postman artifacts on Windows
+        run: dotnet run --project tools/Agentstration.Postman --configuration Release --no-build -- --check
       - name: Verify Windows host lifecycle
         run: dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "FullyQualifiedName~QuartzHostLifecycleTests|FullyQualifiedName~StartupDoesNotCreateLegacyDataJson" --progress off
 
@@ -139,6 +145,9 @@ jobs:
       - name: Build Agentstration
         if: needs.changes.outputs.dotnet == 'true'
         run: dotnet build Agentstration.slnx --configuration Release --no-restore
+      - name: Verify generated Postman artifacts
+        if: needs.changes.outputs.dotnet == 'true'
+        run: dotnet run --project tools/Agentstration.Postman --configuration Release --no-build -- --check
       - name: Test Agentstration
         if: needs.changes.outputs.dotnet == 'true'
         run: dotnet test Agentstration.slnx --configuration Release --no-build

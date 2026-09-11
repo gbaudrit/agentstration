@@ -204,6 +204,8 @@ dotnet build Agentstration.slnx --configuration Release
 dotnet test Agentstration.slnx --configuration Release
 ```
 
+The complete Postman collection and Local/Docker environment templates are under [`dev/postman`](dev/postman/README.md). Regenerate them from the authoritative runtime OpenAPI document with `dotnet run --project tools/Agentstration.Postman`.
+
 Warnings are treated as errors, .NET analyzers are enabled and NuGet audit findings fail restore. The default tests are designed to remain offline and cost-free; real-provider smoke tests are opt-in.
 
 ## Documentation

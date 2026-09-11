@@ -278,9 +278,13 @@ public static class OpenApiConfiguration
     private static string TagFor(string path)
     {
         var value = path.ToLowerInvariant();
-        if (value == "/health") return "System";
+        if (value == "/health" || value.StartsWith("/health/", StringComparison.Ordinal)) return "System";
         if (value.StartsWith("/api/auth", StringComparison.Ordinal)) return "Authentication";
         if (value.StartsWith("/api/identity", StringComparison.Ordinal)) return "Identity";
+        if (value.StartsWith("/api/aep/enrollments", StringComparison.Ordinal)) return "AEP enrollment";
+        if (value.StartsWith("/api/bootstrap", StringComparison.Ordinal)) return "Bootstrap";
+        if (value.StartsWith("/api/resource-scopes", StringComparison.Ordinal)) return "Resource scopes";
+        if (value.StartsWith("/api/resources", StringComparison.Ordinal)) return "Resources";
         if (value.StartsWith("/api/workplace", StringComparison.Ordinal)) return "Workplace";
         if (value.StartsWith("/api/work/workitems", StringComparison.Ordinal)) return "Work";
         if (value.StartsWith("/api/tasks", StringComparison.Ordinal)) return "Work operations";
@@ -291,11 +295,16 @@ public static class OpenApiConfiguration
         if (value.StartsWith("/api/tool-governance", StringComparison.Ordinal)) return "Tool governance";
         if (value.StartsWith("/api/model", StringComparison.Ordinal)
             || value.StartsWith("/api/runtimeprofiles", StringComparison.Ordinal)) return "Model management";
-        if (value.StartsWith("/api/extensions", StringComparison.Ordinal)) return "Extensions";
+        if (value.StartsWith("/api/extensions", StringComparison.Ordinal)
+            || value.StartsWith("/api/extensionregistrations", StringComparison.Ordinal)) return "Extensions";
+        if (value.StartsWith("/api/sourceproviders", StringComparison.Ordinal)) return "Source providers";
+        if (value.StartsWith("/api/sourceregistries", StringComparison.Ordinal)) return "Source registries";
+        if (value.StartsWith("/api/sources", StringComparison.Ordinal)) return "Sources";
         if (value.StartsWith("/api/vaults", StringComparison.Ordinal)
             || value.StartsWith("/api/secrets", StringComparison.Ordinal)) return "Secrets";
         if (value.StartsWith("/api/toolproviders", StringComparison.Ordinal)
             || value.StartsWith("/api/tools", StringComparison.Ordinal)
+            || value.StartsWith("/api/tooldefinitions", StringComparison.Ordinal)
             || value.StartsWith("/api/toolexecutionhooks", StringComparison.Ordinal)) return "Tools";
         if (value.StartsWith("/api/packs", StringComparison.Ordinal)
             || value.StartsWith("/api/pack-projects", StringComparison.Ordinal)) return "Packs";
@@ -304,7 +313,11 @@ public static class OpenApiConfiguration
             || value.Contains("/deployments", StringComparison.Ordinal)
             || value.StartsWith("/api/routing", StringComparison.Ordinal)) return "Management";
         if (value.StartsWith("/api/diagnostics", StringComparison.Ordinal)) return "Diagnostics";
-        if (value.StartsWith("/api/workspaces", StringComparison.Ordinal)) return "Workplace";
+        if (value.StartsWith("/api/workspaces", StringComparison.Ordinal)
+            || value.StartsWith("/api/entries", StringComparison.Ordinal)
+            || value.StartsWith("/api/management/entries", StringComparison.Ordinal)
+            || value.StartsWith("/api/management/workspaces", StringComparison.Ordinal)
+            || value.StartsWith("/api/namespaces/", StringComparison.Ordinal) && value.Contains("/entries", StringComparison.Ordinal)) return "Workplace";
         return "API";
     }
 }
