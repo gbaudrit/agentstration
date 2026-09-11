@@ -23,7 +23,7 @@ else
     @if (!string.IsNullOrWhiteSpace(warning)) { <div class="form-alert form-alert-warning" role="status">@warning</div> }
     @if (!IsNew && usages.Count > 0) { <div class="form-alert form-alert-warning" role="status">@T("ChangingProfileAffects", AgentCount(usages.Count))</div> }
 
-    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-profile-editor" class="resource-form">
+    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-profile-editor" class="resource-form" data-testid="model-profile-form" data-interactive="@(interactive ? "true" : "false")">
         <DataAnnotationsValidator /><ValidationSummary />
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ProfileResource")</h2></div>@if (resolution is not null) { <StatusBadge Text="@StatusLabel(resolution.Status)" Status="@ModelManagementUi.Status(resolution.Status)" /> }</div>
             <div class="form-grid">
@@ -153,7 +153,7 @@ else
     private ModelProfileEditorModel? model; private IReadOnlyList<ModelProviderResponse> providers = []; private IReadOnlyList<AvailableModelResponse> models = []; private IReadOnlyList<ExtensionResponse> extensions = [];
     private IReadOnlyList<ModelProfileUsageResponse> usages = []; private ModelProfileResolutionResponse? resolution;
     private ExtensionOptionsEditorModel? optionEditor; private bool rawOptions;
-    private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool diagnosing; private bool confirmDelete;
+    private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool diagnosing; private bool confirmDelete; private bool interactive;
     private ResourceScopeRef? selectedScope;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
@@ -168,6 +168,7 @@ else
         }
     }
     protected override Task OnParametersSetAsync() => LoadAsync();
+    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
     private async Task LoadAsync()
     {
         loading = true; error = null; warning = null;

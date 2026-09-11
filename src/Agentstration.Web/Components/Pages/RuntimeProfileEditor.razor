@@ -16,7 +16,7 @@ else
 {
     @if (error is not null) { <div class="form-alert form-alert-danger"><strong>@T("UnableToSave")</strong><span>@error.Message</span></div> }
     @if (usages.Count > 0) { <div class="form-alert form-alert-warning">@T("ProfileUsedWarning", DeploymentCount(usages.Count))</div> }
-    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="runtime-profile-editor" class="resource-form">
+    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="runtime-profile-editor" class="resource-form" data-testid="runtime-profile-form" data-interactive="@(interactive ? "true" : "false")">
         <DataAnnotationsValidator /><ValidationSummary />
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("RuntimeResource")</h2></div></div><div class="form-grid">
             <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" data-testid="runtime-profile-name" /></label><label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" data-testid="runtime-profile-display-name" /></label>
@@ -46,11 +46,12 @@ else
     private string ToolInvocationLabel(RuntimeToolInvocationMode value) => Localizer[$"ToolInvocation.{value}"];
     private string StreamingLabel(StreamingMode value) => Localizer[$"Streaming.{value}"];
     private readonly CancellationTokenSource cancellation = new();
-    private RuntimeProfileEditorModel? model; private IReadOnlyList<RuntimeProfileUsageResponse> usages = []; private string? etag; private AgentstrationApiException? error; private bool saving; private bool confirmDelete;
+    private RuntimeProfileEditorModel? model; private IReadOnlyList<RuntimeProfileUsageResponse> usages = []; private string? etag; private AgentstrationApiException? error; private bool saving; private bool confirmDelete; private bool interactive;
     private ResourceScopeRef? selectedScope;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
     protected override Task OnParametersSetAsync() => LoadAsync();
+    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
     private async Task LoadAsync() { error = null; if (IsNew) { model = new RuntimeProfileEditorModel { Namespace = SelectedNamespace.Value }; return; } try { var snapshot = await Client.GetRuntimeProfileAsync(SelectedNamespace, Name!, cancellation.Token); model = RuntimeProfileEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag; usages = (await Client.GetRuntimeProfileUsagesAsync(SelectedNamespace, model.Name, cancellation.Token)).Value; } catch (AgentstrationApiException exception) { error = exception; model ??= new RuntimeProfileEditorModel { Namespace = SelectedNamespace.Value }; } }
     private async Task SaveAsync() { if (model is null || saving) return; saving = true; error = null; try { var @namespace = ResourceNamespace.Parse(model.Namespace); var snapshot = IsNew ? await Client.CreateRuntimeProfileAsync(model.ToCreateRequest() with { ScopeRef = selectedScope }, cancellation.Token) : await Client.UpdateRuntimeProfileAsync(@namespace, model.Name, model.ToPutRequest(), etag!, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? T("CreatedNotification") : T("UpdatedNotification"), snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name)); } catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); } catch (AgentstrationApiException exception) { error = exception; } finally { saving = false; } }
     private void RequestDelete() { if (usages.Count == 0) confirmDelete = true; else error = new AgentstrationApiException(T("ProfileUsedError", DeploymentCount(usages.Count)), Guid.NewGuid().ToString("N")); }

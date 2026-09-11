@@ -24,6 +24,7 @@ export class ModelAdministrationPage {
     await this.page.waitForURL(url => url.pathname === `/modelproviders/${definition.providerName}`);
     const marker = this.page.getByTestId(TestIds.resourceAdministration.modelProviderEditor);
     await marker.waitFor({ state: 'visible' });
+    await this.waitForInteractive(TestIds.modelAdministration.providerForm);
     const testResponse = this.waitForApiResponse('POST', `/api/modelproviders/${encodeURIComponent(definition.providerName)}/test`);
     await this.page.getByTestId(TestIds.modelAdministration.providerTest).click();
     await testResponse;
@@ -37,6 +38,7 @@ export class ModelAdministrationPage {
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.runtimeDisplayName), definition.runtimeDisplayName);
     await this.page.getByTestId(TestIds.modelAdministration.runtimeSave).click();
     await this.page.waitForURL(url => url.pathname === `/runtimeprofiles/${definition.runtimeName}`);
+    await this.waitForInteractive(TestIds.modelAdministration.runtimeForm);
     return this.page.getByTestId(TestIds.resourceAdministration.runtimeProfileEditor);
   }
 
@@ -48,6 +50,7 @@ export class ModelAdministrationPage {
     await selectFirstOption(this.page.getByTestId(TestIds.modelAdministration.profileModel));
     await this.page.getByTestId(TestIds.modelAdministration.profileSave).click();
     await this.page.waitForURL(url => url.pathname === `/modelprofiles/${definition.profileName}`);
+    await this.waitForInteractive(TestIds.modelAdministration.profileForm);
     return this.page.getByTestId(TestIds.resourceAdministration.modelProfileEditor);
   }
 
@@ -111,6 +114,10 @@ export class ModelAdministrationPage {
     if (!response.ok()) {
       throw new Error(`${method} ${new URL(response.url()).pathname} returned HTTP ${response.status()}.`);
     }
+  }
+
+  private async waitForInteractive(testId: string): Promise<void> {
+    await this.page.locator(`[data-testid="${testId}"][data-interactive="true"]`).waitFor({ state: 'visible' });
   }
 
   private async deleteCurrent(deleteButtonId: string, confirmButtonId: string, listPath: string): Promise<void> {

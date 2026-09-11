@@ -74,6 +74,7 @@ export const TestIds = {
     triggerEditor: 'resource-trigger-editor',
   },
   modelAdministration: {
+    providerForm: 'model-provider-form',
     providerName: 'model-provider-name',
     providerDisplayName: 'model-provider-display-name',
     providerExtension: 'model-provider-extension',
@@ -83,6 +84,7 @@ export const TestIds = {
     providerStatus: 'model-provider-status',
     providerDelete: 'model-provider-delete',
     providerDeleteConfirm: 'model-provider-delete-dialog-confirm',
+    profileForm: 'model-profile-form',
     profileName: 'model-profile-name',
     profileDisplayName: 'model-profile-display-name',
     profileProvider: 'model-profile-provider',
@@ -90,6 +92,7 @@ export const TestIds = {
     profileSave: 'model-profile-save',
     profileDelete: 'model-profile-delete',
     profileDeleteConfirm: 'model-profile-delete-dialog-confirm',
+    runtimeForm: 'runtime-profile-form',
     runtimeName: 'runtime-profile-name',
     runtimeDisplayName: 'runtime-profile-display-name',
     runtimeSave: 'runtime-profile-save',
