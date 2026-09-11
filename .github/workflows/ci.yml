@@ -147,10 +147,41 @@ jobs:
         run: dotnet build Agentstration.slnx --configuration Release --no-restore
       - name: Test fast lane
         if: needs.changes.outputs.dotnet == 'true'
-        run: dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 1
+        run: dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 139 --max-parallel-test-modules 4
       - name: Test integration lane
         if: needs.changes.outputs.dotnet == 'true'
-        run: dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 1
+        run: dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 692 --max-parallel-test-modules 2
+      - name: Capture hosted module diagnostics
+        if: needs.changes.outputs.dotnet == 'true'
+        shell: pwsh
+        run: |
+          @(
+            '## Hosted test module diagnostics',
+            '',
+            '| Module | Tests | Duration (s) | Peak working set (MiB) | Peak private memory (MiB) | Aggregate dotnet working set (MiB) | Status |',
+            '| --- | ---: | ---: | ---: | ---: | ---: | --- |'
+          ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          $modules = @(
+            @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 66; Warning = 900; Failure = 1024 },
+            @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 38; Warning = 800; Failure = 1024 },
+            @{ Name = 'Agentstration.Management.Aep.Tests'; Tests = 11; Warning = 450; Failure = 700 },
+            @{ Name = 'Agentstration.Management.Sources.Tests'; Tests = 93; Warning = 550; Failure = 900 }
+          )
+          foreach ($module in $modules) {
+            ./scripts/ci/run-test-module-with-diagnostics.ps1 `
+              -AssemblyPath "tests/$($module.Name)/bin/Release/net10.0/$($module.Name).dll" `
+              -ReportPath "artifacts/test-diagnostics/$($module.Name).json" `
+              -MinimumExpectedTests $module.Tests `
+              -WarningWorkingSetMiB $module.Warning `
+              -FailureWorkingSetMiB $module.Failure
+          }
+      - name: Upload hosted module diagnostics
+        if: always() && needs.changes.outputs.dotnet == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: hosted-test-module-diagnostics
+          path: artifacts/test-diagnostics/*.json
+          if-no-files-found: warn
       - name: Smoke-test Source Registry tool package
         if: needs.changes.outputs.dotnet == 'true'
         shell: pwsh
@@ -161,7 +192,7 @@ jobs:
       - name: Test complete AEP SDK
         if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
         working-directory: aep
-        run: dotnet test --solution Aep.slnx --configuration Release --no-build --minimum-expected-tests 1
+        run: dotnet test --solution Aep.slnx --configuration Release --no-build --minimum-expected-tests 33 --max-parallel-test-modules 2
 
   postgresql-storage:
     name: postgresql-storage
