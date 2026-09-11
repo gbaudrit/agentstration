@@ -1,4 +1,4 @@
-<section class="entry-renderer" data-entry-role="@Role.ToString().ToLowerInvariant()">
+<section class="entry-renderer" data-entry-role="@Role.ToString().ToLowerInvariant()" data-testid="workplace-entry" data-entry-id="@Definition.Id.Value" data-entry-namespace="@Definition.Id.Namespace.Value">
     @if (Definition.Presentation.Kind == EntryPresentationKind.Prompt)
     {
         <PromptEntry Definition="Definition" OnSubmit="OnSubmit" Disabled="Disabled" Busy="Busy" />

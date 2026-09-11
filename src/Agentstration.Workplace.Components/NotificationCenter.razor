@@ -6,7 +6,7 @@
         </div>
         @if (Notifications.Any(value => value.ReadAt is null))
         {
-            <button class="text-button" @onclick="OnMarkAllRead">@Localizer["MarkAllRead"]</button>
+            <button class="text-button" @onclick="OnMarkAllRead" data-testid="workplace-notifications-mark-all-read">@Localizer["MarkAllRead"]</button>
         }
     </div>
 
@@ -18,7 +18,7 @@
     {
         @foreach (var item in Notifications.OrderBy(value => value.ReadAt is not null).ThenByDescending(value => value.CreatedAt))
         {
-            <article class="notification-row @(item.ReadAt is null ? "unread" : null)">
+            <article class="notification-row @(item.ReadAt is null ? "unread" : null)" data-testid="workplace-notification" data-notification-id="@item.Id" data-read="@(item.ReadAt is not null ? "true" : "false")">
                 <div>
                     <strong>@NotificationTitle(item)</strong>
                     <p>@NotificationMessage(item)</p>
@@ -26,7 +26,7 @@
                 </div>
                 @if (item.ReadAt is null)
                 {
-                    <button class="text-button" @onclick="() => OnMarkRead.InvokeAsync(item.Id)">@Localizer["MarkRead"]</button>
+                    <button class="text-button" @onclick="() => OnMarkRead.InvokeAsync(item.Id)" data-testid="workplace-notification-mark-read">@Localizer["MarkRead"]</button>
                 }
             </article>
         }

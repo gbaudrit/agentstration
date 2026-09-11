@@ -1,4 +1,4 @@
-<a class="inline-task-card task-@Task.Status.ToString().ToLowerInvariant()" href="@DetailsUrl" aria-label="@Localizer["ViewTaskDetails", Task.Title]">
+<a class="inline-task-card task-@Task.Status.ToString().ToLowerInvariant()" href="@DetailsUrl" aria-label="@Localizer["ViewTaskDetails", Task.Title]" data-testid="workplace-inline-task" data-task-id="@Task.Id" data-task-status="@Task.Status">
     <span class="task-card-icon"><UiIcon Name="tasks" /></span>
     <span class="task-card-label"><small>@Localizer["Task"]</small><strong>@Task.Title</strong></span>
     <span class="task-status">@StatusLabel</span>

@@ -1,13 +1,13 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JavaScript
 
-<section class="interaction-view" aria-labelledby="interaction-title">
+<section class="interaction-view" aria-labelledby="interaction-title" data-testid="workplace-interaction">
     <header class="interaction-header">
         <div><p class="eyebrow">@Localizer["CurrentRequest"]</p><h2 id="interaction-title">@Localizer["Conversation"]</h2><p class="interaction-context">@(Task?.Title ?? Localizer["YourCurrentRequest"].Value)</p></div>
-        <div class="interaction-actions"><RealtimeStatus Connected="RealtimeConnected" /><button class="button-secondary" type="button" aria-label="@Localizer["NewRequest"]" title="@Localizer["NewRequest"]" @onclick="OnNewRequest"><UiIcon Name="message-plus" /> <span>@Localizer["NewRequest"]</span></button></div>
+        <div class="interaction-actions"><RealtimeStatus Connected="RealtimeConnected" /><button class="button-secondary" type="button" aria-label="@Localizer["NewRequest"]" title="@Localizer["NewRequest"]" @onclick="OnNewRequest" data-testid="workplace-new-request"><UiIcon Name="message-plus" /> <span>@Localizer["NewRequest"]</span></button></div>
     </header>
 
-    <div class="conversation-thread" aria-live="polite" @ref="conversationThread">
+    <div class="conversation-thread" aria-live="polite" @ref="conversationThread" data-testid="workplace-conversation-thread">
         @foreach (var item in Timeline)
         {
             @switch (item.Value)
@@ -48,7 +48,7 @@
                     <div class="processing-feedback" role="status"><span></span>@Localizer["ProcessingRequest"]</div>
                     break;
                 case AssistantResponseItem response:
-                    <article class="assistant-response"><span><UiIcon Name="sparkle" /></span><div><strong>Agentstration</strong><p>@response.Content</p></div></article>
+                    <article class="assistant-response" data-testid="workplace-assistant-response"><span><UiIcon Name="sparkle" /></span><div><strong>Agentstration</strong><p>@response.Content</p></div></article>
                     break;
             }
         }

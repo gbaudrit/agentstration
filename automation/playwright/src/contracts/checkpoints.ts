@@ -35,4 +35,10 @@ export const Checkpoints = {
     created: 'workspace-created',
     selected: 'workspace-selected',
   },
+  workplace: {
+    home: 'workplace-home',
+    entryReady: 'workplace-entry-ready',
+    requestSubmitted: 'workplace-request-submitted',
+    responseCompleted: 'workplace-response-completed',
+  },
 } as const;
