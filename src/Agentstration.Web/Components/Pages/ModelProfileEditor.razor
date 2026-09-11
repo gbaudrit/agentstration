@@ -10,7 +10,7 @@
 
 <PageTitle>@(IsNew ? T("CreateModelProfile") : $"{Name} · {T("ModelProfile")}") · Agentstration</PageTitle>
 <PageHeader Title="@(IsNew ? T("CreateModelProfile") : model?.DisplayName ?? Name)" Description="@T("Description")" TestId="resource-model-profile-editor">
-    <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">@T("Delete")</button> }<a class="button-secondary" href="/modelprofiles">@T("Back")</a></Actions>
+    <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete" data-testid="model-profile-delete">@T("Delete")</button> }<a class="button-secondary" href="/modelprofiles">@T("Back")</a></Actions>
 </PageHeader>
 
 @if (loading || model is null)
@@ -23,13 +23,13 @@ else
     @if (!string.IsNullOrWhiteSpace(warning)) { <div class="form-alert form-alert-warning" role="status">@warning</div> }
     @if (!IsNew && usages.Count > 0) { <div class="form-alert form-alert-warning" role="status">@T("ChangingProfileAffects", AgentCount(usages.Count))</div> }
 
-    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-profile-editor" class="resource-form">
+    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-profile-editor" class="resource-form" data-testid="model-profile-form" data-interactive="@(interactive ? "true" : "false")">
         <DataAnnotationsValidator /><ValidationSummary />
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ProfileResource")</h2></div>@if (resolution is not null) { <StatusBadge Text="@StatusLabel(resolution.Status)" Status="@ModelManagementUi.Status(resolution.Status)" /> }</div>
             <div class="form-grid">
-                <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
+                <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" data-testid="model-profile-name" /><ValidationMessage For="() => model.Name" /></label>
                 <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
-                <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
+                <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" data-testid="model-profile-display-name" /><ValidationMessage For="() => model.DisplayName" /></label>
                 <ResourceScopeFormField ResourceKind="@ResourceKinds.ModelProfile" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
                 <label class="form-span-2"><span>@T("DescriptionLabel")</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
             </div>
@@ -37,8 +37,8 @@ else
 
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("ModelSelection")</p><h2>@T("ProviderAndModel")</h2></div></div>
             <div class="form-grid">
-                <label><span>@T("Provider")</span><select value="@SelectedProvider" @onchange="ProviderChangedAsync"><option value="">@T("SelectProvider")</option>@foreach (var provider in providers) { <option value="@ProviderKey(provider)">@provider.Properties.DisplayName — @provider.Namespace/@provider.Name</option> }</select><ValidationMessage For="() => model.ProviderName" /></label>
-                <label><span>@T("Model")</span><select @bind="model.ModelName" disabled="@loadingModels"><option value="">@(loadingModels ? T("LoadingModels") : T("SelectModel"))</option>@if (!string.IsNullOrWhiteSpace(model.ModelName) && models.All(item => !string.Equals(item.Name, model.ModelName, StringComparison.Ordinal))) { <option value="@model.ModelName">@model.ModelName — @T("NotCurrentlyDiscovered")</option> }@foreach (var available in models) { <option value="@available.Name" disabled="@IsUnavailable(available)">@available.DisplayName — @available.Name · @StatusLabel(available.Status)</option> }</select><ValidationMessage For="() => model.ModelName" /></label>
+                <label><span>@T("Provider")</span><select value="@SelectedProvider" @onchange="ProviderChangedAsync" data-testid="model-profile-provider"><option value="">@T("SelectProvider")</option>@foreach (var provider in providers) { <option value="@ProviderKey(provider)">@provider.Properties.DisplayName — @provider.Namespace/@provider.Name</option> }</select><ValidationMessage For="() => model.ProviderName" /></label>
+                <label><span>@T("Model")</span><select @bind="model.ModelName" disabled="@loadingModels" data-testid="model-profile-model"><option value="">@(loadingModels ? T("LoadingModels") : T("SelectModel"))</option>@if (!string.IsNullOrWhiteSpace(model.ModelName) && models.All(item => !string.Equals(item.Name, model.ModelName, StringComparison.Ordinal))) { <option value="@model.ModelName">@model.ModelName — @T("NotCurrentlyDiscovered")</option> }@foreach (var available in models) { <option value="@available.Name" disabled="@IsUnavailable(available)">@available.DisplayName — @available.Name · @StatusLabel(available.Status)</option> }</select><ValidationMessage For="() => model.ModelName" /></label>
             </div>
             @if (models.Count == 0 && !loadingModels && !string.IsNullOrWhiteSpace(model.ProviderName)) { <p class="inline-warning">@T("NoModelsReported")</p> }
         </section>
@@ -105,7 +105,7 @@ else
             }
         </section>
 
-        <div class="form-actions"><a class="button-secondary" href="/modelprofiles">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving">@(saving ? T("Saving") : IsNew ? T("CreateProfile") : T("SaveChanges"))</button></div>
+        <div class="form-actions"><a class="button-secondary" href="/modelprofiles">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving" data-testid="model-profile-save">@(saving ? T("Saving") : IsNew ? T("CreateProfile") : T("SaveChanges"))</button></div>
     </EditForm>
 
     @if (!IsNew)
@@ -140,7 +140,7 @@ else
     }
 }
 
-<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" TestId="model-profile-delete-dialog" />
 
 @code {
     [Parameter] public string? Name { get; set; }
@@ -153,7 +153,7 @@ else
     private ModelProfileEditorModel? model; private IReadOnlyList<ModelProviderResponse> providers = []; private IReadOnlyList<AvailableModelResponse> models = []; private IReadOnlyList<ExtensionResponse> extensions = [];
     private IReadOnlyList<ModelProfileUsageResponse> usages = []; private ModelProfileResolutionResponse? resolution;
     private ExtensionOptionsEditorModel? optionEditor; private bool rawOptions;
-    private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool diagnosing; private bool confirmDelete;
+    private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool diagnosing; private bool confirmDelete; private bool interactive;
     private ResourceScopeRef? selectedScope;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
@@ -168,6 +168,7 @@ else
         }
     }
     protected override Task OnParametersSetAsync() => LoadAsync();
+    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
     private async Task LoadAsync()
     {
         loading = true; error = null; warning = null;
