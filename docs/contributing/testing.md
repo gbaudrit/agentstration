@@ -22,7 +22,7 @@ Run both fast and integration solutions for complete required functional validat
 
 ## Functional coverage
 
-CI collects managed-code coverage while running the required Fast and Integration lanes. Performance workloads, live-provider scenarios, test assemblies, generated sources, and files outside product `src` directories are excluded. Coverage is initially report-only: collection or report-generation failures fail CI, but the measured percentage does not.
+CI collects managed-code coverage from the required Fast and Integration inventory on two balanced runners while the uninstrumented functional lanes remain in `build-and-test`. The raw shard reports are merged into one consolidated result after both runners complete. Performance workloads, live-provider scenarios, test assemblies, generated sources, and files outside product `src` directories are excluded. Coverage is initially report-only: collection or report-generation failures fail CI, but the measured percentage does not.
 
 After restoring dependencies and building the root solution, reproduce the CI report locally with:
 
