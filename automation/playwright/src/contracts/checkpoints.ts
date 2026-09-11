@@ -55,4 +55,11 @@ export const Checkpoints = {
     requestSubmitted: 'workplace-request-submitted',
     responseCompleted: 'workplace-response-completed',
   },
+  flowObservability: {
+    task: 'flow-observability-task',
+    taskRun: 'flow-observability-task-run',
+    globalRun: 'flow-observability-global-run',
+    agentRun: 'flow-observability-agent-run',
+    events: 'flow-observability-events',
+  },
 } as const;

@@ -5,7 +5,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.FlowDesigner.Components.FlowDesignerStrings> Localizer
 
 <PageTitle>@Localizer["PageTitle"] · Agentstration</PageTitle>
-<div class="flow-designer-page">
+<div class="flow-designer-page" data-testid="flow-observability-designer">
     <Agentstration.Web.FlowDesigner.Components.FlowDesigner ResourceId="@FlowId" Namespace="@DesignerNamespace" />
 </div>
 

@@ -37,7 +37,7 @@
                         <h3>@T("RecentConversations")</h3>
                         @foreach (var conversation in recentConversations)
                         {
-                            <NavLink href="@conversation.Url" data-testid="workplace-recent-conversation"><span aria-hidden="true"><UiIcon Name="message" /></span><span>@conversation.Title</span></NavLink>
+                            <NavLink href="@conversation.Url" data-testid="workplace-recent-conversation" data-conversation-id="@conversation.ConversationId"><span aria-hidden="true"><UiIcon Name="message" /></span><span>@conversation.Title</span></NavLink>
                         }
                     </div>
                 }

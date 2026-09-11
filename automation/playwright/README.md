@@ -56,6 +56,14 @@ npm run capture -- --plan examples/create-local-pack-project.capture-plan.json -
 
 The managed fixture starts the Git and Ollama AEP extensions on loopback and performs no Registry refresh. External runs mutate the selected Workspace, so use a disposable campaign Workspace.
 
+Flow execution observability can be captured end to end from a deterministic Workplace task through its task-scoped Flow Run, global Flow Run, Agent Run, and retained event views:
+
+```powershell
+npm run capture -- --plan examples/inspect-flow-observability.capture-plan.json --output .work/flow-observability
+```
+
+The local plan uses the seeded `prepare-report` Entry. An external target must provide that Entry and a compatible published Flow in the selected Workspace.
+
 The solution-discovery video Flow and Entry are captured with:
 
 ```powershell

@@ -52,7 +52,7 @@ test('Workplace aliases, prompt conversations, theme, and recent navigation are 
   await pages.workplace.openActivity(product.workplaceUrl, root.workspaceName);
   await pages.workplace.waitForConversation(conversation.conversationId);
   await pages.workplace.openDashboard(product.workplaceUrl, root);
-  await expect(pages.workplace.recentConversations).toHaveCount(1);
+  await expect(pages.workplace.recentConversation(conversation.conversationId)).toBeVisible();
 });
 
 test('a Workplace task completes, appears in activity, opens, and emits a readable notification @smoke', async ({ page, product }) => {

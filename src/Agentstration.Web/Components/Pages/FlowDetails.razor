@@ -6,6 +6,7 @@
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings> Localizer
 <PageTitle>@(flow?.Name ?? T("Flow")) · Agentstration</PageTitle>
+<div data-testid="flow-observability-flow-details">
 @if (flow is null) { <LoadingState Message="@T("Loading")" /> }
 else
 {
@@ -81,6 +82,7 @@ else
         <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true"><h2>@T("RunFlow")</h2><label>@T("PublishedVersion")<select @bind="runVersion">@foreach(var version in versions){<option value="@version.Version">@version.Version</option>}</select></label><label>@T("Deployment")<select @bind="deployment"><option value="local">local</option></select></label><label>@T("InputJson")<textarea rows="11" @bind="inputJson"></textarea></label>@if(error is not null){<p class="error-panel">@error</p>}<div class="dialog-actions"><button class="button-secondary" @onclick="() => showRun=false">@T("Cancel")</button><button class="button-primary" disabled="@submitting" @onclick="SubmitRunAsync">@(submitting ? T("Starting") : T("RunFlow"))</button></div></section></div>
     }
 }
+</div>
 @code {
     [Parameter] public string FlowId { get; set; } = string.Empty;
     [Parameter] public string? FlowNamespace { get; set; }

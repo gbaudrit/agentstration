@@ -155,6 +155,12 @@ export class WorkplacePage {
   public get mobileAppBar(): Locator { return this.page.getByTestId(TestIds.workplace.mobileAppBar); }
   public get recentConversations(): Locator { return this.page.getByTestId(TestIds.workplace.recentConversation); }
 
+  public recentConversation(conversationId: string): Locator {
+    return this.page.locator(
+      `[data-testid="${TestIds.workplace.recentConversation}"][data-conversation-id="${attributeValue(conversationId)}"]`,
+    );
+  }
+
   private async open(url: string): Promise<void> {
     const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Workplace page '${url}' returned HTTP ${response?.status() ?? 'no response'}.`);

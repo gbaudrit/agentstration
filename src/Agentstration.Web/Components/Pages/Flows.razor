@@ -3,6 +3,7 @@
 @inject IFlowApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowsStrings> Localizer
 <PageTitle>@T("PageTitle")</PageTitle>
+<div data-testid="flow-observability-flows">
 <PageHeader Title="@T("Flows")" Description="@T("Description")">
     <Actions><a class="button-primary" href="/flows/new">@T("NewFlow")</a><a class="button-secondary" href="/flow-runs">@T("ViewAllRuns")</a></Actions>
 </PageHeader>
@@ -16,6 +17,7 @@ else
         <Row Context="item"><tr><td><span class="resource-name-with-scope"><strong>@item.Name</strong><ResourceScopeBadge Kind="@ResourceScopeKind.Workspace" Compact /></span><code>@item.Id</code></td><td><code>@item.Namespace.Value</code></td><td>@item.Kind</td><td>@item.Version</td><td><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td><td><a class="text-button" href="@item.DetailsUrl">@T("Open")</a></td></tr></Row>
     </DataGrid>
 }
+</div>
 @code {
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<FlowSummary>? items;
