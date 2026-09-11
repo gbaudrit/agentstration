@@ -39,6 +39,7 @@ test('Console navigation adapts to a mobile viewport @smoke', async ({ page, pro
   await authenticateConsole({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
   await pages.consoleAdministration.open(product.consoleUrl, '/settings', 'settings');
   await expect(page.getByTestId(TestIds.console.sidebar)).toBeVisible();
+  await expect(page.getByTestId(TestIds.console.sidebarToggle)).toBeVisible();
   await expect(page.getByTestId(TestIds.console.commandTrigger)).toBeHidden();
-  await expect(page.getByTestId(TestIds.console.breadcrumb)).toBeVisible();
+  await expect(page.getByTestId(TestIds.console.breadcrumb)).toBeHidden();
 });

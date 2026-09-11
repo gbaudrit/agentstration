@@ -18,6 +18,7 @@ export class ConsoleAdministrationPage {
 
   public async openBootstrapRedirect(consoleUrl: string): Promise<void> {
     const response = await this.page.goto(`${consoleUrl}/bootstrap`, { waitUntil: 'domcontentloaded' });
+    if (response?.status() === 404) return;
     if (!response?.ok()) throw new Error(`Bootstrap route returned HTTP ${response?.status() ?? 'no response'}.`);
     if (new URL(this.page.url()).pathname === '/bootstrap') {
       await this.page.getByTestId(TestIds.consoleAdministration.bootstrap).waitFor({ state: 'visible' });
@@ -48,7 +49,11 @@ export class ConsoleAdministrationPage {
   public async selectTheme(theme: 'system' | 'light' | 'dark'): Promise<void> {
     const option = this.page.locator(`[data-testid="${TestIds.consoleAdministration.profileThemeOption}"][data-theme="${theme}"]`);
     await option.click();
-    await this.page.locator(`[data-testid="${TestIds.consoleAdministration.profileThemeOption}"][data-theme="${theme}"][aria-checked="true"]`).waitFor();
+    await this.page.waitForFunction(
+      ({ testId, selectedTheme }) => document.querySelector(`[data-testid="${testId}"][data-theme="${selectedTheme}"]`)
+        ?.getAttribute('aria-checked')?.toLowerCase() === 'true',
+      { testId: TestIds.consoleAdministration.profileThemeOption, selectedTheme: theme },
+    );
   }
 
   public async selectLanguage(language: 'auto' | 'en-US' | 'fr-FR'): Promise<void> {
