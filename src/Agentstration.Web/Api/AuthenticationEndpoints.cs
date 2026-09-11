@@ -38,7 +38,7 @@ public static class AuthenticationEndpoints
         CancellationToken cancellationToken)
     {
         if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
-        return Results.Ok(await accounts.ListAsync(cancellationToken));
+        return Results.Ok((await accounts.ListAsync(cancellationToken)).Select(ToResponse).ToArray());
     }
 
     private static async Task<IResult> CreateAccountAsync(
@@ -53,7 +53,7 @@ public static class AuthenticationEndpoints
             var result = await accounts.CreateAsync(request, cancellationToken);
             if (result.Account is null)
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["account"] = result.Errors.ToArray() });
-            return Results.Created($"/api/identity/accounts/{result.Account.AccountId:D}", result.Account);
+            return Results.Created($"/api/identity/accounts/{result.Account.AccountId:D}", ToResponse(result.Account));
         }
         catch (ArgumentException exception)
         {
@@ -69,7 +69,7 @@ public static class AuthenticationEndpoints
         CancellationToken cancellationToken)
     {
         if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
-        try { return Results.Ok(await accounts.SetEnabledAsync(accountId, request.Enabled, cancellationToken)); }
+        try { return Results.Ok(ToResponse(await accounts.SetEnabledAsync(accountId, request.Enabled, cancellationToken))); }
         catch (ArgumentException exception) { return Results.NotFound(new { error = exception.Message }); }
         catch (InvalidOperationException exception) { return Results.Conflict(new { error = exception.Message }); }
     }
@@ -82,6 +82,18 @@ public static class AuthenticationEndpoints
         if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
         return Results.Ok(new { initialized = await bootstrap.IsInitializedAsync(cancellationToken) });
     }
+
+    private static Agentstration.Management.Contracts.LocalAccountResponse ToResponse(LocalAccountView account) =>
+        new(
+            account.AccountId,
+            account.PrincipalId,
+            account.UserName,
+            account.DisplayName,
+            account.Email,
+            account.PrincipalStatus,
+            account.AccessFailedCount,
+            account.LockoutEnd,
+            account.PlatformAdministrator);
 
     private static async Task<IResult> BootstrapAsync(
         LocalBootstrapRequest request,

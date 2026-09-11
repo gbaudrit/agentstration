@@ -5,6 +5,7 @@ using System.Text;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets.Abstractions;
 
@@ -15,8 +16,6 @@ public sealed class AepEnrollmentException(string code, string message, int stat
     public string Code { get; } = code;
     public int StatusCode { get; } = statusCode;
 }
-
-public sealed record AepPairingCodeResult(Guid RequestId, string Code, DateTimeOffset ExpiresAt);
 
 public interface IAepEnrollmentAnnouncementProvisioner
 {

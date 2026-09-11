@@ -34,6 +34,7 @@ public sealed partial class SecurityApiTests
             {
                 Func<HttpMessageHandler> handlerFactory = () => factory!.Server.CreateHandler();
                 RouteThroughTestServer<IUserPreferencesClient>(services, handlerFactory);
+                RouteThroughTestServer<IIdentityAdministrationApiClient>(services, handlerFactory);
                 RouteThroughTestServer<IManagementApiClient>(services, handlerFactory);
                 RouteThroughTestServer<IModelProvidersClient>(services, handlerFactory);
                 RouteThroughTestServer<IFlowApiClient>(services, handlerFactory);

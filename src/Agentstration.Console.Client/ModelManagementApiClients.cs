@@ -6,6 +6,12 @@ using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
+internal sealed record PutAepEnrollmentSettingsRequest(
+    bool PairingCodeEnabled,
+    bool SharedKeyFileEnabled,
+    string? ETag);
+internal sealed record AssignAepEnrollmentRequest(ResourceScopeRef ScopeRef);
+
 public interface IModelProvidersClient
 {
     Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(CancellationToken cancellationToken);

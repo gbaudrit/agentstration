@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Web.Components.Localization;
+using Agentstration.Web.Configuration;
 using Agentstration.Web.Hosting;
 using Agentstration.Web.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -13,8 +14,10 @@ public static class IdentityEndpoints
     public static IEndpointRouteBuilder MapAgentstrationIdentityApi(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/identity").RequireAuthorization(AgentstrationPolicies.Authenticated);
-        group.MapGet("/context", async (IdentityExperienceService service, CancellationToken token) => Results.Ok(await service.GetContextAsync(token)))
+        group.MapGet("/context", async (IdentityExperienceService service, CancellationToken token) => Results.Ok(ToResponse(await service.GetContextAsync(token))))
             .RequireAuthorization(AgentstrationPolicies.WorkspaceReader);
+        group.MapGet("/administration-capabilities", GetAdministrationCapabilitiesAsync)
+            .RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapGet("/preferences", GetPreferencesAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapPut("/preferences", UpdatePreferencesAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapPost("/context/workspace", SelectWorkspaceAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
@@ -23,7 +26,7 @@ public static class IdentityEndpoints
         group.MapDelete("/pat", RevokeAllPersonalAccessTokensAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapDelete("/pat/{tokenId:guid}", RevokePersonalAccessTokenAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapGet("/organization", async (IdentityAdministrationService service, CancellationToken token) =>
-            Results.Ok(await service.GetCurrentAsync(token))).RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
+            Results.Ok(ToResponse(await service.GetCurrentAsync(token)))).RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
         group.MapGet("/workspaces", async (IdentityAdministrationService service, CancellationToken token) =>
             Results.Ok((await service.GetCurrentAsync(token)).Workspaces)).RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
         group.MapGet("/workspaces/{workspaceId:guid}", GetWorkspaceAsync)
@@ -36,11 +39,11 @@ public static class IdentityEndpoints
         group.MapDelete("/workspaces/{workspaceId:guid}/memberships/{principalId:guid}", RemoveWorkspaceMembershipAsync)
             .RequireAuthorization(AgentstrationPolicies.AuthorizationAdmin);
         group.MapGet("/members", async (IdentityAdministrationService service, CancellationToken token) =>
-            Results.Ok((await service.GetCurrentAsync(token)).Members)).RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
+            Results.Ok((await service.GetCurrentAsync(token)).Members.Select(ToResponse).ToArray())).RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
         group.MapGet("/platform", () => Results.Ok(new { role = "PlatformAdmin" }))
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         group.MapGet("/platform-administrators", async (PlatformAdministratorAdministrationService service, CancellationToken token) =>
-            Results.Ok(await service.ListAsync(token)))
+            Results.Ok((await service.ListAsync(token)).Select(ToResponse).ToArray()))
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         group.MapPut("/platform-administrators/{principalId:guid}", GrantPlatformAdministratorAsync)
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
@@ -71,6 +74,55 @@ public static class IdentityEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken) =>
         Results.Ok((await service.ListCurrentAsync(cancellationToken)).Select(token => ToResponse(token, timeProvider.GetUtcNow())));
+
+    private static Agentstration.Management.Contracts.IdentityConsoleContextResponse ToResponse(ConsoleContextView view) =>
+        new(
+            view.Context,
+            view.UserDisplayName,
+            view.TenantName,
+            view.TenantDisplayName,
+            view.WorkspaceName,
+            view.WorkspaceDisplayName,
+            view.Permissions,
+            view.AvailableWorkspaces.Select(workspace => new Agentstration.Management.Contracts.IdentityConsoleWorkspaceResponse(
+                workspace.Id,
+                workspace.TenantId,
+                workspace.TenantName,
+                workspace.TenantDisplayName,
+                workspace.Name,
+                workspace.DisplayName,
+                workspace.Status,
+                workspace.Permissions)).ToArray());
+
+    private static Agentstration.Management.Contracts.OrganizationAdministrationResponse ToResponse(TenantAdministrationView view) =>
+        new(view.Tenant, view.Workspaces, view.Members.Select(ToResponse).ToArray());
+
+    private static Agentstration.Management.Contracts.OrganizationMemberResponse ToResponse(MemberAdministrationView view) =>
+        new(
+            view.Principal,
+            view.Membership,
+            view.ExternalIdentities,
+            view.Roles.Select(role => new Agentstration.Management.Contracts.AssignedRoleResponse(role.Role, role.Scope)).ToArray());
+
+    private static Agentstration.Management.Contracts.WorkspaceMemberResponse ToResponse(WorkspaceMemberView view) =>
+        new(view.Principal, view.Membership, view.Role, view.Inherited);
+
+    private static Agentstration.Management.Contracts.PlatformAdministratorResponse ToResponse(PlatformAdministratorView view) =>
+        new(view.Principal, view.Grant);
+
+    private static async Task<IResult> GetAdministrationCapabilitiesAsync(
+        ICurrentRequestContext requestContext,
+        IPlatformAuthorizationService platformAuthorization,
+        IOptions<AgentstrationWebOptions> options,
+        CancellationToken cancellationToken)
+    {
+        var context = requestContext.Current;
+        return Results.Ok(new Agentstration.Management.Contracts.IdentityAdministrationCapabilitiesResponse(
+            context.PrincipalId,
+            context.WorkspaceId,
+            await platformAuthorization.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken),
+            Agentstration.Web.Configuration.AuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)));
+    }
 
     private static async Task<IResult> CreatePersonalAccessTokenAsync(
         CreatePersonalAccessTokenRequest request,
@@ -261,7 +313,7 @@ public static class IdentityEndpoints
         Guid workspaceId,
         WorkspaceMembershipAdministrationService service,
         CancellationToken cancellationToken) =>
-        Results.Ok(await service.ListAsync(workspaceId, cancellationToken));
+        Results.Ok((await service.ListAsync(workspaceId, cancellationToken)).Select(ToResponse).ToArray());
 
     private static async Task<IResult> SetWorkspaceMembershipAsync(
         Guid workspaceId,
@@ -270,7 +322,7 @@ public static class IdentityEndpoints
         WorkspaceMembershipAdministrationService service,
         CancellationToken cancellationToken)
     {
-        try { return Results.Ok(await service.SetAsync(workspaceId, principalId, request.Role, cancellationToken)); }
+        try { return Results.Ok(ToResponse(await service.SetAsync(workspaceId, principalId, request.Role, cancellationToken))); }
         catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["membership"] = [exception.Message] }); }
         catch (InvalidOperationException exception) { return Results.Conflict(new { error = exception.Message }); }
     }
@@ -294,7 +346,7 @@ public static class IdentityEndpoints
         PlatformAdministratorAdministrationService service,
         CancellationToken cancellationToken)
     {
-        try { return Results.Ok(await service.GrantAsync(principalId, cancellationToken)); }
+        try { return Results.Ok(ToResponse(await service.GrantAsync(principalId, cancellationToken))); }
         catch (ArgumentException exception) { return Results.NotFound(new { error = exception.Message }); }
         catch (InvalidOperationException exception) { return Results.Conflict(new { error = exception.Message }); }
     }

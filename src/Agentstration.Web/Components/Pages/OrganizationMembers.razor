@@ -1,9 +1,5 @@
 @page "/settings/organization/members"
-@inject Agentstration.Management.Core.IdentityAdministrationService Service
-@inject Agentstration.Security.AspNetCoreIdentity.LocalAccountAdministrationService Accounts
-@inject Agentstration.Management.Abstractions.ICurrentRequestContext RequestContext
-@inject Agentstration.Management.Abstractions.IPlatformAuthorizationService PlatformAuthorization
-@inject Microsoft.Extensions.Options.IOptions<Agentstration.Web.Configuration.AgentstrationWebOptions> Options
+@inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
 <PageTitle>@T("Members") · @T("Organization") · Agentstration</PageTitle>
@@ -21,12 +17,12 @@
             <label><span>@T("EmailOptional")</span><input @bind="newEmail" type="email" autocomplete="off" /></label>
             <label><span>@T("InitialPassword")</span><input @bind="newPassword" type="password" autocomplete="new-password" /></label>
             <label><span>@T("Workspace")</span><select @bind="newWorkspaceId">@foreach(var workspace in view?.Workspaces ?? []){<option value="@workspace.Id">@workspace.DisplayName</option>}</select></label>
-            <label><span>@T("Role")</span><select @bind="newRole">@foreach(var role in Agentstration.Management.Core.BuiltInIdentityRoles.Names){<option value="@role">@role</option>}</select></label>
+            <label><span>@T("Role")</span><select @bind="newRole">@foreach(var role in Agentstration.Management.Contracts.BuiltInIdentityRoleNames.All){<option value="@role">@role</option>}</select></label>
         </div>
         <div class="form-actions"><button class="button-primary" @onclick="CreateAccountAsync" disabled="@savingAccount">@(savingAccount ? T("Creating") : T("CreateLocalAccount"))</button></div>
         @if (localAccounts.Count > 0)
         {
-            <DataGrid TItem="Agentstration.Security.AspNetCoreIdentity.LocalAccountView" Items="localAccounts">
+            <DataGrid TItem="Agentstration.Management.Contracts.LocalAccountResponse" Items="localAccounts">
                 <Header><tr><th>@T("Account")</th><th>@T("Principal")</th><th>@T("Status")</th><th>@T("InstanceRole")</th><th></th></tr></Header>
                 <Row Context="account"><tr><td><strong>@account.UserName</strong><br /><small>@(account.Email ?? T("NoEmail"))</small></td><td>@account.DisplayName<br /><code>@account.PrincipalId</code></td><td><StatusBadge Text="@T($"Status.{account.PrincipalStatus}")" Status="@(account.PrincipalStatus == PrincipalStatus.Active ? UiStatus.Success : UiStatus.Warning)" /></td><td>@(account.PlatformAdministrator ? T("PlatformAdministrator") : "—")</td><td><button class="text-button" @onclick="() => SetEnabledAsync(account, account.PrincipalStatus != PrincipalStatus.Active)">@(account.PrincipalStatus == PrincipalStatus.Active ? T("Disable") : T("Enable"))</button></td></tr></Row>
             </DataGrid>
@@ -38,44 +34,45 @@
 else if (view.Members.Count == 0) { <EmptyState Title="@T("NoMembers")" Message="@T("NoMembersMessage")" /> }
 else
 {
-    <DataGrid TItem="Agentstration.Management.Core.MemberAdministrationView" Items="view.Members">
+    <DataGrid TItem="Agentstration.Management.Contracts.OrganizationMemberResponse" Items="view.Members">
         <Header><tr><th>@T("Member")</th><th>@T("Identity")</th><th>@T("Membership")</th><th>@T("AssignedAccess")</th></tr></Header>
         <Row Context="member"><tr><td><a href="@($"/settings/organization/members/{member.Principal.Id:D}")"><strong>@member.Principal.DisplayName</strong></a><br /><small>@(member.Principal.Email ?? T("NoEmail"))</small></td><td>@(member.ExternalIdentities.Count == 0 ? T("Unlinked") : T("ExternalIdentityCount", member.ExternalIdentities.Count))</td><td><StatusBadge Text="@T($"Status.{member.Membership.Status}")" Status="UiStatus.Success" /></td><td>@if(member.Roles.Count == 0){<span>@T("None")</span>}else{@foreach(var assigned in member.Roles){<div><strong>@assigned.Role.DisplayName</strong> <small>@ScopeLabel(assigned.Scope)</small></div>}}</td></tr></Row>
     </DataGrid>
 }
 
 @code {
-    private Agentstration.Management.Core.TenantAdministrationView? view;
-    private IReadOnlyList<Agentstration.Security.AspNetCoreIdentity.LocalAccountView> localAccounts = [];
+    private Agentstration.Management.Contracts.OrganizationAdministrationResponse? view;
+    private IReadOnlyList<Agentstration.Management.Contracts.LocalAccountResponse> localAccounts = [];
     private bool canManageLocalAccounts; private bool savingAccount; private bool accountError;
     private string newUserName = ""; private string newDisplayName = ""; private string? newEmail; private string newPassword = "";
-    private Guid newWorkspaceId; private string newRole = Agentstration.Management.Core.BuiltInIdentityRoles.Member; private string? accountMessage;
+    private Guid newWorkspaceId; private string newRole = Agentstration.Management.Contracts.BuiltInIdentityRoleNames.Member; private string? accountMessage;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     protected override async Task OnInitializedAsync()
     {
-        view = await Service.GetCurrentAsync(default);
-        newWorkspaceId = RequestContext.Current.WorkspaceId;
-        var mode = Options.Value.Authentication.Mode;
-        var supportsLocal = string.Equals(mode, Agentstration.Web.Configuration.AuthenticationOptions.Local, StringComparison.OrdinalIgnoreCase) || string.Equals(mode, Agentstration.Web.Configuration.AuthenticationOptions.Hybrid, StringComparison.OrdinalIgnoreCase);
-        canManageLocalAccounts = supportsLocal && await PlatformAuthorization.IsPlatformAdministratorAsync(RequestContext.Current.PrincipalId, default);
-        if (canManageLocalAccounts) localAccounts = await Accounts.ListAsync(default);
+        view = await Client.GetOrganizationAsync(default);
+        var capabilities = await Client.GetCapabilitiesAsync(default);
+        newWorkspaceId = capabilities.WorkspaceId;
+        canManageLocalAccounts = capabilities.SupportsLocalAccounts && capabilities.IsPlatformAdministrator;
+        if (canManageLocalAccounts) localAccounts = await Client.GetLocalAccountsAsync(default);
     }
     private async Task CreateAccountAsync()
     {
         savingAccount = true; accountMessage = null;
         try
         {
-            var result = await Accounts.CreateAsync(new(newUserName, newPassword, newDisplayName, newEmail, newWorkspaceId, newRole), default);
-            accountError = result.Account is null; accountMessage = result.Account is null ? string.Join(" ", result.Errors) : T("AccountCreated", result.Account.UserName);
-            if (result.Account is not null) { newUserName = newDisplayName = newPassword = ""; newEmail = null; localAccounts = await Accounts.ListAsync(default); view = await Service.GetCurrentAsync(default); }
+            var account = await Client.CreateLocalAccountAsync(new(newUserName, newPassword, newDisplayName, newEmail, newWorkspaceId, newRole), default);
+            accountError = false; accountMessage = T("AccountCreated", account.UserName);
+            newUserName = newDisplayName = newPassword = ""; newEmail = null;
+            localAccounts = await Client.GetLocalAccountsAsync(default);
+            view = await Client.GetOrganizationAsync(default);
         }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { accountError = true; accountMessage = exception.Message; }
+        catch (Agentstration.Web.Console.AgentstrationApiException exception) { accountError = true; accountMessage = exception.Message; }
         finally { savingAccount = false; }
     }
-    private async Task SetEnabledAsync(Agentstration.Security.AspNetCoreIdentity.LocalAccountView account, bool enabled)
+    private async Task SetEnabledAsync(Agentstration.Management.Contracts.LocalAccountResponse account, bool enabled)
     {
-        try { await Accounts.SetEnabledAsync(account.AccountId, enabled, default); localAccounts = await Accounts.ListAsync(default); accountError = false; accountMessage = T(enabled ? "AccountEnabled" : "AccountDisabled", account.UserName); }
-        catch (InvalidOperationException exception) { accountError = true; accountMessage = exception.Message; }
+        try { await Client.SetLocalAccountEnabledAsync(account.AccountId, enabled, default); localAccounts = await Client.GetLocalAccountsAsync(default); accountError = false; accountMessage = T(enabled ? "AccountEnabled" : "AccountDisabled", account.UserName); }
+        catch (Agentstration.Web.Console.AgentstrationApiException exception) { accountError = true; accountMessage = exception.Message; }
     }
     private string ScopeLabel(string scope) => scope.StartsWith("/tenants/", StringComparison.Ordinal) ? T("TenantInherited") : view?.Workspaces.FirstOrDefault(workspace => scope == AuthorizationScopes.Workspace(workspace.Id)) is { } workspace ? T("WorkspaceScope", workspace.DisplayName) : scope;
 }

@@ -58,3 +58,5 @@ public sealed class WorkApiClient(HttpClient httpClient) : IWorkApiClient
     private static string WorkspaceName(string id) => id[(id.LastIndexOf('/') + 1)..];
 }
 
+internal sealed record TaskPendingActionResponse(IReadOnlyDictionary<string, JsonElement> Values);
+

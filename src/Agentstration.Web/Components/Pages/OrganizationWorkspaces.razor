@@ -1,5 +1,5 @@
 @page "/settings/organization/workspaces"
-@inject Agentstration.Management.Core.IdentityAdministrationService Service
+@inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
 @inject ConsoleContextState ContextState
 @inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
@@ -47,7 +47,7 @@ else
     {
         loading = true;
         loadError = null;
-        try { workspaces = (await Service.GetCurrentAsync(default)).Workspaces; }
+        try { workspaces = (await Client.GetOrganizationAsync(default)).Workspaces; }
         catch (Exception exception) { loadError = exception.Message; }
         finally { loading = false; }
     }
@@ -57,7 +57,7 @@ else
         busy = true; operationError = null;
         try
         {
-            await Service.CreateWorkspaceAsync(technicalName, displayName, default);
+            await Client.CreateWorkspaceAsync(technicalName, displayName, default);
             displayName = technicalName = string.Empty;
             technicalNameEdited = false;
             await ReloadAsync();

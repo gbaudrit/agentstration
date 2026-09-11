@@ -1,13 +1,12 @@
-using Agentstration.Management.Core;
 using Agentstration.Web.Components.State;
 
 namespace Agentstration.Web.Console;
 
-public sealed class ConsoleContextProvider(IdentityExperienceService experience) : IConsoleContextProvider
+public sealed class ConsoleContextProvider(IIdentityAdministrationApiClient client) : IConsoleContextProvider
 {
     public async Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken)
     {
-        var view = await experience.GetContextAsync(cancellationToken);
+        var view = await client.GetContextAsync(cancellationToken);
         return new ConsoleContextSnapshot(
             view.Context.PrincipalId,
             view.UserDisplayName,

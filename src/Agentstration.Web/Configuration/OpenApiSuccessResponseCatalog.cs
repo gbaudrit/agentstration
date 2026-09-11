@@ -396,19 +396,20 @@ internal static class OpenApiSuccessResponseCatalog
             };
         }
         if (path.StartsWith("/api/identity/accounts", StringComparison.OrdinalIgnoreCase))
-            return path == "/api/identity/accounts" && method == "GET" ? Json<IReadOnlyList<LocalAccountView>>(200, "List local accounts") : Json<LocalAccountView>(method == "POST" ? 201 : 200, method == "POST" ? "Create a local account" : "Update local account status");
-        if (path == "/api/identity/context") return Json<ConsoleContextView>(200, "Get the current identity context");
-        if (path == "/api/identity/context/workspace") return Json<ConsoleContextView>(200, "Select the current workspace");
+            return path == "/api/identity/accounts" && method == "GET" ? Json<IReadOnlyList<LocalAccountResponse>>(200, "List local accounts") : Json<LocalAccountResponse>(method == "POST" ? 201 : 200, method == "POST" ? "Create a local account" : "Update local account status");
+        if (path == "/api/identity/context") return Json<IdentityConsoleContextResponse>(200, "Get the current identity context");
+        if (path == "/api/identity/context/workspace") return Json<RequestContext>(200, "Select the current workspace");
+        if (path == "/api/identity/administration-capabilities") return Json<IdentityAdministrationCapabilitiesResponse>(200, "Get identity administration capabilities");
         if (path == "/api/identity/preferences") return Json<PrincipalPreferencesResponse>(200, method == "PUT" ? "Update principal preferences" : "Get principal preferences");
-        if (path == "/api/identity/organization") return Json<TenantAdministrationView>(200, "Get organization administration details");
-        if (path == "/api/identity/workspaces") return method == "POST" ? Json<Workspace>(201, "Create a workspace") : Json<IReadOnlyList<ConsoleWorkspaceView>>(200, "List identity workspaces");
-        if (path.EndsWith("/memberships/{principalId}", StringComparison.OrdinalIgnoreCase)) return method == "DELETE" ? NoContent("Remove a workspace membership") : Json<WorkspaceMemberView>(200, "Set a workspace membership");
-        if (path.EndsWith("/memberships", StringComparison.OrdinalIgnoreCase)) return Json<IReadOnlyList<WorkspaceMemberView>>(200, "List workspace memberships");
+        if (path == "/api/identity/organization") return Json<OrganizationAdministrationResponse>(200, "Get organization administration details");
+        if (path == "/api/identity/workspaces") return method == "POST" ? Json<Workspace>(201, "Create a workspace") : Json<IReadOnlyList<Workspace>>(200, "List identity workspaces");
+        if (path.EndsWith("/memberships/{principalId}", StringComparison.OrdinalIgnoreCase)) return method == "DELETE" ? NoContent("Remove a workspace membership") : Json<WorkspaceMemberResponse>(200, "Set a workspace membership");
+        if (path.EndsWith("/memberships", StringComparison.OrdinalIgnoreCase)) return Json<IReadOnlyList<WorkspaceMemberResponse>>(200, "List workspace memberships");
         if (path.StartsWith("/api/identity/workspaces/", StringComparison.OrdinalIgnoreCase)) return Json<Workspace>(200, "Get a workspace");
-        if (path == "/api/identity/members") return Json<IReadOnlyList<MemberAdministrationView>>(200, "List organization members");
+        if (path == "/api/identity/members") return Json<IReadOnlyList<OrganizationMemberResponse>>(200, "List organization members");
         if (path == "/api/identity/platform") return Json<PlatformRoleResponse>(200, "Get platform role");
-        if (path == "/api/identity/platform-administrators") return Json<IReadOnlyList<PlatformAdministratorView>>(200, "List platform administrators");
-        if (path.StartsWith("/api/identity/platform-administrators/", StringComparison.OrdinalIgnoreCase)) return method == "DELETE" ? NoContent("Revoke platform administrator") : Json<PlatformAdministratorView>(200, "Grant platform administrator");
+        if (path == "/api/identity/platform-administrators") return Json<IReadOnlyList<PlatformAdministratorResponse>>(200, "List platform administrators");
+        if (path.StartsWith("/api/identity/platform-administrators/", StringComparison.OrdinalIgnoreCase)) return method == "DELETE" ? NoContent("Revoke platform administrator") : Json<PlatformAdministratorResponse>(200, "Grant platform administrator");
         if (path.EndsWith("/external-identities/{externalIdentityId}", StringComparison.OrdinalIgnoreCase)) return NoContent("Unlink an external identity");
         if (path.EndsWith("/external-identities", StringComparison.OrdinalIgnoreCase)) return method == "POST" ? Json<ExternalIdentity>(200, "Link an external identity") : Json<IReadOnlyList<ExternalIdentity>>(200, "List external identities");
         if (path == "/api/identity/audit-events") return Json<IReadOnlyList<SecurityAuditEvent>>(200, "List security audit events");
@@ -419,6 +420,10 @@ internal static class OpenApiSuccessResponseCatalog
     {
         if (path == "/api/bootstrap/profiles" && method == "GET")
             return Json<BootstrapManagementView>(200, "List bootstrap profiles and applications");
+        if (path == "/api/bootstrap/source-profile" && method == "POST")
+            return Json<BootstrapProfileSummary>(200, "Resolve a source bootstrap profile");
+        if (path == "/api/bootstrap/binding-targets" && method == "POST")
+            return Json<IReadOnlyList<BootstrapBindingTargetOption>>(200, "List bootstrap binding targets");
         if (path == "/api/bootstrap/profiles/preview" && method == "POST")
             return Json<BootstrapCompositionPreview>(200, "Preview bootstrap profiles");
         if (path == "/api/bootstrap/applications" && method == "POST")
