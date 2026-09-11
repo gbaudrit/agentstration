@@ -193,6 +193,13 @@ dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Rele
 
 The two test solutions together form the required deterministic, offline functional suite. Performance and live-provider workloads are explicit opt-ins documented in `docs/contributing/testing.md`. For a focused iteration, run the affected test project first, then run both functional lanes before handoff. Do not suppress warnings or disable analyzers to make a change pass.
 
+When changing coverage collection or its CI workflow, restore the pinned repository tool and reproduce the consolidated report after the Release build:
+
+```powershell
+dotnet tool restore
+./scripts/ci/run-functional-coverage.ps1 -Configuration Release -NoBuild
+```
+
 To smoke-test the executable default with the Development bootstrap when startup behavior changes:
 
 ```powershell

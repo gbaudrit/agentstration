@@ -20,6 +20,19 @@ dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Rele
 
 Run both fast and integration solutions for complete required functional validation. Their union is the functional test inventory represented by the root solution.
 
+## Functional coverage
+
+CI collects managed-code coverage while running the required Fast and Integration lanes. Performance workloads, live-provider scenarios, test assemblies, generated sources, and files outside product `src` directories are excluded. Coverage is initially report-only: collection or report-generation failures fail CI, but the measured percentage does not.
+
+After restoring dependencies and building the root solution, reproduce the CI report locally with:
+
+```powershell
+dotnet tool restore
+./scripts/ci/run-functional-coverage.ps1 -Configuration Release -NoBuild
+```
+
+The script merges every module result into `artifacts/coverage/report/Cobertura.xml`, writes the line and branch totals to `artifacts/coverage/report/summary.md`, and generates the browsable report at `artifacts/coverage/report/index.html`. The same summary appears in the GitHub Actions run, and the complete raw and consolidated output is retained as the `functional-code-coverage` artifact.
+
 ## Performance lane
 
 Performance workloads live in a dedicated project and are never discovered by the fast or integration lanes:
