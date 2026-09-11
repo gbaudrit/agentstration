@@ -52,6 +52,7 @@ tests/
   Agentstration.Management.Api.Tests/
   Agentstration.Management.Security.Tests/
   Agentstration.Management.Aep.Tests/
+  Agentstration.Performance.Tests/
   Agentstration.Web.Tests/
   Agentstration.Web.Components.Tests/
   Agentstration.Web.FlowDesigner.Tests/

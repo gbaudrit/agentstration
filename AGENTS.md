@@ -54,6 +54,7 @@ tests/
   Agentstration.Management.Api.Tests/
   Agentstration.Management.Security.Tests/
   Agentstration.Management.Aep.Tests/
+  Agentstration.Performance.Tests/
 docs/
   architecture.md
   decisions/
