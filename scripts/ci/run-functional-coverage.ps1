@@ -24,14 +24,14 @@ $lanes = @(
     @{
         Name = 'Fast'
         Solution = 'Agentstration.Tests.Fast.slnx'
-        MinimumTests = 139
+        MinimumTests = 336
         ParallelModules = 4
         ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/fast'
     },
     @{
         Name = 'Integration'
         Solution = 'Agentstration.Tests.Integration.slnx'
-        MinimumTests = 692
+        MinimumTests = 515
         ParallelModules = 2
         ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/integration'
     }

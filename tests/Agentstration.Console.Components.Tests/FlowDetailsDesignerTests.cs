@@ -8,9 +8,8 @@ using Agentstration.Resources;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
-using Agentstration.Web.Security;
 using Bunit;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Connections.Client;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
@@ -124,7 +123,7 @@ public sealed class FlowDetailsDesignerTests
             new(run.Id, FlowInvocationOrigin.Trigger, FlowRunTrigger.Event, "news-watcher", "news-item-42", "news-42", Guid.NewGuid().ToString("D")),
             [node], 1, null);
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run, causality: causality));
-        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(new ConsoleRealtimeSession(new HttpContextAccessor(), new UninitializedRequestContext()));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
         context.Services.AddSingleton(TimeProvider.System);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
 
@@ -148,7 +147,7 @@ public sealed class FlowDetailsDesignerTests
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub());
-        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(new ConsoleRealtimeSession(new HttpContextAccessor(), new UninitializedRequestContext()));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
         context.Services.AddSingleton(TimeProvider.System);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
 
@@ -230,9 +229,12 @@ public sealed class FlowDetailsDesignerTests
         public Task<ManagementSummary> GetSummaryAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
-    private sealed class UninitializedRequestContext : ICurrentRequestContext
+    private sealed class NoOpRealtimeConfigurator : IConsoleRealtimeConnectionConfigurator
     {
-        public bool IsInitialized => false;
-        public RequestContext Current => throw new InvalidOperationException("The request context is not initialized.");
+        public static NoOpRealtimeConfigurator Instance { get; } = new();
+
+        public void Configure(Uri hubUri, HttpConnectionOptions options)
+        {
+        }
     }
 }

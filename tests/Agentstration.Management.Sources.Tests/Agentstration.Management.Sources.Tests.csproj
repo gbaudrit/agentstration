@@ -1,6 +1,5 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
-    <ProjectReference Include="../../src/Agentstration.Api/Agentstration.Api.csproj" />
     <ProjectReference Include="../../src/Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
     <ProjectReference Include="../../src/Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
     <ProjectReference Include="../../src/Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
@@ -9,9 +8,5 @@
     <ProjectReference Include="../../src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <ProjectReference Include="../../src/Agentstration.Secrets.Local/Agentstration.Secrets.Local.csproj" />
     <ProjectReference Include="../../src/Agentstration.Tools.SourceRegistry/Agentstration.Tools.SourceRegistry.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
 </Project>

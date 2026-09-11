@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/tests/fast/">
     <Project Path="tests/Agentstration.ArchitectureTests/Agentstration.ArchitectureTests.csproj" />
+    <Project Path="tests/Agentstration.Console.Client.Tests/Agentstration.Console.Client.Tests.csproj" />
+    <Project Path="tests/Agentstration.Console.Components.Tests/Agentstration.Console.Components.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Core.Tests/Agentstration.Management.Core.Tests.csproj" />
     <Project Path="tests/Agentstration.Tools.SourceRegistry.Tests/Agentstration.Tools.SourceRegistry.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Components.Tests/Agentstration.Web.Components.Tests.csproj" />

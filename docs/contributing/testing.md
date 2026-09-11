@@ -7,7 +7,7 @@ Agentstration separates test execution by runtime cost and dependency type. The 
 Fast tests do not start an ASP.NET Core host, open a relational database, spawn a child process, or contact a remote provider. They cover architecture rules, component behavior, mapping, validation, and in-process command behavior.
 
 ```powershell
-dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 139 --max-parallel-test-modules 4
+dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 336 --max-parallel-test-modules 4
 ```
 
 ## Integration lane
@@ -15,7 +15,7 @@ dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --n
 Integration tests exercise a real boundary such as `WebApplicationFactory`, SQLite, Git, persistent Identity, or runtime reconstruction. This lane remains deterministic and offline by default. Tests marked `Integration` for a live model provider are opt-in and report inconclusive unless their documented environment variables are supplied.
 
 ```powershell
-dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 692 --max-parallel-test-modules 2
+dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 515 --max-parallel-test-modules 2
 ```
 
 Run both fast and integration solutions for complete required functional validation. Their union is the functional test inventory represented by the root solution.
@@ -57,31 +57,32 @@ The initial budgets below use Release runs on Windows 11 10.0.26200 with .NET 10
 | `Agentstration.Management.Bootstrap.Tests` | 355.3 | 500 | 700 | 23 |
 | `Agentstration.Management.Security.Tests` | 730.1 | 800 | 1024 | 38 |
 | `Agentstration.Management.Aep.Tests` | 322.1 | 450 | 700 | 11 |
-| `Agentstration.Management.Sources.Tests` | 431.5 | 550 | 900 | 93 |
 
 ## Project classification
 
 | Test project | Lane | Boundary or rationale |
 | --- | --- | --- |
 | `Agentstration.ArchitectureTests` | Fast | Assembly dependency rules |
+| `Agentstration.Console.Client.Tests` | Fast | HTTP and SignalR mappings, pagination, errors, retries, and credential forwarding without an authoritative server |
+| `Agentstration.Console.Components.Tests` | Fast | Console Razor behavior, presentation state, permissions, localization, and static assets with mocked clients |
 | `Agentstration.Management.Core.Tests` | Fast | Pure Management validation and in-memory use cases |
 | `Agentstration.Tools.SourceRegistry.Tests` | Fast | In-process CLI and manifest validation |
 | `Agentstration.Web.Components.Tests` | Fast | bUnit component behavior |
 | `Agentstration.Web.FlowDesigner.Tests` | Fast | bUnit and graph projection behavior |
 | `Agentstration.Workplace.Components.Tests` | Fast | bUnit component behavior |
-| `Agentstration.Application.Tests` | Integration | Includes SQLite Flow and Work storage contracts |
+| `Agentstration.Application.Tests` | Integration | Application use cases and their SQLite-backed contracts without the executable host |
 | `Agentstration.Management.Storage.Tests` | Integration | SQLite control-plane, Identity persistence, secrets, audit, and trigger storage |
-| `Agentstration.Management.Sources.Tests` | Integration | Source, registry, provider, and Pack distribution boundaries |
+| `Agentstration.Management.Sources.Tests` | Integration | Source provider, registry transport, and Pack composition behavior without the executable host |
+| `Agentstration.Api.Tests` | Integration | Hosted HTTP, authentication, OpenAPI, MCP, SignalR, Flow, Runtime, Work, and cross-cutting transport behavior |
 | `Agentstration.Management.Api.Tests` | Integration | Hosted Management API tests using the API-only test profile |
 | `Agentstration.Management.Bootstrap.Tests` | Integration | Declarative bootstrap catalog, application, and hosted startup scenarios using the API-only test profile |
 | `Agentstration.Management.Security.Tests` | Integration | Identity, authorization, local-account, and interactive Security boundaries |
 | `Agentstration.Management.Aep.Tests` | Integration | AEP enrollment lifecycle and extension inventory boundaries using the API-only test profile |
 | `Agentstration.ModelProviders.Tests` | Integration, provider-optional | AEP test hosts plus opt-in live-provider checks |
-| `Agentstration.Runtime.Tests` | Integration | SQLite reconstruction and hosted runtime endpoints |
+| `Agentstration.Runtime.Tests` | Integration | Runtime business behavior and SQLite reconstruction without the executable host |
 | `Agentstration.SourceProviders.Git.Tests` | Integration | Real Git processes and file-system repositories |
-| `Agentstration.Web.Tests` | Integration | Full Web host plus a bounded deterministic SQLite contention correctness smoke |
+| `Agentstration.Web.Tests` | Integration | Combined standalone composition, startup, storage profiles, workers, and lifecycle |
 | `Agentstration.Performance.Tests` | Performance, opt-in | SQLite/PostgreSQL relational storage concurrency workloads and machine-readable reports |
-| `Agentstration.Work.Api.Tests` | Integration | Full Work API host |
 | `Agentstration.Workplace.Web.Tests` | Integration | Workplace HTTP host |
 
 The autonomous AEP SDK keeps its own `aep/Aep.slnx` validation because it can be built and released independently from the product solution.

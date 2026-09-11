@@ -108,4 +108,4 @@ Interactive Server components invoke canonical APIs through server-side typed cl
 
 ## Tests
 
-`Agentstration.Web.Tests` covers API client mapping, model discovery, profile filtering and selection rules, conditional request headers, Problem Details, editor and runner payload mapping, simulated CRUD, SSE processing, retry, and dashboard aggregation. `Agentstration.Web.Components.Tests` covers focused UI state services. Both use MSTest and remain offline.
+`Agentstration.Api.Tests` owns hosted transport behavior. `Agentstration.Console.Client.Tests` covers client mappings, conditional requests, Problem Details, streaming, and retries without starting the authoritative server. `Agentstration.Console.Components.Tests` covers Console presentation behavior with mocked clients. `Agentstration.Web.Tests` is reserved for combined standalone composition, startup, storage, workers, and lifecycle. All use MSTest and remain offline by default.
