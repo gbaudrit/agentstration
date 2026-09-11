@@ -4,6 +4,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<TaskFlowRunDetailsStrings> Localizer
 
 <PageTitle>@(run is null ? T("Title") : run.Id) · Agentstration</PageTitle>
+<div data-testid="flow-observability-task-run-details" data-task-id="@TaskId" data-run-id="@RunId">
 @if (unavailable)
 {
     <WorkApiUnavailableState OnRetry="LoadAsync" />
@@ -53,6 +54,7 @@ else
     </section>
 }
 
+</div>
 @code {
     [Parameter] public Guid TaskId { get; set; }
     [Parameter] public string RunId { get; set; } = string.Empty;

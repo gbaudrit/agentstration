@@ -55,6 +55,22 @@ function coveredDistribution(
   };
 }
 
+function coveredFlow(
+  id: string,
+  source: string,
+  routes: readonly string[],
+  fixtureKeys: readonly string[] = [],
+  journey?: string,
+): ApplicationSurface {
+  return {
+    id, host: 'console', source, routes, fixtureKeys,
+    pageObject: 'src/pages/flow-observability.page.ts',
+    ...(journey ? { journey } : {}),
+    specification: 'tests/flow-observability.spec.ts',
+    coverage: 'covered',
+  };
+}
+
 export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
     id: 'console-home', host: 'console', source: `${consolePages}/Home.razor`, routes: ['/'], fixtureKeys: [],
@@ -85,7 +101,7 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
     id: 'flow-orchestration-editor', host: 'console', source: `${consolePages}/FlowOrchestrationEditor.razor`,
     routes: ['/flows/{FlowId}/orchestration', '/namespaces/{FlowNamespace}/flows/{FlowId}/orchestration'],
     fixtureKeys: ['flowId', 'flowNamespace'], pageObject: 'src/pages/flow-editor.page.ts',
-    journey: 'create-handoff-flow', specification: 'tests/create-flow-entry.spec.ts', coverage: 'partial', trackingIssue: 288,
+    journey: 'create-handoff-flow', specification: 'tests/create-flow-entry.spec.ts', coverage: 'covered',
   },
   {
     id: 'entry-editor', host: 'console', source: `${consolePages}/EntryEditor.razor`,
@@ -101,20 +117,20 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   planned('logout', `${razorPages}/Logout.cshtml`, ['/logout'], 289),
 
   planned('agents', `${consolePages}/Agents.razor`, ['/agents'], 291),
-  planned('agent-runner', `${consolePages}/AgentRunner.razor`, ['/agents/{Name}/run', '/runs/{RunId}'], 288, ['name', 'runId']),
-  planned('agent-runs', `${consolePages}/AgentRuns.razor`, ['/agent-runs'], 288),
+  coveredFlow('agent-runner', `${consolePages}/AgentRunner.razor`, ['/agents/{Name}/run', '/runs/{RunId}'], ['name', 'runId'], 'inspect-flow-observability'),
+  coveredFlow('agent-runs', `${consolePages}/AgentRuns.razor`, ['/agent-runs'], [], 'inspect-flow-observability'),
   planned('namespaced-agent-details', `${consolePages}/NamespacedAgentDetails.razor`, ['/namespaces/{AgentNamespace}/agents/{Name}'], 291, ['agentNamespace', 'name']),
   planned('deployments', `${consolePages}/Deployments.razor`, ['/deployments'], 291),
 
-  planned('flows', `${consolePages}/Flows.razor`, ['/flows'], 288),
-  planned('flow-details', `${consolePages}/FlowDetails.razor`, ['/flows/{FlowId}', '/namespaces/{FlowNamespace}/flows/{FlowId}'], 288, ['flowId', 'flowNamespace']),
-  planned('flow-designer', `${consolePages}/FlowDesigner.razor`, ['/flows/{FlowId}/designer', '/namespaces/{FlowNamespace}/flows/{FlowId}/designer'], 288, ['flowId', 'flowNamespace']),
-  planned('flow-runs', `${consolePages}/FlowRuns.razor`, ['/flow-runs'], 288),
-  planned('flow-run-details', `${consolePages}/FlowRunDetails.razor`, ['/flow-runs/{RunId}'], 288, ['runId']),
-  planned('run-events', `${consolePages}/RunEvents.razor`, ['/run-events'], 288),
-  planned('tasks', `${consolePages}/Tasks.razor`, ['/tasks', '/work'], 288),
-  planned('task-details', `${consolePages}/TaskDetails.razor`, ['/tasks/{TaskId:guid}'], 288, ['taskId']),
-  planned('task-flow-run-details', `${consolePages}/TaskFlowRunDetails.razor`, ['/tasks/{TaskId:guid}/flowruns/{RunId}'], 288, ['taskId', 'runId']),
+  coveredFlow('flows', `${consolePages}/Flows.razor`, ['/flows']),
+  coveredFlow('flow-details', `${consolePages}/FlowDetails.razor`, ['/flows/{FlowId}', '/namespaces/{FlowNamespace}/flows/{FlowId}'], ['flowId', 'flowNamespace']),
+  coveredFlow('flow-designer', `${consolePages}/FlowDesigner.razor`, ['/flows/{FlowId}/designer', '/namespaces/{FlowNamespace}/flows/{FlowId}/designer'], ['flowId', 'flowNamespace']),
+  coveredFlow('flow-runs', `${consolePages}/FlowRuns.razor`, ['/flow-runs'], [], 'inspect-flow-observability'),
+  coveredFlow('flow-run-details', `${consolePages}/FlowRunDetails.razor`, ['/flow-runs/{RunId}'], ['runId'], 'inspect-flow-observability'),
+  coveredFlow('run-events', `${consolePages}/RunEvents.razor`, ['/run-events'], [], 'inspect-flow-observability'),
+  coveredFlow('tasks', `${consolePages}/Tasks.razor`, ['/tasks', '/work'], [], 'inspect-flow-observability'),
+  coveredFlow('task-details', `${consolePages}/TaskDetails.razor`, ['/tasks/{TaskId:guid}'], ['taskId'], 'inspect-flow-observability'),
+  coveredFlow('task-flow-run-details', `${consolePages}/TaskFlowRunDetails.razor`, ['/tasks/{TaskId:guid}/flowruns/{RunId}'], ['taskId', 'runId'], 'inspect-flow-observability'),
 
   planned('entries', `${consolePages}/Entries.razor`, ['/entries'], 291),
   planned('model-profiles', `${consolePages}/ModelProfiles.razor`, ['/modelprofiles'], 291),

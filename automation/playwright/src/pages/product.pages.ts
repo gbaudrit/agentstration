@@ -8,6 +8,7 @@ import { OrganizationWorkspacesPage } from './organization-workspaces.page.js';
 import { WorkplacePage } from './workplace.page.js';
 import { DashboardEditorPage } from './dashboard-editor.page.js';
 import { DistributionPage } from './distribution.page.js';
+import { FlowObservabilityPage } from './flow-observability.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -18,6 +19,7 @@ export class ProductPages {
   public readonly workplace: WorkplacePage;
   public readonly dashboardEditor: DashboardEditorPage;
   public readonly distribution: DistributionPage;
+  public readonly flowObservability: FlowObservabilityPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -28,6 +30,7 @@ export class ProductPages {
     this.workplace = new WorkplacePage(page);
     this.dashboardEditor = new DashboardEditorPage(page);
     this.distribution = new DistributionPage(page);
+    this.flowObservability = new FlowObservabilityPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

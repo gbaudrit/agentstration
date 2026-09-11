@@ -9,6 +9,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunnerInspectorStrings> InspectorLocalizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
+<div data-testid="flow-observability-agent-runner">
 <PageHeader Title="@T("Title")" Description="@T("Description")">
     <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@(agent is null || preparing)">@(preparing ? T("Reconciling") : T("ReconcileRuntime"))</button><a class="button-secondary" href="@BackUrl">@T("BackToAgent")</a></Actions>
 </PageHeader>
@@ -151,6 +152,7 @@ else
     </section>
 }
 
+</div>
 @code {
     [Parameter] public string? Name { get; set; }
     [Parameter] public string? RunId { get; set; }

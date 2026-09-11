@@ -7,6 +7,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<TaskDetailsStrings> Localizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
+<div data-testid="flow-observability-task-details" data-task-id="@TaskId">
 @if (notFound)
 {
     <EmptyState Title="@T("NotFoundTitle")" Message="@T("NotFoundMessage")"><a class="button-secondary" href="/tasks">@T("BackToTasks")</a></EmptyState>
@@ -46,6 +47,7 @@ else
     </div>
 }
 
+</div>
 @code {
     [Parameter] public Guid TaskId { get; set; }
     private readonly CancellationTokenSource lifetime=new();private WorkTaskOperationsDetailResponse? detail;private bool unavailable,notFound,confirmCancel,realtimeStarted;private Guid? respondingActionId;private string? pendingActionError;
