@@ -7,7 +7,7 @@ Agentstration separates test execution by runtime cost and dependency type. The 
 Fast tests do not start an ASP.NET Core host, open a relational database, spawn a child process, or contact a remote provider. They cover architecture rules, component behavior, mapping, validation, and in-process command behavior.
 
 ```powershell
-dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 1
+dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 139 --max-parallel-test-modules 4
 ```
 
 ## Integration lane
@@ -15,7 +15,7 @@ dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --n
 Integration tests exercise a real boundary such as `WebApplicationFactory`, SQLite, Git, persistent Identity, or runtime reconstruction. This lane remains deterministic and offline by default. Tests marked `Integration` for a live model provider are opt-in and report inconclusive unless their documented environment variables are supplied.
 
 ```powershell
-dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 1
+dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 692 --max-parallel-test-modules 2
 ```
 
 Run both fast and integration solutions for complete required functional validation. Their union is the functional test inventory represented by the root solution.
@@ -27,10 +27,23 @@ Performance workloads live in a dedicated project and are never discovered by th
 ```powershell
 $env:AGENTSTRATION_STORAGE_BENCHMARK_PROVIDER = "Sqlite"
 $env:AGENTSTRATION_STORAGE_BENCHMARK_REPORT = "artifacts/storage-benchmark-sqlite.json"
-dotnet test --solution Agentstration.Tests.Performance.slnx --configuration Release --no-build --filter TestCategory=Benchmark --minimum-expected-tests 1
+dotnet test --solution Agentstration.Tests.Performance.slnx --configuration Release --no-build --filter TestCategory=Benchmark --minimum-expected-tests 1 --max-parallel-test-modules 1
 ```
 
 The report records workload parameters, provider, elapsed time, runtime and OS metadata, throughput, median, p95, errors, conflicts, and retries. SQLite remains the local default; set `AGENTSTRATION_TEST_POSTGRES` for an opt-in PostgreSQL run. Pull requests execute only a bounded contention smoke for relevant storage paths. Full workloads run from the scheduled or manual `Storage performance` workflow and publish their JSON reports. Latency and throughput gates remain disabled until representative baselines have been collected; zero storage errors is always required.
+
+## CI concurrency and memory diagnostics
+
+The fast, integration, and performance lanes cap concurrent test modules at 4, 2, and 1 respectively. Host-heavy Management modules also use one class worker per assembly. CI reruns the designated hosted modules sequentially through `scripts/ci/run-test-module-with-diagnostics.ps1`; each JSON artifact contains the discovered count, duration, process peak working set, process peak private memory, aggregate peak working set for active `dotnet` processes, runtime, and OS. The diagnostic artifact deliberately excludes test output and payloads.
+
+The initial budgets below use Release runs on Windows 11 10.0.26200 with .NET 10.0.10/10.0.11, collected during #298. A warning is evidence to review the Linux and Windows trend; a failure protects constrained runners from returning to the original greater-than-1-GiB process. Adjust these values only after retaining representative artifacts from both runner families.
+
+| Module | Baseline peak (MiB) | Warning (MiB) | Failure (MiB) | Minimum tests |
+| --- | ---: | ---: | ---: | ---: |
+| `Agentstration.Management.Api.Tests` | 887.0 | 900 | 1024 | 66 |
+| `Agentstration.Management.Security.Tests` | 730.1 | 800 | 1024 | 38 |
+| `Agentstration.Management.Aep.Tests` | 322.1 | 450 | 700 | 11 |
+| `Agentstration.Management.Sources.Tests` | 431.5 | 550 | 900 | 93 |
 
 ## Project classification
 
