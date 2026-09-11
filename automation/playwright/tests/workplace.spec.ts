@@ -2,6 +2,7 @@ import { TestIds } from '../src/contracts/test-ids.js';
 import { createEntry, type CreateEntryInput } from '../src/journeys/create-entry.journey.js';
 import { authenticateConsole } from '../src/journeys/authenticate-console.journey.js';
 import { ignoreCheckpoints } from '../src/journeys/journey.js';
+import { exposeEntryOnDashboard } from '../src/journeys/expose-entry-on-dashboard.journey.js';
 import { ProductPages } from '../src/pages/product.pages.js';
 import { expect, test } from '../src/fixtures/test.js';
 
@@ -81,6 +82,7 @@ test('a published form Entry can be submitted from its dedicated Workplace route
   const pages = new ProductPages(page);
   const context = { ...product, pages, checkpoint: ignoreCheckpoints };
   await createEntry(context, formEntry);
+  await exposeEntryOnDashboard(context, { entryName: formEntry.name });
 
   const route = await pages.workplace.openRoot(product.workplaceUrl);
   await pages.workplace.openEntry(product.workplaceUrl, route, 'default', formEntry.name);

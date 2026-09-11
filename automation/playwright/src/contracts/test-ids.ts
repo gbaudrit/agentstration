@@ -104,6 +104,13 @@ export const TestIds = {
     create: 'workspace-create',
     row: 'workspace-row',
   },
+  dashboardEditor: {
+    editor: 'dashboard-editor',
+    entryRow: 'dashboard-entry-row',
+    entryToggle: 'dashboard-entry-toggle',
+    publish: 'dashboard-publish',
+    status: 'dashboard-status',
+  },
   workplace: {
     shell: 'workplace-shell',
     home: 'workplace-home',
