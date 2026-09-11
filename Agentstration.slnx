@@ -62,6 +62,7 @@
     <Project Path="tests/Agentstration.Management.Security.Tests/Agentstration.Management.Security.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Aep.Tests/Agentstration.Management.Aep.Tests.csproj" />
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
+    <Project Path="tests/Agentstration.Performance.Tests/Agentstration.Performance.Tests.csproj" />
     <Project Path="tests/Agentstration.SourceProviders.Git.Tests/Agentstration.SourceProviders.Git.Tests.csproj" />
     <Project Path="tests/Agentstration.Tools.SourceRegistry.Tests/Agentstration.Tools.SourceRegistry.Tests.csproj" />
     <Project Path="tests/Agentstration.Runtime.Tests/Agentstration.Runtime.Tests.csproj" />

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Agentstration.Flow;
 using Agentstration.Flow.Storage.Abstractions;
@@ -13,7 +14,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace Agentstration.Web.Tests;
+namespace Agentstration.Performance.Tests;
 
 [TestClass]
 public sealed class StorageConcurrencyBenchmarkTests
@@ -73,8 +74,8 @@ public sealed class StorageConcurrencyBenchmarkTests
                     var workItem = WorkItem.Create(WorkItemId.New(), workspaceId, "benchmark", $"Operation {index}", now);
                     var storedWorkItem = await workItems.CreateAsync(workItem, default);
                     var expectedVersion = storedWorkItem.Value.Version;
-                    workItem.AddMessage("update", "benchmark", Guid.NewGuid(), now.AddMilliseconds(1));
-                    await workItems.SaveAsync(workItem, expectedVersion, default);
+                    storedWorkItem.Value.AddMessage("update", "benchmark", Guid.NewGuid(), now.AddMilliseconds(1));
+                    await workItems.SaveAsync(storedWorkItem.Value, expectedVersion, default);
 
                     var flowId = new FlowId("benchmark-flow");
                     var flowRunId = $"flow-{Guid.NewGuid():N}";
@@ -148,6 +149,12 @@ public sealed class StorageConcurrencyBenchmarkTests
                 provider,
                 operations,
                 concurrency,
+                writesPerOperation = 7,
+                elapsedMilliseconds = elapsed.TotalMilliseconds,
+                runtime = RuntimeInformation.FrameworkDescription,
+                runtimeVersion = Environment.Version.ToString(),
+                os = RuntimeInformation.OSDescription,
+                processArchitecture = RuntimeInformation.ProcessArchitecture.ToString(),
                 throughputPerSecond = operations / elapsed.TotalSeconds,
                 medianMilliseconds = Percentile(ordered, 0.50),
                 p95Milliseconds = Percentile(ordered, 0.95),

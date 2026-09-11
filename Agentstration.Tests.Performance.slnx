@@ -1,5 +1,5 @@
 <Solution>
   <Folder Name="/tests/performance/">
-    <Project Path="tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj" />
+    <Project Path="tests/Agentstration.Performance.Tests/Agentstration.Performance.Tests.csproj" />
   </Folder>
 </Solution>

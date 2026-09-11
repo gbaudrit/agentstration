@@ -22,7 +22,7 @@ Run both fast and integration solutions for complete required functional validat
 
 ## Performance lane
 
-Performance workloads are selected explicitly and are never part of the fast lane:
+Performance workloads live in a dedicated project and are never discovered by the fast or integration lanes:
 
 ```powershell
 $env:AGENTSTRATION_STORAGE_BENCHMARK_PROVIDER = "Sqlite"
@@ -30,7 +30,7 @@ $env:AGENTSTRATION_STORAGE_BENCHMARK_REPORT = "artifacts/storage-benchmark-sqlit
 dotnet test --solution Agentstration.Tests.Performance.slnx --configuration Release --no-build --filter TestCategory=Benchmark --minimum-expected-tests 1
 ```
 
-The current Web storage workload remains a mixed-project boundary until #303 moves it to a dedicated performance project. PostgreSQL is optional and runs only in its service-backed CI job or an explicitly configured local environment.
+The report records workload parameters, provider, elapsed time, runtime and OS metadata, throughput, median, p95, errors, conflicts, and retries. SQLite remains the local default; set `AGENTSTRATION_TEST_POSTGRES` for an opt-in PostgreSQL run. Pull requests execute only a bounded contention smoke for relevant storage paths. Full workloads run from the scheduled or manual `Storage performance` workflow and publish their JSON reports. Latency and throughput gates remain disabled until representative baselines have been collected; zero storage errors is always required.
 
 ## Project classification
 
@@ -51,7 +51,8 @@ The current Web storage workload remains a mixed-project boundary until #303 mov
 | `Agentstration.ModelProviders.Tests` | Integration, provider-optional | AEP test hosts plus opt-in live-provider checks |
 | `Agentstration.Runtime.Tests` | Integration | SQLite reconstruction and hosted runtime endpoints |
 | `Agentstration.SourceProviders.Git.Tests` | Integration | Real Git processes and file-system repositories |
-| `Agentstration.Web.Tests` | Integration, mixed | Full Web host plus the temporary benchmark boundary tracked by #303 |
+| `Agentstration.Web.Tests` | Integration | Full Web host plus a bounded deterministic SQLite contention correctness smoke |
+| `Agentstration.Performance.Tests` | Performance, opt-in | SQLite/PostgreSQL relational storage concurrency workloads and machine-readable reports |
 | `Agentstration.Work.Api.Tests` | Integration | Full Work API host |
 | `Agentstration.Workplace.Web.Tests` | Integration | Workplace HTTP host |
 
