@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
@@ -10,7 +11,7 @@ public sealed class SourceChannelSnapshotService(
     SourceManagementService sources,
     SourceBindingManagementService bindings,
     SourceChannelCompatibilityEvaluator compatibility,
-    IControlPlaneStore store,
+    IResourceStore store,
     IResourceReferenceResolver references,
     ISourceProviderMaterializer materializer,
     ISourceSnapshotArtifactStore artifacts,
@@ -274,7 +275,7 @@ public sealed class SourceChannelSnapshotService(
                     }
                 }, cancellationToken)).Value;
             }
-            catch (ControlPlaneConcurrencyException)
+            catch (ResourceConcurrencyException)
             {
                 var existing = await store.GetExactAsync<SourceChannelSnapshotResource>(
                     ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceChannelSnapshot, snapshotName), cancellationToken);
@@ -311,7 +312,7 @@ public sealed class SourceChannelSnapshotService(
 
     private async Task<SourceVersionResource> RequiredVersionAsync(SourceResource source, Guid uid, CancellationToken cancellationToken) =>
         await sources.GetVersionExactAsync(RequireScope(source), source.Definition.Publisher, source.Name, uid, cancellationToken)
-        ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceVersion, uid.ToString("D")));
+        ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, uid.ToString("D")));
 
     private Task<StoredResource<SourceChannelObservedResource>?> LoadObservedAsync(
         ResourceScopeRef scopeRef, SourceResource source, Guid versionUid, string channel, CancellationToken cancellationToken) =>
@@ -406,6 +407,6 @@ public sealed class SourceChannelSnapshotService(
     private static ResourceScopeRef RequireScope(Resource resource) => resource.ScopeRef
         ?? throw new InvalidOperationException($"Resource '{resource.Address}' has no ownership scope.");
     private static SourceValidationException Invalid(string code, string message) => new(code, message);
-    private static ControlPlaneResourceNotFoundException NotFound(string kind, string name, string @namespace) =>
+    private static ResourceNotFoundException NotFound(string kind, string name, string @namespace) =>
         new(new(kind, name, new ResourceNamespace(@namespace)));
 }

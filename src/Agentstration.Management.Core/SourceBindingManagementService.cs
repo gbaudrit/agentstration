@@ -1,12 +1,13 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
 
 public sealed class SourceBindingManagementService(
     SourceManagementService sources,
-    IControlPlaneStore store,
+    IResourceStore store,
     IResourceReferenceResolver references,
     IEnumerable<IExtensionInspector> inspectors,
     ResourceScopeOperationService scopeOperations)
@@ -23,7 +24,7 @@ public sealed class SourceBindingManagementService(
         var source = (await sources.GetAsync(publisher, name, cancellationToken))?.Source
             ?? throw NotFound(ResourceKinds.Source, name, publisher);
         var version = await sources.GetVersionAsync(publisher, name, versionUid, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
         return await GetStatusAsync(source, version, cancellationToken);
     }
 
@@ -37,7 +38,7 @@ public sealed class SourceBindingManagementService(
         var source = (await sources.GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
             ?? throw NotFound(ResourceKinds.Source, name, publisher);
         var version = await sources.GetVersionExactAsync(scopeRef, publisher, name, versionUid, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
         return await GetStatusAsync(source, version, cancellationToken);
     }
 
@@ -52,7 +53,7 @@ public sealed class SourceBindingManagementService(
         var source = (await sources.GetAsync(publisher, name, cancellationToken))?.Source
             ?? throw NotFound(ResourceKinds.Source, name, publisher);
         var version = await sources.GetVersionAsync(publisher, name, versionUid, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
         return await ConfigureAsync(source, version, selections, ifMatch, cancellationToken);
     }
 
@@ -68,7 +69,7 @@ public sealed class SourceBindingManagementService(
         var source = (await sources.GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
             ?? throw NotFound(ResourceKinds.Source, name, publisher);
         var version = await sources.GetVersionExactAsync(scopeRef, publisher, name, versionUid, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
         return await ConfigureAsync(source, version, selections, ifMatch, cancellationToken);
     }
 
@@ -288,6 +289,6 @@ public sealed class SourceBindingManagementService(
 
     private static SourceValidationException Invalid(string code, string message) => new(code, message);
 
-    private static ControlPlaneResourceNotFoundException NotFound(string kind, string name, string @namespace) =>
+    private static ResourceNotFoundException NotFound(string kind, string name, string @namespace) =>
         new(new(kind, name, new ResourceNamespace(@namespace)));
 }

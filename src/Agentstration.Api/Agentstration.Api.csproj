@@ -5,10 +5,10 @@
   <ItemGroup>
     <ProjectReference Include="../../aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
-    <ProjectReference Include="../Agentstration.Flow/Agentstration.Flow.csproj" />
-    <ProjectReference Include="../Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
-    <ProjectReference Include="../Agentstration.Flow.Contracts/Agentstration.Flow.Contracts.csproj" />
-    <ProjectReference Include="../Agentstration.Flow.Storage.Abstractions/Agentstration.Flow.Storage.Abstractions.csproj" />
+    <ProjectReference Include="../Agentstration.Flows/Agentstration.Flows.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Application/Agentstration.Flows.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Contracts/Agentstration.Flows.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Storage.Abstractions/Agentstration.Flows.Storage.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
     <ProjectReference Include="../Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />

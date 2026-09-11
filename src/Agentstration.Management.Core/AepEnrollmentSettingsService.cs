@@ -1,5 +1,6 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
@@ -12,7 +13,7 @@ public sealed record AepEnrollmentPolicyOptions
 }
 
 public sealed class AepEnrollmentSettingsService(
-    IControlPlaneStore store,
+    IResourceStore store,
     IAuthorizationService authorization,
     ICurrentRequestContext requestContext,
     AepEnrollmentPolicyOptions? policy = null)

@@ -1,8 +1,10 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Security;
+using Agentstration.Tools;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Models;
@@ -54,7 +56,7 @@ internal static class ToolDefinitionEndpoints
         {
             var ns = ResourceNamespace.Parse(@namespace);
             var stored = await service.GetAsync(name, ns, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ToolDefinition, name, ns));
+                ?? throw new ResourceNotFoundException(new(ResourceKinds.ToolDefinition, name, ns));
             return ModelManagementHttp.ResourceResult(stored, response, 200);
         });
 

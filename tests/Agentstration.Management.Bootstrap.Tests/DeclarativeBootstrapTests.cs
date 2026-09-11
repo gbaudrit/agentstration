@@ -1,5 +1,7 @@
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.Agents;
+using Agentstration.ResourceManagement;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
@@ -365,7 +367,7 @@ public sealed class DeclarativeBootstrapTests
         Assert.IsFalse(string.IsNullOrWhiteSpace(application.ETag));
         Assert.IsTrue(application.Definition.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Skip));
         using var systemScope = scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
-        var history = await scope.ServiceProvider.GetRequiredService<IControlPlaneStore>()
+        var history = await scope.ServiceProvider.GetRequiredService<IResourceStore>()
             .ListAllAsync<BootstrapApplicationResource>(ResourceKinds.BootstrapApplication, default);
         Assert.AreEqual(application.Metadata.Name, history.Single().Value.Metadata.Name);
         Assert.AreEqual(
@@ -386,7 +388,7 @@ public sealed class DeclarativeBootstrapTests
                 Resources = []
             }
         };
-        _ = await scope.ServiceProvider.GetRequiredService<IControlPlaneStore>().PutAsync(stale, null, true, default);
+        _ = await scope.ServiceProvider.GetRequiredService<IResourceStore>().PutAsync(stale, null, true, default);
         var recovered = await management.GetApplicationAsync(staleName, principal.Id, default);
         Assert.AreEqual(BootstrapApplicationStatus.Interrupted, recovered?.Definition.Status);
         Assert.IsNotNull(recovered?.Definition.CompletedAt);
@@ -419,7 +421,7 @@ public sealed class DeclarativeBootstrapTests
             () => management.ApplyAsync(selection, preview.Digest, principal.Id, default));
 
         using var systemScope = scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
-        var application = (await scope.ServiceProvider.GetRequiredService<IControlPlaneStore>()
+        var application = (await scope.ServiceProvider.GetRequiredService<IResourceStore>()
             .ListAllAsync<BootstrapApplicationResource>(ResourceKinds.BootstrapApplication, default)).Single().Value;
         Assert.AreEqual(BootstrapApplicationStatus.Interrupted, application.Definition.Status);
         Assert.IsNotNull(application.Definition.CompletedAt);

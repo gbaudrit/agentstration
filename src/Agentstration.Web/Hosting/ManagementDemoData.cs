@@ -1,5 +1,8 @@
+using Agentstration.Agents;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Models;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Web.Hosting;
@@ -12,7 +15,7 @@ public static class ManagementDemoData
         var providers = services.GetRequiredService<ModelProviderManagementService>();
         var extensions = services.GetRequiredService<ExtensionRegistrationManagementService>();
         var profiles = services.GetRequiredService<ModelProfileManagementService>();
-        var store = services.GetRequiredService<IControlPlaneStore>();
+        var store = services.GetRequiredService<IResourceStore>();
         var configuration = services.GetRequiredService<IConfiguration>();
         if (await extensions.GetAsync(ResourceNamespace.Default, "ollama-extension", cancellationToken) is not null
             && await providers.GetAsync("ollama-local", cancellationToken) is null)
@@ -92,7 +95,7 @@ public static class ManagementDemoData
 
     internal static async Task EnsureAgentAsync(
         AgentManagementService management,
-        IControlPlaneStore store,
+        IResourceStore store,
         string name,
         string description,
         string instructions,

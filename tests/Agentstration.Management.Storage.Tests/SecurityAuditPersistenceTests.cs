@@ -1,5 +1,6 @@
+using Agentstration.ResourceManagement;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Storage.Sqlite;
+using Agentstration.ResourceManagement.Storage.Sqlite;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -60,5 +61,5 @@ public sealed class SecurityAuditPersistenceTests
     }
 
     private static Task InitializeAsync(IServiceProvider provider) =>
-        ((SqliteControlPlaneStore)provider.GetRequiredService<IControlPlaneStore>()).InitializeAsync(default);
+        ((SqliteResourceStore)provider.GetRequiredService<IResourceStore>()).InitializeAsync(default);
 }

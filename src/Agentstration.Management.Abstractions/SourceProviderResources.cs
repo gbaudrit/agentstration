@@ -1,3 +1,5 @@
+using Agentstration.Resources;
+
 namespace Agentstration.Management.Abstractions;
 
 public sealed record SourceProviderProperties

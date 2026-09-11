@@ -1,6 +1,8 @@
+using Agentstration.Tools;
+using Agentstration.ResourceManagement;
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Infrastructure.Declarative;
 using Agentstration.Infrastructure.Notifications;
 using Agentstration.Management.Abstractions;
@@ -75,7 +77,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             JsonSerializer.SerializeToElement(new { deliveryKey = "spoof", title = "Spoof", message = "Spoof", workspaceId = Guid.NewGuid() }),
             ToolDefinitionCallerKind.Mcp), default));
         Assert.AreEqual("notification_argument_unknown", spoof.Code);
-        var projected = await factory.Services.GetRequiredService<IControlPlaneStore>().GetAsync<ToolResource>(
+        var projected = await factory.Services.GetRequiredService<IResourceStore>().GetAsync<ToolResource>(
             new(ResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.NotificationCreate)), default);
         Assert.IsNotNull(projected);
         Assert.AreEqual(AgentstrationInternalTools.NotificationCreate, projected.Value.Definition.ExternalId);
@@ -155,7 +157,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
 
         var current = await flows.GetAsync(workspaceId, new FlowId("notification-delivery"), default);
         Assert.IsNotNull(current);
-        await AddExternalDeliveryToolAsync(factory.Services.GetRequiredService<IControlPlaneStore>(), scope, schemas);
+        await AddExternalDeliveryToolAsync(factory.Services.GetRequiredService<IResourceStore>(), scope, schemas);
         var updated = await flows.UpdateAsync(workspaceId, current.Value.Id, new UpdateFlowCommand(
             current.Value.Description,
             "2.0.0",
@@ -272,7 +274,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
     }
 
     private static async Task AddExternalDeliveryToolAsync(
-        IControlPlaneStore store,
+        IResourceStore store,
         ResourceScopeRef scope,
         (JsonElement Input, JsonElement Output) schemas)
     {

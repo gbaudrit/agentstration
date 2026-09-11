@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 
 namespace Agentstration.Management.Contracts;
 

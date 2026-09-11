@@ -1,3 +1,6 @@
+using Agentstration.Agents;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
@@ -6,7 +9,7 @@ using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
-using Agentstration.Management.Storage.Sqlite;
+using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Runtime.Core;
@@ -581,7 +584,7 @@ public sealed class RuntimeRunTests
             services.AddSingleton(TimeProvider.System);
             services.AddSingleton<ICurrentRequestContext, SystemOperationRequestContext>();
             services.AddSqliteControlPlane($"Data Source={Path.Combine(directory, "management.db")}");
-            services.AddSingleton<IRuntimeAgentResolver, ControlPlaneRuntimeAgentResolver>();
+            services.AddSingleton<IRuntimeAgentResolver, ResourceRuntimeAgentResolver>();
             services.AddSqliteRuntimeRuns($"Data Source={Path.Combine(directory, "runtime.db")}");
             var queue = new TestRuntimeRunQueue();
             services.AddSingleton(queue);
@@ -594,7 +597,7 @@ public sealed class RuntimeRunTests
             services.AddSingleton<RuntimeRunStateManager>();
             services.AddSingleton<RuntimeRunService>();
             var provider = services.BuildServiceProvider();
-            var management = provider.GetRequiredService<IControlPlaneStore>();
+            var management = provider.GetRequiredService<IResourceStore>();
             var store = provider.GetRequiredService<IRuntimeRunStore>();
             await management.InitializeAsync(default);
             await store.InitializeAsync(default);

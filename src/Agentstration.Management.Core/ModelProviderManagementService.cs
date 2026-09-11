@@ -1,5 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
+using Agentstration.Models;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Management.Core;
 
 public sealed class ModelProviderManagementService(
-    IControlPlaneStore store,
+    IResourceStore store,
     IResourceReferenceResolver references,
     ResourceScopeOperationService scopeOperations,
     IEnumerable<IModelProviderDiscovery> discoveries,
@@ -30,7 +32,7 @@ public sealed class ModelProviderManagementService(
         {
             var address = ScopedResourceAddress.Create(scopeRef, resource.Namespace, ResourceKinds.ModelProvider, resource.Name);
             if (await store.GetExactAsync<ModelProviderResource>(address, token) is not null)
-                throw new ControlPlaneConcurrencyException($"Model provider '{resource.Address}' already exists in scope '{scopeRef}'.");
+                throw new ResourceConcurrencyException($"Model provider '{resource.Address}' already exists in scope '{scopeRef}'.");
             var definition = await ValidateAndNormalizeAsync(resource.Namespace, resource.Definition, scopeRef, token);
             return await store.PutExactAsync(scopeRef, resource with
             {

@@ -61,7 +61,7 @@ Authentication proves control of an account. Identity mapping converts that auth
 | --- | --- |
 | `Principal`, `PrincipalPreferences`, `ExternalIdentity`, `LocalIdentity`, Tenant, Workspace, memberships, role assignments, Platform administrator grant | `Agentstration.Management.Abstractions` |
 | Identity and authorization use cases and invariant enforcement | `Agentstration.Management.Core` |
-| Management records, external/local links, memberships, roles, grants, and security audit persistence | `Agentstration.Management.Storage.Sqlite` |
+| Management records, external/local links, memberships, roles, grants, and security audit persistence | `Agentstration.ResourceManagement.Storage.Sqlite` |
 | Local credentials, password hashing, lockout, security stamps, and Identity lifecycle tokens | `Agentstration.Security.AspNetCoreIdentity` |
 | ASP.NET Core schemes, claims boundary, handlers, policies, HTTP endpoints, Razor Pages, and Console | `Agentstration.Web` |
 | Composition | `Agentstration.Infrastructure` and `Agentstration.Web` |

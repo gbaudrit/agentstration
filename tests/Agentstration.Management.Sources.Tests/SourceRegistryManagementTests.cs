@@ -1,10 +1,12 @@
+using Agentstration.Secrets;
+using Agentstration.ResourceManagement;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
-using Agentstration.Management.Storage.Sqlite;
+using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Web.Api.Models;
 using Microsoft.AspNetCore.Hosting;
@@ -1159,10 +1161,10 @@ public sealed class SourceRegistryManagementTests
                 .BuildServiceProvider();
             var context = services.GetRequiredService<CurrentRequestContext>();
             using (context.PushSystem())
-                await services.GetRequiredService<IControlPlaneStore>().InitializeAsync(default);
+                await services.GetRequiredService<IResourceStore>().InitializeAsync(default);
             var documents = new FakeDocuments();
             var service = new SourceRegistryManagementService(
-                services.GetRequiredService<IControlPlaneStore>(),
+                services.GetRequiredService<IResourceStore>(),
                 new SourceRegistryIndexReader(),
                 new SourceRegistryReader(),
                 new SourceRegistryRuntimeReferenceResolver(),
@@ -1213,7 +1215,7 @@ public sealed class SourceRegistryManagementTests
             Task.FromResult<ResolvedResourceScope?>(scopeRef == ResourceScopeRef.Instance ? new(Instance, []) : null);
     }
 
-    private sealed class MemoryStore : IControlPlaneStore
+    private sealed class MemoryStore : IResourceStore
     {
         private readonly Dictionary<ScopedResourceAddress, (Resource Value, string ETag, DateTimeOffset At)> values = [];
         private long version;
@@ -1229,8 +1231,8 @@ public sealed class SourceRegistryManagementTests
         public Task<StoredResource<T>> PutExactAsync<T>(ResourceScopeRef scopeRef, T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
         {
             var key = ScopedResourceAddress.Create(scopeRef, resource.Namespace, resource.Kind, resource.Name);
-            if (ifNoneMatch && values.ContainsKey(key)) throw new ControlPlaneConcurrencyException("Already exists.");
-            if (ifMatch is not null && (!values.TryGetValue(key, out var current) || current.ETag != ifMatch)) throw new ControlPlaneConcurrencyException("ETag mismatch.");
+            if (ifNoneMatch && values.ContainsKey(key)) throw new ResourceConcurrencyException("Already exists.");
+            if (ifMatch is not null && (!values.TryGetValue(key, out var current) || current.ETag != ifMatch)) throw new ResourceConcurrencyException("ETag mismatch.");
             var etag = $"\"{Interlocked.Increment(ref version)}\"";
             var value = resource.WithSystemState(resource.Uid == Guid.Empty ? Guid.NewGuid() : resource.Uid, scopeRef, etag);
             values[key] = (value, etag, DateTimeOffset.UnixEpoch);

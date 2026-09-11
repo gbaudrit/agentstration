@@ -1,6 +1,8 @@
+using Agentstration.Agents;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Web.Security;
 
@@ -32,10 +34,10 @@ internal sealed class GetAgentModelEndpoint : IModelManagementEndpoint
         CancellationToken cancellationToken) => ModelManagementHttp.ExecuteAsync(async () =>
         {
             var agent = await agents.GetAgentAsync(@namespace, agentName, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(ResourceKey.Create(ResourceKinds.Agent, agentName, @namespace));
+                ?? throw new ResourceNotFoundException(ResourceKey.Create(ResourceKinds.Agent, agentName, @namespace));
             var profileAddress = agent.Value.Definition.ModelProfile.Resolve(agent.Value.Namespace, ResourceKinds.ModelProfile);
             var profile = await profiles.GetAsync(profileAddress.Namespace, profileAddress.Name, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(ResourceKey.Create(ResourceKinds.ModelProfile, profileAddress.Name, profileAddress.Namespace));
+                ?? throw new ResourceNotFoundException(ResourceKey.Create(ResourceKinds.ModelProfile, profileAddress.Name, profileAddress.Namespace));
             var resolution = await profiles.ResolveAsync(profile.Value, cancellationToken);
             var mapped = ModelManagementHttp.Resolution(resolution);
             return Results.Ok(new AgentModelResponse(

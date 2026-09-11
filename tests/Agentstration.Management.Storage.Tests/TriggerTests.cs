@@ -1,13 +1,15 @@
+using Agentstration.Triggers;
+using Agentstration.ResourceManagement;
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
-using Agentstration.Flow.Storage.Abstractions;
-using Agentstration.Flow.Storage.Sqlite;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Flows.Storage.Abstractions;
+using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Triggers;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
-using Agentstration.Management.Storage.Sqlite;
+using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
@@ -52,7 +54,7 @@ public sealed class TriggerTests
         Assert.AreEqual(2, updated.Value.Generation);
         Assert.IsFalse(updated.Value.Definition.Enabled);
         Assert.AreEqual(2, fixture.Scheduler.Reconciled.Count);
-        await Assert.ThrowsExactlyAsync<ControlPlaneConcurrencyException>(() => service.UpdateAsync(ResourceNamespace.Default, "morning", updated.Value.Definition, created.ETag, CancellationToken.None));
+        await Assert.ThrowsExactlyAsync<ResourceConcurrencyException>(() => service.UpdateAsync(ResourceNamespace.Default, "morning", updated.Value.Definition, created.ETag, CancellationToken.None));
     }
 
     [TestMethod]
@@ -293,7 +295,7 @@ public sealed class TriggerTests
                 .AddSingleton<TriggerManagementService>()
                 .AddSingleton<TriggerFiringService>()
                 .BuildServiceProvider();
-            await services.GetRequiredService<IControlPlaneStore>().InitializeAsync(CancellationToken.None);
+            await services.GetRequiredService<IResourceStore>().InitializeAsync(CancellationToken.None);
             var identities = services.GetRequiredService<IIdentityStore>();
             var now = DateTimeOffset.UtcNow;
             await identities.AddTenantAsync(new(request.TenantId, "test", "Test", TenantStatus.Active, now), CancellationToken.None);
@@ -317,7 +319,7 @@ public sealed class TriggerTests
         {
             var services = new ServiceCollection().AddSingleton(TimeProvider.System).AddSingleton<ICurrentRequestContext, SystemOperationRequestContext>()
                 .AddSqliteControlPlane($"Data Source={database}").BuildServiceProvider();
-            await services.GetRequiredService<IControlPlaneStore>().InitializeAsync(CancellationToken.None);
+            await services.GetRequiredService<IResourceStore>().InitializeAsync(CancellationToken.None);
             return new() { Services = services };
         }
         public async ValueTask DisposeAsync() => await Services.DisposeAsync();

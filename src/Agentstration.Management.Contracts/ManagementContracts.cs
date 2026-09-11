@@ -1,6 +1,8 @@
 using System.Text.Json.Serialization;
+using Agentstration.Agents;
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Triggers;
 
 namespace Agentstration.Management.Contracts;
 

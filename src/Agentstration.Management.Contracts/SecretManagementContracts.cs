@@ -1,5 +1,6 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Secrets;
 
 namespace Agentstration.Management.Contracts;
 

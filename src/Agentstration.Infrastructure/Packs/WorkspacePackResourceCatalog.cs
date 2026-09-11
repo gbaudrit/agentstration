@@ -1,19 +1,25 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using Agentstration.Agents;
 using Agentstration.Application.Work;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Infrastructure.Declarative;
 using Agentstration.Management.Abstractions;
+using Agentstration.Models;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets;
+using Agentstration.Tools;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 
 namespace Agentstration.Infrastructure.Packs;
 
 public sealed class WorkspacePackResourceCatalog(
-    IControlPlaneStore store,
+    IResourceStore store,
     FlowService flows,
     IWorkplaceRepository workplace,
     IWorkplaceContext workplaceContext) : IPackWorkspaceResourceCatalog

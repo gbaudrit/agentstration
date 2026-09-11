@@ -1,6 +1,9 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Models;
@@ -41,7 +44,7 @@ internal static class RuntimeProfileEndpoints
         {
             var @namespace = ModelManagementHttp.Namespace(resourceNamespace);
             var stored = await service.GetAsync(@namespace, profileName, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.RuntimeProfile, profileName, @namespace));
+                ?? throw new ResourceNotFoundException(new(ResourceKinds.RuntimeProfile, profileName, @namespace));
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
 
@@ -78,7 +81,7 @@ internal static class RuntimeProfileEndpoints
         {
             var @namespace = ModelManagementHttp.Namespace(resourceNamespace);
             _ = await service.GetAsync(@namespace, profileName, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.RuntimeProfile, profileName, @namespace));
+                ?? throw new ResourceNotFoundException(new(ResourceKinds.RuntimeProfile, profileName, @namespace));
             var usages = await service.GetUsagesAsync(@namespace, profileName, cancellationToken);
             var values = usages.Select(value => new RuntimeProfileUsageResponse(value.DeploymentUid.ToString("D"), value.Name, value.Environment, value.AgentName)).ToArray();
             return Results.Ok(new RuntimeProfileUsagesResponse(values, values.Length));

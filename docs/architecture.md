@@ -19,16 +19,16 @@ src/
   Agentstration.Workplace.Components/ reusable Workplace business components
   Agentstration.Workplace.Web/    standalone end-user Blazor host
   Agentstration.Application/      use cases and module contracts
-  Agentstration.Flow/             provider-neutral Flow definitions and references
-  Agentstration.Flow.Application/ Flow CRUD, publication, activation, resolution
-  Agentstration.Flow.Contracts/   public Flow API contracts
-  Agentstration.Flow.Storage.Abstractions/
-  Agentstration.Flow.Storage.Sqlite/
+  Agentstration.Flows/             provider-neutral Flow definitions and references
+  Agentstration.Flows.Application/ Flow CRUD, publication, activation, resolution
+  Agentstration.Flows.Contracts/   public Flow API contracts
+  Agentstration.Flows.Storage.Abstractions/
+  Agentstration.Flows.Storage.Sqlite/
   Agentstration.Infrastructure/   JSON/EF storage, AI, HTTP, event bus, queues
   Agentstration.Management.Abstractions/ canonical resources, ports, events, resolved specs
   Agentstration.Management.Core/  Management validation, use cases, revisions, deployments
   Agentstration.Management.Contracts/
-  Agentstration.Management.Storage.Sqlite/
+  Agentstration.ResourceManagement.Storage.Sqlite/
   ../aep/                            autonomous future AEP repository subtree
   Agentstration.Extensions.Ollama/   autonomous AEP-to-Ollama service
   Agentstration.Extensions.LlamaCpp/ autonomous AEP-to-llama.cpp service

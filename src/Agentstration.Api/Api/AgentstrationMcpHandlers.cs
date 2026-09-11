@@ -3,8 +3,10 @@ using System.Text.Json.Nodes;
 using Agentstration.Infrastructure.Notifications;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Tools;
 using Agentstration.Tools.Mcp;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -23,7 +25,7 @@ internal static class AgentstrationMcpHandlers
             ResourceScopeRef.Workspace(current.WorkspaceId), ResourceNamespace.Default, cancellationToken);
         var definitions = services.GetRequiredService<ToolDefinitionService>();
         var values = await definitions.ListAsync(cancellationToken);
-        var projected = (await services.GetRequiredService<IControlPlaneStore>()
+        var projected = (await services.GetRequiredService<IResourceStore>()
                 .ListAllAsync<ToolResource>(ResourceKinds.Tool, cancellationToken))
             .Select(value => value.Value)
             .Where(value => value.Namespace.IsDefault && value.Definition.Provider?.Name == AgentstrationToolProvider.Name)

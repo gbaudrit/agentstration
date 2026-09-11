@@ -2,6 +2,7 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Web.Security;
 
@@ -82,7 +83,7 @@ public static class AepEnrollmentEndpoints
         {
             return Results.Json(new { error = new AepEnrollmentError(exception.Code, exception.Message) }, statusCode: exception.StatusCode);
         }
-        catch (ControlPlaneConcurrencyException)
+        catch (ResourceConcurrencyException)
         {
             return Results.Json(new { error = new AepEnrollmentError("request_changed", "The enrollment request changed; retry the operation.") }, statusCode: 409);
         }
@@ -95,7 +96,7 @@ public static class AepEnrollmentEndpoints
         {
             return Results.Json(new { error = new AepEnrollmentError(exception.Code, exception.Message) }, statusCode: exception.StatusCode);
         }
-        catch (ControlPlaneConcurrencyException)
+        catch (ResourceConcurrencyException)
         {
             return Results.Json(new { error = new AepEnrollmentError("request_changed", "The enrollment request changed; retry the operation.") }, statusCode: 409);
         }

@@ -1,6 +1,9 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
+using Agentstration.Models;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Secrets;
 
 namespace Agentstration.Management.Core;
 
@@ -14,7 +17,7 @@ public sealed class ExtensionRegistrationInUseException(string name, IReadOnlyLi
 }
 
 public sealed class ExtensionRegistrationManagementService(
-    IControlPlaneStore store,
+    IResourceStore store,
     IResourceReferenceResolver references,
     ResourceScopeOperationService scopeOperations,
     Agentstration.Aep.Client.AepTransportSecurityOptions? transportOptions = null)
@@ -50,7 +53,7 @@ public sealed class ExtensionRegistrationManagementService(
         {
             var definition = await ValidateDefinitionAsync(resource.Namespace, resource.Metadata.Name, resource.Definition, scopeRef, token);
             if (await GetExactAsync(scopeRef, resource.Namespace, resource.Name, token) is not null)
-                throw new ControlPlaneConcurrencyException($"Extension registration '{resource.Address}' already exists in scope '{scopeRef}'.");
+                throw new ResourceConcurrencyException($"Extension registration '{resource.Address}' already exists in scope '{scopeRef}'.");
             return await store.PutExactAsync(scopeRef, resource with
             {
                 ScopeRef = scopeRef,

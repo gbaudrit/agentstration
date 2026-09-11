@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
@@ -34,7 +35,7 @@ public sealed record ExtensionInventoryConnection(
 
 public sealed class ExtensionInventoryService(
     ExtensionManagementService extensions,
-    IControlPlaneStore store,
+    IResourceStore store,
     IAuthorizationService authorization,
     IPlatformAuthorizationService platformAuthorization,
     ICurrentRequestContext requestContext)

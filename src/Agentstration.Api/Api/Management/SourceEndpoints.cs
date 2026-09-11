@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Web.Hosting;
 using Agentstration.Web.Security;
 
@@ -77,7 +78,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         ManagementHttp.ExecuteAsync(async () =>
         {
             var ifMatch = ManagementHttp.IfMatch(request)
-                ?? throw new ControlPlaneConcurrencyException("Updating Source bindings requires If-Match.");
+                ?? throw new ResourceConcurrencyException("Updating Source bindings requires If-Match.");
             await service.ConfigureBindingsAsync(
                 Agentstration.Resources.ResourceScopeRef.Parse(scopeRef),
                 publisher,
@@ -203,7 +204,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
             await (Scope(scopeRef) is { } scope
                 ? service.GetExactAsync(scope, publisher, name, cancellationToken)
                 : service.GetAsync(publisher, name, cancellationToken))
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new Agentstration.Resources.ResourceNamespace(publisher)))));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.Source, name, new Agentstration.Resources.ResourceNamespace(publisher)))));
 
     private static Task<IResult> DeleteAsync(
         string publisher,
@@ -215,7 +216,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         ManagementHttp.ExecuteAsync(async () =>
         {
             var ifMatch = ManagementHttp.IfMatch(request)
-                ?? throw new ControlPlaneConcurrencyException("Deleting a Source requires If-Match.");
+                ?? throw new ResourceConcurrencyException("Deleting a Source requires If-Match.");
             await service.DeleteExactAsync(
                 await ResolveScopeAsync(scopeRef, publisher, name, service, cancellationToken),
                 publisher,
@@ -253,7 +254,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         ManagementHttp.ExecuteAsync(async () =>
         {
             var ifMatch = ManagementHttp.IfMatch(httpRequest)
-                ?? throw new ControlPlaneConcurrencyException("Updating Source refresh policy requires If-Match.");
+                ?? throw new ResourceConcurrencyException("Updating Source refresh policy requires If-Match.");
             var scope = await ResolveScopeAsync(scopeRef, publisher, name, service, cancellationToken);
             var updated = await service.UpdateRefreshConfigurationExactAsync(
                 scope, publisher, name, request.Refresh, ifMatch, cancellationToken);
@@ -281,7 +282,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
             await (Scope(scopeRef) is { } scope
                 ? service.GetVersionExactAsync(scope, publisher, name, versionUid, cancellationToken)
                 : service.GetVersionAsync(publisher, name, versionUid, cancellationToken))
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")))));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")))));
 
     private static Task<IResult> UpdateDisplayNameAsync(
         string publisher,
@@ -295,7 +296,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         ManagementHttp.ExecuteAsync(async () =>
         {
             var ifMatch = ManagementHttp.IfMatch(httpRequest)
-                ?? throw new ControlPlaneConcurrencyException("Updating a Source display name requires If-Match.");
+                ?? throw new ResourceConcurrencyException("Updating a Source display name requires If-Match.");
             var updated = Scope(scopeRef) is { } scope
                 ? await service.UpdateDisplayNameExactAsync(scope, publisher, name, request.DisplayName, ifMatch, cancellationToken)
                 : await service.UpdateDisplayNameAsync(publisher, name, request.DisplayName, ifMatch, cancellationToken);
@@ -314,7 +315,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         {
             var scope = await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken);
             var version = await sources.GetVersionExactAsync(scope, publisher, name, versionUid, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+                ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
             return Results.Ok(await verification.VerifyDefinitionAsync(version, cancellationToken));
         });
 
@@ -348,7 +349,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         ManagementHttp.ExecuteAsync(async () =>
         {
             var ifMatch = ManagementHttp.IfMatch(httpRequest)
-                ?? throw new ControlPlaneConcurrencyException("Updating Source bindings requires If-Match.");
+                ?? throw new ResourceConcurrencyException("Updating Source bindings requires If-Match.");
             var result = Scope(scopeRef) is { } scope
                 ? await service.ConfigureExactAsync(scope, publisher, name, versionUid, request.Bindings, ifMatch, cancellationToken)
                 : await service.ConfigureAsync(publisher, name, versionUid, request.Bindings, ifMatch, cancellationToken);
@@ -409,7 +410,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.GetAsync(
             await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken),
             publisher, name, versionUid, channel, snapshotUid, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceChannelSnapshot, snapshotUid.ToString("D")))));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceChannelSnapshot, snapshotUid.ToString("D")))));
 
     private static Task<IResult> GetChannelStatusAsync(
         string publisher,
@@ -439,9 +440,9 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         {
             var scope = await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken);
             var version = await sources.GetVersionExactAsync(scope, publisher, name, versionUid, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+                ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
             var snapshot = await snapshots.GetAsync(scope, publisher, name, versionUid, channel, snapshotUid, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceChannelSnapshot, snapshotUid.ToString("D")));
+                ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceChannelSnapshot, snapshotUid.ToString("D")));
             return Results.Ok(await verification.VerifySnapshotAsync(version, snapshot, cancellationToken));
         });
 
@@ -454,7 +455,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
     {
         if (Scope(value) is { } explicitScope) return explicitScope;
         var source = (await sources.GetAsync(publisher, name, cancellationToken))?.Source
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new Agentstration.Resources.ResourceNamespace(publisher)));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.Source, name, new Agentstration.Resources.ResourceNamespace(publisher)));
         return source.ScopeRef ?? throw new InvalidOperationException("A Source must have an ownership scope.");
     }
 

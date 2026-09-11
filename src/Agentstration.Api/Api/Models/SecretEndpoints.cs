@@ -2,7 +2,9 @@ using System.Text;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Web.Security;
 
@@ -78,7 +80,7 @@ internal static class SecretEndpoints
         catch (VaultInUseException exception) { return Results.Problem(statusCode: 409, title: "Vault in use", detail: exception.Message); }
         catch (VaultAlreadyInitializedException exception) { return Results.Problem(statusCode: 409, title: "Vault already initialized", detail: exception.Message); }
         catch (VaultInitializationNotSupportedException exception) { return Results.Problem(statusCode: 422, title: "Vault initialization unsupported", detail: exception.Message); }
-        catch (ControlPlaneConcurrencyException exception) { return Results.Problem(statusCode: 409, title: "Resource version conflict", detail: exception.Message); }
+        catch (ResourceConcurrencyException exception) { return Results.Problem(statusCode: 409, title: "Resource version conflict", detail: exception.Message); }
         catch (ResourceScopeAccessDeniedException exception) { return Results.Problem(statusCode: 403, title: "Resource scope access denied", detail: exception.Message); }
         catch (ResourceScopePolicyException exception) { return Results.Problem(statusCode: 422, title: "Invalid resource scope", detail: exception.Message); }
         catch (Exception exception) when (exception is SecretManagementException or ArgumentException or InvalidOperationException) { return Results.Problem(statusCode: 422, title: "Invalid secret operation", detail: exception.Message); }

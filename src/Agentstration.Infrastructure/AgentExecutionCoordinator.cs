@@ -1,4 +1,7 @@
+using Agentstration.Agents;
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Infrastructure;
@@ -6,7 +9,7 @@ namespace Agentstration.Infrastructure;
 public sealed record SelectedAgentRoute(AgentRouteResult Route, string DeploymentId);
 
 public sealed class AgentExecutionCoordinator(
-    IControlPlaneStore store,
+    IResourceStore store,
     IAgentResourceQueries agentQueries,
     IAgentRouter router,
     IRuntimeRegistry runtimes)

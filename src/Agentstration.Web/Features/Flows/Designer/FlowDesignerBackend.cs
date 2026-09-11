@@ -1,6 +1,6 @@
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
-using Agentstration.Flow.Contracts;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Flows.Contracts;
 using Agentstration.Web.Console;
 using Agentstration.Web.FlowDesigner.Backend;
 

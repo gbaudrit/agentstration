@@ -1,5 +1,8 @@
+using Agentstration.Agents;
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
+using Agentstration.Models;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Management.Core;
 
 public sealed class ModelProfileManagementService(
-    IControlPlaneStore store,
+    IResourceStore store,
     IResourceReferenceResolver references,
     ResourceScopeOperationService scopeOperations,
     ModelProviderManagementService providerConfigurations,
@@ -32,7 +35,7 @@ public sealed class ModelProfileManagementService(
             await ValidateDefinitionAsync(resource.Namespace, resource.Definition, scopeRef, token);
             var address = ScopedResourceAddress.Create(scopeRef, resource.Namespace, ResourceKinds.ModelProfile, resource.Name);
             if (await store.GetExactAsync<ModelProfileResource>(address, token) is not null)
-                throw new ControlPlaneConcurrencyException($"Model profile '{resource.Address}' already exists in scope '{scopeRef}'.");
+                throw new ResourceConcurrencyException($"Model profile '{resource.Address}' already exists in scope '{scopeRef}'.");
             return await store.PutExactAsync(scopeRef, resource with { ScopeRef = scopeRef, Generation = 1, Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded } }, null, true, token);
         }, cancellationToken);
     }
@@ -42,7 +45,7 @@ public sealed class ModelProfileManagementService(
 
     public async Task<StoredResource<ModelProfileResource>> PutAsync(ResourceNamespace @namespace, string name, ModelProfileProperties definition, string? ifMatch, CancellationToken cancellationToken)
     {
-        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, name, @namespace));
+        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ResourceNotFoundException(new(ResourceKinds.ModelProfile, name, @namespace));
         var scopeRef = existing.Value.ScopeRef ?? throw Invalid("scopeRef", "The model profile has no ownership scope.");
         return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
@@ -67,7 +70,7 @@ public sealed class ModelProfileManagementService(
 
     public async Task DeleteAsync(ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
     {
-        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, name, @namespace));
+        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ResourceNotFoundException(new(ResourceKinds.ModelProfile, name, @namespace));
         var usages = await GetUsagesAsync(@namespace, name, cancellationToken);
         if (usages.Count > 0) throw new ModelProfileInUseException(name, usages);
         var scopeRef = existing.Value.ScopeRef ?? throw Invalid("scopeRef", "The model profile has no ownership scope.");

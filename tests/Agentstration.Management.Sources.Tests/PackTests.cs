@@ -1,16 +1,21 @@
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets;
+using Agentstration.Models;
+using Agentstration.Agents;
+using Agentstration.ResourceManagement;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Contracts;
+using Agentstration.Flows;
+using Agentstration.Flows.Contracts;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
-using Agentstration.Management.Storage.Sqlite;
+using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Runtime.Contracts;
 using Microsoft.AspNetCore.Hosting;
@@ -505,7 +510,7 @@ public sealed class PackTests
         Assert.IsNotNull(prepared);
         Assert.AreEqual("Ready", prepared.State);
 
-        var store = factory.Services.GetRequiredService<IControlPlaneStore>();
+        var store = factory.Services.GetRequiredService<IResourceStore>();
         await store.DeleteAsync(new(ResourceKinds.Agent, "assistant", packNamespace), agent.ETag, default);
         await runtimeProfiles.DeleteAsync(runtimeNamespace, "pack-runtime", runtime.ETag, default);
         Assert.IsNull(await store.GetAsync<AgentDeployment>(
@@ -576,7 +581,7 @@ public sealed class PackTests
         var packService = factory.Services.GetRequiredService<PackManagementService>();
         var runtimeProfiles = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
         Assert.IsNotNull(await runtimeProfiles.GetAsync(new ResourceNamespace("agentstration.test-pack"), "pack-runtime", default));
-        var controlStore = factory.Services.GetRequiredService<IControlPlaneStore>();
+        var controlStore = factory.Services.GetRequiredService<IResourceStore>();
         var retained = await packService.GetAsync(new("agentstration", "test-pack"), default);
         Assert.IsNotNull(retained);
         _ = await controlStore.PutAsync(retained.Value with
@@ -946,9 +951,9 @@ public sealed class PackTests
         }
     }
 
-    private sealed class PackFixture(string directory, ServiceProvider provider, IControlPlaneStore store) : IAsyncDisposable
+    private sealed class PackFixture(string directory, ServiceProvider provider, IResourceStore store) : IAsyncDisposable
     {
-        public IControlPlaneStore Store { get; } = store;
+        public IResourceStore Store { get; } = store;
         public static async Task<PackFixture> CreateAsync()
         {
             var directory = Path.Combine(Path.GetTempPath(), "agentstration-pack-tests", Guid.NewGuid().ToString("N"));
@@ -958,7 +963,7 @@ public sealed class PackTests
                 .AddSingleton<ICurrentRequestContext, SystemOperationRequestContext>()
                 .AddSqliteControlPlane($"Data Source={Path.Combine(directory, "management.db")};Pooling=False")
                 .BuildServiceProvider();
-            var store = provider.GetRequiredService<IControlPlaneStore>();
+            var store = provider.GetRequiredService<IResourceStore>();
             await store.InitializeAsync(default);
             return new(directory, provider, store);
         }

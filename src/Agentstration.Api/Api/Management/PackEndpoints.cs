@@ -2,6 +2,7 @@ using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;
@@ -137,7 +138,7 @@ internal sealed class PackEndpoints : IManagementEndpoint
             var installed = await service.GetAsync(identity, cancellationToken) ?? throw new PackNotFoundException(identity);
             var ifMatch = ManagementHttp.IfMatch(request);
             if (ifMatch is not null && !string.Equals(ifMatch, installed.ETag, StringComparison.Ordinal))
-                throw new ControlPlaneConcurrencyException("The supplied ETag does not match the installed Pack.");
+                throw new ResourceConcurrencyException("The supplied ETag does not match the installed Pack.");
             await service.UninstallAsync(identity, new PackRemovalOptions(removeDashboardReferences ?? false), cancellationToken);
             return Results.NoContent();
         });
@@ -153,7 +154,7 @@ internal sealed class PackEndpoints : IManagementEndpoint
         ManagementHttp.ExecuteAsync(async () =>
         {
             ManagementHttp.RequireApiVersion(request);
-            var etag = ManagementHttp.IfMatch(request) ?? throw new ControlPlaneConcurrencyException("Attaching a Pack source requires If-Match.");
+            var etag = ManagementHttp.IfMatch(request) ?? throw new ResourceConcurrencyException("Attaching a Pack source requires If-Match.");
             var archive = await ReadArchiveAsync(request, archiveReader, cancellationToken);
             var installed = await service.AttachSourceAsync(new(publisher, name), archive, etag, cancellationToken);
             return ManagementHttp.ResourceResult(installed, response, StatusCodes.Status200OK);
@@ -196,7 +197,7 @@ internal sealed class PackEndpoints : IManagementEndpoint
     private static Task<IResult> UpdateProjectAsync(Guid projectId, UpdatePackProjectCommand command, HttpRequest request, HttpResponse response, PackAuthoringService service, CancellationToken token) =>
         ManagementHttp.ExecuteAsync(async () =>
         {
-            var etag = ManagementHttp.IfMatch(request) ?? throw new ControlPlaneConcurrencyException("Updating a Pack Project requires If-Match.");
+            var etag = ManagementHttp.IfMatch(request) ?? throw new ResourceConcurrencyException("Updating a Pack Project requires If-Match.");
             var project = await service.UpdateProjectAsync(projectId, command, etag, token);
             return ManagementHttp.ResourceResult(project, response, StatusCodes.Status200OK);
         });
@@ -224,7 +225,7 @@ internal sealed class PackEndpoints : IManagementEndpoint
     private static Task<IResult> UpdateProjectResourceAsync(Guid projectId, UpdatePackProjectSourceCommand command, HttpRequest request, HttpResponse response, PackAuthoringService service, CancellationToken token) =>
         ManagementHttp.ExecuteAsync(async () =>
         {
-            var etag = ManagementHttp.IfMatch(request) ?? throw new ControlPlaneConcurrencyException("Updating a Pack Project resource requires If-Match.");
+            var etag = ManagementHttp.IfMatch(request) ?? throw new ResourceConcurrencyException("Updating a Pack Project resource requires If-Match.");
             var manifest = ResourceManifestSerializer.FromYaml<JsonElement>(command.Source);
             var project = await service.UpdateSourceDocumentAsync(projectId, command with { Source = ResourceManifestSerializer.ToJson(manifest) }, etag, token);
             return ManagementHttp.ResourceResult(project, response, StatusCodes.Status200OK);

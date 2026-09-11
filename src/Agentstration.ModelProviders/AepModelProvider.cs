@@ -1,6 +1,7 @@
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Management.Abstractions;
+using Agentstration.Models;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Secrets.Abstractions;
 using Microsoft.Extensions.AI;
@@ -172,9 +173,9 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients, ISecretReso
         }
     }
 
-    public async ValueTask<Agentstration.Management.Abstractions.VersionedExtensionOptions> MigrateAsync(
+    public async ValueTask<Agentstration.Models.VersionedExtensionOptions> MigrateAsync(
         ModelProviderConfiguration provider,
-        Agentstration.Management.Abstractions.VersionedExtensionOptions source,
+        Agentstration.Models.VersionedExtensionOptions source,
         string targetVersion,
         CancellationToken cancellationToken = default)
     {
@@ -187,7 +188,7 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients, ISecretReso
                 source.SchemaDigest,
                 targetVersion,
                 source.Values.Clone()), cancellationToken);
-            return new Agentstration.Management.Abstractions.VersionedExtensionOptions
+            return new Agentstration.Models.VersionedExtensionOptions
             {
                 OptionSet = response.Options.OptionSet,
                 Version = response.Options.Version,
@@ -249,7 +250,7 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients, ISecretReso
 
     private static void ValidateNativeOptions(
         string providerType,
-        Agentstration.Management.Abstractions.VersionedExtensionOptions options,
+        Agentstration.Models.VersionedExtensionOptions options,
         Agentstration.Aep.Abstractions.AepConfigurationCatalog catalog)
     {
         if (string.IsNullOrWhiteSpace(options.OptionSet)
@@ -277,7 +278,7 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients, ISecretReso
     }
 
     private static Agentstration.Aep.Abstractions.AepVersionedOptions Map(
-        Agentstration.Management.Abstractions.VersionedExtensionOptions value) =>
+        Agentstration.Models.VersionedExtensionOptions value) =>
         new(value.OptionSet, value.Version, value.SchemaDigest, value.Values.Clone());
 
     private static ExtensionOptionSet Map(Agentstration.Aep.Abstractions.AepOptionSetDescriptor value) => new(

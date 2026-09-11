@@ -14,7 +14,7 @@ Agentstration.Management.Core
 Agentstration.Management.Contracts
   versioned HTTP request and response contracts
 
-Agentstration.Management.Storage.Sqlite
+Agentstration.ResourceManagement.Storage.Sqlite
   EF Core and SQLite implementation of the control-plane store
 ```
 

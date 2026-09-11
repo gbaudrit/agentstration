@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="../Agentstration.Flow/Agentstration.Flow.csproj" />
-    <ProjectReference Include="../Agentstration.Flow.Storage.Abstractions/Agentstration.Flow.Storage.Abstractions.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="YamlDotNet" />
-  </ItemGroup>
-</Project>

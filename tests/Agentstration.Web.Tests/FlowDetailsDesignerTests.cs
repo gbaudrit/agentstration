@@ -1,7 +1,9 @@
+using Agentstration.Agents;
+using Agentstration.Triggers;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Contracts;
+using Agentstration.Flows;
+using Agentstration.Flows.Contracts;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Resources;

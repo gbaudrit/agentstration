@@ -1,7 +1,9 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Triggers;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;
@@ -57,7 +59,7 @@ internal sealed class TriggerEndpoints : IManagementEndpoint
     private static Task<IResult> GetNamespacedAsync(string @namespace, string name, HttpResponse response, TriggerManagementService service, CancellationToken token) => GetCoreAsync(ResourceNamespace.Parse(@namespace), name, response, service, token);
     private static Task<IResult> GetCoreAsync(ResourceNamespace @namespace, string name, HttpResponse response, TriggerManagementService service, CancellationToken token) => ManagementHttp.ExecuteAsync(async () =>
     {
-        var stored = await service.GetAsync(@namespace, name, token) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Trigger, name, @namespace));
+        var stored = await service.GetAsync(@namespace, name, token) ?? throw new ResourceNotFoundException(new(ResourceKinds.Trigger, name, @namespace));
         return ManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
     });
 
@@ -76,7 +78,7 @@ internal sealed class TriggerEndpoints : IManagementEndpoint
         }
         else
         {
-            var ifMatch = ManagementHttp.IfMatch(request) ?? throw new ControlPlaneConcurrencyException("Updating a Trigger requires If-Match.");
+            var ifMatch = ManagementHttp.IfMatch(request) ?? throw new ResourceConcurrencyException("Updating a Trigger requires If-Match.");
             stored = await service.UpdateAsync(@namespace, name, body.Definition, ifMatch, token);
         }
         return ManagementHttp.ResourceResult(stored, response, current is null ? StatusCodes.Status201Created : StatusCodes.Status200OK);
@@ -86,7 +88,7 @@ internal sealed class TriggerEndpoints : IManagementEndpoint
     private static Task<IResult> DeleteNamespacedAsync(string @namespace, string name, HttpRequest request, TriggerManagementService service, CancellationToken token) => DeleteCoreAsync(ResourceNamespace.Parse(@namespace), name, request, service, token);
     private static Task<IResult> DeleteCoreAsync(ResourceNamespace @namespace, string name, HttpRequest request, TriggerManagementService service, CancellationToken token) => ManagementHttp.ExecuteAsync(async () =>
     {
-        var ifMatch = ManagementHttp.IfMatch(request) ?? throw new ControlPlaneConcurrencyException("Deleting a Trigger requires If-Match.");
+        var ifMatch = ManagementHttp.IfMatch(request) ?? throw new ResourceConcurrencyException("Deleting a Trigger requires If-Match.");
         await service.DeleteAsync(@namespace, name, ifMatch, token);
         return Results.NoContent();
     });
@@ -104,7 +106,7 @@ internal sealed class TriggerEndpoints : IManagementEndpoint
     private static Task<IResult> HistoryNamespacedAsync(string @namespace, string name, int? take, TriggerManagementService management, TriggerFiringService firing, CancellationToken token) => HistoryCoreAsync(ResourceNamespace.Parse(@namespace), name, take, management, firing, token);
     private static Task<IResult> HistoryCoreAsync(ResourceNamespace @namespace, string name, int? take, TriggerManagementService management, TriggerFiringService firing, CancellationToken token) => ManagementHttp.ExecuteAsync(async () =>
     {
-        var trigger = await management.GetAsync(@namespace, name, token) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Trigger, name, @namespace));
+        var trigger = await management.GetAsync(@namespace, name, token) ?? throw new ResourceNotFoundException(new(ResourceKinds.Trigger, name, @namespace));
         return Results.Ok(await firing.ListHistoryAsync(trigger.Value.RequireScopeTargetId(ResourceScopeKind.Workspace), trigger.Value.Uid, take ?? 50, token));
     });
 }

@@ -1,9 +1,10 @@
+using Agentstration.Models;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.Resources;
@@ -526,7 +527,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 new ModelReasoningOptions
                 {
                     Mode = ReasoningMode.Enabled,
-                    Effort = Agentstration.Management.Abstractions.ReasoningEffort.Medium
+                    Effort = Agentstration.Models.ReasoningEffort.Medium
                 }),
             ResponseFactory = (call, _, options) =>
             {
@@ -745,7 +746,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                     Seed = 42,
                     StopSequences = ["STOP"]
                 },
-                Reasoning: new ModelReasoningOptions { Mode = ReasoningMode.Enabled, Effort = Agentstration.Management.Abstractions.ReasoningEffort.Medium },
+                Reasoning: new ModelReasoningOptions { Mode = ReasoningMode.Enabled, Effort = Agentstration.Models.ReasoningEffort.Medium },
                 Output: new ModelOutputOptions { Format = ModelOutputFormat.JsonSchema, JsonSchema = schema.RootElement.Clone(), Strict = true })
         };
         var runtime = await new AgentFrameworkRuntimeFactory(new RecordingResolver(chatClient), NullLoggerFactory.Instance, new GenAiObservabilityOptions { Enabled = false })

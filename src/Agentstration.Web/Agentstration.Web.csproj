@@ -7,8 +7,8 @@
     <ProjectReference Include="../Agentstration.Web.FlowDesigner/Agentstration.Web.FlowDesigner.csproj" />
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
     <ProjectReference Include="../Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
-    <ProjectReference Include="../Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
-    <ProjectReference Include="../Agentstration.Flow.Contracts/Agentstration.Flow.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Application/Agentstration.Flows.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Contracts/Agentstration.Flows.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
     <ProjectReference Include="../Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />

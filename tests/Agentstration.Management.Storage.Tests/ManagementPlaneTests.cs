@@ -1,8 +1,10 @@
+using Agentstration.Agents;
+using Agentstration.ResourceManagement;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
-using Agentstration.Management.Storage.Sqlite;
+using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -132,7 +134,7 @@ public sealed class ManagementPlaneTests
 
         Assert.AreNotEqual(Guid.Empty, created.Value.Uid);
         Assert.AreEqual(created.Value.Uid, updated.Value.Uid);
-        var error = await Assert.ThrowsAsync<ControlPlaneConcurrencyException>(() => fixture.Store.PutAsync(
+        var error = await Assert.ThrowsAsync<ResourceConcurrencyException>(() => fixture.Store.PutAsync(
             updated.Value with { Uid = Guid.NewGuid() }, updated.ETag, false, default));
         StringAssert.Contains(error.Message, "immutable");
     }
@@ -152,7 +154,7 @@ public sealed class ManagementPlaneTests
         };
 
         var created = await fixture.Store.PutAsync(desired, null, true, default);
-        await Assert.ThrowsAsync<ControlPlaneConcurrencyException>(() => fixture.Store.PutAsync(Agent("assistant"), null, true, default));
+        await Assert.ThrowsAsync<ResourceConcurrencyException>(() => fixture.Store.PutAsync(Agent("assistant"), null, true, default));
         var key = new ResourceKey(ResourceKinds.Agent, "assistant");
         var loaded = await fixture.Store.GetAsync<AgentResource>(key, default);
 
@@ -210,9 +212,9 @@ public sealed class ManagementPlaneTests
     {
         private readonly string directory;
         private readonly ServiceProvider services;
-        public IControlPlaneStore Store { get; }
+        public IResourceStore Store { get; }
 
-        private StoreFixture(string directory, ServiceProvider services, IControlPlaneStore store)
+        private StoreFixture(string directory, ServiceProvider services, IResourceStore store)
         {
             this.directory = directory;
             this.services = services;
@@ -228,7 +230,7 @@ public sealed class ManagementPlaneTests
                 .AddSingleton<ICurrentRequestContext, SystemOperationRequestContext>()
                 .AddSqliteControlPlane($"Data Source={Path.Combine(directory, "control-plane.db")};Pooling=False")
                 .BuildServiceProvider();
-            var store = services.GetRequiredService<IControlPlaneStore>();
+            var store = services.GetRequiredService<IResourceStore>();
             await store.InitializeAsync(default);
             return new StoreFixture(directory, services, store);
         }

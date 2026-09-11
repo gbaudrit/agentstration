@@ -1,11 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
-    <ProjectReference Include="../Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
-    <ProjectReference Include="../Agentstration.Flow.Storage.Sqlite/Agentstration.Flow.Storage.Sqlite.csproj" />
-    <ProjectReference Include="../Agentstration.Flow.Storage.PostgreSql/Agentstration.Flow.Storage.PostgreSql.csproj" />
-    <ProjectReference Include="../Agentstration.Management.Storage.Sqlite/Agentstration.Management.Storage.Sqlite.csproj" />
-    <ProjectReference Include="../Agentstration.Management.Storage.PostgreSql/Agentstration.Management.Storage.PostgreSql.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Application/Agentstration.Flows.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Storage.Sqlite/Agentstration.Flows.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Storage.PostgreSql/Agentstration.Flows.Storage.PostgreSql.csproj" />
+    <ProjectReference Include="../Agentstration.ResourceManagement.Storage.Sqlite/Agentstration.ResourceManagement.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../Agentstration.ResourceManagement.Storage.PostgreSql/Agentstration.ResourceManagement.Storage.PostgreSql.csproj" />
     <ProjectReference Include="../Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
     <ProjectReference Include="../Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />

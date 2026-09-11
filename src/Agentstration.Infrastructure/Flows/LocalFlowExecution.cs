@@ -2,14 +2,17 @@ using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Channels;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
-using Agentstration.Flow.Storage.Abstractions;
+using Agentstration.Agents;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
+using Agentstration.Tools;
 using Agentstration.Tools.Mcp;
 using Agentstration.Work;
 
@@ -100,7 +103,7 @@ public sealed class LocalFlowRunCancellationRegistry : IFlowRunCancellationRegis
 
 public sealed class ManagedFlowAgentExecutor(
     AgentExecutionCoordinator execution,
-    IControlPlaneStore store,
+    IResourceStore store,
     IAgentResourceQueries agentQueries,
     AgentManagementService agents) : IFlowAgentExecutor
 {
@@ -114,7 +117,7 @@ public sealed class ManagedFlowAgentExecutor(
             : input.GetRawText();
         var targetNamespace = target.Namespace ?? Agentstration.Resources.ResourceNamespace.Default;
         var agent = await agents.GetAgentAsync(targetNamespace, ResourceName(target.Id), cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, ResourceName(target.Id), targetNamespace));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.Agent, ResourceName(target.Id), targetNamespace));
         var prepared = await agents.PrepareLocalRuntimeAsync(targetNamespace, agent.Value.Metadata.Name, agent.Value.Generation, cancellationToken);
         if (prepared.Value.OperationalState != OperationalState.Ready)
             throw new InvalidOperationException(prepared.Value.LastError ?? $"Agent '{target.Id}' could not be prepared for local execution.");
@@ -156,7 +159,7 @@ public sealed class ManagedFlowOrchestrationEngine(
         {
             var targetNamespace = reference.Namespace ?? Agentstration.Resources.ResourceNamespace.Default;
             var agent = await agents.GetAgentAsync(targetNamespace, reference.Id, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, reference.Id, targetNamespace));
+                ?? throw new ResourceNotFoundException(new(ResourceKinds.Agent, reference.Id, targetNamespace));
             var prepared = await agents.PrepareLocalRuntimeAsync(targetNamespace, agent.Value.Metadata.Name, agent.Value.Generation, cancellationToken);
             if (prepared.Value.OperationalState != OperationalState.Ready)
                 throw new InvalidOperationException(prepared.Value.LastError ?? $"Agent '{targetNamespace}/{reference.Id}' could not be prepared for local execution.");
@@ -167,7 +170,7 @@ public sealed class ManagedFlowOrchestrationEngine(
     }
 }
 
-public sealed class ManagementFlowResourceReferenceResolver(IControlPlaneStore store, IFlowRepository flows) : IFlowResourceReferenceResolver
+public sealed class ManagementFlowResourceReferenceResolver(IResourceStore store, IFlowRepository flows) : IFlowResourceReferenceResolver
 {
     public async Task<bool> ExistsAsync(string resourceId, CancellationToken cancellationToken) =>
         await store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, resourceId), cancellationToken) is not null;
@@ -246,7 +249,7 @@ public sealed class ManagementFlowResourceReferenceResolver(IControlPlaneStore s
 }
 
 public sealed class ManagedFlowToolExecutor(
-    IControlPlaneStore store,
+    IResourceStore store,
     IToolExecutionPipeline pipeline) : IFlowToolExecutor
 {
     public async Task<JsonElement?> ExecuteAsync(

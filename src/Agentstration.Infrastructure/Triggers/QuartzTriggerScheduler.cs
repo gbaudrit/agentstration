@@ -1,6 +1,8 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Triggers;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Quartz;
@@ -87,7 +89,7 @@ public sealed class TriggerQuartzJob(
 }
 
 public sealed class TriggerSchedulerReconciler(
-    IControlPlaneStore store,
+    IResourceStore store,
     ITriggerSchedulerProjection scheduler,
     IRequestContextScopeFactory scopes,
     ILogger<TriggerSchedulerReconciler> logger) : IHostedService

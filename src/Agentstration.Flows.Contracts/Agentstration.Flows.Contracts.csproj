@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Flows/Agentstration.Flows.csproj" />
+  </ItemGroup>
+</Project>

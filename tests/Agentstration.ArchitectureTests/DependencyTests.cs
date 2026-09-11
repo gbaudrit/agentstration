@@ -1,3 +1,5 @@
+using Agentstration.Agents;
+using Agentstration.ResourceManagement;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
@@ -7,19 +9,23 @@ using Agentstration.Extensions.Git;
 using Agentstration.Extensions.LlamaCpp;
 using Agentstration.Extensions.LocalAI;
 using Agentstration.Extensions.Ollama;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
-using Agentstration.Flow.Storage.Abstractions;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
-using Agentstration.Management.Storage.Sqlite;
+using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.ModelProviders;
+using Agentstration.Models;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Storage.Sqlite;
+using Agentstration.Secrets;
+using Agentstration.Tools;
+using Agentstration.Triggers;
 using Agentstration.Tools.SourceRegistry;
 using Agentstration.Web.Console;
 using Agentstration.Web.Components;
@@ -394,14 +400,71 @@ public sealed class DependencyTests
     [TestMethod]
     public void StorageAbstractionsDoNotReferenceEntityFramework()
     {
-        var references = typeof(IControlPlaneStore).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        var references = typeof(IResourceStore).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("EntityFramework", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void ResourcePrimitivesRemainIndependentFromManagementFamilies()
+    {
+        var references = typeof(Resource).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+
+        Assert.IsFalse(references.Any(name => name!.StartsWith("Agentstration.", StringComparison.Ordinal)));
+        Assert.IsFalse(references.Any(name => name!.Contains("EntityFramework", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void GenericResourceManagementDoesNotReferenceBusinessFamiliesOrAdapters()
+    {
+        var references = typeof(IResourceStore).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        var forbidden = new[] { "Agents", "Flows", "Models", "Tools", "Triggers", "Secrets", "Work", "Runtime", "Management", "Web", "Infrastructure", "Storage" };
+
+        Assert.IsFalse(references.Any(name => forbidden.Any(value => name!.Contains($"Agentstration.{value}", StringComparison.Ordinal))));
+        Assert.IsFalse(references.Any(name => name!.Contains("EntityFramework", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void ResourceFamilyModulesDoNotReferenceHostsOrConcreteStorage()
+    {
+        var assemblies = new[]
+        {
+            typeof(AgentResource).Assembly,
+            typeof(TriggerResource).Assembly,
+            typeof(FlowDefinition).Assembly,
+            typeof(ModelProfileResource).Assembly,
+            typeof(ToolResource).Assembly,
+            typeof(SecretResource).Assembly
+        };
+
+        Assert.IsFalse(assemblies.SelectMany(assembly => assembly.GetReferencedAssemblies()).Any(reference =>
+            reference.Name!.Contains("Agentstration.Web", StringComparison.Ordinal)
+            || reference.Name.Contains("Agentstration.Infrastructure", StringComparison.Ordinal)
+            || reference.Name.Contains(".Storage.", StringComparison.Ordinal)
+            || reference.Name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void AgentFamilyDoesNotReferenceTriggersOrFlows()
+    {
+        var references = typeof(AgentManagementService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+
+        Assert.IsFalse(references.Any(name => name is "Agentstration.Triggers" or "Agentstration.Flows"));
+    }
+
+    [TestMethod]
+    public void FlowFamilyUsesTheAcceptedPluralAssemblyIdentity()
+    {
+        Assert.AreEqual("Agentstration.Flows", typeof(FlowDefinition).Assembly.GetName().Name);
+        Assert.AreEqual("Agentstration.Flows.Application", typeof(FlowService).Assembly.GetName().Name);
+        Assert.AreEqual("Agentstration.Flows.Storage.Abstractions", typeof(IFlowRepository).Assembly.GetName().Name);
     }
 
     [TestMethod]
     public void ManagementStoreExposesHierarchicalScopeContracts()
     {
-        var methods = typeof(IControlPlaneStore).GetMethods().Select(method => method.Name).ToHashSet(StringComparer.Ordinal);
+        var methods = typeof(IResourceStore).GetMethods().Select(method => method.Name).ToHashSet(StringComparer.Ordinal);
 
         CollectionAssert.IsSubsetOf(
             new[] { "GetByUidAsync", "GetExactAsync", "ListExactAsync", "ListVisibleAsync", "PutExactAsync", "DeleteExactAsync" },
@@ -419,8 +482,8 @@ public sealed class DependencyTests
             typeof(AgentResource).Assembly,
             typeof(AgentManagementService).Assembly,
             typeof(AgentResourceRequest).Assembly,
-            typeof(IControlPlaneStore).Assembly,
-            typeof(SqliteControlPlaneStore).Assembly
+            typeof(IResourceStore).Assembly,
+            typeof(SqliteResourceStore).Assembly
         };
 
         Assert.IsFalse(assemblies.SelectMany(assembly => assembly.GetReferencedAssemblies())
@@ -430,7 +493,7 @@ public sealed class DependencyTests
     [TestMethod]
     public void ManagementAbstractionsDoNotReferenceCoreRuntimeStorageOrFrameworks()
     {
-        var references = typeof(IControlPlaneStore).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        var references = typeof(IResourceStore).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Management.Core", StringComparison.Ordinal)
             || name.Contains("Agentstration.Runtime", StringComparison.Ordinal)
             || name.Contains("Storage.Sqlite", StringComparison.Ordinal)
@@ -472,7 +535,7 @@ public sealed class DependencyTests
         {
             typeof(Agentstration.Resources.ResourceAddress).Assembly,
             typeof(WorkplaceService).Assembly,
-            typeof(IControlPlaneStore).Assembly,
+            typeof(IResourceStore).Assembly,
             typeof(AgentManagementService).Assembly
         };
         var forbidden = new[] { "Azure.Identity", "Microsoft.Identity", "Keycloak", "Zitadel", "Auth0", "WorkOS", "OpenIddict", "Microsoft.AspNetCore.Authentication", "Microsoft.AspNetCore.Identity" };
@@ -605,7 +668,7 @@ public sealed class DependencyTests
             .Select(parameter => parameter.ParameterType)
             .ToArray();
         Assert.IsTrue(dependencies.Contains(typeof(IRuntimeAgentResolver)));
-        Assert.IsFalse(dependencies.Any(type => type.Name == "IControlPlaneStore"
+        Assert.IsFalse(dependencies.Any(type => type.Name == "IResourceStore"
             || type.Name is "AgentResource" or "AgentRevision" or "AgentDeployment"));
     }
 

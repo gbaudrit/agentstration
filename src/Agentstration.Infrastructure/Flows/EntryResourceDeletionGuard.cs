@@ -1,13 +1,15 @@
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.Agents;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Work.Storage.Abstractions;
 
 namespace Agentstration.Infrastructure.Flows;
 
-public sealed class EntryResourceDeletionGuard(IWorkplaceRepository workplace, ICurrentRequestContext requestContext) : IManagementResourceDeletionGuard, IFlowDeletionGuard
+public sealed class EntryResourceDeletionGuard(IWorkplaceRepository workplace, ICurrentRequestContext requestContext) : IResourceDeletionGuard, IFlowDeletionGuard
 {
     public async Task ValidateDeleteAsync(ResourceKey key, CancellationToken cancellationToken)
     {

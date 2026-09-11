@@ -2,6 +2,7 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Web.Hosting;
@@ -65,13 +66,13 @@ public sealed class SourceConsoleManagementService(
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
         var source = await sources.GetExactAsync(scopeRef, publisher, name, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
         var versions = await sources.ListVersionsExactAsync(scopeRef, publisher, name, cancellationToken);
         var selectedVersion = versionUid is null
             ? versions.FirstOrDefault()
             : versions.SingleOrDefault(value => value.Uid == versionUid);
         if (selectedVersion is null)
-            throw new ControlPlaneResourceNotFoundException(
+            throw new ResourceNotFoundException(
                 new(ResourceKinds.SourceVersion, versionUid?.ToString("D") ?? name));
 
         var bindingStatus = await bindings.GetStatusExactAsync(
@@ -322,7 +323,7 @@ public sealed class SourceConsoleManagementService(
         {
             created = await providers.CreateAsync(resource, cancellationToken);
         }
-        catch (ControlPlaneConcurrencyException)
+        catch (ResourceConcurrencyException)
         {
             var raced = (await providers.ListAsync(cancellationToken))
                 .SingleOrDefault(provider => References(provider.Value, extension, candidate.ContributionId));

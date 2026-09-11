@@ -1,8 +1,12 @@
+using Agentstration.Agents;
 using Agentstration.Application.Work;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
+using Agentstration.Tools;
 
 namespace Agentstration.Web.Hosting;
 
@@ -94,7 +98,7 @@ public static class InteractiveFlowDemoData
         }
 
         var agents = services.GetRequiredService<AgentManagementService>();
-        var store = services.GetRequiredService<IControlPlaneStore>();
+        var store = services.GetRequiredService<IResourceStore>();
         await ManagementDemoData.EnsureAgentAsync(
             agents,
             store,

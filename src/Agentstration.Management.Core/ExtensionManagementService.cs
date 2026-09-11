@@ -1,5 +1,6 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
+using Agentstration.Models;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;

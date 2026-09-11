@@ -1,11 +1,12 @@
 using System.Text;
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
 
 public sealed class SourceRegistryDiscoveryService(
-    IControlPlaneStore store,
+    IResourceStore store,
     ISourceRegistryCacheStore cache,
     ISourceRegistryIndexReader indexReader,
     ISourceRegistryReader registryReader,

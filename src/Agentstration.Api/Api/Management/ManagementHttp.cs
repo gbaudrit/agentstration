@@ -1,5 +1,9 @@
+using Agentstration.Agents;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
+using Agentstration.Triggers;
 
 namespace Agentstration.Web.Api.Management;
 
@@ -8,8 +12,8 @@ internal static class ManagementHttp
     public static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {
         try { return await action(); }
-        catch (ControlPlaneResourceNotFoundException exception) { return Results.Problem(statusCode: 404, title: "resource_not_found", detail: exception.Message); }
-        catch (ControlPlaneConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
+        catch (ResourceNotFoundException exception) { return Results.Problem(statusCode: 404, title: "resource_not_found", detail: exception.Message); }
+        catch (ResourceConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
         catch (ResourceReferenceOutsideScopeException exception) { return Results.Problem(statusCode: 400, title: "resource_reference_outside_scope", detail: exception.Message); }
         catch (ResourceReferenceAmbiguousException exception) { return Results.Problem(statusCode: 400, title: "resource_reference_ambiguous", detail: exception.Message); }
         catch (ResourceScopeAccessDeniedException exception) { return Results.Problem(statusCode: 403, title: "resource_scope_access_denied", detail: exception.Message); }
@@ -84,10 +88,10 @@ internal static class ManagementHttp
         {
             RequireApiVersion(request);
             var stored = await service.GetDeploymentAsync(name, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.AgentDeployment, name));
+                ?? throw new ResourceNotFoundException(new(ResourceKinds.AgentDeployment, name));
             var requestedETag = IfMatch(request);
             if (requestedETag is not null && !string.Equals(requestedETag, stored.ETag, StringComparison.Ordinal))
-                throw new ControlPlaneConcurrencyException("The supplied ETag does not match the current deployment.");
+                throw new ResourceConcurrencyException("The supplied ETag does not match the current deployment.");
             var updated = await action(stored, cancellationToken);
             response.Headers.ETag = updated.ETag;
             response.Headers.Location = $"/api/deployments/{Uri.EscapeDataString(updated.Value.Metadata.Name)}";

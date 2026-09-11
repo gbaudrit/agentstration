@@ -1,0 +1,131 @@
+using System.Text.Json;
+using Agentstration.Flows.Storage.Abstractions;
+using Agentstration.Resources;
+
+namespace Agentstration.Flows.Application;
+
+public sealed record CreateFlowCommand(string Name, string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null, FlowGraphDefinition? Graph = null, string? DisplayName = null);
+public sealed record UpdateFlowCommand(string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null, FlowGraphDefinition? Graph = null, string? DisplayName = null);
+
+public interface IFlowDeletionGuard
+{
+    Task ValidateDeleteAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken);
+}
+
+public interface IFlowVersionActivationGuard
+{
+    Task ValidateActivationAsync(WorkspaceId workspaceId, FlowVersion version, CancellationToken cancellationToken);
+}
+
+public sealed class FlowService(
+    IFlowRepository repository,
+    TimeProvider timeProvider,
+    IEnumerable<IFlowDeletionGuard> deletionGuards,
+    IEnumerable<IFlowVersionActivationGuard>? activationGuards = null)
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public Task InitializeAsync(CancellationToken cancellationToken) => repository.InitializeAsync(cancellationToken);
+
+    public async Task<StoredFlow> CreateAsync(WorkspaceId workspaceId, CreateFlowCommand command, CancellationToken cancellationToken)
+        => await CreateAsync(workspaceId, command, ResourceNamespace.Default, cancellationToken);
+
+    public async Task<StoredFlow> CreateAsync(WorkspaceId workspaceId, CreateFlowCommand command, ResourceNamespace @namespace, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        var now = timeProvider.GetUtcNow();
+        var resource = new FlowResource(workspaceId, new FlowId(command.Name, @namespace), command.Name, command.Description, command.Version, command.Enabled, null,
+            command.Definition, Copy(command.Metadata), now, now, command.DisplayName, command.Graph);
+        FlowValidator.Validate(resource);
+        return await repository.CreateAsync(resource, cancellationToken);
+    }
+
+    public Task<StoredFlow?> GetAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken) => repository.GetAsync(workspaceId, id, cancellationToken);
+    public Task<FlowPage> ListAsync(WorkspaceId workspaceId, int skip, int take, CancellationToken cancellationToken) => ListAsync(workspaceId, ResourceNamespace.Default, skip, take, cancellationToken);
+    public Task<FlowPage> ListAsync(WorkspaceId workspaceId, ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken) => repository.ListAsync(workspaceId, @namespace, skip, take, cancellationToken);
+    public Task<FlowPage> ListAllAsync(WorkspaceId workspaceId, int skip, int take, CancellationToken cancellationToken) => repository.ListAsync(workspaceId, skip, take, cancellationToken);
+
+    public async Task<StoredFlow> UpdateAsync(WorkspaceId workspaceId, FlowId id, UpdateFlowCommand command, string expectedETag, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        var current = await repository.GetAsync(workspaceId, id, cancellationToken) ?? throw new FlowNotFoundException(id);
+        if (!string.Equals(current.ETag, expectedETag, StringComparison.Ordinal)) throw new FlowConcurrencyException("The supplied ETag does not match the current Flow version.");
+        var published = await repository.GetVersionAsync(workspaceId, id, command.Version, cancellationToken);
+        if (published is not null && JsonSerializer.Serialize(published.Value.Definition, JsonOptions) != JsonSerializer.Serialize(command.Definition, JsonOptions))
+            throw new FlowValidationException("published_version_immutable", $"Published Flow version '{command.Version}' cannot be modified.");
+        var updated = current.Value with
+        {
+            Description = command.Description,
+            Version = command.Version,
+            Enabled = command.Enabled,
+            Definition = command.Definition,
+            Metadata = Copy(command.Metadata),
+            Graph = command.Graph,
+            DisplayName = command.DisplayName ?? current.Value.DisplayName,
+            UpdatedAt = timeProvider.GetUtcNow()
+        };
+        FlowValidator.Validate(updated);
+        return await repository.UpdateAsync(updated, expectedETag, cancellationToken);
+    }
+
+    public Task DeleteAsync(WorkspaceId workspaceId, FlowId id, string? expectedETag, CancellationToken cancellationToken) =>
+        DeleteAsync(workspaceId, id, expectedETag, allowSystemManaged: false, cancellationToken);
+
+    public async Task DeleteAsync(WorkspaceId workspaceId, FlowId id, string? expectedETag, bool allowSystemManaged, CancellationToken cancellationToken)
+    {
+        var stored = await repository.GetAsync(workspaceId, id, cancellationToken) ?? throw new FlowNotFoundException(id);
+        if (IsSystemManaged(stored.Value.Metadata)
+            && (!allowSystemManaged || !IsDirectAgentFlow(stored.Value.Metadata)))
+            throw new FlowValidationException("system_flow_managed", $"Flow '{id}' is managed by Agentstration and cannot be deleted independently.");
+        foreach (var guard in deletionGuards) await guard.ValidateDeleteAsync(workspaceId, id, cancellationToken);
+        await repository.DeleteAsync(workspaceId, id, expectedETag, cancellationToken);
+    }
+
+    public async Task<StoredFlowVersion> PublishVersionAsync(WorkspaceId workspaceId, FlowId id, string version, bool activate, CancellationToken cancellationToken, string? releaseNotes = null)
+    {
+        var stored = await repository.GetAsync(workspaceId, id, cancellationToken) ?? throw new FlowNotFoundException(id);
+        if (!string.Equals(stored.Value.Version, version, StringComparison.Ordinal))
+            throw new FlowValidationException("flow_version_mismatch", "The requested version must match the current Flow definition version.");
+        var published = new FlowVersion(workspaceId, id, version, stored.Value.Description, stored.Value.Definition, stored.Value.Metadata, timeProvider.GetUtcNow(), stored.Value.Graph,
+            stored.Value.Graph is null ? null : FlowDefinitionHash.Compute(stored.Value.Graph), releaseNotes);
+        FlowValidator.ValidateVersion(published);
+        if (activate)
+            foreach (var guard in activationGuards ?? []) await guard.ValidateActivationAsync(workspaceId, published, cancellationToken);
+        var created = await repository.CreateVersionAsync(published, cancellationToken);
+        if (activate)
+        {
+            var activated = stored.Value with { ActiveVersion = version, Enabled = true, UpdatedAt = timeProvider.GetUtcNow() };
+            await repository.UpdateAsync(activated, stored.ETag, cancellationToken);
+        }
+        return created;
+    }
+
+    public Task<StoredFlowVersion?> GetVersionAsync(WorkspaceId workspaceId, FlowId id, string version, CancellationToken cancellationToken) => repository.GetVersionAsync(workspaceId, id, version, cancellationToken);
+    public Task<IReadOnlyList<StoredFlowVersion>> ListVersionsAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken) => repository.ListVersionsAsync(workspaceId, id, cancellationToken);
+
+    public async Task<FlowVersion> ResolveAsync(WorkspaceId workspaceId, FlowReference reference, CancellationToken cancellationToken)
+        => await ResolveAsync(workspaceId, reference, reference.FlowId.Namespace, cancellationToken);
+
+    public async Task<FlowVersion> ResolveAsync(WorkspaceId workspaceId, FlowReference reference, ResourceNamespace ownerNamespace, CancellationToken cancellationToken)
+    {
+        FlowValidator.ValidateReference(reference);
+        var flowId = reference.Resolve(ownerNamespace);
+        var version = reference.Version;
+        if (version is null)
+        {
+            var flow = await repository.GetAsync(workspaceId, flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
+            version = flow.Value.ActiveVersion ?? throw new FlowValidationException("flow_active_version_missing", "The referenced Flow has no active version.");
+        }
+        return (await repository.GetVersionAsync(workspaceId, flowId, version, cancellationToken))?.Value
+            ?? throw new FlowValidationException("flow_version_not_found", $"Flow version '{flowId}:{version}' does not exist.");
+    }
+
+    private static IReadOnlyDictionary<string, string> Copy(IReadOnlyDictionary<string, string>? source) =>
+        source is null ? new Dictionary<string, string>() : new Dictionary<string, string>(source, StringComparer.Ordinal);
+
+    private static bool IsSystemManaged(IReadOnlyDictionary<string, string> metadata) =>
+        metadata.TryGetValue("systemManaged", out var value) && bool.TryParse(value, out var parsed) && parsed;
+
+    private static bool IsDirectAgentFlow(IReadOnlyDictionary<string, string> metadata) =>
+        metadata.TryGetValue("systemKind", out var value) && string.Equals(value, "DirectAgentFlow", StringComparison.Ordinal);
+}

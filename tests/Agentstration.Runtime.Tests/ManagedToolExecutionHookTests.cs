@@ -1,3 +1,5 @@
+using Agentstration.Tools;
+using Agentstration.ResourceManagement;
 using System.Text.Json;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Management.Abstractions;
@@ -174,7 +176,7 @@ public sealed class ManagedToolExecutionHookTests
             invoke(context, cancellationToken);
     }
 
-    private sealed class HookResourceStore(IReadOnlyList<ToolExecutionHookResource> resources) : IControlPlaneStore
+    private sealed class HookResourceStore(IReadOnlyList<ToolExecutionHookResource> resources) : IResourceStore
     {
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException();
@@ -190,7 +192,7 @@ public sealed class ManagedToolExecutionHookTests
         public Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
-    private sealed class FailingHookResourceStore : IControlPlaneStore
+    private sealed class FailingHookResourceStore : IResourceStore
     {
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException();

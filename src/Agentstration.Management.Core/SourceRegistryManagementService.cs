@@ -2,7 +2,9 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Text.RegularExpressions;
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Secrets;
 using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Management.Core;
@@ -18,7 +20,7 @@ public sealed class SourceRegistryOperationException(string code, string message
 }
 
 public sealed partial class SourceRegistryManagementService(
-    IControlPlaneStore store,
+    IResourceStore store,
     ISourceRegistryIndexReader indexReader,
     ISourceRegistryReader registryReader,
     ISourceRegistryReferenceResolver references,
@@ -69,7 +71,7 @@ public sealed partial class SourceRegistryManagementService(
                     Status = SucceededStatus()
                 }, null, true, cancellationToken);
             }
-            catch (ControlPlaneConcurrencyException)
+            catch (ResourceConcurrencyException)
             {
                 registration = await GetRegistrationStoredAsync(SourceRegistryWellKnown.OfficialName, cancellationToken);
                 if (registration is null)
@@ -690,7 +692,7 @@ public sealed partial class SourceRegistryManagementService(
                 Status = SucceededStatus()
             }, existing?.ETag, existing is null, cancellationToken);
         }
-        catch (ControlPlaneConcurrencyException)
+        catch (ResourceConcurrencyException)
         {
             var concurrent = await GetObservedStoredAsync(registration.Name, cancellationToken);
             if (concurrent is null)
