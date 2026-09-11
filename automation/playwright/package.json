@@ -10,7 +10,8 @@
     "install:browsers": "playwright install chromium",
     "test": "playwright test",
     "test:smoke": "playwright test --grep @smoke",
-    "capture": "tsx cli/capture.ts"
+    "capture": "tsx cli/capture.ts",
+    "coverage:report": "node --import tsx cli/coverage.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
