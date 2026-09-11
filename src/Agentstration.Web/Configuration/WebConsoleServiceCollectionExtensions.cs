@@ -66,6 +66,7 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<HttpUserPreferencesClient, IUserPreferencesClient>(services, configured.ManagementApi);
         AddClient<ModelProvidersApiClient, IModelProvidersClient>(services, configured.ManagementApi);
         AddClient<ExtensionsApiClient, IExtensionsClient>(services, configured.ManagementApi);
+        AddClient<SourceConsoleApiClient, ISourceConsoleApiClient>(services, configured.ManagementApi);
         AddClient<SourceProvidersApiClient, ISourceProvidersClient>(services, configured.ManagementApi);
         AddClient<SourceRegistriesApiClient, ISourceRegistriesClient>(services, configured.ManagementApi);
         AddClient<ModelProfilesApiClient, IModelProfilesClient>(services, configured.ManagementApi);
@@ -179,6 +180,7 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddSingleton<IAuthorizationHandler, PlatformAdministratorHandler>();
         services.AddSingleton<IAuthorizationHandler, InteractiveUserHandler>();
         services.AddSingleton<ConsoleRealtimeSession>();
+        services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(provider => provider.GetRequiredService<ConsoleRealtimeSession>());
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()

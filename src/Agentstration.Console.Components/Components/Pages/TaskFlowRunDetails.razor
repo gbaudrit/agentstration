@@ -68,7 +68,7 @@ else
         unavailable = false; notFound = false;
         try { run = await Client.GetTaskFlowRunAsync(TaskId, RunId, lifetime.Token); selected = run.Steps.FirstOrDefault(value => value.StepName == selected?.StepName) ?? run.Steps.FirstOrDefault(); }
         catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound) { notFound = true; run = null; }
-        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or Polly.Timeout.TimeoutRejectedException) { unavailable = true; run = null; }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException) { unavailable = true; run = null; }
     }
     private void SelectStep(string name) => selected = run?.Steps.FirstOrDefault(value => value.StepName == name);
     private void SetInspectorVisible(bool value) => inspectorVisible = value;

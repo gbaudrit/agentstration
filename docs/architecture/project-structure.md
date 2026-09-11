@@ -11,7 +11,8 @@ src/
   Agentstration.Tools.SourceRegistry/ Offline Source Version validation and digest .NET tool
   Agentstration.Flow.*/               Flow model, use cases, contracts and SQLite
   Agentstration.Work*/                Work model, contracts, API and SQLite
-  Agentstration.Web*/                 Console, UI libraries and shared components
+  Agentstration.Console.*/            Operations Console typed clients and Razor presentation
+  Agentstration.Web*/                 Standalone host, Flow Designer and shared UI components
   Agentstration.Workplace.*/          End-user client, components and host
   Agentstration.AppHost/              Aspire development orchestration
 tests/

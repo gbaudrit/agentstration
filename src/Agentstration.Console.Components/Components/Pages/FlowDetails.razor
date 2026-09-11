@@ -99,7 +99,7 @@ else
     private IReadOnlyList<string> AvailableTabs => Tabs;
     private OrchestrationFlowDefinition? Orchestration => flow?.Definition as OrchestrationFlowDefinition;
     private bool IsOrchestration => Orchestration is not null;
-    private string FlowYaml => flow?.Graph is { } graph ? Agentstration.Flow.Application.FlowDraftService.ToYaml(graph) : flow is null ? string.Empty : ResourceManifestSerializer.ToYaml(flow.Definition);
+    private string FlowYaml => flow?.Graph is { } graph ? FlowYamlPresentation.ToYaml(graph) : flow is null ? string.Empty : ResourceManifestSerializer.ToYaml(flow.Definition);
     private string EditorUrl
     {
         get

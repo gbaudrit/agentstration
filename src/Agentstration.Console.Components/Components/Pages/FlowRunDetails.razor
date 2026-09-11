@@ -2,7 +2,7 @@
 @implements IDisposable
 @inject IFlowApiClient Client
 @inject NavigationManager Navigation
-@inject Agentstration.Web.Security.ConsoleRealtimeSession RealtimeSession
+@inject IConsoleRealtimeConnectionConfigurator RealtimeSession
 @inject ILogger<FlowRunDetails> Logger
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings> Localizer
 @inject TimeProvider TimeProvider

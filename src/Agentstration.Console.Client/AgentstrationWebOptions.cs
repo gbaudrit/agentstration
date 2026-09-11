@@ -33,8 +33,8 @@ public sealed class AuthenticationOptions
     public string? ClientSecret { get; set; }
     public bool RequireHttpsMetadata { get; set; } = true;
     public string? DataProtectionKeysPath { get; set; }
-    public string DevelopmentIssuer { get; set; } = Agentstration.Management.Core.LocalBootstrapOptions.DevelopmentIssuer;
-    public string DevelopmentSubject { get; set; } = Agentstration.Management.Core.LocalBootstrapOptions.DevelopmentSubject;
+    public string DevelopmentIssuer { get; set; } = "https://agentstration.local/development";
+    public string DevelopmentSubject { get; set; } = "development-operator";
     public string DevelopmentDisplayName { get; set; } = "Development operator";
 
     public static bool SupportsLocalAccounts(string mode) =>

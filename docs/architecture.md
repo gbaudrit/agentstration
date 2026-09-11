@@ -2,14 +2,16 @@
 
 ## Outcome and constraints
 
-Agentstration keeps explicit Management Plane, Runtime Plane, and Work Plane boundaries in one modular codebase and one authoritative standalone server. `Agentstration.Web` hosts the operations Console and all server-side API surfaces; the end-user Workplace remains a separate HTTP/SignalR client UI. The Management Plane is authoritative for definitions, revisions, and desired deployment state. The Runtime Plane owns technical execution. The Work Plane owns the functional lifecycle, history, interactions, and results of delegated work. Runtime `AIAgent` objects are reconstructible and never persisted. The default launch is fully local; Foundry, PostgreSQL, Ollama, and OTLP are optional profiles, while Aspire orchestrates the server, Workplace, and optional extensions.
+Agentstration keeps explicit Management Plane, Runtime Plane, and Work Plane boundaries in one modular codebase and one authoritative standalone server. `Agentstration.Web` hosts the operations Console and all server-side API surfaces, while the Console presentation is compiled in a dedicated Razor component library that consumes typed HTTP clients; the end-user Workplace remains a separate HTTP/SignalR client UI. The Management Plane is authoritative for definitions, revisions, and desired deployment state. The Runtime Plane owns technical execution. The Work Plane owns the functional lifecycle, history, interactions, and results of delegated work. Runtime `AIAgent` objects are reconstructible and never persisted. The default launch is fully local; Foundry, PostgreSQL, Ollama, and OTLP are optional profiles, while Aspire orchestrates the server, Workplace, and optional extensions.
 
 ## Solution tree
 
 ```text
 src/
   Agentstration.AppHost/          Aspire orchestration and dashboard
-  Agentstration.Web/              authoritative server, operations Console, REST, MCP, workers and hubs
+  Agentstration.Web/              authoritative standalone host, REST, MCP, workers and hubs
+  Agentstration.Console.Client/   typed operations Console HTTP and SignalR clients
+  Agentstration.Console.Components/ operations Console routes, presentation state and localization
   Agentstration.Web.Components/   reusable Razor components and console design system
   Agentstration.Web.FlowDesigner/ Flow-specific Razor UI, editor state, Z diagrams, Monaco
   Agentstration.Workplace.Client/ typed HTTP and reconnecting SignalR client
@@ -58,6 +60,7 @@ Core dependency direction:
 ```text
 Web ---> Infrastructure ---> Application ---> Work
 Web ---> Management / Flow / Runtime public boundaries
+Console.Components ---> Console.Client + shared UI + neutral contracts
 
 Web -> Management contracts + core
 Management.Core -> Management.Abstractions + Runtime.Abstractions

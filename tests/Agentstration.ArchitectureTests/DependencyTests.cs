@@ -22,12 +22,14 @@ using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Storage.Sqlite;
 using Agentstration.Tools.SourceRegistry;
 using Agentstration.Web.Console;
+using Agentstration.Web.Components;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Agentstration.Workplace.Client;
 using Agentstration.Workplace.Components;
 using Agentstration.Workplace.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Components;
 
 namespace Agentstration.ArchitectureTests;
 
@@ -62,7 +64,7 @@ public sealed class DependencyTests
     [TestMethod]
     public void OrganizationComponentsUseTheIdentityHttpClientBoundary()
     {
-        var pages = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Web", "Components", "Pages");
+        var pages = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Console.Components", "Components", "Pages");
         var forbidden = new[]
         {
             "Agentstration.Management.Core",
@@ -77,6 +79,72 @@ public sealed class DependencyTests
             .ToArray();
 
         Assert.IsEmpty(violations, $"Organization components must use IIdentityAdministrationApiClient: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
+    public void ConsoleComponentsReferenceOnlyClientsAndNeutralUiBoundaries()
+    {
+        var references = typeof(ConsoleRouteAssembly).Assembly.GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .ToArray();
+        var forbidden = new[]
+        {
+            "Agentstration.Application",
+            "Agentstration.Infrastructure",
+            "Agentstration.Management.Core",
+            "Agentstration.ModelProviders",
+            "Agentstration.Runtime.AgentFramework",
+            "Agentstration.Runtime.Core",
+            "Agentstration.Security.AspNetCoreIdentity",
+            "Agentstration.Tools.Mcp",
+            "Agentstration.Web"
+        };
+
+        Assert.IsFalse(references.Any(reference =>
+            forbidden.Contains(reference, StringComparer.Ordinal)
+            || reference!.Contains(".Storage.", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void ConsoleComponentsDoNotUseServerImplementationNamespaces()
+    {
+        var components = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Console.Components");
+        var forbidden = new[]
+        {
+            "Agentstration.Application",
+            "Agentstration.Infrastructure",
+            "Agentstration.Management.Core",
+            "Agentstration.Runtime.Core",
+            "Agentstration.Security.AspNetCoreIdentity",
+            "Agentstration.Web.Api",
+            "Agentstration.Web.Hosting"
+        };
+        var violations = Directory.EnumerateFiles(components, "*.*", SearchOption.AllDirectories)
+            .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".razor", StringComparison.OrdinalIgnoreCase))
+            .Where(path => forbidden.Any(value => File.ReadAllText(path).Contains(value, StringComparison.Ordinal)))
+            .Select(path => Path.GetRelativePath(components, path))
+            .ToArray();
+
+        Assert.IsEmpty(violations, $"Console components must consume typed clients and neutral contracts: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
+    public void ConsoleRoutesAreOwnedByTheDedicatedComponentAssembly()
+    {
+        var routes = typeof(ConsoleRouteAssembly).Assembly.GetTypes()
+            .SelectMany(type => type.GetCustomAttributes(typeof(RouteAttribute), inherit: false)
+                .Cast<RouteAttribute>()
+                .Select(attribute => attribute.Template))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        Assert.IsGreaterThanOrEqualTo(80, routes.Count);
+        foreach (var route in new[]
+                 {
+                     "/", "/agents", "/deployments", "/flows", "/tasks", "/settings",
+                     "/settings/organization", "/settings/sources", "/triggers"
+                 })
+            Assert.Contains(route, routes);
     }
 
     [TestMethod]
