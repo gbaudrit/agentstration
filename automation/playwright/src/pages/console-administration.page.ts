@@ -62,6 +62,17 @@ export class ConsoleAdministrationPage {
     if (language !== 'auto') await this.page.locator(`html[lang="${language}"]`).waitFor({ state: 'attached' });
   }
 
+  public async restoreLanguage(consoleUrl: string, language: 'en-US' | 'fr-FR'): Promise<void> {
+    const response = await this.page.request.put(`${consoleUrl}/api/identity/preferences`, {
+      data: { theme: 'Dark', language },
+    });
+    if (!response.ok()) throw new Error(`Preference cleanup returned HTTP ${response.status()}.`);
+    await this.page.goto(`${consoleUrl}/_culture?culture=${encodeURIComponent(language)}&returnUrl=${encodeURIComponent('/settings/profile')}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await this.page.locator(`html[lang="${language}"]`).waitFor({ state: 'attached' });
+  }
+
   public async createAndRevokeToken(name: string): Promise<void> {
     await fillAndCommit(this.page.getByTestId(TestIds.consoleAdministration.patName), name);
     const permission = this.page.getByTestId(TestIds.consoleAdministration.patPermission).first();

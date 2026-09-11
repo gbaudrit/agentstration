@@ -24,6 +24,7 @@ export const inspectConsoleAdministration: Journey<InspectConsoleAdministrationI
   await administration.selectTheme('dark');
   await administration.selectLanguage('fr-FR');
   await context.checkpoint({ name: Checkpoints.consoleAdministration.preferences, page: context.pages.page, target: context.pages.page.getByTestId(TestIds.consoleAdministration.profileSettings) });
+  await administration.restoreLanguage(context.consoleUrl, 'en-US');
 
   await administration.open(context.consoleUrl, '/account/pat', 'accountPat');
   await administration.createAndRevokeToken(input.tokenName?.trim() || 'playwright-console-administration');
