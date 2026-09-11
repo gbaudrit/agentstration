@@ -24,6 +24,8 @@ $reportDirectory = Split-Path -Parent $resolvedReport
 if (-not [string]::IsNullOrWhiteSpace($reportDirectory)) {
     New-Item -ItemType Directory -Force -Path $reportDirectory | Out-Null
 }
+$trxFileName = ".test-results-$([Guid]::NewGuid().ToString('N')).trx"
+$trxPath = Join-Path $reportDirectory $trxFileName
 
 $startInfo = [System.Diagnostics.ProcessStartInfo]::new('dotnet')
 $startInfo.ArgumentList.Add($resolvedAssembly)
@@ -31,6 +33,11 @@ $startInfo.ArgumentList.Add('--minimum-expected-tests')
 $startInfo.ArgumentList.Add($MinimumExpectedTests.ToString([System.Globalization.CultureInfo]::InvariantCulture))
 $startInfo.ArgumentList.Add('--progress')
 $startInfo.ArgumentList.Add('off')
+$startInfo.ArgumentList.Add('--report-trx')
+$startInfo.ArgumentList.Add('--report-trx-filename')
+$startInfo.ArgumentList.Add($trxFileName)
+$startInfo.ArgumentList.Add('--results-directory')
+$startInfo.ArgumentList.Add($reportDirectory)
 $startInfo.UseShellExecute = $false
 $startInfo.CreateNoWindow = $true
 $startInfo.RedirectStandardOutput = $true
@@ -70,11 +77,22 @@ while (-not $process.HasExited) {
 }
 $process.WaitForExit()
 $stopwatch.Stop()
-$output = $standardOutput.GetAwaiter().GetResult()
+$null = $standardOutput.GetAwaiter().GetResult()
 $null = $standardError.GetAwaiter().GetResult()
 
-$countMatches = [regex]::Matches($output, '(?im)^\s*total\s*:\s*(\d+)\s*$')
-$testCount = if ($countMatches.Count -gt 0) { [int]$countMatches[$countMatches.Count - 1].Groups[1].Value } else { 0 }
+$testCount = 0
+if (Test-Path -LiteralPath $trxPath) {
+    try {
+        [xml] $trx = Get-Content -LiteralPath $trxPath -Raw
+        $counters = $trx.SelectSingleNode("//*[local-name()='Counters']")
+        if ($null -ne $counters) {
+            $testCount = [int]$counters.GetAttribute('total')
+        }
+    }
+    finally {
+        [System.IO.File]::Delete($trxPath)
+    }
+}
 $workingSetMiB = [Math]::Round($peakWorkingSetBytes / 1MB, 1)
 $privateMiB = [Math]::Round($peakPrivateBytes / 1MB, 1)
 $aggregateDotnetWorkingSetMiB = [Math]::Round($peakAggregateDotnetWorkingSetBytes / 1MB, 1)
