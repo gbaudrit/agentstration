@@ -1,5 +1,6 @@
 using System.Net;
 using Agentstration.Management.Abstractions;
+using Agentstration.Web.Console;
 using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Http.Connections.Client;
 
@@ -7,7 +8,7 @@ namespace Agentstration.Web.Security;
 
 public sealed class ConsoleRealtimeSession(
     IHttpContextAccessor httpContextAccessor,
-    ICurrentRequestContext requestContext)
+    ICurrentRequestContext requestContext) : IConsoleRealtimeConnectionConfigurator
 {
     public void Configure(Uri endpoint, HttpConnectionOptions options)
     {

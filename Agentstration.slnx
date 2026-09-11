@@ -8,6 +8,7 @@
   <Folder Name="/src/">
     <Project Path="src/Agentstration.AppHost/Agentstration.AppHost.csproj" />
     <Project Path="src/Agentstration.Application/Agentstration.Application.csproj" />
+    <Project Path="src/Agentstration.Console.Client/Agentstration.Console.Client.csproj" />
     <Project Path="src/Agentstration.Flow/Agentstration.Flow.csproj" />
     <Project Path="src/Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
     <Project Path="src/Agentstration.Flow.Contracts/Agentstration.Flow.Contracts.csproj" />

@@ -1,5 +1,5 @@
-using Agentstration.Web.Security;
 using Agentstration.Work.Contracts;
+using Microsoft.AspNetCore.Http.Connections.Client;
 using Microsoft.AspNetCore.SignalR.Client;
 
 namespace Agentstration.Web.Console;
@@ -15,9 +15,14 @@ public interface IWorkOperationsRealtimeClient : IAsyncDisposable
     Task StartAsync(IEnumerable<string> workspaceIds, CancellationToken cancellationToken);
 }
 
+public interface IConsoleRealtimeConnectionConfigurator
+{
+    void Configure(Uri endpoint, HttpConnectionOptions options);
+}
+
 public sealed class WorkOperationsRealtimeClient(
     Uri hubUrl,
-    ConsoleRealtimeSession realtimeSession,
+    IConsoleRealtimeConnectionConfigurator realtimeSession,
     ILogger<WorkOperationsRealtimeClient> logger) : IWorkOperationsRealtimeClient
 {
     private readonly HubConnection connection = new HubConnectionBuilder()
