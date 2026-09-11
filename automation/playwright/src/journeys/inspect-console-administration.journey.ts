@@ -23,7 +23,6 @@ export const inspectConsoleAdministration: Journey<InspectConsoleAdministrationI
   await administration.selectTheme('light');
   await administration.selectTheme('dark');
   await administration.selectLanguage('fr-FR');
-  await administration.selectLanguage('en-US');
   await context.checkpoint({ name: Checkpoints.consoleAdministration.preferences, page: context.pages.page, target: context.pages.page.getByTestId(TestIds.consoleAdministration.profileSettings) });
 
   await administration.open(context.consoleUrl, '/account/pat', 'accountPat');

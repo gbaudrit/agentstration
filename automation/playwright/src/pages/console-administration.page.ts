@@ -88,13 +88,4 @@ export class ConsoleAdministrationPage {
     await this.page.getByTestId(TestIds.console.notificationsTrigger).click();
     await this.page.getByTestId(TestIds.console.notificationsPanel).waitFor({ state: 'visible' });
   }
-
-  public async signOut(): Promise<void> {
-    await Promise.all([
-      this.page.waitForURL(url => url.pathname !== '/logout'),
-      this.page.getByTestId(TestIds.consoleAdministration.logoutSubmit).click(),
-    ]);
-    const path = new URL(this.page.url()).pathname;
-    if (path !== '/' && path !== '/login') throw new Error(`Logout redirected to unexpected path '${path}'.`);
-  }
 }

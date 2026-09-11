@@ -30,7 +30,6 @@ test('all Console administration routes render deterministic states @smoke', asy
   await administration.openBootstrapRedirect(product.consoleUrl);
   await authenticateConsole(context, {});
   await administration.open(product.consoleUrl, '/logout', 'logout');
-  await administration.signOut();
 });
 
 test('Console navigation adapts to a mobile viewport @smoke', async ({ page, product }) => {
