@@ -90,12 +90,10 @@ test('a published form Entry can be submitted from its dedicated Workplace route
   await pages.workplace.waitForAgentResponse();
 });
 
-test('Workplace keeps its primary navigation usable at a mobile viewport @smoke', async ({ page, product }) => {
+test('Workplace keeps its primary navigation usable at a mobile viewport @smoke @responsive', async ({ page, product }) => {
   const pages = new ProductPages(page);
   const context = { ...product, pages, checkpoint: ignoreCheckpoints };
   await authenticateConsole(context, {});
-  await page.setViewportSize({ width: 390, height: 844 });
-
   await pages.workplace.openRoot(product.workplaceUrl);
   await expect(pages.workplace.mobileAppBar).toBeVisible();
   await expect(page.getByTestId(TestIds.workplace.activityLink)).toBeVisible();

@@ -2,6 +2,11 @@ export const SupportedTestLocales = ['en-US', 'fr-FR'] as const;
 export type SupportedTestLocale = typeof SupportedTestLocales[number];
 
 export interface ExpectedText {
+  navigation: {
+    main: string;
+    overview: string;
+    settings: string;
+  };
   organizationWorkspaces: {
     title: string;
     createWorkspace: string;
@@ -20,6 +25,11 @@ export interface ExpectedText {
 
 export const ExpectedTextByLocale = {
   'en-US': {
+    navigation: {
+      main: 'Main navigation',
+      overview: 'Overview',
+      settings: 'Settings',
+    },
     organizationWorkspaces: {
       title: 'Workspaces',
       createWorkspace: 'Create Workspace',
@@ -36,6 +46,11 @@ export const ExpectedTextByLocale = {
     },
   },
   'fr-FR': {
+    navigation: {
+      main: 'Navigation principale',
+      overview: 'Vue d’ensemble',
+      settings: 'Paramètres',
+    },
     organizationWorkspaces: {
       title: 'Espaces de travail',
       createWorkspace: 'Créer un espace de travail',

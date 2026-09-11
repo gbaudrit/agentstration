@@ -81,11 +81,15 @@ jobs:
         env:
           AGENTSTRATION_PLAYWRIGHT_NO_BUILD: true
         run: npm run test:smoke
-      - name: Upload browser diagnostics
-        if: failure()
+      - name: Write application coverage report
+        if: always()
+        working-directory: automation/playwright
+        run: npm run coverage:report > test-results/application-coverage.md
+      - name: Upload browser quality evidence
+        if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: browser-ux-diagnostics
+          name: browser-ux-evidence-${{ github.run_attempt }}
           path: |
             automation/playwright/test-results
             automation/playwright/playwright-report

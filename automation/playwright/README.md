@@ -8,6 +8,8 @@ npm run install:browsers
 npm run test:smoke
 ```
 
+The smoke gate runs three Chromium projects: the desktop suite, focused responsive checks at a mobile viewport, and the independent `en-US`/`fr-FR` locale contract. Every product test also fails on unhandled page errors, actionable console errors, first-party request failures, or a visible fatal Blazor state. CI publishes the Playwright diagnostics and typed application-surface coverage report on every run.
+
 To use Playwright UI against an already-running instance:
 
 ```powershell
