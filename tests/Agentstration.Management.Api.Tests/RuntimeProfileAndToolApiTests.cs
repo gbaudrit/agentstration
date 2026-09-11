@@ -15,7 +15,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
-public sealed partial class ModelManagementApiTests
+[TestClass]
+public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
     public async Task RuntimeProfileIsPersistedAsAnIndependentManagementResource()

@@ -777,7 +777,7 @@ public sealed class DeclarativeBootstrapTests
         bool configureOllamaExtension = false)
     {
         EnsureInstanceProfileDescriptor(path);
-        return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        return new ApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Authentication:Mode", "Local");
@@ -794,7 +794,7 @@ public sealed class DeclarativeBootstrapTests
     private static WebApplicationFactory<Program> FactoryWithExtensionPresenceHandler(string path, bool discoverOnStartup)
     {
         EnsureInstanceProfileDescriptor(path);
-        return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        return new ApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Authentication:Mode", "Development");

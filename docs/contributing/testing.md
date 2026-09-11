@@ -45,7 +45,9 @@ The current Web storage workload remains a mixed-project boundary until #303 mov
 | `Agentstration.Application.Tests` | Integration | Includes SQLite Flow and Work storage contracts |
 | `Agentstration.Management.Storage.Tests` | Integration | SQLite control-plane, Identity persistence, secrets, audit, and trigger storage |
 | `Agentstration.Management.Sources.Tests` | Integration | Source, registry, provider, and Pack distribution boundaries |
-| `Agentstration.Management.Tests` | Integration, mixed | Remaining hosted API, Security, bootstrap, and AEP tests; split by #302 |
+| `Agentstration.Management.Api.Tests` | Integration | Hosted Management API and declarative bootstrap tests using the API-only test profile |
+| `Agentstration.Management.Security.Tests` | Integration | Identity, authorization, local-account, and interactive Security boundaries |
+| `Agentstration.Management.Aep.Tests` | Integration | AEP enrollment lifecycle and extension inventory boundaries using the API-only test profile |
 | `Agentstration.ModelProviders.Tests` | Integration, provider-optional | AEP test hosts plus opt-in live-provider checks |
 | `Agentstration.Runtime.Tests` | Integration | SQLite reconstruction and hosted runtime endpoints |
 | `Agentstration.SourceProviders.Git.Tests` | Integration | Real Git processes and file-system repositories |
