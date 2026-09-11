@@ -44,7 +44,7 @@ test('a pasted Source manifest is imported without Internet and opens its detail
     displayName: 'Playwright offline source',
   });
   await pages.distribution.open(product.consoleUrl, '/settings/sources', 'sources');
-  await pages.distribution.open(product.consoleUrl, '/settings/sources/playwright/offline-source', 'sources');
+  await pages.distribution.openSourceDetailsFromList('playwright', 'offline-source');
   await expect(pages.distribution.sourceDetails('playwright', 'offline-source')).toBeVisible();
 });
 

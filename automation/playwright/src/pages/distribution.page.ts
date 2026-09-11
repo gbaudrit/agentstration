@@ -80,6 +80,14 @@ export class DistributionPage {
     return this.page.url().split('/').at(-1)!;
   }
 
+  public async openSourceDetailsFromList(publisher: string, name: string): Promise<void> {
+    const row = this.page.locator(
+      `[data-testid="${TestIds.distribution.sourceRow}"][data-source-publisher="${attributeValue(publisher)}"][data-source-name="${attributeValue(name)}"]`,
+    );
+    await row.locator('a.resource-name-link').click();
+    await this.sourceDetails(publisher, name).waitFor({ state: 'visible' });
+  }
+
   public async buildPackProject(): Promise<void> {
     await this.page.getByTestId(TestIds.distribution.packProjectBuild).click();
     await this.page.locator(`[data-testid="${TestIds.distribution.packProjectStatus}"][data-state="success"]`).waitFor({ state: 'visible' });
