@@ -26,6 +26,7 @@
   <data name="Status.Pending"><value>Pending</value></data>
   <data name="Status.Running"><value>Running</value></data>
   <data name="Status.WaitingForInput"><value>Waiting for input</value></data>
+  <data name="Status.WaitingForChild"><value>Waiting for child Flow</value></data>
   <data name="Status.Succeeded"><value>Succeeded</value></data>
   <data name="Status.Failed"><value>Failed</value></data>
   <data name="Status.Cancelled"><value>Cancelled</value></data>

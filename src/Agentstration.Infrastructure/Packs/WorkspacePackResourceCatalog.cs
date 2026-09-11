@@ -329,6 +329,18 @@ public sealed class WorkspacePackResourceCatalog(
                 if (router.Fallback is { } fallback && !Dynamic(fallback.ResourceId))
                     yield return IncludeDependency(fallback.ResourceId, fallback.Namespace ?? flow.Id.Namespace, ResourceKinds.Agent, "routerFallback");
             }
+            else if (step is FlowCallStepDefinition flowCall)
+            {
+                yield return IncludeDependency(flowCall.Flow.ResourceId, flowCall.Flow.Namespace ?? flow.Id.Namespace, ResourceKinds.Flow, "graphFlow");
+            }
+            else if (step is ToolFlowStepDefinition tool)
+            {
+                yield return UnsupportedDependency(
+                    new ResourceReference(tool.Tool.ResourceId, @namespace: tool.Tool.Namespace),
+                    flow.Id.Namespace,
+                    ResourceKinds.Tool,
+                    "graphTool");
+            }
         }
     }
 

@@ -1,0 +1,29 @@
+apiVersion: agentstration.io/v1
+kind: ToolDefinition
+metadata:
+  name: notification.send
+definition:
+  displayName: Send notification
+  description: Delivers a notification through the active reusable delivery Flow.
+  enabled: true
+  requiresApproval: false
+  inputSchema:
+    type: object
+    properties:
+      deliveryKey: { type: string }
+      title: { type: string }
+      message: { type: string }
+      actionUrl: { type: string }
+    required: [deliveryKey, title, message]
+  outputSchema:
+    type: object
+    properties:
+      notificationId: { type: string }
+      deliveryKey: { type: string }
+      createdAt: { type: string }
+      recovered: { type: boolean }
+    required: [notificationId, deliveryKey, createdAt, recovered]
+  flow:
+    name: notification-delivery
+    useActiveVersion: true
+  invocationTimeoutSeconds: 90

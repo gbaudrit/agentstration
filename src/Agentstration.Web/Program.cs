@@ -168,7 +168,11 @@ builder.Services.AddSingleton<IFlowRunEventSink>(provider => new CompositeFlowRu
 ]));
 builder.Services.AddSingleton<IWorkplaceEventSink, SignalRWorkplaceEventSink>();
 builder.Services.AddAgentstrationWebConsole(builder.Configuration, builder.Environment);
-builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();
+builder.Services.AddMcpServer()
+    .WithHttpTransport()
+    .WithToolsFromAssembly()
+    .WithListToolsHandler(AgentstrationMcpHandlers.ListToolsAsync)
+    .WithCallToolHandler(AgentstrationMcpHandlers.CallToolAsync);
 if (hostedServicesEnabled)
 {
     builder.Services.AddHostedService<AgentDeploymentReconciliationWorker>();

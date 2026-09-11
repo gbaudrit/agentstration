@@ -105,7 +105,7 @@ public sealed class WorkspaceTriggerExecutionAuthorizer(
         scopes.Push(new RequestContext(executionScope.PrincipalId, executionScope.TenantId, executionScope.WorkspaceId));
 }
 
-public sealed class TriggerWorkSubmitter(FlowService flows, WorkItemService work, IWorkItemRepository repository) : ITriggerWorkSubmitter
+public sealed class TriggerWorkSubmitter(RootFlowSubmissionService rootFlows, IWorkItemRepository repository) : ITriggerWorkSubmitter
 {
     public async Task<TriggerSubmission?> GetExistingAsync(Guid workspaceId, Guid occurrenceId, CancellationToken cancellationToken)
     {
@@ -127,8 +127,6 @@ public sealed class TriggerWorkSubmitter(FlowService flows, WorkItemService work
         var workspaceId = new WorkspaceId(occurrence.WorkspaceId);
         var ownerNamespace = trigger.Namespace;
         var reference = new FlowReference(new FlowId(target.Name, target.Namespace ?? ownerNamespace), target.Version, target.Version is null, target.Namespace);
-        var resolved = await flows.ResolveAsync(workspaceId, reference, ownerNamespace, cancellationToken);
-        var immutable = new FlowReference(resolved.FlowId, resolved.Version, false, resolved.FlowId.Namespace);
         var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["origin"] = "trigger",
@@ -142,18 +140,29 @@ public sealed class TriggerWorkSubmitter(FlowService flows, WorkItemService work
         IReadOnlyList<WorkInput> inputs = trigger.Definition.Input.ValueKind == System.Text.Json.JsonValueKind.Undefined
             ? []
             : [new WorkInput(Structured: trigger.Definition.Input)];
-        var stored = await work.SubmitAsync(new SubmitWorkItemCommand(
+        var instruction = $"Triggered execution of Flow '{reference.FlowId}'.";
+        var flowInput = System.Text.Json.JsonSerializer.SerializeToElement(new
+        {
+            prompt = instruction,
+            inputs = inputs.Select(value => value.Structured ?? System.Text.Json.JsonSerializer.SerializeToElement(value.Text)).ToArray()
+        });
+        var submission = await rootFlows.SubmitAsync(new SubmitRootFlowCommand(
             workspaceId,
+            reference,
+            flowInput,
+            FlowInvocationOrigin.Trigger,
+            trigger.Definition.ExecutionScope?.PrincipalId.ToString("D") ?? "trigger-system",
+            FlowRunTrigger.Schedule,
+            occurrence.Id.ToString("N"),
+            occurrence.Id.ToString("D"),
+            $"trigger:{trigger.Uid:N}:{occurrence.Id:N}",
             "trigger",
-            $"Triggered execution of Flow '{resolved.FlowId}'.",
+            instruction,
             trigger.Definition.DisplayName,
             trigger.Definition.Description,
-            trigger.Definition.ExecutionScope?.PrincipalId.ToString("D"),
-            new WorkCorrelationId($"trigger:{trigger.Uid:N}:{occurrence.Id:N}"),
             Metadata: metadata,
-            Inputs: inputs,
-            Flow: immutable,
-            Id: new WorkItemId(occurrence.Id)), cancellationToken);
-        return new(stored.Value.Id.ToString());
+            WorkInputs: inputs,
+            WorkItemId: new WorkItemId(occurrence.Id)), cancellationToken);
+        return new(submission.WorkItem.Value.Id.ToString());
     }
 }

@@ -13,16 +13,25 @@ public sealed partial class FlowRunService
     {
         var stored = initial;
         var graph = stored.Value.DefinitionSnapshot.Graph!;
-        var outputs = new Dictionary<string, JsonElement?>(StringComparer.Ordinal);
-        var currentName = graph.EntryStep;
-        var executed = new HashSet<string>(StringComparer.Ordinal);
+        var outputs = stored.Value.Steps
+            .Where(step => step.Status is FlowStepRunStatus.Succeeded or FlowStepRunStatus.Failed)
+            .ToDictionary(step => step.StepName, step => step.Output?.Clone(), StringComparer.Ordinal);
+        var resumedChildStep = stored.Value.Steps.SingleOrDefault(step =>
+            step.Status == FlowStepRunStatus.Running && step.ChildFlowRunId is not null);
+        var currentName = resumedChildStep?.StepName ?? graph.EntryStep;
+        var executed = stored.Value.Steps
+            .Where(step => step.Status is FlowStepRunStatus.Succeeded or FlowStepRunStatus.Failed)
+            .Select(step => step.StepName)
+            .ToHashSet(StringComparer.Ordinal);
         JsonElement? finalOutput = null;
-        for (var count = 0; count < graph.Steps.Count; count++)
+        for (var count = executed.Count; count < graph.Steps.Count; count++)
         {
             runToken.ThrowIfCancellationRequested();
             var step = graph.Steps.Single(item => item.Name == currentName);
             if (!executed.Add(step.Name)) throw new FlowValidationException("flow_cycle_detected", $"Step '{step.Name}' was reached more than once.");
-            stored = await StartStepAsync(stored, step.Name, runToken);
+            if (resumedChildStep?.StepName != step.Name)
+                stored = await StartStepAsync(stored, step.Name, runToken);
+            resumedChildStep = null;
             var context = new FlowExecutionContext(stored.Value.Input, outputs);
             JsonElement? output;
             string eventName;
@@ -60,6 +69,69 @@ public sealed partial class FlowRunService
                         ? await EvaluateExpressionAsync(transform.Expression!, context, runToken)
                         : transform.Mapping is null ? JsonSerializer.SerializeToElement(new { }) : await ResolveJsonAsync(transform.Mapping.Value, context, runToken);
                     eventName = "completed"; break;
+                case ToolFlowStepDefinition tool:
+                    var arguments = tool.ArgumentsMapping is null
+                        ? JsonSerializer.SerializeToElement(new { })
+                        : await ResolveJsonAsync(tool.ArgumentsMapping.Value, context, runToken);
+                    try
+                    {
+                        output = await toolExecutor.ExecuteAsync(new FlowToolExecutionRequest(
+                            stored.Value.Scope,
+                            stored.Value.Id,
+                            stored.Value.FlowId,
+                            step.Name,
+                            stored.Value.Steps.Single(item => item.StepName == step.Name).Attempt,
+                            stored.Value.CorrelationId!,
+                            tool.Tool,
+                            arguments), runToken);
+                        eventName = "completed";
+                    }
+                    catch (Exception exception) when (exception is not OperationCanceledException)
+                    {
+                        output = JsonSerializer.SerializeToElement(new { error = exception.Message });
+                        eventName = "failed";
+                        stepError = exception is FlowValidationException validation
+                            ? new FlowRunError(validation.Code, "The Tool step failed.", validation.Message)
+                            : new FlowRunError("tool_step_failed", "The Tool step failed.", exception.Message);
+                    }
+                    break;
+                case FlowCallStepDefinition flowCall:
+                    var callInput = flowCall.InputMapping is null
+                        ? stored.Value.Input.Clone()
+                        : await ResolveJsonAsync(flowCall.InputMapping.Value, context, runToken);
+                    var stepRun = stored.Value.Steps.Single(item => item.StepName == step.Name);
+                    var childRunId = stepRun.ChildFlowRunId ?? ChildFlowRunId(stored.Value, step.Name, stepRun.Attempt);
+                    var child = await repository.GetRunAsync(stored.Value.WorkspaceId, childRunId, runToken);
+                    if (child is null)
+                    {
+                        stored = await SuspendForChildAsync(stored, step.Name, childRunId, runToken);
+                        await EnsureChildFlowRunAsync(stored.Value, flowCall, callInput, childRunId, runToken);
+                        return;
+                    }
+                    ValidateChildIdentity(stored.Value, flowCall, child.Value, childRunId);
+                    if (!child.Value.Status.IsTerminal())
+                    {
+                        await SuspendForChildAsync(stored, step.Name, childRunId, runToken);
+                        return;
+                    }
+                    output = child.Value.Output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
+                    eventName = child.Value.Status switch
+                    {
+                        FlowRunStatus.Succeeded => "completed",
+                        FlowRunStatus.Failed => "failed",
+                        FlowRunStatus.TimedOut => "timedOut",
+                        FlowRunStatus.Cancelled => "cancelled",
+                        _ => throw new InvalidOperationException($"Child Flow Run '{childRunId}' has unsupported terminal status '{child.Value.Status}'.")
+                    };
+                    if (child.Value.Status != FlowRunStatus.Succeeded)
+                    {
+                        var childError = child.Value.Error;
+                        stepError = new FlowRunError(
+                            childError?.Code ?? $"child_flow_{eventName}",
+                            $"Child Flow Run '{childRunId}' {eventName}.",
+                            childError?.Details ?? childError?.Message);
+                    }
+                    break;
                 case OutputFlowStepDefinition terminal:
                     output = terminal.OutputMapping is null ? outputs.Values.LastOrDefault(value => value is not null)?.Clone() : await ResolveJsonAsync(terminal.OutputMapping.Value, context, runToken);
                     finalOutput = output; eventName = "completed"; break;
@@ -187,6 +259,6 @@ public sealed partial class FlowRunService
         return value.Clone();
     }
 
-    private static JsonElement? StepDeclaredInput(FlowStepDefinition step) => step switch { AgentFlowStepDefinition agent => agent.InputMapping?.Clone(), TransformFlowStepDefinition transform => transform.Mapping?.Clone(), OutputFlowStepDefinition output => output.OutputMapping?.Clone(), _ => null };
+    private static JsonElement? StepDeclaredInput(FlowStepDefinition step) => step switch { AgentFlowStepDefinition agent => agent.InputMapping?.Clone(), FlowCallStepDefinition flow => flow.InputMapping?.Clone(), ToolFlowStepDefinition tool => tool.ArgumentsMapping?.Clone(), TransformFlowStepDefinition transform => transform.Mapping?.Clone(), OutputFlowStepDefinition output => output.OutputMapping?.Clone(), _ => null };
 }
 

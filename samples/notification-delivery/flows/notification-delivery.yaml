@@ -1,0 +1,55 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: notification-delivery
+definition:
+  displayName: In-product notification delivery
+  description: Maps the stable notification contract to the internal atomic MCP Tool.
+  version: 1.0.0
+  enabled: true
+  spec:
+    flowKind: direct
+    target:
+      kind: agent
+      id: unused-graph-target
+  graph:
+    entryStep: input
+    inputSchema:
+      type: object
+      properties:
+        deliveryKey: { type: string }
+        title: { type: string }
+        message: { type: string }
+        actionUrl: { type: string }
+      required: [deliveryKey, title, message]
+    outputSchema:
+      type: object
+      properties:
+        notificationId: { type: string }
+        deliveryKey: { type: string }
+        createdAt: { type: string }
+        recovered: { type: boolean }
+      required: [notificationId, deliveryKey, createdAt, recovered]
+    steps:
+      - type: input
+        name: input
+        displayName: Delivery request
+      - type: tool
+        name: create-notification
+        displayName: Create in-product notification
+        tool:
+          resourceId: agentstration.work.notification.create
+        argumentsMapping:
+          deliveryKey: "${input.deliveryKey}"
+          title: "${input.title}"
+          message: "${input.message}"
+          actionUrl: "${input.actionUrl}"
+      - type: output
+        name: output
+        displayName: Delivery receipt
+        outputMapping: "${steps.create-notification.output}"
+    transitions:
+      - { id: input-to-tool, fromStep: input, event: completed, toStep: create-notification }
+      - { id: tool-to-output, fromStep: create-notification, event: completed, toStep: output }
+  publish: true
+  activate: true

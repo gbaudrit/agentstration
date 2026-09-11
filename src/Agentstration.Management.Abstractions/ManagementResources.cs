@@ -30,6 +30,7 @@ public static class ResourceKinds
     public const string Secret = "Secret";
     public const string Vault = "Vault";
     public const string Tool = "Tool";
+    public const string ToolDefinition = "ToolDefinition";
     public const string ToolProvider = "ToolProvider";
     public const string ToolExecutionHook = "ToolExecutionHook";
     public const string Trigger = "Trigger";

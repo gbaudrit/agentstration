@@ -30,7 +30,12 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
             throw new AgentDefinitionValidationException("handler_not_supported", $"Handler '{agent.Handler}' is not supported.");
 
         var instructions = NormalizeInstructions(agent.Instructions);
-        var tools = agent.Tools.Select(reference => reference.Name).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        var tools = agent.Tools
+            .Select(reference => reference.Resolve(resource.Namespace, ResourceKinds.Tool))
+            .Select(address => ToolResourceIdentity.CatalogId(address.Namespace, address.Name))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
         var middleware = agent.Middleware.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         var contextProviders = agent.ContextProviders.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         var capabilities = agent.Behaviors.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();

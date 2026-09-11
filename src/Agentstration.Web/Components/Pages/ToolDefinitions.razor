@@ -1,0 +1,33 @@
+@page "/tools/definitions"
+@inject IToolDefinitionsClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
+
+<PageTitle>@T("DefinitionsTitle") · Agentstration</PageTitle>
+<PageHeader Title="@T("DefinitionsTitle")" Description="@T("DefinitionsDescription")">
+    <Actions><a class="button-primary" href="/tools/definitions/new">@T("NewDefinition")</a><button class="button-secondary" @onclick="LoadAsync">@T("Refresh")</button></Actions>
+</PageHeader>
+<ResourceTabs Label="@T("SectionsLabel")"><a href="/tools">@T("Catalog")</a><a class="active" href="/tools/definitions">@T("Definitions")</a><a href="/tools/providers">@T("Providers")</a></ResourceTabs>
+
+@if (loading) { <LoadingState Message="@T("LoadingDefinitions")" /> }
+else if (error is not null) { <ErrorState Message="@error" /> }
+else if (definitions.Count == 0) { <EmptyState Title="@T("DefinitionsEmptyTitle")" Message="@T("DefinitionsEmptyMessage")" /> }
+else
+{
+    <DataGrid TItem="ToolDefinitionResource" Items="definitions">
+        <Header><tr><th>@T("Tool")</th><th>@T("FlowImplementation")</th><th>@T("Enabled")</th><th>@T("RequiresApproval")</th><th></th></tr></Header>
+        <Row Context="definition"><tr><td><span class="resource-name-with-scope"><strong>@definition.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="definition.ScopeRef" Compact /></span><code>@PublicName(definition)</code></td><td><code>@Flow(definition)</code></td><td>@BooleanLabel(definition.Definition.Enabled)</td><td>@BooleanLabel(definition.Definition.RequiresApproval)</td><td><a class="text-button" href="@EditUrl(definition)">@T("Edit")</a></td></tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private IReadOnlyList<ToolDefinitionResource> definitions = [];
+    private bool loading = true;
+    private string? error;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync() { loading=true;error=null;try{definitions=await Client.GetAsync(default);}catch(Exception ex){error=ex.Message;}finally{loading=false;} }
+    private static string PublicName(ToolDefinitionResource value) => value.Namespace.IsDefault ? value.Name : $"{value.Namespace.Value}.{value.Name}";
+    private static string Flow(ToolDefinitionResource value) => $"{value.Definition.Flow.Namespace ?? value.Namespace}/{value.Definition.Flow.Name}:{(value.Definition.Flow.UseActiveVersion ? "active" : value.Definition.Flow.Version)}";
+    private static string EditUrl(ToolDefinitionResource value) => $"/tools/definitions/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString(value.Namespace.Value)}";
+}

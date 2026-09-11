@@ -104,9 +104,9 @@ Canonical Management resources and provider-neutral ports live in `Management.Ab
 | Agents | management definitions plus isolated MAF runtime adapter | sessions, execution budgets, richer tool policies |
 | Workflows | normalize → analyze → remember | parallel, routing, handoff, supervisor, HITL |
 | Scheduling | Workspace-scoped Trigger resources, durable occurrences, Quartz.NET projection in the selected SQLite or PostgreSQL store, startup reconciliation, explicit misfire/concurrency policy and authorized Work submission | webhook/event/condition sources, workload identities, clustered scheduling |
-| Tools | persisted ToolProvider/Tool resources, AEP contribution resolution, MCP schema catalog, and an Agentstration-owned runtime execution boundary before MCP `tools/call` | richer permissions, credentials, connection policies, and execution hooks |
-| Notifications | Work and Workplace notification records | email, Teams, webhook channels |
-| MCP | generic governed MCP provider/client infrastructure; no built-in legacy platform tools | managed server-side tools and authorization |
+| Tools | persisted ToolProvider/Tool resources, AEP contribution resolution, MCP schema catalog, governed execution, and Workspace ToolDefinitions that publish bounded Flow-backed Tools | richer permissions, credentials, connection policies, and additional built-in hook handlers |
+| Notifications | Work and Workplace notification records, the idempotent `work.notification.create` internal MCP Tool, and reusable delivery Flows | packaged external-provider delivery recipes |
+| MCP | generic governed provider/client infrastructure, bounded internal Tools, and dynamic `tools/list`/`tools/call` publication of enabled ToolDefinitions; no generic Flow launcher or legacy platform tools | resources, prompts, and richer task progress |
 | Observability | OTel traces/metrics/log correlation tags | dashboards and SLOs |
 
 ## Principal contracts
@@ -173,19 +173,26 @@ POST /api/flows
 POST /api/flows/{id}/versions
   -> immutable FlowVersion snapshot
   -> optional active-version pointer update
-WorkItem -> optional FlowReference (exact or active)
-Flow Run -> resolves exact published FlowReference -> local graph execution or isolated MAF orchestration adapter
+Entry / Trigger / REST / Console -> RootFlowSubmissionService
+  -> trusted FlowRunScope authorization and exact published FlowReference
+  -> one idempotent WorkItem plus one deterministic root FlowRun
+WorkItem execution -> revalidates durable scope -> local graph execution or isolated MAF orchestration adapter
 ```
 
-The Flow module is physically independent and owns editable typed graph drafts, immutable published snapshots, constrained expressions, and the provider-neutral Flow Run model. The local executor traverses `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps sequentially without referencing Microsoft Agent Framework; Infrastructure adapts agent steps and Management resource lookups.
+The Flow module is physically independent and owns editable typed graph drafts, immutable published snapshots, constrained expressions, and the provider-neutral Flow Run model. The graph vocabulary includes one generic `Flow` call and one generic governed `Tool` call; resource catalogs populate their targets without adding provider-specific node types. Flow Application validates their logical references, mappings, and published schemas while remaining independent of Runtime and MCP implementations. The local executor traverses `Input`, `Agent`, `Flow`, `Tool`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps sequentially. Infrastructure adapts agent steps, Management resource lookups, and Tool steps to the shared Tool Execution Pipeline. A Tool step records stable logical and per-attempt invocation identities, preserves workspace and principal scope, and projects Tool lifecycle and governance events into its owning Flow Run.
+
+A Flow call creates a deterministic durable child Flow Run for the parent step attempt. The parent persists `WaitingForChild`, clears its execution lease, and releases the worker. The child captures the resolved immutable version, parent/root causality, nesting depth, and the parent's tenant, Workspace, Principal, interaction, and Work Task identities. A terminal child atomically moves a waiting parent back to `Pending`; replay reconstructs completed step outputs and resumes at the calling step. Startup recovery requeues lost parents or children, cancellation walks the active descendant tree, and configured depth and descendant limits bound composition. Both local SQLite and optional PostgreSQL persist these additions inside the existing Flow document payload, so this increment does not require a relational schema migration.
+
+Root Flow callers share `RootFlowSubmissionService`, an Application-owned boundary distinct from child execution. It obtains tenant, Workspace, and Principal scope from the authenticated execution context, reauthorizes submission, resolves active references to an immutable version, validates input before creating Work, and persists structured origin, caller, causation, correlation, and idempotency metadata. A caller-supplied idempotency key deterministically identifies the functional WorkItem; the root FlowRun derives from that Work identity. Both the submission path and the local worker use the same idempotent root-run gateway, so a crash or concurrent queue delivery recovers the same pair. Trigger occurrences retain their existing WorkItem identifier. Execution revalidates the durable scope before observing the run. The existing JSON Work metadata and Flow payload carry these fields, so no relational migration is required.
 
 ### Flow Run vertical
 
 ```text
-Console / API / future Work adapter
+Entry / Trigger / REST / Console
+  -> RootFlowSubmissionService returns or recovers the WorkItem and published root Flow Run
   -> POST published Flow Run returns 202 Accepted
-  -> bounded local Flow queue
-  -> validate input and persist the exact draft or published definition snapshot
+  -> bounded local Work and Flow queues
+  -> persist the exact validated published definition snapshot
   -> traverse typed steps or execute a bounded provider-neutral orchestration through the runtime adapter
   -> persist differential events, transitions, diagnostics, usage, and failures
   -> SignalR updates with persisted replay, cancellation, global and per-Flow history
@@ -280,6 +287,10 @@ Agent tool reference: Agentstration.Tools/tools/{name}
 
 AEP owns extension identity, presentation metadata, server declarations, and the mapping from a lightweight contribution to MCP. It deliberately carries no tool schema, invocation payload, result, or operational MCP error. MCP remains authoritative for `tools/list`, schema/annotations, `tools/call`, results, and protocol failures. Agentstration owns persistent `ToolProviderResource` and `ToolResource` documents, discovery state, assignment by canonical resource ID, enablement, and approval policy. Direct external MCP is a ToolProvider and does not pass through AEP. The catalog is independent of MAF; the Runtime adapter consumes its provider-neutral `IAgentTool` and reuses the official SDK's native `AITool` when available. A governed tool marked `requiresApproval` is exposed as an `ApprovalRequiredAIFunction`; MAF's external request then follows the durable `InputRequest` suspension and resume path.
 
+The reserved `agentstration` MCP provider is materialized from Workspace-owned `ToolDefinition` resources. An enabled definition publishes one stable MCP Tool whose exact or active Flow implementation has the same JSON input/output schemas. `tools/call` and assigned Agent invocations both create or recover the root WorkItem/FlowRun through `RootFlowSubmissionService`; trusted scope never comes from Tool arguments. Calls execute within the configured bound, return the Flow output, and retain a receipt containing the effective immutable Flow version and durable identifiers. Active Flow publication is guarded against breaking an enabled definition. See ADR-0106.
+
+The same internal provider publishes a deliberately bounded atomic `work.notification.create` Tool and projects it as an ordinary governed Tool in each Workspace. It accepts presentation fields plus an explicit delivery key, while scope and Flow/Tool causality come only from the trusted execution context. A reusable delivery Flow maps its stable contract to that Tool; parents call the delivery Flow, and a contract-compatible active version can instead map to Slack, Teams, email, or another MCP provider without changing them. There is no notification-specific graph step or channel resource. See ADR-0107.
+
 Discovery is performed on provider create/update and by an explicit refresh operation. It materializes new tools as disabled, updates provider-owned metadata while preserving administrator enablement, marks disappeared tools unavailable without deleting them, and restores availability if they reappear. Runtime usability requires provider enabled, tool enabled, tool available, and an Agent assignment.
 
 Extension endpoints are resolved from `Agentstration:Extensions:{extensionId}:Endpoint`, Aspire connection strings named `*-extension`, and workspace-owned `ExtensionRegistration` Management resources. The Extensions inventory treats enabled registrations as discovery candidates and does not scan the local network. Manual registrations have their own ETag-protected CRUD surface and can be disabled without being deleted. Relative MCP endpoints in AEP discovery are resolved against that extension base URL; absolute endpoints must use HTTP(S). The earlier AEP chat `AepToolDefinition`, `AepToolCall`, and `AepToolResult` contracts describe model-provider function-calling exchange only and are not an operational extension-tool protocol.
@@ -323,7 +334,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 3. **Delivered runtime vertical:** isolated Microsoft Agent Framework adapter, in-process/shared-host provisioners, runtime registry, periodic reconciliation, single-agent routing, execution, and standalone sample data.
 4. **Retired legacy vertical:** the historical content ingestion, memory search and Mission monitoring stack was removed after the Management, Work, Flow, Runtime and Trigger modules superseded its responsibilities. See ADR-0071.
 5. **Delivered Work vertical:** domain-controlled lifecycle, typed identifiers, interactions, idempotent Runtime events, independent SQLite persistence, local execution gateway, canonical REST API, metrics, traces, and tests.
-6. **Delivered Flow authoring vertical:** independent projects, typed seven-step graphs, draft revisions and ETags, structural/resource/expression validation, YAML/JSON source, immutable publication, visual authoring, Work references, OpenAPI, and SQLite.
+6. **Delivered Flow authoring vertical:** independent projects, a finite typed graph vocabulary including the generic Flow-call authoring primitive, draft revisions and ETags, structural/resource/expression/schema/dependency validation, YAML/JSON source, immutable publication, visual authoring, Work references, OpenAPI, and SQLite.
 7. **Delivered Flow Runtime vertical:** durable FlowRun contracts and event history, immutable draft/published snapshots, bounded sequential typed-graph execution, input validation, cancellation, SignalR replay, telemetry, and the Flow-centered console.
 8. **Next Work increment:** durable execution dispatch/recovery, requester authorization, external artifact storage, cancel propagation, and retry/relaunch operations.
 9. **Delivered Runtime Run increment:** durable Run resources, local queue, exact agent-generation resolution, SQLite history, SSE observation, cancellation, retry, and Agent Runner console.
@@ -362,6 +373,9 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 42. **Delivered Source registry lifecycle increment:** Platform administrators manage independent official, community, and private Registry endpoints as instance-owned, ETag-protected registrations with explicit trust, network, authentication, refresh, and cache policies. Opt-in periodic refresh reuses the Source scheduling worker with persisted timeout/backoff/jitter, last-known-good, staleness, recovery, and bounded cache-retention state. Credentials remain instance-scoped Secret references resolved only for same-origin requests, while deletion preserves retained observations for provenance. See ADR-0098 and ADR-0101.
 43. **Delivered Source registry trust increment:** Registry origin, publisher assertion, exact SourceVersion verification, and Snapshot verification remain independent decisions. Current trust is recalculated from local registration policy and immutable cached observations; revocation and conflicting accepted digests fail closed, while every contributing observation remains exposed as provenance. Agentstration-owned HTTPS host classification is informational, and only the stable built-in official registration receives official-origin classification. See ADR-0103.
 44. **Delivered Source registry discovery/import increment:** Platform administrators can search and page a deterministic merge of current compatible Registry shards, inspect every equal or conflicting observation, and import one exact retained observation. The selected manifest alone is fetched and revalidated for origin, identity, opaque version, and canonical digest before the normal immutable Source import runs. SourceVersion and downstream Pack provenance retain the Registry registration, observation, index/shard evidence, validators, publisher assertion, and trust snapshot; no Channel is materialized and `latest` remains shard-local. See ADR-0104.
+45. **Delivered Flow-backed ToolDefinition increment:** namespaced Workspace ETag CRUD, Console authoring, published-Flow contract guards, reserved internal MCP provider projection, dynamic MCP publication, governed Agent assignment, bounded root Flow invocation, deterministic replay, and operation receipts. See ADR-0106.
+46. **Delivered reusable notification Flow increment:** bounded internal `work.notification.create` MCP Tool, ordinary Tool projection and governance, Workspace-scoped deterministic delivery, causal receipts, and samples composing parent → delivery Flow → terminal Tool. See ADR-0107.
+47. **Delivered composable Flow Run diagnostics increment:** bounded Workspace-scoped causal projection from invocation origin through nested Flow Runs, Agent steps, logical Tool calls, physical attempts and governance deep links, without duplicating execution state or exposing sensitive payloads. See ADR-0108.
 
 ## ADR catalog
 
@@ -436,3 +450,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0088: Source verification binds exact definitions and snapshots
 - ADR-0089: Source Bootstrap profiles reuse administrative applications
 - ADR-0102: Source Providers follow hierarchical resource visibility
+- ADR-0105: Flows compose reusable Flows and governed Tools
+- ADR-0106: ToolDefinitions publish Flow-backed MCP Tools
+- ADR-0107: notification channels are delivery Flows
+- ADR-0108: Flow Run causality is a bounded read model

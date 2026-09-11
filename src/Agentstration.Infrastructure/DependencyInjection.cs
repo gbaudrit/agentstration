@@ -7,6 +7,7 @@ using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.Events;
 using Agentstration.Infrastructure.Flows;
+using Agentstration.Infrastructure.Notifications;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Sources;
@@ -217,6 +218,7 @@ public static class DependencyInjection
         services.AddSingleton<SourceRegistryDiscoveryService>();
         services.AddSingleton<ISourceVerificationEvidenceProvider>(services => services.GetRequiredService<SourceRegistryTrustEvaluationService>());
         services.AddSingleton<ToolManagementService>();
+        services.AddSingleton<ToolDefinitionService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
         services.AddSingleton<ITriggerScheduleCalculator, QuartzTriggerScheduleCalculator>();
@@ -274,6 +276,7 @@ public static class DependencyInjection
         services.AddSingleton<IToolExecutionHookResolver, ManagementToolExecutionHookResolver>();
         services.AddSingleton<IToolGovernanceAuditReader, ToolGovernanceAuditReader>();
         services.AddSingleton<IToolExecutionPipeline, ToolExecutionPipeline>();
+        services.AddSingleton<IFlowToolExecutor, ManagedFlowToolExecutor>();
         services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
             services.AddPostgreSqlWorkPlane(storageOptions.ConnectionString!);
@@ -288,6 +291,13 @@ public static class DependencyInjection
         services.AddSingleton<ILocalWorkExecutionQueue>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
         services.AddSingleton<WorkItemService>();
         services.AddSingleton<WorkplaceService>();
+        services.AddSingleton<WorkNotificationMcpToolDefinitionProvider>();
+        services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<WorkNotificationMcpToolDefinitionProvider>());
+        services.AddSingleton<WorkNotificationMcpTool>();
+        services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<WorkNotificationMcpTool>());
+        services.AddSingleton<InternalMcpToolProjectionService>();
+        services.AddSingleton(provider => new Lazy<IEnumerable<IInternalMcpToolHandler>>(
+            () => provider.GetServices<IInternalMcpToolHandler>()));
         services.AddSingleton<WorkTaskDeletionService>();
         services.AddSingleton<IWorkTaskEventSink, WorkplaceProjectionSink>();
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
@@ -298,6 +308,9 @@ public static class DependencyInjection
             services.AddSqliteFlowStorage(flowConnectionString);
         }
         services.AddSingleton<FlowService>();
+        services.AddSingleton<IToolDefinitionFlowResolver, ToolDefinitionFlowResolver>();
+        services.AddSingleton<IFlowVersionActivationGuard, ToolDefinitionFlowActivationGuard>();
+        services.AddSingleton<IFlowDeletionGuard, ToolDefinitionFlowDeletionGuard>();
         services.AddSingleton<IEntryTargetResolver, EntryTargetResolver>();
         services.AddSingleton<EntryResourceDeletionGuard>();
         services.AddSingleton<IManagementResourceDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
@@ -309,6 +322,9 @@ public static class DependencyInjection
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
         services.AddSingleton<IFlowRunExecutionScope, WorkspaceFlowRunExecutionScope>();
         services.AddSingleton<IWorkExecutionScopeAccessor, CurrentWorkExecutionScopeAccessor>();
+        services.AddSingleton<IRootFlowTargetResolver, RootFlowTargetResolver>();
+        services.AddSingleton<IRootFlowRunGateway, RootFlowRunGateway>();
+        services.AddSingleton<IRootFlowSubmissionAuthorizer, RootFlowSubmissionAuthorizer>();
         services.TryAddSingleton<IFlowRunEventSink, NullFlowRunEventSink>();
         services.AddSingleton<IFlowInputRequestSink, WorkplaceFlowInputProjectionSink>();
         services.AddSingleton<IWorkplaceExternalInputResponder, WorkplaceFlowInputResponder>();
@@ -325,6 +341,9 @@ public static class DependencyInjection
         services.AddSingleton<IFlowDefinitionValidator, FlowGraphValidator>();
         services.AddSingleton<FlowDraftService>();
         services.AddSingleton<FlowRunService>();
+        services.AddSingleton<RootFlowSubmissionService>();
+        services.AddSingleton<IToolDefinitionExecutor, ToolDefinitionExecutor>();
+        services.AddSingleton(provider => new Lazy<IToolDefinitionExecutor>(provider.GetRequiredService<IToolDefinitionExecutor>));
         return services;
     }
 }
