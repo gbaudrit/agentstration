@@ -81,7 +81,6 @@ export class ConsoleAdministrationPage {
     await sidebarToggle.click();
     await this.page.getByTestId(TestIds.console.commandTrigger).click();
     await this.page.getByTestId(TestIds.console.commandPalette).waitFor({ state: 'visible' });
-    await fillAndCommit(this.page.getByTestId(TestIds.console.commandInput), 'settings');
     await this.page.getByTestId(TestIds.console.commandPalette).getByRole('option').first().waitFor({ state: 'visible' });
     await this.page.keyboard.press('Escape');
     await this.page.getByTestId(TestIds.console.commandPalette).waitFor({ state: 'detached' });
