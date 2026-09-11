@@ -35,6 +35,31 @@ namespace Agentstration.ArchitectureTests;
 public sealed class DependencyTests
 {
     [TestMethod]
+    public void ConsoleClientDoesNotReferenceAuthoritativeServerImplementations()
+    {
+        var references = typeof(IManagementApiClient).Assembly.GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .ToArray();
+
+        var forbidden = new[]
+        {
+            "Agentstration.Application",
+            "Agentstration.Infrastructure",
+            "Agentstration.Management.Core",
+            "Agentstration.ModelProviders",
+            "Agentstration.Runtime.AgentFramework",
+            "Agentstration.Runtime.Core",
+            "Agentstration.Security.AspNetCoreIdentity",
+            "Agentstration.Tools.Mcp",
+            "Agentstration.Web"
+        };
+
+        Assert.IsFalse(references.Any(reference =>
+            forbidden.Contains(reference, StringComparer.Ordinal)
+            || reference!.Contains(".Storage.", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public void WorkplaceRealtimeClientIsScopedPerBlazorCircuit()
     {
         var services = new ServiceCollection();
