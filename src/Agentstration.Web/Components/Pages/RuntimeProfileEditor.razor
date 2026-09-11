@@ -8,7 +8,7 @@
 
 <PageTitle>@(IsNew ? T("CreateProfile") : $"{Name} · {T("RuntimeProfile")}") · Agentstration</PageTitle>
 <PageHeader Title="@(IsNew ? T("CreateProfile") : model?.DisplayName ?? Name)" Description="@T("Description")" TestId="resource-runtime-profile-editor">
-    <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">@T("Delete")</button> }<a class="button-secondary" href="/runtimeprofiles">@T("Back")</a></Actions>
+    <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete" data-testid="runtime-profile-delete">@T("Delete")</button> }<a class="button-secondary" href="/runtimeprofiles">@T("Back")</a></Actions>
 </PageHeader>
 
 @if (model is null) { <LoadingState Message="@T("Loading")" /> }
@@ -19,7 +19,7 @@ else
     <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="runtime-profile-editor" class="resource-form">
         <DataAnnotationsValidator /><ValidationSummary />
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("RuntimeResource")</h2></div></div><div class="form-grid">
-            <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /></label><label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /></label>
+            <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" data-testid="runtime-profile-name" /></label><label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" data-testid="runtime-profile-display-name" /></label>
             <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /></label>
             <ResourceScopeFormField ResourceKind="@ResourceKinds.RuntimeProfile" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
             <label class="form-span-2"><span>@T("RuntimeType")</span><InputText @bind-Value="model.RuntimeType" /><small>@T("RuntimeTypeHelpPrefix") <code>microsoft-agent-framework</code> @T("RuntimeTypeHelpSuffix")</small></label>
@@ -30,12 +30,12 @@ else
             <label><span>@T("Streaming")</span><InputSelect @bind-Value="model.Streaming">@foreach (var value in Enum.GetValues<StreamingMode>()) { <option value="@value">@StreamingLabel(value)</option> }</InputSelect></label>
         </div></section>
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Adapter")</p><h2>@T("RuntimeOptions")</h2></div><span>@T("Advanced")</span></div><div class="form-grid"><label class="form-span-2"><span>@T("RuntimeSpecificJson")</span><InputTextArea @bind-Value="model.RuntimeOptionsJson" rows="8" class="runner-json form-code-editor" /><small>@T("RuntimeJsonHelp")</small></label></div></section>
-        <div class="form-actions"><a class="button-secondary" href="/runtimeprofiles">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving">@(saving ? T("Saving") : IsNew ? T("CreateProfileAction") : T("SaveChanges"))</button></div>
+        <div class="form-actions"><a class="button-secondary" href="/runtimeprofiles">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving" data-testid="runtime-profile-save">@(saving ? T("Saving") : IsNew ? T("CreateProfileAction") : T("SaveChanges"))</button></div>
     </EditForm>
     @if (!IsNew && usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>@T("Deployments")</h2><span>@usages.Count</span></div><ul>@foreach (var usage in usages) { <li><strong>@usage.Name</strong> · @usage.Environment</li> }</ul></section> }
 }
 
-<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" TestId="runtime-profile-delete-dialog" />
 
 @code {
     [Parameter] public string? Name { get; set; }

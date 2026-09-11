@@ -74,4 +74,11 @@ export const Checkpoints = {
     profileEditors: 'resource-administration-profile-editors',
     protectedEditors: 'resource-administration-protected-editors',
   },
+  modelAdministration: {
+    provider: 'model-administration-provider',
+    runtime: 'model-administration-runtime',
+    profile: 'model-administration-profile',
+    updated: 'model-administration-updated',
+    deleted: 'model-administration-deleted',
+  },
 } as const;

@@ -108,6 +108,15 @@ function partialResourceAdministration(
   };
 }
 
+function coveredModelAdministration(id: string, source: string, routes: readonly string[], fixtureKeys: readonly string[] = []): ApplicationSurface {
+  return {
+    id, host: 'console', source, routes, fixtureKeys,
+    pageObject: 'src/pages/model-administration.page.ts',
+    journey: 'exercise-model-administration',
+    specification: 'tests/model-administration.spec.ts', coverage: 'covered',
+  };
+}
+
 export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
     id: 'console-home', host: 'console', source: `${consolePages}/Home.razor`, routes: ['/'], fixtureKeys: [],
@@ -170,12 +179,12 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   coveredFlow('task-flow-run-details', `${consolePages}/TaskFlowRunDetails.razor`, ['/tasks/{TaskId:guid}/flowruns/{RunId}'], ['taskId', 'runId'], 'inspect-flow-observability'),
 
   partialResourceAdministration('entries', `${consolePages}/Entries.razor`, ['/entries']),
-  partialResourceAdministration('model-profiles', `${consolePages}/ModelProfiles.razor`, ['/modelprofiles']),
-  partialResourceAdministration('model-profile-editor', `${consolePages}/ModelProfileEditor.razor`, ['/modelprofiles/new', '/modelprofiles/{Name}'], ['name']),
-  partialResourceAdministration('model-providers', `${consolePages}/ModelProviders.razor`, ['/modelproviders']),
-  partialResourceAdministration('model-provider-details', `${consolePages}/ModelProviderDetails.razor`, ['/modelproviders/new', '/modelproviders/{Name}'], ['name']),
-  partialResourceAdministration('runtime-profiles', `${consolePages}/RuntimeProfiles.razor`, ['/runtimeprofiles']),
-  partialResourceAdministration('runtime-profile-editor', `${consolePages}/RuntimeProfileEditor.razor`, ['/runtimeprofiles/new', '/runtimeprofiles/{Name}'], ['name']),
+  coveredModelAdministration('model-profiles', `${consolePages}/ModelProfiles.razor`, ['/modelprofiles']),
+  coveredModelAdministration('model-profile-editor', `${consolePages}/ModelProfileEditor.razor`, ['/modelprofiles/new', '/modelprofiles/{Name}'], ['name']),
+  coveredModelAdministration('model-providers', `${consolePages}/ModelProviders.razor`, ['/modelproviders']),
+  coveredModelAdministration('model-provider-details', `${consolePages}/ModelProviderDetails.razor`, ['/modelproviders/new', '/modelproviders/{Name}'], ['name']),
+  coveredModelAdministration('runtime-profiles', `${consolePages}/RuntimeProfiles.razor`, ['/runtimeprofiles']),
+  coveredModelAdministration('runtime-profile-editor', `${consolePages}/RuntimeProfileEditor.razor`, ['/runtimeprofiles/new', '/runtimeprofiles/{Name}'], ['name']),
   partialResourceAdministration('secrets', `${consolePages}/Secrets.razor`, ['/secrets']),
   partialResourceAdministration('secret-editor', `${consolePages}/SecretEditor.razor`, ['/secrets/new', '/secrets/{Name}'], ['name']),
   partialResourceAdministration('vaults', `${consolePages}/Vaults.razor`, ['/vaults']),
