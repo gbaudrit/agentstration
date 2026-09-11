@@ -45,6 +45,7 @@ export const TestIds = {
     route: 'flow-handoff-route',
     routeFrom: 'flow-handoff-from',
     routeTo: 'flow-handoff-to',
+    removeRoute: 'flow-remove-route',
     autonomous: 'flow-autonomous-handoffs',
     maximumTurns: 'flow-maximum-turns',
     terminationPhrase: 'flow-termination-phrase',
