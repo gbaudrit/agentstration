@@ -135,9 +135,6 @@ jobs:
       - name: Restore Agentstration
         if: needs.changes.outputs.dotnet == 'true'
         run: dotnet restore Agentstration.slnx -p:NuGetAudit=true -p:NuGetAuditMode=all
-      - name: Restore repository tools
-        if: needs.changes.outputs.dotnet == 'true'
-        run: dotnet tool restore
       - name: Restore complete AEP SDK
         if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
         run: dotnet restore aep/Aep.slnx -p:NuGetAudit=true -p:NuGetAuditMode=all
@@ -148,19 +145,69 @@ jobs:
       - name: Build Agentstration
         if: needs.changes.outputs.dotnet == 'true'
         run: dotnet build Agentstration.slnx --configuration Release --no-restore
-      - name: Test functional lanes with coverage
+      - name: Test functional lanes
         if: needs.changes.outputs.dotnet == 'true'
         shell: pwsh
-        run: ./scripts/ci/run-functional-coverage.ps1 -Configuration Release -NoBuild
-      - name: Upload functional coverage report
-        if: always() && needs.changes.outputs.dotnet == 'true'
-        uses: actions/upload-artifact@v6
-        with:
-          name: functional-code-coverage
-          path: artifacts/coverage
-          if-no-files-found: error
-      - name: Capture hosted module diagnostics
+        run: |
+          dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 139 --max-parallel-test-modules 4
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Fast functional lane failed.'
+          }
+          dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 692 --max-parallel-test-modules 2
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Integration functional lane failed.'
+          }
+      - name: Smoke-test Source Registry tool package
         if: needs.changes.outputs.dotnet == 'true'
+        shell: pwsh
+        run: ./scripts/ci/test-source-registry-tool-package.ps1 -Configuration Release -NoBuild
+      - name: Build complete AEP SDK
+        if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
+        run: dotnet build aep/Aep.slnx --configuration Release --no-restore
+      - name: Test complete AEP SDK
+        if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
+        working-directory: aep
+        run: dotnet test --solution Aep.slnx --configuration Release --no-build --minimum-expected-tests 33 --max-parallel-test-modules 2
+
+  hosted-module-diagnostics:
+    name: hosted-module-diagnostics
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.dotnet == 'true'
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Cache NuGet packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+      - name: Restore Agentstration
+        run: dotnet restore Agentstration.slnx -p:NuGetAudit=true -p:NuGetAuditMode=all
+      - name: Build hosted test modules
+        shell: pwsh
+        run: |
+          $modules = @(
+            'Agentstration.Management.Api.Tests',
+            'Agentstration.Management.Bootstrap.Tests',
+            'Agentstration.Management.Security.Tests',
+            'Agentstration.Management.Aep.Tests',
+            'Agentstration.Management.Sources.Tests'
+          )
+          foreach ($module in $modules) {
+            dotnet build "tests/$module/$module.csproj" --configuration Release --no-restore
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not build hosted test module '$module'."
+            }
+          }
+      - name: Capture hosted module diagnostics
         shell: pwsh
         run: |
           @(
@@ -185,23 +232,93 @@ jobs:
               -FailureWorkingSetMiB $module.Failure
           }
       - name: Upload hosted module diagnostics
-        if: always() && needs.changes.outputs.dotnet == 'true'
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: hosted-test-module-diagnostics
           path: artifacts/test-diagnostics/*.json
           if-no-files-found: warn
-      - name: Smoke-test Source Registry tool package
-        if: needs.changes.outputs.dotnet == 'true'
+
+  functional-coverage:
+    name: functional-coverage-${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.dotnet == 'true'
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [a, b]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Cache NuGet packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', '.config/dotnet-tools.json', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+      - name: Restore Agentstration
+        run: dotnet restore Agentstration.slnx -p:NuGetAudit=true -p:NuGetAuditMode=all
+      - name: Build Agentstration
+        run: dotnet build Agentstration.slnx --configuration Release --no-restore
+      - name: Collect functional coverage shard ${{ matrix.shard }}
         shell: pwsh
-        run: ./scripts/ci/test-source-registry-tool-package.ps1 -Configuration Release -NoBuild
-      - name: Build complete AEP SDK
-        if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
-        run: dotnet build aep/Aep.slnx --configuration Release --no-restore
-      - name: Test complete AEP SDK
-        if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
-        working-directory: aep
-        run: dotnet test --solution Aep.slnx --configuration Release --no-build --minimum-expected-tests 33 --max-parallel-test-modules 2
+        run: ./scripts/ci/run-functional-coverage.ps1 -Configuration Release -NoBuild -Shard ${{ matrix.shard }} -SkipPublish
+      - name: Upload raw functional coverage shard ${{ matrix.shard }}
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: functional-code-coverage-raw-${{ matrix.shard }}
+          path: artifacts/coverage/raw/${{ matrix.shard }}
+          if-no-files-found: error
+
+  publish-functional-coverage:
+    name: publish-functional-coverage
+    runs-on: ubuntu-latest
+    needs: [changes, functional-coverage]
+    if: needs.changes.outputs.dotnet == 'true' && needs.functional-coverage.result == 'success'
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Cache NuGet packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', '.config/dotnet-tools.json', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+      - name: Restore repository tools
+        run: dotnet tool restore
+      - name: Download raw functional coverage shard a
+        uses: actions/download-artifact@v8
+        with:
+          name: functional-code-coverage-raw-a
+          path: artifacts/coverage/raw/a
+      - name: Download raw functional coverage shard b
+        uses: actions/download-artifact@v8
+        with:
+          name: functional-code-coverage-raw-b
+          path: artifacts/coverage/raw/b
+      - name: Publish consolidated functional coverage
+        shell: pwsh
+        run: ./scripts/ci/publish-functional-coverage.ps1
+      - name: Upload functional coverage report
+        uses: actions/upload-artifact@v6
+        with:
+          name: functional-code-coverage
+          path: artifacts/coverage
+          if-no-files-found: error
 
   postgresql-storage:
     name: postgresql-storage

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/tests/coverage-b/">
+    <Project Path="tests/Agentstration.Management.Storage.Tests/Agentstration.Management.Storage.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Sources.Tests/Agentstration.Management.Sources.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Security.Tests/Agentstration.Management.Security.Tests.csproj" />
+    <Project Path="tests/Agentstration.Runtime.Tests/Agentstration.Runtime.Tests.csproj" />
+    <Project Path="tests/Agentstration.SourceProviders.Git.Tests/Agentstration.SourceProviders.Git.Tests.csproj" />
+    <Project Path="tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj" />
+    <Project Path="tests/Agentstration.Work.Api.Tests/Agentstration.Work.Api.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -3,7 +3,12 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string] $Configuration = 'Release',
 
-    [switch] $NoBuild
+    [switch] $NoBuild,
+
+    [ValidateSet('All', 'a', 'b')]
+    [string] $Shard = 'All',
+
+    [switch] $SkipPublish
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,27 +20,66 @@ $resolvedCoverageRoot = [System.IO.Path]::GetFullPath($coverageRoot)
 if (-not $resolvedCoverageRoot.StartsWith($coveragePrefix, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Coverage output '$resolvedCoverageRoot' must be inside '$artifactsRoot'."
 }
-if (Test-Path -LiteralPath $resolvedCoverageRoot) {
-    Remove-Item -LiteralPath $resolvedCoverageRoot -Recurse -Force
+$cleanupRoot = if ($Shard -eq 'All') {
+    $resolvedCoverageRoot
+}
+else {
+    Join-Path $resolvedCoverageRoot "raw/$($Shard.ToLowerInvariant())"
+}
+if (Test-Path -LiteralPath $cleanupRoot) {
+    Remove-Item -LiteralPath $cleanupRoot -Recurse -Force
 }
 
 $settingsPath = Join-Path $PSScriptRoot 'coverage.settings.xml'
-$lanes = @(
-    @{
-        Name = 'Fast'
-        Solution = 'Agentstration.Tests.Fast.slnx'
-        MinimumTests = 139
-        ParallelModules = 4
-        ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/fast'
-    },
-    @{
-        Name = 'Integration'
-        Solution = 'Agentstration.Tests.Integration.slnx'
-        MinimumTests = 692
-        ParallelModules = 2
-        ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/integration'
+$lanes = switch ($Shard.ToLowerInvariant()) {
+    'a' {
+        @(
+            @{
+                Name = 'Fast'
+                Solution = 'Agentstration.Tests.Fast.slnx'
+                MinimumTests = 139
+                ParallelModules = 4
+                ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/a/fast'
+            },
+            @{
+                Name = 'Integration coverage shard A'
+                Solution = 'Agentstration.Tests.CoverageA.slnx'
+                MinimumTests = 221
+                ParallelModules = 2
+                ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/a/integration'
+            }
+        )
     }
-)
+    'b' {
+        @(
+            @{
+                Name = 'Integration coverage shard B'
+                Solution = 'Agentstration.Tests.CoverageB.slnx'
+                MinimumTests = 471
+                ParallelModules = 2
+                ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/b/integration'
+            }
+        )
+    }
+    default {
+        @(
+            @{
+                Name = 'Fast'
+                Solution = 'Agentstration.Tests.Fast.slnx'
+                MinimumTests = 139
+                ParallelModules = 4
+                ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/fast'
+            },
+            @{
+                Name = 'Integration'
+                Solution = 'Agentstration.Tests.Integration.slnx'
+                MinimumTests = 692
+                ParallelModules = 2
+                ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/integration'
+            }
+        )
+    }
+}
 
 Push-Location $repositoryRoot
 try {
@@ -63,7 +107,9 @@ try {
         }
     }
 
-    & (Join-Path $PSScriptRoot 'publish-functional-coverage.ps1') -CoverageRoot $resolvedCoverageRoot
+    if (-not $SkipPublish) {
+        & (Join-Path $PSScriptRoot 'publish-functional-coverage.ps1') -CoverageRoot $resolvedCoverageRoot
+    }
 }
 finally {
     Pop-Location
