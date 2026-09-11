@@ -9,7 +9,7 @@ public sealed class DevelopmentAuthenticationHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
     ILoggerFactory logger,
     UrlEncoder encoder,
-    IOptions<AgentstrationWebOptions> webOptions,
+    IOptions<AgentstrationApiOptions> apiOptions,
     IHostEnvironment environment)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
@@ -17,10 +17,10 @@ public sealed class DevelopmentAuthenticationHandler(
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        var authentication = webOptions.Value.Authentication;
-        if (string.Equals(authentication.Mode, AuthenticationOptions.Disabled, StringComparison.OrdinalIgnoreCase))
+        var authentication = apiOptions.Value.Authentication;
+        if (string.Equals(authentication.Mode, ApiAuthenticationOptions.Disabled, StringComparison.OrdinalIgnoreCase))
             return Task.FromResult(AuthenticateResult.NoResult());
-        if (!string.Equals(authentication.Mode, AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase)
+        if (!string.Equals(authentication.Mode, ApiAuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase)
             || (!environment.IsDevelopment() && !environment.IsEnvironment("Testing")))
             return Task.FromResult(AuthenticateResult.NoResult());
         var claims = new[]

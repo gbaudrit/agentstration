@@ -1,6 +1,5 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
-using Agentstration.Web.Components.Localization;
 using Agentstration.Web.Configuration;
 using Agentstration.Web.Hosting;
 using Agentstration.Web.Security;
@@ -113,7 +112,7 @@ public static class IdentityEndpoints
     private static async Task<IResult> GetAdministrationCapabilitiesAsync(
         ICurrentRequestContext requestContext,
         IPlatformAuthorizationService platformAuthorization,
-        IOptions<AgentstrationWebOptions> options,
+        IOptions<AgentstrationApiOptions> options,
         CancellationToken cancellationToken)
     {
         var context = requestContext.Current;
@@ -121,7 +120,7 @@ public static class IdentityEndpoints
             context.PrincipalId,
             context.WorkspaceId,
             await platformAuthorization.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken),
-            Agentstration.Web.Configuration.AuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)));
+            Agentstration.Web.Configuration.ApiAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)));
     }
 
     private static async Task<IResult> CreatePersonalAccessTokenAsync(
@@ -221,13 +220,14 @@ public static class IdentityEndpoints
         UpdatePrincipalPreferencesRequest request,
         HttpContext context,
         PrincipalPreferencesService service,
-        IOptions<AgentstrationLocalizationOptions> localizationOptions,
+        IOptions<RequestLocalizationOptions> localizationOptions,
         CancellationToken cancellationToken)
     {
         var principal = context.Features.Get<ResolvedPrincipalFeature>()?.Principal;
         if (principal is null) return Results.Forbid();
         if (!string.IsNullOrWhiteSpace(request.Language)
-            && !localizationOptions.Value.SupportedCultures.Contains(request.Language, StringComparer.OrdinalIgnoreCase))
+            && !(localizationOptions.Value.SupportedCultures ?? []).Any(culture =>
+                string.Equals(culture.Name, request.Language, StringComparison.OrdinalIgnoreCase)))
             return Results.ValidationProblem(new Dictionary<string, string[]>
             {
                 ["language"] = ["Language must be one of the supported cultures."]

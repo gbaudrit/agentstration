@@ -38,13 +38,13 @@ public sealed partial class ApiClientTests
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Agentstration:Authentication:Mode"] = Agentstration.Web.Configuration.AuthenticationOptions.Oidc,
+            ["Agentstration:Authentication:Mode"] = ApiAuthenticationOptions.Oidc,
             ["Agentstration:Authentication:Authority"] = "https://identity.example/",
             ["Agentstration:Authentication:Audience"] = "agentstration-api",
             ["Agentstration:Authentication:ClientId"] = "agentstration-console"
         }).Build();
         services.AddLogging();
-        services.AddAgentstrationWebConsole(configuration, new TestHostEnvironment());
+        services.AddAgentstrationApi(configuration, new TestHostEnvironment());
         using var provider = services.BuildServiceProvider();
         var selector = provider.GetRequiredService<IOptionsMonitor<PolicySchemeOptions>>()
             .Get(AgentstrationAuthenticationDefaults.PolicyScheme).ForwardDefaultSelector;
@@ -67,10 +67,10 @@ public sealed partial class ApiClientTests
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Agentstration:Authentication:Mode"] = Agentstration.Web.Configuration.AuthenticationOptions.Local
+            ["Agentstration:Authentication:Mode"] = ApiAuthenticationOptions.Local
         }).Build();
         services.AddLogging();
-        services.AddAgentstrationWebConsole(configuration, new TestHostEnvironment());
+        services.AddAgentstrationApi(configuration, new TestHostEnvironment());
         using var provider = services.BuildServiceProvider();
         var options = provider.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
             .Get(IdentityConstants.ApplicationScheme);

@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
-using WebAuthenticationOptions = Agentstration.Web.Configuration.AuthenticationOptions;
+using WebAuthenticationOptions = Agentstration.Web.Configuration.ApiAuthenticationOptions;
 
 namespace Agentstration.Web;
 
@@ -34,7 +34,7 @@ public static class AuthenticationEndpoints
 
     private static async Task<IResult> ListAccountsAsync(
         LocalAccountAdministrationService accounts,
-        IOptions<AgentstrationWebOptions> options,
+        IOptions<AgentstrationApiOptions> options,
         CancellationToken cancellationToken)
     {
         if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
@@ -44,7 +44,7 @@ public static class AuthenticationEndpoints
     private static async Task<IResult> CreateAccountAsync(
         CreateLocalAccountRequest request,
         LocalAccountAdministrationService accounts,
-        IOptions<AgentstrationWebOptions> options,
+        IOptions<AgentstrationApiOptions> options,
         CancellationToken cancellationToken)
     {
         if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
@@ -65,7 +65,7 @@ public static class AuthenticationEndpoints
         Guid accountId,
         SetLocalAccountStatusRequest request,
         LocalAccountAdministrationService accounts,
-        IOptions<AgentstrationWebOptions> options,
+        IOptions<AgentstrationApiOptions> options,
         CancellationToken cancellationToken)
     {
         if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
@@ -76,7 +76,7 @@ public static class AuthenticationEndpoints
 
     private static async Task<IResult> BootstrapStatusAsync(
         LocalBootstrapCoordinator bootstrap,
-        IOptions<AgentstrationWebOptions> options,
+        IOptions<AgentstrationApiOptions> options,
         CancellationToken cancellationToken)
     {
         if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
@@ -100,7 +100,7 @@ public static class AuthenticationEndpoints
         LocalBootstrapCoordinator bootstrap,
         UserManager<LocalIdentityUser> users,
         SignInManager<LocalIdentityUser> signIn,
-        IOptions<AgentstrationWebOptions> options,
+        IOptions<AgentstrationApiOptions> options,
         CancellationToken cancellationToken)
     {
         if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
@@ -124,7 +124,7 @@ public static class AuthenticationEndpoints
     private static async Task<IResult> LoginAsync(
         LocalLoginRequest request,
         LocalAuthenticationService authentication,
-        IOptions<AgentstrationWebOptions> options,
+        IOptions<AgentstrationApiOptions> options,
         CancellationToken cancellationToken)
     {
         if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
@@ -142,7 +142,7 @@ public static class AuthenticationEndpoints
         return Results.NoContent();
     }
 
-    private static IResult OidcLogin(string? returnUrl, IOptions<AgentstrationWebOptions> options)
+    private static IResult OidcLogin(string? returnUrl, IOptions<AgentstrationApiOptions> options)
     {
         var mode = options.Value.Authentication.Mode;
         if (!WebAuthenticationOptions.SupportsExternalLogin(mode)) return Results.NotFound();
