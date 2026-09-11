@@ -46,6 +46,9 @@ src/
 tests/
   Agentstration.Application.Tests/
   Agentstration.ArchitectureTests/
+  Agentstration.Management.Core.Tests/
+  Agentstration.Management.Storage.Tests/
+  Agentstration.Management.Sources.Tests/
   Agentstration.Management.Tests/
   Agentstration.Web.Tests/
   Agentstration.Web.Components.Tests/
