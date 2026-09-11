@@ -3,9 +3,7 @@
 @rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
 @using System.Xml
-@using Agentstration.Management.Core
-@inject TriggerManagementService Management
-@inject ITriggerScheduleCalculator Schedules
+@inject ITriggerApiClient Client
 @inject IFlowApiClient Flows
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
@@ -106,7 +104,7 @@ else
 @code {
     [Parameter] public string? Name { get; set; }
     private TriggerEditorModel? model;
-    private StoredResource<TriggerResource>? existing;
+    private ResourceSnapshot<TriggerResource>? existing;
     private IReadOnlyList<FlowSummary> availableFlows = [];
     private IReadOnlyList<string> timeZones = [];
     private IReadOnlyList<DateTimeOffset> preview = [];
@@ -132,7 +130,7 @@ else
             }
             else
             {
-                existing = await Management.GetAsync(ResourceNamespace.Default, Name!, CancellationToken.None);
+                existing = await Client.GetAsync(ResourceNamespace.Default, Name!, CancellationToken.None);
                 if (existing is null) { notFound = true; return; }
                 selectedScope = existing.Value.ScopeRef;
                 model = From(existing.Value);
@@ -161,7 +159,7 @@ else
     {
         if (model is null) return;
         scheduleError = null; preview = [];
-        try { var schedule = BuildSchedule(); Schedules.Validate(schedule); var values = new List<DateTimeOffset>(); var cursor = TimeProvider.GetUtcNow(); for (var index = 0; index < 5; index++) { var next = Schedules.GetNextOccurrence(schedule, cursor); if (next is null) break; values.Add(next.Value); cursor = next.Value; } preview = values; }
+        try { preview = await Client.PreviewScheduleAsync(BuildSchedule(), 5, CancellationToken.None); }
         catch (Exception exception) { scheduleError = exception.Message; }
         await Task.CompletedTask;
     }
@@ -197,9 +195,8 @@ else
             var separator = model.FlowKey.IndexOf('/'); if (separator <= 0) throw new InvalidOperationException(T("SelectFlowTarget"));
             var flowNamespace = ResourceNamespace.Parse(model.FlowKey[..separator]); var flowName = model.FlowKey[(separator + 1)..];
             var definition = new TriggerProperties { DisplayName = model.DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), Enabled = existing?.Value.Definition.Enabled ?? false, Source = new() { Schedule = BuildSchedule() }, Target = new() { Flow = new() { Name = flowName, Namespace = flowNamespace } }, Input = input, MisfirePolicy = model.MisfirePolicy, ConcurrencyPolicy = model.ConcurrencyPolicy, ExecutionScope = existing?.Value.Definition.ExecutionScope };
-            StoredResource<TriggerResource> saved;
-            if (IsNew) saved = await Management.CreateAsync(new() { ApiVersion = ManagementApiVersions.CoreV1, Kind = ResourceKinds.Trigger, Metadata = new() { Name = model.Name.Trim() }, Definition = definition, ScopeRef = selectedScope }, CancellationToken.None);
-            else saved = await Management.UpdateAsync(ResourceNamespace.Default, model.Name, definition, existing!.ETag, CancellationToken.None);
+            var resource = new TriggerResource { ApiVersion = ManagementApiVersions.CoreV1, Kind = ResourceKinds.Trigger, Metadata = new() { Name = model.Name.Trim() }, Definition = definition, ScopeRef = IsNew ? selectedScope : existing!.Value.ScopeRef };
+            var saved = await Client.SaveAsync(resource, IsNew ? null : existing!.ETag, CancellationToken.None);
             Notifications.Add(new(Guid.NewGuid(), IsNew ? T("Notification.Created") : T("Notification.Updated"), saved.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success));
             Navigation.NavigateTo($"/triggers/{Uri.EscapeDataString(saved.Value.Name)}");
         }

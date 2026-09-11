@@ -87,6 +87,7 @@ public sealed class OpenApiTests
             ("DELETE", "/api/namespaces/{namespace}/management/entries/{entryName}", AgentstrationPolicies.CanDeleteResources),
             ("POST", "/api/triggers/{name}/run", AgentstrationPolicies.CanExecuteRuns),
             ("GET", "/api/triggers/{name}/occurrences", AgentstrationPolicies.CanReadRuns),
+            ("POST", "/api/triggers/schedule-preview", AgentstrationPolicies.CanReadResources),
             ("GET", "/api/modelproviders", AgentstrationPolicies.CanReadResources),
             ("POST", "/api/modelproviders", AgentstrationPolicies.CanWriteResources),
             ("DELETE", "/api/modelproviders/{providerName}", AgentstrationPolicies.CanDeleteResources),

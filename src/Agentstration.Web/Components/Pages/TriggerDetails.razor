@@ -1,8 +1,6 @@
 @page "/triggers/{Name}"
 @rendermode InteractiveServer
-@using Agentstration.Management.Core
-@inject TriggerManagementService Management
-@inject TriggerFiringService Firing
+@inject ITriggerApiClient Client
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
 @inject ConsoleContextState ContextState
@@ -91,7 +89,7 @@ else
 
 @code {
     [Parameter] public string Name { get; set; } = "";
-    private StoredResource<TriggerResource>? stored;
+    private ResourceSnapshot<TriggerResource>? stored;
     private IReadOnlyList<TriggerOccurrence> history = [];
     private bool loading = true, notFound, running, changingState, refreshing, confirmEnable, confirmDelete, hasError;
     private string? message;
@@ -104,17 +102,17 @@ else
     private async Task LoadAsync()
     {
         loading = true; notFound = false; message = null;
-        try { stored = await Management.GetAsync(ResourceNamespace.Default, Name, CancellationToken.None); if (stored is null) { notFound = true; return; } await LoadHistoryAsync(); }
+        try { stored = await Client.GetAsync(ResourceNamespace.Default, Name, CancellationToken.None); if (stored is null) { notFound = true; return; } await LoadHistoryAsync(); }
         catch (Exception exception) { SetError(exception); }
         finally { loading = false; }
     }
-    private async Task LoadHistoryAsync() { if (stored is null) return; refreshing = true; try { history = await Firing.ListHistoryAsync(stored.Value.RequireScopeTargetId(ResourceScopeKind.Workspace), stored.Value.Uid, 100, CancellationToken.None); } catch (Exception exception) { SetError(exception); } finally { refreshing = false; } }
-    private async Task RunNowAsync() { if (stored is null || running || !CanExecute) return; running = true; ClearMessage(); try { var occurrence = await Firing.RunNowAsync(stored.Value.Namespace, stored.Value.Name, CancellationToken.None); SetSuccess(occurrence.WorkItemId is null ? T("RunCompleted", T($"OccurrenceOutcome.{occurrence.Outcome}")) : T("WorkSubmitted", Short(occurrence.WorkItemId))); Notifications.Add(new(Guid.NewGuid(), T("Notification.Fired"), stored.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success)); await ReloadAsync(); } catch (Exception exception) { SetError(exception); } finally { running = false; } }
+    private async Task LoadHistoryAsync() { if (stored is null) return; refreshing = true; try { history = await Client.ListHistoryAsync(stored.Value.Namespace, stored.Value.Name, 100, CancellationToken.None); } catch (Exception exception) { SetError(exception); } finally { refreshing = false; } }
+    private async Task RunNowAsync() { if (stored is null || running || !CanExecute) return; running = true; ClearMessage(); try { var occurrence = await Client.RunNowAsync(stored.Value.Namespace, stored.Value.Name, CancellationToken.None); SetSuccess(occurrence.WorkItemId is null ? T("RunCompleted", T($"OccurrenceOutcome.{occurrence.Outcome}")) : T("WorkSubmitted", Short(occurrence.WorkItemId))); Notifications.Add(new(Guid.NewGuid(), T("Notification.Fired"), stored.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success)); await ReloadAsync(); } catch (Exception exception) { SetError(exception); } finally { running = false; } }
     private async Task EnableAsync() { confirmEnable = false; await SetEnabledAsync(true); }
     private async Task DisableAsync() => await SetEnabledAsync(false);
-    private async Task SetEnabledAsync(bool enabled) { if (stored is null || changingState || !CanManage) return; changingState = true; ClearMessage(); try { stored = await Management.UpdateAsync(stored.Value.Namespace, stored.Value.Name, stored.Value.Definition with { Enabled = enabled }, stored.ETag, CancellationToken.None); SetSuccess(T(enabled ? "EnabledSuccess" : "DisabledSuccess")); Notifications.Add(new(Guid.NewGuid(), T(enabled ? "Notification.Enabled" : "Notification.Disabled"), stored.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), enabled ? UiStatus.Success : UiStatus.Neutral)); await LoadHistoryAsync(); } catch (Exception exception) { SetError(exception); } finally { changingState = false; } }
-    private async Task DeleteAsync() { if (stored is null || !CanManage) return; confirmDelete = false; try { await Management.DeleteAsync(stored.Value.Namespace, stored.Value.Name, stored.ETag, CancellationToken.None); Notifications.Add(new(Guid.NewGuid(), T("Notification.Deleted"), stored.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Neutral)); Navigation.NavigateTo("/triggers"); } catch (Exception exception) { SetError(exception); } }
-    private async Task ReloadAsync() { if (stored is null) return; stored = await Management.GetAsync(stored.Value.Namespace, stored.Value.Name, CancellationToken.None); await LoadHistoryAsync(); }
+    private async Task SetEnabledAsync(bool enabled) { if (stored is null || changingState || !CanManage) return; changingState = true; ClearMessage(); try { stored = await Client.SaveAsync(stored.Value with { Definition = stored.Value.Definition with { Enabled = enabled } }, stored.ETag, CancellationToken.None); SetSuccess(T(enabled ? "EnabledSuccess" : "DisabledSuccess")); Notifications.Add(new(Guid.NewGuid(), T(enabled ? "Notification.Enabled" : "Notification.Disabled"), stored.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), enabled ? UiStatus.Success : UiStatus.Neutral)); await LoadHistoryAsync(); } catch (Exception exception) { SetError(exception); } finally { changingState = false; } }
+    private async Task DeleteAsync() { if (stored is null || !CanManage) return; confirmDelete = false; try { await Client.DeleteAsync(stored.Value.Namespace, stored.Value.Name, stored.ETag, CancellationToken.None); Notifications.Add(new(Guid.NewGuid(), T("Notification.Deleted"), stored.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Neutral)); Navigation.NavigateTo("/triggers"); } catch (Exception exception) { SetError(exception); } }
+    private async Task ReloadAsync() { if (stored is null) return; stored = await Client.GetAsync(stored.Value.Namespace, stored.Value.Name, CancellationToken.None); await LoadHistoryAsync(); }
     private void ClearMessage() { message = null; hasError = false; }
     private void SetSuccess(string value) { message = value; hasError = false; }
     private void SetError(Exception exception) { message = exception.Message; hasError = true; }
