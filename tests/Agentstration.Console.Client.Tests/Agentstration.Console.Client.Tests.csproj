@@ -1,0 +1,16 @@
+<Project Sdk="MSTest.Sdk/4.3.3">
+  <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Console.Client/Agentstration.Console.Client.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Console.Components/Agentstration.Console.Components.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Flow/Agentstration.Flow.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Flow.Contracts/Agentstration.Flow.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Resources/Agentstration.Resources.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Runtime.Contracts/Agentstration.Runtime.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Work/Agentstration.Work.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Work.Contracts/Agentstration.Work.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
+  </ItemGroup>
+</Project>

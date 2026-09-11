@@ -27,6 +27,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Agentstration.Web.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Api.Tests" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />

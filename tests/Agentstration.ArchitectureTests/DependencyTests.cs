@@ -595,6 +595,77 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void TestProjectsReflectApiConsoleAndStandaloneHostOwnership()
+    {
+        var testsRoot = Path.Combine(FindRepositoryRoot(), "tests");
+        foreach (var project in new[]
+                 {
+                     "Agentstration.Api.Tests",
+                     "Agentstration.Console.Client.Tests",
+                     "Agentstration.Console.Components.Tests",
+                     "Agentstration.Web.Tests"
+                 })
+        {
+            Assert.IsTrue(File.Exists(Path.Combine(testsRoot, project, $"{project}.csproj")), $"Missing {project}.");
+        }
+
+        Assert.IsFalse(File.Exists(Path.Combine(testsRoot, "Agentstration.Work.Api.Tests", "Agentstration.Work.Api.Tests.csproj")));
+    }
+
+    [TestMethod]
+    public void BusinessTestProjectsDoNotReferenceTheApiOrExecutableHost()
+    {
+        var testsRoot = Path.Combine(FindRepositoryRoot(), "tests");
+        foreach (var project in new[]
+                 {
+                     "Agentstration.Application.Tests",
+                     "Agentstration.Runtime.Tests",
+                     "Agentstration.Management.Core.Tests",
+                     "Agentstration.Management.Sources.Tests",
+                     "Agentstration.Management.Storage.Tests"
+                 })
+        {
+            var contents = File.ReadAllText(Path.Combine(testsRoot, project, $"{project}.csproj"));
+            Assert.DoesNotContain("src/Agentstration.Api/", contents, StringComparison.Ordinal, project);
+            Assert.DoesNotContain("src/Agentstration.Web/", contents, StringComparison.Ordinal, project);
+            Assert.DoesNotContain("Microsoft.AspNetCore.Mvc.Testing", contents, StringComparison.Ordinal, project);
+        }
+    }
+
+    [TestMethod]
+    public void ConsoleTestProjectsDoNotDependOnTheAuthoritativeServer()
+    {
+        var testsRoot = Path.Combine(FindRepositoryRoot(), "tests");
+        var clientRoot = Path.Combine(testsRoot, "Agentstration.Console.Client.Tests");
+        var componentRoot = Path.Combine(testsRoot, "Agentstration.Console.Components.Tests");
+
+        foreach (var projectRoot in new[] { clientRoot, componentRoot })
+        {
+            var project = File.ReadAllText(Directory.EnumerateFiles(projectRoot, "*.csproj").Single());
+            var sources = string.Join(Environment.NewLine, Directory.EnumerateFiles(projectRoot, "*.cs").Select(File.ReadAllText));
+            Assert.DoesNotContain("src/Agentstration.Api/", project, StringComparison.Ordinal);
+            Assert.DoesNotContain("src/Agentstration.Web/", project, StringComparison.Ordinal);
+            Assert.DoesNotContain("WebApplicationFactory", sources, StringComparison.Ordinal);
+            Assert.DoesNotContain("Agentstration.Web.Api", sources, StringComparison.Ordinal);
+            Assert.DoesNotContain("Agentstration.Web.Hosting", sources, StringComparison.Ordinal);
+            Assert.DoesNotContain("Agentstration.Web.Security", sources, StringComparison.Ordinal);
+        }
+    }
+
+    [TestMethod]
+    public void StandaloneHostTestsDoNotOwnClientOrComponentTestInfrastructure()
+    {
+        var project = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(), "tests", "Agentstration.Web.Tests", "Agentstration.Web.Tests.csproj"));
+
+        Assert.DoesNotContain(
+            "<ProjectReference Include=\"../../src/Agentstration.Console.Components/",
+            project,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("bunit", project, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [TestMethod]
     public void RuntimeAbstractionsDoNotReferenceManagementAndRuntimeCoreUsesOnlyRuntimeResolver()
     {
         var references = typeof(IRuntimeAgentResolver).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();

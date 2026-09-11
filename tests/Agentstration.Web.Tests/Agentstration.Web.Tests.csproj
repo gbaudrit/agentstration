@@ -1,20 +1,14 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
-    <ProjectReference Include="../../src/Agentstration.Api/Agentstration.Api.csproj" />
     <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Console.Components/Agentstration.Console.Components.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Tools.Mcp/Agentstration.Tools.Mcp.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" Aliases="UtilitiesExtension" />
-  <ProjectReference Include="../../src/Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
-  <PackageReference Include="bunit" />
-  <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="../../src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css" Link="TestAssets/AgentEditor.razor.css" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor.css" Link="TestAssets/EntryEditor.razor.css" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../src/Agentstration.Web.Components/wwwroot/design-tokens.css" Link="TestAssets/design-tokens.css" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../src/Agentstration.Web.Components/MainLayout.razor" Link="TestAssets/MainLayout.razor" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../src/Agentstration.Web/Pages/Shared/_AuthenticationLayout.cshtml" Link="TestAssets/_AuthenticationLayout.cshtml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../src/Agentstration.Web/wwwroot/auth.css" Link="TestAssets/auth.css" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../../src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css" Link="TestAssets/AgentEditor.razor.css" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../../src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor.css" Link="TestAssets/EntryEditor.razor.css" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

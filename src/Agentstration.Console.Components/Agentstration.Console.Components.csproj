@@ -4,7 +4,7 @@
     <RootNamespace>Agentstration.Web</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="Agentstration.Web.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Console.Components.Tests" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="YamlDotNet" />
     <ProjectReference Include="../Agentstration.Console.Client/Agentstration.Console.Client.csproj" />

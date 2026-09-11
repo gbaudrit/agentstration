@@ -10,23 +10,9 @@ using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Web.Components;
-using Agentstration.Web.Configuration;
 using Agentstration.Web.Console;
-using Agentstration.Web.Features.Flows.Designer;
-using Agentstration.Web.FlowDesigner.Backend;
-using Agentstration.Web.Security;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 
 namespace Agentstration.Web.Tests;
 
@@ -144,14 +130,4 @@ public sealed partial class ApiClientTests
         public HttpClient CreateClient(string name) => factory(name);
     }
 
-    private sealed class TestHostEnvironment : IHostEnvironment
-    {
-        public string EnvironmentName { get; set; } = "Testing";
-
-        public string ApplicationName { get; set; } = nameof(ApiClientTests);
-
-        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
-
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
-    }
 }
