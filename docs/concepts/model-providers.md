@@ -49,7 +49,7 @@ The default tests use fake HTTP. To run the optional real-server smoke test:
 $env:AGENTSTRATION_LOCALAI_ENDPOINT = "http://localhost:8081"
 $env:AGENTSTRATION_LOCALAI_MODEL = "your-chat-model"
 # Optional: $env:AGENTSTRATION_LOCALAI_API_KEY = "..."
-dotnet test tests/Agentstration.ModelProviders.Tests --filter TestCategory=Integration
+dotnet test --project tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj --filter TestCategory=Integration --minimum-expected-tests 1
 ```
 
 ## llama.cpp
@@ -120,5 +120,5 @@ The default tests use fake HTTP and require no model. To run the optional real-s
 ```powershell
 $env:AGENTSTRATION_LLAMA_CPP_ENDPOINT = "http://localhost:8080"
 $env:AGENTSTRATION_LLAMA_CPP_MODEL = "local-gguf"
-dotnet test tests/Agentstration.ModelProviders.Tests --filter TestCategory=Integration
+dotnet test --project tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj --filter TestCategory=Integration --minimum-expected-tests 1
 ```

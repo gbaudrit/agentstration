@@ -201,7 +201,7 @@ Aspire starts Agentstration's AEP extensions against existing inference servers.
 
 ```powershell
 dotnet build Agentstration.slnx --configuration Release
-dotnet test Agentstration.slnx --configuration Release
+dotnet test --solution Agentstration.slnx --configuration Release --minimum-expected-tests 1
 ```
 
 Warnings are treated as errors, .NET analyzers are enabled and NuGet audit findings fail restore. The default tests are designed to remain offline and cost-free; real-provider smoke tests are opt-in.
