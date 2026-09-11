@@ -21,6 +21,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Agentstration.Management.Api.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Management.Bootstrap.Tests" />
     <InternalsVisibleTo Include="Agentstration.Management.Security.Tests" />
     <InternalsVisibleTo Include="Agentstration.Management.Aep.Tests" />
     <InternalsVisibleTo Include="Agentstration.Management.Sources.Tests" />
