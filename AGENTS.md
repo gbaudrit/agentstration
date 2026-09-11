@@ -52,6 +52,7 @@ tests/
   Agentstration.Management.Storage.Tests/
   Agentstration.Management.Sources.Tests/
   Agentstration.Management.Api.Tests/
+  Agentstration.Management.Bootstrap.Tests/
   Agentstration.Management.Security.Tests/
   Agentstration.Management.Aep.Tests/
   Agentstration.Performance.Tests/

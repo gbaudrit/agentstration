@@ -162,7 +162,8 @@ jobs:
             '| --- | ---: | ---: | ---: | ---: | ---: | --- |'
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
           $modules = @(
-            @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 66; Warning = 900; Failure = 1024 },
+            @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 43; Warning = 900; Failure = 1024 },
+            @{ Name = 'Agentstration.Management.Bootstrap.Tests'; Tests = 23; Warning = 500; Failure = 700 },
             @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 38; Warning = 800; Failure = 1024 },
             @{ Name = 'Agentstration.Management.Aep.Tests'; Tests = 11; Warning = 450; Failure = 700 },
             @{ Name = 'Agentstration.Management.Sources.Tests'; Tests = 93; Warning = 550; Failure = 900 }

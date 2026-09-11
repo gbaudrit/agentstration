@@ -40,7 +40,8 @@ The initial budgets below use Release runs on Windows 11 10.0.26200 with .NET 10
 
 | Module | Baseline peak (MiB) | Warning (MiB) | Failure (MiB) | Minimum tests |
 | --- | ---: | ---: | ---: | ---: |
-| `Agentstration.Management.Api.Tests` | 887.0 | 900 | 1024 | 66 |
+| `Agentstration.Management.Api.Tests` | 749.3 | 900 | 1024 | 43 |
+| `Agentstration.Management.Bootstrap.Tests` | 355.3 | 500 | 700 | 23 |
 | `Agentstration.Management.Security.Tests` | 730.1 | 800 | 1024 | 38 |
 | `Agentstration.Management.Aep.Tests` | 322.1 | 450 | 700 | 11 |
 | `Agentstration.Management.Sources.Tests` | 431.5 | 550 | 900 | 93 |
@@ -58,7 +59,8 @@ The initial budgets below use Release runs on Windows 11 10.0.26200 with .NET 10
 | `Agentstration.Application.Tests` | Integration | Includes SQLite Flow and Work storage contracts |
 | `Agentstration.Management.Storage.Tests` | Integration | SQLite control-plane, Identity persistence, secrets, audit, and trigger storage |
 | `Agentstration.Management.Sources.Tests` | Integration | Source, registry, provider, and Pack distribution boundaries |
-| `Agentstration.Management.Api.Tests` | Integration | Hosted Management API and declarative bootstrap tests using the API-only test profile |
+| `Agentstration.Management.Api.Tests` | Integration | Hosted Management API tests using the API-only test profile |
+| `Agentstration.Management.Bootstrap.Tests` | Integration | Declarative bootstrap catalog, application, and hosted startup scenarios using the API-only test profile |
 | `Agentstration.Management.Security.Tests` | Integration | Identity, authorization, local-account, and interactive Security boundaries |
 | `Agentstration.Management.Aep.Tests` | Integration | AEP enrollment lifecycle and extension inventory boundaries using the API-only test profile |
 | `Agentstration.ModelProviders.Tests` | Integration, provider-optional | AEP test hosts plus opt-in live-provider checks |

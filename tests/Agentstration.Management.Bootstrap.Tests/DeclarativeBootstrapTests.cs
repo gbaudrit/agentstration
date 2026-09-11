@@ -777,7 +777,7 @@ public sealed class DeclarativeBootstrapTests
         bool configureOllamaExtension = false)
     {
         EnsureInstanceProfileDescriptor(path);
-        return new ApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
+        return new BootstrapApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Authentication:Mode", "Local");
@@ -794,7 +794,7 @@ public sealed class DeclarativeBootstrapTests
     private static WebApplicationFactory<Program> FactoryWithExtensionPresenceHandler(string path, bool discoverOnStartup)
     {
         EnsureInstanceProfileDescriptor(path);
-        return new ApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
+        return new BootstrapApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Authentication:Mode", "Development");
@@ -1161,5 +1161,15 @@ public sealed class DeclarativeBootstrapTests
 
         public string Path { get; }
         public void Dispose() => Directory.Delete(Path, recursive: true);
+    }
+}
+
+internal sealed class BootstrapApiOnlyWebApplicationFactory : WebApplicationFactory<Program>
+{
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseEnvironment("Testing");
+        builder.UseSetting("Agentstration:Testing:ApiOnly", "true");
+        builder.UseSetting("Logging:LogLevel:Default", "Warning");
     }
 }
