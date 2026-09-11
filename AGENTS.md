@@ -186,8 +186,8 @@ Run from the repository root:
 ```powershell
 dotnet restore Agentstration.slnx
 dotnet build Agentstration.slnx --configuration Release --no-restore
-dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 1
-dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 1
+dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 139 --max-parallel-test-modules 4
+dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 692 --max-parallel-test-modules 2
 ```
 
 The two test solutions together form the required deterministic, offline functional suite. Performance and live-provider workloads are explicit opt-ins documented in `docs/contributing/testing.md`. For a focused iteration, run the affected test project first, then run both functional lanes before handoff. Do not suppress warnings or disable analyzers to make a change pass.
