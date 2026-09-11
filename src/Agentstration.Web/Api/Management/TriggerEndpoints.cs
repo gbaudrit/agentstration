@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Resources;
 using Agentstration.Web.Security;
@@ -10,6 +11,7 @@ internal sealed class TriggerEndpoints : IManagementEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("/triggers", ListAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapPost("/triggers/schedule-preview", PreviewScheduleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         group.MapGet("/triggers/{name}", GetAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         group.MapPut("/triggers/{name}", PutAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         group.MapDelete("/triggers/{name}", DeleteAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
@@ -22,6 +24,26 @@ internal sealed class TriggerEndpoints : IManagementEndpoint
         group.MapPost("/namespaces/{namespace}/triggers/{name}/run", RunNowNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
         group.MapGet("/namespaces/{namespace}/triggers/{name}/occurrences", HistoryNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
     }
+
+    private static Task<IResult> PreviewScheduleAsync(
+        TriggerSchedulePreviewRequest request,
+        ITriggerScheduleCalculator schedules,
+        TimeProvider timeProvider) => ManagementHttp.ExecuteAsync(() =>
+        {
+            if (request.Count is < 1 or > 20)
+                throw new TriggerValidationException("trigger_preview_count_invalid", "Trigger schedule preview count must be between 1 and 20.");
+            schedules.Validate(request.Schedule);
+            var occurrences = new List<DateTimeOffset>(request.Count);
+            var cursor = timeProvider.GetUtcNow();
+            for (var index = 0; index < request.Count; index++)
+            {
+                var next = schedules.GetNextOccurrence(request.Schedule, cursor);
+                if (next is null) break;
+                occurrences.Add(next.Value);
+                cursor = next.Value;
+            }
+            return Task.FromResult<IResult>(Results.Ok(new TriggerSchedulePreviewResponse(occurrences)));
+        });
 
     private static Task<IResult> ListAsync(TriggerManagementService service, CancellationToken token) => ListCoreAsync(null, service, token);
     private static Task<IResult> ListNamespacedAsync(string @namespace, TriggerManagementService service, CancellationToken token) => ListCoreAsync(ResourceNamespace.Parse(@namespace), service, token);

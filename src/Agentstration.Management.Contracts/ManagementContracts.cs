@@ -39,3 +39,5 @@ public sealed record AgentRevisionPurgeImpactResponse(
 public sealed record RouteAndExecuteRequest(string Input);
 public sealed record RouteAndExecuteResponse(string AgentName, double Confidence, string Reason, string Output);
 public sealed record PagedResponse<T>(IReadOnlyList<T> Value, string? NextLink);
+public sealed record TriggerSchedulePreviewRequest(TriggerSchedule Schedule, int Count = 5);
+public sealed record TriggerSchedulePreviewResponse(IReadOnlyList<DateTimeOffset> Occurrences);
