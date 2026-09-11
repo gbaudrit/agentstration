@@ -1,6 +1,8 @@
+using Agentstration.Infrastructure.Notifications;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.Resources;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Models;
@@ -24,8 +26,12 @@ internal static class ToolProviderEndpoints
         tools.MapPut("/{toolName}/enabled", SetEnabledAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     }
 
-    private static Task<IResult> ListProvidersAsync(ToolManagementService service, CancellationToken cancellationToken) =>
-        ModelManagementHttp.ExecuteAsync(async () => Results.Ok(new ValueResponse<ToolProviderResource>((await service.ListProvidersAsync(cancellationToken)).Select(value => value.Value).ToArray())));
+    private static Task<IResult> ListProvidersAsync(ToolManagementService service, InternalMcpToolProjectionService internalTools, ICurrentRequestContext context, CancellationToken cancellationToken) =>
+        ModelManagementHttp.ExecuteAsync(async () =>
+        {
+            await internalTools.EnsureAsync(ResourceScopeRef.Workspace(context.Current.WorkspaceId), ResourceNamespace.Default, cancellationToken);
+            return Results.Ok(new ValueResponse<ToolProviderResource>((await service.ListProvidersAsync(cancellationToken)).Select(value => value.Value).ToArray()));
+        });
 
     private static Task<IResult> GetProviderAsync(string providerName, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
@@ -38,7 +44,7 @@ internal static class ToolProviderEndpoints
     private static Task<IResult> CreateProviderAsync(CreateToolProviderRequest body, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var stored = await service.PutProviderAsync(Resource(body.Name, body.Properties), null, true, cancellationToken);
+            var stored = await service.PutProviderAsync(Resource(body.Name, body.Properties) with { ScopeRef = body.ScopeRef }, null, true, cancellationToken);
             try { _ = await service.RefreshDiscoveryAsync(stored.Value.Metadata.Name, cancellationToken); } catch (Exception exception) when (exception is not OperationCanceledException) { }
             stored = await service.GetProviderAsync(stored.Value.Metadata.Name, cancellationToken) ?? stored;
             response.Headers.Location = $"/api/toolproviders/{Uri.EscapeDataString(body.Name)}";
@@ -80,9 +86,10 @@ internal static class ToolProviderEndpoints
             return Results.Ok(new ValueResponse<ToolResource>(tools.Where(value => value.Value.Definition.Provider?.Name == providerId).Select(value => value.Value).ToArray()));
         });
 
-    private static Task<IResult> ListToolsAsync(bool? enabled, bool? available, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> ListToolsAsync(bool? enabled, bool? available, ToolManagementService service, InternalMcpToolProjectionService internalTools, ICurrentRequestContext context, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
+            await internalTools.EnsureAsync(ResourceScopeRef.Workspace(context.Current.WorkspaceId), ResourceNamespace.Default, cancellationToken);
             var values = (await service.ListToolsAsync(cancellationToken)).Select(value => value.Value);
             if (enabled.HasValue) values = values.Where(value => value.Definition.Enabled == enabled.Value);
             if (available.HasValue) values = values.Where(value => value.Definition.Discovery?.Available == available.Value);

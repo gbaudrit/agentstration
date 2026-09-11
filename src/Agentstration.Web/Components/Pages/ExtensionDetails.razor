@@ -1,0 +1,338 @@
+@page "/extensions/{RegistrationName}"
+@page "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+@implements IDisposable
+@inject IExtensionsClient Client
+@inject IModelProfilesClient ProfilesClient
+@inject NotificationState Notifications
+@inject IServiceProvider Services
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> Localizer
+
+<PageTitle>@(item?.DisplayName ?? T("Extension")) · Agentstration</PageTitle>
+<PageHeader Title="@(item?.DisplayName ?? T("Extension"))" Description="@(item?.Extension?.Extension?.Description ?? T("ExtensionDetails.Description"))">
+    <Actions><a class="button-secondary" href="/extensions">@T("BackToExtensions")</a></Actions>
+</PageHeader>
+
+@if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
+}
+else if (loading)
+{
+    <LoadingState Message="@T("LoadingExtension")" />
+}
+else if (item is null)
+{
+    <EmptyState Title="@T("ExtensionNotFound")" Message="@T("ExtensionNotFound.Description")" />
+}
+else
+{
+    <ResourceTabs Label="@T("ExtensionDetailsTabs")">
+        @foreach (var tab in Enum.GetValues<DetailTab>())
+        {
+            <button type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@T($"DetailTab.{tab}")</button>
+        }
+    </ResourceTabs>
+
+    @if (activeTab == DetailTab.Summary)
+    {
+        <section class="panel resource-section">
+            <div class="panel-header"><div><p class="eyebrow">@T("AepExtension")</p><h2>@item.DisplayName</h2><p>@(item.Extension?.Details ?? item.Extension?.Extension?.Description ?? T("ExtensionIdentityUnavailable"))</p></div><StatusBadge Text="@StatusLabel(item.AvailabilityStatus)" Status="@ModelManagementUi.Status(item.AvailabilityStatus)" /></div>
+            <dl class="resource-details">
+                <dt>@T("ExtensionId")</dt><dd><code>@item.ExtensionId</code></dd>
+                <dt>@T("ObservedVersion")</dt><dd>@(item.Version ?? "—")</dd>
+                <dt>@T("Enrollment")</dt><dd>@if (item.EnrollmentStatus is { } state) { <StatusBadge Text="@EnrollmentStatusLabel(state)" Status="@EnrollmentStatus(state)" /> } else { <span>—</span> }</dd>
+                <dt>@T("Availability")</dt><dd><StatusBadge Text="@StatusLabel(item.AvailabilityStatus)" Status="@ModelManagementUi.Status(item.AvailabilityStatus)" /></dd>
+                <dt>@T("Connection")</dt><dd><code>@item.Endpoint</code></dd>
+                <dt>@T("Origin")</dt><dd>@SourceLabel(item.RegistrationSource)</dd>
+                <dt>@T("Contributions")</dt><dd>@(item.Extension?.Contributions.Count > 0 ? string.Join(", ", item.Extension.Contributions.Select(value => $"{value.Kind}:{value.Id}")) : "—")</dd>
+            </dl>
+        </section>
+    }
+
+    @if (activeTab == DetailTab.Connection)
+    {
+        <section class="panel resource-section">
+            <div class="panel-header"><div><p class="eyebrow">@T("Connection")</p><h2>@T("ConnectionDetails")</h2><p>@T("ConnectionDetails.Description")</p></div></div>
+            @if (editing && registration is not null)
+            {
+                <EditForm Model="form" OnValidSubmit="SaveAsync">
+                    <DataAnnotationsValidator /><ValidationSummary />
+                    <div class="form-grid">
+                        <label>@T("DisplayName")<InputText @bind-Value="form.DisplayName" /></label>
+                        <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" /></label>
+                        <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /></label>
+                        <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
+                    </div>
+                    <div class="panel-actions"><button class="button-primary" type="submit" disabled="@saving">@T("SaveChanges")</button><button class="button-secondary" type="button" @onclick="() => editing = false" disabled="@saving">@T("Cancel")</button></div>
+                </EditForm>
+            }
+            else
+            {
+                <dl class="resource-details">
+                    <dt>@T("AepEndpoint")</dt><dd><a href="@item.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@item.Endpoint</a></dd>
+                    <dt>@T("Registration")</dt><dd>@(item.RegistrationName is null ? "—" : $"{item.RegistrationNamespace}/{item.RegistrationName}")</dd>
+                    <dt>@T("Origin")</dt><dd>@SourceLabel(item.RegistrationSource)</dd>
+                    <dt>@T("Discovery")</dt><dd>@(item.RegistrationEnabled ? T("Enabled") : T("Disabled"))</dd>
+                    <dt>@T("AuthenticationMode")</dt><dd>@(registration is null ? "—" : T($"Authentication.{registration.Value.Definition.AuthenticationMode}"))</dd>
+                    <dt>@T("Enrollment")</dt><dd>@if (item.EnrollmentStatus is { } state) { <StatusBadge Text="@EnrollmentStatusLabel(state)" Status="@EnrollmentStatus(state)" /> } else { <span>—</span> }</dd>
+                    @if (item.AnnouncedAt is { } announced) { <dt>@T("AnnouncedAt")</dt><dd>@announced.ToLocalTime().ToString("g")</dd> }
+                </dl>
+                @if (item.Connections.Count > 0)
+                {
+                    <div class="panel-header"><div><h3>@T("Connections")</h3><p>@T("Connections.Description")</p></div><span>@T("ConnectionCount", item.Connections.Count)</span></div>
+                    <DataGrid TItem="ExtensionInventoryConnectionResponse" Items="item.Connections">
+                        <Header><tr><th>@T("Registration")</th><th>@T("Endpoint")</th><th>@T("Origin")</th><th>@T("Availability")</th></tr></Header>
+                        <Row Context="connection"><tr><td><strong>@connection.DisplayName</strong><br /><code>@connection.RegistrationNamespace/@connection.RegistrationName</code></td><td><a href="@connection.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@connection.Endpoint</a></td><td>@SourceLabel(connection.Source)</td><td><StatusBadge Text="@StatusLabel(connection.AvailabilityStatus)" Status="@ModelManagementUi.Status(connection.AvailabilityStatus)" /></td></tr></Row>
+                    </DataGrid>
+                }
+                <div class="panel-actions">
+                    @if (CanEditRegistration)
+                    {
+                        <button class="button-secondary" @onclick="StartEdit">@T("Edit")</button>
+                        <button class="button-secondary" @onclick="ToggleAsync">@(registration!.Value.Definition.Enabled ? T("Disable") : T("Enable"))</button>
+                        <button class="button-danger" @onclick="() => confirmDelete = true">@T("Delete")</button>
+                    }
+                    else if (registration is not null) { <span>@T("ManagedBy", registration.Value.Definition.Source)</span> }
+                    @if (item.EnrollmentInstanceId.HasValue && CanAdminister) { <a class="button-primary" href="/extensions?tab=enrollments">@T("ManageEnrollment")</a> }
+                </div>
+            }
+        </section>
+    }
+
+    @if (activeTab == DetailTab.Enrollment)
+    {
+        <section class="panel resource-section">
+            <div class="panel-header">
+                <div><p class="eyebrow">@T("Enrollment")</p><h2>@T("EnrollmentDetails")</h2><p>@T("EnrollmentDetails.Description")</p></div>
+                @if (item.EnrollmentStatus is { } enrollmentState)
+                {
+                    <StatusBadge Text="@EnrollmentStatusLabel(enrollmentState)" Status="@EnrollmentStatus(enrollmentState)" />
+                }
+            </div>
+            @if (enrollment is not null)
+            {
+                <dl class="resource-details">
+                    <dt>@T("EnrollmentInstance")</dt><dd><code>@enrollment.Definition.InstanceId</code></dd>
+                    <dt>@T("EnrollmentState")</dt><dd><StatusBadge Text="@EnrollmentStatusLabel(enrollment.Definition.State)" Status="@EnrollmentStatus(enrollment.Definition.State)" /></dd>
+                    <dt>@T("AepEndpoint")</dt><dd><a href="@enrollment.Definition.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@enrollment.Definition.Endpoint</a></dd>
+                    @if (enrollment.Definition.PairingUri is { } pairingUri) { <dt>@T("PairingForm")</dt><dd><a href="@pairingUri.AbsoluteUri" target="_blank" rel="noopener noreferrer">@pairingUri</a></dd> }
+                    <dt>@T("AnnouncedAt")</dt><dd>@FormatDate(enrollment.Definition.AnnouncedAt)</dd>
+                    <dt>@T("CodeIssuedAt")</dt><dd>@FormatDate(enrollment.Definition.CodeIssuedAt)</dd>
+                    <dt>@T("CodeExpiresAt")</dt><dd>@FormatDate(enrollment.Definition.CodeExpiresAt)</dd>
+                    <dt>@T("AttemptCount")</dt><dd>@enrollment.Definition.AttemptCount</dd>
+                    <dt>@T("Registration")</dt><dd>@(enrollment.Definition.RegistrationName ?? "—")</dd>
+                    <dt>@T("Outcome")</dt><dd>@(enrollment.Definition.Outcome ?? "—")</dd>
+                </dl>
+                <div class="panel-actions">
+                    <a class="button-primary" href="/extensions?tab=enrollments">@T("ManageEnrollment")</a>
+                    @if (CanAdminister && CanUnenroll(enrollment.Definition.State))
+                    {
+                        <button class="button-danger" @onclick="() => confirmUnenroll = true">@T("UnenrollExtension")</button>
+                    }
+                </div>
+            }
+            else if (item.EnrollmentInstanceId is { } instanceId)
+            {
+                <dl class="resource-details">
+                    <dt>@T("EnrollmentInstance")</dt><dd><code>@instanceId</code></dd>
+                    <dt>@T("EnrollmentState")</dt><dd>@if (item.EnrollmentStatus is { } state) { <StatusBadge Text="@EnrollmentStatusLabel(state)" Status="@EnrollmentStatus(state)" /> } else { <span>—</span> }</dd>
+                    @if (item.AnnouncedAt is { } announced) { <dt>@T("AnnouncedAt")</dt><dd>@FormatDate(announced)</dd> }
+                </dl>
+            }
+            else
+            {
+                <p>@T("NoEnrollmentDetails")</p>
+            }
+        </section>
+    }
+
+    @if (activeTab == DetailTab.Contributions)
+    {
+        <section class="panel resource-section">
+            <div class="panel-header"><div><p class="eyebrow">@T("Contributions")</p><h2>@T("Contributions")</h2></div><span>@T("ContributionCount", item.Extension?.Contributions.Count ?? 0)</span></div>
+            @if (item.Extension?.Contributions.Count > 0)
+            {
+                <DataGrid TItem="ExtensionContributionResponse" Items="item.Extension.Contributions">
+                    <Header><tr><th>@T("Type")</th><th>@T("Name")</th><th>@T("Actions")</th></tr></Header>
+                    <Row Context="contribution"><tr><td>@contribution.Kind</td><td><code>@contribution.Id</code></td><td>
+                        @foreach (var provider in item.Extension.Providers.Where(value => value.ContributionId == contribution.Id)) { <a class="button-secondary" href="@ProviderUrl(provider)">@T("OpenProvider", provider.Name)</a> }
+                        @if (contribution.Kind == "model-provider" && !item.Extension.Providers.Any(value => value.ContributionId == contribution.Id)) { <a class="button-primary" href="@ConfigureProviderUrl(item.Extension, contribution)">@T("ConfigureProvider", contribution.Id)</a> }
+                    </td></tr></Row>
+                </DataGrid>
+            }
+            else { <p>@T("NoContributions")</p> }
+        </section>
+    }
+
+    @if (activeTab == DetailTab.Options)
+    {
+        <section class="panel resource-section">
+            <div class="panel-header"><div><p class="eyebrow">@T("OptionContracts")</p><h2>@T("OptionContracts")</h2><p>@T("OptionContracts.Description")</p></div><span>@T("SetCount", item.Extension?.OptionSets.Count ?? 0)</span></div>
+            @if (item.Extension?.OptionSets.Count > 0)
+            {
+                <DataGrid TItem="ExtensionOptionSetResponse" Items="item.Extension.OptionSets">
+                    <Header><tr><th>@T("OptionSet")</th><th>@T("Target")</th><th>@T("Preferred")</th><th>@T("SupportedVersions")</th></tr></Header>
+                    <Row Context="optionSet"><tr><td><code>@optionSet.Id</code></td><td>@optionSet.ContributionKind · <code>@optionSet.ContributionId</code> · @optionSet.Scope</td><td>@optionSet.PreferredVersion</td><td>@foreach (var version in optionSet.Versions) { <div><strong>@version.Version</strong>@(version.Deprecated ? T("DeprecatedSuffix") : null)<br /><code>@version.SchemaDigest</code><details><summary>@T("JsonSchema")</summary><pre class="runner-json">@JsonSerializer.Serialize(version.Schema, IndentedJsonOptions)</pre></details></div> }</td></tr></Row>
+                </DataGrid>
+            }
+            else { <p class="inline-warning">@(item.AvailabilityStatus == "available" ? T("NoVersionedOptionContract") : T("ContractsUnavailable"))</p> }
+        </section>
+    }
+
+    @if (activeTab == DetailTab.Usages)
+    {
+        <section class="panel resource-section">
+            <div class="panel-header"><div><p class="eyebrow">@T("PersistedUsage")</p><h2>@T("PersistedUsage")</h2><p>@T("PersistedUsage.Description")</p></div><span>@T("ProfileCount", item.Extension?.Usages.Count ?? 0)</span></div>
+            @if (item.Extension?.Usages.Count > 0)
+            {
+                <DataGrid TItem="ExtensionOptionUsageResponse" Items="item.Extension.Usages">
+                    <Header><tr><th>@T("ModelProfile")</th><th>@T("Contract")</th><th>@T("Status")</th><th>@T("Diagnostics")</th></tr></Header>
+                    <Row Context="usage"><tr><td><a href="@ProfileUrl(usage)">@usage.ProfileName</a><br /><small>@usage.ProfileNamespace</small></td><td>@if (string.IsNullOrWhiteSpace(usage.OptionSet)) { <span>@T("LegacyUnversionedOptions")</span> } else { <code>@usage.OptionSet@@@usage.Version</code> }</td><td><StatusBadge Text="@StatusLabel(usage.Status)" Status="@ModelManagementUi.Status(usage.Status)" />@if (MigrationTarget(item.Extension, usage) is { } targetVersion) { <br /><button class="button-secondary" @onclick="() => PreviewMigrationAsync(usage, targetVersion)" disabled="@migrating">@T("MigrateTo", targetVersion)</button> }</td><td>@(usage.Issues.Count == 0 ? T("Compatible") : string.Join(" ", usage.Issues))</td></tr></Row>
+                </DataGrid>
+            }
+            else { <p>@T("NoPersistedUsage")</p> }
+        </section>
+        @if (migrationPreview is not null)
+        {
+            <section class="panel resource-section">
+                <div class="panel-header"><div><p class="eyebrow">@T("ExplicitMigrationPreview")</p><h2>@migrationPreview.Value.ProfileNamespace/@migrationPreview.Value.ProfileName</h2><p>@T("NoProfileChanged")</p></div><span>@migrationPreview.Value.Source.Version → @migrationPreview.Value.Target.Version</span></div>
+                <div class="details-grid"><article><h3>@T("CurrentOptions")</h3><pre class="runner-json">@JsonSerializer.Serialize(migrationPreview.Value.Source, IndentedJsonOptions)</pre></article><article><h3>@T("ProposedOptions")</h3><pre class="runner-json">@JsonSerializer.Serialize(migrationPreview.Value.Target, IndentedJsonOptions)</pre></article></div>
+                <div class="panel-actions"><button class="button-primary" @onclick="ApplyMigrationAsync" disabled="@migrating">@(migrating ? T("Applying") : T("ApplyMigration"))</button><button class="button-secondary" @onclick="() => migrationPreview = null" disabled="@migrating">@T("Cancel")</button></div>
+            </section>
+        }
+    }
+}
+
+<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteExtensionRegistration")" Message="@T("DeleteRegistrationMessage", item?.RegistrationNamespace ?? string.Empty, item?.RegistrationName ?? string.Empty)" ConfirmLabel="@T("DeleteRegistration")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+<ConfirmationDialog IsOpen="@confirmUnenroll" Title="@T("UnenrollExtension")" Message="@T("UnenrollExtensionMessage")" ConfirmLabel="@T("ConfirmUnenrollExtension")" OnConfirm="UnenrollAsync" OnCancel="() => confirmUnenroll = false" />
+
+@code {
+    private static readonly JsonSerializerOptions IndentedJsonOptions = new() { WriteIndented = true };
+    [Parameter] public string? RegistrationName { get; set; }
+    [Parameter] public Guid? EnrollmentInstanceId { get; set; }
+    [SupplyParameterFromQuery(Name = "namespace")] public string? ResourceNamespaceValue { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private ExtensionInventoryItemResponse? item;
+    private AepEnrollmentRequestResource? enrollment;
+    private ResourceSnapshot<ExtensionRegistrationResource>? registration;
+    private AgentstrationApiException? error;
+    private bool loading = true;
+    private bool editing;
+    private bool saving;
+    private bool confirmDelete;
+    private bool confirmUnenroll;
+    private bool migrating;
+    private ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>? migrationPreview;
+    private RegistrationEditForm form = new();
+    private DetailTab activeTab;
+    private bool CanAdminister => Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState state
+        && state.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    private bool CanEditRegistration => CanAdminister && registration?.Value.Definition.Source == ExtensionRegistrationSource.Manual;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    private string StatusLabel(string status) => T($"Status.{status}");
+    private string EnrollmentStatusLabel(AepEnrollmentState status) => T($"EnrollmentStatus.{status}");
+    private string SourceLabel(string source) => T($"Source.{source}");
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            var inventory = await Client.GetExtensionInventoryAsync(cancellation.Token);
+            item = RegistrationName is not null
+                ? inventory.SingleOrDefault(value => string.Equals(value.RegistrationName, RegistrationName, StringComparison.Ordinal) && string.Equals(value.RegistrationNamespace, ResourceNamespaceValue ?? ResourceNamespace.DefaultValue, StringComparison.Ordinal))
+                : inventory.SingleOrDefault(value => value.EnrollmentInstanceId == EnrollmentInstanceId);
+            registration = item?.RegistrationName is null ? null : await Client.GetRegistrationAsync(ResourceNamespace.Parse(item.RegistrationNamespace), item.RegistrationName, cancellation.Token);
+            enrollment = null;
+            if (CanAdminister && item?.EnrollmentInstanceId is { } instanceId)
+            {
+                var enrollmentRequests = await Client.GetEnrollmentsAsync(cancellation.Token);
+                enrollment = enrollmentRequests.SingleOrDefault(value => value.Definition.InstanceId == instanceId);
+            }
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+    private void StartEdit()
+    {
+        if (registration is null) return;
+        form = new RegistrationEditForm { DisplayName = registration.Value.Definition.DisplayName, Endpoint = registration.Value.Definition.Endpoint.AbsoluteUri, ExpectedExtensionId = registration.Value.Definition.ExpectedExtensionId, Enabled = registration.Value.Definition.Enabled };
+        editing = true;
+    }
+    private async Task SaveAsync()
+    {
+        if (registration is null || !Uri.TryCreate(form.Endpoint, UriKind.Absolute, out var endpoint)) return;
+        saving = true;
+        try
+        {
+            _ = await Client.UpdateRegistrationAsync(registration.Value.Namespace, registration.Value.Name, new(registration.Value.Definition with { DisplayName = form.DisplayName, Endpoint = endpoint, ExpectedExtensionId = form.ExpectedExtensionId, Enabled = form.Enabled }), registration.ETag, cancellation.Token);
+            editing = false; await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { saving = false; }
+    }
+    private async Task ToggleAsync()
+    {
+        if (registration is null) return;
+        try { _ = await Client.UpdateRegistrationAsync(registration.Value.Namespace, registration.Value.Name, new(registration.Value.Definition with { Enabled = !registration.Value.Definition.Enabled }), registration.ETag, cancellation.Token); await LoadAsync(); }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+    private async Task DeleteAsync()
+    {
+        if (registration is null) return;
+        try { await Client.DeleteRegistrationAsync(registration.Value.Namespace, registration.Value.Name, registration.ETag, cancellation.Token); Navigation.NavigateTo("/extensions"); }
+        catch (AgentstrationApiException exception) { error = exception; confirmDelete = false; }
+    }
+    private async Task UnenrollAsync()
+    {
+        if (enrollment is null) return;
+        try
+        {
+            await Client.UnenrollExtensionAsync(enrollment.Definition.InstanceId, cancellation.Token);
+            confirmUnenroll = false;
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("ExtensionUnenrolled"), T("ExtensionUnenrolled.Description"), DateTimeOffset.Now, UiStatus.Success));
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; confirmUnenroll = false; }
+    }
+    private async Task PreviewMigrationAsync(ExtensionOptionUsageResponse usage, string targetVersion)
+    {
+        migrating = true;
+        try { migrationPreview = await ProfilesClient.PreviewOptionMigrationAsync(ResourceNamespace.Parse(usage.ProfileNamespace), usage.ProfileName, targetVersion, cancellation.Token); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { migrating = false; }
+    }
+    private async Task ApplyMigrationAsync()
+    {
+        if (migrationPreview is null) return;
+        migrating = true;
+        try
+        {
+            _ = await ProfilesClient.ApplyOptionMigrationAsync(ResourceNamespace.Parse(migrationPreview.Value.ProfileNamespace), migrationPreview.Value.ProfileName, migrationPreview.Value.Target.Version, migrationPreview.ETag, cancellation.Token);
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("ExtensionOptionsMigrated"), $"{migrationPreview.Value.ProfileName}: {migrationPreview.Value.Source.Version} → {migrationPreview.Value.Target.Version}", DateTimeOffset.Now, UiStatus.Success));
+            migrationPreview = null; await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { migrating = false; }
+    }
+    private static string? MigrationTarget(ExtensionResponse extension, ExtensionOptionUsageResponse usage)
+    {
+        var optionSet = extension.OptionSets.SingleOrDefault(value => string.Equals(value.Id, usage.OptionSet, StringComparison.Ordinal));
+        if (optionSet is null || string.Equals(optionSet.PreferredVersion, usage.Version, StringComparison.Ordinal)) return null;
+        var pending = new Queue<string>(); var visited = new HashSet<string>(StringComparer.Ordinal) { usage.Version }; pending.Enqueue(usage.Version);
+        while (pending.TryDequeue(out var current)) foreach (var migration in optionSet.Migrations.Where(value => string.Equals(value.FromVersion, current, StringComparison.Ordinal))) { if (string.Equals(migration.ToVersion, optionSet.PreferredVersion, StringComparison.Ordinal)) return optionSet.PreferredVersion; if (visited.Add(migration.ToVersion)) pending.Enqueue(migration.ToVersion); }
+        return null;
+    }
+    private static bool CanUnenroll(AepEnrollmentState state) => state is AepEnrollmentState.Available or AepEnrollmentState.Disabled or AepEnrollmentState.VerificationFailed or AepEnrollmentState.Unenrolling;
+    private static UiStatus EnrollmentStatus(AepEnrollmentState state) => state switch { AepEnrollmentState.Available => UiStatus.Success, AepEnrollmentState.CodeIssued or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying or AepEnrollmentState.Unenrolling => UiStatus.Warning, AepEnrollmentState.Rejected or AepEnrollmentState.Cancelled or AepEnrollmentState.Expired or AepEnrollmentState.AttemptsExceeded or AepEnrollmentState.VerificationFailed or AepEnrollmentState.Revoked => UiStatus.Danger, _ => UiStatus.Neutral };
+    private static string FormatDate(DateTimeOffset value) => value.ToLocalTime().ToString("g");
+    private static string FormatDate(DateTimeOffset? value) => value is { } date ? FormatDate(date) : "—";
+    private static string ProfileUrl(ExtensionOptionUsageResponse usage) => $"/modelprofiles/{Uri.EscapeDataString(usage.ProfileName)}?namespace={Uri.EscapeDataString(usage.ProfileNamespace)}";
+    private static string ProviderUrl(ExtensionProviderBindingResponse provider) => $"/modelproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
+    private static string ConfigureProviderUrl(ExtensionResponse extension, ExtensionContributionResponse contribution) => $"/modelproviders/new?extension={Uri.EscapeDataString(extension.RegistrationName)}&extensionNamespace={Uri.EscapeDataString(extension.RegistrationNamespace)}&contributionId={Uri.EscapeDataString(contribution.Id)}&displayName={Uri.EscapeDataString(extension.Extension?.Name ?? contribution.Id)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); GC.SuppressFinalize(this); }
+    private sealed class RegistrationEditForm { [System.ComponentModel.DataAnnotations.Required] public string DisplayName { get; set; } = string.Empty; [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.Url] public string Endpoint { get; set; } = string.Empty; public string? ExpectedExtensionId { get; set; } public bool Enabled { get; set; } }
+    private enum DetailTab { Summary, Connection, Enrollment, Contributions, Options, Usages }
+}

@@ -30,6 +30,7 @@ public static class WorkspaceStartupData
         await ManagementDemoData.SeedAsync(services, cancellationToken);
         if (includeInteractiveDemo)
             await InteractiveFlowDemoData.SeedAsync(services, cancellationToken);
-        await WorkplaceDemoData.SeedAsync(services, cancellationToken);
+        if (await services.GetRequiredService<AgentManagementService>().GetAgentAsync("dotnet-expert", cancellationToken) is not null)
+            await WorkplaceDemoData.SeedAsync(services, cancellationToken);
     }
 }

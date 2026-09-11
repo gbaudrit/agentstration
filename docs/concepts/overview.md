@@ -1,5 +1,7 @@
 # Concepts
 
+- [Sources](sources.md) provide stable publisher identities and retain immutable published definitions.
+
 Agentstration separates what is declared, what executes, and what users ask the system to accomplish.
 
 | Distinction | Meaning |

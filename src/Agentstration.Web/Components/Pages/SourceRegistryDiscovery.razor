@@ -1,0 +1,206 @@
+@page "/settings/source-registries/discovery"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = Agentstration.Web.Security.AgentstrationPolicies.PlatformAdmin)]
+@implements IDisposable
+@inject ISourceRegistriesClient Client
+@inject NavigationManager Navigation
+@inject NotificationState Notifications
+@inject TimeProvider Clock
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SourceRegistriesStrings> Localizer
+
+<PageTitle>@T("DiscoveryPageTitle")</PageTitle>
+<PageHeader Title="@T("DiscoveryTitle")" Description="@T("DiscoveryDescription")">
+    <Actions><button class="button-secondary" disabled="@loading" @onclick="SearchAsync">@T("RefreshList")</button></Actions>
+</PageHeader>
+
+<ResourceTabs Label="@T("RegistryNavigation")">
+    <a href="/settings/source-registries">@T("Registrations")</a>
+    <a class="active" href="/settings/source-registries/discovery">@T("DiscoverSources")</a>
+    <a href="/settings/sources">@T("ImportedSources")</a>
+</ResourceTabs>
+
+<section class="panel discovery-filters">
+    <div class="panel-header"><div><p class="eyebrow">@T("CatalogSearch")</p><h2>@T("Filters")</h2><p>@T("FiltersHelp")</p></div><button class="button-primary" disabled="@loading" @onclick="SearchAsync">@T("SearchAction")</button></div>
+    <div class="form-grid">
+        <label class="form-wide"><span>@T("Search")</span><input @bind="search" @bind:event="oninput" placeholder="@T("DiscoverySearchPlaceholder")" @onkeydown="SearchOnEnterAsync" /></label>
+        <label><span>@T("Publisher")</span><select @bind="publisher"><option value="">@T("AllPublishers")</option>@foreach (var item in publishers) { <option value="@item.Name">@(item.DisplayName ?? item.Name) (@item.SourceCount)</option> }</select></label>
+        <label><span>@T("Registry")</span><select @bind="registry"><option value="">@T("AllRegistries")</option>@foreach (var item in registries) { <option value="@item.Registration.Name">@item.Registration.Definition.DisplayName</option> }</select></label>
+        <label><span>@T("TrustPolicy")</span><select value="@trustPolicy" @onchange="SetTrustPolicy"><option value="">@T("AnyTrustPolicy")</option>@foreach (var value in Enum.GetValues<SourceRegistryTrustPolicy>()) { <option value="@value">@TrustPolicy(value)</option> }</select></label>
+        <label><span>@T("PublisherStatus")</span><select value="@publisherStatus" @onchange="SetPublisherStatus"><option value="">@T("AnyPublisherStatus")</option>@foreach (var value in Enum.GetValues<SourceRegistryPublisherStatus>()) { <option value="@value">@PublisherStatus(value)</option> }</select></label>
+        <label><span>@T("SourceVersionVerification")</span><select value="@verificationStatus" @onchange="SetVerificationStatus"><option value="">@T("AnyVerificationStatus")</option>@foreach (var value in Enum.GetValues<SourceVerificationStatus>()) { <option value="@value">@VerificationStatus(value)</option> }</select></label>
+    </div>
+    <div class="discovery-toggle-row">
+        <label class="switch-field"><input type="checkbox" @bind="compatibleOnly" /><span>@T("CompatibleOnly")</span></label>
+        <label class="switch-field"><input type="checkbox" @bind="freshOnly" /><span>@T("FreshOnly")</span></label>
+        <label class="switch-field"><input type="checkbox" @bind="conflictsOnly" /><span>@T("ConflictsOnly")</span></label>
+    </div>
+</section>
+
+@if (error is not null)
+{
+    <ErrorState Title="@T("DiscoveryFailed")" Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="SearchAsync">@T("Retry")</button></ErrorState>
+}
+else if (loading && page is null)
+{
+    <LoadingState Message="@T("LoadingDiscovery")" />
+}
+else if (page?.Count == 0)
+{
+    <EmptyState Title="@T("NoDiscoveredSources")" Message="@T("NoDiscoveredSourcesMessage")" />
+}
+else if (page is not null)
+{
+    <div class="discovery-results-heading"><p>@F("DiscoveryCount", page.Count, page.Total)</p></div>
+    <section class="discovery-results" aria-live="polite">
+        @foreach (var source in page.Value)
+        {
+            <article class="panel discovered-source">
+                <header><div><p class="eyebrow">@source.Publisher / @source.Name</p><h2>@(source.DisplayName ?? source.Name)</h2><p>@(source.Description ?? T("NoDescription"))</p></div><StatusBadge Text="@F("VersionCount", source.Versions.Count)" Status="UiStatus.Info" /></header>
+                @foreach (var version in source.Versions)
+                {
+                    <section class="discovered-version @(version.Conflicted ? "conflicted" : null)">
+                        <header><div><strong>@version.Version</strong><code>@version.VerificationReasonCode</code></div><div class="version-badges"><StatusBadge Text="@VerificationStatus(version.VerificationStatus)" Status="@VerificationTone(version.VerificationStatus)" />@if (version.Conflicted) { <StatusBadge Text="@T("DigestConflict")" Status="UiStatus.Danger" /> }</div></header>
+                        @if (version.Conflicted) { <p class="form-alert form-alert-danger">@T("ConflictImportDenied")</p> }
+                        <div class="observation-grid">
+                            @foreach (var observation in version.Observations)
+                            {
+                                <article class="observation-card">
+                                    <header><div><strong>@observation.RegistrationDisplayName</strong><small><code>@observation.RegistrationName / @observation.Selection.CatalogName</code></small></div>@if (observation.IsCatalogLatest) { <StatusBadge Text="@T("ShardLatest")" Status="UiStatus.Info" /> }</header>
+                                    <div class="evidence-grid" aria-label="@T("IndependentEvidence")">
+                                        <span><small>@T("RegistryOriginTrust")</small><strong>@TrustPolicy(observation.TrustPolicy)</strong><small>@OriginClassification(observation.OriginClassification)</small></span>
+                                        <span><small>@T("PublisherEvidence")</small><strong>@PublisherStatus(ParsePublisherStatus(observation.Publisher.Status))</strong><small>@observation.Publisher.Name</small></span>
+                                        <span><small>@T("SourceVersionVerification")</small><strong>@VerificationStatus(version.VerificationStatus)</strong><small><code>@Short(observation.ManifestDigest)</code></small></span>
+                                        <span><small>@T("SnapshotVerification")</small><strong>@T("NotEvaluated")</strong><small>@T("AfterChannelRefresh")</small></span>
+                                    </div>
+                                    <dl class="resource-details compact"><dt>@T("Freshness")</dt><dd>@ObservedStatus(observation.Freshness) · @FormatDate(observation.FetchedAt)</dd><dt>@T("ManifestDigest")</dt><dd><code>@observation.ManifestDigest</code></dd><dt>@T("IndexDigest")</dt><dd><code>@Short(observation.IndexDigest)</code></dd><dt>@T("ShardDigest")</dt><dd><code>@Short(observation.CatalogDigest)</code></dd></dl>
+                                    @if (SelectionWarning(version, observation) is { } warning) { <p class="inline-warning">@warning</p> }
+                                    <button class="button-primary" disabled="@(!CanSelect(version, observation) || importing)" @onclick="() => Select(version, observation)">@T("SelectExactVersion")</button>
+                                </article>
+                            }
+                        </div>
+                    </section>
+                }
+            </article>
+        }
+    </section>
+    @if (page.Total > page.Skip + page.Count)
+    {
+        <div class="panel-actions"><button class="button-secondary" disabled="@loading" @onclick="LoadMoreAsync">@T("LoadMore")</button></div>
+    }
+}
+
+@if (selected is not null)
+{
+    <div class="dialog-backdrop" @onclick="CloseImport">
+        <section class="dialog discovery-import-dialog" role="dialog" aria-modal="true" aria-labelledby="registry-import-title" @onclick:stopPropagation="true">
+            <div class="panel-header"><div><p class="eyebrow">@T("ExactRegistryImport")</p><h2 id="registry-import-title">@T("ConfirmExactImport")</h2><p>@T("ConfirmExactImportHelp")</p></div><button class="icon-button" aria-label="@T("Close")" @onclick="CloseImport">×</button></div>
+            <div class="exact-selection"><strong>@selected.Selection.Publisher/@selected.Selection.SourceName · @selected.Selection.Version</strong><dl class="resource-details"><dt>@T("Registry")</dt><dd>@selected.RegistrationDisplayName <code>@selected.RegistrationName</code></dd><dt>@T("Observation")</dt><dd><code>@selected.Selection.ObservationId</code></dd><dt>@T("Catalog")</dt><dd><code>@selected.Selection.CatalogName</code></dd><dt>@T("ManifestDigest")</dt><dd><code>@selected.ManifestDigest</code></dd></dl></div>
+            <ResourceScopeFormField ResourceKind="@ResourceKinds.Source" @bind-Value="importScope" Disabled="@importing" />
+            <div class="form-alert form-alert-warning">@T("ImportPinWarning")</div>
+            @if (importError is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>@T("ImportFailed")</strong><span>@importError.Message</span></div> }
+            <div class="panel-actions"><button class="button-secondary" disabled="@importing" @onclick="CloseImport">@T("Cancel")</button><button class="button-primary" disabled="@(importScope is null || importing)" @onclick="ImportAsync">@(importing ? T("Importing") : T("ImportExactSelection"))</button></div>
+        </section>
+    </div>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private SourceRegistryDiscoveryPage? page;
+    private IReadOnlyList<SourceRegistryDiscoveryPublisher> publishers = [];
+    private IReadOnlyList<SourceRegistryRegistrationView> registries = [];
+    private AgentstrationApiException? error;
+    private AgentstrationApiException? importError;
+    private SourceRegistryDiscoveryObservation? selected;
+    private ResourceScopeRef? importScope;
+    private string search = string.Empty;
+    private string publisher = string.Empty;
+    private string registry = string.Empty;
+    private SourceRegistryTrustPolicy? trustPolicy;
+    private SourceRegistryPublisherStatus? publisherStatus;
+    private SourceVerificationStatus? verificationStatus;
+    private bool compatibleOnly = true;
+    private bool freshOnly;
+    private bool conflictsOnly;
+    private bool loading;
+    private bool importing;
+    private const int PageSize = 25;
+    private string T(string key) => Localizer[key].Value;
+    private string F(string key, params object[] arguments) => Localizer[key, arguments].Value;
+
+    protected override async Task OnInitializedAsync()
+    {
+        loading = true;
+        try
+        {
+            var publishersTask = Client.GetPublishersAsync(cancellation.Token);
+            var registriesTask = Client.GetRegistriesAsync(cancellation.Token);
+            var searchTask = Client.SearchAsync(Query(0, PageSize), cancellation.Token);
+            await Task.WhenAll(publishersTask, registriesTask, searchTask);
+            publishers = await publishersTask; registries = await registriesTask; page = await searchTask;
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+
+    private async Task SearchAsync()
+    {
+        loading = true; error = null;
+        try { page = await Client.SearchAsync(Query(0, PageSize), cancellation.Token); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        if (page is null) return;
+        loading = true; error = null;
+        try
+        {
+            var next = await Client.SearchAsync(Query(0, Math.Min(100, page.Take + PageSize)), cancellation.Token);
+            page = next;
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+
+    private SourceRegistryDiscoveryQuery Query(int skip, int take) => new() { Search = NullIfEmpty(search), Publisher = NullIfEmpty(publisher), Registry = NullIfEmpty(registry), CompatibleOnly = compatibleOnly, FreshOnly = freshOnly, ConflictsOnly = conflictsOnly, TrustPolicy = trustPolicy, PublisherStatus = publisherStatus, VerificationStatus = verificationStatus, Skip = skip, Take = take };
+    private async Task SearchOnEnterAsync(KeyboardEventArgs args) { if (args.Key == "Enter") await SearchAsync(); }
+    private void SetTrustPolicy(ChangeEventArgs args) => trustPolicy = ParseNullable<SourceRegistryTrustPolicy>(args.Value);
+    private void SetPublisherStatus(ChangeEventArgs args) => publisherStatus = ParseNullable<SourceRegistryPublisherStatus>(args.Value);
+    private void SetVerificationStatus(ChangeEventArgs args) => verificationStatus = ParseNullable<SourceVerificationStatus>(args.Value);
+    private static TEnum? ParseNullable<TEnum>(object? value) where TEnum : struct, Enum => Enum.TryParse<TEnum>(value?.ToString(), out var parsed) ? parsed : null;
+    private static string? NullIfEmpty(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private void Select(SourceRegistryDiscoveryVersion version, SourceRegistryDiscoveryObservation observation)
+    {
+        if (!CanSelect(version, observation)) return;
+        selected = observation; importScope = null; importError = null;
+    }
+
+    private async Task ImportAsync()
+    {
+        if (selected is null || importScope is null) return;
+        importing = true; importError = null;
+        try
+        {
+            var result = await Client.ImportAsync(selected.Selection, importScope, cancellation.Token);
+            Notifications.Add(new(Guid.NewGuid(), T(result.Outcome == SourceImportOutcome.Unchanged ? "ImportUnchanged" : "ImportComplete"), F("ImportCompleteMessage", result.Source.Configuration.Definition.DisplayName, result.Version.Definition.Version), Clock.GetLocalNow(), UiStatus.Success));
+            Navigation.NavigateTo($"/settings/sources/{Uri.EscapeDataString(result.Source.Source.Definition.Publisher)}/{Uri.EscapeDataString(result.Source.Source.Name)}?scopeRef={Uri.EscapeDataString(result.Source.Source.ScopeRef!.Value.Value)}");
+        }
+        catch (AgentstrationApiException exception) { importError = exception; }
+        finally { importing = false; }
+    }
+
+    private void CloseImport() { if (!importing) { selected = null; importScope = null; importError = null; } }
+    private static bool CanSelect(SourceRegistryDiscoveryVersion version, SourceRegistryDiscoveryObservation observation) => !version.Conflicted && observation.TrustPolicy != SourceRegistryTrustPolicy.Untrusted && ParsePublisherStatus(observation.Publisher.Status) is SourceRegistryPublisherStatus.Verified or SourceRegistryPublisherStatus.Official && version.VerificationStatus is not SourceVerificationStatus.Conflict and not SourceVerificationStatus.Revoked;
+    private string? SelectionWarning(SourceRegistryDiscoveryVersion version, SourceRegistryDiscoveryObservation observation) => version.Conflicted ? T("Warning.Conflict") : ParsePublisherStatus(observation.Publisher.Status) == SourceRegistryPublisherStatus.Revoked || version.VerificationStatus == SourceVerificationStatus.Revoked ? T("Warning.Revoked") : observation.TrustPolicy == SourceRegistryTrustPolicy.Untrusted ? T("Warning.Untrusted") : ParsePublisherStatus(observation.Publisher.Status) == SourceRegistryPublisherStatus.Declared ? T("Warning.UnverifiedPublisher") : observation.Freshness is not SourceRegistryObservedStatus.Fresh and not SourceRegistryObservedStatus.Recovered ? T("Warning.Stale") : version.VerificationStatus is SourceVerificationStatus.Unverified or SourceVerificationStatus.Unavailable ? T("Warning.UnverifiedVersion") : null;
+    private static SourceRegistryPublisherStatus ParsePublisherStatus(string value) => Enum.TryParse<SourceRegistryPublisherStatus>(value, true, out var parsed) ? parsed : SourceRegistryPublisherStatus.Declared;
+    private string TrustPolicy(SourceRegistryTrustPolicy value) => T($"TrustPolicy.{value}");
+    private string PublisherStatus(SourceRegistryPublisherStatus value) => T($"PublisherStatus.{value}");
+    private string VerificationStatus(SourceVerificationStatus value) => T($"Verification.{value}");
+    private string OriginClassification(SourceRegistryOriginClassification value) => T($"Origin.{value}");
+    private string ObservedStatus(SourceRegistryObservedStatus value) => T($"Observed.{value}");
+    private static UiStatus VerificationTone(SourceVerificationStatus value) => value switch { SourceVerificationStatus.Verified => UiStatus.Success, SourceVerificationStatus.Unverified or SourceVerificationStatus.Unavailable => UiStatus.Warning, _ => UiStatus.Danger };
+    private static string Short(string value) => value.Length <= 24 ? value : $"{value[..14]}…{value[^8..]}";
+    private static string FormatDate(DateTimeOffset value) => value.ToLocalTime().ToString("g");
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

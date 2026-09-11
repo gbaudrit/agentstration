@@ -33,7 +33,7 @@ else
     }
     <EditForm Model="model" OnValidSubmit="SaveAsync" data-testid="flow-orchestration-editor">
         <fieldset class="panel orchestration-metadata" disabled="@IsReadOnly">
-            <div class="form-columns"><label>@T("TechnicalName")<input value="@model.Name" readonly /></label><label>@T("CurrentDefinitionVersion")<InputText @bind-Value="model.Version" /></label></div>
+            <div class="form-columns"><label>@T("TechnicalName")<input value="@model.Name" readonly /></label><label>@T("CurrentDefinitionVersion")<InputText @bind-Value="model.Version" /></label><ResourceScopeFormField ResourceKind="@ResourceKinds.Flow" @bind-Value="selectedScope" Disabled="true" /></div>
             <label>@T("Description")<InputTextArea @bind-Value="model.Description" /></label>
             <label class="check-option"><InputCheckbox @bind-Value="model.Enabled" /> @T("Enabled")</label>
         </fieldset>
@@ -59,6 +59,7 @@ else
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private readonly CancellationTokenSource cancellation = new();
     private OrchestrationEditorModel? model;
+    private ResourceScopeRef? selectedScope;
     private IReadOnlyList<AgentSummary> agents = [];
     private string? etag;
     private string publishVersion = "0.1.0";

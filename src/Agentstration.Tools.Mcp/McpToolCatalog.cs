@@ -2,6 +2,7 @@ using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -166,6 +167,8 @@ public sealed class ToolProviderAdapter(
             native.Name,
             resource.Definition.Description ?? native.Description,
             resource.Definition.Provider?.Name,
+            resource.Namespace,
+            resource.Definition.Provider?.Namespace ?? resource.Namespace,
             resource.Definition.ExternalId,
             native.JsonSchema.Clone(),
             native.ReturnJsonSchema?.Clone(),
@@ -217,7 +220,8 @@ public sealed class McpToolCatalog(IControlPlaneStore store, ToolProviderAdapter
         var resources = new List<ToolResource>();
         foreach (var id in toolIds.Distinct(StringComparer.Ordinal))
         {
-            var tool = await store.GetAsync<ToolResource>(new ResourceKey(ResourceKinds.Tool, id), cancellationToken) ?? throw new ToolResolutionException("tool_not_found", $"Tool resource '{id}' was not found.");
+            var identity = ToolResourceIdentity.ParseCatalogId(id);
+            var tool = await store.GetAsync<ToolResource>(new ResourceKey(ResourceKinds.Tool, identity.Name, identity.Namespace), cancellationToken) ?? throw new ToolResolutionException("tool_not_found", $"Tool resource '{id}' was not found.");
             if (!tool.Value.Definition.Enabled) throw new ToolResolutionException("tool_disabled", $"Tool resource '{id}' is disabled.");
             if (tool.Value.Definition.Discovery?.Available != true) throw new ToolResolutionException("tool_unavailable", $"Tool resource '{id}' is no longer available from its provider.");
             if (tool.Value.Definition.Provider is null) throw new ToolResolutionException("tool_mapping_invalid", $"Tool resource '{id}' has no ToolProvider mapping.");
@@ -225,14 +229,31 @@ public sealed class McpToolCatalog(IControlPlaneStore store, ToolProviderAdapter
         }
 
         var resolved = new List<IAgentTool>();
-        foreach (var group in resources.GroupBy(value => value.Definition.Provider!.Name, StringComparer.Ordinal))
+        foreach (var group in resources.GroupBy(value => (
+                     value.Definition.Provider!.Name,
+                     Namespace: value.Definition.Provider.Namespace ?? value.Namespace)))
         {
-            var provider = await store.GetAsync<ToolProviderResource>(new ResourceKey(ResourceKinds.ToolProvider, group.Key), cancellationToken) ?? throw new ToolResolutionException("tool_provider_not_found", $"ToolProvider '{group.Key}' was not found.");
+            var provider = await store.GetAsync<ToolProviderResource>(new ResourceKey(ResourceKinds.ToolProvider, group.Key.Name, group.Key.Namespace), cancellationToken) ?? throw new ToolResolutionException("tool_provider_not_found", $"ToolProvider '{group.Key.Name}' was not found.");
             if (!provider.Value.Definition.Enabled) throw new ToolResolutionException("tool_provider_disabled", $"ToolProvider '{provider.Value.Metadata.Name}' is disabled.");
-            resolved.AddRange(await providers.ResolveAsync(provider.Value, group.ToArray(), cancellationToken));
+            if (provider.Value.Definition.Mcp?.Internal == true)
+                resolved.AddRange(group.Select(Tool));
+            else
+                resolved.AddRange(await providers.ResolveAsync(provider.Value, group.ToArray(), cancellationToken));
         }
         return resolved;
     }
+
+    private static IAgentTool Tool(ToolResource resource) => new McpAgentTool(
+        resource.Name,
+        resource.Definition.ExternalId ?? resource.Name,
+        resource.Definition.Description,
+        resource.Definition.Provider?.Name,
+        resource.Namespace,
+        resource.Definition.Provider?.Namespace ?? resource.Namespace,
+        resource.Definition.ExternalId,
+        resource.Definition.Schema?.Input ?? JsonSerializer.SerializeToElement(new { type = "object" }),
+        resource.Definition.Schema?.Output,
+        resource.Definition.RequiresApproval);
 }
 
 internal sealed record McpAgentTool(
@@ -240,16 +261,22 @@ internal sealed record McpAgentTool(
     string Name,
     string? Description,
     string? ProviderId,
+    ResourceNamespace? Namespace,
+    ResourceNamespace? ProviderNamespace,
     string? ExternalId,
     JsonElement InputSchema,
     JsonElement? OutputSchema,
     bool RequiresApproval) : IAgentTool;
 
-public sealed class McpToolInvoker(IControlPlaneStore store, ToolProviderAdapter providers) : IToolInvoker
+public sealed class McpToolInvoker(
+    IControlPlaneStore store,
+    ToolProviderAdapter providers,
+    Lazy<IToolDefinitionExecutor>? internalTools = null,
+    Lazy<IEnumerable<IInternalMcpToolHandler>>? builtInTools = null) : IToolInvoker
 {
     public async ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
     {
-        var tool = await store.GetAsync<ToolResource>(new ResourceKey(ResourceKinds.Tool, context.ToolId), cancellationToken)
+        var tool = await store.GetAsync<ToolResource>(new ResourceKey(ResourceKinds.Tool, context.ToolId, context.ToolNamespace ?? default), cancellationToken)
             ?? throw new ToolResolutionException("tool_not_found", $"Tool resource '{context.ToolId}' was not found.");
         if (!tool.Value.Definition.Enabled) throw new ToolResolutionException("tool_disabled", $"Tool resource '{context.ToolId}' is disabled.");
         if (tool.Value.Definition.Discovery?.Available != true) throw new ToolResolutionException("tool_unavailable", $"Tool resource '{context.ToolId}' is no longer available from its provider.");
@@ -259,9 +286,41 @@ public sealed class McpToolInvoker(IControlPlaneStore store, ToolProviderAdapter
             throw new ToolResolutionException("tool_provider_mismatch", $"Tool resource '{context.ToolId}' no longer maps to provider '{context.ToolProviderId}'.");
         if (context.ExternalToolId is not null && !string.Equals(context.ExternalToolId, tool.Value.Definition.ExternalId, StringComparison.Ordinal))
             throw new ToolResolutionException("external_tool_mismatch", $"Tool resource '{context.ToolId}' no longer maps to external Tool '{context.ExternalToolId}'.");
-        var provider = await store.GetAsync<ToolProviderResource>(new ResourceKey(ResourceKinds.ToolProvider, providerId), cancellationToken)
+        var provider = await store.GetAsync<ToolProviderResource>(new ResourceKey(ResourceKinds.ToolProvider, providerId, context.ToolProviderNamespace ?? default), cancellationToken)
             ?? throw new ToolResolutionException("tool_provider_not_found", $"ToolProvider '{providerId}' was not found.");
         if (!provider.Value.Definition.Enabled) throw new ToolResolutionException("tool_provider_disabled", $"ToolProvider '{providerId}' is disabled.");
+        if (provider.Value.Definition.Mcp?.Internal == true)
+        {
+            if (context.TenantId is not { } tenantId || context.WorkspaceId is not { } workspaceId || context.PrincipalId is not { } principalId)
+                throw new ToolResolutionException("tool_execution_scope_required", "An internal Tool invocation requires trusted Tenant, Workspace, and Principal scope.");
+            var externalId = tool.Value.Definition.ExternalId ?? tool.Value.Name;
+            var builtIn = builtInTools?.Value.SingleOrDefault(value => string.Equals(value.Definition.Name, externalId, StringComparison.Ordinal));
+            if (builtIn is not null)
+                return await builtIn.ExecuteAsync(new InternalMcpToolInvocation(
+                    tenantId,
+                    workspaceId,
+                    principalId,
+                    context.ToolCallId,
+                    context.CorrelationId,
+                    context.Arguments ?? JsonSerializer.SerializeToElement(new { }),
+                    context.AgentId is not null ? ToolDefinitionCallerKind.Agent : context.OwnerKind == ToolExecutionOwnerKind.FlowRun ? ToolDefinitionCallerKind.Flow : ToolDefinitionCallerKind.Agent,
+                    context.AgentId is not null ? $"agent:{context.AgentId}" : context.RunId is not null ? $"flow:{context.RunId}" : null,
+                    context.RunId,
+                    context.FlowStepId), cancellationToken);
+            if (internalTools is null) throw new ToolResolutionException("internal_tool_executor_unavailable", "The Agentstration ToolDefinition executor is unavailable.");
+            var result = await internalTools.Value.ExecuteAsync(new ToolDefinitionInvocation(
+                tenantId,
+                workspaceId,
+                principalId,
+                tool.Value.Namespace,
+                externalId,
+                context.ToolCallId,
+                context.CorrelationId,
+                context.Arguments ?? JsonSerializer.SerializeToElement(new { }),
+                context.AgentId is not null ? ToolDefinitionCallerKind.Agent : context.OwnerKind == ToolExecutionOwnerKind.FlowRun ? ToolDefinitionCallerKind.Flow : ToolDefinitionCallerKind.Agent,
+                context.AgentId is not null ? $"agent:{context.AgentId}" : context.RunId is not null ? $"flow:{context.RunId}" : null), cancellationToken);
+            return result.Output?.Clone();
+        }
         return await providers.InvokeAsync(provider.Value, tool.Value, context.Arguments, cancellationToken);
     }
 }
@@ -275,8 +334,12 @@ public static class McpToolServiceCollectionExtensions
     public static IServiceCollection AddAgentstrationMcpTools(this IServiceCollection services)
     {
         services.TryAddSingleton<IConfiguration>(_ => new ConfigurationBuilder().Build());
-        services.AddHttpClient(AepClientName, client => client.Timeout = TimeSpan.FromSeconds(15));
-        services.AddHttpClient(McpClientName, client => client.Timeout = TimeSpan.FromSeconds(90));
+        services.TryAddSingleton(new AepTransportSecurityOptions());
+        services.AddHttpClient(AepClientName, client => client.Timeout = TimeSpan.FromSeconds(15))
+            .ConfigurePrimaryHttpMessageHandler(provider =>
+                AepSecureHttpMessageHandler.Create(provider.GetRequiredService<AepTransportSecurityOptions>()));
+        services.AddHttpClient(McpClientName, client => client.Timeout = TimeSpan.FromSeconds(90))
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddSingleton<IAepExtensionEndpointResolver, ConfigurationAepExtensionEndpointResolver>();
         services.AddSingleton<IToolProviderEnvironmentResolver, ConfigurationToolProviderEnvironmentResolver>();
         services.AddSingleton<ToolProviderAdapter>();

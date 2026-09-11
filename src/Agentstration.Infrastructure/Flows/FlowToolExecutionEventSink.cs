@@ -46,7 +46,7 @@ public sealed class FlowToolExecutionEventSink : IToolExecutionEventSink
             context.RunId,
             0,
             EventType(executionEvent),
-            null,
+            context.FlowStepId,
             Payload(executionEvent),
             executionEvent.Timestamp), cancellationToken);
         await eventSink.PublishAsync(runEvent, cancellationToken);
@@ -69,9 +69,12 @@ public sealed class FlowToolExecutionEventSink : IToolExecutionEventSink
             context.ToolCallId,
             context.InvocationId,
             context.ToolId,
+            ToolNamespace = context.ToolNamespace?.Value,
             context.ToolName,
             ProviderId = context.ToolProviderId,
+            ProviderNamespace = context.ToolProviderNamespace?.Value,
             context.ExternalToolId,
+            context.FlowStepId,
             context.AgentId,
             context.AgentVersion,
             context.AgentGeneration,

@@ -1,7 +1,6 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
-using Agentstration.Web.Hosting;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Models;
@@ -11,7 +10,7 @@ public static class ExtensionEndpoints
     public static void Map(IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/extensions", ListAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        endpoints.MapPost("/api/extensions/discover", DiscoverAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        endpoints.MapGet("/api/extensions/inventory", ListInventoryAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         var registrations = endpoints.MapGroup("/api/extensionregistrations");
         registrations.MapGet("/", ListRegistrationsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         registrations.MapGet("/{registrationName}", GetRegistrationAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
@@ -20,11 +19,6 @@ public static class ExtensionEndpoints
         registrations.MapDelete("/{registrationName}", DeleteRegistrationAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
     }
 
-    private static Task<IResult> DiscoverAsync(
-        ExtensionSourceDiscoveryService discovery,
-        CancellationToken cancellationToken) =>
-        ModelManagementHttp.ExecuteAsync(async () => Results.Ok(await discovery.DiscoverAsync(cancellationToken)));
-
     private static async Task<IResult> ListAsync(
         ExtensionManagementService service,
         CancellationToken cancellationToken) =>
@@ -32,6 +26,16 @@ public static class ExtensionEndpoints
         {
             var views = await service.ListAsync(cancellationToken);
             return Results.Ok(new ValueResponse<ExtensionResponse>(views.Select(Map).ToArray()));
+        });
+
+    private static async Task<IResult> ListInventoryAsync(
+        ICurrentRequestContext current,
+        ExtensionInventoryService service,
+        CancellationToken cancellationToken) =>
+        await ModelManagementHttp.ExecuteAsync(async () =>
+        {
+            var items = await service.ListAsync(current.Current, cancellationToken);
+            return Results.Ok(new ValueResponse<ExtensionInventoryItemResponse>(items.Select(MapInventory).ToArray()));
         });
 
     private static Task<IResult> ListRegistrationsAsync(
@@ -65,7 +69,8 @@ public static class ExtensionEndpoints
                 Metadata = new ResourceMetadata { Name = body.Name, Namespace = ModelManagementHttp.Namespace(body.Namespace) },
                 Kind = ResourceKinds.ExtensionRegistration,
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Definition = body.Properties
+                Definition = body.Properties,
+                ScopeRef = body.ScopeRef
             }, cancellationToken);
             response.Headers.Location = $"/api/extensionregistrations/{Uri.EscapeDataString(stored.Value.Name)}?resourceNamespace={Uri.EscapeDataString(stored.Value.Namespace.Value)}";
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status201Created);
@@ -134,5 +139,35 @@ public static class ExtensionEndpoints
             provider.Namespace,
             provider.ContributionId)).ToArray(),
         view.Details,
-        view.DiscoverySource);
+        view.DiscoverySource,
+        view.RegistrationEnabled,
+        view.EnrollmentMode,
+        view.RegistrationScopeRef);
+
+    private static ExtensionInventoryItemResponse MapInventory(ExtensionInventoryItem item) => new(
+        item.Key,
+        item.RegistrationName,
+        item.RegistrationNamespace,
+        item.RegistrationScopeRef,
+        item.EnrollmentInstanceId,
+        item.DisplayName,
+        item.ExtensionId,
+        item.Version,
+        item.Endpoint,
+        item.RegistrationSource,
+        item.RegistrationEnabled,
+        item.AvailabilityStatus,
+        item.EnrollmentStatus,
+        item.AnnouncedAt,
+        item.Extension is null ? null : Map(item.Extension),
+        item.Connections.Select(value => new ExtensionInventoryConnectionResponse(
+            value.RegistrationName,
+            value.RegistrationNamespace,
+            value.RegistrationScopeRef,
+            value.DisplayName,
+            value.Endpoint,
+            value.Source,
+            value.Enabled,
+            value.EnrollmentMode,
+            value.AvailabilityStatus)).ToArray());
 }

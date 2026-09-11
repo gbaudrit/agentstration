@@ -28,6 +28,21 @@ public static class SecurityAuditActions
     public const string PersonalAccessTokenRevoked = "personal-access-token.revoked";
     public const string PersonalAccessTokensRevoked = "personal-access-token.revoked-all";
     public const string BootstrapProfileApplied = "bootstrap-profile.applied";
+    public const string AepEnrollmentAnnounced = "aep-enrollment.announced";
+    public const string AepPairingCodeIssued = "aep-enrollment.code-issued";
+    public const string AepCredentialIssued = "aep-enrollment.credential-issued";
+    public const string AepEnrollmentAvailable = "aep-enrollment.available";
+    public const string AepEnrollmentRejected = "aep-enrollment.rejected";
+    public const string AepEnrollmentCancelled = "aep-enrollment.cancelled";
+    public const string AepCredentialRotated = "aep-enrollment.credential-rotated";
+    public const string AepCredentialRevoked = "aep-enrollment.credential-revoked";
+    public const string AepEnrollmentUnenrolled = "aep-enrollment.unenrolled";
+    public const string AepEnrollmentFailed = "aep-enrollment.failed";
+    public const string SourceRegistryCreated = "source-registry.created";
+    public const string SourceRegistryConfigurationUpdated = "source-registry.configuration-updated";
+    public const string SourceRegistryDeleted = "source-registry.deleted";
+    public const string SourceRegistryRefreshed = "source-registry.refreshed";
+    public const string SourceRegistrySourceImported = "source-registry.source-imported";
 }
 
 public sealed record SecurityAuditEvent(

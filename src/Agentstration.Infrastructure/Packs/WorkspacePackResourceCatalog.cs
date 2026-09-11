@@ -173,8 +173,7 @@ public sealed class WorkspacePackResourceCatalog(
         var clean = agent with
         {
             Uid = Guid.Empty,
-            TenantId = Guid.Empty,
-            WorkspaceId = Guid.Empty,
+            ScopeRef = null,
             Generation = 1,
             ETag = null,
             Metadata = CleanMetadata(agent.Metadata),
@@ -238,8 +237,7 @@ public sealed class WorkspacePackResourceCatalog(
         var clean = profile with
         {
             Uid = Guid.Empty,
-            TenantId = Guid.Empty,
-            WorkspaceId = Guid.Empty,
+            ScopeRef = null,
             Generation = 1,
             ETag = null,
             Metadata = CleanMetadata(profile.Metadata),
@@ -261,8 +259,7 @@ public sealed class WorkspacePackResourceCatalog(
         var clean = provider with
         {
             Uid = Guid.Empty,
-            TenantId = Guid.Empty,
-            WorkspaceId = Guid.Empty,
+            ScopeRef = null,
             Generation = 1,
             ETag = null,
             Metadata = CleanMetadata(provider.Metadata),
@@ -281,8 +278,7 @@ public sealed class WorkspacePackResourceCatalog(
         var clean = runtime with
         {
             Uid = Guid.Empty,
-            TenantId = Guid.Empty,
-            WorkspaceId = Guid.Empty,
+            ScopeRef = null,
             Generation = 1,
             ETag = null,
             Metadata = CleanMetadata(runtime.Metadata),
@@ -332,6 +328,18 @@ public sealed class WorkspacePackResourceCatalog(
                     yield return IncludeDependency(candidate.Agent.ResourceId, candidate.Agent.Namespace ?? flow.Id.Namespace, ResourceKinds.Agent, "routerAgent");
                 if (router.Fallback is { } fallback && !Dynamic(fallback.ResourceId))
                     yield return IncludeDependency(fallback.ResourceId, fallback.Namespace ?? flow.Id.Namespace, ResourceKinds.Agent, "routerFallback");
+            }
+            else if (step is FlowCallStepDefinition flowCall)
+            {
+                yield return IncludeDependency(flowCall.Flow.ResourceId, flowCall.Flow.Namespace ?? flow.Id.Namespace, ResourceKinds.Flow, "graphFlow");
+            }
+            else if (step is ToolFlowStepDefinition tool)
+            {
+                yield return UnsupportedDependency(
+                    new ResourceReference(tool.Tool.ResourceId, @namespace: tool.Tool.Namespace),
+                    flow.Id.Namespace,
+                    ResourceKinds.Tool,
+                    "graphTool");
             }
         }
     }

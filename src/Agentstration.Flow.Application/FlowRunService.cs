@@ -21,6 +21,30 @@ public interface IFlowAgentExecutor
 {
     Task<FlowAgentExecutionResult> ExecuteAsync(FlowTargetReference target, JsonElement input, string correlationId, CancellationToken cancellationToken);
 }
+
+public sealed record FlowToolExecutionRequest(
+    FlowRunScope Scope,
+    string RunId,
+    FlowId OwnerFlowId,
+    string StepName,
+    int Attempt,
+    string CorrelationId,
+    FlowToolReference Tool,
+    JsonElement Arguments);
+
+public interface IFlowToolExecutor
+{
+    Task<JsonElement?> ExecuteAsync(FlowToolExecutionRequest request, CancellationToken cancellationToken);
+}
+
+public sealed class UnsupportedFlowToolExecutor : IFlowToolExecutor
+{
+    public static UnsupportedFlowToolExecutor Instance { get; } = new();
+    private UnsupportedFlowToolExecutor() { }
+
+    public Task<JsonElement?> ExecuteAsync(FlowToolExecutionRequest request, CancellationToken cancellationToken) =>
+        Task.FromException<JsonElement?>(new FlowValidationException("flow_tool_executor_unavailable", "No governed Tool executor is configured for Flow Runs."));
+}
 public interface IFlowRunQueue
 {
     ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken);
@@ -71,6 +95,8 @@ public sealed record FlowRunExecutionOptions
     public TimeSpan OrchestrationTimeout { get; init; } = TimeSpan.FromMinutes(10);
     public TimeSpan InputRequestTimeout { get; init; } = TimeSpan.FromDays(7);
     public TimeSpan ExecutionLeaseDuration { get; init; } = TimeSpan.FromMinutes(15);
+    public int MaximumNestingDepth { get; init; } = 16;
+    public int MaximumDescendantRuns { get; init; } = 256;
 }
 
 public sealed record FlowRevisionUsage(
@@ -102,7 +128,8 @@ public sealed partial class FlowRunService(
     IFlowRunExecutionScope executionScope,
     TimeProvider timeProvider,
     FlowRunExecutionOptions? executionOptions = null,
-    IFlowInputRequestSink? inputRequestSink = null)
+    IFlowInputRequestSink? inputRequestSink = null,
+    IFlowToolExecutor? configuredToolExecutor = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly FlowRunExecutionOptions executionOptions = executionOptions is null
@@ -110,8 +137,11 @@ public sealed partial class FlowRunService(
         : executionOptions.OrchestrationTimeout > TimeSpan.Zero
           && executionOptions.InputRequestTimeout > TimeSpan.Zero
           && executionOptions.ExecutionLeaseDuration > executionOptions.OrchestrationTimeout
+          && executionOptions.MaximumNestingDepth is >= 1 and <= 64
+          && executionOptions.MaximumDescendantRuns is >= 1 and <= 4096
             ? executionOptions
             : throw new ArgumentOutOfRangeException(nameof(executionOptions), "Execution and input timeouts must be positive, and the execution lease must exceed the orchestration timeout.");
+    private readonly IFlowToolExecutor toolExecutor = configuredToolExecutor ?? UnsupportedFlowToolExecutor.Instance;
     public static readonly ActivitySource ActivitySource = new("Agentstration.Flow");
     public static readonly Meter Meter = new("Agentstration.Flow");
     private static readonly Counter<long> RunsCreated = Meter.CreateCounter<long>("agentstration.flow.runs.created");

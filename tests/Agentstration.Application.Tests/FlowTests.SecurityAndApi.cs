@@ -11,6 +11,7 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Work;
+using Agentstration.Work.Storage.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
@@ -269,17 +270,75 @@ public sealed partial class FlowTests
         Assert.AreEqual(new FlowRunScope(requestContext.TenantId, new(requestContext.WorkspaceId), requestContext.PrincipalId), run.Scope);
         var principal = await factory.Services.GetRequiredService<IIdentityStore>().GetPrincipalAsync(requestContext.PrincipalId, default);
         Assert.AreEqual(principal?.DisplayName, run.StartedBy);
+        Assert.AreEqual(FlowInvocationOrigin.Api, run.InvocationOrigin);
+        Assert.AreEqual(principal?.DisplayName, run.CallerId);
+        Assert.IsNotNull(run.WorkItemResourceId);
+        Assert.IsNull(run.ParentFlowRunId);
+        Assert.AreEqual(0, run.NestingDepth);
         Assert.IsNull(typeof(CreateFlowRunRequest).GetProperty("StartedBy"));
         var global = await client.GetFromJsonAsync<FlowRunPageResponse>("/api/flowRuns", JsonOptions);
         Assert.IsTrue(global!.Value.Any(item => item.Id == run.Id));
         var scoped = await client.GetFromJsonAsync<FlowRunPageResponse>("/api/flows/api-run-flow/runs", JsonOptions);
         Assert.IsTrue(scoped!.Value.Any(item => item.Id == run.Id));
+        var causality = await client.GetFromJsonAsync<FlowRunCausalityPageResponse>($"/api/flowRuns/{run.Id}/causality?top=1", JsonOptions);
+        Assert.IsNotNull(causality);
+        Assert.AreEqual(run.Id, causality.Origin.RootFlowRunId);
+        Assert.AreEqual(FlowInvocationOrigin.Api, causality.Origin.InvocationOrigin);
+        Assert.AreEqual(1, causality.TotalCount);
+        Assert.HasCount(1, causality.Value);
+        Assert.IsTrue(causality.Value[0].ResolvedFromActiveReference);
+        Assert.IsNull(causality.NextLink);
         var routes = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
             .OfType<RouteEndpoint>()
             .Select(endpoint => endpoint.RoutePattern.RawText)
             .ToArray();
         Assert.Contains("/api/flowRuns/{runId}", routes);
+        Assert.Contains("/api/flowRuns/{runId}/causality", routes);
         Assert.DoesNotContain("/flowRuns/{runId}", routes);
+    }
+
+    [TestMethod]
+    public async Task FlowRunApiIdempotencyRecoversTheSameRootWorkAndRejectsConflicts()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var definition = new CreateFlowRequest("idempotent-api-flow", null, "1.0.0", true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "sql-expert")));
+        Assert.AreEqual(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/flows", definition, JsonOptions)).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/flows/idempotent-api-flow/versions", new CreateFlowVersionRequest("1.0.0"))).StatusCode);
+
+        static HttpRequestMessage Request(int value)
+        {
+            var message = new HttpRequestMessage(HttpMethod.Post, "/api/flows/idempotent-api-flow/runs")
+            {
+                Content = JsonContent.Create(new CreateFlowRunRequest(JsonSerializer.SerializeToElement(new { value })), options: JsonOptions)
+            };
+            message.Headers.Add("Idempotency-Key", "api-request-42");
+            message.Headers.Add("X-Causation-Id", "external-request-42");
+            return message;
+        }
+
+        using var firstRequest = Request(1);
+        using var firstResponse = await client.SendAsync(firstRequest);
+        using var secondRequest = Request(1);
+        using var secondResponse = await client.SendAsync(secondRequest);
+        Assert.AreEqual(HttpStatusCode.Accepted, firstResponse.StatusCode, await firstResponse.Content.ReadAsStringAsync());
+        Assert.AreEqual(HttpStatusCode.Accepted, secondResponse.StatusCode, await secondResponse.Content.ReadAsStringAsync());
+        var first = await firstResponse.Content.ReadFromJsonAsync<FlowRun>(JsonOptions);
+        var second = await secondResponse.Content.ReadFromJsonAsync<FlowRun>(JsonOptions);
+        Assert.AreEqual(first?.Id, second?.Id);
+        Assert.AreEqual("api-request-42", first?.IdempotencyKey);
+        Assert.AreEqual("external-request-42", first?.CausationId);
+
+        var workspace = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+        var work = factory.Services.GetRequiredService<IWorkItemRepository>();
+        Assert.HasCount(1, (await work.QueryAsync(new WorkItemQuery(new WorkspaceId(workspace.WorkspaceId), Type: "flow-api"), default)).Items);
+
+        using var conflictingRequest = Request(2);
+        using var conflict = await client.SendAsync(conflictingRequest);
+        Assert.AreEqual(HttpStatusCode.Conflict, conflict.StatusCode);
+        using var problem = JsonDocument.Parse(await conflict.Content.ReadAsStreamAsync());
+        Assert.AreEqual("flow_invocation_idempotency_conflict", problem.RootElement.GetProperty("title").GetString());
     }
 
     [TestMethod]

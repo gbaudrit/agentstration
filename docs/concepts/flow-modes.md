@@ -74,7 +74,7 @@ Choose Routing instead of Orchestration when exactly one Agent should run.
 
 A Workflow models an application-controlled graph. The executable representation is `FlowGraphDefinition`, containing one entry step, typed steps, transitions, optional input/output schemas, and designer metadata.
 
-### Executable step types
+### Graph step types
 
 | Step | Responsibility | Main emitted transition event |
 | --- | --- | --- |
@@ -83,10 +83,13 @@ A Workflow models an application-controlled graph. The executable representation
 | `router` | Selects a declared candidate or fallback. | `selected` or `failed` |
 | `condition` | Evaluates a constrained simple condition or expression. | `true` or `false` |
 | `transform` | Produces a mapped or expression-derived value. | `completed` |
+| `flow` | Selects an accessible published Flow by active or exact version and maps its declared input. Durable child execution is delivered by the nested FlowRun increment. | `completed` or `failed` |
 | `output` | Maps the terminal Flow output. | `completed` |
 | `failure` | Terminates the Run with a declared code and message. | Terminal failure |
 
 Transitions connect `fromStep`, event, and `toStep`; an optional condition and priority refine selection. Execution is bounded and rejects a step reached twice, so cycles are not currently supported. Business logic remains in application services and agents, not in the designer or transport endpoints.
+
+The palette contains one generic Flow card, independently of the number of Flows installed in the Workspace. Its namespace-aware selector includes Pack Flows. Changing the target preserves existing mappings; validation reports properties that are no longer compatible with the selected input schema. An active reference follows the target's active published version, while an exact reference pins one immutable version. Publication resolves both forms and rejects dependency cycles before a Run can be created.
 
 The polymorphic `WorkflowFlowDefinition` contract also exposes generic nodes and edges. A directly-created Workflow definition without a stored `FlowGraphDefinition` is structurally valid but is not executable by the current FlowRun engine. The Console draft/publish path stores the executable graph and is the supported Workflow execution path.
 

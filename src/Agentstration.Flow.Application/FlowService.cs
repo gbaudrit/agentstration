@@ -12,7 +12,16 @@ public interface IFlowDeletionGuard
     Task ValidateDeleteAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken);
 }
 
-public sealed class FlowService(IFlowRepository repository, TimeProvider timeProvider, IEnumerable<IFlowDeletionGuard> deletionGuards)
+public interface IFlowVersionActivationGuard
+{
+    Task ValidateActivationAsync(WorkspaceId workspaceId, FlowVersion version, CancellationToken cancellationToken);
+}
+
+public sealed class FlowService(
+    IFlowRepository repository,
+    TimeProvider timeProvider,
+    IEnumerable<IFlowDeletionGuard> deletionGuards,
+    IEnumerable<IFlowVersionActivationGuard>? activationGuards = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -80,6 +89,8 @@ public sealed class FlowService(IFlowRepository repository, TimeProvider timePro
         var published = new FlowVersion(workspaceId, id, version, stored.Value.Description, stored.Value.Definition, stored.Value.Metadata, timeProvider.GetUtcNow(), stored.Value.Graph,
             stored.Value.Graph is null ? null : FlowDefinitionHash.Compute(stored.Value.Graph), releaseNotes);
         FlowValidator.ValidateVersion(published);
+        if (activate)
+            foreach (var guard in activationGuards ?? []) await guard.ValidateActivationAsync(workspaceId, published, cancellationToken);
         var created = await repository.CreateVersionAsync(published, cancellationToken);
         if (activate)
         {

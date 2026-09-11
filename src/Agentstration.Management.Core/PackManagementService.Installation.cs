@@ -50,6 +50,35 @@ public sealed partial class PackManagementService
         bool replaceExisting,
         IReadOnlyList<PackBindingSelection> bindings,
         PackRemovalOptions removalOptions,
+        CancellationToken cancellationToken) =>
+        await InstallAsync(archive, replaceExisting, bindings, removalOptions, null, cancellationToken);
+
+    public async Task<StoredResource<InstalledPackResource>> InstallAsync(
+        PackArchive archive,
+        bool replaceExisting,
+        IReadOnlyList<PackBindingSelection> bindings,
+        PackRemovalOptions removalOptions,
+        SourcePackProvenance? sourceProvenance,
+        CancellationToken cancellationToken)
+    {
+        if (scopeOperations is null)
+            return await InstallCoreAsync(archive, replaceExisting, bindings, removalOptions, sourceProvenance, null, cancellationToken);
+        var targetScopeRef = scopeOperations.TargetScopeRef(archive.Manifest.Definition.TargetScope);
+        return await scopeOperations.WriteAsync(
+            ResourceKinds.InstalledPack,
+            targetScopeRef,
+            AuthorizationPermissions.ResourcesWrite,
+            token => InstallCoreAsync(archive, replaceExisting, bindings, removalOptions, sourceProvenance, targetScopeRef, token),
+            cancellationToken);
+    }
+
+    private async Task<StoredResource<InstalledPackResource>> InstallCoreAsync(
+        PackArchive archive,
+        bool replaceExisting,
+        IReadOnlyList<PackBindingSelection> bindings,
+        PackRemovalOptions removalOptions,
+        SourcePackProvenance? sourceProvenance,
+        ResourceScopeRef? targetScopeRef,
         CancellationToken cancellationToken)
     {
         var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
@@ -60,7 +89,7 @@ public sealed partial class PackManagementService
         if (prepared.Preview.AlreadyInstalled)
         {
             if (!replaceExisting) throw new PackAlreadyInstalledException(identity);
-            return await UpdateInstallationAsync(archive, prepared, removalOptions, cancellationToken);
+            return await UpdateInstallationAsync(archive, prepared, removalOptions, sourceProvenance, cancellationToken);
         }
 
         var @namespace = identity.Namespace;
@@ -79,6 +108,7 @@ public sealed partial class PackManagementService
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.InstalledPack,
+            ScopeRef = targetScopeRef,
             Metadata = new ResourceMetadata { Name = identity.ResourceName },
             Generation = 1,
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Creating },
@@ -94,6 +124,7 @@ public sealed partial class PackManagementService
                 Description = archive.Manifest.Metadata.Description,
                 Source = archive.Source,
                 SourceArtifact = sourceArtifact,
+                SourceProvenance = sourceProvenance,
                 InstalledAt = now,
                 State = InstalledPackState.Installing,
                 Bindings = resolutions
@@ -168,18 +199,27 @@ public sealed partial class PackManagementService
             throw new PackValidationException("pack_source_resources_mismatch", "The selected archive does not contain the same resource inventory as the installed Pack.");
 
         var sourceArtifact = await artifacts.SaveAsync(archive.Content, archive.Source, cancellationToken);
-        return await store.PutAsync(installed.Value with
+        var updated = installed.Value with
         {
             Generation = checked(installed.Value.Generation + 1),
             Definition = installed.Value.Definition with { Source = archive.Source, SourceArtifact = sourceArtifact },
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
-        }, etag, false, cancellationToken);
+        };
+        if (scopeOperations is not null && installed.Value.ScopeRef is { } scopeRef)
+            return await scopeOperations.WriteAsync(
+                installed.Value,
+                scopeRef,
+                AuthorizationPermissions.ResourcesWrite,
+                token => store.PutExactAsync(scopeRef, updated, etag, false, token),
+                cancellationToken);
+        return await store.PutAsync(updated, etag, false, cancellationToken);
     }
 
     private async Task<StoredResource<InstalledPackResource>> UpdateInstallationAsync(
         PackArchive archive,
         (PackInstallationPreview Preview, IReadOnlyDictionary<PackResourceDocument, IPackResourceHandler> Handlers) prepared,
         PackRemovalOptions removalOptions,
+        SourcePackProvenance? sourceProvenance,
         CancellationToken cancellationToken)
     {
         var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
@@ -239,6 +279,7 @@ public sealed partial class PackManagementService
                 Description = archive.Manifest.Metadata.Description,
                 Source = archive.Source,
                 SourceArtifact = sourceArtifact,
+                SourceProvenance = sourceProvenance,
                 InstalledAt = timeProvider.GetUtcNow(),
                 State = InstalledPackState.Installed,
                 Bindings = resolutions,
@@ -260,12 +301,22 @@ public sealed partial class PackManagementService
         StoredResource<InstalledPackResource> current,
         InstalledPackProperties definition,
         ProvisioningState state,
-        CancellationToken cancellationToken) =>
-        await store.PutAsync(current.Value with
+        CancellationToken cancellationToken)
+    {
+        var updated = current.Value with
         {
             Generation = checked(current.Value.Generation + 1),
             Definition = definition,
             Status = new ResourceStatus { ProvisioningState = state }
-        }, current.ETag, false, cancellationToken);
+        };
+        if (scopeOperations is not null && current.Value.ScopeRef is { } scopeRef)
+            return await scopeOperations.WriteAsync(
+                current.Value,
+                scopeRef,
+                AuthorizationPermissions.ResourcesWrite,
+                token => store.PutExactAsync(scopeRef, updated, current.ETag, false, token),
+                cancellationToken);
+        return await store.PutAsync(updated, current.ETag, false, cancellationToken);
+    }
 }
 

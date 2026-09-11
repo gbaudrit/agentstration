@@ -8,6 +8,7 @@ namespace Agentstration.Web.Console;
 public sealed record AgentSummary(string Id, string Name, string Type, string Version, string Status, IReadOnlyList<string> Capabilities, string Runtime, DateTimeOffset LastActivity, string ModelProfile = "Not configured")
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
     public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
     public string? DeploymentId { get; init; }
     public ResourceAddress ModelProfileAddress => ResourceAddress.Create(ModelProfileNamespace, Agentstration.Management.Abstractions.ResourceKinds.ModelProfile, ModelProfile);
@@ -34,6 +35,7 @@ public sealed record WorkSummary(Guid Id, string Title, string Type, string Stat
 public sealed record FlowSummary(string Id, string Name, string Kind, string Version, string Status, int Steps, int ActiveExecutions, DateTimeOffset UpdatedAt)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public string? ActiveVersion { get; init; }
     public string DetailsUrl => ConsoleResourceUrls.Flow(new FlowId(Id, Namespace));
 }
 

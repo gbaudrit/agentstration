@@ -7,11 +7,14 @@ using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.Events;
 using Agentstration.Infrastructure.Flows;
+using Agentstration.Infrastructure.Notifications;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Infrastructure.Runtime;
+using Agentstration.Infrastructure.Sources;
 using Agentstration.Infrastructure.Triggers;
 using Agentstration.Infrastructure.Work;
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.PostgreSql;
 using Agentstration.Management.Storage.Sqlite;
@@ -48,7 +51,9 @@ public static class DependencyInjection
         string? flowConnectionString = null,
         string? runtimeConnectionString = null,
         AgentstrationStorageOptions? storageOptions = null,
-        bool enableHostedServices = true)
+        bool enableHostedServices = true,
+        SourceVerificationIndexOptions? sourceVerificationIndexOptions = null,
+        SourceRegistryTransportOptions? sourceRegistryTransportOptions = null)
     {
         services.AddSingleton(TimeProvider.System);
         services.TryAddSingleton<LocalBootstrapOptions>();
@@ -91,6 +96,7 @@ public static class DependencyInjection
         services.AddSingleton<ISecretVaultProvider>(provider => new LocalSecretVaultProvider(
             secretPath,
             provider.GetRequiredService<IMasterKeyProvider>()));
+        services.AddSingleton<ISecretVaultProvider, SharedKeyFileSecretVaultProvider>();
         services.AddSingleton<SecretManagementService>();
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
         services.AddSingleton<IPrincipalResolver, ExternalIdentityPrincipalResolver>();
@@ -155,7 +161,64 @@ public static class DependencyInjection
         services.AddSingleton<PackManagementService>();
         services.AddSingleton<PackAuthoringService>();
         services.AddSingleton<PackCompositionService>();
+        services.AddSingleton<Agentstration.Management.Contracts.SourceManifestValidator>();
+        services.AddSingleton<ISourceManifestReader, Agentstration.Management.Contracts.SourceManifestReader>();
+        services.AddSingleton<ISourceVerificationIndexReader, Agentstration.Management.Contracts.SourceVerificationIndexReader>();
+        services.AddHttpClient<ISourceManifestRetriever, HttpSourceManifestRetriever>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Agentstration-Source-Importer/1.0");
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            AllowAutoRedirect = true,
+            MaxAutomaticRedirections = 5
+        });
+        sourceVerificationIndexOptions ??= new SourceVerificationIndexOptions();
+        if (sourceVerificationIndexOptions.TimeoutSeconds is < 1 or > 60)
+            throw new InvalidOperationException("Source verification index timeout must be between 1 and 60 seconds.");
+        if (sourceVerificationIndexOptions.MaximumBytes is < 1024 or > Agentstration.Management.Contracts.SourceVerificationIndexReader.MaximumIndexBytes)
+            throw new InvalidOperationException($"Source verification index maximum bytes must be between 1024 and {Agentstration.Management.Contracts.SourceVerificationIndexReader.MaximumIndexBytes}.");
+        services.AddSingleton(sourceVerificationIndexOptions);
+        services.AddHttpClient<ISourceVerificationIndexProvider, HttpSourceVerificationIndexProvider>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(sourceVerificationIndexOptions.TimeoutSeconds);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Agentstration-Source-Verification/1.0");
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            AllowAutoRedirect = true,
+            MaxAutomaticRedirections = 5
+        });
+        services.AddSingleton<SourceManagementService>();
+        services.AddSingleton<SourceVerificationService>();
+        services.AddSingleton<SourceBindingManagementService>();
+        services.AddSingleton<IAgentstrationVersionProvider, AssemblyAgentstrationVersionProvider>();
+        services.AddSingleton<SourceChannelCompatibilityEvaluator>();
+        services.AddSingleton<ISourceSnapshotArtifactStore>(_ => new FileSystemSourceSnapshotArtifactStore(Path.Combine(dataDirectory, "source-snapshots")));
+        services.AddSingleton<ISourceSnapshotContentReader, ZipSourceSnapshotContentReader>();
+        services.AddSingleton<ISourceCatalogManifestReader, Agentstration.Management.Contracts.SourceCatalogManifestReader>();
+        services.AddSingleton(new SourceMaterializationLimits());
+        services.AddSingleton<SourceChannelSnapshotService>();
+        services.AddSingleton<SourceRefreshScheduler>();
+        services.AddSingleton<SourceCatalogService>();
+        services.AddSingleton<SourcePackInstallationService>();
+        services.AddSingleton<ISourceRegistryIndexReader, SourceRegistryIndexReader>();
+        services.AddSingleton<ISourceRegistryReader, SourceRegistryReader>();
+        services.AddSingleton<ISourceRegistryReferenceResolver, SourceRegistryRuntimeReferenceResolver>();
+        sourceRegistryTransportOptions ??= new();
+        sourceRegistryTransportOptions.Validate();
+        services.AddSingleton(sourceRegistryTransportOptions);
+        services.AddHttpClient<ISourceRegistryDocumentRetriever, HttpSourceRegistryDocumentRetriever>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(sourceRegistryTransportOptions.TimeoutSeconds);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Agentstration-Source-Registry/1.0");
+        }).ConfigurePrimaryHttpMessageHandler(() => HttpSourceRegistryDocumentRetriever.CreatePrimaryHandler(sourceRegistryTransportOptions));
+        services.AddSingleton<ISourceRegistryCacheStore>(_ => new FileSystemSourceRegistryCacheStore(Path.Combine(dataDirectory, "source-registry-cache")));
+        services.AddSingleton<SourceRegistryManagementService>();
+        services.AddSingleton<SourceRegistryTrustEvaluationService>();
+        services.AddSingleton<SourceRegistryDiscoveryService>();
+        services.AddSingleton<ISourceVerificationEvidenceProvider>(services => services.GetRequiredService<SourceRegistryTrustEvaluationService>());
         services.AddSingleton<ToolManagementService>();
+        services.AddSingleton<ToolDefinitionService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
         services.AddSingleton<ITriggerScheduleCalculator, QuartzTriggerScheduleCalculator>();
@@ -213,6 +276,7 @@ public static class DependencyInjection
         services.AddSingleton<IToolExecutionHookResolver, ManagementToolExecutionHookResolver>();
         services.AddSingleton<IToolGovernanceAuditReader, ToolGovernanceAuditReader>();
         services.AddSingleton<IToolExecutionPipeline, ToolExecutionPipeline>();
+        services.AddSingleton<IFlowToolExecutor, ManagedFlowToolExecutor>();
         services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
             services.AddPostgreSqlWorkPlane(storageOptions.ConnectionString!);
@@ -227,6 +291,13 @@ public static class DependencyInjection
         services.AddSingleton<ILocalWorkExecutionQueue>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
         services.AddSingleton<WorkItemService>();
         services.AddSingleton<WorkplaceService>();
+        services.AddSingleton<WorkNotificationMcpToolDefinitionProvider>();
+        services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<WorkNotificationMcpToolDefinitionProvider>());
+        services.AddSingleton<WorkNotificationMcpTool>();
+        services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<WorkNotificationMcpTool>());
+        services.AddSingleton<InternalMcpToolProjectionService>();
+        services.AddSingleton(provider => new Lazy<IEnumerable<IInternalMcpToolHandler>>(
+            () => provider.GetServices<IInternalMcpToolHandler>()));
         services.AddSingleton<WorkTaskDeletionService>();
         services.AddSingleton<IWorkTaskEventSink, WorkplaceProjectionSink>();
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
@@ -237,6 +308,9 @@ public static class DependencyInjection
             services.AddSqliteFlowStorage(flowConnectionString);
         }
         services.AddSingleton<FlowService>();
+        services.AddSingleton<IToolDefinitionFlowResolver, ToolDefinitionFlowResolver>();
+        services.AddSingleton<IFlowVersionActivationGuard, ToolDefinitionFlowActivationGuard>();
+        services.AddSingleton<IFlowDeletionGuard, ToolDefinitionFlowDeletionGuard>();
         services.AddSingleton<IEntryTargetResolver, EntryTargetResolver>();
         services.AddSingleton<EntryResourceDeletionGuard>();
         services.AddSingleton<IManagementResourceDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
@@ -248,6 +322,9 @@ public static class DependencyInjection
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
         services.AddSingleton<IFlowRunExecutionScope, WorkspaceFlowRunExecutionScope>();
         services.AddSingleton<IWorkExecutionScopeAccessor, CurrentWorkExecutionScopeAccessor>();
+        services.AddSingleton<IRootFlowTargetResolver, RootFlowTargetResolver>();
+        services.AddSingleton<IRootFlowRunGateway, RootFlowRunGateway>();
+        services.AddSingleton<IRootFlowSubmissionAuthorizer, RootFlowSubmissionAuthorizer>();
         services.TryAddSingleton<IFlowRunEventSink, NullFlowRunEventSink>();
         services.AddSingleton<IFlowInputRequestSink, WorkplaceFlowInputProjectionSink>();
         services.AddSingleton<IWorkplaceExternalInputResponder, WorkplaceFlowInputResponder>();
@@ -264,6 +341,9 @@ public static class DependencyInjection
         services.AddSingleton<IFlowDefinitionValidator, FlowGraphValidator>();
         services.AddSingleton<FlowDraftService>();
         services.AddSingleton<FlowRunService>();
+        services.AddSingleton<RootFlowSubmissionService>();
+        services.AddSingleton<IToolDefinitionExecutor, ToolDefinitionExecutor>();
+        services.AddSingleton(provider => new Lazy<IToolDefinitionExecutor>(provider.GetRequiredService<IToolDefinitionExecutor>));
         return services;
     }
 }

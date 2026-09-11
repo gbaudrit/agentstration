@@ -118,6 +118,7 @@ else
                 <div class="form-grid">
                     <label><span>@T("Name")</span><input @bind="resourceName" disabled="@(!IsNew)" data-testid="entry-name" /></label>
                     <label><span>@T("DisplayName")</span><input @bind="displayName" data-testid="entry-display-name" /></label>
+                    <ResourceScopeFormField ResourceKind="@ResourceKinds.Entry" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
                     <label class="form-span-2"><span>@T("Description")</span><textarea @bind="description" rows="2" data-testid="entry-description"></textarea></label>
                 </div>
             </section>
@@ -304,6 +305,7 @@ else
     private bool interactive;
     private long draftRevision = 1;
     private string resourceName = "", displayName = "", description = "", placeholder = "Ask Agentstration", icon = "", resourceId = "", message = "";
+    private ResourceScopeRef? selectedScope;
     private string rawYaml = "";
     private string? rawError;
     private EntryTab activeTab = EntryTab.Overview;

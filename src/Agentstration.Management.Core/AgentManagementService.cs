@@ -32,6 +32,8 @@ public sealed class AgentManagementService(
     IAgentDeploymentReconciler reconciler,
     IManagementEventPublisher eventBus,
     IModelProfileReferenceValidator modelProfiles,
+    IResourceReferenceResolver references,
+    ResourceScopeOperationService scopeOperations,
     TimeProvider timeProvider,
     IEnumerable<IManagementResourceDeletionGuard> deletionGuards,
     IAgentRevisionRunRetention revisionRunRetention,
@@ -44,31 +46,33 @@ public sealed class AgentManagementService(
     {
         ValidateResource(resource, ResourceKinds.Agent);
         ValidateDefinition(resource.Definition);
-        await modelProfiles.ValidateAsync(resource.Definition.ModelProfile, cancellationToken);
-        var runtimeProfile = resource.Definition.RuntimeProfile.Resolve(resource.Namespace, ResourceKinds.RuntimeProfile);
-        await ValidateRuntimeProfileAsync(runtimeProfile.Namespace, runtimeProfile.Name, cancellationToken);
+        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ResourceKinds.Agent);
+        ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
+        await ValidateReferencesAsync(resource, scopeRef, cancellationToken);
     }
 
     public async Task<StoredResource<AgentResource>> PutAgentAsync(AgentResource resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken)
     {
         ValidateResource(resource, ResourceKinds.Agent);
         ValidateDefinition(resource.Definition);
-        await modelProfiles.ValidateAsync(resource.Definition.ModelProfile, cancellationToken);
-        var runtimeProfile = resource.Definition.RuntimeProfile.Resolve(resource.Namespace, ResourceKinds.RuntimeProfile);
-        await ValidateRuntimeProfileAsync(runtimeProfile.Namespace, runtimeProfile.Name, cancellationToken);
         var key = ResourceKey.Create(ResourceKinds.Agent, resource.Metadata.Name, resource.Namespace);
         var existing = await store.GetAsync<AgentResource>(key, cancellationToken);
         ValidatePreconditions(existing, ifMatch, ifNoneMatch);
         if (existing is not null && DesiredStateEquals(existing.Value, resource)) return existing;
+        var scopeRef = existing?.Value.ScopeRef ?? resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ResourceKinds.Agent);
+        ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
+        await ValidateReferencesAsync(resource, scopeRef, cancellationToken);
 
         var desired = resource with
         {
+            ScopeRef = scopeRef,
             Uid = existing?.Value.Uid ?? Guid.Empty,
             Generation = existing is null ? 1 : checked(existing.Value.Generation + 1),
             ETag = null,
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Accepted }
         };
-        var stored = await store.PutAsync(desired, ifMatch, ifNoneMatch, cancellationToken);
+        var stored = await scopeOperations.WriteAsync(desired, scopeRef, AuthorizationPermissions.ResourcesWrite,
+            token => store.PutExactAsync(scopeRef, desired, ifMatch, ifNoneMatch, token), cancellationToken);
         if (existing is null)
             await eventBus.PublishAsync(new AgentCreated(stored.Value.Uid, stored.Value.Metadata.Name, stored.Value.Generation, timeProvider.GetUtcNow()), cancellationToken);
         else
@@ -80,6 +84,8 @@ public sealed class AgentManagementService(
         store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, name), cancellationToken);
     public Task<StoredResource<AgentResource>?> GetAgentAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, name, @namespace), cancellationToken);
+    public Task<StoredResource<AgentResource>?> GetAgentExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        store.GetExactAsync<AgentResource>(ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.Agent, name), cancellationToken);
 
     public Task<StoredResource<AgentDeployment>?> GetDeploymentAsync(string name, CancellationToken cancellationToken) =>
         store.GetAsync<AgentDeployment>(new ResourceKey(ResourceKinds.AgentDeployment, name), cancellationToken);
@@ -348,6 +354,21 @@ public sealed class AgentManagementService(
         _ = await store.GetAsync<RuntimeProfileResource>(new ResourceKey(ResourceKinds.RuntimeProfile, name, @namespace), cancellationToken)
             ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.RuntimeProfile, name, @namespace));
 
+    private async Task ValidateReferencesAsync(AgentResource resource, ResourceScopeRef scopeRef, CancellationToken cancellationToken)
+    {
+        await modelProfiles.ValidateAsync(resource.Definition.ModelProfile, resource.Namespace, scopeRef, cancellationToken);
+        if (await references.ResolveAsync<RuntimeProfileResource>(
+                resource.Definition.RuntimeProfile,
+                resource.Namespace,
+                ResourceKinds.RuntimeProfile,
+                scopeRef,
+                cancellationToken) is null)
+        {
+            var runtime = resource.Definition.RuntimeProfile.Resolve(resource.Namespace, ResourceKinds.RuntimeProfile);
+            throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.RuntimeProfile, runtime.Name, runtime.Namespace));
+        }
+    }
+
     private async Task<StoredResource<AgentDeployment>> SetDesiredStateAsync(StoredResource<AgentDeployment> stored, DesiredAgentState state, CancellationToken cancellationToken) =>
         await store.PutAsync(stored.Value with
         {
@@ -381,8 +402,6 @@ public sealed class AgentManagementService(
     private static void ValidateReference(ResourceReference reference, string errorCode)
     {
         ValidateName(reference.Name, "reference.name");
-        if (reference.WorkspaceRef is not null)
-            throw new AgentDefinitionValidationException("cross_workspace_reference_not_supported", "Cross-workspace resource references are not enabled in this installation.");
         if (string.IsNullOrWhiteSpace(reference.Name)) throw new AgentDefinitionValidationException(errorCode, "A resource reference name is required.");
     }
 

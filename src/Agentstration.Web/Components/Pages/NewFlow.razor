@@ -27,6 +27,7 @@
                     <label><span>@T("TechnicalName")</span><InputText @bind-Value="model.Name" data-testid="flow-name" /><small>@T("TechnicalNameHelp")</small><ValidationMessage For="@(() => model.Name)" /></label>
                     <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" data-testid="flow-display-name" /><small>@T("DisplayNameHelp")</small><ValidationMessage For="@(() => model.DisplayName)" /></label>
                     <label><span>@T("InitialVersion")</span><InputText @bind-Value="orchestration.Version" data-testid="flow-version" /><small>@T("InitialVersionHelp")</small></label>
+                    <ResourceScopeFormField ResourceKind="@ResourceKinds.Flow" @bind-Value="selectedScope" />
                     <label class="flow-form-span-all"><span>@T("Field.Description")</span><InputTextArea @bind-Value="model.Description" rows="3" data-testid="flow-description" /><small>@T("DescriptionHelp")</small></label>
                 </div>
             </section>
@@ -114,6 +115,7 @@
 </EditForm>
 
 @code {
+    private ResourceScopeRef? selectedScope;
     private readonly CancellationTokenSource cancellation = new();
     private readonly NewFlowModel model = new();
     private readonly OrchestrationEditorModel orchestration = new();

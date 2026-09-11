@@ -3,6 +3,7 @@ using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Application.Work;
+using Agentstration.Extensions.Git;
 using Agentstration.Extensions.LlamaCpp;
 using Agentstration.Extensions.LocalAI;
 using Agentstration.Extensions.Ollama;
@@ -14,10 +15,12 @@ using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.ModelProviders;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Storage.Sqlite;
+using Agentstration.Tools.SourceRegistry;
 using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -96,6 +99,7 @@ public sealed class DependencyTests
         Assert.IsFalse(references.Any(name => name!.Contains("Ollama", StringComparison.Ordinal)
             || name.Contains("LlamaCpp", StringComparison.Ordinal)
             || name.Contains("LocalAI", StringComparison.Ordinal)
+            || name.Contains("Extensions.Git", StringComparison.Ordinal)
             || name.Contains("Aspire", StringComparison.Ordinal)
             || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
@@ -110,7 +114,8 @@ public sealed class DependencyTests
             || reference.Name.Contains("Microsoft.Extensions.AI", StringComparison.Ordinal)
             || reference.Name.Contains("Ollama", StringComparison.Ordinal)
             || reference.Name.Contains("LlamaCpp", StringComparison.Ordinal)
-            || reference.Name.Contains("LocalAI", StringComparison.Ordinal)));
+            || reference.Name.Contains("LocalAI", StringComparison.Ordinal)
+            || reference.Name.Contains("Extensions.Git", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -154,12 +159,23 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void GitSourceExtensionDoesNotReferenceManagementRuntimeMafOrAspireHosting()
+    {
+        var references = typeof(GitSourceProvider).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Management", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Runtime", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
+            || name.Contains("Aspire.Hosting", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public void AgentFrameworkRuntimeDoesNotReferenceConcreteModelProviders()
     {
         var references = typeof(AgentFrameworkRuntimeFactory).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Ollama", StringComparison.Ordinal)
             || name.Contains("LlamaCpp", StringComparison.Ordinal)
-            || name.Contains("LocalAI", StringComparison.Ordinal)));
+            || name.Contains("LocalAI", StringComparison.Ordinal)
+            || name.Contains("Extensions.Git", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -189,6 +205,19 @@ public sealed class DependencyTests
     {
         var references = typeof(IControlPlaneStore).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("EntityFramework", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void ManagementStoreExposesHierarchicalScopeContracts()
+    {
+        var methods = typeof(IControlPlaneStore).GetMethods().Select(method => method.Name).ToHashSet(StringComparer.Ordinal);
+
+        CollectionAssert.IsSubsetOf(
+            new[] { "GetByUidAsync", "GetExactAsync", "ListExactAsync", "ListVisibleAsync", "PutExactAsync", "DeleteExactAsync" },
+            methods.ToArray());
+        Assert.AreEqual(typeof(ResourceScopeRef?), typeof(Resource).GetProperty(nameof(Resource.ScopeRef))?.PropertyType);
+        Assert.AreEqual(typeof(ResourceScopeRef), typeof(ScopedResourceAddress).GetProperty(nameof(ScopedResourceAddress.ScopeRef))?.PropertyType);
+        Assert.IsTrue(typeof(IResourceScopeResolver).IsInterface);
     }
 
     [TestMethod]
@@ -229,6 +258,20 @@ public sealed class DependencyTests
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
             || name.Contains("Runtime.Local", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void SourceRegistryToolDependsOnPortableManagementContractsOnly()
+    {
+        var references = typeof(SourceRegistryCli).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+
+        Assert.Contains("Agentstration.Management.Contracts", references);
+        Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Management.Core", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Infrastructure", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Web", StringComparison.Ordinal)
+            || name.Contains("Storage.Sqlite", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
+        Assert.AreSame(typeof(SourceManifestReader).Assembly, typeof(SourceManifestValidator).Assembly);
     }
 
     [TestMethod]

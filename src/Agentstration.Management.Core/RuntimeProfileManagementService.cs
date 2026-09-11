@@ -13,6 +13,7 @@ public sealed record RuntimeProfileUsage(Guid DeploymentUid, string Name, string
 
 public sealed class RuntimeProfileManagementService(
     IControlPlaneStore store,
+    ResourceScopeOperationService scopeOperations,
     IAgentDeploymentReconciler reconciler)
 {
     public static string ProfileId(string name) => name;
@@ -21,15 +22,22 @@ public sealed class RuntimeProfileManagementService(
     public async Task<StoredResource<RuntimeProfileResource>> CreateAsync(RuntimeProfileResource resource, CancellationToken cancellationToken)
     {
         Validate(resource);
-        if (await GetAsync(resource.Namespace, resource.Metadata.Name, cancellationToken) is not null)
-            throw new ControlPlaneConcurrencyException($"Runtime profile '{resource.Metadata.Name}' already exists.");
-        return await store.PutAsync(resource with { Generation = 1, Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded } }, null, true, cancellationToken);
+        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ResourceKinds.RuntimeProfile);
+        return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
+        {
+            var address = ScopedResourceAddress.Create(scopeRef, resource.Namespace, ResourceKinds.RuntimeProfile, resource.Name);
+            if (await store.GetExactAsync<RuntimeProfileResource>(address, token) is not null)
+                throw new ControlPlaneConcurrencyException($"Runtime profile '{resource.Metadata.Name}' already exists in scope '{scopeRef}'.");
+            return await store.PutExactAsync(scopeRef, resource with { ScopeRef = scopeRef, Generation = 1, Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded } }, null, true, token);
+        }, cancellationToken);
     }
 
     public Task<StoredResource<RuntimeProfileResource>?> GetAsync(string name, CancellationToken cancellationToken) =>
         store.GetAsync<RuntimeProfileResource>(new ResourceKey(ResourceKinds.RuntimeProfile, name), cancellationToken);
     public Task<StoredResource<RuntimeProfileResource>?> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         store.GetAsync<RuntimeProfileResource>(new ResourceKey(ResourceKinds.RuntimeProfile, name, @namespace), cancellationToken);
+    public Task<StoredResource<RuntimeProfileResource>?> GetExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        store.GetExactAsync<RuntimeProfileResource>(ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.RuntimeProfile, name), cancellationToken);
 
     public Task<IReadOnlyList<StoredResource<RuntimeProfileResource>>> ListAsync(CancellationToken cancellationToken) =>
         store.ListAllAsync<RuntimeProfileResource>(ResourceKinds.RuntimeProfile, cancellationToken);
@@ -47,7 +55,9 @@ public sealed class RuntimeProfileManagementService(
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
         };
         Validate(updated);
-        return await store.PutAsync(updated, ifMatch, false, cancellationToken);
+        var scopeRef = existing.Value.ScopeRef ?? throw new RuntimeProfileValidationException("The runtime profile has no ownership scope.");
+        return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite,
+            token => store.PutExactAsync(scopeRef, updated, ifMatch, false, token), cancellationToken);
     }
 
     public async Task<IReadOnlyList<RuntimeProfileUsage>> GetUsagesAsync(string name, CancellationToken cancellationToken) =>
@@ -64,22 +74,21 @@ public sealed class RuntimeProfileManagementService(
         return usages;
     }
 
-    public async Task DeleteAsync(string name, string? ifMatch, CancellationToken cancellationToken)
-    {
-        var existing = await GetAsync(name, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.RuntimeProfile, name));
-        await DeleteOrphanedDeploymentsAsync(ResourceNamespace.Default, name, cancellationToken);
-        var usages = await GetUsagesAsync(name, cancellationToken);
-        if (usages.Count > 0) throw new RuntimeProfileInUseException(existing.Value.Metadata.Name, usages);
-        await store.DeleteAsync(new(ResourceKinds.RuntimeProfile, name), ifMatch, cancellationToken);
-    }
+    public Task DeleteAsync(string name, string? ifMatch, CancellationToken cancellationToken) =>
+        DeleteAsync(ResourceNamespace.Default, name, ifMatch, cancellationToken);
 
     public async Task DeleteAsync(ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
     {
-        _ = await GetAsync(@namespace, name, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.RuntimeProfile, name, @namespace));
+        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.RuntimeProfile, name, @namespace));
         await DeleteOrphanedDeploymentsAsync(@namespace, name, cancellationToken);
         var usages = await GetUsagesAsync(@namespace, name, cancellationToken);
         if (usages.Count > 0) throw new RuntimeProfileInUseException(name, usages);
-        await store.DeleteAsync(new(ResourceKinds.RuntimeProfile, name, @namespace), ifMatch, cancellationToken);
+        var scopeRef = existing.Value.ScopeRef ?? throw new RuntimeProfileValidationException("The runtime profile has no ownership scope.");
+        await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
+        {
+            await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.RuntimeProfile, name), ifMatch, token);
+            return true;
+        }, cancellationToken);
     }
 
     private async Task DeleteOrphanedDeploymentsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)

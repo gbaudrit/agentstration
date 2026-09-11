@@ -23,7 +23,7 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
     public async Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken)
     {
         var page = await ApiResponse.ReadAsync<FlowPageResponse>(httpClient, "api/flows?allNamespaces=true&top=100", cancellationToken);
-        return page.Value.Select(item => new FlowSummary(item.Id, item.Name, item.FlowKind.ToString(), item.ActiveVersion ?? item.Version, item.Enabled ? "Active" : "Disabled", 0, 0, item.UpdatedAt) { Namespace = item.Namespace }).ToArray();
+        return page.Value.Select(item => new FlowSummary(item.Id, item.Name, item.FlowKind.ToString(), item.ActiveVersion ?? item.Version, item.Enabled ? "Active" : "Disabled", 0, 0, item.UpdatedAt) { Namespace = item.Namespace, ActiveVersion = item.ActiveVersion }).ToArray();
     }
 
     public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) =>
@@ -112,6 +112,31 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
     public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<FlowRun>(httpClient, $"api/flowRuns/{Uri.EscapeDataString(runId)}", cancellationToken);
 
+    public async Task<FlowRunCausalityPageResponse> GetFlowRunCausalityAsync(string runId, CancellationToken cancellationToken)
+    {
+        var values = new List<FlowRunCausalityNode>();
+        FlowRunCausalityOrigin? origin = null;
+        var totalCount = 0;
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        string? path = $"api/flowRuns/{Uri.EscapeDataString(runId)}/causality?top=100";
+        while (path is not null)
+        {
+            path = NormalizeFlowRunPageLink(path);
+            if (!visited.Add(path))
+                throw new AgentstrationApiException("Flow causality API returned a repeated pagination link.", Guid.NewGuid().ToString("N"));
+            var page = await ApiResponse.ReadAsync<FlowRunCausalityPageResponse>(httpClient, path, cancellationToken);
+            origin ??= page.Origin;
+            totalCount = page.TotalCount;
+            values.AddRange(page.Value);
+            path = string.IsNullOrWhiteSpace(page.NextLink) ? null : page.NextLink;
+        }
+        return new FlowRunCausalityPageResponse(
+            origin ?? throw new AgentstrationApiException("Flow causality API returned no invocation origin.", Guid.NewGuid().ToString("N")),
+            values,
+            totalCount,
+            null);
+    }
+
     public async Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<FlowRunEvent[]>(httpClient, $"api/flowRuns/{Uri.EscapeDataString(runId)}/eventHistory?afterSequence={Math.Max(0, afterSequence)}", cancellationToken);
 
@@ -134,7 +159,12 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
 
     public async Task<FlowRun> CreateFlowRunAsync(ResourceNamespace @namespace, string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsJsonAsync($"{FlowPath(@namespace, flowId)}/runs", request, JsonOptions, cancellationToken);
+        using var message = new HttpRequestMessage(HttpMethod.Post, $"{FlowPath(@namespace, flowId)}/runs")
+        {
+            Content = JsonContent.Create(request, options: JsonOptions)
+        };
+        message.Headers.Add("X-Agentstration-Origin", "Console");
+        using var response = await httpClient.SendAsync(message, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<FlowRun>(JsonOptions, cancellationToken)
             ?? throw new AgentstrationApiException("Flow API returned an empty Run.", Guid.NewGuid().ToString("N"));

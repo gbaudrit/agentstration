@@ -10,6 +10,10 @@ internal static class ManagementHttp
         try { return await action(); }
         catch (ControlPlaneResourceNotFoundException exception) { return Results.Problem(statusCode: 404, title: "resource_not_found", detail: exception.Message); }
         catch (ControlPlaneConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
+        catch (ResourceReferenceOutsideScopeException exception) { return Results.Problem(statusCode: 400, title: "resource_reference_outside_scope", detail: exception.Message); }
+        catch (ResourceReferenceAmbiguousException exception) { return Results.Problem(statusCode: 400, title: "resource_reference_ambiguous", detail: exception.Message); }
+        catch (ResourceScopeAccessDeniedException exception) { return Results.Problem(statusCode: 403, title: "resource_scope_access_denied", detail: exception.Message); }
+        catch (ResourceScopePolicyException exception) { return Results.Problem(statusCode: 422, title: "resource_scope_invalid", detail: exception.Message); }
         catch (AgentRevisionPurgeBlockedException exception)
         {
             var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
@@ -30,6 +34,9 @@ internal static class ManagementHttp
         catch (PackResourceModifiedException exception) { return Results.Problem(statusCode: 409, title: "pack_resource_modified", detail: exception.Message); }
         catch (TriggerValidationException exception) { return Results.Problem(statusCode: 422, title: exception.Code, detail: exception.Message); }
         catch (TriggerExecutionException exception) { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); }
+        catch (SourceValidationException exception) { return Results.Problem(statusCode: 422, title: exception.Code, detail: exception.Message); }
+        catch (SourceVersionConflictException exception) { return Results.Problem(statusCode: 409, title: "source_version_digest_conflict", detail: exception.Message); }
+        catch (SourceRetrievalException exception) { return Results.Problem(statusCode: 502, title: exception.Code, detail: exception.Message); }
         catch (AgentDefinitionValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
         catch (ModelProfileValidationException exception)
         {

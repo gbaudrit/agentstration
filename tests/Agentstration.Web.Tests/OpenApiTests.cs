@@ -61,7 +61,11 @@ public sealed class OpenApiTests
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         CollectionAssert.AreEquivalent(
-            new[] { "health", "api/auth/bootstrap", "api/auth/local/login", "api/auth/oidc/login", "login", "bootstrap", "access-denied" },
+            new[]
+            {
+                "health", "api/auth/bootstrap", "api/auth/local/login", "api/auth/oidc/login", "login", "bootstrap", "access-denied",
+                "api/aep/enrollments/announce", "api/aep/enrollments/claim", "api/aep/enrollments/ready"
+            },
             anonymous);
     }
 
@@ -87,7 +91,17 @@ public sealed class OpenApiTests
             ("POST", "/api/modelproviders", AgentstrationPolicies.CanWriteResources),
             ("DELETE", "/api/modelproviders/{providerName}", AgentstrationPolicies.CanDeleteResources),
             ("POST", "/api/modelproviders/{providerName}/test", AgentstrationPolicies.CanExecuteRuns),
-            ("POST", "/api/extensions/discover", AgentstrationPolicies.CanWriteResources),
+            ("GET", "/api/sourceproviders", AgentstrationPolicies.PlatformAdmin),
+            ("POST", "/api/sourceproviders", AgentstrationPolicies.PlatformAdmin),
+            ("DELETE", "/api/sourceproviders/{providerName}", AgentstrationPolicies.PlatformAdmin),
+            ("GET", "/api/sourceregistries", AgentstrationPolicies.PlatformAdmin),
+            ("GET", "/api/sourceregistries/{registryName}", AgentstrationPolicies.PlatformAdmin),
+            ("PUT", "/api/sourceregistries/{registryName}", AgentstrationPolicies.PlatformAdmin),
+            ("POST", "/api/sourceregistries/{registryName}/refresh", AgentstrationPolicies.PlatformAdmin),
+            ("GET", "/api/sourceregistries/{registryName}/refreshes", AgentstrationPolicies.PlatformAdmin),
+            ("POST", "/api/sources/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}/pack-catalogs/{catalog}/entries/{entry}/preview", AgentstrationPolicies.PlatformAdmin),
+            ("POST", "/api/sources/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}/pack-catalogs/{catalog}/entries/{entry}/install", AgentstrationPolicies.PlatformAdmin),
+            ("DELETE", "/api/sources/{publisher}/{name}", AgentstrationPolicies.PlatformAdmin),
             ("POST", "/api/toolproviders/{providerName}/test", AgentstrationPolicies.CanExecuteRuns),
             ("POST", "/api/toolproviders/{providerName}/refresh", AgentstrationPolicies.CanWriteResources),
             ("DELETE", "/api/toolexecutionhooks/{hookName}", AgentstrationPolicies.CanDeleteResources),

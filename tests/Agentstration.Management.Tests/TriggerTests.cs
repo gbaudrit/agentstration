@@ -120,7 +120,7 @@ public sealed class TriggerTests
     [TestMethod]
     public void ScheduledOccurrenceIdentityIsStablePerTriggerAndInstant()
     {
-        var trigger = Resource("stable", true) with { Uid = Guid.NewGuid(), WorkspaceId = Guid.NewGuid() };
+        var trigger = Resource("stable", true) with { Uid = Guid.NewGuid(), ScopeRef = ResourceScopeRef.Workspace(Guid.NewGuid()) };
         var at = DateTimeOffset.Parse("2026-08-21T08:00:00+02:00", System.Globalization.CultureInfo.InvariantCulture);
         Assert.AreEqual(TriggerFiringService.DeterministicOccurrenceId(trigger, at), TriggerFiringService.DeterministicOccurrenceId(trigger, at.ToUniversalTime()));
         Assert.AreNotEqual(TriggerFiringService.DeterministicOccurrenceId(trigger, at), TriggerFiringService.DeterministicOccurrenceId(trigger, at.AddHours(1)));
@@ -281,6 +281,7 @@ public sealed class TriggerTests
             var scheduler = new RecordingScheduler();
             var work = new RecordingWorkSubmitter(context);
             var authorizer = new RecordingAuthorizer(context);
+            var request = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
             var services = new ServiceCollection().AddSingleton(TimeProvider.System).AddSingleton(context).AddSingleton<ICurrentRequestContext>(context)
                 .AddSqliteControlPlane($"Data Source={database}")
                 .AddSingleton<ITriggerScheduleCalculator, QuartzTriggerScheduleCalculator>()
@@ -293,7 +294,11 @@ public sealed class TriggerTests
                 .AddSingleton<TriggerFiringService>()
                 .BuildServiceProvider();
             await services.GetRequiredService<IControlPlaneStore>().InitializeAsync(CancellationToken.None);
-            return new() { Database = database, Services = services, Context = context, Request = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), Scheduler = scheduler, Work = work, Authorizer = authorizer };
+            var identities = services.GetRequiredService<IIdentityStore>();
+            var now = DateTimeOffset.UtcNow;
+            await identities.AddTenantAsync(new(request.TenantId, "test", "Test", TenantStatus.Active, now), CancellationToken.None);
+            await identities.AddWorkspaceAsync(new(request.WorkspaceId, request.TenantId, "default", "Default", WorkspaceStatus.Active, now), CancellationToken.None);
+            return new() { Database = database, Services = services, Context = context, Request = request, Scheduler = scheduler, Work = work, Authorizer = authorizer };
         }
 
         public async ValueTask DisposeAsync()

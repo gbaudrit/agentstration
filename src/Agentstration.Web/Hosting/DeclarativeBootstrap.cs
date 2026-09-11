@@ -13,7 +13,8 @@ public sealed class DeclarativeBootstrapException(string message, Exception? inn
 public sealed record BootstrapProfileSelection(
     IReadOnlyList<string> Profiles,
     BootstrapApplicationTarget? Target = null,
-    IReadOnlyList<BootstrapBindingSelection>? Bindings = null);
+    IReadOnlyList<BootstrapBindingSelection>? Bindings = null,
+    BootstrapSourceProfileSelection? Source = null);
 
 public sealed record BootstrapResourcePreview(
     string Profile,
@@ -30,7 +31,8 @@ public sealed record BootstrapCompositionPreview(
     BootstrapApplicationTarget? Target,
     IReadOnlyList<BootstrapBindingSelection> Bindings,
     string Digest,
-    IReadOnlyList<BootstrapResourcePreview> Resources)
+    IReadOnlyList<BootstrapResourcePreview> Resources,
+    BootstrapSourceProvenance? SourceProvenance = null)
 {
     public bool CanApply => Resources.All(resource => resource.Disposition != BootstrapResourceDisposition.Invalid);
 }
@@ -44,7 +46,8 @@ public sealed class DeclarativeBootstrapService(
     IConfiguration configuration,
     BootstrapProfileCatalog catalog,
     IEnumerable<IBootstrapResourceHandler> resourceHandlers,
-    ILogger<DeclarativeBootstrapService> logger)
+    ILogger<DeclarativeBootstrapService> logger,
+    SourceBootstrapProfileLoader? sourceProfiles = null)
 {
     private const string ConfigurationSection = "Agentstration:Bootstrap";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -71,9 +74,12 @@ public sealed class DeclarativeBootstrapService(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(selection);
-        if (selection.Profiles.Count == 0)
+        if (selection.Source is null && selection.Profiles.Count == 0)
             throw new DeclarativeBootstrapException("At least one bootstrap profile must be selected.");
-        var profiles = await catalog.LoadAsync(selection.Profiles, cancellationToken);
+        if (selection.Source is not null && selection.Profiles.Count != 0)
+            throw new DeclarativeBootstrapException("Local and Source Bootstrap profiles cannot be composed in one application.");
+        await using var loadedSelection = await LoadAsync(selection, cancellationToken);
+        var profiles = loadedSelection.Profiles;
         var scope = profiles[0].Summary.Scope;
         var incompatible = profiles.FirstOrDefault(profile => profile.Summary.Scope != scope);
         if (incompatible is not null)
@@ -103,7 +109,7 @@ public sealed class DeclarativeBootstrapService(
                         BootstrapResourceDisposition.Invalid, $"Unknown bootstrap resource kind '{resource.Kind}'."));
                     continue;
                 }
-                if (handler.Scope != profile.Summary.Scope)
+                if (!IsCompatibleScope(handler.Scope, profile.Summary.Scope))
                 {
                     resources.Add(new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name,
                         BootstrapResourceDisposition.Invalid, $"Resource scope '{handler.Scope}' does not match profile scope '{profile.Summary.Scope}'."));
@@ -128,9 +134,14 @@ public sealed class DeclarativeBootstrapService(
             scope,
             selection.Target,
             bindings,
-            ComputeDigest(profiles, scope, selection.Target, bindings),
-            resources);
+            ComputeDigest(profiles, scope, selection.Target, bindings, loadedSelection.SourceProvenance),
+            resources,
+            loadedSelection.SourceProvenance);
     }
+
+    private static bool IsCompatibleScope(BootstrapProfileScope resourceScope, BootstrapProfileScope profileScope) =>
+        resourceScope == profileScope
+        || (profileScope == BootstrapProfileScope.Workspace && resourceScope == BootstrapProfileScope.Tenant);
 
     public async Task<BootstrapExecutionResult> ExecuteAsync(
         BootstrapProfileSelection selection,
@@ -141,9 +152,10 @@ public sealed class DeclarativeBootstrapService(
         if (invalid is not null)
             return new(preview, [], $"Bootstrap resource '{invalid.Kind}/{invalid.Name}' from '{invalid.Location}' is invalid: {invalid.Message}");
 
-        var loaded = await catalog.LoadAsync(selection.Profiles, cancellationToken);
+        await using var loadedSelection = await LoadAsync(selection, cancellationToken);
+        var loaded = loadedSelection.Profiles;
         var bindings = ResolveBindings(loaded, selection.Bindings ?? []);
-        var executionDigest = ComputeDigest(loaded, preview.Scope, selection.Target, bindings);
+        var executionDigest = ComputeDigest(loaded, preview.Scope, selection.Target, bindings, loadedSelection.SourceProvenance);
         if (!string.Equals(executionDigest, preview.Digest, StringComparison.Ordinal))
             return new(preview, [], "The bootstrap catalog changed while the application was being prepared. Preview the application again.");
         var resources = new List<BootstrapAppliedResource>();
@@ -193,7 +205,8 @@ public sealed class DeclarativeBootstrapService(
         IReadOnlyList<LoadedBootstrapProfile> profiles,
         BootstrapProfileScope scope,
         BootstrapApplicationTarget? target,
-        IReadOnlyList<BootstrapBindingSelection> bindings)
+        IReadOnlyList<BootstrapBindingSelection> bindings,
+        BootstrapSourceProvenance? source)
     {
         var lines = new List<string>
         {
@@ -203,9 +216,34 @@ public sealed class DeclarativeBootstrapService(
         };
         lines.AddRange(profiles.Select(profile => $"{profile.Summary.Name}:{profile.Summary.Digest}"));
         lines.AddRange(bindings.Select(binding =>
-            $"{binding.Profile}:{binding.Name}:{binding.Target.Name}:{binding.Target.Namespace?.Value ?? string.Empty}:{binding.Target.WorkspaceRef ?? string.Empty}"));
+            $"{binding.Profile}:{binding.Name}:{binding.Target.Name}:{binding.Target.Namespace?.Value ?? string.Empty}:{binding.Target.ScopeRef?.Value ?? string.Empty}"));
+        if (source is not null)
+        {
+            lines.AddRange([
+                source.ScopeRef.ToString(), source.SourceUid.ToString("D"), source.Publisher, source.SourceName,
+                source.SourceVersionUid.ToString("D"), source.SourceVersion, source.SourceVersionDigest,
+                source.Channel, source.ProviderRevision, source.SnapshotUid.ToString("D"), source.SnapshotDigest,
+                source.CatalogKind, source.CatalogName, source.CatalogPath, source.EntryName, source.Locale, source.Path
+            ]);
+            if (source.Registry is { } registry)
+            {
+                lines.AddRange([
+                    registry.Selection.RegistrationUid.ToString("D"), registry.Selection.ObservationId.ToString("D"),
+                    registry.Selection.CatalogName, registry.IndexDigest, registry.CatalogDigest,
+                    registry.ExpectedManifestDigest, registry.FinalManifestUrl.AbsoluteUri
+                ]);
+            }
+        }
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', lines)))).ToLowerInvariant();
     }
+
+    private async Task<LoadedBootstrapSelection> LoadAsync(
+        BootstrapProfileSelection selection,
+        CancellationToken cancellationToken) =>
+        selection.Source is { } source
+            ? await (sourceProfiles ?? throw new DeclarativeBootstrapException("Source Bootstrap profiles are not configured."))
+                .LoadAsync(source, cancellationToken)
+            : new(await catalog.LoadAsync(selection.Profiles, cancellationToken));
 
     private static IReadOnlyList<BootstrapBindingSelection> ResolveBindings(
         IReadOnlyList<LoadedBootstrapProfile> profiles,
@@ -233,12 +271,10 @@ public sealed class DeclarativeBootstrapService(
                 }
                 if (string.IsNullOrWhiteSpace(target.Name))
                     throw new DeclarativeBootstrapException($"Bootstrap binding '{profile.Summary.Name}/{binding.Name}' requires a target name.");
-                if (target.WorkspaceRef is not null)
-                    throw new DeclarativeBootstrapException($"Bootstrap binding '{profile.Summary.Name}/{binding.Name}' cannot target another Workspace.");
                 resolved.Add(new(
                     profile.Summary.Name,
                     binding.Name,
-                    new ResourceReference(target.Name, @namespace: target.Namespace ?? ResourceNamespace.Default)));
+                    new ResourceReference(target.Name, target.ScopeRef, target.Namespace ?? ResourceNamespace.Default)));
             }
         }
         if (selected.Count > 0)

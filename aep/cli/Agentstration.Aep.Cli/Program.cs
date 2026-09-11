@@ -8,7 +8,12 @@ if (args.Length < 2 || args[0] is not ("inspect" or "validate") || !Uri.TryCreat
     Console.Error.WriteLine("Usage: aep <inspect|validate> <http(s)://endpoint> [--format json]");
     return 2;
 }
-using var httpClient = new HttpClient { BaseAddress = new Uri(endpoint.AbsoluteUri.TrimEnd('/') + '/'), Timeout = TimeSpan.FromSeconds(30) };
+var transportOptions = new AepTransportSecurityOptions();
+using var httpClient = new HttpClient(AepSecureHttpMessageHandler.Create(transportOptions))
+{
+    BaseAddress = new Uri(endpoint.AbsoluteUri.TrimEnd('/') + '/'),
+    Timeout = TimeSpan.FromSeconds(30)
+};
 var client = new AepClient(httpClient);
 try
 {

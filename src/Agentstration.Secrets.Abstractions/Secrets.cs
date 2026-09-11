@@ -29,12 +29,13 @@ public sealed class ResolvedSecret(ResourceAddress secret, ResourceAddress vault
     public void Dispose() => Value.Dispose();
 }
 
-public sealed record SecretResolutionContext(Guid TenantId, Guid WorkspaceId, ResourceAddress Consumer);
-public sealed record SecretVaultContext(Guid TenantId, Guid WorkspaceId, ResourceAddress Vault, IReadOnlyDictionary<string, JsonElement> Options);
+public sealed record SecretReference(ResourceAddress Address, ResourceScopeRef? ScopeRef = null);
+public sealed record SecretResolutionContext(ResourceScopeRef ConsumerScopeRef, ResourceAddress Consumer);
+public sealed record SecretVaultContext(ResourceScopeRef ScopeRef, ResourceAddress Vault, IReadOnlyDictionary<string, JsonElement> Options);
 
 public interface ISecretResolver
 {
-    Task<ResolvedSecret?> ResolveAsync(ResourceAddress secret, SecretResolutionContext context, CancellationToken cancellationToken = default);
+    Task<ResolvedSecret?> ResolveAsync(SecretReference secret, SecretResolutionContext context, CancellationToken cancellationToken = default);
 }
 
 public interface ISecretVaultProvider

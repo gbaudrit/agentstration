@@ -12,9 +12,11 @@
   <data name="EmptyTitle"><value>No Tool Providers</value></data>
   <data name="EmptyMessage"><value>Add an MCP or AEP provider to discover tools.</value></data>
   <data name="Name"><value>Name</value></data>
+  <data name="Scope"><value>Scope</value></data>
   <data name="Type"><value>Type</value></data>
   <data name="Status"><value>Status</value></data>
   <data name="Tools"><value>Tools</value></data>
+  <data name="Definitions"><value>Definitions</value></data>
   <data name="Enabled"><value>Enabled</value></data>
   <data name="Yes"><value>Yes</value></data>
   <data name="No"><value>No</value></data>

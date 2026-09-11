@@ -11,6 +11,7 @@ using Agentstration.Web.Components;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
+using Agentstration.Web.Hosting;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Microsoft.AspNetCore.Components;
@@ -30,8 +31,11 @@ public partial class Packs
     private IReadOnlyList<InstalledPackResource>? packs;
     private IReadOnlyList<PackProjectResource>? projects;
     private ResourceSnapshot<InstalledPackResource>? selected;
+    private string? sourceDisplayName;
+    private string? sourceUrl;
     private AgentstrationApiException? error;
     private PackInstallationPreview? preview;
+    private ResourceScopeRef? installScope;
     private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
     private IReadOnlyList<ModelProviderResponse> modelProviders = [];
     private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
@@ -97,6 +101,7 @@ public partial class Packs
                 var match = packs.FirstOrDefault(pack => SameIdentity(pack, selected.Value));
                 selected = match is null ? null : await Client.GetPackAsync(match.Definition.Publisher, match.Definition.PackName, cancellation.Token);
             }
+            await ResolveSelectedSourceAsync();
         }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
@@ -105,6 +110,7 @@ public partial class Packs
     private void OpenInstall()
     {
         preview = null;
+        installScope = null;
         archive = null;
         archiveName = string.Empty;
         installError = null;
@@ -123,6 +129,7 @@ public partial class Packs
     {
         previewing = true;
         preview = null;
+        installScope = null;
         archive = null;
         installError = null;
         replaceExisting = false;
@@ -181,8 +188,39 @@ public partial class Packs
     private async Task SelectAsync(InstalledPackResource pack)
     {
         error = null;
-        try { selected = await Client.GetPackAsync(pack.Definition.Publisher, pack.Definition.PackName, cancellation.Token); }
+        try
+        {
+            selected = await Client.GetPackAsync(pack.Definition.Publisher, pack.Definition.PackName, cancellation.Token);
+            await ResolveSelectedSourceAsync();
+        }
         catch (AgentstrationApiException exception) { error = exception; }
+    }
+
+    private async Task ResolveSelectedSourceAsync()
+    {
+        sourceDisplayName = null;
+        sourceUrl = null;
+        if (selected?.Value.Definition.SourceProvenance is not { } provenance) return;
+        var sourceService = Services.GetService<SourceConsoleManagementService>();
+        var requestContext = Services.GetService<ICurrentRequestContext>();
+        if (sourceService is null || requestContext is null) return;
+
+        try
+        {
+            var source = (await sourceService.ListAsync(requestContext.Current.PrincipalId, cancellation.Token))
+                .SingleOrDefault(item => item.Source.Source.Uid == provenance.SourceUid);
+            if (source is null) return;
+
+            sourceDisplayName = source.Source.Configuration.Definition.DisplayName;
+            var resource = source.Source.Source;
+            var scopeRef = resource.ScopeRef
+                ?? throw new InvalidOperationException($"Source '{resource.Address}' has no ownership scope.");
+            sourceUrl = $"/settings/sources/{Uri.EscapeDataString(resource.Definition.Publisher)}/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(scopeRef.Value.ToString())}";
+        }
+        catch (AuthorizationDeniedException)
+        {
+            // The Pack remains inspectable when the current user cannot open platform Sources.
+        }
     }
 
     private void OpenFork()

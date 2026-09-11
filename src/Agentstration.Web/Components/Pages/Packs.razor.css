@@ -5,6 +5,13 @@
 .pack-facts { display: grid; grid-template-columns: 110px 1fr; gap: 8px 18px; margin: 20px 0 0; }
 .pack-facts dt { color: var(--muted); }
 .pack-facts dd { margin: 0; overflow-wrap: anywhere; }
+.pack-source-provenance { margin-top: 1.25rem; padding: 1rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface-2); }
+.pack-source-provenance h3 { margin: .2rem 0 .75rem; }
+.pack-source-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: .2rem 0 .9rem; }
+.pack-source-heading h3 { margin: 0 0 .2rem; font-size: 1rem; }
+.pack-source-heading code { color: var(--muted); font-size: .72rem; }
+.pack-source-heading .text-button { flex: 0 0 auto; }
+.pack-source-provenance .pack-facts { margin-top: 0; }
 .pack-resource-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
 .pack-resource-list article { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
 .pack-resource-list article > div { min-width: 0; flex: 1; }
@@ -45,4 +52,4 @@
 .pack-source-picker input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
 .pack-success { margin: 16px 0 0; padding: 10px 12px; border-radius: 8px; background: rgba(31,168,104,.12); color: #1b9560; font-size: .8rem; }
 @media (max-width: 820px) { .pack-metrics { grid-template-columns: repeat(3, minmax(140px, 1fr)); } }
-@media (max-width: 620px) { .pack-metrics { grid-template-columns: 1fr; } .pack-detail-actions { align-items: flex-end; flex-direction: column; } .pack-facts { grid-template-columns: 1fr; } .pack-facts dd { margin-bottom: 8px; } }
+@media (max-width: 620px) { .pack-metrics { grid-template-columns: 1fr; } .pack-detail-actions { align-items: flex-end; flex-direction: column; } .pack-facts { grid-template-columns: 1fr; } .pack-facts dd { margin-bottom: 8px; } .pack-source-heading { align-items: flex-start; flex-direction: column; } }

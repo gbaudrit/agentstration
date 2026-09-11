@@ -23,4 +23,5 @@
   <data name="Streaming.Automatic"><value>Automatic</value></data>
   <data name="Streaming.Enabled"><value>Enabled</value></data>
   <data name="Streaming.Disabled"><value>Disabled</value></data>
+  <data name="Scope"><value>Scope</value></data>
 </root>

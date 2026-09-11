@@ -1,3 +1,5 @@
+using System.Threading.RateLimiting;
+using Agentstration.Aep.Abstractions;
 using Agentstration.Application.Work;
 using Agentstration.Flow.Application;
 using Agentstration.Infrastructure;
@@ -12,6 +14,7 @@ using Agentstration.Runtime.Core;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Security.AspNetCoreIdentity.PostgreSql;
 using Agentstration.Web;
+using Agentstration.Web.Api;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Localization;
 using Agentstration.Web.Configuration;
@@ -19,6 +22,7 @@ using Agentstration.Web.Features.Flows;
 using Agentstration.Web.Features.Workplace;
 using Agentstration.Web.Hosting;
 using Agentstration.Work;
+using Microsoft.AspNetCore.RateLimiting;
 using ModelContextProtocol.AspNetCore;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -91,6 +95,12 @@ var controlPlaneConnectionString = BuildSqliteConnectionString("Data:ControlPlan
 var workPlaneConnectionString = BuildSqliteConnectionString("Data:WorkPlanePath", "work-plane.db");
 var flowConnectionString = BuildSqliteConnectionString("Data:FlowPath", "flow-plane.db");
 var runtimeConnectionString = BuildSqliteConnectionString("Data:RuntimePath", "runtime-plane.db");
+var sourceVerificationIndexOptions = builder.Configuration
+    .GetSection(Agentstration.Infrastructure.Sources.SourceVerificationIndexOptions.SectionName)
+    .Get<Agentstration.Infrastructure.Sources.SourceVerificationIndexOptions>() ?? new();
+var sourceRegistryTransportOptions = builder.Configuration
+    .GetSection(Agentstration.Infrastructure.Sources.SourceRegistryTransportOptions.SectionName)
+    .Get<Agentstration.Infrastructure.Sources.SourceRegistryTransportOptions>() ?? new();
 builder.Services.AddAgentstration(
     dataDirectory,
     aiOptions,
@@ -99,14 +109,36 @@ builder.Services.AddAgentstration(
     flowConnectionString,
     runtimeConnectionString,
     storageOptions,
-    enableHostedServices: hostedServicesEnabled);
+    enableHostedServices: hostedServicesEnabled,
+    sourceVerificationIndexOptions: sourceVerificationIndexOptions,
+    sourceRegistryTransportOptions: sourceRegistryTransportOptions);
 builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,
     useManagedProfileResolver);
+builder.Services.AddSingleton(builder.Configuration
+    .GetSection(AepEnrollmentPolicyOptions.SectionName)
+    .Get<AepEnrollmentPolicyOptions>() ?? new());
 builder.Services.AddAgentstrationModelManagement();
 builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
+builder.Services.AddSingleton<IAepEnrollmentAnnouncementProvisioner>(provider => provider.GetRequiredService<ExtensionSourceDiscoveryService>());
 builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
 builder.Services.AddProblemDetails();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = static async (context, token) =>
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new { error = new AepEnrollmentError("rate_limited", "Too many enrollment requests; retry later.") }, token);
+    options.AddPolicy("aep-enrollment-public", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
 builder.Services.AddAgentstrationOpenApi();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
@@ -124,6 +156,7 @@ else
         useDevelopmentPasswordPolicy: builder.Environment.IsDevelopment());
 builder.Services.AddScoped<DeclarativeBootstrapService>();
 builder.Services.AddSingleton<BootstrapProfileCatalog>();
+builder.Services.AddSingleton<SourceBootstrapProfileLoader>();
 builder.Services.AddSingleton<BootstrapApplicationLock>();
 builder.Services.AddScoped<BootstrapProfileManagementService>();
 builder.Services.AddSingleton<SignalRFlowRunEventSink>();
@@ -135,7 +168,11 @@ builder.Services.AddSingleton<IFlowRunEventSink>(provider => new CompositeFlowRu
 ]));
 builder.Services.AddSingleton<IWorkplaceEventSink, SignalRWorkplaceEventSink>();
 builder.Services.AddAgentstrationWebConsole(builder.Configuration, builder.Environment);
-builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();
+builder.Services.AddMcpServer()
+    .WithHttpTransport()
+    .WithToolsFromAssembly()
+    .WithListToolsHandler(AgentstrationMcpHandlers.ListToolsAsync)
+    .WithCallToolHandler(AgentstrationMcpHandlers.CallToolAsync);
 if (hostedServicesEnabled)
 {
     builder.Services.AddHostedService<AgentDeploymentReconciliationWorker>();
@@ -143,6 +180,7 @@ if (hostedServicesEnabled)
     builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
     builder.Services.AddHostedService<FlowRunExecutionWorker>();
     builder.Services.AddHostedService<FlowRunRecoveryWorker>();
+    builder.Services.AddHostedService<SourceRefreshWorker>();
 }
 if (testingStorageDirectory is not null)
 {
@@ -196,6 +234,7 @@ if (openTelemetryEnabled)
                 .AddMeter(
                     WorkItemService.Meter.Name,
                     FlowRunService.Meter.Name,
+                    SourceRegistryManagementService.Meter.Name,
                     AgentFrameworkRuntimeFactory.TelemetrySourceName,
                     GenAiObservabilityOptions.ChatClientSourceName);
             if (otlpEnabled) metrics.AddOtlpExporter();
@@ -215,6 +254,7 @@ if (genAiObservability.HttpPayloadCapture.Enabled)
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseRequestLocalization();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<PrincipalResolutionMiddleware>();
 app.UseMiddleware<RequestContextMiddleware>();
@@ -233,6 +273,7 @@ app.MapAgentstrationIdentityApi();
 app.MapAgentstrationBootstrapProfiles();
 app.MapAgentstrationManagementApi();
 app.MapAgentstrationModelManagementApi();
+app.MapAgentstrationAepEnrollment();
 app.MapAgentstrationWorkApi();
 app.MapAgentstrationWorkplaceApi();
 app.MapAgentstrationWorkOperationsApi();
@@ -255,6 +296,7 @@ try
     {
         await app.Services.GetRequiredService<IAgentstrationStorageInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+        await app.Services.GetRequiredService<SourceRegistryManagementService>().EnsureOfficialAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<LocalIdentityDatabaseInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
         if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
             bootstrapContext = await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
@@ -263,10 +305,10 @@ try
         await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-        if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", true))
+        if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
             await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
         await app.Services.ApplyDeclarativeBootstrapAsync(app.Lifetime.ApplicationStopping);
-        if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", true))
+        if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
             await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
     }
     if (bootstrapContext is not null)

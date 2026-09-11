@@ -21,16 +21,31 @@ public static class ResourceKinds
     public const string InstalledPack = "InstalledPack";
     public const string PackConfiguration = "PackConfiguration";
     public const string ModelProvider = "ModelProvider";
+    public const string SourceProvider = "SourceProvider";
     public const string ExtensionRegistration = "ExtensionRegistration";
+    public const string AepEnrollmentSettings = "AepEnrollmentSettings";
+    public const string AepEnrollmentRequest = "AepEnrollmentRequest";
     public const string ModelProfile = "ModelProfile";
     public const string RuntimeProfile = "RuntimeProfile";
     public const string Secret = "Secret";
     public const string Vault = "Vault";
     public const string Tool = "Tool";
+    public const string ToolDefinition = "ToolDefinition";
     public const string ToolProvider = "ToolProvider";
     public const string ToolExecutionHook = "ToolExecutionHook";
     public const string Trigger = "Trigger";
     public const string BootstrapApplication = "BootstrapApplication";
+    public const string Source = "Source";
+    public const string SourceVersion = "SourceVersion";
+    public const string SourceConfiguration = "SourceConfiguration";
+    public const string SourceObservedState = "SourceObservedState";
+    public const string SourceImportRecord = "SourceImportRecord";
+    public const string SourceChannelSnapshot = "SourceChannelSnapshot";
+    public const string SourceChannelObservedState = "SourceChannelObservedState";
+    public const string SourceRegistryRegistration = "SourceRegistryRegistration";
+    public const string SourceRegistryObservedState = "SourceRegistryObservedState";
+    public const string SourceRegistryRefreshRecord = "SourceRegistryRefreshRecord";
+    public const string SourceChannelRefreshRecord = "SourceChannelRefreshRecord";
 }
 
 public sealed record ResourceMetadata
@@ -51,6 +66,7 @@ public readonly record struct ResourceKey(string Kind, string Name, ResourceName
     }
 
     public ResourceAddress Address => ResourceAddress.Create(Namespace, Kind, Name);
+    public ScopedResourceAddress AtScope(ResourceScopeRef scopeRef) => ScopedResourceAddress.Create(scopeRef, Namespace, Kind, Name);
     public override string ToString() => Address.ToString();
 }
 
@@ -65,17 +81,16 @@ public abstract record Resource
     public ResourceNamespace Namespace => Metadata.Namespace;
     [JsonIgnore]
     public ResourceAddress Address => ResourceAddress.Create(Namespace, Kind, Name);
-    public Guid TenantId { get; init; }
-    public Guid WorkspaceId { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ResourceScopeRef? ScopeRef { get; init; }
     public long Generation { get; init; }
     public ResourceStatus Status { get; init; } = new() { ProvisioningState = ProvisioningState.Accepted };
     public string? ETag { get; init; }
 
-    public Resource WithSystemState(Guid uid, Guid tenantId, Guid workspaceId, string etag) => this with
+    public Resource WithSystemState(Guid uid, ResourceScopeRef scopeRef, string etag) => this with
     {
         Uid = uid,
-        TenantId = tenantId,
-        WorkspaceId = workspaceId,
+        ScopeRef = scopeRef,
         ETag = etag,
         Status = Status with { ResourceVersion = etag }
     };
@@ -99,9 +114,9 @@ public sealed record ResourceStatus
 
 public sealed record ResourceReference
 {
-    public ResourceReference(string name, string? workspaceRef = null, ResourceNamespace? @namespace = null) { Name = name; WorkspaceRef = workspaceRef; Namespace = @namespace; }
+    public ResourceReference(string name, ResourceScopeRef? scopeRef = null, ResourceNamespace? @namespace = null) { Name = name; ScopeRef = scopeRef; Namespace = @namespace; }
     public string Name { get; init; }
-    public string? WorkspaceRef { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
     [JsonIgnore] public string ResourceId => Name;
     public ResourceNamespace? Namespace { get; init; }
     public ResourceAddress Resolve(ResourceNamespace ownerNamespace, string kind) =>

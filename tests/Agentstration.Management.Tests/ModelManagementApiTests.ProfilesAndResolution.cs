@@ -252,7 +252,7 @@ public sealed partial class ModelManagementApiTests
     }
 
     [TestMethod]
-    public async Task AgentUpdateRejectsCrossWorkspaceResourceReference()
+    public async Task AgentUpdateRejectsResourceReferenceOutsideItsVisibleScopes()
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
@@ -266,7 +266,7 @@ public sealed partial class ModelManagementApiTests
             Metadata = agent.Metadata,
             Definition = agent.Definition with
             {
-                ModelProfile = new ResourceReference(agent.Definition.ModelProfile.Name, "another-workspace")
+                ModelProfile = new ResourceReference(agent.Definition.ModelProfile.Name, ResourceScopeRef.Workspace(Guid.NewGuid()))
             }
         };
 

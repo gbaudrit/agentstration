@@ -229,6 +229,42 @@ internal static class OpenApiSuccessResponseCatalog
             if (path.EndsWith("/triggers", StringComparison.OrdinalIgnoreCase)) return Json<IReadOnlyList<TriggerResource>>(200, "List Triggers");
             return Json<TriggerResource>(200, method == "PUT" ? "Create or update a Trigger" : "Get a Trigger");
         }
+        if (path.StartsWith("/api/sources", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path.Contains("/pack-catalogs/", StringComparison.OrdinalIgnoreCase)
+                && path.EndsWith("/preview", StringComparison.OrdinalIgnoreCase))
+                return Json<SourcePackInstallationPreview>(200, "Preview a Pack installation from a pinned Source snapshot");
+            if (path.Contains("/pack-catalogs/", StringComparison.OrdinalIgnoreCase)
+                && path.EndsWith("/install", StringComparison.OrdinalIgnoreCase))
+                return Json<InstalledPackResource>(201, "Install a Pack from a pinned Source snapshot");
+            if (path.EndsWith("/imports/yaml", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith("/imports/url", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceImportResult>(201, "Import a Source Version");
+            if (path.EndsWith("/display-name", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceConfigurationResource>(200, "Update a Source display name");
+            if (path.EndsWith("/refresh-policy", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceConfigurationResource>(200, "Update independent Source and Channel refresh policies");
+            if (path.EndsWith("/refresh", StringComparison.OrdinalIgnoreCase)
+                && !path.Contains("/channels/", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceImportResult>(200, "Refresh a Source definition from its retained origin");
+            if (path.EndsWith("/bindings", StringComparison.OrdinalIgnoreCase))
+                return method == "PUT"
+                    ? Json<SourceBindingConfigurationResult>(200, "Configure Source Provider bindings")
+                    : Json<SourceBindingStatusView>(200, "Get Source Provider binding status");
+            if (path.EndsWith("/status", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceChannelStatusView>(200, "Get Source Channel status");
+            if (path.EndsWith("/verification", StringComparison.OrdinalIgnoreCase)
+                && path.Contains("/snapshots/", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceChannelSnapshotVerificationView>(200, "Get Source Channel Snapshot verification");
+            if (path.EndsWith("/verification", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceDefinitionVerificationView>(200, "Get Source Version verification");
+            if (path.EndsWith("/versions/{versionUid}", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceVersionResource>(200, "Get an immutable Source Version");
+            if (path.EndsWith("/versions", StringComparison.OrdinalIgnoreCase))
+                return Json<IReadOnlyList<SourceVersionResource>>(200, "List immutable Source Versions");
+            if (path == "/api/sources") return Json<IReadOnlyList<SourceView>>(200, "List Sources");
+            return Json<SourceView>(200, "Get a Source");
+        }
         return Pack(method, path);
     }
 
@@ -258,7 +294,7 @@ internal static class OpenApiSuccessResponseCatalog
     {
         if (method == "DELETE" && IsModelManagementPath(path)) return NoContent("Delete the resource");
         if (path == "/api/extensions") return Json<ValueResponse<ExtensionResponse>>(200, "List extensions");
-        if (path == "/api/extensions/discover") return Json<ExtensionDiscoveryResponse>(200, "Discover extensions");
+        if (path == "/api/extensions/inventory") return Json<ValueResponse<ExtensionInventoryItemResponse>>(200, "List extension inventory");
         if (path.StartsWith("/api/extensionregistrations", StringComparison.OrdinalIgnoreCase))
             return path == "/api/extensionregistrations"
                 ? method == "POST" ? Json<ExtensionRegistrationResource>(201, "Create an extension registration") : Json<ValueResponse<ExtensionRegistrationResource>>(200, "List extension registrations")
@@ -270,6 +306,25 @@ internal static class OpenApiSuccessResponseCatalog
             if (path.EndsWith("/status", StringComparison.OrdinalIgnoreCase) || path.EndsWith("/test", StringComparison.OrdinalIgnoreCase)) return Json<ModelProviderStatusResponse>(200, "Get model provider status");
             if (path.EndsWith("/usages", StringComparison.OrdinalIgnoreCase)) return Json<ModelProviderUsagesResponse>(200, "List model provider usages");
             return Json<ModelProviderResource>(200, method == "PUT" ? "Update a model provider" : "Get a model provider");
+        }
+        if (path.StartsWith("/api/sourceproviders", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path == "/api/sourceproviders") return method == "POST" ? Json<SourceProviderResource>(201, "Create a Source Provider") : Json<ValueResponse<SourceProviderSummaryResponse>>(200, "List Source Providers");
+            if (path.EndsWith("/status", StringComparison.OrdinalIgnoreCase)) return Json<SourceProviderStatusResponse>(200, "Get Source Provider status");
+            if (path.EndsWith("/usages", StringComparison.OrdinalIgnoreCase)) return Json<SourceProviderUsagesResponse>(200, "List Source Provider usages");
+            return Json<SourceProviderResource>(200, method == "PUT" ? "Update a Source Provider" : "Get a Source Provider");
+        }
+        if (path.StartsWith("/api/sourceregistries", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path == "/api/sourceregistries") return Json<ValueResponse<SourceRegistryRegistrationView>>(200, "List Source registries");
+            if (path == "/api/sourceregistries/discovery") return Json<SourceRegistryDiscoveryPage>(200, "Discover Sources across registries");
+            if (path == "/api/sourceregistries/discovery/publishers") return Json<ValueResponse<SourceRegistryDiscoveryPublisher>>(200, "List discovered publishers");
+            if (path == "/api/sourceregistries/discovery/imports") return Json<SourceImportResult>(200, "Import an exact registry observation");
+            if (path.Contains("/discovery/sources/", StringComparison.OrdinalIgnoreCase)) return Json<SourceRegistryDiscoverySource>(200, "Get discovered Source observations");
+            if (path.Contains("/trust/sources/", StringComparison.OrdinalIgnoreCase)) return Json<SourceRegistrySourceTrustView>(200, "Evaluate Source registry evidence");
+            if (path.EndsWith("/trust", StringComparison.OrdinalIgnoreCase)) return Json<SourceRegistryOriginTrustView>(200, "Evaluate Source registry origin trust");
+            if (path.EndsWith("/refreshes", StringComparison.OrdinalIgnoreCase)) return Json<SourceRegistryRefreshHistoryResponse>(200, "List Source registry refreshes");
+            return Json<SourceRegistryRegistrationView>(200, path.EndsWith("/refresh", StringComparison.OrdinalIgnoreCase) ? "Refresh a Source registry" : "Get or update a Source registry");
         }
         if (path.StartsWith("/api/modelprofiles", StringComparison.OrdinalIgnoreCase))
         {
@@ -386,6 +441,7 @@ internal static class OpenApiSuccessResponseCatalog
         path.StartsWith("/api/extensions", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/extensionregistrations", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/modelproviders", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/api/sourceproviders", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/modelprofiles", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/runtimeprofiles", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/toolproviders", StringComparison.OrdinalIgnoreCase)

@@ -44,6 +44,7 @@ public sealed record FlowStepRun
     public IReadOnlyList<string> Logs { get; init; } = [];
     public FlowStepRunUsage? Usage { get; init; }
     public FlowRunError? Error { get; init; }
+    public string? ChildFlowRunId { get; init; }
 }
 
 public sealed record FlowRun
@@ -60,9 +61,16 @@ public sealed record FlowRun
     public FlowRunStatus Status { get; init; } = FlowRunStatus.Pending;
     public FlowRunTrigger Trigger { get; init; }
     public string? StartedBy { get; init; }
+    public FlowInvocationOrigin? InvocationOrigin { get; init; }
+    public string? CallerId { get; init; }
+    public string? CausationId { get; init; }
+    public string? IdempotencyKey { get; init; }
     public string? CorrelationId { get; init; }
     public string? WorkItemResourceId { get; init; }
+    public bool ResolvedFromActiveReference { get; init; }
     public string? ParentFlowRunId { get; init; }
+    public string? RootFlowRunId { get; init; }
+    public int NestingDepth { get; init; }
     public string? InteractionId { get; init; }
     public string? WorkTaskId { get; init; }
     public string? TriggerMessageId { get; init; }

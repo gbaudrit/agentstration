@@ -7,6 +7,7 @@ namespace Agentstration.ModelProviders;
 public static class ExtensionOptionScopes
 {
     public const string ModelProfile = "model-profile";
+    public const string SourceChannel = "source-channel";
 }
 
 public sealed record ExtensionOptionSetVersion(
@@ -66,6 +67,10 @@ public interface IExtensionInspector
         string registrationName,
         Uri endpoint,
         CancellationToken cancellationToken = default);
+    ValueTask<ExtensionInspection> InspectAsync(
+        ExtensionRegistrationResource registration,
+        CancellationToken cancellationToken = default) =>
+        InspectAsync(registration.Name, registration.Definition.Endpoint, cancellationToken);
 }
 
 public sealed record ExtensionOptionValidationIssue(string Path, string Code, string Message);

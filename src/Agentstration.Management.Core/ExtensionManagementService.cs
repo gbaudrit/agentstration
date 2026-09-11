@@ -1,5 +1,6 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
 
@@ -28,7 +29,11 @@ public sealed record ExtensionView(
     IReadOnlyList<ExtensionOptionUsage> Usages,
     IReadOnlyList<ExtensionProviderBinding> Providers,
     string? Details,
-    string DiscoverySource);
+    string DiscoverySource,
+    bool RegistrationEnabled,
+    AepEnrollmentMode EnrollmentMode,
+    ResourceScopeRef? RegistrationScopeRef,
+    string RegistrationDisplayName);
 
 public sealed class ExtensionManagementService(
     IModelProviderConfigurationStore providers,
@@ -51,7 +56,7 @@ public sealed class ExtensionManagementService(
             var inspection = inspector is null
                 ? new ExtensionInspection(resource.Name, endpoint, "unknown", null, [], [], "No extension inspector is registered.")
                 : resource.Definition.Enabled
-                    ? await inspector.InspectAsync(resource.Name, endpoint, cancellationToken)
+                    ? await inspector.InspectAsync(resource, cancellationToken)
                     : new ExtensionInspection(resource.Name, endpoint, "disabled", null, [], [], "The extension registration is disabled.");
             if (inspection.Extension is not null
                 && resource.Definition.ExpectedExtensionId is { Length: > 0 } expectedId
@@ -82,7 +87,11 @@ public sealed class ExtensionManagementService(
                 usages,
                 bindings.Select(value => new ExtensionProviderBinding(value.Name, value.Namespace.Value, value.ContributionId)).ToArray(),
                 inspection.Details,
-                resource.Definition.Source.ToString().ToLowerInvariant()));
+                resource.Definition.Source.ToString().ToLowerInvariant(),
+                resource.Definition.Enabled,
+                resource.Definition.EnrollmentMode,
+                resource.ScopeRef,
+                resource.Definition.DisplayName));
         }
         return views;
     }

@@ -8,6 +8,7 @@ src/
   Agentstration.Infrastructure/       Local adapters and composition support
   Agentstration.Management.*/         Management resources, use cases, SQLite
   Agentstration.Runtime.*/            Runtime contracts, core, local and MAF adapters
+  Agentstration.Tools.SourceRegistry/ Offline Source Version validation and digest .NET tool
   Agentstration.Flow.*/               Flow model, use cases, contracts and SQLite
   Agentstration.Work*/                Work model, contracts, API and SQLite
   Agentstration.Web*/                 Console, UI libraries and shared components

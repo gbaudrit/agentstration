@@ -10,6 +10,7 @@ public sealed record ModelProviderConfiguration
 {
     public required Guid Uid { get; init; }
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
     public required string Name { get; init; }
     public required string AdapterType { get; init; }
     public required string ContributionId { get; init; }
@@ -20,6 +21,8 @@ public sealed record ModelProviderConfiguration
     public string? DisplayName { get; init; }
     public ExtensionRegistrationSource RegistrationSource { get; init; } = ExtensionRegistrationSource.Manual;
     public string? EndpointDisplayName { get; init; }
+    public ResourceScopeRef? ExtensionScopeRef { get; init; }
+    public AepTransportAuthenticationMode AuthenticationMode { get; init; }
     public ResourceReference? Credential { get; init; }
 }
 

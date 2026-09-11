@@ -23,6 +23,8 @@ public sealed record FlowDesignerMetadata
 [JsonDerivedType(typeof(RouterFlowStepDefinition), "router")]
 [JsonDerivedType(typeof(ConditionFlowStepDefinition), "condition")]
 [JsonDerivedType(typeof(TransformFlowStepDefinition), "transform")]
+[JsonDerivedType(typeof(FlowCallStepDefinition), "flow")]
+[JsonDerivedType(typeof(ToolFlowStepDefinition), "tool")]
 [JsonDerivedType(typeof(OutputFlowStepDefinition), "output")]
 [JsonDerivedType(typeof(FailureFlowStepDefinition), "failure")]
 public abstract record FlowStepDefinition
@@ -70,6 +72,43 @@ public sealed record TransformFlowStepDefinition : FlowStepDefinition
     public string Mode { get; init; } = "Mapping";
     public JsonElement? Mapping { get; init; }
     public string? Expression { get; init; }
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<FlowCallVersionStrategy>))]
+public enum FlowCallVersionStrategy
+{
+    [JsonStringEnumMemberName("active")]
+    Active,
+    [JsonStringEnumMemberName("exact")]
+    Exact
+}
+
+public sealed record FlowCallReference(
+    string ResourceId,
+    FlowCallVersionStrategy VersionStrategy = FlowCallVersionStrategy.Active,
+    string? Version = null,
+    ResourceNamespace? Namespace = null)
+{
+    public FlowId Resolve(ResourceNamespace ownerNamespace) => new(ResourceId, Namespace ?? ownerNamespace);
+}
+
+public sealed record FlowCallStepDefinition : FlowStepDefinition
+{
+    public required FlowCallReference Flow { get; init; }
+    public JsonElement? InputMapping { get; init; }
+}
+
+public sealed record FlowToolReference(
+    string ResourceId,
+    ResourceNamespace? Namespace = null)
+{
+    public ResourceNamespace ResolveNamespace(ResourceNamespace ownerNamespace) => Namespace ?? ownerNamespace;
+}
+
+public sealed record ToolFlowStepDefinition : FlowStepDefinition
+{
+    public required FlowToolReference Tool { get; init; }
+    public JsonElement? ArgumentsMapping { get; init; }
 }
 
 public sealed record OutputFlowStepDefinition : FlowStepDefinition
@@ -136,6 +175,8 @@ public static class FlowStepDefinitionExtensions
         RouterFlowStepDefinition => "router",
         ConditionFlowStepDefinition => "condition",
         TransformFlowStepDefinition => "transform",
+        FlowCallStepDefinition => "flow",
+        ToolFlowStepDefinition => "tool",
         OutputFlowStepDefinition => "output",
         FailureFlowStepDefinition => "failure",
         _ => throw new ArgumentOutOfRangeException(nameof(step))

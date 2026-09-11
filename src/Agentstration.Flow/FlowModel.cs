@@ -20,8 +20,9 @@ public enum FlowRoutingStrategy { Deterministic, Capabilities, Semantic, Llm, Hy
 public enum FlowNodeKind { Input, Agent, Router, Condition, Transform, Output, Failure, Flow, Function, ExternalCall, HumanApproval, Custom }
 public enum FlowOrchestrationStrategy { Sequential, Concurrent, Handoff, GroupChat, Magentic }
 public enum FlowCompositionMode { Sequential, Concurrent, Custom }
-public enum FlowRunStatus { Pending, Running, WaitingForInput, Succeeded, Failed, Cancelled, TimedOut }
+public enum FlowRunStatus { Pending, Running, WaitingForInput, Succeeded, Failed, Cancelled, TimedOut, WaitingForChild }
 public enum FlowRunTrigger { Manual, Api, WorkItem, Flow, Schedule, Event }
+public enum FlowInvocationOrigin { Entry, Trigger, Api, Mcp, Agent, Console }
 public enum FlowStepRunStatus { NotStarted, Running, Succeeded, Failed, Skipped, Cancelled }
 public enum FlowRunEventType
 {
@@ -45,7 +46,10 @@ public enum FlowRunEventType
     ToolCallGovernanceEvaluated,
     ToolCallCompleted,
     ToolCallFailed,
-    ParticipantHandoff
+    ParticipantHandoff,
+    ChildFlowRunCreated,
+    FlowRunWaitingForChild,
+    FlowRunResumedFromChild
 }
 
 public enum InputRequestType { Text, Choice, Confirmation }

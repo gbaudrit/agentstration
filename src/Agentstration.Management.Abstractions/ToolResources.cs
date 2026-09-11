@@ -16,6 +16,7 @@ public sealed record AepToolProviderConfiguration
 
 public sealed record McpToolProviderConfiguration
 {
+    public bool Internal { get; init; }
     public McpToolProviderTransport Transport { get; init; } = McpToolProviderTransport.Stdio;
     public Uri? Endpoint { get; init; }
     public string? Command { get; init; }
@@ -81,6 +82,21 @@ public sealed record ToolResourceProperties
 public sealed record ToolResource : Resource
 {
     public ToolResourceProperties Definition { get; init; } = null!;
+}
+
+public static class ToolResourceIdentity
+{
+    public static string CatalogId(ResourceNamespace @namespace, string name) =>
+        @namespace.IsDefault ? name : $"{@namespace.Value}/{name}";
+
+    public static (ResourceNamespace Namespace, string Name) ParseCatalogId(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        var separator = value.IndexOf('/');
+        return separator < 0
+            ? (ResourceNamespace.Default, value)
+            : (ResourceNamespace.Parse(value[..separator]), value[(separator + 1)..]);
+    }
 }
 
 public static class ToolExecutionHookHandlers

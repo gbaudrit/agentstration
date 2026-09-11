@@ -12,9 +12,11 @@
   <data name="EmptyTitle"><value>Aucun fournisseur d’outils</value></data>
   <data name="EmptyMessage"><value>Ajoutez un fournisseur MCP ou AEP pour découvrir des outils.</value></data>
   <data name="Name"><value>Nom</value></data>
+  <data name="Scope"><value>Périmètre</value></data>
   <data name="Type"><value>Type</value></data>
   <data name="Status"><value>État</value></data>
   <data name="Tools"><value>Outils</value></data>
+  <data name="Definitions"><value>Définitions</value></data>
   <data name="Enabled"><value>Activé</value></data>
   <data name="Yes"><value>Oui</value></data>
   <data name="No"><value>Non</value></data>

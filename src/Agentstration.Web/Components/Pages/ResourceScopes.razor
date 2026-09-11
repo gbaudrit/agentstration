@@ -1,0 +1,184 @@
+@page "/settings/resource-scopes"
+@implements IDisposable
+@inject IResourceScopeInventoryClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceScopesStrings> Localizer
+
+<PageTitle>@T("PageTitle")</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")">
+    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button></Actions>
+</PageHeader>
+
+@if (error is not null)
+{
+    <ErrorState Title="@T("UnableToLoad")" Message="@error.Message" ErrorId="@error.ErrorId">
+        <button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button>
+    </ErrorState>
+}
+else if (inventory is null)
+{
+    <LoadingState Message="@T("Loading")" />
+}
+else
+{
+    <section class="metric-grid" aria-label="@T("Metrics")">
+        <MetricCard Label="@T("Scopes")" Value="@inventory.Scopes.Count.ToString()" Status="UiStatus.Info" />
+        <MetricCard Label="@T("Resources")" Value="@inventory.Scopes.Sum(scope => scope.Resources.Count).ToString()" Status="UiStatus.Success" />
+        <MetricCard Label="@T("SelectedScopeResources")" Value="@(Selected?.Resources.Count.ToString() ?? "0")" />
+    </section>
+
+    <section class="scope-explorer">
+        <aside class="panel scope-tree" aria-label="@T("Hierarchy")">
+            <div class="panel-header"><div><p class="eyebrow">@T("Hierarchy")</p><h2>@T("OwnershipScopes")</h2><p class="scope-tree-intro">@T("HierarchyDescription")</p></div></div>
+            @foreach (var instance in inventory.Scopes.Where(scope => scope.Kind == ResourceScopeKind.Instance))
+            {
+                <ResourceScopeTreeNode Scope="instance" Depth="0" Selected="@(selectedScopeRef == instance.ScopeRef)" OnSelected="Select" />
+                @foreach (var tenant in Children(instance.ScopeRef))
+                {
+                    <ResourceScopeTreeNode Scope="tenant" Depth="1" Selected="@(selectedScopeRef == tenant.ScopeRef)" OnSelected="Select" />
+                    @foreach (var workspace in Children(tenant.ScopeRef))
+                    {
+                        <ResourceScopeTreeNode Scope="workspace" Depth="2" Selected="@(selectedScopeRef == workspace.ScopeRef)" OnSelected="Select" />
+                    }
+                }
+            }
+        </aside>
+
+        <article class="panel scope-detail">
+            @if (Selected is { } selected)
+            {
+                <div class="panel-header scope-detail-header">
+                    <div class="scope-heading"><div><p class="eyebrow">@KindLabel(selected.Kind)</p><h2>@ScopeDisplayName(selected)</h2></div></div>
+                    <div class="scope-detail-badges"><ResourceScopeBadge ScopeRef="selected.ScopeRef" />@if (selected.IsCurrent) { <StatusBadge Text="@T("Current")" Status="UiStatus.Info" /> }</div>
+                </div>
+                <code class="scope-reference">@selected.ScopeRef.Value</code>
+                <p class="scope-visibility">@VisibilityDescription(selected.Kind)</p>
+
+                @if (Kinds.Count > 0)
+                {
+                    <div class="kind-summary" aria-label="@T("ResourceTypes")">
+                        @foreach (var value in Kinds)
+                        {
+                            <button type="button" class="kind-summary-item @(kind == value ? "selected" : null)" @onclick="() => SelectKind(value)">
+                                <span class="kind-summary-mark" aria-hidden="true"></span><strong>@value</strong><span>@selected.Resources.Count(resource => resource.Kind == value)</span>
+                            </button>
+                        }
+                    </div>
+                }
+
+                @if (!CanOpenSelectedScopeResources && selected.Resources.Count > 0)
+                {
+                    <p class="scope-link-notice"><span aria-hidden="true">↗</span>@T("LinksRequireCurrentWorkspace")</p>
+                }
+
+                <div class="scope-filters">
+                    <label><span>@T("Search")</span><input value="@search" @oninput="SearchChanged" placeholder="@T("SearchPlaceholder")" /></label>
+                    <label><span>@T("Kind")</span><select value="@kind" @onchange="KindChanged"><option value="">@T("AllKinds")</option>@foreach (var value in Kinds) { <option value="@value">@value</option> }</select></label>
+                </div>
+
+                @if (FilteredResources.Count == 0)
+                {
+                    <EmptyState Title="@T("NoResources")" Message="@T("NoResourcesMessage")" />
+                }
+                else
+                {
+                    <DataGrid TItem="ResourceScopeInventoryItemResponse" Items="FilteredResources">
+                        <Header><tr><th>@T("Resource")</th><th>@T("Kind")</th><th>@T("Namespace")</th><th>@T("Updated")</th><th><span class="sr-only">@T("Actions")</span></th></tr></Header>
+                        <Row Context="resource">
+                            <tr class="resource-row">
+                                <td><div class="resource-identity"><span>@if (ResourceUrl(resource) is { } titleUrl) { <a class="resource-name-link" href="@titleUrl">@resource.Name</a> } else { <strong>@resource.Name</strong> }<small>@resource.Uid</small></span></div></td>
+                                <td><span class="pack-kind">@resource.Kind</span></td>
+                                <td><code>@resource.Namespace.Value</code></td>
+                                <td><time datetime="@resource.UpdatedAt.ToString("O")">@resource.UpdatedAt.ToLocalTime().ToString("g")</time></td>
+                                <td class="resource-action">@if (ResourceUrl(resource) is { } url) { <a class="text-button" href="@url" aria-label="@T("OpenNamedResource", resource.Name)">@T("Open") <span aria-hidden="true">→</span></a> } else { <span class="scope-no-link" title="@T("NoDirectPage")">—</span> }</td>
+                            </tr>
+                        </Row>
+                    </DataGrid>
+                }
+            }
+        </article>
+    </section>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private ResourceScopeInventoryResponse? inventory;
+    private ResourceScopeRef? selectedScopeRef;
+    private AgentstrationApiException? error;
+    private bool loading;
+    private string search = string.Empty;
+    private string kind = string.Empty;
+    private ResourceScopeInventoryNodeResponse? Selected => inventory?.Scopes.SingleOrDefault(scope => scope.ScopeRef == selectedScopeRef);
+    private IReadOnlyList<string> Kinds => Selected?.Resources.Select(resource => resource.Kind).Distinct(StringComparer.Ordinal).Order(StringComparer.CurrentCultureIgnoreCase).ToArray() ?? [];
+    private bool CanOpenSelectedScopeResources
+    {
+        get
+        {
+            if (Selected is not { } selected || inventory?.Scopes.FirstOrDefault(scope => scope.IsCurrent) is not { } current) return false;
+            return selected.Kind == ResourceScopeKind.Instance
+                || selected.ScopeRef == current.ScopeRef
+                || selected.ScopeRef == current.ParentScopeRef;
+        }
+    }
+    private IReadOnlyList<ResourceScopeInventoryItemResponse> FilteredResources => Selected?.Resources.Where(resource =>
+        (string.IsNullOrWhiteSpace(kind) || string.Equals(resource.Kind, kind, StringComparison.Ordinal))
+        && (string.IsNullOrWhiteSpace(search)
+            || resource.Name.Contains(search, StringComparison.CurrentCultureIgnoreCase)
+            || resource.Kind.Contains(search, StringComparison.CurrentCultureIgnoreCase)
+            || resource.Namespace.Value.Contains(search, StringComparison.CurrentCultureIgnoreCase))).ToArray() ?? [];
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            inventory = await Client.GetAsync(cancellation.Token);
+            selectedScopeRef = inventory.Scopes.FirstOrDefault(scope => scope.IsCurrent)?.ScopeRef
+                ?? inventory.Scopes.FirstOrDefault()?.ScopeRef;
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+    private IEnumerable<ResourceScopeInventoryNodeResponse> Children(ResourceScopeRef parent) => inventory is null
+        ? []
+        : inventory.Scopes.Where(scope => scope.ParentScopeRef == parent).OrderBy(scope => scope.DisplayName, StringComparer.CurrentCultureIgnoreCase);
+    private void Select(ResourceScopeRef scopeRef) { selectedScopeRef = scopeRef; search = kind = string.Empty; }
+    private void SearchChanged(ChangeEventArgs args) => search = args.Value?.ToString() ?? string.Empty;
+    private void KindChanged(ChangeEventArgs args) => kind = args.Value?.ToString() ?? string.Empty;
+    private void SelectKind(string value) => kind = kind == value ? string.Empty : value;
+    private string ScopeDisplayName(ResourceScopeInventoryNodeResponse scope) => scope.Kind == ResourceScopeKind.Instance ? T("InstanceName") : scope.DisplayName;
+    private string KindLabel(ResourceScopeKind value) => T($"ScopeKind.{value}");
+    private string VisibilityDescription(ResourceScopeKind value) => T($"Visibility.{value}");
+    private string T(string key) => Localizer[key].Value;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    private string? ResourceUrl(ResourceScopeInventoryItemResponse resource)
+    {
+        if (!CanOpenSelectedScopeResources || Selected is not { } selected) return null;
+        var name = Uri.EscapeDataString(resource.Name);
+        var resourceNamespace = Uri.EscapeDataString(resource.Namespace.Value);
+        var scopeRef = Uri.EscapeDataString(selected.ScopeRef.Value);
+        return resource.Kind switch
+        {
+            ResourceKinds.Agent => resource.Namespace.IsDefault ? $"/agents/{name}" : $"/namespaces/{resourceNamespace}/agents/{name}",
+            ResourceKinds.Flow => resource.Namespace.IsDefault ? $"/flows/{name}" : $"/namespaces/{resourceNamespace}/flows/{name}",
+            ResourceKinds.Entry => resource.Namespace.IsDefault ? $"/entries/{name}" : $"/namespaces/{resourceNamespace}/entries/{name}",
+            ResourceKinds.ModelProvider => $"/modelproviders/{name}?namespace={resourceNamespace}",
+            ResourceKinds.SourceProvider => $"/sourceproviders/{name}?namespace={resourceNamespace}&scopeRef={scopeRef}",
+            ResourceKinds.ModelProfile => $"/modelprofiles/{name}?namespace={resourceNamespace}",
+            ResourceKinds.RuntimeProfile => $"/runtimeprofiles/{name}?namespace={resourceNamespace}",
+            ResourceKinds.Vault => $"/vaults/{name}?scopeRef={scopeRef}",
+            ResourceKinds.Secret => $"/secrets/{name}?scopeRef={scopeRef}",
+            ResourceKinds.Tool => $"/tools/{name}",
+            ResourceKinds.ToolProvider => $"/tools/providers/{name}",
+            ResourceKinds.Trigger when resource.Namespace.IsDefault => $"/triggers/{name}",
+            ResourceKinds.AgentDeployment => $"/deployments#deployment-{resourceNamespace}-{name}",
+            ResourceKinds.InstalledPack or ResourceKinds.PackConfiguration => "/packs",
+            ResourceKinds.ExtensionRegistration => "/extensions",
+            ResourceKinds.BootstrapApplication => "/settings/bootstrap",
+            _ => null
+        };
+    }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+
+}

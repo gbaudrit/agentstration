@@ -6,6 +6,7 @@ using Agentstration.Web.Console;
 using Agentstration.Web.Features.Flows.Designer;
 using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.FlowDesigner.DependencyInjection;
+using Agentstration.Web.Hosting;
 using Agentstration.Web.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -31,6 +32,7 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddScoped<IResourceSearchProvider, ConsoleResourceSearchProvider>();
         services.AddAgentstrationFlowDesigner();
         services.AddScoped<PlatformDashboardService>();
+        services.AddScoped<SourceConsoleManagementService>();
         services.AddScoped<IFlowDesignerBackend, FlowDesignerBackend>();
         services.AddScoped<IFlowDesignerResourceProvider, FlowDesignerResourceProvider>();
 
@@ -63,12 +65,16 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<HttpUserPreferencesClient, IUserPreferencesClient>(services, configured.ManagementApi);
         AddClient<ModelProvidersApiClient, IModelProvidersClient>(services, configured.ManagementApi);
         AddClient<ExtensionsApiClient, IExtensionsClient>(services, configured.ManagementApi);
+        AddClient<SourceProvidersApiClient, ISourceProvidersClient>(services, configured.ManagementApi);
+        AddClient<SourceRegistriesApiClient, ISourceRegistriesClient>(services, configured.ManagementApi);
         AddClient<ModelProfilesApiClient, IModelProfilesClient>(services, configured.ManagementApi);
         AddClient<AgentsModelApiClient, IAgentsModelClient>(services, configured.ManagementApi);
         AddClient<RuntimeProfilesApiClient, IRuntimeProfilesClient>(services, configured.ManagementApi);
         AddClient<PacksApiClient, IPacksClient>(services, configured.ManagementApi);
         AddClient<ToolsApiClient, IToolsClient>(services, configured.ManagementApi);
+        AddClient<ToolDefinitionsApiClient, IToolDefinitionsClient>(services, configured.ManagementApi);
         AddSensitiveClient<SecretsApiClient, ISecretsClient>(services, configured.ManagementApi);
+        AddClient<ResourceScopeInventoryApiClient, IResourceScopeInventoryClient>(services, configured.ManagementApi);
         AddClient<ManagementApiClient, IAgentRunnerManagementClient>(services, configured.ManagementApi);
         AddClient<RuntimeApiClient, IAgentRunnerRuntimeClient>(services, configured.RuntimeApi);
 

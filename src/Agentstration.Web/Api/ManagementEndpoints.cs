@@ -31,6 +31,7 @@ public static class ManagementEndpoints
         RouteAndExecuteEndpoint.Map(group);
         PackEndpoints.Map(group);
         TriggerEndpoints.Map(group);
+        SourceEndpoints.Map(group);
     }
 }
 

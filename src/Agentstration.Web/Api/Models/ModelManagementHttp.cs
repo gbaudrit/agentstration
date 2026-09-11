@@ -21,6 +21,21 @@ internal static class ModelManagementHttp
                 new Dictionary<string, object?> { ["references"] = exception.Usages });
         }
         catch (ModelProviderValidationException exception) { return Problem("model-provider-invalid", "Invalid model provider", 422, exception.Message); }
+        catch (SourceProviderNotFoundException exception) { return Problem("source-provider-not-found", "Source Provider not found", 404, exception.Message); }
+        catch (SourceProviderInUseException exception)
+        {
+            return Problem("source-provider-in-use", "Source Provider is in use", 409, exception.Message,
+                new Dictionary<string, object?> { ["references"] = exception.Usages });
+        }
+        catch (SourceProviderValidationException exception) { return Problem("source-provider-invalid", "Invalid Source Provider", 422, exception.Message); }
+        catch (SourceRegistryNotFoundException exception) { return Problem("source-registry-not-found", "Source registry not found", 404, exception.Message); }
+        catch (SourceRegistryOperationException exception)
+        {
+            var status = exception.Code == "source_registry_disabled" ? 409 : exception.Unavailable ? 503 : 422;
+            return Problem(exception.Code.Replace('_', '-'), "Source registry operation failed", status, exception.Message);
+        }
+        catch (SourceValidationException exception) { return Problem(exception.Code.Replace('_', '-'), "Invalid Source", 422, exception.Message); }
+        catch (SourceVersionConflictException exception) { return Problem("source-version-conflict", "Source version conflict", 409, exception.Message); }
         catch (ExtensionRegistrationNotFoundException exception) { return Problem("extension-registration-not-found", "Extension registration not found", 404, exception.Message); }
         catch (ExtensionRegistrationInUseException exception) { return Problem("extension-registration-in-use", "Extension registration in use", 409, exception.Message); }
         catch (ExtensionRegistrationValidationException exception) { return Problem("extension-registration-invalid", "Invalid extension registration", 422, exception.Message); }
@@ -38,6 +53,7 @@ internal static class ModelManagementHttp
         }
         catch (RuntimeProfileValidationException exception) { return Problem("runtime-profile-invalid", "Invalid runtime profile", 422, exception.Message); }
         catch (ToolResourceValidationException exception) { return Problem("tool-resource-invalid", "Invalid tool resource", 422, exception.Message); }
+        catch (ToolDefinitionValidationException exception) { return Problem(exception.Code, "Invalid ToolDefinition", 422, exception.Message); }
         catch (ToolExecutionHookValidationException exception) { return Problem("tool-execution-hook-invalid", "Invalid Tool execution hook", 422, exception.Message); }
         catch (ToolProviderDiscoveryFailedException exception) { return Problem("tool-provider-unavailable", "Tool provider unavailable", 503, exception.Message); }
         catch (ModelProfileInUseException exception)
@@ -69,6 +85,12 @@ internal static class ModelManagementHttp
         return Results.Json(stored.Value, statusCode: statusCode);
     }
 
+    public static IResult ResourceResult(StoredResource<SourceProviderResource> stored, HttpResponse response, int statusCode)
+    {
+        response.Headers.ETag = stored.ETag;
+        return Results.Json(stored.Value, statusCode: statusCode);
+    }
+
     public static IResult ResourceResult(StoredResource<ExtensionRegistrationResource> stored, HttpResponse response, int statusCode)
     {
         response.Headers.ETag = stored.ETag;
@@ -88,6 +110,12 @@ internal static class ModelManagementHttp
     }
 
     public static IResult ResourceResult(StoredResource<ToolResource> stored, HttpResponse response, int statusCode)
+    {
+        response.Headers.ETag = stored.ETag;
+        return Results.Json(stored.Value, statusCode: statusCode);
+    }
+
+    public static IResult ResourceResult(StoredResource<ToolDefinitionResource> stored, HttpResponse response, int statusCode)
     {
         response.Headers.ETag = stored.ETag;
         return Results.Json(stored.Value, statusCode: statusCode);

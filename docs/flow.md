@@ -37,7 +37,7 @@ GET    /api/flows/{id}/versions/{version}
 POST   /api/flows/{id}/versions
 ```
 
-Deletion currently removes the logical Flow and its published versions. Direct self-reference is rejected for Composite Flows; indirect recursion analysis is intentionally deferred.
+Deletion currently removes the logical Flow and its published versions. Generic Flow-call steps are validated against published targets in the current Workspace; direct and indirect dependency cycles block publication.
 
 ## Runtime boundary
 

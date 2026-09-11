@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Hosting;
 
@@ -31,6 +32,7 @@ public sealed class BootstrapApplicationLock
 
 public sealed class BootstrapProfileManagementService(
     BootstrapProfileCatalog catalog,
+    SourceBootstrapProfileLoader sourceProfiles,
     DeclarativeBootstrapService bootstrap,
     IIdentityStore identities,
     IPlatformAuthorizationService platformAuthorization,
@@ -79,12 +81,23 @@ public sealed class BootstrapProfileManagementService(
         return await bootstrap.PreviewAsync(selection, cancellationToken);
     }
 
+    public async Task<BootstrapProfileSummary> GetSourceProfileAsync(
+        BootstrapSourceProfileSelection selection,
+        Guid actorPrincipalId,
+        CancellationToken cancellationToken)
+    {
+        await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
+        await using var loaded = await sourceProfiles.LoadAsync(selection, cancellationToken);
+        return loaded.Profiles.Single().Summary;
+    }
+
     public async Task<IReadOnlyList<BootstrapBindingTargetOption>> GetBindingTargetsAsync(
         BootstrapApplicationTarget? target,
         BootstrapBindingTargetKind targetKind,
         IReadOnlyList<string> profiles,
         Guid actorPrincipalId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        BootstrapSourceProfileSelection? source = null)
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
         if (target?.TenantId is null || target.WorkspaceId is null)
@@ -119,7 +132,10 @@ public sealed class BootstrapProfileManagementService(
             BootstrapBindingTargetKind.Secret => ResourceKinds.Secret,
             _ => throw new DeclarativeBootstrapException($"Unsupported bootstrap binding target kind '{targetKind}'.")
         };
-        var planned = (await catalog.LoadAsync(profiles, cancellationToken))
+        await using var loadedSelection = source is null
+            ? new LoadedBootstrapSelection(await catalog.LoadAsync(profiles, cancellationToken))
+            : await sourceProfiles.LoadAsync(source, cancellationToken);
+        var planned = loadedSelection.Profiles
             .SelectMany(profile => profile.Resources)
             .Where(source => string.Equals(source.Resource.Kind, resourceKind, StringComparison.Ordinal))
             .Select(source => new BootstrapBindingTargetOption(
@@ -229,8 +245,7 @@ public sealed class BootstrapProfileManagementService(
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.BootstrapApplication,
             Metadata = new ResourceMetadata { Name = id.ToString("N") },
-            TenantId = preview.Target?.TenantId ?? Guid.Empty,
-            WorkspaceId = preview.Target?.WorkspaceId ?? Guid.Empty,
+            ScopeRef = ApplicationScopeRef(preview),
             Generation = 1,
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Creating },
             Definition = new BootstrapApplicationProperties
@@ -241,12 +256,21 @@ public sealed class BootstrapProfileManagementService(
                 Scope = preview.Scope,
                 Target = preview.Target,
                 Bindings = preview.Bindings,
+                SourceProvenance = preview.SourceProvenance,
                 Digest = preview.Digest,
                 StartedAt = timeProvider.GetUtcNow()
             }
         };
         return await SaveApplicationAsync(resource, null, cancellationToken);
     }
+
+    private static ResourceScopeRef ApplicationScopeRef(BootstrapCompositionPreview preview) => preview.Scope switch
+    {
+        BootstrapProfileScope.Instance => ResourceScopeRef.Instance,
+        BootstrapProfileScope.Tenant when preview.Target?.TenantId is Guid tenantId => ResourceScopeRef.Tenant(tenantId),
+        BootstrapProfileScope.Workspace when preview.Target?.WorkspaceId is Guid workspaceId => ResourceScopeRef.Workspace(workspaceId),
+        _ => throw new DeclarativeBootstrapException($"Bootstrap scope '{preview.Scope}' requires an explicit target.")
+    };
 
     private BootstrapApplicationResource Complete(
         BootstrapApplicationResource application,

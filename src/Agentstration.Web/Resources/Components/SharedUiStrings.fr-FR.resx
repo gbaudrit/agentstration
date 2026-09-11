@@ -2,4 +2,11 @@
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader><resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader><resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="LatestRunEvents" xml:space="preserve"><value>Derniers événements d’exécution</value></data><data name="OpenRunActivity" xml:space="preserve"><value>Ouvrir l’activité des exécutions</value></data><data name="LoadingRunEvents" xml:space="preserve"><value>Chargement des événements d’exécution…</value></data><data name="RunEventsUnavailable" xml:space="preserve"><value>Événements d’exécution indisponibles</value></data><data name="PageNotFound" xml:space="preserve"><value>Page introuvable</value></data><data name="PageNotFoundMessage" xml:space="preserve"><value>La page de Console demandée n’existe pas.</value></data>
+  <data name="ResourceScope.Label" xml:space="preserve"><value>Périmètre</value></data>
+  <data name="ResourceScope.Help" xml:space="preserve"><value>La ressource est visible depuis ce périmètre et ses descendants.</value></data>
+  <data name="ResourceScope.Instance" xml:space="preserve"><value>Instance</value></data>
+  <data name="ResourceScope.Tenant" xml:space="preserve"><value>Tenant</value></data>
+  <data name="ResourceScope.Workspace" xml:space="preserve"><value>Workspace</value></data>
+  <data name="ResourceScope.Loading" xml:space="preserve"><value>Chargement des périmètres…</value></data>
+  <data name="ResourceScope.Unavailable" xml:space="preserve"><value>Aucun périmètre disponible</value></data>
 </root>

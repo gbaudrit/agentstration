@@ -30,7 +30,8 @@ internal static class RuntimeProfileEndpoints
                     profile.Value.Name,
                     profile.Value.Definition,
                     usages.Count,
-                    profile.Value.Namespace.Value));
+                    profile.Value.Namespace.Value,
+                    profile.Value.ScopeRef));
             }
             return Results.Ok(new ValueResponse<RuntimeProfileSummaryResponse>(values));
         });
@@ -52,7 +53,8 @@ internal static class RuntimeProfileEndpoints
                 Metadata = new ResourceMetadata { Name = body.Name, Namespace = ModelManagementHttp.Namespace(body.Namespace) },
                 Kind = ResourceKinds.RuntimeProfile,
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Definition = body.Properties
+                Definition = body.Properties,
+                ScopeRef = body.ScopeRef
             }, cancellationToken);
             response.Headers.Location = $"/api/runtimeprofiles/{Uri.EscapeDataString(stored.Value.Name)}?resourceNamespace={Uri.EscapeDataString(stored.Value.Namespace.Value)}";
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status201Created);

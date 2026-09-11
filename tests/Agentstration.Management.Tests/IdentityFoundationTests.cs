@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Agentstration.Infrastructure;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Resources;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -355,8 +356,7 @@ public sealed class IdentityFoundationTests
         Metadata = new ResourceMetadata { Name = id },
         Kind = ResourceKinds.RuntimeProfile,
         ApiVersion = ManagementApiVersions.CoreV1,
-        TenantId = context.TenantId,
-        WorkspaceId = context.WorkspaceId,
+        ScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId),
         Definition = new RuntimeProfileProperties { DisplayName = "Shared", RuntimeType = "Local" }
     };
 

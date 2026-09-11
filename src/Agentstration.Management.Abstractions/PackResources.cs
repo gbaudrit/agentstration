@@ -60,6 +60,7 @@ public sealed record PackMetadata
 
 public sealed record PackDefinition
 {
+    public ResourceScopeKind TargetScope { get; init; } = ResourceScopeKind.Workspace;
     public IReadOnlyList<string> Resources { get; init; } = [];
     public IReadOnlyList<PackRequirement> Requirements { get; init; } = [];
     public IReadOnlyList<PackBindingRequirement> Bindings { get; init; } = [];
@@ -156,12 +157,32 @@ public sealed record InstalledPackProperties
     public string? Description { get; init; }
     public required string Source { get; init; }
     public PackArtifactReference? SourceArtifact { get; init; }
+    public SourcePackProvenance? SourceProvenance { get; init; }
     public required DateTimeOffset InstalledAt { get; init; }
     public InstalledPackState State { get; init; } = InstalledPackState.Installing;
     public IReadOnlyList<PackBindingResolution> Bindings { get; init; } = [];
     public IReadOnlyList<ManagedPackResource> ManagedResources { get; init; } = [];
     public string? ErrorCode { get; init; }
     public string? ErrorMessage { get; init; }
+}
+
+public sealed record SourcePackProvenance
+{
+    public required Guid SourceUid { get; init; }
+    public required string SourceName { get; init; }
+    public required string SourcePublisher { get; init; }
+    public required Guid SourceVersionUid { get; init; }
+    public required string SourceVersion { get; init; }
+    public required string ManifestDigest { get; init; }
+    public required string Channel { get; init; }
+    public required string ProviderRevision { get; init; }
+    public required Guid SnapshotUid { get; init; }
+    public required string SnapshotDigest { get; init; }
+    public required string CatalogName { get; init; }
+    public required string CatalogPath { get; init; }
+    public required string EntryName { get; init; }
+    public required string EntryPath { get; init; }
+    public SourceRegistryImportProvenance? Registry { get; init; }
 }
 
 public sealed record InstalledPackResource : Resource
@@ -214,6 +235,7 @@ public sealed record PackInstallationPreview(
     bool AlreadyInstalled)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeKind TargetScope { get; init; } = ResourceScopeKind.Workspace;
     public IReadOnlyList<PackBindingPreview> Bindings { get; init; } = [];
     public bool CanInstall => !AlreadyInstalled && Resources.All(resource => !resource.AlreadyExists);
     public bool RequiresConfiguration => Bindings.Any(binding => !binding.IsResolved);

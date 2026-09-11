@@ -1,0 +1,102 @@
+name: agentstration
+
+services:
+  aep-key-provisioner:
+    image: alpine:3.22
+    command: >-
+      sh -ec 'provision() { target="$$1/token"; if [ ! -f "$$target" ]; then temporary="$$target.tmp"; head -c 32 /dev/urandom | base64 | tr -d "\r\n" > "$$temporary"; chmod 600 "$$temporary"; mv "$$temporary" "$$target"; fi; test "$$(wc -c < "$$target")" -ge 32; }; provision /keys/localai; provision /keys/utilities'
+    volumes:
+      - aep-localai-key:/keys/localai
+      - aep-utilities-key:/keys/utilities
+    restart: "no"
+
+  localai:
+    image: ${LOCALAI_IMAGE:-localai/localai:v4.9.0}
+    environment:
+      LOCALAI_API_KEY: ${LOCALAI_API_KEY:-}
+    volumes:
+      - localai-models:/models
+      - localai-data:/data
+
+  localai-extension:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.extension
+      args:
+        PROJECT: src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj
+        ENTRYPOINT_DLL: Agentstration.Extensions.LocalAI.dll
+    depends_on:
+      aep-key-provisioner:
+        condition: service_completed_successfully
+      localai:
+        condition: service_started
+    environment:
+      LocalAI__Endpoint: http://localai:8080
+      LocalAI__ApiKey: ${LOCALAI_API_KEY:-}
+      Aep__EnrollmentMode: SharedKeyFile
+      Aep__SharedKeyFile__Path: /run/aep-key/token
+    volumes:
+      - aep-localai-key:/run/aep-key:ro
+
+  utilities-extension:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.extension
+      args:
+        PROJECT: src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj
+        ENTRYPOINT_DLL: Agentstration.Extensions.Utilities.dll
+    environment:
+      Aep__EnrollmentMode: SharedKeyFile
+      Aep__SharedKeyFile__Path: /run/aep-key/token
+    volumes:
+      - aep-utilities-key:/run/aep-key:ro
+    depends_on:
+      aep-key-provisioner:
+        condition: service_completed_successfully
+
+  agentstration:
+    build:
+      context: ../..
+    depends_on:
+      aep-key-provisioner:
+        condition: service_completed_successfully
+      localai-extension:
+        condition: service_started
+      utilities-extension:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${AGENTSTRATION_HTTP_PORT:-5100}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      AI__Provider: ${AI_PROVIDER:-Managed}
+      Data__Directory: /data
+      Data__ControlPlanePath: /data/control-plane.db
+      Data__WorkPlanePath: /data/work-plane.db
+      Data__FlowPath: /data/flow-plane.db
+      Agentstration__ManagementApi__BaseAddress: http://localhost:8080/
+      Agentstration__RuntimeApi__BaseAddress: http://localhost:8080/
+      Agentstration__WorkApi__BaseAddress: http://localhost:8080/
+      Agentstration__FlowApi__BaseAddress: http://localhost:8080/
+      Agentstration__Aep__Transport__AllowedHttpHosts__0: localai-extension
+      Agentstration__Aep__Transport__AllowedHttpHosts__1: utilities-extension
+      Agentstration__Aep__Transport__AllowedPrivateNetworkHosts__0: localai-extension
+      Agentstration__Aep__Transport__AllowedPrivateNetworkHosts__1: utilities-extension
+      Agentstration__Extensions__Agentstration.Extensions.LocalAI__Endpoint: http://localai-extension:8080
+      Agentstration__Extensions__Agentstration.Extensions.LocalAI__AuthenticationMode: StaticBearer
+      Agentstration__Extensions__Agentstration.Extensions.LocalAI__EnrollmentMode: SharedKeyFile
+      Agentstration__Extensions__Agentstration.Extensions.LocalAI__SharedKeyFile__Path: /run/aep-keys/localai/token
+      Agentstration__Extensions__Agentstration.Extensions.Utilities__Endpoint: http://utilities-extension:8080
+      Agentstration__Extensions__Agentstration.Extensions.Utilities__AuthenticationMode: StaticBearer
+      Agentstration__Extensions__Agentstration.Extensions.Utilities__EnrollmentMode: SharedKeyFile
+      Agentstration__Extensions__Agentstration.Extensions.Utilities__SharedKeyFile__Path: /run/aep-keys/utilities/token
+    volumes:
+      - agentstration-data:/data
+      - aep-localai-key:/run/aep-keys/localai:ro
+      - aep-utilities-key:/run/aep-keys/utilities:ro
+
+volumes:
+  agentstration-data:
+  localai-models:
+  localai-data:
+  aep-localai-key:
+  aep-utilities-key:

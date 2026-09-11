@@ -152,5 +152,70 @@ public sealed partial class FlowTests
         Assert.AreEqual("simulated agent failure", completed.Error?.Message);
     }
 
+    [TestMethod]
+    public async Task GraphToolStepMapsArgumentsAndExposesItsOutput()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new ToolFlowStepDefinition
+                {
+                    Name = "notify",
+                    Tool = new("notification.send"),
+                    ArgumentsMapping = JsonSerializer.SerializeToElement(new { message = "${input.message}" })
+                },
+                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.notify.output}") }
+            ],
+            Transitions =
+            [
+                new("input-notify", "input", "completed", "notify"),
+                new("notify-output", "notify", "completed", "output")
+            ]
+        };
+        var now = TimeProvider.System.GetUtcNow();
+        var draft = new FlowDraft { WorkspaceId = TestScope.WorkspaceId, Id = "tool-draft", FlowId = new("tool-run"), DisplayName = "Tool run", Definition = graph, CreatedAt = now, UpdatedAt = now };
+        var tool = new RecordingFlowToolExecutor();
+        var expressions = new FlowExpressionParser();
+        var runs = new FlowRunService(
+            fixture.Repository,
+            new TestFlowRunQueue(),
+            new TestCancellationRegistry(),
+            new TestAgentExecutor(),
+            new UnsupportedFlowOrchestrationEngine(),
+            expressions,
+            expressions,
+            new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(),
+            TimeProvider.System,
+            configuredToolExecutor: tool);
+        using var input = JsonDocument.Parse("""{"message":"A new article is available."}""");
+
+        var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", "tool-correlation", input.RootElement, TestScope, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
+
+        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
+        Assert.AreEqual("sent", completed.Output?.GetString());
+        Assert.AreEqual("A new article is available.", tool.Request!.Arguments.GetProperty("message").GetString());
+        Assert.AreEqual("notify", tool.Request.StepName);
+        Assert.AreEqual(1, tool.Request.Attempt);
+        Assert.AreEqual(TestScope, tool.Request.Scope);
+    }
+
+    private sealed class RecordingFlowToolExecutor : IFlowToolExecutor
+    {
+        public FlowToolExecutionRequest? Request { get; private set; }
+
+        public Task<JsonElement?> ExecuteAsync(FlowToolExecutionRequest request, CancellationToken cancellationToken)
+        {
+            Request = request;
+            return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement("sent"));
+        }
+    }
+
 }
 

@@ -1,0 +1,709 @@
+@page "/settings/sources"
+@page "/settings/sources/{Publisher}/{Name}"
+@implements IDisposable
+@using System.Globalization
+@using Agentstration.Management.Core
+@inject SourceConsoleManagementService Service
+@inject IServiceProvider Services
+@inject ICurrentRequestContext RequestContext
+@inject TimeProvider Clock
+@inject NavigationManager Navigation
+@inject NotificationState Notifications
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SourcesStrings> Localizer
+
+<PageTitle>@T("PageTitle")</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")">
+    <Actions>
+        @if (detail is not null)
+        {
+            <a class="button-secondary" href="/settings/sources">@T("AllSources")</a>
+            <button class="button-danger" disabled="@busy" @onclick="() => confirmDeleteSource = true">@T("DeleteSource")</button>
+            <button class="button-primary" disabled="@(busy || detail.Source.Configuration.Definition.Origin is null)" title="@(detail.Source.Configuration.Definition.Origin is null ? T("PastedSourceCannotRefresh") : null)" @onclick="RefreshSourceAsync">@T("RefreshSource")</button>
+        }
+        else
+        {
+            <a class="button-secondary" href="/settings/source-registries/discovery">@T("DiscoverFromRegistries")</a>
+            <button class="button-primary" disabled="@busy" @onclick="() => importing = !importing">@T("ImportSource")</button>
+        }
+    </Actions>
+</PageHeader>
+
+@if (denied)
+{
+    <ErrorState Title="@T("PlatformAdministratorRequired")" Message="@T("PlatformAdministratorRequiredMessage")" />
+}
+else if (error is not null)
+{
+    <ErrorState Message="@error"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
+}
+else if (busy && sources is null && detail is null)
+{
+    <LoadingState Message="@T("Loading")" />
+}
+else if (detail is null)
+{
+    @if (importing)
+    {
+        <section class="panel source-import">
+            <div class="panel-header"><div><p class="eyebrow">@T("NewSource")</p><h2>@T("ImportSource")</h2><p>@T("ImportDescription")</p></div></div>
+            <div class="source-import-tabs" role="tablist" aria-label="@T("ImportMethod")">
+                <button class="text-button @(importMode == "url" ? "active" : null)" type="button" @onclick='() => SetImportMode("url")'>@T("FromUrl")</button>
+                <button class="text-button @(importMode == "yaml" ? "active" : null)" type="button" @onclick='() => SetImportMode("yaml")'>@T("PasteYaml")</button>
+            </div>
+            <div class="form-grid">
+                <ResourceScopeFormField ResourceKind="@ResourceKinds.Source" @bind-Value="importScope" Disabled="@busy" />
+                @if (importMode == "url")
+                {
+                    <label class="form-wide"><span>@T("ManifestUrl")</span><input @bind="importUrl" type="url" placeholder="https://example.org/source.yaml" disabled="@busy" /></label>
+                }
+                else
+                {
+                    <label class="form-wide"><span>@T("ManifestYaml")</span><textarea @bind="importYaml" rows="13" spellcheck="false" disabled="@busy"></textarea></label>
+                }
+            </div>
+            <div class="panel-actions"><button class="button-primary" disabled="@(!CanImport || busy)" @onclick="ImportAsync">@(busy ? T("Importing") : T("Import"))</button><button class="button-secondary" disabled="@busy" @onclick="() => importing = false">@T("Cancel")</button></div>
+        </section>
+    }
+
+    <section class="metric-grid source-metrics" aria-label="@T("SourceSummary")">
+        <MetricCard Label="@T("Sources")" Value="@FilteredSources.Count.ToString()" Detail="@T("ReusableCatalogs")" Status="UiStatus.Info" />
+        <MetricCard Label="@T("Versions")" Value="@(sources?.Sum(value => value.Source.VersionCount).ToString() ?? "0")" Detail="@T("ImmutableHistory")" Status="UiStatus.Neutral" />
+        <MetricCard Label="@T("Healthy")" Value="@(sources?.Count(IsHealthy).ToString() ?? "0")" Detail="@T("LastImportSucceeded")" Status="UiStatus.Success" />
+    </section>
+
+    <section class="panel">
+        <div class="panel-header"><div><p class="eyebrow">@T("Distribution")</p><h2>@T("AvailableSources")</h2><p>@T("AvailableSourcesDescription")</p></div><button class="button-secondary" disabled="@busy" @onclick="LoadAsync">@T("Refresh")</button></div>
+        <label class="source-search"><span>@T("Search")</span><input @bind="search" @bind:event="oninput" placeholder="@T("SearchPlaceholder")" /></label>
+        @if (FilteredSources.Count == 0)
+        {
+            <EmptyState Title="@T("NoSources")" Message="@T("NoSourcesMessage")" />
+        }
+        else
+        {
+            <div class="source-table">
+                <DataGrid TItem="SourceConsoleListItem" Items="FilteredSources">
+                    <Header><tr><th>@T("Source")</th><th>@T("OwnershipScope")</th><th>@T("Origin")</th><th>@T("LatestImport")</th><th>@T("Health")</th><th></th></tr></Header>
+                    <Row Context="item"><tr>
+                        <td><a class="resource-name-link" href="@SourceUrl(item)">@item.Source.Configuration.Definition.DisplayName</a><br /><code>@item.Source.Source.Definition.Publisher/@item.Source.Source.Name</code></td>
+                        <td><ResourceScopeBadge ScopeRef="@item.Source.Source.ScopeRef" Compact /></td>
+                        <td>@if (item.Source.Configuration.Definition.Origin is { } origin) { <a class="text-link source-origin" href="@origin.Url" target="_blank" rel="noopener noreferrer" title="@origin.Url">@origin.Url</a> } else { <span class="source-origin">@T("PastedManifest")</span> }</td>
+                        <td><strong>@(item.LatestVersion?.Definition.Version ?? "—")</strong><br /><small>@item.Source.Observed.Definition.LastAttemptAt.ToLocalTime().ToString("g") · @F("VersionCount", item.Source.VersionCount)</small></td>
+                        <td><StatusBadge Text="@ImportOutcome(item.Source.Observed.Definition.LastOutcome)" Status="@(IsHealthy(item) ? UiStatus.Success : UiStatus.Danger)" /></td>
+                        <td><a class="text-link" href="@SourceUrl(item)">@T("Open") →</a></td>
+                    </tr></Row>
+                </DataGrid>
+            </div>
+        }
+    </section>
+}
+else
+{
+    <section class="source-heading panel">
+        <div>
+            <p class="eyebrow">@detail.Source.Source.Definition.Publisher / @detail.Source.Source.Name</p>
+            <div class="source-title"><h2>@detail.Source.Configuration.Definition.DisplayName</h2><ResourceScopeBadge ScopeRef="@detail.Source.Source.ScopeRef" /></div>
+            <p>@(detail.SelectedVersion.Definition.PublishedDefinition.Description ?? T("NoDescription"))</p>
+        </div>
+        <StatusBadge Text="@VerificationLabel(detail.Verification.Status)" Status="@VerificationTone(detail.Verification.Status)" />
+    </section>
+
+    <nav class="section-tabs source-tabs" role="tablist" aria-label="@T("SourceDetails")">
+        @foreach (var tab in Enum.GetValues<PageTab>())
+        {
+            <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="source-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@TabLabel(tab)</button>
+        }
+    </nav>
+    <main id="source-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
+    @if (activeTab == PageTab.Overview)
+    {
+        <section class="source-detail-grid">
+        <article class="panel">
+            <div class="panel-header"><div><p class="eyebrow">@T("LocalConfiguration")</p><h2>@T("DisplayName")</h2><p>@T("DisplayNameDescription")</p></div></div>
+            <label><span>@T("DisplayName")</span><input @bind="displayName" disabled="@busy" /></label>
+            <div class="panel-actions"><button class="button-primary" disabled="@(busy || string.IsNullOrWhiteSpace(displayName))" @onclick="SaveDisplayNameAsync">@T("Save")</button></div>
+        </article>
+        <article class="panel">
+            <div class="panel-header"><div><p class="eyebrow">@T("PublishedIdentity")</p><h2>@T("Publisher")</h2></div></div>
+            <dl class="resource-details"><dt>@T("Declared")</dt><dd>@PublisherLabel(detail.Verification.DeclaredPublisher)</dd><dt>@T("Verified")</dt><dd>@(detail.Verification.VerifiedPublisher is null ? T("NotVerified") : PublisherLabel(detail.Verification.VerifiedPublisher))</dd><dt>@T("ManifestDigest")</dt><dd><code>@Short(detail.SelectedVersion.Definition.ManifestDigest)</code></dd></dl>
+        </article>
+        <article class="panel">
+            <div class="panel-header"><div><p class="eyebrow">@T("SourceActivity")</p><h2>@T("ImportStatus")</h2><p>@T("ImportStatusDescription")</p></div><StatusBadge Text="@ImportOutcome(detail.Source.Observed.Definition.LastOutcome)" Status="@(IsHealthy(detail.Source) ? UiStatus.Success : UiStatus.Danger)" /></div>
+            <dl class="resource-details">
+                <dt>@T("Origin")</dt><dd>@if (detail.Source.Configuration.Definition.Origin is { } sourceOrigin) { <a class="text-link detail-origin" href="@sourceOrigin.Url" target="_blank" rel="noopener noreferrer">@sourceOrigin.Url</a> } else { @T("PastedManifest") }</dd>
+                <dt>@T("SelectedVersion")</dt><dd><button class="text-button version-link" type="button" @onclick="() => activeTab = PageTab.Versions">@detail.SelectedVersion.Definition.Version</button> <code>@Short(detail.SelectedVersion.Definition.ManifestDigest)</code></dd>
+                <dt>@T("LastSuccessfulImport")</dt><dd>@LastSuccessfulImport()</dd>
+                <dt>@T("LastAttempt")</dt><dd>@detail.Source.Observed.Definition.LastAttemptAt.ToLocalTime().ToString("g")</dd>
+            </dl>
+            @if (detail.Source.Observed.Definition.ErrorMessage is { } importError) { <p class="inline-warning">@importError</p> }
+        </article>
+        @{ var nextRefresh = NextRefresh(); }
+        <article class="panel refresh-overview-panel">
+            <div class="panel-header"><div><p class="eyebrow">@T("Automation")</p><h2>@T("NextRefresh")</h2><p>@T("NextRefreshDescription")</p></div><button class="text-button" type="button" @onclick="() => activeTab = PageTab.Scheduling">@T("ConfigureScheduling") →</button></div>
+            @if (nextRefresh is null)
+            {
+                <p class="refresh-overview-empty">@T("NoRefreshScheduled")</p>
+            }
+            else
+            {
+                <div class="refresh-overview-value"><strong>@NextRefreshDate(nextRefresh)</strong><span>@nextRefresh.Target</span></div>
+            }
+        </article>
+        </section>
+    }
+    else if (activeTab == PageTab.Versions)
+    {
+
+        <section class="panel">
+        <div class="panel-header"><div><p class="eyebrow">@T("ImmutableHistory")</p><h2>@T("Versions")</h2><p>@T("VersionHistoryDescription")</p></div></div>
+        <div class="version-strip">
+            @foreach (var version in detail.Versions)
+            {
+                <button type="button" class="version-card @(version.Uid == detail.SelectedVersion.Uid ? "selected" : null)" @onclick="() => SelectVersion(version.Uid)"><strong>@version.Definition.Version</strong><small>@version.Definition.ImportedAt.ToLocalTime().ToString("g")</small><code>@Short(version.Definition.ManifestDigest)</code></button>
+            }
+        </div>
+        </section>
+    }
+    else if (activeTab == PageTab.Bindings)
+    {
+
+        <section class="panel">
+        <div class="panel-header"><div><p class="eyebrow">@T("ProviderRouting")</p><h2>@T("Bindings")</h2><p>@T("BindingsDescription")</p></div><StatusBadge Text="@(detail.Bindings.Ready ? T("Ready") : T("NeedsConfiguration"))" Status="@(detail.Bindings.Ready ? UiStatus.Success : UiStatus.Warning)" /></div>
+        @if (detail.Bindings.Bindings.Count == 0) { <p>@T("NoBindings")</p> }
+        else
+        {
+            @if (detail.Providers.Count == 0) { <div class="form-alert form-alert-warning"><span>@T("NoConfiguredProviders")</span><a class="text-link" href="@ConfigureProviderUrl()">@T("ConfigureProvider") →</a></div> }
+            <div class="binding-grid">
+                @foreach (var binding in detail.Bindings.Bindings)
+                {
+                    <article class="binding-card">
+                        <header>
+                            <span class="binding-identity"><span class="binding-icon" aria-hidden="true"><UiIcon Name="database" /></span><strong>@binding.Name</strong></span>
+                            <span class="binding-channels">@foreach (var channel in binding.Channels) { <code>@channel</code> }</span>
+                        </header>
+                        <label><span class="sr-only">@T("SelectProvider")</span><select value="@BindingValue(binding)" @onchange="args => SetBinding(binding, args)" disabled="@busy"><option value="">@T("SelectProvider")</option>@foreach (var provider in CompatibleProviders(binding.TargetKind)) { <option value="@ProviderValue(provider.Value)">@provider.Value.Definition.DisplayName — @provider.Value.Namespace/@provider.Value.Name</option> }@foreach (var candidate in CompatibleProviderCandidates(binding.TargetKind)) { <option value="@CandidateValue(candidate)">@F("DiscoveredProvider", candidate.DisplayName, candidate.ContributionId)</option> }</select></label>
+                        @if (binding.Issues.Count > 0) { <small class="inline-warning">@string.Join(" ", binding.Issues.Select(value => value.Message))</small> }
+                    </article>
+                }
+            </div>
+            <div class="panel-actions"><button class="button-primary" disabled="@busy" @onclick="SaveBindingsAsync">@T("SaveBindings")</button></div>
+        }
+        </section>
+    }
+    else if (activeTab == PageTab.Scheduling)
+    {
+        <section class="panel">
+        <div class="panel-header"><div><p class="eyebrow">@T("Automation")</p><h2>@T("RefreshScheduling")</h2><p>@T("RefreshSchedulingDescription")</p></div></div>
+        <div class="refresh-policy-grid">
+            <article class="refresh-policy-card">
+                <header><div><h3>@T("SourceDefinitionRefresh")</h3><p>@T("SourceDefinitionRefreshDescription")</p></div><label class="switch-field"><input type="checkbox" @bind="sourceRefresh.Enabled" disabled="@(busy || detail.Source.Configuration.Definition.Origin is null)" /><span>@T("Enabled")</span></label></header>
+                @if (detail.Source.Configuration.Definition.Origin is null) { <p class="inline-warning">@T("PastedSourceCannotSchedule")</p> }
+                <p class="refresh-observed">@F("LastSourceRefreshStatus", detail.Source.Observed.Definition.LastAttemptAt.ToLocalTime().ToString("g"), ImportOutcome(detail.Source.Observed.Definition.LastOutcome))</p>
+                @if (detail.Source.Observed.Definition.ErrorMessage is { } sourceRefreshError) { <p class="inline-warning">@RefreshError(detail.Source.Observed.Definition.ErrorCode, sourceRefreshError)</p> }
+                <div class="refresh-policy-fields"><label><span>@T("IntervalMinutes")</span><input type="number" min="1" max="10080" @bind="sourceRefresh.IntervalMinutes" disabled="@busy" /></label><label><span>@T("TimeoutSeconds")</span><input type="number" min="1" max="300" @bind="sourceRefresh.TimeoutSeconds" disabled="@busy" /></label><label><span>@T("MaximumAttempts")</span><input type="number" min="1" max="10" @bind="sourceRefresh.MaximumAttempts" disabled="@busy" /></label><label><span>@T("InitialBackoffSeconds")</span><input type="number" min="1" max="3600" @bind="sourceRefresh.InitialBackoffSeconds" disabled="@busy" /></label><label><span>@T("MaximumBackoffSeconds")</span><input type="number" min="1" max="86400" @bind="sourceRefresh.MaximumBackoffSeconds" disabled="@busy" /></label><label><span>@T("JitterSeconds")</span><input type="number" min="0" max="3600" @bind="sourceRefresh.JitterSeconds" disabled="@busy" /></label></div>
+            </article>
+            <article class="refresh-policy-card">
+                <header><div><h3>@T("ChannelRefreshDefaults")</h3><p>@T("ChannelRefreshDefaultsDescription")</p></div><label class="switch-field"><input type="checkbox" @bind="channelRefresh.Enabled" disabled="@busy" /><span>@T("Enabled")</span></label></header>
+                <div class="refresh-policy-fields"><label><span>@T("IntervalMinutes")</span><input type="number" min="1" max="10080" @bind="channelRefresh.IntervalMinutes" disabled="@busy" /></label><label><span>@T("TimeoutSeconds")</span><input type="number" min="1" max="300" @bind="channelRefresh.TimeoutSeconds" disabled="@busy" /></label><label><span>@T("MaximumAttempts")</span><input type="number" min="1" max="10" @bind="channelRefresh.MaximumAttempts" disabled="@busy" /></label><label><span>@T("InitialBackoffSeconds")</span><input type="number" min="1" max="3600" @bind="channelRefresh.InitialBackoffSeconds" disabled="@busy" /></label><label><span>@T("MaximumBackoffSeconds")</span><input type="number" min="1" max="86400" @bind="channelRefresh.MaximumBackoffSeconds" disabled="@busy" /></label><label><span>@T("JitterSeconds")</span><input type="number" min="0" max="3600" @bind="channelRefresh.JitterSeconds" disabled="@busy" /></label></div>
+            </article>
+        </div>
+        @if (detail.SelectedVersion.Definition.PublishedDefinition.Channels.Count > 0)
+        {
+            <div class="channel-overrides"><div><h3>@T("ChannelOverrides")</h3><p>@T("ChannelOverridesDescription")</p></div>
+            @foreach (var channel in detail.SelectedVersion.Definition.PublishedDefinition.Channels)
+            {
+                var editor = channelRefreshOverrides[channel.Name];
+                <article class="channel-override-card"><header><strong>@channel.Name</strong><label class="switch-field"><input type="checkbox" @bind="editor.Custom" disabled="@busy" /><span>@T("CustomPolicy")</span></label></header>
+                @if (editor.Custom) { <div class="refresh-policy-fields compact"><label class="switch-field"><input type="checkbox" @bind="editor.Enabled" disabled="@busy" /><span>@T("Enabled")</span></label><label><span>@T("IntervalMinutes")</span><input type="number" min="1" max="10080" @bind="editor.IntervalMinutes" disabled="@busy" /></label><label><span>@T("TimeoutSeconds")</span><input type="number" min="1" max="300" @bind="editor.TimeoutSeconds" disabled="@busy" /></label><label><span>@T("MaximumAttempts")</span><input type="number" min="1" max="10" @bind="editor.MaximumAttempts" disabled="@busy" /></label><label><span>@T("InitialBackoffSeconds")</span><input type="number" min="1" max="3600" @bind="editor.InitialBackoffSeconds" disabled="@busy" /></label><label><span>@T("MaximumBackoffSeconds")</span><input type="number" min="1" max="86400" @bind="editor.MaximumBackoffSeconds" disabled="@busy" /></label><label><span>@T("JitterSeconds")</span><input type="number" min="0" max="3600" @bind="editor.JitterSeconds" disabled="@busy" /></label></div> }
+                </article>
+            }
+            </div>
+        }
+        <div class="panel-actions"><button class="button-primary" disabled="@busy" @onclick="SaveRefreshPolicyAsync">@T("SaveScheduling")</button></div>
+        </section>
+    }
+    @if (activeTab == PageTab.Overview)
+    {
+
+        <section class="panel">
+        <div class="panel-header"><div><p class="eyebrow">@T("Content")</p><h2>@T("ChannelsAndCatalogs")</h2><p>@T("ChannelsDescription")</p></div></div>
+        @if (detail.Channels.Count == 0) { <EmptyState Title="@T("NoChannels")" Message="@T("NoChannelsMessage")" /> }
+        @foreach (var channel in DisplayedChannels)
+        {
+            <article class="channel-card">
+                <header><div>@if (detail.Channels.Count > 1) { <label class="channel-selector"><span>@T("Channel")</span><select value="@selectedChannelName" @onchange="SelectChannel" aria-label="@T("SelectChannel")">@foreach (var option in detail.Channels) { <option value="@option.Definition.Name">@option.Definition.Name</option> }</select></label> } else { <h3>@channel.Definition.Name</h3> }<p>@F("ChannelContract", channel.Definition.Provider.Binding, channel.Definition.Configuration.OptionSet, channel.Definition.Configuration.Version)</p></div><div class="channel-actions"><StatusBadge Text="@CompatibilityLabel(channel.Status.Compatibility.Status)" Status="@CompatibilityTone(channel.Status.Compatibility.Status)" /><button class="button-secondary" disabled="@(busy || channel.Status.Compatibility.Status != SourceChannelCompatibilityStatus.Compatible || !detail.Bindings.Ready)" @onclick="() => RefreshChannelAsync(channel.Definition.Name)">@T("RefreshChannel")</button></div></header>
+                <dl class="resource-details channel-details">
+                    <dt>@T("Provider")</dt><dd>@if (channel.CurrentSnapshot is { } providerSnapshot) { <a class="text-link" href="@SourceProviderUrl(providerSnapshot.Definition.Provider)">@providerSnapshot.Definition.Provider.Namespace/@providerSnapshot.Definition.Provider.Name</a><small>@F("ProviderGeneration", providerSnapshot.Definition.Provider.ContributionId, providerSnapshot.Definition.Provider.Generation)</small> } else { @T("PendingMaterialization") }</dd>
+                    <dt>@T("Compatibility")</dt><dd>@CompatibilityLabel(channel.Status.Compatibility.Status)</dd>
+                    <dt>@T("LastAttempt")</dt><dd>@(channel.Status.Refresh is null ? T("Never") : channel.Status.Refresh.Definition.LastAttemptAt.ToLocalTime().ToString("g"))</dd>
+                    <dt>@T("Result")</dt><dd>@(channel.Status.Refresh is null ? "—" : RefreshOutcome(channel.Status.Refresh.Definition.LastOutcome))</dd>
+                    <dt>@T("ResolvedRevision")</dt><dd><code>@(channel.CurrentSnapshot is null ? "—" : channel.CurrentSnapshot.Definition.ResolvedRevision)</code></dd>
+                    <dt>@T("Snapshot")</dt><dd>@if (channel.CurrentSnapshot is { } currentSnapshot) { <code>@currentSnapshot.Uid.ToString("D")</code><small>@Short(currentSnapshot.Definition.Artifact.Sha256)</small> } else { <text>—</text> }</dd>
+                    <dt>@T("Verified")</dt><dd>@(channel.Verification is null ? "—" : VerificationLabel(channel.Verification.Status))</dd>
+                </dl>
+                @if (channel.Status.Compatibility.Status != SourceChannelCompatibilityStatus.Compatible && channel.Status.Compatibility.Reason is { } compatibilityReason) { <p class="inline-warning">@RefreshError(channel.Status.Compatibility.ReasonCode, compatibilityReason)</p> }
+                @if (channel.Status.Refresh?.Definition.ErrorMessage is { } refreshError) { <p class="inline-warning">@RefreshError(channel.Status.Refresh.Definition.ErrorCode, refreshError)</p> }
+                @if (channel.CatalogFailure is { } catalogFailure)
+                {
+                    <div class="catalog-failure" role="alert">
+                        <UiIcon Name="alert-triangle" />
+                        <span><strong>@T("CatalogUnavailable")</strong><small>@catalogFailure.Message</small><code>@catalogFailure.Code</code></span>
+                    </div>
+                }
+                @if (channel.Catalogs.Count > 0)
+                {
+                    <div class="catalog-toolbar"><h4>@T("Catalogs")</h4><label><span>@T("ContentLanguage")</span><select value="@catalogLocale" @onchange="ChangeLocaleAsync">@foreach (var locale in AvailableCatalogLocales(channel)) { <option value="@locale">@LocaleLabel(channel, locale)</option> }</select></label></div>
+                    @foreach (var catalog in channel.Catalogs)
+                    {
+                        <section class="catalog-card"><div><strong>@catalog.DisplayName</strong><small><code>@catalog.Provenance.CatalogKind/@catalog.Provenance.CatalogName</code> · @catalog.Provenance.CatalogPath</small>@if (catalog.Description is not null) { <p>@catalog.Description</p> }</div>
+                            @foreach (var entry in catalog.BootstrapEntries)
+                            {
+                                <div class="catalog-entry"><span><strong>@entry.Name</strong><small>@F("Locales", string.Join(", ", entry.Variants.Select(value => value.Locale))) · @F("SelectedLocale", entry.ResolvedLocale)@if (entry.ResolvedLocale != catalogLocale) { <em> · @F("FallbackFrom", catalogLocale)</em> }</small><code>@entry.ResolvedPath</code></span><a class="button-primary" href="@BootstrapUrl(channel, catalog, entry)">@T("PreviewAndApply")</a></div>
+                            }
+                            @foreach (var entry in catalog.PackEntries)
+                            {
+                                <div class="catalog-entry"><span><strong>@if (IsPackInstalled(entry)) { <a class="text-link" href="@PackUrl(entry)">@(entry.DisplayName ?? entry.Name)</a> } else { @(entry.DisplayName ?? entry.Name) }</strong><small>@entry.Description</small><code>@entry.Path</code></span><div class="catalog-entry-actions"><button class="button-secondary" disabled="@busy" @onclick="() => PreviewPackAsync(channel, catalog, entry)">@(IsPackInstalled(entry) ? T("ReinstallPack") : T("InstallPack"))</button></div></div>
+                            }
+                        </section>
+                    }
+                }
+            </article>
+        }
+        </section>
+    }
+    </main>
+}
+
+@if (confirmDeleteSource && detail is not null)
+{
+    <div class="dialog-backdrop" role="presentation" @onclick="CloseDeleteSource">
+        <section class="dialog source-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="source-delete-title" @onclick:stopPropagation="true">
+            <div class="panel-header"><div><p class="eyebrow">@detail.Source.Source.Definition.Publisher / @detail.Source.Source.Name</p><h2 id="source-delete-title">@T("DeleteSourceTitle")</h2></div><button class="icon-button" @onclick="CloseDeleteSource" aria-label="@T("Close")">×</button></div>
+            <p>@T("DeleteSourceDescription")</p>
+            <div class="source-delete-retention" role="note">@T("DeleteSourceRetainsPacks")</div>
+            @if (deleteError is not null) { <p class="error-panel" role="alert">@deleteError</p> }
+            <div class="dialog-actions"><button class="button-secondary" disabled="@deletingSource" @onclick="CloseDeleteSource">@T("Cancel")</button><button class="button-danger" disabled="@deletingSource" @onclick="DeleteSourceAsync">@(deletingSource ? T("DeletingSource") : T("ConfirmDeleteSource"))</button></div>
+        </section>
+    </div>
+}
+
+@if (packSelection is not null)
+{
+    <div class="dialog-backdrop" role="presentation" @onclick="ClosePackPreview">
+        <section class="dialog source-pack-dialog" role="dialog" aria-modal="true" aria-labelledby="source-pack-title" @onclick:stopPropagation="true">
+            <div class="panel-header"><div><p class="eyebrow">@T("PinnedSourcePack")</p><h2 id="source-pack-title">@(reinstallPack ? T("ReinstallPack") : T("InstallPack"))</h2></div><button class="icon-button" @onclick="ClosePackPreview" aria-label="@T("Close")">×</button></div>
+            @if (packPreviewing) { <LoadingState Message="@T("ValidatingPack")" /> }
+            @if (packError is not null) { <p class="error-panel" role="alert">@packError</p> }
+            @if (packPreview is not null)
+            {
+                <div class="source-pack-summary"><div><strong>@(packPreview.Metadata.DisplayName ?? packPreview.Metadata.Name)</strong><small><code>@packPreview.Metadata.Publisher/@packPreview.Metadata.Name</code> · @packPreview.Metadata.Version</small></div><ResourceScopeBadge ScopeRef="@PackTargetScope()" /></div>
+                @if (!string.IsNullOrWhiteSpace(packPreview.Metadata.Description))
+                {
+                    <div class="source-pack-description"><span>@T("PublishedPackDescription")</span><p>@packPreview.Metadata.Description</p></div>
+                }
+                <p class="pack-pin"><UiIcon Name="pin" /><span>@F("PinnedSourceSelectionMessage", sourcePackPreview!.Pin.SourceVersion, Short(sourcePackPreview.Pin.ManifestDigest), sourcePackPreview.Pin.Channel, Short(sourcePackPreview.Pin.SnapshotUid.ToString("D")), sourcePackPreview.Pin.EntryName)</span></p>
+                @if (packPreview.Bindings.Count > 0)
+                {
+                    <section class="source-pack-bindings"><h3>@T("PackBindingsTitle")</h3><p>@T("PackBindingsHelp")</p>
+                    @foreach (var binding in packPreview.Bindings)
+                    {
+                        <label class="source-pack-binding"><span class="source-pack-binding-heading"><span><strong>@BindingKindLabel(binding.TargetKind)</strong><small><code>@binding.Name</code></small></span><StatusBadge Text="@(binding.Required ? T("Required") : T("Optional"))" Status="@(binding.Required ? UiStatus.Info : UiStatus.Neutral)" /></span><select value="@PackBindingValue(binding.Name)" @onchange="args => SetPackBindingAsync(binding.Name, args)"><option value="">@F("SelectPackBindingTarget", BindingKindLabel(binding.TargetKind).ToLowerInvariant())</option>@if (binding.TargetKind == PackBindingTargetKind.ModelProfile) { @foreach (var item in packModelProfiles) { <option value="@BindingValue(item.Name, ResourceNamespace.Parse(item.Namespace))">@item.Properties.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.ModelProvider) { @foreach (var item in packModelProviders) { <option value="@BindingValue(item.Name, ResourceNamespace.Default)">@item.Properties.DisplayName — default/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.RuntimeProfile) { @foreach (var item in packRuntimeProfiles) { <option value="@BindingValue(item.Name, ResourceNamespace.Parse(item.Namespace))">@item.Properties.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.ExtensionRegistration) { @foreach (var item in packExtensions) { <option value="@BindingValue(item.Name, item.Namespace)">@item.Definition.DisplayName — @item.Namespace/@item.Name</option> } } else { @foreach (var item in packSecrets) { <option value="@BindingValue(item.Resource.Name, item.Resource.Namespace)">@item.Resource.Definition.DisplayName — @item.Resource.Namespace/@item.Resource.Name</option> } }</select></label>
+                    }
+                    </section>
+                }
+                @if (packPreview.AlreadyInstalled) { <label class="replace-pack"><input type="checkbox" checked="@replacePack" @onchange="SetReplacePackAsync" /> @T("ReplaceInstalledPack")</label> }
+                <section class="source-pack-resources"><header><strong>@PackResourceCount(packPreview.Resources.Count)</strong></header><div>@foreach (var resource in packPreview.Resources) { <article><span><strong>@resource.Name</strong><small>@resource.Kind</small></span><StatusBadge Text="@T($"Change.{resource.Change}")" Status="@ChangeTone(resource.Change)" /></article> }</div></section>
+            }
+            <div class="dialog-actions"><button class="button-secondary" @onclick="ClosePackPreview">@T("Cancel")</button><button class="button-primary" disabled="@(!CanInstallPack)" @onclick="InstallPackAsync">@(packInstalling ? T("InstallingPack") : reinstallPack ? T("ConfirmReinstallPack") : T("ConfirmInstallPack"))</button></div>
+        </section>
+    </div>
+}
+
+@code {
+    [Parameter] public string? Publisher { get; set; }
+    [Parameter] public string? Name { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
+    [SupplyParameterFromQuery(Name = "versionUid")] public Guid? VersionUid { get; set; }
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<SourceConsoleListItem>? sources;
+    private SourceConsoleDetailView? detail;
+    private readonly Dictionary<string, SourceConsoleBindingSelection> bindingSelections = new(StringComparer.Ordinal);
+    private string search = string.Empty;
+    private string displayName = string.Empty;
+    private RefreshPolicyForm sourceRefresh = new();
+    private RefreshPolicyForm channelRefresh = new();
+    private readonly Dictionary<string, RefreshPolicyForm> channelRefreshOverrides = new(StringComparer.Ordinal);
+    private string catalogLocale = string.IsNullOrWhiteSpace(CultureInfo.CurrentUICulture.Name)
+        ? "en-US"
+        : CultureInfo.CurrentUICulture.Name;
+    private string importMode = "url";
+    private string importUrl = string.Empty;
+    private string importYaml = string.Empty;
+    private ResourceScopeRef? importScope;
+    private bool importing;
+    private bool busy;
+    private bool denied;
+    private string? error;
+    private SourcePackSelection? packSelection;
+    private SourcePackInstallationPreview? sourcePackPreview;
+    private PackInstallationPreview? packPreview => sourcePackPreview?.Pack;
+    private readonly Dictionary<string, string> packBindingSelections = new(StringComparer.Ordinal);
+    private IReadOnlyList<ModelProfileSummaryResponse> packModelProfiles = [];
+    private IReadOnlyList<ModelProviderResponse> packModelProviders = [];
+    private IReadOnlyList<RuntimeProfileSummaryResponse> packRuntimeProfiles = [];
+    private IReadOnlyList<ExtensionRegistrationResource> packExtensions = [];
+    private IReadOnlyList<SecretResponse> packSecrets = [];
+    private string? packError;
+    private bool packPreviewing;
+    private bool packInstalling;
+    private bool replacePack;
+    private bool reinstallPack;
+    private IReadOnlySet<string> installedPackIdentities = new HashSet<string>(StringComparer.Ordinal);
+    private string? selectedChannelName;
+    private PageTab activeTab;
+    private bool confirmDeleteSource;
+    private bool deletingSource;
+    private string? deleteError;
+
+    private IReadOnlyList<SourceConsoleListItem> FilteredSources => (sources ?? []).Where(value => string.IsNullOrWhiteSpace(search) || value.Source.Configuration.Definition.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase) || value.Source.Source.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || value.Source.Source.Definition.Publisher.Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
+    private IReadOnlyList<SourceConsoleChannelView> DisplayedChannels => detail is null ? [] : detail.Channels.Count <= 1 ? detail.Channels : detail.Channels.Where(channel => channel.Definition.Name == selectedChannelName).ToArray();
+    private bool CanImport => importScope is not null && (importMode == "url" ? Uri.TryCreate(importUrl, UriKind.Absolute, out _) : !string.IsNullOrWhiteSpace(importYaml));
+    private bool CanInstallPack => packPreview is not null && !packPreviewing && !packInstalling
+        && (packPreview.CanInstall || packPreview.AlreadyInstalled && replacePack)
+        && packPreview.Bindings.All(binding => !binding.Required || !string.IsNullOrWhiteSpace(PackBindingValue(binding.Name)));
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        busy = true; error = null;
+        try
+        {
+            if (Publisher is not null && Name is not null && !string.IsNullOrWhiteSpace(ScopeRefValue))
+            {
+                detail = await Service.GetAsync(ResourceScopeRef.Parse(ScopeRefValue), Publisher, Name, VersionUid, catalogLocale, RequestContext.Current.PrincipalId, lifetime.Token);
+                installedPackIdentities = (await Services.GetRequiredService<IPacksClient>().GetPacksAsync(lifetime.Token))
+                    .Select(value => PackIdentityKey(value.Definition.Publisher, value.Definition.PackName))
+                    .ToHashSet(StringComparer.Ordinal);
+                if (!detail.Channels.Any(channel => channel.Definition.Name == selectedChannelName))
+                    selectedChannelName = detail.Channels.FirstOrDefault()?.Definition.Name;
+                displayName = detail.Source.Configuration.Definition.DisplayName;
+                sourceRefresh = RefreshPolicyForm.From(detail.Source.Configuration.Definition.Refresh.Source);
+                channelRefresh = RefreshPolicyForm.From(detail.Source.Configuration.Definition.Refresh.Channels);
+                channelRefreshOverrides.Clear();
+                foreach (var channel in detail.SelectedVersion.Definition.PublishedDefinition.Channels)
+                {
+                    var custom = detail.Source.Configuration.Definition.Refresh.ChannelOverrides.TryGetValue(channel.Name, out var policy);
+                    channelRefreshOverrides[channel.Name] = RefreshPolicyForm.From(policy ?? detail.Source.Configuration.Definition.Refresh.Channels) with { Custom = custom };
+                }
+                bindingSelections.Clear();
+                foreach (var binding in detail.Bindings.Bindings.Where(value => value.Target is not null)) bindingSelections[binding.Name] = new(binding.Name, binding.TargetKind, binding.Target, null);
+                activeTab = Enum.TryParse<PageTab>(View, true, out var requestedTab) ? requestedTab : PageTab.Overview;
+            }
+            else
+            {
+                detail = null;
+                confirmDeleteSource = false;
+                deleteError = null;
+                sources = await Service.ListAsync(RequestContext.Current.PrincipalId, lifetime.Token);
+            }
+        }
+        catch (AuthorizationDeniedException) { denied = true; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; }
+        finally { busy = false; }
+    }
+
+    private async Task ImportAsync()
+    {
+        if (importScope is null) return;
+        await RunAsync(async () =>
+        {
+            var result = importMode == "url"
+                ? await Service.ImportUrlAsync(new Uri(importUrl), importScope.Value, RequestContext.Current.PrincipalId, lifetime.Token)
+                : await Service.ImportYamlAsync(importYaml, importScope.Value, RequestContext.Current.PrincipalId, lifetime.Token);
+            Notify("ImportComplete", F("ImportCompleteMessage", result.Source.Configuration.Definition.DisplayName, result.Version.Definition.Version));
+            Navigation.NavigateTo(SourceUrl(result.Source));
+        });
+    }
+
+    private async Task SaveDisplayNameAsync() => await RunAsync(async () => { await Service.UpdateDisplayNameAsync(ScopeRef(), Publisher!, Name!, displayName, detail!.Source.Configuration.ETag!, RequestContext.Current.PrincipalId, lifetime.Token); Notify("SourceUpdated", T("DisplayNameSaved")); await LoadAsync(); });
+    private async Task SaveRefreshPolicyAsync() => await RunAsync(async () =>
+    {
+        var refresh = new SourceRefreshConfiguration
+        {
+            Source = sourceRefresh.ToPolicy(),
+            Channels = channelRefresh.ToPolicy(),
+            ChannelOverrides = channelRefreshOverrides.Where(value => value.Value.Custom)
+                .ToDictionary(value => value.Key, value => value.Value.ToPolicy(), StringComparer.Ordinal)
+        };
+        await Service.UpdateRefreshConfigurationAsync(ScopeRef(), Publisher!, Name!, refresh,
+            detail!.Source.Configuration.ETag!, RequestContext.Current.PrincipalId, lifetime.Token);
+        Notify("SchedulingUpdated", T("SchedulingSaved"));
+        await LoadAsync();
+    });
+    private async Task SaveBindingsAsync() => await RunAsync(async () => { await Service.ConfigureBindingsAsync(ScopeRef(), Publisher!, Name!, detail!.SelectedVersion.Uid, bindingSelections.Values.ToArray(), detail.Bindings.ConfigurationETag, RequestContext.Current.PrincipalId, lifetime.Token); Notify("BindingsUpdated", T("BindingsSaved")); await LoadAsync(); });
+    private async Task RefreshChannelAsync(string channel) => await RunAsync(async () => { await Service.RefreshChannelAsync(ScopeRef(), Publisher!, Name!, detail!.SelectedVersion.Uid, channel, RequestContext.Current.PrincipalId, lifetime.Token); Notify("ChannelRefreshed", F("ChannelRefreshedMessage", channel)); await LoadAsync(); });
+    private async Task RefreshSourceAsync() => await RunAsync(async () => { var result = await Service.RefreshSourceAsync(ScopeRef(), Publisher!, Name!, RequestContext.Current.PrincipalId, lifetime.Token); Notify("SourceRefreshed", F("SourceRefreshedMessage", result.Version.Definition.Version)); await LoadAsync(); });
+    private async Task DeleteSourceAsync()
+    {
+        deletingSource = true; deleteError = null;
+        try
+        {
+            var source = detail!.Source.Source;
+            await Service.DeleteSourceAsync(
+                source.ScopeRef ?? throw new InvalidOperationException("The selected Source has no ownership scope."),
+                source.Definition.Publisher,
+                source.Name,
+                source.ETag ?? throw new InvalidOperationException("The selected Source has no ETag."),
+                RequestContext.Current.PrincipalId,
+                lifetime.Token);
+            Notify("SourceDeleted", F("SourceDeletedMessage", detail.Source.Configuration.Definition.DisplayName));
+            confirmDeleteSource = false;
+            detail = null;
+            Navigation.NavigateTo("/settings/sources");
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { deleteError = exception.Message; }
+        finally { deletingSource = false; }
+    }
+    private void CloseDeleteSource() { if (!deletingSource) { confirmDeleteSource = false; deleteError = null; } }
+    private async Task PreviewPackAsync(SourceConsoleChannelView channel, SourceCatalogView catalog, SourcePackEntryView entry)
+    {
+        packSelection = new(ScopeRef(), Publisher!, Name!, detail!.SelectedVersion.Uid, channel.Definition.Name,
+            channel.Status.Refresh!.Definition.CurrentSnapshotUid!.Value, catalog.Provenance.CatalogName, entry.Name);
+        reinstallPack = IsPackInstalled(entry);
+        sourcePackPreview = null; packError = null; replacePack = reinstallPack; packBindingSelections.Clear(); packPreviewing = true;
+        try
+        {
+            sourcePackPreview = await Service.PreviewPackAsync(packSelection, [], replacePack, RequestContext.Current.PrincipalId, lifetime.Token);
+            var preview = sourcePackPreview.Pack;
+            foreach (var binding in preview.Bindings.Where(value => value.TargetAvailable && value.Target is not null))
+                packBindingSelections[binding.Name] = $"{(binding.Target!.Namespace ?? ResourceNamespace.Default).Value}:{binding.Target.Name}";
+            await LoadPackBindingOptionsAsync(preview.Bindings);
+            if (packBindingSelections.Count > 0)
+                sourcePackPreview = await Service.PreviewPackAsync(packSelection, SelectedPackBindings(), replacePack, RequestContext.Current.PrincipalId, lifetime.Token);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { packError = exception.Message; }
+        finally { packPreviewing = false; }
+    }
+    private async Task InstallPackAsync()
+    {
+        if (!CanInstallPack || packSelection is null || packPreview is null) return;
+        packInstalling = true; packError = null;
+        try
+        {
+            var bindings = SelectedPackBindings();
+            var installed = await Service.InstallPackAsync(packSelection, sourcePackPreview!.PreviewDigest, replacePack, bindings, RequestContext.Current.PrincipalId, lifetime.Token);
+            Notify("PackInstalled", F("PackInstalledMessage", installed.Value.Definition.DisplayName ?? installed.Value.Definition.PackName));
+            Navigation.NavigateTo($"/packs?publisher={Uri.EscapeDataString(installed.Value.Definition.Publisher)}&name={Uri.EscapeDataString(installed.Value.Definition.PackName)}");
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { packError = exception.Message; }
+        finally { packInstalling = false; }
+    }
+    private void ClosePackPreview() { if (!packInstalling) { packSelection = null; sourcePackPreview = null; packError = null; reinstallPack = false; } }
+    private string? PackBindingValue(string name) => packBindingSelections.GetValueOrDefault(name);
+    private async Task SetPackBindingAsync(string name, ChangeEventArgs args)
+    {
+        packBindingSelections[name] = args.Value?.ToString()?.Trim() ?? string.Empty;
+        await RefreshPackPreviewAsync();
+    }
+    private async Task SetReplacePackAsync(ChangeEventArgs args)
+    {
+        replacePack = args.Value is true;
+        await RefreshPackPreviewAsync();
+    }
+    private IReadOnlyList<PackBindingSelection> SelectedPackBindings() => packBindingSelections
+        .Where(value => !string.IsNullOrWhiteSpace(value.Value))
+        .Select(value => new PackBindingSelection(value.Key, ParsePackBinding(value.Value))).ToArray();
+    private async Task RefreshPackPreviewAsync()
+    {
+        if (packSelection is null) return;
+        packPreviewing = true; packError = null;
+        try
+        {
+            sourcePackPreview = await Service.PreviewPackAsync(packSelection, SelectedPackBindings(), replacePack, RequestContext.Current.PrincipalId, lifetime.Token);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { packError = exception.Message; sourcePackPreview = null; }
+        finally { packPreviewing = false; }
+    }
+    private async Task LoadPackBindingOptionsAsync(IReadOnlyList<PackBindingPreview> bindings)
+    {
+        if (bindings.Any(value => value.TargetKind == PackBindingTargetKind.ModelProfile)) packModelProfiles = await Services.GetRequiredService<IModelProfilesClient>().GetModelProfilesAsync(null, null, null, lifetime.Token);
+        if (bindings.Any(value => value.TargetKind == PackBindingTargetKind.ModelProvider)) packModelProviders = await Services.GetRequiredService<IModelProvidersClient>().GetModelProvidersAsync(lifetime.Token);
+        if (bindings.Any(value => value.TargetKind == PackBindingTargetKind.RuntimeProfile)) packRuntimeProfiles = await Services.GetRequiredService<IRuntimeProfilesClient>().GetRuntimeProfilesAsync(lifetime.Token);
+        if (bindings.Any(value => value.TargetKind == PackBindingTargetKind.ExtensionRegistration)) packExtensions = await Services.GetRequiredService<IExtensionsClient>().GetRegistrationsAsync(lifetime.Token);
+        if (bindings.Any(value => value.TargetKind == PackBindingTargetKind.Secret)) packSecrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(lifetime.Token);
+    }
+    private static string BindingValue(string name, ResourceNamespace @namespace) => $"{@namespace.Value}:{name}";
+    private static ResourceReference ParsePackBinding(string value)
+    {
+        var parts = value.Split(':', 2);
+        if (parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]) || string.IsNullOrWhiteSpace(parts[1]))
+            throw new SourceValidationException("source_pack_binding_invalid", "Pack binding targets must use namespace:resource-name.");
+        return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
+    }
+    private ResourceScopeRef? PackTargetScope() => packPreview?.TargetScope switch { ResourceScopeKind.Instance => ResourceScopeRef.Instance, ResourceScopeKind.Tenant => ResourceScopeRef.Tenant(RequestContext.Current.TenantId), _ => ResourceScopeRef.Workspace(RequestContext.Current.WorkspaceId) };
+    private string PackResourceCount(int count) => F(count == 1 ? "PackResourceCount.One" : "PackResourceCount.Many", count);
+    private bool IsPackInstalled(SourcePackEntryView entry) => installedPackIdentities.Contains(PackIdentityKey(detail!.SelectedVersion.Definition.PublishedDefinition.Publisher.Name, entry.Name));
+    private string PackUrl(SourcePackEntryView entry) => $"/packs?publisher={Uri.EscapeDataString(detail!.SelectedVersion.Definition.PublishedDefinition.Publisher.Name)}&name={Uri.EscapeDataString(entry.Name)}";
+    private static string PackIdentityKey(string publisher, string name) => $"{publisher}\n{name}";
+    private string BindingKindLabel(PackBindingTargetKind kind) => T($"BindingTargetKind.{kind}");
+    private static UiStatus ChangeTone(PackResourceChange change) => change switch { PackResourceChange.Add => UiStatus.Success, PackResourceChange.Conflict => UiStatus.Danger, PackResourceChange.Remove => UiStatus.Warning, _ => UiStatus.Info };
+    private async Task ChangeLocaleAsync(ChangeEventArgs args) { catalogLocale = args.Value?.ToString() ?? "en-US"; await LoadAsync(); }
+    private void SelectChannel(ChangeEventArgs args) => selectedChannelName = args.Value?.ToString();
+    private void SelectVersion(Guid uid) => Navigation.NavigateTo($"{SourceUrl(detail!.Source)}&versionUid={uid:D}&view=versions");
+
+    private void SetBinding(SourceBindingStatus binding, ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(value)) { bindingSelections.Remove(binding.Name); return; }
+        if (value.StartsWith("provider\n", StringComparison.Ordinal))
+        {
+            var parts = value.Split('\n', 4);
+            bindingSelections[binding.Name] = new(binding.Name, binding.TargetKind, new(parts[3], ResourceScopeRef.Parse(parts[1]), new(parts[2])), null);
+            return;
+        }
+        var candidateKey = value["candidate\n".Length..];
+        var candidate = detail!.ProviderCandidates.Single(item => item.Key == candidateKey);
+        bindingSelections[binding.Name] = new(binding.Name, binding.TargetKind, null, candidate);
+    }
+
+    private void SetImportMode(string mode) => importMode = mode;
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        busy = true; error = null;
+        try { await action(); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; }
+        finally { busy = false; }
+    }
+
+    private ResourceScopeRef ScopeRef() => detail?.Source.Source.ScopeRef
+        ?? ResourceScopeRef.Parse(ScopeRefValue!);
+    private IEnumerable<StoredResource<SourceProviderResource>> CompatibleProviders(string targetKind) => targetKind == SourceKinds.SourceProvider ? detail!.Providers : [];
+    private IEnumerable<SourceConsoleProviderCandidate> CompatibleProviderCandidates(string targetKind) => targetKind == SourceKinds.SourceProvider ? detail!.ProviderCandidates : [];
+    private static string ProviderValue(SourceProviderResource provider) => $"provider\n{provider.ScopeRef!.Value.Value}\n{provider.Namespace.Value}\n{provider.Name}";
+    private static string CandidateValue(SourceConsoleProviderCandidate candidate) => $"candidate\n{candidate.Key}";
+    private string BindingValue(SourceBindingStatus binding)
+    {
+        if (!bindingSelections.TryGetValue(binding.Name, out var selection)) return string.Empty;
+        return selection.Target is { } target
+            ? $"provider\n{target.ScopeRef!.Value.Value}\n{target.Namespace?.Value ?? "default"}\n{target.Name}"
+            : selection.Candidate is { } candidate ? CandidateValue(candidate) : string.Empty;
+    }
+    private string ConfigureProviderUrl() => $"/sourceproviders/new?scopeRef={Uri.EscapeDataString(ScopeRef().Value)}&returnUrl={Uri.EscapeDataString(SourceUrl(detail!.Source))}";
+    private static string SourceProviderUrl(SourceProviderSnapshotIdentity provider) =>
+        $"/sourceproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace.Value)}&scopeRef={Uri.EscapeDataString(provider.ScopeRef.Value)}";
+    private static string Short(string value) => value.Length <= 14 ? value : value[..14];
+    private static bool IsHealthy(SourceConsoleListItem source) => IsHealthy(source.Source);
+    private static bool IsHealthy(SourceView source) => source.Observed.Definition.LastOutcome != SourceImportOutcome.Rejected;
+    private string SourceUrl(SourceConsoleListItem source) => SourceUrl(source.Source);
+    private string SourceUrl(SourceView source) => $"/settings/sources/{Uri.EscapeDataString(source.Source.Definition.Publisher)}/{Uri.EscapeDataString(source.Source.Name)}?scopeRef={Uri.EscapeDataString(source.Source.ScopeRef!.Value.ToString())}";
+    private string BootstrapUrl(SourceConsoleChannelView channel, SourceCatalogView catalog, SourceBootstrapEntryView entry)
+    {
+        var query = new Dictionary<string, string> { ["sourceScope"] = ScopeRefValue!, ["publisher"] = Publisher!, ["source"] = Name!, ["versionUid"] = detail!.SelectedVersion.Uid.ToString("D"), ["channel"] = channel.Definition.Name, ["snapshotUid"] = channel.Status.Refresh!.Definition.CurrentSnapshotUid!.Value.ToString("D"), ["catalog"] = catalog.Provenance.CatalogName, ["entry"] = entry.Name, ["locale"] = entry.ResolvedLocale, ["path"] = entry.ResolvedPath };
+        return "/settings/bootstrap?" + string.Join("&", query.Select(value => $"{Uri.EscapeDataString(value.Key)}={Uri.EscapeDataString(value.Value)}"));
+    }
+    private string Origin(SourceConsoleListItem value) => value.Source.Configuration.Definition.Origin?.Url ?? T("PastedManifest");
+    private string LastSuccessfulImport()
+    {
+        var observed = detail!.Source.Observed.Definition;
+        if (observed.LastSuccessfulAt is null || observed.LastSuccessfulVersionUid is not { } versionUid)
+            return T("Never");
+        var version = detail.Versions.SingleOrDefault(value => value.Uid == versionUid);
+        return F("SuccessfulImportValue", version?.Definition.Version ?? T("UnknownVersion"), observed.LastSuccessfulAt.Value.ToLocalTime().ToString("g"));
+    }
+    private IReadOnlyList<string> AvailableCatalogLocales(SourceConsoleChannelView channel) =>
+        SourceConsoleLocalePresentation.AvailableLocales(channel.Catalogs, catalogLocale);
+    private string LocaleLabel(SourceConsoleChannelView channel, string locale)
+    {
+        var label = locale == "neutral" ? T("Neutral") : CultureInfo.GetCultureInfo(locale).NativeName;
+        var available = SourceConsoleLocalePresentation.IsAvailable(channel.Catalogs, locale);
+        return available ? $"{label} · {locale}" : F("UnavailableLocaleFallback", label, locale);
+    }
+    private static string PublisherLabel(SourcePublisher value) => value.DisplayName is null ? value.Name : $"{value.DisplayName} ({value.Name})";
+    private string ImportOutcome(SourceImportOutcome value) => T($"ImportOutcome.{value}");
+    private string RefreshOutcome(SourceChannelRefreshOutcome value) => T($"RefreshOutcome.{value}");
+    private string RefreshError(string? code, string fallback)
+    {
+        if (code is null) return fallback;
+        var localized = Localizer[$"RefreshError.{code}"];
+        return localized.ResourceNotFound ? fallback : localized.Value;
+    }
+    private RefreshScheduleSummary? NextRefresh()
+    {
+        if (detail is null) return null;
+        var now = Clock.GetUtcNow();
+        var source = detail.Source.Source;
+        var refresh = detail.Source.Configuration.Definition.Refresh;
+        var candidates = new List<RefreshScheduleSummary>();
+        if (refresh.Source.Enabled && detail.Source.Configuration.Definition.Origin is not null)
+        {
+            candidates.Add(new(SourceRefreshScheduler.GetNextDue(
+                detail.Source.Observed.Definition.LastAttemptAt,
+                detail.Source.Observed.Definition.ConsecutiveFailures,
+                refresh.Source,
+                $"{source.ScopeRef}|{source.Namespace}|{source.Name}|source"),
+                T("SourceDefinitionRefresh")));
+        }
+        foreach (var channel in detail.Channels)
+        {
+            var policy = refresh.ChannelOverrides.TryGetValue(channel.Definition.Name, out var configured)
+                ? configured
+                : refresh.Channels;
+            if (!policy.Enabled) continue;
+            var observed = channel.Status.Refresh?.Definition;
+            var next = observed is null
+                ? now
+                : SourceRefreshScheduler.GetNextDue(observed.LastAttemptAt, observed.ConsecutiveFailures, policy,
+                    $"{source.ScopeRef}|{source.Namespace}|{source.Name}|{detail.SelectedVersion.Uid:N}|{channel.Definition.Name}");
+            candidates.Add(new(next, F("ChannelRefreshTarget", channel.Definition.Name)));
+        }
+        return candidates.OrderBy(value => value.At).FirstOrDefault();
+    }
+    private string NextRefreshDate(RefreshScheduleSummary summary) =>
+        summary.At <= Clock.GetUtcNow() ? T("RefreshDueNow") : summary.At.ToLocalTime().ToString("g");
+    private string VerificationLabel(SourceVerificationStatus value) => T($"Verification.{value}");
+    private string CompatibilityLabel(SourceChannelCompatibilityStatus value) => T($"Compatibility.{value}");
+    private static UiStatus VerificationTone(SourceVerificationStatus value) => value switch { SourceVerificationStatus.Verified => UiStatus.Success, SourceVerificationStatus.Unavailable => UiStatus.Warning, _ => UiStatus.Neutral };
+    private static UiStatus CompatibilityTone(SourceChannelCompatibilityStatus value) => value switch { SourceChannelCompatibilityStatus.Compatible => UiStatus.Success, SourceChannelCompatibilityStatus.Incompatible => UiStatus.Danger, _ => UiStatus.Warning };
+    private static string TabId(PageTab tab) => $"source-{tab.ToString().ToLowerInvariant()}-tab";
+    private string TabLabel(PageTab tab) => Localizer[$"Tab.{tab}"];
+    private string T(string key) => Localizer[key];
+    private string F(string key, params object[] arguments) => Localizer[key, arguments];
+    private void Notify(string titleKey, string message) => Notifications.Add(new(Guid.NewGuid(), T(titleKey), message, DateTimeOffset.Now, UiStatus.Success));
+    private enum PageTab { Overview, Versions, Bindings, Scheduling }
+    private sealed record RefreshScheduleSummary(DateTimeOffset At, string Target);
+    private sealed record RefreshPolicyForm
+    {
+        public bool Custom { get; set; }
+        public bool Enabled { get; set; }
+        public int IntervalMinutes { get; set; } = 360;
+        public int TimeoutSeconds { get; set; } = 30;
+        public int MaximumAttempts { get; set; } = 3;
+        public int InitialBackoffSeconds { get; set; } = 30;
+        public int MaximumBackoffSeconds { get; set; } = 900;
+        public int JitterSeconds { get; set; } = 15;
+        public static RefreshPolicyForm From(SourceRefreshPolicy policy) => new()
+        {
+            Enabled = policy.Enabled,
+            IntervalMinutes = Math.Max(1, policy.IntervalSeconds / 60),
+            TimeoutSeconds = policy.TimeoutSeconds,
+            MaximumAttempts = policy.MaximumAttempts,
+            InitialBackoffSeconds = policy.InitialBackoffSeconds,
+            MaximumBackoffSeconds = policy.MaximumBackoffSeconds,
+            JitterSeconds = policy.JitterSeconds
+        };
+        public SourceRefreshPolicy ToPolicy() => new()
+        {
+            Enabled = Enabled,
+            IntervalSeconds = checked(IntervalMinutes * 60),
+            TimeoutSeconds = TimeoutSeconds,
+            MaximumAttempts = MaximumAttempts,
+            InitialBackoffSeconds = InitialBackoffSeconds,
+            MaximumBackoffSeconds = MaximumBackoffSeconds,
+            JitterSeconds = JitterSeconds
+        };
+    }
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

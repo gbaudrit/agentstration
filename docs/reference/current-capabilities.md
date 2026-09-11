@@ -38,6 +38,10 @@ flowchart LR
 
 The management plane is the source of truth for agent definitions and desired state; runtime `AIAgent` instances are reconstructible. The Work Plane owns the functional lifecycle, interactions, history, and result of each `WorkItem`. Its architectural principle is **Microsoft-first, provider-neutral, cloud-optional**.
 
+The official static Source registry is available as an optional instance-owned discovery input, and Platform administrators can add independent community or private enterprise registrations. Registrations have ETag-protected CRUD, explicit trust/network/refresh/cache policies, and optional instance Secret references resolved only for exact same-origin requests. Manual and opt-in scheduled refreshes retrieve only compatible Registry v1 shards, validate canonical digests, retain a bounded last-known-good cache, and persist conditional HTTP, backoff, staleness, failure, and recovery state across restart. Registry trust evaluation preserves every observation, gates remote publisher assertions through local policy, rejects accepted digest conflicts and revocation, and feeds the existing exact SourceVersion verification boundary. Merged discovery remains offline; an explicit retained-observation selection retrieves and imports only one exact manifest with complete Registry provenance and no Channel materialization. It never equates a trusted origin or verified SourceVersion with a verified mutable Channel Snapshot or makes startup depend on the public network. See [Source registry registrations](source-registries.md).
+
+The Console exposes these operations under **System > Source registries**. It supports registration CRUD, enablement, manual refresh, refresh history, Secret-reference selection, merged discovery filters, all observation evidence, and exact import confirmation. The official registration, local origin policy, publisher evidence, SourceVersion verification, and later Snapshot verification are presented separately on responsive desktop and mobile layouts.
+
 ## Schedule Triggers
 
 Agentstration can submit autonomous Work from a declarative Workspace-scoped `Trigger`. Trigger owns **when**, Work owns **what**, Flow owns **how**, and Runtime owns execution. Automation is not a second runtime.
@@ -107,7 +111,7 @@ The server generates an immutable UID; logical identity is `(Workspace, Agent, m
 
 The Management Plane persists `Agentstration.Tools/toolProviders` and the `Agentstration.Tools/tools` resources materialized by discovery. Tool Providers support AEP and MCP; MCP connections support STDIO and Streamable HTTP using the official SDK. Creation/configuration performs an initial discovery attempt and the Console exposes manual test and refresh operations. Refresh reports new, changed, unchanged, and unavailable counts without deleting disappeared tools or overwriting enablement.
 
-AEP itself is staged as an autonomous repository under `aep/`, with protocol `2026-08-01`, canonical discovery at `/.well-known/aep`, versioned capability descriptors, a reusable validator and tracing client, a headless CLI, a generic sample, and a standalone Blazor Inspector. Agentstration uses local project references during extraction and can switch to versioned packages with `UseLocalAepProjects=false` after publication.
+AEP itself is staged as an autonomous repository under `aep/`, with protocol `2026-08-01`, canonical discovery at `/.well-known/aep`, versioned capability descriptors, a reusable validator and tracing client, a headless CLI, a generic sample, and a standalone Blazor Inspector. Agentstration uses local project references during extraction and can switch to versioned packages with `UseLocalAepProjects=false` after publication. Registered AEP extensions can use request-scoped Static Bearer authentication backed by a scope-visible Secret; the value is resolved for every request and expected extension identity is checked centrally before functional calls.
 
 The Tools Console separates Providers and Catalog, displays provider status, schemas, and whether approval is required, and defaults every newly discovered tool to disabled. The Agent editor assigns canonical Tool resource IDs and warns when an existing assignment is unavailable. Runtime resolution requires provider enabled, tool enabled, tool available, and assignment before creating an Agentstration-owned MAF function adapter. MAF never receives the native invocable MCP Tool: every effective call crosses the provider-neutral Agentstration Tool Execution Pipeline, then the MCP invoker performs `tools/call`. Tools governed with `requiresApproval` wrap the Agentstration adapter in MAF `ApprovalRequiredAIFunction`, so approval pauses remain ordinary durable Flow input requests and the resumed invocation still crosses the pipeline.
 
@@ -140,7 +144,7 @@ Runtime
 Agents
 ```
 
-The Flow module manages editable graph drafts, immutable published versions, and durable Flow Runs. Its local sequential executor supports typed `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps through provider-neutral contracts. The earlier `Direct`, `Routing`, `Workflow`, `Orchestration`, and `Composite` specifications remain compatible with the same Flow resource and storage boundary. Orchestration Runs can suspend durably for text, choice, or confirmation input, survive process reconstruction through opaque SQLite-backed MAF checkpoints, and resume with the exact Flow snapshot and Agent revisions selected at first execution.
+The Flow module manages editable graph drafts, immutable published versions, and durable Flow Runs. The designer adds one generic `Flow` call card that selects a namespaced published Flow by active or exact version, maps its input schema, exposes its output schema, and blocks missing targets, incompatible mappings, and dependency cycles at publication. Durable child-Flow execution is not yet available. The local sequential executor supports typed `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps through provider-neutral contracts. The earlier `Direct`, `Routing`, `Workflow`, `Orchestration`, and `Composite` specifications remain compatible with the same Flow resource and storage boundary. Orchestration Runs can suspend durably for text, choice, or confirmation input, survive process reconstruction through opaque SQLite-backed MAF checkpoints, and resume with the exact Flow snapshot and Agent revisions selected at first execution.
 
 The standalone vertical uses SQLite for management resources and runs without Azure, Foundry, a remote model, or an API key. It seeds `dotnet-expert` and `sql-expert`, compiles immutable revisions, deploys them in-process, reconciles their runtime state, routes each request to one agent, and executes that agent through Microsoft Agent Framework.
 
@@ -188,10 +192,10 @@ dotnet run --project src/Agentstration.AppHost
 
 The AppHost exposes the authoritative server, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to `Ollama:Endpoint` (default `http://localhost:11434`), the llama.cpp extension to `LlamaCpp:Endpoint` (default `http://localhost:8080`), and the LocalAI extension to `LocalAI:Endpoint` (default `http://localhost:8081`). It provisions no inference server or model. Aspire preserves the server's normal `Managed` mode; deterministic execution remains an explicit offline/test override.
 
-Or with containers:
+Or with one provider-specific AEP container topology, for example Ollama:
 
 ```powershell
-docker compose up --build
+docker compose -f deploy/compose/ollama.yml up --build
 ```
 
 ## AI modes
