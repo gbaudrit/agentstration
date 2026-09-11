@@ -70,8 +70,16 @@ export class FlowEditorPage {
     }
     for (let index = 0; index < flow.routes.length; index++) {
       const route = routes.nth(index);
-      await route.getByTestId(TestIds.flowEditor.routeFrom).selectOption(flow.routes[index]!.from);
-      await route.getByTestId(TestIds.flowEditor.routeTo).selectOption(flow.routes[index]!.to);
+      const from = route.getByTestId(TestIds.flowEditor.routeFrom);
+      const to = route.getByTestId(TestIds.flowEditor.routeTo);
+      const desired = flow.routes[index]!;
+      if (await to.inputValue() === desired.from) {
+        await to.selectOption(desired.to);
+        await from.selectOption(desired.from);
+      } else {
+        await from.selectOption(desired.from);
+        await to.selectOption(desired.to);
+      }
     }
 
     await this.page.getByTestId(TestIds.flowEditor.autonomous).setChecked(flow.autonomous);
