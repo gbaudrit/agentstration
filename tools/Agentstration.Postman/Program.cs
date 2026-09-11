@@ -156,7 +156,7 @@ internal static partial class PostmanProgram
         var parameters = Parameters(pathItem, operation).ToArray();
         foreach (var parameter in parameters)
         {
-            if (parameter.TryGetProperty("name", out var name) && name.GetString() is { Length: > 0 } value)
+            if (parameter.TryGetProperty("name", out var parameterName) && parameterName.GetString() is { Length: > 0 } value)
                 parameterNames.Add(value);
         }
 
@@ -221,7 +221,8 @@ internal static partial class PostmanProgram
         {
             ["raw"] = $"{{{{baseUrl}}}}{postmanPath}{rawQuery}",
             ["host"] = new JsonArray("{{baseUrl}}"),
-            ["path"] = new JsonArray(postmanPath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries).Select(JsonValue.Create).ToArray())
+            ["path"] = new JsonArray(postmanPath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries)
+                .Select(value => (JsonNode?)JsonValue.Create(value)).ToArray())
         };
         if (query.Count > 0) url["query"] = query;
         return url;
@@ -441,7 +442,7 @@ internal static partial class PostmanProgram
         new() { ["key"] = key, ["value"] = value, ["type"] = "default", ["enabled"] = enabled };
 
     private static JsonObject Script(params string[] lines) =>
-        new() { ["type"] = "text/javascript", ["exec"] = new JsonArray(lines.Select(JsonValue.Create).ToArray()) };
+        new() { ["type"] = "text/javascript", ["exec"] = new JsonArray(lines.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray()) };
 
     private static int TagOrder(string tag)
     {
