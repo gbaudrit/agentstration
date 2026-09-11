@@ -15,7 +15,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
-public sealed partial class ModelManagementApiTests
+[TestClass]
+public sealed class ModelProviderApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
     public async Task ReadOnlyProviderApisExposeConfiguredProviderAndUnavailableDiscovery()

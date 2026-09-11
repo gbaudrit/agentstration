@@ -45,6 +45,8 @@ var toolExecutionCapture = builder.Configuration.GetSection("Agentstration:ToolE
 toolExecutionCapture.Validate();
 builder.Services.AddSingleton(toolExecutionCapture);
 var isTesting = builder.Environment.IsEnvironment("Testing");
+var apiOnlyTesting = isTesting
+    && builder.Configuration.GetValue("Agentstration:Testing:ApiOnly", false);
 var hostedServicesEnabled = !isTesting
     || builder.Configuration.GetValue("Agentstration:Testing:HostedServicesEnabled", false);
 var openTelemetryEnabled = !isTesting
@@ -140,8 +142,11 @@ builder.Services.AddRateLimiter(options =>
             }));
 });
 builder.Services.AddAgentstrationOpenApi();
-builder.Services.AddRazorPages();
-builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+if (!apiOnlyTesting)
+{
+    builder.Services.AddRazorPages();
+    builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+}
 builder.Services.AddAgentstrationLocalization(builder.Configuration);
 builder.Services.AddSignalR();
 if (storageProvider == AgentstrationStorageProvider.PostgreSql)
@@ -261,7 +266,7 @@ app.UseMiddleware<RequestContextMiddleware>();
 app.UseMiddleware<StandardManagementDataMiddleware>();
 app.UseAuthorization();
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.MapAgentstrationOpenApi();
-app.UseAntiforgery();
+if (!apiOnlyTesting) app.UseAntiforgery();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 app.MapGet("/health/ready", (IAgentstrationStorageInitializer storage) => storage.IsReady
     ? Results.Ok(new { status = "ready" })
@@ -284,10 +289,13 @@ app.MapHub<FlowRunHub>("/hubs/flow-runs").RequireAuthorization(Agentstration.Web
 app.MapHub<WorkplaceHub>("/hubs/workplace").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
 if (app.Environment.IsDevelopment()) app.MapOllamaDiagnostics();
 app.MapMcp("/mcp").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
-app.MapStaticAssets().AllowAnonymous();
-app.MapRazorPages();
-app.MapRazorComponents<App>().AddAdditionalAssemblies(typeof(MainLayout).Assembly).AddInteractiveServerRenderMode()
-    .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
+if (!apiOnlyTesting)
+{
+    app.MapStaticAssets().AllowAnonymous();
+    app.MapRazorPages();
+    app.MapRazorComponents<App>().AddAdditionalAssemblies(typeof(MainLayout).Assembly).AddInteractiveServerRenderMode()
+        .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
+}
 try
 {
     RequestContext? bootstrapContext = null;

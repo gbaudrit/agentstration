@@ -51,7 +51,9 @@ tests/
   Agentstration.Management.Core.Tests/
   Agentstration.Management.Storage.Tests/
   Agentstration.Management.Sources.Tests/
-  Agentstration.Management.Tests/
+  Agentstration.Management.Api.Tests/
+  Agentstration.Management.Security.Tests/
+  Agentstration.Management.Aep.Tests/
 docs/
   architecture.md
   decisions/
