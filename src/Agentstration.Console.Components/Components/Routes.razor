@@ -1,6 +1,6 @@
 @rendermode InteractiveServer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Localizer
-<Router AppAssembly="typeof(Program).Assembly">
+<Router AppAssembly="typeof(ConsoleRouteAssembly).Assembly">
     <Found Context="routeData"><RouteView RouteData="routeData" DefaultLayout="typeof(Agentstration.Web.Components.MainLayout)" /><FocusOnNavigate RouteData="routeData" Selector="h1" /></Found>
     <NotFound><LayoutView Layout="typeof(Agentstration.Web.Components.MainLayout)"><EmptyState Title="@Localizer["PageNotFound"]" Message="@Localizer["PageNotFoundMessage"]" /></LayoutView></NotFound>
 </Router>

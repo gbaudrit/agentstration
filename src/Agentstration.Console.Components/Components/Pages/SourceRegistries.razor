@@ -1,8 +1,7 @@
 @page "/settings/source-registries"
 @page "/settings/source-registries/new"
 @page "/settings/source-registries/{Name}"
-@using Agentstration.Management.Core
-@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = Agentstration.Web.Security.AgentstrationPolicies.PlatformAdmin)]
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "agentstration:platform-admin")]
 @implements IDisposable
 @inject ISourceRegistriesClient Client
 @inject ISecretsClient Secrets
@@ -284,7 +283,7 @@ else
         if (!item.Registration.Definition.Enabled || !item.Registration.Definition.RefreshPolicy.PeriodicEnabled) return T("NotScheduled");
         var observed = item.Observed.Definition;
         if (observed.LastAttemptedAt is not { } lastAttempt) return T("DueNow");
-        var next = SourceRefreshScheduler.GetNextDue(lastAttempt, observed.ConsecutiveFailures,
+        var next = SourceRefreshSchedule.GetNextDue(lastAttempt, observed.ConsecutiveFailures,
             item.Registration.Definition.RefreshPolicy, $"registry|{item.Registration.Uid:N}");
         return next <= Clock.GetUtcNow() ? T("DueNow") : FormatDate(next);
     }

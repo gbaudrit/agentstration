@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.Web.Hosting;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;
@@ -14,6 +15,9 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         var sources = group.MapGroup("/sources").RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         sources.MapPost("/imports/yaml", ImportYamlAsync);
         sources.MapPost("/imports/url", ImportUrlAsync);
+        sources.MapGet("/console", ListConsoleAsync);
+        sources.MapGet("/console/{publisher}/{name}", GetConsoleAsync);
+        sources.MapPut("/console/{publisher}/{name}/versions/{versionUid:guid}/bindings", ConfigureConsoleBindingsAsync);
         sources.MapPost("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}/pack-catalogs/{catalog}/entries/{entry}/preview", PreviewPackAsync);
         sources.MapPost("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}/pack-catalogs/{catalog}/entries/{entry}/install", InstallPackAsync);
         sources.MapGet("", ListAsync);
@@ -34,6 +38,57 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}/catalogs", BrowseCatalogsAsync);
         sources.MapPut("/{publisher}/{name}/display-name", UpdateDisplayNameAsync);
     }
+
+    private static Task<IResult> ListConsoleAsync(
+        SourceConsoleManagementService service,
+        ICurrentRequestContext requestContext,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () => Results.Ok(
+            await service.ListAsync(requestContext.Current.PrincipalId, cancellationToken)));
+
+    private static Task<IResult> GetConsoleAsync(
+        string publisher,
+        string name,
+        string scopeRef,
+        Guid? versionUid,
+        string? locale,
+        SourceConsoleManagementService service,
+        ICurrentRequestContext requestContext,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.GetAsync(
+            Agentstration.Resources.ResourceScopeRef.Parse(scopeRef),
+            publisher,
+            name,
+            versionUid,
+            locale,
+            requestContext.Current.PrincipalId,
+            cancellationToken)));
+
+    private static Task<IResult> ConfigureConsoleBindingsAsync(
+        string publisher,
+        string name,
+        Guid versionUid,
+        string scopeRef,
+        IReadOnlyList<SourceConsoleBindingSelection> selections,
+        HttpRequest request,
+        SourceConsoleManagementService service,
+        ICurrentRequestContext requestContext,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var ifMatch = ManagementHttp.IfMatch(request)
+                ?? throw new ControlPlaneConcurrencyException("Updating Source bindings requires If-Match.");
+            await service.ConfigureBindingsAsync(
+                Agentstration.Resources.ResourceScopeRef.Parse(scopeRef),
+                publisher,
+                name,
+                versionUid,
+                selections,
+                ifMatch,
+                requestContext.Current.PrincipalId,
+                cancellationToken);
+            return Results.NoContent();
+        });
 
     private static Task<IResult> ImportYamlAsync(
         ImportSourceYamlRequest request,

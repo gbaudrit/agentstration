@@ -57,7 +57,7 @@ else
             await Task.WhenAll(workspaceTask,pageTask,summaryTask);workspaces=await workspaceTask;page=await pageTask;counters=await summaryTask;
             if(!realtimeStarted){realtimeStarted=true;Realtime.Updated+=OnRealtimeUpdate;Realtime.StateChanged+=OnRealtimeStateChanged;await Realtime.StartAsync(workspaces.Select(value=>value.Id.ToString("D")),lifetime.Token);}
         }
-        catch(Exception exception) when(exception is HttpRequestException or AgentstrationApiException or Polly.Timeout.TimeoutRejectedException){unavailable=true;page=null;counters=null;}
+        catch(Exception exception) when(exception is HttpRequestException or AgentstrationApiException or TimeoutException){unavailable=true;page=null;counters=null;}
         finally{loading=false;}
     }
     private async Task OnRealtimeUpdate(WorkOperationsRealtimeUpdate update)

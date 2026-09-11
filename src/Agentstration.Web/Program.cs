@@ -286,7 +286,9 @@ if (app.Environment.IsDevelopment()) app.MapOllamaDiagnostics();
 app.MapMcp("/mcp").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
 app.MapStaticAssets().AllowAnonymous();
 app.MapRazorPages();
-app.MapRazorComponents<App>().AddAdditionalAssemblies(typeof(MainLayout).Assembly).AddInteractiveServerRenderMode()
+app.MapRazorComponents<App>()
+    .AddAdditionalAssemblies(typeof(ConsoleRouteAssembly).Assembly, typeof(MainLayout).Assembly)
+    .AddInteractiveServerRenderMode()
     .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
 try
 {

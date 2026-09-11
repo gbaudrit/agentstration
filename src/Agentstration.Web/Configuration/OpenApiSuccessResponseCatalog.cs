@@ -231,6 +231,13 @@ internal static class OpenApiSuccessResponseCatalog
         }
         if (path.StartsWith("/api/sources", StringComparison.OrdinalIgnoreCase))
         {
+            if (path == "/api/sources/console")
+                return Json<IReadOnlyList<SourceConsoleListItem>>(200, "List Sources for the operations Console");
+            if (path.StartsWith("/api/sources/console/", StringComparison.OrdinalIgnoreCase)
+                && path.EndsWith("/bindings", StringComparison.OrdinalIgnoreCase))
+                return NoContent("Configure Source Provider bindings from the operations Console");
+            if (path.StartsWith("/api/sources/console/", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceConsoleDetailView>(200, "Get Source details for the operations Console");
             if (path.Contains("/pack-catalogs/", StringComparison.OrdinalIgnoreCase)
                 && path.EndsWith("/preview", StringComparison.OrdinalIgnoreCase))
                 return Json<SourcePackInstallationPreview>(200, "Preview a Pack installation from a pinned Source snapshot");

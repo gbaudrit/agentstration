@@ -1,5 +1,5 @@
 @page "/settings/source-registries/discovery"
-@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = Agentstration.Web.Security.AgentstrationPolicies.PlatformAdmin)]
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "agentstration:platform-admin")]
 @implements IDisposable
 @inject ISourceRegistriesClient Client
 @inject NavigationManager Navigation

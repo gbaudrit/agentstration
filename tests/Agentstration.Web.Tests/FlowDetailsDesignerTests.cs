@@ -124,7 +124,7 @@ public sealed class FlowDetailsDesignerTests
             new(run.Id, FlowInvocationOrigin.Trigger, FlowRunTrigger.Event, "news-watcher", "news-item-42", "news-42", Guid.NewGuid().ToString("D")),
             [node], 1, null);
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run, causality: causality));
-        context.Services.AddSingleton(new ConsoleRealtimeSession(new HttpContextAccessor(), new UninitializedRequestContext()));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(new ConsoleRealtimeSession(new HttpContextAccessor(), new UninitializedRequestContext()));
         context.Services.AddSingleton(TimeProvider.System);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
 
@@ -148,7 +148,7 @@ public sealed class FlowDetailsDesignerTests
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub());
-        context.Services.AddSingleton(new ConsoleRealtimeSession(new HttpContextAccessor(), new UninitializedRequestContext()));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(new ConsoleRealtimeSession(new HttpContextAccessor(), new UninitializedRequestContext()));
         context.Services.AddSingleton(TimeProvider.System);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
 

@@ -2,10 +2,9 @@
 @page "/settings/sources/{Publisher}/{Name}"
 @implements IDisposable
 @using System.Globalization
-@using Agentstration.Management.Core
-@inject SourceConsoleManagementService Service
+@inject ISourceConsoleApiClient Service
 @inject IServiceProvider Services
-@inject ICurrentRequestContext RequestContext
+@inject ConsoleContextState ContextState
 @inject TimeProvider Clock
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
@@ -382,7 +381,7 @@ else
         {
             if (Publisher is not null && Name is not null && !string.IsNullOrWhiteSpace(ScopeRefValue))
             {
-                detail = await Service.GetAsync(ResourceScopeRef.Parse(ScopeRefValue), Publisher, Name, VersionUid, catalogLocale, RequestContext.Current.PrincipalId, lifetime.Token);
+                detail = await Service.GetAsync(ResourceScopeRef.Parse(ScopeRefValue), Publisher, Name, VersionUid, catalogLocale, lifetime.Token);
                 installedPackIdentities = (await Services.GetRequiredService<IPacksClient>().GetPacksAsync(lifetime.Token))
                     .Select(value => PackIdentityKey(value.Definition.Publisher, value.Definition.PackName))
                     .ToHashSet(StringComparer.Ordinal);
@@ -406,7 +405,7 @@ else
                 detail = null;
                 confirmDeleteSource = false;
                 deleteError = null;
-                sources = await Service.ListAsync(RequestContext.Current.PrincipalId, lifetime.Token);
+                sources = await Service.ListAsync(lifetime.Token);
             }
         }
         catch (AuthorizationDeniedException) { denied = true; }
@@ -420,14 +419,14 @@ else
         await RunAsync(async () =>
         {
             var result = importMode == "url"
-                ? await Service.ImportUrlAsync(new Uri(importUrl), importScope.Value, RequestContext.Current.PrincipalId, lifetime.Token)
-                : await Service.ImportYamlAsync(importYaml, importScope.Value, RequestContext.Current.PrincipalId, lifetime.Token);
+                ? await Service.ImportUrlAsync(new Uri(importUrl), importScope.Value, lifetime.Token)
+                : await Service.ImportYamlAsync(importYaml, importScope.Value, lifetime.Token);
             Notify("ImportComplete", F("ImportCompleteMessage", result.Source.Configuration.Definition.DisplayName, result.Version.Definition.Version));
             Navigation.NavigateTo(SourceUrl(result.Source));
         });
     }
 
-    private async Task SaveDisplayNameAsync() => await RunAsync(async () => { await Service.UpdateDisplayNameAsync(ScopeRef(), Publisher!, Name!, displayName, detail!.Source.Configuration.ETag!, RequestContext.Current.PrincipalId, lifetime.Token); Notify("SourceUpdated", T("DisplayNameSaved")); await LoadAsync(); });
+    private async Task SaveDisplayNameAsync() => await RunAsync(async () => { await Service.UpdateDisplayNameAsync(ScopeRef(), Publisher!, Name!, displayName, detail!.Source.Configuration.ETag!, lifetime.Token); Notify("SourceUpdated", T("DisplayNameSaved")); await LoadAsync(); });
     private async Task SaveRefreshPolicyAsync() => await RunAsync(async () =>
     {
         var refresh = new SourceRefreshConfiguration
@@ -438,13 +437,13 @@ else
                 .ToDictionary(value => value.Key, value => value.Value.ToPolicy(), StringComparer.Ordinal)
         };
         await Service.UpdateRefreshConfigurationAsync(ScopeRef(), Publisher!, Name!, refresh,
-            detail!.Source.Configuration.ETag!, RequestContext.Current.PrincipalId, lifetime.Token);
+            detail!.Source.Configuration.ETag!, lifetime.Token);
         Notify("SchedulingUpdated", T("SchedulingSaved"));
         await LoadAsync();
     });
-    private async Task SaveBindingsAsync() => await RunAsync(async () => { await Service.ConfigureBindingsAsync(ScopeRef(), Publisher!, Name!, detail!.SelectedVersion.Uid, bindingSelections.Values.ToArray(), detail.Bindings.ConfigurationETag, RequestContext.Current.PrincipalId, lifetime.Token); Notify("BindingsUpdated", T("BindingsSaved")); await LoadAsync(); });
-    private async Task RefreshChannelAsync(string channel) => await RunAsync(async () => { await Service.RefreshChannelAsync(ScopeRef(), Publisher!, Name!, detail!.SelectedVersion.Uid, channel, RequestContext.Current.PrincipalId, lifetime.Token); Notify("ChannelRefreshed", F("ChannelRefreshedMessage", channel)); await LoadAsync(); });
-    private async Task RefreshSourceAsync() => await RunAsync(async () => { var result = await Service.RefreshSourceAsync(ScopeRef(), Publisher!, Name!, RequestContext.Current.PrincipalId, lifetime.Token); Notify("SourceRefreshed", F("SourceRefreshedMessage", result.Version.Definition.Version)); await LoadAsync(); });
+    private async Task SaveBindingsAsync() => await RunAsync(async () => { await Service.ConfigureBindingsAsync(ScopeRef(), Publisher!, Name!, detail!.SelectedVersion.Uid, bindingSelections.Values.ToArray(), detail.Bindings.ConfigurationETag, lifetime.Token); Notify("BindingsUpdated", T("BindingsSaved")); await LoadAsync(); });
+    private async Task RefreshChannelAsync(string channel) => await RunAsync(async () => { await Service.RefreshChannelAsync(ScopeRef(), Publisher!, Name!, detail!.SelectedVersion.Uid, channel, lifetime.Token); Notify("ChannelRefreshed", F("ChannelRefreshedMessage", channel)); await LoadAsync(); });
+    private async Task RefreshSourceAsync() => await RunAsync(async () => { var result = await Service.RefreshSourceAsync(ScopeRef(), Publisher!, Name!, lifetime.Token); Notify("SourceRefreshed", F("SourceRefreshedMessage", result.Version.Definition.Version)); await LoadAsync(); });
     private async Task DeleteSourceAsync()
     {
         deletingSource = true; deleteError = null;
@@ -456,7 +455,6 @@ else
                 source.Definition.Publisher,
                 source.Name,
                 source.ETag ?? throw new InvalidOperationException("The selected Source has no ETag."),
-                RequestContext.Current.PrincipalId,
                 lifetime.Token);
             Notify("SourceDeleted", F("SourceDeletedMessage", detail.Source.Configuration.Definition.DisplayName));
             confirmDeleteSource = false;
@@ -475,13 +473,13 @@ else
         sourcePackPreview = null; packError = null; replacePack = reinstallPack; packBindingSelections.Clear(); packPreviewing = true;
         try
         {
-            sourcePackPreview = await Service.PreviewPackAsync(packSelection, [], replacePack, RequestContext.Current.PrincipalId, lifetime.Token);
+            sourcePackPreview = await Service.PreviewPackAsync(packSelection, [], replacePack, lifetime.Token);
             var preview = sourcePackPreview.Pack;
             foreach (var binding in preview.Bindings.Where(value => value.TargetAvailable && value.Target is not null))
                 packBindingSelections[binding.Name] = $"{(binding.Target!.Namespace ?? ResourceNamespace.Default).Value}:{binding.Target.Name}";
             await LoadPackBindingOptionsAsync(preview.Bindings);
             if (packBindingSelections.Count > 0)
-                sourcePackPreview = await Service.PreviewPackAsync(packSelection, SelectedPackBindings(), replacePack, RequestContext.Current.PrincipalId, lifetime.Token);
+                sourcePackPreview = await Service.PreviewPackAsync(packSelection, SelectedPackBindings(), replacePack, lifetime.Token);
         }
         catch (Exception exception) when (exception is not OperationCanceledException) { packError = exception.Message; }
         finally { packPreviewing = false; }
@@ -493,7 +491,7 @@ else
         try
         {
             var bindings = SelectedPackBindings();
-            var installed = await Service.InstallPackAsync(packSelection, sourcePackPreview!.PreviewDigest, replacePack, bindings, RequestContext.Current.PrincipalId, lifetime.Token);
+            var installed = await Service.InstallPackAsync(packSelection, sourcePackPreview!.PreviewDigest, replacePack, bindings, lifetime.Token);
             Notify("PackInstalled", F("PackInstalledMessage", installed.Value.Definition.DisplayName ?? installed.Value.Definition.PackName));
             Navigation.NavigateTo($"/packs?publisher={Uri.EscapeDataString(installed.Value.Definition.Publisher)}&name={Uri.EscapeDataString(installed.Value.Definition.PackName)}");
         }
@@ -521,7 +519,7 @@ else
         packPreviewing = true; packError = null;
         try
         {
-            sourcePackPreview = await Service.PreviewPackAsync(packSelection, SelectedPackBindings(), replacePack, RequestContext.Current.PrincipalId, lifetime.Token);
+            sourcePackPreview = await Service.PreviewPackAsync(packSelection, SelectedPackBindings(), replacePack, lifetime.Token);
         }
         catch (Exception exception) when (exception is not OperationCanceledException) { packError = exception.Message; sourcePackPreview = null; }
         finally { packPreviewing = false; }
@@ -542,7 +540,7 @@ else
             throw new SourceValidationException("source_pack_binding_invalid", "Pack binding targets must use namespace:resource-name.");
         return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
     }
-    private ResourceScopeRef? PackTargetScope() => packPreview?.TargetScope switch { ResourceScopeKind.Instance => ResourceScopeRef.Instance, ResourceScopeKind.Tenant => ResourceScopeRef.Tenant(RequestContext.Current.TenantId), _ => ResourceScopeRef.Workspace(RequestContext.Current.WorkspaceId) };
+    private ResourceScopeRef? PackTargetScope() => packPreview?.TargetScope switch { ResourceScopeKind.Instance => ResourceScopeRef.Instance, ResourceScopeKind.Tenant => ResourceScopeRef.Tenant(ContextState.Current?.TenantId ?? Guid.Empty), _ => ResourceScopeRef.Workspace(ContextState.Current?.WorkspaceId ?? Guid.Empty) };
     private string PackResourceCount(int count) => F(count == 1 ? "PackResourceCount.One" : "PackResourceCount.Many", count);
     private bool IsPackInstalled(SourcePackEntryView entry) => installedPackIdentities.Contains(PackIdentityKey(detail!.SelectedVersion.Definition.PublishedDefinition.Publisher.Name, entry.Name));
     private string PackUrl(SourcePackEntryView entry) => $"/packs?publisher={Uri.EscapeDataString(detail!.SelectedVersion.Definition.PublishedDefinition.Publisher.Name)}&name={Uri.EscapeDataString(entry.Name)}";
@@ -639,7 +637,7 @@ else
         var candidates = new List<RefreshScheduleSummary>();
         if (refresh.Source.Enabled && detail.Source.Configuration.Definition.Origin is not null)
         {
-            candidates.Add(new(SourceRefreshScheduler.GetNextDue(
+            candidates.Add(new(SourceRefreshSchedule.GetNextDue(
                 detail.Source.Observed.Definition.LastAttemptAt,
                 detail.Source.Observed.Definition.ConsecutiveFailures,
                 refresh.Source,
@@ -655,7 +653,7 @@ else
             var observed = channel.Status.Refresh?.Definition;
             var next = observed is null
                 ? now
-                : SourceRefreshScheduler.GetNextDue(observed.LastAttemptAt, observed.ConsecutiveFailures, policy,
+                : SourceRefreshSchedule.GetNextDue(observed.LastAttemptAt, observed.ConsecutiveFailures, policy,
                     $"{source.ScopeRef}|{source.Namespace}|{source.Name}|{detail.SelectedVersion.Uid:N}|{channel.Definition.Name}");
             candidates.Add(new(next, F("ChannelRefreshTarget", channel.Definition.Name)));
         }

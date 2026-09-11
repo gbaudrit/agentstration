@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Agentstration.Application;
 using Agentstration.Flow;
 using Agentstration.Flow.Contracts;
 using Agentstration.Management.Abstractions;
@@ -11,7 +10,6 @@ using Agentstration.Web.Components;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
-using Agentstration.Web.Hosting;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Microsoft.AspNetCore.Components;
@@ -201,13 +199,12 @@ public partial class Packs
         sourceDisplayName = null;
         sourceUrl = null;
         if (selected?.Value.Definition.SourceProvenance is not { } provenance) return;
-        var sourceService = Services.GetService<SourceConsoleManagementService>();
-        var requestContext = Services.GetService<ICurrentRequestContext>();
-        if (sourceService is null || requestContext is null) return;
+        var sourceService = Services.GetService<ISourceConsoleApiClient>();
+        if (sourceService is null) return;
 
         try
         {
-            var source = (await sourceService.ListAsync(requestContext.Current.PrincipalId, cancellation.Token))
+            var source = (await sourceService.ListAsync(cancellation.Token))
                 .SingleOrDefault(item => item.Source.Source.Uid == provenance.SourceUid);
             if (source is null) return;
 

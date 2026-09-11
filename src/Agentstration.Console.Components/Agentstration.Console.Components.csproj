@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <RootNamespace>Agentstration.Web</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Agentstration.Web.Tests" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="YamlDotNet" />
+    <ProjectReference Include="../Agentstration.Console.Client/Agentstration.Console.Client.csproj" />
+    <ProjectReference Include="../Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
+    <ProjectReference Include="../Agentstration.Web.FlowDesigner/Agentstration.Web.FlowDesigner.csproj" />
+    <ProjectReference Include="../Agentstration.Workplace.Components/Agentstration.Workplace.Components.csproj" />
+  </ItemGroup>
+</Project>
