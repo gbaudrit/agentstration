@@ -20,7 +20,7 @@ else
 {
     @if (interaction is null)
     {
-        <div class="workplace-heading" data-testid="workplace-home">
+        <div class="workplace-heading">
             <div><p class="eyebrow">@T("Workspace")</p><h1>@(workspace?.DisplayName ?? "Workplace")</h1></div>
             <RealtimeStatus Connected="RealtimeConnected" />
         </div>
@@ -40,7 +40,7 @@ else
             <a href="@($"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/notifications")"><strong>@unread</strong><span>@T("UnreadUpdates")</span></a>
         </section>
     }
-    <div class="workplace-shell">
+    <div class="workplace-shell" data-testid="workplace-home">
         <div class="workplace-primary">
             @if (interaction is null)
             {

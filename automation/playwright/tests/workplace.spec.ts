@@ -25,7 +25,7 @@ const formEntry: CreateEntryInput = {
     primary: true,
   },
   targetFlow: 'universal-router',
-  taskCreationMode: 'Never',
+  taskCreationMode: 'Automatic',
   allowConversation: true,
   streamResponse: true,
   suggestions: [],
