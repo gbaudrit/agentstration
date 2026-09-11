@@ -2,7 +2,7 @@
 <div class="orchestration-editor-grid">
     <fieldset class="orchestration-configuration" disabled="@IsReadOnly">
         <div class="orchestration-control-column">
-            <section class="panel orchestration-participants-panel">
+            <section class="panel orchestration-participants-panel" data-testid="flow-participants-section">
                 <div class="panel-header orchestration-section-header"><div><p class="eyebrow">@T("TeamEyebrow")</p><h2>@T("Participants")</h2><p>@T("ParticipantsHelp")</p></div><span class="selection-count">@SelectedCount(Model.ParticipantIds.Count)</span></div>
                 @if (Agents.Count == 0)
                 {
@@ -19,7 +19,7 @@
                                 <span class="agent-avatar">@Initial(agent.Name)</span>
                                 <span class="agent-copy"><strong>@agent.Name</strong><small><code>@agent.Id</code><span>@agent.ModelProfile</span></small></span>
                                 <span class="agent-status">@agent.Status</span>
-                                <input type="checkbox" checked="@selected" @onchange="eventArgs => ToggleParticipant(agent.Id, eventArgs)" aria-label="@agent.Name" />
+                                <input type="checkbox" checked="@selected" @onchange="eventArgs => ToggleParticipant(agent.Id, eventArgs)" aria-label="@agent.Name" data-testid="flow-participant" data-agent-id="@agent.Id" />
                             </label>
                         }
                         @if (!FilteredAgents.Any())
@@ -46,10 +46,10 @@
                 }
             </section>
 
-            <section class="panel orchestration-strategy-panel">
+            <section class="panel orchestration-strategy-panel" data-testid="flow-strategy-section">
                 <div class="panel-header orchestration-section-header"><div><p class="eyebrow">@T("BehaviorEyebrow")</p><h2>@T("Strategy")</h2><p>@T("StrategyHelp")</p></div></div>
                 <label class="strategy-picker"><span>@T("StrategyMode")</span>
-                    <InputSelect @bind-Value="Model.Strategy" @bind-Value:after="StrategyChanged">
+                    <InputSelect @bind-Value="Model.Strategy" @bind-Value:after="StrategyChanged" data-testid="flow-strategy">
                         @foreach (var strategy in Enum.GetValues<FlowOrchestrationStrategy>()) { <option value="@strategy">@Label(strategy)</option> }
                     </InputSelect>
                     <small>@T($"StrategyHelp.{Model.Strategy}")</small>
@@ -65,20 +65,21 @@
                             <p class="strategy-note"><UiIcon Name="activity" />@T("ConcurrentHelp")</p>
                             break;
                         case FlowOrchestrationStrategy.Handoff:
-                            <label>@T("InitialParticipant")<InputSelect @bind-Value="Model.InitialParticipant">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</InputSelect></label>
-                            <div class="panel-header handoff-heading"><div><h3>@T("HandoffRoutes")</h3><p>@T("HandoffRoutesHelp")</p></div><button type="button" class="button-secondary" disabled="@(Model.ParticipantIds.Count < 2)" @onclick="AddRoute">@T("AddRoute")</button></div>
-                            @foreach (var route in Model.Handoffs.ToArray())
+                            <label>@T("InitialParticipant")<InputSelect @bind-Value="Model.InitialParticipant" data-testid="flow-initial-participant">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</InputSelect></label>
+                            <div class="panel-header handoff-heading"><div><h3>@T("HandoffRoutes")</h3><p>@T("HandoffRoutesHelp")</p></div><button type="button" class="button-secondary" disabled="@(Model.ParticipantIds.Count < 2)" @onclick="AddRoute" data-testid="flow-add-route">@T("AddRoute")</button></div>
+                            @for (var routeIndex = 0; routeIndex < Model.Handoffs.Count; routeIndex++)
                             {
-                                <div class="handoff-route">
-                                    <InputSelect @bind-Value="route.From">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</InputSelect>
+                                var route = Model.Handoffs[routeIndex];
+                                <div class="handoff-route" data-testid="flow-handoff-route" data-route-index="@routeIndex" @key="route">
+                                    <InputSelect @bind-Value="route.From" data-testid="flow-handoff-from">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</InputSelect>
                                     <span>→</span>
-                                    <InputSelect @bind-Value="route.To">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</InputSelect>
+                                    <InputSelect @bind-Value="route.To" data-testid="flow-handoff-to">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</InputSelect>
                                     <button type="button" class="button-danger" @onclick="() => Model.Handoffs.Remove(route)" aria-label="@T("DeleteRoute")">×</button>
                                 </div>
                             }
-                            <label class="check-option"><InputCheckbox @bind-Value="Model.Autonomous" /><span><strong>@T("AutonomousHandoffs")</strong></span></label>
-                            <label>@T("MaximumTurns")<InputNumber @bind-Value="Model.MaximumTurnsPerParticipant" /></label>
-                            <label>@T("TerminationPhrase")<InputText @bind-Value="Model.TerminationPhrase" /></label>
+                            <label class="check-option"><InputCheckbox @bind-Value="Model.Autonomous" data-testid="flow-autonomous-handoffs" /><span><strong>@T("AutonomousHandoffs")</strong></span></label>
+                            <label>@T("MaximumTurns")<InputNumber @bind-Value="Model.MaximumTurnsPerParticipant" data-testid="flow-maximum-turns" /></label>
+                            <label>@T("TerminationPhrase")<InputText @bind-Value="Model.TerminationPhrase" data-testid="flow-termination-phrase" /></label>
                             break;
                         case FlowOrchestrationStrategy.GroupChat:
                             <label>@T("MaximumIterations")<InputNumber @bind-Value="Model.MaximumIterations" /></label>
@@ -95,7 +96,7 @@
 
         </div>
     </fieldset>
-    <section class="panel orchestration-preview-panel">
+    <section class="panel orchestration-preview-panel" data-testid="flow-execution-preview">
         <div class="panel-header orchestration-preview-header"><div><h2>@T("ExecutionPreview")</h2><p>@T("ExecutionPreviewHelp")</p></div><StatusBadge Text="@Label(Model.Strategy)" Status="UiStatus.Info" /></div>
         <OrchestrationPreview Model="Model" Agents="Agents" />
     </section>

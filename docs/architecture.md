@@ -454,3 +454,5 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0106: ToolDefinitions publish Flow-backed MCP Tools
 - ADR-0107: notification channels are delivery Flows
 - ADR-0108: Flow Run causality is a bounded read model
+- ADR-0109: product-owned reusable browser journeys
+- ADR-0110: dedicated Workspaces for browser campaign data isolation

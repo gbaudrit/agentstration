@@ -31,7 +31,7 @@ else
     {
         <p class="muted"><span class="read-only-badge">@T("ReadOnly")</span> @T("Namespace") <code>@FlowResourceNamespace.Value</code> · @T("PublishedVersion") <strong>@publishedVersion</strong></p>
     }
-    <EditForm Model="model" OnValidSubmit="SaveAsync">
+    <EditForm Model="model" OnValidSubmit="SaveAsync" data-testid="flow-orchestration-editor">
         <fieldset class="panel orchestration-metadata" disabled="@IsReadOnly">
             <div class="form-columns"><label>@T("TechnicalName")<input value="@model.Name" readonly /></label><label>@T("CurrentDefinitionVersion")<InputText @bind-Value="model.Version" /></label><ResourceScopeFormField ResourceKind="@ResourceKinds.Flow" @bind-Value="selectedScope" Disabled="true" /></div>
             <label>@T("Description")<InputTextArea @bind-Value="model.Description" /></label>
@@ -39,14 +39,14 @@ else
         </fieldset>
         <OrchestrationDefinitionEditor Model="model" Agents="agents" IsReadOnly="@IsReadOnly" />
         @if (error is not null) { <p class="error-panel orchestration-message">@error</p> }
-        @if (message is not null) { <p class="success-panel orchestration-message">@message</p> }
+        @if (message is not null) { <p class="success-panel orchestration-message" data-testid="flow-status-message" data-published-version="@lastPublishedVersion">@message</p> }
         @if (!IsReadOnly)
         {
             <div class="orchestration-actions">
                 <span class="save-state">@T("EtagProtected") · @(saving ? T("Saving") : T("Ready"))</span>
                 <button type="submit" class="button-secondary" disabled="@saving">@T("Save")</button>
                 <label>@T("PublishVersion")<input @bind="publishVersion" /></label>
-                <button type="button" class="button-primary" disabled="@saving" @onclick="PublishAsync">@T("PublishAndActivate")</button>
+                <button type="button" class="button-primary" disabled="@saving" @onclick="PublishAsync" data-testid="flow-publish-and-activate">@T("PublishAndActivate")</button>
             </div>
         }
     </EditForm>
@@ -68,6 +68,7 @@ else
     private bool loading = true;
     private bool saving;
     private string? publishedVersion;
+    private string? lastPublishedVersion;
     private ResourceNamespace FlowResourceNamespace => string.IsNullOrWhiteSpace(FlowNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(FlowNamespace);
     private bool IsReadOnly => !FlowResourceNamespace.IsDefault;
     private string DetailsUrl => IsReadOnly
@@ -136,6 +137,7 @@ else
         {
             saving = true; message = null;
             var published = await Client.CreateFlowVersionAsync(FlowId, new CreateFlowVersionRequest(publishVersion, true), cancellation.Token);
+            lastPublishedVersion = published.Version;
             message = T("VersionPublished", published.Version);
             publishVersion = NextVersion(published.Version);
         }

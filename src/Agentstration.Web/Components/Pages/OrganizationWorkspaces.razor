@@ -13,19 +13,19 @@ else
 {
     @if (CanCreate)
     {
-        <section class="panel workspace-create-panel">
+        <section class="panel workspace-create-panel" data-testid="workspace-create-form" data-interactive="@(interactive ? "true" : "false")">
             <div class="panel-header"><h2>@T("CreateWorkspace")</h2></div>
             <div class="workspace-create-form">
-                <label><span>@T("DisplayName")</span><input value="@displayName" @oninput="DisplayNameChanged" /></label>
-                <label><span>@T("TechnicalName")</span><input value="@technicalName" @oninput="TechnicalNameChanged" placeholder="support" /></label>
-                <button class="button-primary" @onclick="CreateAsync" disabled="@(!CanSubmit)">@(busy ? T("Creating") : T("CreateWorkspace"))</button>
+                <label><span>@T("DisplayName")</span><input value="@displayName" @oninput="DisplayNameChanged" data-testid="workspace-display-name" /></label>
+                <label><span>@T("TechnicalName")</span><input value="@technicalName" @oninput="TechnicalNameChanged" placeholder="support" data-testid="workspace-technical-name" /></label>
+                <button class="button-primary" @onclick="CreateAsync" disabled="@(!CanSubmit)" data-testid="workspace-create">@(busy ? T("Creating") : T("CreateWorkspace"))</button>
             </div>
             @if (!string.IsNullOrWhiteSpace(operationError)) { <p class="inline-warning" role="alert">@operationError</p> }
         </section>
     }
     <DataGrid TItem="Agentstration.Management.Abstractions.Workspace" Items="workspaces">
         <Header><tr><th>@T("Workspace")</th><th>@T("TechnicalName")</th><th>@T("Status")</th><th>@T("Created")</th><th>@T("Context")</th></tr></Header>
-        <Row Context="workspace"><tr><td><strong>@workspace.DisplayName</strong><br /><small>@workspace.Id</small></td><td><code>@workspace.Name</code></td><td><StatusBadge Text="@T($"Status.{workspace.Status}")" Status="UiStatus.Success" /></td><td>@workspace.CreatedAt.ToLocalTime().ToString("g")</td><td>@if(workspace.Id == ContextState.Current?.WorkspaceId){<StatusBadge Text="@T("Current")" Status="UiStatus.Info" />}</td></tr></Row>
+        <Row Context="workspace"><tr data-testid="workspace-row" data-workspace-id="@workspace.Id" data-workspace-name="@workspace.Name"><td><strong>@workspace.DisplayName</strong><br /><small>@workspace.Id</small></td><td><code>@workspace.Name</code></td><td><StatusBadge Text="@T($"Status.{workspace.Status}")" Status="UiStatus.Success" /></td><td>@workspace.CreatedAt.ToLocalTime().ToString("g")</td><td>@if(workspace.Id == ContextState.Current?.WorkspaceId){<StatusBadge Text="@T("Current")" Status="UiStatus.Info" />}</td></tr></Row>
     </DataGrid>
 }
 
@@ -38,11 +38,18 @@ else
     private bool loading = true;
     private bool busy;
     private bool technicalNameEdited;
+    private bool interactive;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private bool CanCreate => ContextState.HasPermission(AuthorizationPermissions.WorkspacesWrite);
     private bool CanSubmit => !busy && displayName.Trim().Length >= 2 && technicalName.Trim().Length >= 2;
 
     protected override async Task OnInitializedAsync() => await ReloadAsync();
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender) return;
+        interactive = true;
+        StateHasChanged();
+    }
     private async Task ReloadAsync()
     {
         loading = true;
