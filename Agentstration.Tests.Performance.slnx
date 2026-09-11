@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/tests/performance/">
+    <Project Path="tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj" />
+  </Folder>
+</Solution>
