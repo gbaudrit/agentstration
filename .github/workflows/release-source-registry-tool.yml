@@ -87,9 +87,10 @@ jobs:
           -p:Version=${{ steps.version.outputs.package-version }}
       - name: Test tool
         run: >-
-          dotnet test tests/Agentstration.Tools.SourceRegistry.Tests/Agentstration.Tools.SourceRegistry.Tests.csproj
+          dotnet test --project tests/Agentstration.Tools.SourceRegistry.Tests/Agentstration.Tools.SourceRegistry.Tests.csproj
           --configuration Release
           --no-build
+          --minimum-expected-tests 1
           -p:Version=${{ steps.version.outputs.package-version }}
       - name: Smoke-test package
         shell: pwsh

@@ -20,7 +20,11 @@
     <ProjectReference Include="../Agentstration.Work.Storage.PostgreSql/Agentstration.Work.Storage.PostgreSql.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="Agentstration.Management.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Management.Api.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Management.Bootstrap.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Management.Security.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Management.Aep.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Management.Sources.Tests" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.AI" />

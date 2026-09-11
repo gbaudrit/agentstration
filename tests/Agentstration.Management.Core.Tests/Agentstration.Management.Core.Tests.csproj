@@ -1,0 +1,8 @@
+<Project Sdk="MSTest.Sdk/4.3.3">
+  <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Resources/Agentstration.Resources.csproj" />
+  </ItemGroup>
+</Project>

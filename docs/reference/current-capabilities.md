@@ -430,7 +430,7 @@ The capture creates a correlated `gen_ai.http.payload_capture` span between the 
 
 ```powershell
 dotnet build Agentstration.slnx --configuration Release
-dotnet test Agentstration.slnx --configuration Release
+dotnet test --solution Agentstration.slnx --configuration Release --minimum-expected-tests 1
 ```
 
 Warnings are errors, .NET analyzers are enabled, and NuGet audit findings fail restore. The test suite covers Management, Work, Workplace, Flow, Runtime, Triggers, Packs, Agents, workspace isolation, MCP infrastructure, REST startup, and dependency rules.

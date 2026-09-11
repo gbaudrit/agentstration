@@ -15,28 +15,11 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
-[TestClass]
-public sealed partial class ModelManagementApiTests
+public abstract class ModelManagementApiTestBase
 {
-    private static WebApplicationFactory<Program> Factory() =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:ollama-extension", "Endpoint=http://127.0.0.1:1");
-            builder.UseSetting("Logging:LogLevel:Default", "Warning");
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<IModelProviderDiscovery>();
-                services.RemoveAll<IModelProviderCapabilitiesResolver>();
-                services.RemoveAll<IExtensionInspector>();
-                services.AddSingleton<UnavailableModelProviderAdapter>();
-                services.AddSingleton<IModelProviderDiscovery>(provider => provider.GetRequiredService<UnavailableModelProviderAdapter>());
-                services.AddSingleton<IModelProviderCapabilitiesResolver>(provider => provider.GetRequiredService<UnavailableModelProviderAdapter>());
-                services.AddSingleton<IExtensionInspector>(provider => provider.GetRequiredService<UnavailableModelProviderAdapter>());
-            });
-        });
+    protected static WebApplicationFactory<Program> Factory() => new ManagementApiTestFactory();
 
-    private static WebApplicationFactory<Program> DiagnosticFactory() => Factory().WithWebHostBuilder(builder =>
+    protected static WebApplicationFactory<Program> DiagnosticFactory() => Factory().WithWebHostBuilder(builder =>
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<IModelProviderDiscovery>();
@@ -45,7 +28,7 @@ public sealed partial class ModelManagementApiTests
             services.AddSingleton<IModelProviderCapabilitiesResolver, DiagnosticModelProvider>();
         }));
 
-    private static Task<RequestContext> GetBootstrapContextAsync(WebApplicationFactory<Program> factory) =>
+    protected static Task<RequestContext> GetBootstrapContextAsync(WebApplicationFactory<Program> factory) =>
         factory.Services
             .GetRequiredService<ILocalEnvironmentBootstrapper>()
             .EnsureInitializedAsync(default);
@@ -123,7 +106,7 @@ public sealed partial class ModelManagementApiTests
                 UnavailableDetails));
     }
 
-    private sealed class ConfiguredEndpointInspector : IExtensionInspector
+    protected sealed class ConfiguredEndpointInspector : IExtensionInspector
     {
         public bool CanHandle(string providerType) => true;
         public bool CanInspectEndpoint(Uri endpoint) => true;
@@ -144,7 +127,7 @@ public sealed partial class ModelManagementApiTests
                 []));
     }
 
-    private sealed class MigrationExtensionAdapter : IExtensionInspector, IExtensionOptionsMigrator
+    protected sealed class MigrationExtensionAdapter : IExtensionInspector, IExtensionOptionsMigrator
     {
         private static readonly JsonElement SourceSchema = JsonSerializer.SerializeToElement(new
         {
@@ -202,7 +185,7 @@ public sealed partial class ModelManagementApiTests
         }
     }
 
-    private static CreateModelProfileRequest Request(string name, string model) => new(
+    protected static CreateModelProfileRequest Request(string name, string model) => new(
         name,
         new ModelProfileProperties
         {
@@ -212,4 +195,33 @@ public sealed partial class ModelManagementApiTests
             Model = new ModelSelection { Name = model },
             Generation = new ModelGenerationOptions { Temperature = 0.3, MaxOutputTokens = 512 }
         });
+
+    private sealed class ManagementApiTestFactory : ApiOnlyWebApplicationFactory
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            base.ConfigureWebHost(builder);
+            builder.UseSetting("ConnectionStrings:ollama-extension", "Endpoint=http://127.0.0.1:1");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IModelProviderDiscovery>();
+                services.RemoveAll<IModelProviderCapabilitiesResolver>();
+                services.RemoveAll<IExtensionInspector>();
+                services.AddSingleton<UnavailableModelProviderAdapter>();
+                services.AddSingleton<IModelProviderDiscovery>(provider => provider.GetRequiredService<UnavailableModelProviderAdapter>());
+                services.AddSingleton<IModelProviderCapabilitiesResolver>(provider => provider.GetRequiredService<UnavailableModelProviderAdapter>());
+                services.AddSingleton<IExtensionInspector>(provider => provider.GetRequiredService<UnavailableModelProviderAdapter>());
+            });
+        }
+    }
+}
+
+internal class ApiOnlyWebApplicationFactory : WebApplicationFactory<Program>
+{
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseEnvironment("Testing");
+        builder.UseSetting("Agentstration:Testing:ApiOnly", "true");
+        builder.UseSetting("Logging:LogLevel:Default", "Warning");
+    }
 }
