@@ -426,7 +426,7 @@ The validated baseline for this implementation is:
 
 ```text
 dotnet build Agentstration.slnx --configuration Release --no-restore
-dotnet test Agentstration.slnx --configuration Release --no-build
+dotnet test --solution Agentstration.slnx --configuration Release --no-build --minimum-expected-tests 1
 
 Build: 0 warnings, 0 errors
 Tests: 461 passed, 0 failed, 2 optional provider integration tests skipped

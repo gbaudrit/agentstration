@@ -1,0 +1,68 @@
+name: Storage performance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: storage-performance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    name: ${{ matrix.provider }} full workload
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        provider: [Sqlite, PostgreSql]
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: agentstration
+          POSTGRES_USER: agentstration
+          POSTGRES_PASSWORD: agentstration-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agentstration -d agentstration"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      AGENTSTRATION_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=agentstration;Username=agentstration;Password=agentstration-ci-only
+      AGENTSTRATION_STORAGE_BENCHMARK_PROVIDER: ${{ matrix.provider }}
+      AGENTSTRATION_STORAGE_BENCHMARK_OPERATIONS: 500
+      AGENTSTRATION_STORAGE_BENCHMARK_CONCURRENCY: 16
+      AGENTSTRATION_STORAGE_BENCHMARK_REPORT: ${{ runner.temp }}/storage-benchmark-${{ matrix.provider }}.json
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Restore performance tests
+        run: dotnet restore tests/Agentstration.Performance.Tests/Agentstration.Performance.Tests.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
+      - name: Build performance tests
+        run: dotnet build tests/Agentstration.Performance.Tests/Agentstration.Performance.Tests.csproj --configuration Release --no-restore
+      - name: Run full storage workload
+        run: dotnet tests/Agentstration.Performance.Tests/bin/Release/net10.0/Agentstration.Performance.Tests.dll --filter "Name=ReportsConcurrentRelationalWriteMetrics" --minimum-expected-tests 1 --progress off
+      - name: Display report
+        if: always()
+        shell: pwsh
+        run: if (Test-Path -LiteralPath $env:AGENTSTRATION_STORAGE_BENCHMARK_REPORT) { Get-Content -LiteralPath $env:AGENTSTRATION_STORAGE_BENCHMARK_REPORT }
+      - name: Upload storage report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: storage-benchmark-${{ matrix.provider }}-full
+          path: ${{ runner.temp }}/storage-benchmark-${{ matrix.provider }}.json
+          if-no-files-found: error

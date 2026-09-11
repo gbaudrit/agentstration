@@ -22,11 +22,12 @@ Use MSTest for behavior changes and keep the default test suite deterministic an
 ```powershell
 dotnet restore Agentstration.slnx
 dotnet build Agentstration.slnx --configuration Release --no-restore
-dotnet test Agentstration.slnx --configuration Release --no-build
+dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 1
+dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 1
 ./scripts/ci/verify-dotnet-format.ps1 -BaseRevision "origin/main"
 ```
 
-The format script checks changed C# and Razor files in both solutions. The autonomous AEP subtree has a larger standalone solution; when it changes, also restore, build, and test `aep/Aep.slnx`.
+The fast and integration lanes together cover the complete required functional suite. Performance and live-provider workloads are explicit opt-ins described in the [test lane guide](docs/contributing/testing.md). The format script checks changed C# and Razor files in both product solutions. The autonomous AEP subtree has a larger standalone solution; when it changes, also restore, build, and test `aep/Aep.slnx`.
 
 If documentation changed, run:
 

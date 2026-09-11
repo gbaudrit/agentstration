@@ -7,7 +7,8 @@ using Agentstration.Resources;
 
 namespace Agentstration.Management.Tests;
 
-public sealed partial class ModelManagementApiTests
+[TestClass]
+public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
     public void ResourceScopePolicyMatchesTheInitialOwnershipModel()

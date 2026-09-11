@@ -4,6 +4,7 @@ using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.ModelProviders;
 using Agentstration.Resources;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -12,14 +13,56 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
-public sealed partial class ModelManagementApiTests
+[TestClass]
+public sealed class AepEnrollmentTests
 {
-    private static WebApplicationFactory<Program> EnrollmentFactory() => Factory().WithWebHostBuilder(builder =>
-        builder.ConfigureServices(services =>
+    private static WebApplicationFactory<Program> EnrollmentFactory() => new AepEnrollmentTestFactory();
+
+    private static Task<RequestContext> GetBootstrapContextAsync(WebApplicationFactory<Program> factory) =>
+        factory.Services
+            .GetRequiredService<ILocalEnvironmentBootstrapper>()
+            .EnsureInitializedAsync(default);
+
+    private sealed class AepEnrollmentTestFactory : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            services.RemoveAll<IPlatformAuthorizationService>();
-            services.AddSingleton<IPlatformAuthorizationService, AllowEnrollmentPlatformAdministrator>();
-        }));
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Testing:ApiOnly", "true");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IPlatformAuthorizationService>();
+                services.RemoveAll<IExtensionInspector>();
+                services.AddSingleton<IPlatformAuthorizationService, AllowEnrollmentPlatformAdministrator>();
+                services.AddSingleton<IExtensionInspector, UnavailableExtensionInspector>();
+            });
+        }
+    }
+
+    private sealed class UnavailableExtensionInspector : IExtensionInspector
+    {
+        public bool CanHandle(string providerType) => true;
+        public bool CanInspectEndpoint(Uri endpoint) => true;
+
+        public ValueTask<ExtensionInspection> InspectAsync(
+            ModelProviderConfiguration provider,
+            CancellationToken cancellationToken = default) =>
+            InspectAsync(provider.Name, provider.Endpoint, cancellationToken);
+
+        public ValueTask<ExtensionInspection> InspectAsync(
+            string registrationName,
+            Uri endpoint,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ExtensionInspection(
+                registrationName,
+                endpoint,
+                "unavailable",
+                null,
+                [],
+                [],
+                "The test extension is intentionally unavailable."));
+    }
 
     [TestMethod]
     public async Task PairingCodeCanBeDisabledAndConfigurationCanLockTheMode()

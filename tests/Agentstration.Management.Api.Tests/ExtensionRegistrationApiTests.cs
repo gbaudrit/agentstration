@@ -15,12 +15,13 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
-public sealed partial class ModelManagementApiTests
+[TestClass]
+public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
     public async Task SeededOllamaProviderUsesAepExtensionEndpointInsteadOfNativeOllamaEndpoint()
     {
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        await using var factory = new ApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("AI:Provider", "Managed");
@@ -42,7 +43,7 @@ public sealed partial class ModelManagementApiTests
     [TestMethod]
     public async Task SeededLlamaCppProviderUsesItsAepExtensionEndpoint()
     {
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        await using var factory = new ApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("AI:Provider", "Managed");
@@ -64,7 +65,7 @@ public sealed partial class ModelManagementApiTests
     [TestMethod]
     public async Task SeededLocalAiProviderUsesItsAepExtensionEndpoint()
     {
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        await using var factory = new ApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("AI:Provider", "Managed");
@@ -85,7 +86,7 @@ public sealed partial class ModelManagementApiTests
     [TestMethod]
     public async Task GitSourceExtensionConfigurationUsesTheAspireRegistrationIdentity()
     {
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        await using var factory = new ApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.Git:Endpoint", "http://localhost:5295");
@@ -143,7 +144,7 @@ public sealed partial class ModelManagementApiTests
         using var client = factory.CreateClient();
 
         using var discoveryResponse = await client.PostAsync("/api/extensions/discover", null);
-        Assert.AreEqual(HttpStatusCode.MethodNotAllowed, discoveryResponse.StatusCode);
+        Assert.AreEqual(HttpStatusCode.NotFound, discoveryResponse.StatusCode);
     }
 
     [TestMethod]

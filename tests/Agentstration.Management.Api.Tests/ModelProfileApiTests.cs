@@ -15,12 +15,13 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
-public sealed partial class ModelManagementApiTests
+[TestClass]
+public sealed class ModelProfileApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
     public async Task ManagedHostCompositionUsesPersistedModelProfileResolver()
     {
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        await using var factory = new ApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("AI:Provider", "Managed");

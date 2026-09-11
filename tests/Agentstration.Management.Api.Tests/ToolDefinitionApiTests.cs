@@ -15,7 +15,8 @@ using ModelContextProtocol.Client;
 
 namespace Agentstration.Management.Tests;
 
-public sealed partial class ModelManagementApiTests
+[TestClass]
+public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
     public async Task ToolDefinitionCrudMaterializesInternalProviderAndGovernedTool()
