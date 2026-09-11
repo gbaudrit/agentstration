@@ -273,7 +273,9 @@ internal static partial class PostmanProgram
         return new JsonObject
         {
             ["mode"] = "raw",
-            ["raw"] = example?.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) ?? "{}",
+            ["raw"] = example is null
+                ? "{}"
+                : NormalizeLineEndings(example.ToJsonString(new JsonSerializerOptions { WriteIndented = true })),
             ["options"] = new JsonObject { ["raw"] = new JsonObject { ["language"] = "json" } }
         };
     }
@@ -373,7 +375,7 @@ internal static partial class PostmanProgram
                 .Select(value => $"{value.Name}: {(value.Value.TryGetProperty("description", out var responseDescription) ? responseDescription.GetString() : "Response")}");
             lines.Add("Responses: " + string.Join("; ", outcomes));
         }
-        return string.Join(Environment.NewLine + Environment.NewLine, lines);
+        return string.Join("\n\n", lines.Select(NormalizeLineEndings));
     }
 
     private static string PreferredResponseMediaType(JsonElement operation)
@@ -471,7 +473,11 @@ internal static partial class PostmanProgram
         || path.StartsWith("/health/", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase);
 
-    private static string Serialize(JsonNode node) => node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine;
+    private static string Serialize(JsonNode node) =>
+        NormalizeLineEndings(node.ToJsonString(new JsonSerializerOptions { WriteIndented = true })) + "\n";
+
+    private static string NormalizeLineEndings(string value) =>
+        value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
 
     private static bool SameContent(string current, string expected) =>
         string.Equals(current.Replace("\r\n", "\n", StringComparison.Ordinal), expected.Replace("\r\n", "\n", StringComparison.Ordinal), StringComparison.Ordinal);
