@@ -58,6 +58,10 @@ public sealed class LocalEnvironmentBootstrapper(
         if (!assignments.Any(value => value.RoleDefinitionId == owner.Id && string.Equals(value.Scope, tenantScope, StringComparison.Ordinal)))
             await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), tenant.Id, principal.Id, PrincipalType.User, owner.Id, tenantScope), cancellationToken);
 
+        if (options.GrantPlatformAdministrator
+            && !await store.IsPlatformAdministratorAsync(principal.Id, cancellationToken))
+            await store.AddPlatformAdministratorAsync(new PlatformAdministrator(principal.Id, now), cancellationToken);
+
         return new RequestContext(principal.Id, tenant.Id, workspace.Id);
     }
 }

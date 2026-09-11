@@ -17,6 +17,7 @@
     </Actions>
 </PageHeader>
 
+<div data-testid="distribution-extensions">
 <ResourceTabs Label="@T("ExtensionTabs")">
     <button id="extensions-tab-summary" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Summary ? "true" : "false")" aria-controls="extensions-panel-summary" class="@(activeTab == ExtensionTab.Summary ? "active" : null)" data-testid="extensions-tab-summary" @onclick="() => activeTab = ExtensionTab.Summary">@T("Tab.Summary")</button>
     <button id="extensions-tab-catalog" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Catalog ? "true" : "false")" aria-controls="extensions-panel-catalog" class="@(activeTab == ExtensionTab.Catalog ? "active" : null)" data-testid="extensions-tab-catalog" @onclick="() => activeTab = ExtensionTab.Catalog">@T("Tab.Extensions")</button>
@@ -263,3 +264,4 @@
 }
 
 <ConfirmationDialog IsOpen="@(pendingUnenrollment is not null)" Title="@T("UnenrollExtension")" Message="@T("UnenrollExtensionMessage")" ConfirmLabel="@T("ConfirmUnenrollExtension")" OnConfirm="UnenrollAsync" OnCancel="CancelUnenrollment" />
+</div>

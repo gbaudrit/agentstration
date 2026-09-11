@@ -47,6 +47,15 @@ npm run capture -- --plan examples/submit-workplace-prompt.capture-plan.json --o
 
 The local fixture provides the deterministic `default` Workspace, `home` dashboard, and `quick-answer` Entry. For an external instance, prepare those resources explicitly or replace them in the capture plan.
 
+Offline Source import and Pack authoring reuse the distribution page object and checked-in journey inputs:
+
+```powershell
+npm run capture -- --plan examples/import-offline-source.capture-plan.json --output .work/offline-source
+npm run capture -- --plan examples/create-local-pack-project.capture-plan.json --output .work/local-pack
+```
+
+The managed fixture starts the Git and Ollama AEP extensions on loopback and performs no Registry refresh. External runs mutate the selected Workspace, so use a disposable campaign Workspace.
+
 The solution-discovery video Flow and Entry are captured with:
 
 ```powershell

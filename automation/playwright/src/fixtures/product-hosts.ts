@@ -34,10 +34,11 @@ export async function startProductHosts(): Promise<ProductHosts> {
   const dataDirectory = path.join(workDirectory, 'data');
   await fs.mkdir(dataDirectory, { recursive: true });
 
-  const [consolePort, workplacePort, extensionPort] = await Promise.all([freePort(), freePort(), freePort()]);
+  const [consolePort, workplacePort, extensionPort, gitExtensionPort] = await Promise.all([freePort(), freePort(), freePort(), freePort()]);
   const consoleUrl = `http://127.0.0.1:${consolePort}`;
   const workplaceUrl = `http://127.0.0.1:${workplacePort}`;
   const extensionUrl = `http://127.0.0.1:${extensionPort}`;
+  const gitExtensionUrl = `http://127.0.0.1:${gitExtensionPort}`;
   const bootstrapPath = path.join(repositoryRoot, 'deploy', 'bootstrap', 'profiles');
 
   const fakeOllama = await startFakeOllama();
@@ -47,11 +48,21 @@ export async function startProductHosts(): Promise<ProductHosts> {
     Logging__EventLog__LogLevel__Default: 'None',
     Ollama__Endpoint: fakeOllama.url,
   });
+  const gitExtension = runDotnet('src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj', path.join(workDirectory, 'git-extension.log'), {
+    ASPNETCORE_ENVIRONMENT: 'Development',
+    ASPNETCORE_URLS: gitExtensionUrl,
+    Logging__EventLog__LogLevel__Default: 'None',
+    GitSourceProvider__AllowLocalRepositories: 'true',
+  });
 
   try {
-    await waitUntilHealthy(`${extensionUrl}/health`, modelExtension);
+    await Promise.all([
+      waitUntilHealthy(`${extensionUrl}/health`, modelExtension),
+      waitUntilHealthy(`${gitExtensionUrl}/health`, gitExtension),
+    ]);
   } catch (error) {
     await stopProcess(modelExtension);
+    await stopProcess(gitExtension);
     await fakeOllama.stop();
     throw error;
   }
@@ -79,6 +90,8 @@ export async function startProductHosts(): Promise<ProductHosts> {
   }, [
     '--Agentstration:Extensions:Agentstration.Extensions.Ollama:RegistrationName=ollama-extension',
     `--Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint=${extensionUrl}`,
+    '--Agentstration:Extensions:Agentstration.Extensions.Git:RegistrationName=git-extension',
+    `--Agentstration:Extensions:Agentstration.Extensions.Git:Endpoint=${gitExtensionUrl}`,
   ]);
 
   let workplaceHost: ManagedProcess | undefined;
@@ -96,6 +109,7 @@ export async function startProductHosts(): Promise<ProductHosts> {
     await stopProcess(workplaceHost);
     await stopProcess(consoleHost);
     await stopProcess(modelExtension);
+    await stopProcess(gitExtension);
     await fakeOllama.stop();
     throw error;
   }
@@ -107,6 +121,7 @@ export async function startProductHosts(): Promise<ProductHosts> {
       await stopProcess(workplaceHost);
       await stopProcess(consoleHost);
       await stopProcess(modelExtension);
+      await stopProcess(gitExtension);
       await fakeOllama.stop();
     },
   };
@@ -173,7 +188,7 @@ function runDotnet(project: string, logFile: string, environment: NodeJS.Process
     '--configuration', process.env.AGENTSTRATION_PLAYWRIGHT_CONFIGURATION ?? 'Release',
     '--no-launch-profile',
   ];
-  if (process.env.AGENTSTRATION_PLAYWRIGHT_NO_BUILD === 'true') argumentsList.push('--no-build');
+  if (process.env.AGENTSTRATION_PLAYWRIGHT_NO_BUILD === 'true') argumentsList.push('--no-build', '--no-restore');
   if (applicationArguments.length > 0) argumentsList.push('--', ...applicationArguments);
 
   const child = spawn('dotnet', argumentsList, {

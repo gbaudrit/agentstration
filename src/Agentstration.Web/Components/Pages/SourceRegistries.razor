@@ -26,6 +26,7 @@
     </Actions>
 </PageHeader>
 
+<div data-testid="distribution-source-registries">
 <ResourceTabs Label="@T("RegistryNavigation")">
     <a class="active" href="/settings/source-registries">@T("Registrations")</a>
     <a href="/settings/source-registries/discovery">@T("DiscoverSources")</a>
@@ -145,6 +146,8 @@ else
 }
 
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteDialogTitle")" Message="@F("DeleteDialogMessage", model?.DisplayName ?? Name ?? string.Empty)" ConfirmLabel="@T("DeleteRegistry")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+
+</div>
 
 @code {
     [Parameter] public string? Name { get; set; }

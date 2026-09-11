@@ -8,6 +8,7 @@
     <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button></Actions>
 </PageHeader>
 
+<div data-testid="distribution-resource-scopes">
 @if (error is not null)
 {
     <ErrorState Title="@T("UnableToLoad")" Message="@error.Message" ErrorId="@error.ErrorId">
@@ -98,6 +99,8 @@ else
         </article>
     </section>
 }
+
+</div>
 
 @code {
     private readonly CancellationTokenSource cancellation = new();

@@ -39,6 +39,16 @@ export const Checkpoints = {
     selected: 'dashboard-entry-selected',
     published: 'dashboard-entry-published',
   },
+  importSource: {
+    form: 'source-import-form',
+    imported: 'source-imported',
+  },
+  createPackProject: {
+    composer: 'pack-project-composer',
+    selection: 'pack-project-selection',
+    created: 'pack-project-created',
+    built: 'pack-project-built',
+  },
   workplace: {
     home: 'workplace-home',
     entryReady: 'workplace-entry-ready',

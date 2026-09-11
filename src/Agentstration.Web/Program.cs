@@ -37,6 +37,7 @@ if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration
     bootstrapOptions.ExternalIdentityIssuer = configuredAuthentication.DevelopmentIssuer;
     bootstrapOptions.ExternalIdentitySubject = configuredAuthentication.DevelopmentSubject;
     bootstrapOptions.PrincipalDisplayName = configuredAuthentication.DevelopmentDisplayName;
+    bootstrapOptions.GrantPlatformAdministrator = true;
 }
 builder.Services.AddSingleton(bootstrapOptions);
 var genAiObservability = builder.Configuration.GetSection(GenAiObservabilityOptions.SectionName).Get<GenAiObservabilityOptions>() ?? new();
