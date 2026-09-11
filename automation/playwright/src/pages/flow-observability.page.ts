@@ -1,7 +1,10 @@
 import { type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
+import { fillAndCommit } from './controls.js';
 
-type FlowObservabilityMarker = keyof typeof TestIds.flowObservability;
+type FlowObservabilityMarker = keyof Pick<typeof TestIds.flowObservability,
+  'flows' | 'flowDetails' | 'designer' | 'runs' | 'runDetails' | 'agentRunner' |
+  'agentRuns' | 'runEvents' | 'tasks' | 'taskDetails' | 'taskRunDetails'>;
 
 export class FlowObservabilityPage {
   public constructor(private readonly page: Page) {}
@@ -48,6 +51,20 @@ export class FlowObservabilityPage {
     const runId = decodeURIComponent(href.split('/').at(-1)!);
     await link.click();
     await this.page.getByTestId(TestIds.flowObservability.agentRunner).waitFor({ state: 'visible' });
+    return runId;
+  }
+
+  public async createAgentRun(consoleUrl: string, agentName: string, prompt: string): Promise<string> {
+    requireIdentifier(agentName, 'agent');
+    await this.open(consoleUrl, `/agents/${encodeURIComponent(agentName)}/run`, 'agentRunner');
+    await fillAndCommit(this.page.getByTestId(TestIds.flowObservability.agentRunPrompt), prompt);
+    const submit = this.page.getByTestId(TestIds.flowObservability.agentRunSubmit);
+    await submit.waitFor({ state: 'visible' });
+    await submit.click();
+    const details = this.page.getByTestId(TestIds.flowObservability.agentRunDetails);
+    await details.waitFor({ state: 'visible' });
+    const runId = await details.getAttribute('data-run-id');
+    if (!runId) throw new Error(`Agent '${agentName}' did not expose its Run identifier.`);
     return runId;
   }
 }

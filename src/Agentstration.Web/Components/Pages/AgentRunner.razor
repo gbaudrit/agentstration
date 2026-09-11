@@ -60,7 +60,7 @@ else
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("QuickRun")</p><h2>@T("UserInput")</h2></div><button class="text-button" type="button" @onclick="() => advanced = !advanced">@(advanced ? T("HideAdvanced") : T("AdvancedRun"))</button></div>
             <div class="form-grid">
-                <label class="form-span-2"><span>@T("Prompt")</span><InputTextArea @bind-Value="model.Prompt" rows="7" placeholder="@T("PromptPlaceholder")" /><ValidationMessage For="() => model.Prompt" /></label>
+                <label class="form-span-2"><span>@T("Prompt")</span><InputTextArea @bind-Value="model.Prompt" rows="7" placeholder="@T("PromptPlaceholder")" data-testid="agent-run-prompt" /><ValidationMessage For="() => model.Prompt" /></label>
                 @if (advanced)
                 {
                     <label><span>@T("Context")</span><InputTextArea @bind-Value="model.Context" rows="7" /></label>
@@ -71,7 +71,7 @@ else
                 }
             </div>
             <div class="runner-actions">
-                <button class="button-primary" type="submit" disabled="@(IsBusy || !CanRun)">@(IsBusy ? T("Running") : T("Run"))</button>
+                <button class="button-primary" type="submit" disabled="@(IsBusy || !CanRun)" data-testid="agent-run-submit">@(IsBusy ? T("Running") : T("Run"))</button>
                 <button class="button-danger" type="button" @onclick="CancelAsync" disabled="@(!CanCancel)">@T("Stop")</button>
                 <button class="button-secondary" type="button" @onclick="RetryAsync" disabled="@(state.Run is null || IsBusy)">@T("Retry")</button>
             </div>
@@ -80,7 +80,7 @@ else
 
     @if (state.Run is not null)
     {
-        <section class="panel runner-inspector">
+        <section class="panel runner-inspector" data-testid="agent-run-details" data-run-id="@state.Run.Id" data-run-state="@state.State">
             <div class="runner-tabs" role="tablist">
                 @foreach (var tab in Tabs)
                 {
