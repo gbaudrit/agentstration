@@ -18,7 +18,7 @@ else if (error is not null)
 }
 else if (agent is not null)
 {
-    <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" Name="@agent.Definition.DisplayName" Description="@agent.Definition.Description" StatusText="@StatusPresentation.Label(agent.Status.ProvisioningState.ToString())" Status="@StatusPresentation.Tone(agent.Status.ProvisioningState.ToString())">
+    <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" Name="@agent.Definition.DisplayName" Description="@agent.Definition.Description" StatusText="@StatusPresentation.Label(agent.Status.ProvisioningState.ToString())" Status="@StatusPresentation.Tone(agent.Status.ProvisioningState.ToString())" TestId="resource-namespaced-agent-details">
         <Metadata><span><code>@AgentResourceNamespace.Value/@agent.Metadata.Name</code></span><span>@T("Generation", agent.Generation)</span></Metadata>
         <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button><a class="button-secondary" href="/agents">@T("BackToAgents")</a></Actions>
     </ResourceHeader>

@@ -1,4 +1,4 @@
-<header class="page-header">
+<header class="page-header" data-testid="@TestId">
     <div class="page-header-copy">
         @if (Breadcrumb is not null) { <div class="page-header-breadcrumb">@Breadcrumb</div> }
         @if (!string.IsNullOrWhiteSpace(Eyebrow)) { <p class="eyebrow">@Eyebrow</p> }
@@ -17,4 +17,5 @@
     [Parameter] public RenderFragment? Status { get; set; }
     [Parameter] public RenderFragment? Metadata { get; set; }
     [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public string? TestId { get; set; }
 }

@@ -1,0 +1,9 @@
+{
+  "journey": "inspect-resource-administration",
+  "input": {},
+  "checkpoints": [
+    "resource-administration-lists",
+    "resource-administration-profile-editors",
+    "resource-administration-protected-editors"
+  ]
+}

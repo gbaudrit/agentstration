@@ -21,7 +21,7 @@ export class OperationsPage {
     await confirm.waitFor({ state: 'visible' });
     if (!await confirm.isDisabled()) throw new Error('Cleanup confirmation must require explicit acknowledgement.');
     await this.page.getByTestId(TestIds.operations.cleanupAcknowledgement).check();
-    if (!await confirm.isEnabled()) throw new Error('Cleanup confirmation did not become available after acknowledgement.');
+    await confirm.click({ trial: true });
     await this.page.getByTestId(TestIds.operations.cleanupCancel).click();
     await confirm.waitFor({ state: 'detached' });
     return true;

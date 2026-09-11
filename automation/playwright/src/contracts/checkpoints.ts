@@ -69,4 +69,9 @@ export const Checkpoints = {
     token: 'console-admin-token',
     navigation: 'console-admin-navigation',
   },
+  resourceAdministration: {
+    lists: 'resource-administration-lists',
+    profileEditors: 'resource-administration-profile-editors',
+    protectedEditors: 'resource-administration-protected-editors',
+  },
 } as const;

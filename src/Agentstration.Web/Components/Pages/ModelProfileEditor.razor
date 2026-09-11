@@ -9,7 +9,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProfileEditorStrings> Localizer
 
 <PageTitle>@(IsNew ? T("CreateModelProfile") : $"{Name} · {T("ModelProfile")}") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("CreateModelProfile") : model?.DisplayName ?? Name)" Description="@T("Description")">
+<PageHeader Title="@(IsNew ? T("CreateModelProfile") : model?.DisplayName ?? Name)" Description="@T("Description")" TestId="resource-model-profile-editor">
     <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">@T("Delete")</button> }<a class="button-secondary" href="/modelprofiles">@T("Back")</a></Actions>
 </PageHeader>
 

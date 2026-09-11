@@ -7,7 +7,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimeProfileEditorStrings> Localizer
 
 <PageTitle>@(IsNew ? T("CreateProfile") : $"{Name} · {T("RuntimeProfile")}") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("CreateProfile") : model?.DisplayName ?? Name)" Description="@T("Description")">
+<PageHeader Title="@(IsNew ? T("CreateProfile") : model?.DisplayName ?? Name)" Description="@T("Description")" TestId="resource-runtime-profile-editor">
     <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">@T("Delete")</button> }<a class="button-secondary" href="/runtimeprofiles">@T("Back")</a></Actions>
 </PageHeader>
 

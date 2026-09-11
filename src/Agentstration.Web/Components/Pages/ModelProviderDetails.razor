@@ -8,7 +8,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProviderDetailsStrings> Localizer
 
 <PageTitle>@(IsNew ? T("CreateProvider") : $"{Name} · {T("ModelProvider")}") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("CreateProvider") : model?.DisplayName ?? Name)" Description="@T("Description")">
+<PageHeader Title="@(IsNew ? T("CreateProvider") : model?.DisplayName ?? Name)" Description="@T("Description")" TestId="resource-model-provider-editor">
     <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">@T("Delete")</button><a class="button-primary" href="@CreateModelProfileUrl()">@T("CreateModelProfile")</a> }<a class="button-secondary" href="/modelproviders">@T("Back")</a></Actions>
 </PageHeader>
 

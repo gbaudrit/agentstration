@@ -3,7 +3,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolProvidersStrings> Localizer
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")"><Actions><a class="button-secondary" href="/tools">@T("Catalog")</a><a class="button-primary" href="/tools/providers/new">@T("AddProvider")</a></Actions></PageHeader>
+<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-tool-providers"><Actions><a class="button-secondary" href="/tools">@T("Catalog")</a><a class="button-primary" href="/tools/providers/new">@T("AddProvider")</a></Actions></PageHeader>
 <ResourceTabs Label="@T("SectionsLabel")"><a href="/tools">@T("Catalog")</a><a href="/tools/definitions">@T("Definitions")</a><a class="active" href="/tools/providers">@T("Providers")</a></ResourceTabs>
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else if (providers.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
