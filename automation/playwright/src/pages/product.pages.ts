@@ -7,6 +7,7 @@ import { LoginPage } from './login.page.js';
 import { OrganizationWorkspacesPage } from './organization-workspaces.page.js';
 import { WorkplacePage } from './workplace.page.js';
 import { DashboardEditorPage } from './dashboard-editor.page.js';
+import { DistributionPage } from './distribution.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -16,6 +17,7 @@ export class ProductPages {
   public readonly organizationWorkspaces: OrganizationWorkspacesPage;
   public readonly workplace: WorkplacePage;
   public readonly dashboardEditor: DashboardEditorPage;
+  public readonly distribution: DistributionPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -25,6 +27,7 @@ export class ProductPages {
     this.organizationWorkspaces = new OrganizationWorkspacesPage(page);
     this.workplace = new WorkplacePage(page);
     this.dashboardEditor = new DashboardEditorPage(page);
+    this.distribution = new DistributionPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

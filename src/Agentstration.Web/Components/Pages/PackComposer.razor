@@ -8,10 +8,11 @@
 <PageHeader Title="@T("CreatePackFromWorkspace")" Description="@T("PackComposer.Description")">
     <Actions>
         <a class="button-secondary" href="/packs">@T("Cancel")</a>
-        <button class="button-primary" disabled="@(!CanCreate || creating)" @onclick="CreateAsync">@(creating ? T("Creating") : T("CreatePackProject"))</button>
+        <button class="button-primary" disabled="@(!CanCreate || creating)" @onclick="CreateAsync" data-testid="pack-project-create">@(creating ? T("Creating") : T("CreatePackProject"))</button>
     </Actions>
 </PageHeader>
 
+<div data-testid="distribution-pack-composer">
 @if (error is not null)
 {
     <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
@@ -32,10 +33,10 @@ else
     <article class="panel composer-metadata">
         <div class="panel-header"><div><p class="eyebrow">@T("PackIdentity")</p><h2>@T("ProjectMetadata")</h2></div></div>
         <div class="composer-fields">
-            <label><span>@T("Publisher")</span><input @bind="publisher" autocomplete="off" spellcheck="false" /></label>
-            <label><span>@T("Name")</span><input @bind="name" autocomplete="off" spellcheck="false" /></label>
-            <label><span>@T("Version")</span><input @bind="version" autocomplete="off" spellcheck="false" /></label>
-            <label><span>@T("DisplayName")</span><input @bind="displayName" /></label>
+            <label><span>@T("Publisher")</span><input @bind="publisher" autocomplete="off" spellcheck="false" data-testid="pack-project-publisher" /></label>
+            <label><span>@T("Name")</span><input @bind="name" autocomplete="off" spellcheck="false" data-testid="pack-project-name" /></label>
+            <label><span>@T("Version")</span><input @bind="version" autocomplete="off" spellcheck="false" data-testid="pack-project-version" /></label>
+            <label><span>@T("DisplayName")</span><input @bind="displayName" data-testid="pack-project-display-name" /></label>
             <label><span>@T("Audience")</span><select @bind="audience"><option value="@PackAudience.Universal">@T("Audience.Universal")</option><option value="@PackAudience.Personal">@T("Audience.Personal")</option><option value="@PackAudience.Professional">@T("Audience.Professional")</option></select></label>
             <label><span>@T("Purpose")</span><select @bind="purpose"><option value="@PackPurpose.Standard">@T("Purpose.Standard")</option><option value="@PackPurpose.Sample">@T("Purpose.Sample")</option><option value="@PackPurpose.Template">@T("Purpose.Template")</option></select></label>
             <ResourceScopeFormField ResourceKind="@PackAuthoringKinds.PackProject" @bind-Value="selectedScope" />
@@ -79,7 +80,7 @@ else
                                 <StatusBadge Text="@AvailabilityLabel(item)" Status="@AvailabilityTone(item)" />
                                 @if (selectable)
                                 {
-                                    <button class="composer-add" type="button" aria-label="@T("AddResourceToPack", item.DisplayName)" @onclick="() => AddAsync(item)">@T("Add") <span aria-hidden="true">→</span></button>
+                                    <button class="composer-add" type="button" aria-label="@T("AddResourceToPack", item.DisplayName)" @onclick="() => AddAsync(item)" data-testid="pack-project-add-resource">@T("Add") <span aria-hidden="true">→</span></button>
                                 }
                             </span>
                         </div>
@@ -177,6 +178,8 @@ else
         </article>
     </section>
 }
+
+</div>
 
 @code {
     private ResourceScopeRef? selectedScope;

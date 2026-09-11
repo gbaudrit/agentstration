@@ -12,6 +12,7 @@
     <Actions><button class="button-secondary" disabled="@loading" @onclick="SearchAsync">@T("RefreshList")</button></Actions>
 </PageHeader>
 
+<div data-testid="distribution-source-registry-discovery">
 <ResourceTabs Label="@T("RegistryNavigation")">
     <a href="/settings/source-registries">@T("Registrations")</a>
     <a class="active" href="/settings/source-registries/discovery">@T("DiscoverSources")</a>
@@ -101,6 +102,8 @@ else if (page is not null)
         </section>
     </div>
 }
+
+</div>
 
 @code {
     private readonly CancellationTokenSource cancellation = new();

@@ -39,6 +39,22 @@ function planned(
   };
 }
 
+function coveredDistribution(
+  id: string,
+  source: string,
+  routes: readonly string[],
+  fixtureKeys: readonly string[] = [],
+  journey?: string,
+): ApplicationSurface {
+  return {
+    id, host: 'console', source, routes, fixtureKeys,
+    pageObject: 'src/pages/distribution.page.ts',
+    ...(journey ? { journey } : {}),
+    specification: 'tests/distribution.spec.ts',
+    coverage: 'covered',
+  };
+}
+
 export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
     id: 'console-home', host: 'console', source: `${consolePages}/Home.razor`, routes: ['/'], fixtureKeys: [],
@@ -122,18 +138,18 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   planned('trigger-details', `${consolePages}/TriggerDetails.razor`, ['/triggers/{Name}'], 291, ['name']),
   planned('trigger-editor', `${consolePages}/TriggerEditor.razor`, ['/triggers/new', '/triggers/{Name}/edit'], 291, ['name']),
 
-  planned('extensions', `${consolePages}/Extensions.razor`, ['/extensions'], 287),
-  planned('extension-details', `${consolePages}/ExtensionDetails.razor`, ['/extensions/{RegistrationName}', '/extensions/enrollment/{EnrollmentInstanceId:guid}'], 287, ['registrationName', 'enrollmentInstanceId']),
-  planned('source-providers', `${consolePages}/SourceProviders.razor`, ['/sourceproviders'], 287),
-  planned('source-provider-details', `${consolePages}/SourceProviderDetails.razor`, ['/sourceproviders/new', '/sourceproviders/{Name}'], 287, ['name']),
-  planned('source-registries', `${consolePages}/SourceRegistries.razor`, ['/settings/source-registries', '/settings/source-registries/new', '/settings/source-registries/{Name}'], 287, ['name']),
-  planned('source-registry-discovery', `${consolePages}/SourceRegistryDiscovery.razor`, ['/settings/source-registries/discovery'], 287),
-  planned('sources', `${consolePages}/Sources.razor`, ['/settings/sources', '/settings/sources/{Publisher}/{Name}'], 287, ['publisher', 'name']),
-  planned('bootstrap-profiles', `${consolePages}/BootstrapProfiles.razor`, ['/settings/bootstrap'], 287),
-  planned('packs', `${consolePages}/Packs.razor`, ['/packs'], 287),
-  planned('pack-composer', `${consolePages}/PackComposer.razor`, ['/pack-projects/new'], 287),
-  planned('pack-project-details', `${consolePages}/PackProjectDetails.razor`, ['/pack-projects/{ProjectId:guid}'], 287, ['projectId']),
-  planned('resource-scopes', `${consolePages}/ResourceScopes.razor`, ['/settings/resource-scopes'], 287),
+  coveredDistribution('extensions', `${consolePages}/Extensions.razor`, ['/extensions']),
+  coveredDistribution('extension-details', `${consolePages}/ExtensionDetails.razor`, ['/extensions/{RegistrationName}', '/extensions/enrollment/{EnrollmentInstanceId:guid}'], ['registrationName', 'enrollmentInstanceId']),
+  coveredDistribution('source-providers', `${consolePages}/SourceProviders.razor`, ['/sourceproviders']),
+  coveredDistribution('source-provider-details', `${consolePages}/SourceProviderDetails.razor`, ['/sourceproviders/new', '/sourceproviders/{Name}'], ['name']),
+  coveredDistribution('source-registries', `${consolePages}/SourceRegistries.razor`, ['/settings/source-registries', '/settings/source-registries/new', '/settings/source-registries/{Name}'], ['name']),
+  coveredDistribution('source-registry-discovery', `${consolePages}/SourceRegistryDiscovery.razor`, ['/settings/source-registries/discovery']),
+  coveredDistribution('sources', `${consolePages}/Sources.razor`, ['/settings/sources', '/settings/sources/{Publisher}/{Name}'], ['publisher', 'name'], 'import-source'),
+  coveredDistribution('bootstrap-profiles', `${consolePages}/BootstrapProfiles.razor`, ['/settings/bootstrap']),
+  coveredDistribution('packs', `${consolePages}/Packs.razor`, ['/packs']),
+  coveredDistribution('pack-composer', `${consolePages}/PackComposer.razor`, ['/pack-projects/new'], [], 'create-pack-project'),
+  coveredDistribution('pack-project-details', `${consolePages}/PackProjectDetails.razor`, ['/pack-projects/{ProjectId:guid}'], ['projectId'], 'create-pack-project'),
+  coveredDistribution('resource-scopes', `${consolePages}/ResourceScopes.razor`, ['/settings/resource-scopes']),
 
   planned('management', `${consolePages}/Management.razor`, ['/management'], 290),
   planned('cleanup', `${consolePages}/Cleanup.razor`, ['/cleanup'], 290),

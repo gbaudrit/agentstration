@@ -8,6 +8,7 @@
     <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button><a class="button-primary" href="/sourceproviders/new">@T("CreateProvider")</a></Actions>
 </PageHeader>
 
+<div data-testid="distribution-source-providers">
 @if (loading && providers is null)
 {
     <LoadingState Message="@T("Loading")" />
@@ -35,6 +36,8 @@ else
         </tr></Row>
     </DataGrid>
 }
+
+</div>
 
 @code {
     private readonly CancellationTokenSource cancellation = new();

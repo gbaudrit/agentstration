@@ -5,6 +5,8 @@ import { createEntry, type CreateEntryInput } from './create-entry.journey.js';
 import { createWorkspace, type CreateWorkspaceInput } from './create-workspace.journey.js';
 import { submitWorkplacePrompt, type SubmitWorkplacePromptInput } from './submit-workplace-prompt.journey.js';
 import { exposeEntryOnDashboard, type ExposeEntryOnDashboardInput } from './expose-entry-on-dashboard.journey.js';
+import { importSource, type ImportSourceInput } from './import-source.journey.js';
+import { createPackProject, type CreatePackProjectInput } from './create-pack-project.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -15,4 +17,6 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'create-workspace': (context, input) => createWorkspace(context, input as unknown as CreateWorkspaceInput),
   'submit-workplace-prompt': (context, input) => submitWorkplacePrompt(context, input as unknown as SubmitWorkplacePromptInput),
   'expose-entry-on-dashboard': (context, input) => exposeEntryOnDashboard(context, input as unknown as ExposeEntryOnDashboardInput),
+  'import-source': (context, input) => importSource(context, input as unknown as ImportSourceInput),
+  'create-pack-project': (context, input) => createPackProject(context, input as unknown as CreatePackProjectInput),
 };

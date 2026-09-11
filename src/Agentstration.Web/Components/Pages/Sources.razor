@@ -23,11 +23,12 @@
         else
         {
             <a class="button-secondary" href="/settings/source-registries/discovery">@T("DiscoverFromRegistries")</a>
-            <button class="button-primary" disabled="@busy" @onclick="() => importing = !importing">@T("ImportSource")</button>
+            <button class="button-primary" disabled="@busy" @onclick="() => importing = !importing" data-testid="source-import-open">@T("ImportSource")</button>
         }
     </Actions>
 </PageHeader>
 
+<div data-testid="distribution-sources">
 @if (denied)
 {
     <ErrorState Title="@T("PlatformAdministratorRequired")" Message="@T("PlatformAdministratorRequiredMessage")" />
@@ -48,7 +49,7 @@ else if (detail is null)
             <div class="panel-header"><div><p class="eyebrow">@T("NewSource")</p><h2>@T("ImportSource")</h2><p>@T("ImportDescription")</p></div></div>
             <div class="source-import-tabs" role="tablist" aria-label="@T("ImportMethod")">
                 <button class="text-button @(importMode == "url" ? "active" : null)" type="button" @onclick='() => SetImportMode("url")'>@T("FromUrl")</button>
-                <button class="text-button @(importMode == "yaml" ? "active" : null)" type="button" @onclick='() => SetImportMode("yaml")'>@T("PasteYaml")</button>
+                <button class="text-button @(importMode == "yaml" ? "active" : null)" type="button" @onclick='() => SetImportMode("yaml")' data-testid="source-import-yaml-mode">@T("PasteYaml")</button>
             </div>
             <div class="form-grid">
                 <ResourceScopeFormField ResourceKind="@ResourceKinds.Source" @bind-Value="importScope" Disabled="@busy" />
@@ -58,10 +59,10 @@ else if (detail is null)
                 }
                 else
                 {
-                    <label class="form-wide"><span>@T("ManifestYaml")</span><textarea @bind="importYaml" rows="13" spellcheck="false" disabled="@busy"></textarea></label>
+                    <label class="form-wide"><span>@T("ManifestYaml")</span><textarea @bind="importYaml" rows="13" spellcheck="false" disabled="@busy" data-testid="source-import-yaml"></textarea></label>
                 }
             </div>
-            <div class="panel-actions"><button class="button-primary" disabled="@(!CanImport || busy)" @onclick="ImportAsync">@(busy ? T("Importing") : T("Import"))</button><button class="button-secondary" disabled="@busy" @onclick="() => importing = false">@T("Cancel")</button></div>
+            <div class="panel-actions"><button class="button-primary" disabled="@(!CanImport || busy)" @onclick="ImportAsync" data-testid="source-import-submit">@(busy ? T("Importing") : T("Import"))</button><button class="button-secondary" disabled="@busy" @onclick="() => importing = false">@T("Cancel")</button></div>
         </section>
     }
 
@@ -83,7 +84,7 @@ else if (detail is null)
             <div class="source-table">
                 <DataGrid TItem="SourceConsoleListItem" Items="FilteredSources">
                     <Header><tr><th>@T("Source")</th><th>@T("OwnershipScope")</th><th>@T("Origin")</th><th>@T("LatestImport")</th><th>@T("Health")</th><th></th></tr></Header>
-                    <Row Context="item"><tr>
+                    <Row Context="item"><tr data-testid="source-row" data-source-publisher="@item.Source.Source.Definition.Publisher" data-source-name="@item.Source.Source.Name">
                         <td><a class="resource-name-link" href="@SourceUrl(item)">@item.Source.Configuration.Definition.DisplayName</a><br /><code>@item.Source.Source.Definition.Publisher/@item.Source.Source.Name</code></td>
                         <td><ResourceScopeBadge ScopeRef="@item.Source.Source.ScopeRef" Compact /></td>
                         <td>@if (item.Source.Configuration.Definition.Origin is { } origin) { <a class="text-link source-origin" href="@origin.Url" target="_blank" rel="noopener noreferrer" title="@origin.Url">@origin.Url</a> } else { <span class="source-origin">@T("PastedManifest")</span> }</td>
@@ -98,7 +99,7 @@ else if (detail is null)
 }
 else
 {
-    <section class="source-heading panel">
+    <section class="source-heading panel" data-testid="source-details" data-source-publisher="@Publisher" data-source-name="@Name">
         <div>
             <p class="eyebrow">@detail.Source.Source.Definition.Publisher / @detail.Source.Source.Name</p>
             <div class="source-title"><h2>@detail.Source.Configuration.Definition.DisplayName</h2><ResourceScopeBadge ScopeRef="@detail.Source.Source.ScopeRef" /></div>
@@ -317,6 +318,8 @@ else
         </section>
     </div>
 }
+
+</div>
 
 @code {
     [Parameter] public string? Publisher { get; set; }

@@ -13,6 +13,7 @@
     <Actions><a class="button-secondary" href="/extensions">@T("BackToExtensions")</a></Actions>
 </PageHeader>
 
+<div data-testid="distribution-extension-details">
 @if (error is not null)
 {
     <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
@@ -206,6 +207,8 @@ else
 
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteExtensionRegistration")" Message="@T("DeleteRegistrationMessage", item?.RegistrationNamespace ?? string.Empty, item?.RegistrationName ?? string.Empty)" ConfirmLabel="@T("DeleteRegistration")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 <ConfirmationDialog IsOpen="@confirmUnenroll" Title="@T("UnenrollExtension")" Message="@T("UnenrollExtensionMessage")" ConfirmLabel="@T("ConfirmUnenrollExtension")" OnConfirm="UnenrollAsync" OnCancel="() => confirmUnenroll = false" />
+
+</div>
 
 @code {
     private static readonly JsonSerializerOptions IndentedJsonOptions = new() { WriteIndented = true };
