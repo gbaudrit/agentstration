@@ -32,7 +32,11 @@ internal static partial class PostmanProgram
         var dockerEnvironmentPath = Path.Combine(repositoryRoot, DockerEnvironmentRelativePath);
         var scenarioPath = Path.Combine(repositoryRoot, ScenarioRelativePath);
 
-        await using var factory = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        await using var factory = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseContentRoot(Path.Combine(repositoryRoot, "src", "Agentstration.Web"));
+        });
         using var client = factory.CreateClient();
         var openApi = await client.GetStringAsync(OpenApiConfiguration.DocumentPath);
         using var document = JsonDocument.Parse(openApi);
