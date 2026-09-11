@@ -139,17 +139,9 @@ jobs:
       - name: Build Agentstration
         if: needs.changes.outputs.dotnet == 'true'
         run: dotnet build Agentstration.slnx --configuration Release --no-restore
-      - name: Generate Postman artifacts
+      - name: Verify generated Postman artifacts
         if: needs.changes.outputs.dotnet == 'true'
-        run: dotnet run --project tools/Agentstration.Postman --configuration Release --no-build
-      - name: Upload generated Postman artifacts
-        if: needs.changes.outputs.dotnet == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: postman-artifacts
-          path: |
-            dev/postman/Agentstration.postman_collection.json
-            dev/postman/environments/*.json
+        run: dotnet run --project tools/Agentstration.Postman --configuration Release --no-build -- --check
       - name: Test Agentstration
         if: needs.changes.outputs.dotnet == 'true'
         run: dotnet test Agentstration.slnx --configuration Release --no-build
