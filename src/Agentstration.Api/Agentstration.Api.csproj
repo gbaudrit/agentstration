@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
+    <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Flow/Agentstration.Flow.csproj" />
+    <ProjectReference Include="../Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Flow.Contracts/Agentstration.Flow.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Flow.Storage.Abstractions/Agentstration.Flow.Storage.Abstractions.csproj" />
+    <ProjectReference Include="../Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
+    <ProjectReference Include="../Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
+    <ProjectReference Include="../Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
+    <ProjectReference Include="../Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
+    <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />
+    <ProjectReference Include="../Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
+    <ProjectReference Include="../Agentstration.Runtime.Contracts/Agentstration.Runtime.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
+    <ProjectReference Include="../Agentstration.Secrets.Abstractions/Agentstration.Secrets.Abstractions.csproj" />
+    <ProjectReference Include="../Agentstration.Security.AspNetCoreIdentity/Agentstration.Security.AspNetCoreIdentity.csproj" />
+    <ProjectReference Include="../Agentstration.Tools.Mcp/Agentstration.Tools.Mcp.csproj" />
+    <ProjectReference Include="../Agentstration.Work/Agentstration.Work.csproj" />
+    <ProjectReference Include="../Agentstration.Work.Contracts/Agentstration.Work.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Work.Storage.Abstractions/Agentstration.Work.Storage.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Agentstration.Web.Tests" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
+  </ItemGroup>
+</Project>

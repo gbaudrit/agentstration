@@ -106,6 +106,41 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void ApiTransportDoesNotReferenceConsoleOrExecutableHostAssemblies()
+    {
+        var references = typeof(Agentstration.Web.ApiTransportEndpointRouteBuilderExtensions).Assembly
+            .GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .ToArray();
+        var forbidden = new[]
+        {
+            "Agentstration.Console.Client",
+            "Agentstration.Console.Components",
+            "Agentstration.Web",
+            "Agentstration.Web.Components",
+            "Agentstration.Web.FlowDesigner",
+            "Agentstration.Workplace.Components"
+        };
+
+        Assert.IsFalse(references.Any(reference => forbidden.Contains(reference, StringComparer.Ordinal)));
+    }
+
+    [TestMethod]
+    public void ApiTransportOwnsEndpointsHubsMcpAndSecurity()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var apiRoot = Path.Combine(repositoryRoot, "src", "Agentstration.Api");
+        var hostRoot = Path.Combine(repositoryRoot, "src", "Agentstration.Web");
+
+        Assert.IsGreaterThanOrEqualTo(60, Directory.EnumerateFiles(Path.Combine(apiRoot, "Api"), "*.cs", SearchOption.AllDirectories).Count());
+        Assert.IsTrue(File.Exists(Path.Combine(apiRoot, "Features", "Flows", "FlowRunHub.cs")));
+        Assert.IsTrue(File.Exists(Path.Combine(apiRoot, "Features", "Workplace", "WorkplaceHub.cs")));
+        Assert.IsTrue(File.Exists(Path.Combine(apiRoot, "Api", "AgentstrationMcpHandlers.cs")));
+        Assert.IsTrue(File.Exists(Path.Combine(apiRoot, "Configuration", "OpenApiConfiguration.cs")));
+        Assert.IsFalse(Directory.Exists(Path.Combine(hostRoot, "Api")));
+    }
+
+    [TestMethod]
     public void ConsoleComponentsDoNotUseServerImplementationNamespaces()
     {
         var components = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Console.Components");
@@ -422,7 +457,7 @@ public sealed class DependencyTests
     [TestMethod]
     public void ApiEndpointsDoNotImplementClaimOrRoleAuthorizationLogic()
     {
-        var apiRoot = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Web", "Api");
+        var apiRoot = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Api", "Api");
         var forbidden = new[] { "User.IsInRole", "User.Claims", "User.FindFirst", "ClaimTypes." };
         var violations = Directory.EnumerateFiles(apiRoot, "*.cs", SearchOption.AllDirectories)
             .Where(path => forbidden.Any(value => File.ReadAllText(path).Contains(value, StringComparison.Ordinal)))

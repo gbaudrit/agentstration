@@ -1,5 +1,6 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Api/Agentstration.Api.csproj" />
     <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
     <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
     <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />

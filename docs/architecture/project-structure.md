@@ -12,7 +12,8 @@ src/
   Agentstration.Flow.*/               Flow model, use cases, contracts and SQLite
   Agentstration.Work*/                Work model, contracts, API and SQLite
   Agentstration.Console.*/            Operations Console typed clients and Razor presentation
-  Agentstration.Web*/                 Standalone host, Flow Designer and shared UI components
+  Agentstration.Api/                  Server REST, OpenAPI, MCP, SignalR and HTTP security transport
+  Agentstration.Web*/                 Standalone composition root, Flow Designer and shared UI components
   Agentstration.Workplace.*/          End-user client, components and host
   Agentstration.AppHost/              Aspire development orchestration
 tests/

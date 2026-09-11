@@ -1,4 +1,3 @@
-using System.Threading.RateLimiting;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Application.Work;
 using Agentstration.Flow.Application;
@@ -14,16 +13,11 @@ using Agentstration.Runtime.Core;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Security.AspNetCoreIdentity.PostgreSql;
 using Agentstration.Web;
-using Agentstration.Web.Api;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Localization;
 using Agentstration.Web.Configuration;
-using Agentstration.Web.Features.Flows;
-using Agentstration.Web.Features.Workplace;
 using Agentstration.Web.Hosting;
 using Agentstration.Work;
-using Microsoft.AspNetCore.RateLimiting;
-using ModelContextProtocol.AspNetCore;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -31,8 +25,8 @@ using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 var bootstrapOptions = new LocalBootstrapOptions();
-var configuredAuthentication = builder.Configuration.GetSection("Agentstration:Authentication").Get<Agentstration.Web.Configuration.AuthenticationOptions>() ?? new();
-if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
+var configuredAuthentication = builder.Configuration.GetSection("Agentstration:Authentication").Get<Agentstration.Web.Configuration.ApiAuthenticationOptions>() ?? new();
+if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.ApiAuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
 {
     bootstrapOptions.ExternalIdentityIssuer = configuredAuthentication.DevelopmentIssuer;
     bootstrapOptions.ExternalIdentitySubject = configuredAuthentication.DevelopmentSubject;
@@ -122,28 +116,10 @@ builder.Services.AddAgentstrationModelManagement();
 builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
 builder.Services.AddSingleton<IAepEnrollmentAnnouncementProvisioner>(provider => provider.GetRequiredService<ExtensionSourceDiscoveryService>());
 builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
-builder.Services.AddProblemDetails();
-builder.Services.AddRateLimiter(options =>
-{
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.OnRejected = static async (context, token) =>
-        await context.HttpContext.Response.WriteAsJsonAsync(
-            new { error = new AepEnrollmentError("rate_limited", "Too many enrollment requests; retry later.") }, token);
-    options.AddPolicy("aep-enrollment-public", context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 30,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            }));
-});
-builder.Services.AddAgentstrationOpenApi();
+builder.Services.AddAgentstrationApi(builder.Configuration, builder.Environment);
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddAgentstrationLocalization(builder.Configuration);
-builder.Services.AddSignalR();
 if (storageProvider == AgentstrationStorageProvider.PostgreSql)
     builder.Services.AddAgentstrationPostgreSqlIdentity(
         identityConnectionString,
@@ -155,24 +131,7 @@ else
         dataProtectionKeysPath,
         useDevelopmentPasswordPolicy: builder.Environment.IsDevelopment());
 builder.Services.AddScoped<DeclarativeBootstrapService>();
-builder.Services.AddSingleton<BootstrapProfileCatalog>();
-builder.Services.AddSingleton<SourceBootstrapProfileLoader>();
-builder.Services.AddSingleton<BootstrapApplicationLock>();
-builder.Services.AddScoped<BootstrapProfileManagementService>();
-builder.Services.AddSingleton<SignalRFlowRunEventSink>();
-builder.Services.AddSingleton<WorkplaceFlowConversationProjectionSink>();
-builder.Services.AddSingleton<IFlowRunEventSink>(provider => new CompositeFlowRunEventSink(
-[
-    provider.GetRequiredService<WorkplaceFlowConversationProjectionSink>(),
-    provider.GetRequiredService<SignalRFlowRunEventSink>()
-]));
-builder.Services.AddSingleton<IWorkplaceEventSink, SignalRWorkplaceEventSink>();
 builder.Services.AddAgentstrationWebConsole(builder.Configuration, builder.Environment);
-builder.Services.AddMcpServer()
-    .WithHttpTransport()
-    .WithToolsFromAssembly()
-    .WithListToolsHandler(AgentstrationMcpHandlers.ListToolsAsync)
-    .WithCallToolHandler(AgentstrationMcpHandlers.CallToolAsync);
 if (hostedServicesEnabled)
 {
     builder.Services.AddHostedService<AgentDeploymentReconciliationWorker>();
@@ -260,30 +219,9 @@ app.UseMiddleware<PrincipalResolutionMiddleware>();
 app.UseMiddleware<RequestContextMiddleware>();
 app.UseMiddleware<StandardManagementDataMiddleware>();
 app.UseAuthorization();
-if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.MapAgentstrationOpenApi();
 app.UseAntiforgery();
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
-app.MapGet("/health/ready", (IAgentstrationStorageInitializer storage) => storage.IsReady
-    ? Results.Ok(new { status = "ready" })
-    : Results.StatusCode(StatusCodes.Status503ServiceUnavailable)).AllowAnonymous();
+app.MapAgentstrationApi();
 app.MapAgentstrationCultureEndpoint().AllowAnonymous();
-app.MapAgentstrationAuthentication();
-app.MapAgentstrationLocalAccountAdministration();
-app.MapAgentstrationIdentityApi();
-app.MapAgentstrationBootstrapProfiles();
-app.MapAgentstrationManagementApi();
-app.MapAgentstrationModelManagementApi();
-app.MapAgentstrationAepEnrollment();
-app.MapAgentstrationWorkApi();
-app.MapAgentstrationWorkplaceApi();
-app.MapAgentstrationWorkOperationsApi();
-app.MapAgentstrationFlowApi();
-app.MapAgentstrationRuntimeApi();
-app.MapAgentstrationToolGovernanceAuditApi();
-app.MapHub<FlowRunHub>("/hubs/flow-runs").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
-app.MapHub<WorkplaceHub>("/hubs/workplace").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
-if (app.Environment.IsDevelopment()) app.MapOllamaDiagnostics();
-app.MapMcp("/mcp").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
 app.MapStaticAssets().AllowAnonymous();
 app.MapRazorPages();
 app.MapRazorComponents<App>()
@@ -300,7 +238,7 @@ try
         await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<SourceRegistryManagementService>().EnsureOfficialAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<LocalIdentityDatabaseInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
-        if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.ApiAuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
             bootstrapContext = await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<WorkItemService>().InitializeAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<WorkplaceService>().InitializeAsync(app.Lifetime.ApplicationStopping);

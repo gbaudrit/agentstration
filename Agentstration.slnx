@@ -6,6 +6,7 @@
     <Project Path="aep/src/Agentstration.Aep.MicrosoftExtensionsAI/Agentstration.Aep.MicrosoftExtensionsAI.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/Agentstration.Api/Agentstration.Api.csproj" />
     <Project Path="src/Agentstration.AppHost/Agentstration.AppHost.csproj" />
     <Project Path="src/Agentstration.Application/Agentstration.Application.csproj" />
     <Project Path="src/Agentstration.Console.Client/Agentstration.Console.Client.csproj" />
