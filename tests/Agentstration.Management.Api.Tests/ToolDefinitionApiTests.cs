@@ -1,8 +1,10 @@
+using Agentstration.Tools;
+using Agentstration.ResourceManagement;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
@@ -37,7 +39,7 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         Assert.IsNotNull(created);
         Assert.AreEqual(ResourceScopeRef.Workspace(requestContext.WorkspaceId), created.ScopeRef);
 
-        var store = factory.Services.GetRequiredService<IControlPlaneStore>();
+        var store = factory.Services.GetRequiredService<IResourceStore>();
         var provider = await store.GetAsync<ToolProviderResource>(new(ResourceKinds.ToolProvider, AgentstrationToolProvider.Name), default);
         var tool = await store.GetAsync<ToolResource>(new(ResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName("notification.send")), default);
         Assert.IsNotNull(provider);

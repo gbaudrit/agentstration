@@ -1,5 +1,7 @@
+using Agentstration.Agents;
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +25,7 @@ public static class ModelManagementServiceCollectionExtensions
         services.AddSingleton<AepEnrollmentService>();
         services.AddSingleton<IResourceReferenceResolver, ResourceReferenceResolver>();
         services.AddSingleton<ResourceScopeOperationService>();
+        services.AddSingleton<IResourceScopeOperations>(provider => provider.GetRequiredService<ResourceScopeOperationService>());
         services.AddSingleton<ResourceScopeInventoryService>();
         services.AddSingleton<ExtensionManagementService>();
         services.AddSingleton<ExtensionInventoryService>();

@@ -1,5 +1,6 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 
 namespace Agentstration.Web.Hosting;
 
@@ -96,7 +97,7 @@ public sealed class SourceBootstrapProfileLoader(
 
             return await MaterializeAsync(snapshot.Definition.Artifact, entry, provenance, cancellationToken);
         }
-        catch (ControlPlaneResourceNotFoundException exception)
+        catch (ResourceNotFoundException exception)
         {
             throw new DeclarativeBootstrapException(
                 $"Pinned Source identity '{selection.Publisher}/{selection.SourceName}' or one of its pinned descendants was not found; a publisher mismatch is not rewritten.",

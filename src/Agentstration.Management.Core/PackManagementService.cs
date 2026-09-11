@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
@@ -17,16 +18,16 @@ public sealed class PackResourceModifiedException(string kind, string name) : In
 
 public sealed partial class PackManagementService
 {
-    private readonly IControlPlaneStore store;
+    private readonly IResourceStore store;
     private readonly TimeProvider timeProvider;
     private readonly IPackArtifactStore? artifacts;
     private readonly ResourceScopeOperationService? scopeOperations;
     private readonly IReadOnlyDictionary<string, IPackResourceHandler> handlers;
 
-    public PackManagementService(IControlPlaneStore store, IEnumerable<IPackResourceHandler> resourceHandlers, TimeProvider timeProvider)
+    public PackManagementService(IResourceStore store, IEnumerable<IPackResourceHandler> resourceHandlers, TimeProvider timeProvider)
         : this(store, resourceHandlers, timeProvider, null) { }
 
-    public PackManagementService(IControlPlaneStore store, IEnumerable<IPackResourceHandler> resourceHandlers, TimeProvider timeProvider, IPackArtifactStore? artifacts)
+    public PackManagementService(IResourceStore store, IEnumerable<IPackResourceHandler> resourceHandlers, TimeProvider timeProvider, IPackArtifactStore? artifacts)
     {
         this.store = store;
         this.timeProvider = timeProvider;
@@ -35,7 +36,7 @@ public sealed partial class PackManagementService
     }
 
     public PackManagementService(
-        IControlPlaneStore store,
+        IResourceStore store,
         IEnumerable<IPackResourceHandler> resourceHandlers,
         TimeProvider timeProvider,
         IPackArtifactStore? artifacts,

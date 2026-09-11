@@ -1,9 +1,10 @@
+using Agentstration.ResourceManagement;
 using System.IO.Compression;
 using System.Text.Json;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
-using Agentstration.Management.Storage.Sqlite;
+using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,7 +45,7 @@ public sealed class PackCompositionTests
             .BuildServiceProvider();
         try
         {
-            var store = provider.GetRequiredService<IControlPlaneStore>();
+            var store = provider.GetRequiredService<IResourceStore>();
             await store.InitializeAsync(default);
             var artifacts = new FileSystemPackArtifactStore(Path.Combine(directory, "artifacts"));
             var service = new PackCompositionService(store, artifacts, new ZipPackArchiveReader(), new CatalogStub(), TimeProvider.System);

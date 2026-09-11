@@ -1,6 +1,10 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Models;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets;
 
 namespace Agentstration.Web.Hosting;
 
@@ -16,7 +20,7 @@ public sealed class BootstrapProfileManagementService(
     IIdentityStore identities,
     IPlatformAuthorizationService platformAuthorization,
     IRequestContextScopeFactory scopes,
-    IControlPlaneStore store,
+    IResourceStore store,
     ISecurityAuditWriter audit,
     TimeProvider timeProvider,
     BootstrapApplicationLock applicationLock)

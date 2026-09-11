@@ -3,12 +3,13 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
 
 public sealed partial class SourceManagementService(
-    IControlPlaneStore store,
+    IResourceStore store,
     IRequestContextScopeFactory scopes,
     ISourceManifestReader manifests,
     ISourceManifestRetriever retrieval,
@@ -97,7 +98,7 @@ public sealed partial class SourceManagementService(
         CancellationToken cancellationToken)
     {
         var source = (await GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
         var gate = refreshLocks.GetOrAdd($"{scopeRef}|{publisher}|{name}", _ => new(1, 1));
         await gate.WaitAsync(cancellationToken);
         try
@@ -121,12 +122,12 @@ public sealed partial class SourceManagementService(
     {
         ValidateRefreshConfiguration(refresh);
         var source = (await GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
         return await scopeOperations.WriteAsync(ResourceKinds.SourceConfiguration, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
             var address = ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceConfiguration, source.Name);
             var current = await store.GetExactAsync<SourceConfigurationResource>(address, token)
-                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceConfiguration, source.Name, source.Namespace));
+                ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceConfiguration, source.Name, source.Namespace));
             return await store.PutExactAsync(scopeRef, current.Value with
             {
                 Generation = checked(current.Value.Generation + 1),
@@ -144,7 +145,7 @@ public sealed partial class SourceManagementService(
         CancellationToken cancellationToken)
     {
         var view = await GetExactAsync(scopeRef, publisher, name, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
         var source = view.Source;
         await RecordAsync(source, timeProvider.GetUtcNow(), SourceImportOutcome.Rejected, null, null, null,
             view.Configuration.Definition.Origin,
@@ -208,7 +209,7 @@ public sealed partial class SourceManagementService(
         CancellationToken cancellationToken)
     {
         var source = (await GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
         return await ListVersionsAsync(source, cancellationToken);
     }
 
@@ -258,7 +259,7 @@ public sealed partial class SourceManagementService(
         if (string.IsNullOrWhiteSpace(displayName) || displayName.Trim().Length > 200)
             throw Invalid("source_display_name_invalid", "Display name must contain 1 to 200 characters.");
         var source = (await GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
         return await UpdateDisplayNameAsync(source, displayName, ifMatch, cancellationToken);
     }
 
@@ -273,7 +274,7 @@ public sealed partial class SourceManagementService(
         {
             var address = ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceConfiguration, source.Metadata.Name);
             var current = await store.GetExactAsync<SourceConfigurationResource>(address, token)
-                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceConfiguration, source.Metadata.Name, source.Namespace));
+                ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceConfiguration, source.Metadata.Name, source.Namespace));
             return await store.PutExactAsync(scopeRef, current.Value with
             {
                 Generation = checked(current.Value.Generation + 1),
@@ -294,9 +295,9 @@ public sealed partial class SourceManagementService(
         var address = ScopedResourceAddress.Create(
             scopeRef, new ResourceNamespace(publisher), ResourceKinds.Source, name);
         var source = await store.GetExactAsync<SourceResource>(address, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, address.Namespace));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.Source, name, address.Namespace));
         if (!string.Equals(source.ETag, ifMatch, StringComparison.Ordinal))
-            throw new ControlPlaneConcurrencyException("The Source changed since it was loaded.");
+            throw new ResourceConcurrencyException("The Source changed since it was loaded.");
 
         await scopeOperations.WriteAsync(
             ResourceKinds.Source,
@@ -559,7 +560,7 @@ public sealed partial class SourceManagementService(
         var scopeRef = RequireScope(source);
         var configurationAddress = ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceConfiguration, source.Name);
         var configuration = await store.GetExactAsync<SourceConfigurationResource>(configurationAddress, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceConfiguration, source.Name, source.Namespace));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceConfiguration, source.Name, source.Namespace));
         if (configuration.Value.Definition.Origin is not { } origin
             || !Uri.TryCreate(origin.Url, UriKind.Absolute, out var uri))
             throw Invalid("source_origin_missing", "The Source has no associated HTTP(S) origin.");
@@ -604,7 +605,7 @@ public sealed partial class SourceManagementService(
         var versionUid = observed.Value.Definition.LastSuccessfulVersionUid
             ?? throw new InvalidOperationException($"Source '{source.Address}' has no successful Source Version.");
         var version = await GetVersionExactAsync(scopeRef, source.Definition.Publisher, source.Name, versionUid, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
         await RecordAsync(source, timeProvider.GetUtcNow(), SourceImportOutcome.Unchanged,
             version.Definition.Version, version.Definition.ManifestDigest, version.Uid, retrieved.Origin, trigger, null, null, cancellationToken);
         return new(await BuildViewAsync(source, cancellationToken), version, SourceImportOutcome.Unchanged,
@@ -659,7 +660,7 @@ public sealed partial class SourceManagementService(
 
     private async Task<SourceResource> GetRequiredAsync(string publisher, string name, CancellationToken cancellationToken) =>
         (await GetAsync(publisher, name, cancellationToken))?.Source
-        ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
+        ?? throw new ResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
 
     private static ResourceScopeRef RequireScope(Resource resource) =>
         resource.ScopeRef ?? throw new InvalidOperationException($"Resource '{resource.Address}' has no ownership scope.");

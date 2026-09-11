@@ -1,3 +1,7 @@
+using Agentstration.Models;
+using Agentstration.Agents;
+using Agentstration.Tools;
+using Agentstration.ResourceManagement;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -72,7 +76,7 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
         var agents = factory.Services.GetRequiredService<AgentManagementService>();
         var runtimes = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
-        var store = factory.Services.GetRequiredService<IControlPlaneStore>();
+        var store = factory.Services.GetRequiredService<IResourceStore>();
         const string agentName = "runtime-cleanup-test";
         const string runtimeName = "runtime-cleanup-profile";
         const string deploymentName = "runtime-cleanup-test--g000001";
@@ -172,7 +176,7 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
         var agents = factory.Services.GetRequiredService<AgentManagementService>();
         var runtimes = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
-        var store = factory.Services.GetRequiredService<IControlPlaneStore>();
+        var store = factory.Services.GetRequiredService<IResourceStore>();
         const string agentName = "orphan-cleanup-test";
         const string runtimeName = "orphan-cleanup-profile";
         const string deploymentName = "orphan-cleanup-test--g000001";

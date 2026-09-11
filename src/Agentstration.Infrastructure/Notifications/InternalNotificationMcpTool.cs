@@ -2,7 +2,9 @@ using System.Text.Json;
 using Agentstration.Application.Work;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Tools;
 using Agentstration.Work;
 
 namespace Agentstration.Infrastructure.Notifications;
@@ -90,7 +92,7 @@ public sealed class WorkNotificationMcpTool(
 }
 
 public sealed class InternalMcpToolProjectionService(
-    IControlPlaneStore store,
+    IResourceStore store,
     IEnumerable<IInternalMcpToolDefinitionProvider> definitions,
     TimeProvider timeProvider)
 {

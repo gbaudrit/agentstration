@@ -4,12 +4,13 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
 
 public sealed partial class PackCompositionService(
-    IControlPlaneStore store,
+    IResourceStore store,
     IPackArtifactStore artifacts,
     IPackArchiveReader archiveReader,
     IPackWorkspaceResourceCatalog catalog,

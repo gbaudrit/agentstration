@@ -1,6 +1,6 @@
 using Agentstration.Application.Work;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
 
 namespace Agentstration.Infrastructure.Flows;
 

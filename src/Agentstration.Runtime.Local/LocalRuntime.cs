@@ -1,7 +1,10 @@
 using System.Collections.Concurrent;
+using Agentstration.Agents;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.ModelProviders;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.AI;
 
@@ -116,7 +119,7 @@ public sealed class SharedHostAgentProvisioner(IEnumerable<IAgentRuntimeFactory>
 
 public sealed class LocalAgentDeploymentReconciler(
     IEnumerable<IAgentDeploymentProvisioner> provisioners,
-    IControlPlaneStore store,
+    IResourceStore store,
     IRuntimeRegistry registry) : IAgentDeploymentReconciler
 {
     public async Task<AgentDeploymentReconciliationResult> ReconcileAsync(AgentDeployment deployment, CancellationToken cancellationToken)

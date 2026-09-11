@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Models;
 using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;

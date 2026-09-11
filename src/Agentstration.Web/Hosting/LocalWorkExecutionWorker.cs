@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Agentstration.Application.Work;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Infrastructure;
 using Agentstration.Runtime.Local;
 using Agentstration.Work;

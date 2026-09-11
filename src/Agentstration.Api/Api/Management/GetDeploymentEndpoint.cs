@@ -1,5 +1,7 @@
+using Agentstration.Agents;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;
@@ -19,7 +21,7 @@ internal sealed class GetDeploymentEndpoint : IManagementEndpoint
         {
             ManagementHttp.RequireApiVersion(request);
             var stored = await service.GetDeploymentAsync(name, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.AgentDeployment, name));
+                ?? throw new ResourceNotFoundException(new(ResourceKinds.AgentDeployment, name));
             return ManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
 }

@@ -6,7 +6,9 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Management.Core;
@@ -25,7 +27,7 @@ public interface IAepEnrollmentAnnouncementProvisioner
 }
 
 public sealed class AepEnrollmentService(
-    IControlPlaneStore store,
+    IResourceStore store,
     IAuthorizationService authorization,
     IPlatformAuthorizationService platformAuthorization,
     ResourceScopeOperationService scopeOperations,
@@ -94,7 +96,7 @@ public sealed class AepEnrollmentService(
             }
         };
         try { _ = await store.PutExactAsync(scope, resource, null, true, cancellationToken); }
-        catch (ControlPlaneConcurrencyException)
+        catch (ResourceConcurrencyException)
         {
             // A simultaneous restart announced the same deterministic instance.
             return await AnnounceAsync(announcement, proof, cancellationToken);
@@ -254,7 +256,7 @@ public sealed class AepEnrollmentService(
             Outcome = null
         };
         try { stored = await UpdateAsync(stored, consumed, cancellationToken); }
-        catch (ControlPlaneConcurrencyException) { throw new AepEnrollmentException("code_consumed", "The pairing code was already consumed.", 409); }
+        catch (ResourceConcurrencyException) { throw new AepEnrollmentException("code_consumed", "The pairing code was already consumed.", 409); }
         try
         {
             var names = await PersistCredentialAndRegistrationAsync(stored.Value, accessToken, cancellationToken);
@@ -265,7 +267,7 @@ public sealed class AepEnrollmentService(
         catch
         {
             try { _ = await UpdateAsync(stored, consumed with { State = AepEnrollmentState.VerificationFailed, Outcome = "credential_persistence_failed" }, cancellationToken); }
-            catch (ControlPlaneConcurrencyException) { }
+            catch (ResourceConcurrencyException) { }
             throw;
         }
     }
@@ -299,7 +301,7 @@ public sealed class AepEnrollmentService(
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             try { _ = await UpdateAsync(stored, definition with { State = AepEnrollmentState.VerificationFailed, CompletionDigest = null, Outcome = "verification_failed" }, cancellationToken); }
-            catch (ControlPlaneConcurrencyException) { }
+            catch (ResourceConcurrencyException) { }
             await AuditAsync(SecurityAuditActions.AepEnrollmentFailed, stored.Value, "verification_failed", cancellationToken, SecurityAuditOutcome.Failed);
             throw new AepEnrollmentException("verification_failed", "The authenticated extension manifest could not be verified.", 502);
         }
@@ -330,7 +332,7 @@ public sealed class AepEnrollmentService(
         catch (AepEnrollmentException exception)
         {
             try { _ = await UpdateAsync(stored, stored.Value.Definition with { State = AepEnrollmentState.VerificationFailed, Outcome = exception.Code }, cancellationToken); }
-            catch (ControlPlaneConcurrencyException) { }
+            catch (ResourceConcurrencyException) { }
             await AuditAsync(SecurityAuditActions.AepEnrollmentFailed, stored.Value, exception.Code, cancellationToken, SecurityAuditOutcome.Failed);
             throw;
         }

@@ -1,12 +1,14 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Runtime;
 
 public sealed class ManagementToolExecutionHookResolver(
-    IControlPlaneStore store,
+    IResourceStore store,
     IResourceScopeResolver scopeResolver) : IToolExecutionHookResolver
 {
     public async ValueTask<IReadOnlyList<IToolExecutionHook>> ResolveAsync(

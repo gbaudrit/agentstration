@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
@@ -13,7 +14,7 @@ public sealed record ResourceScopeInventoryNode(
 
 public sealed class ResourceScopeInventoryService(
     IdentityExperienceService identityExperience,
-    IControlPlaneStore store,
+    IResourceStore store,
     IRequestContextScopeFactory scopeFactory)
 {
     public async Task<IReadOnlyList<ResourceScopeInventoryNode>> GetAsync(CancellationToken cancellationToken)

@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 
 namespace Agentstration.Management.Core;
 
@@ -39,7 +40,7 @@ public sealed class ExternalIdentityAdministrationService(
             var existing = await store.FindExternalIdentityAsync(issuer, subject, cancellationToken);
             if (existing?.PrincipalId == principalId) return existing;
             if (existing is not null)
-                throw new ControlPlaneConcurrencyException("The external identity is already linked to another Principal.");
+                throw new ResourceConcurrencyException("The external identity is already linked to another Principal.");
 
             var identity = new ExternalIdentity(Guid.NewGuid(), issuer, subject, principalId, timeProvider.GetUtcNow());
             await store.AddExternalIdentityAsync(identity, cancellationToken);

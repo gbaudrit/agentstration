@@ -1,13 +1,14 @@
 extern alias workapi;
 
+using Agentstration.Agents;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Application.Work;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
-using Agentstration.Flow.Contracts;
-using Agentstration.Flow.Storage.Abstractions;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Flows.Contracts;
+using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Resources;
@@ -47,8 +48,8 @@ public sealed class WorkplaceApiTests
                 "Created through the canonical Flow API.",
                 "1.0.0",
                 true,
-                new Agentstration.Flow.DirectFlowDefinition(new Agentstration.Flow.FlowTargetReference(
-                    Agentstration.Flow.FlowTargetKind.Agent,
+                new Agentstration.Flows.DirectFlowDefinition(new Agentstration.Flows.FlowTargetReference(
+                    Agentstration.Flows.FlowTargetKind.Agent,
                     "dotnet-expert")))))
             {
                 Assert.AreEqual(HttpStatusCode.Created, createdFlow.StatusCode);
@@ -98,7 +99,7 @@ public sealed class WorkplaceApiTests
                 var workspaceId = new Agentstration.Resources.WorkspaceId(workspace!.Id);
                 var agent = await management.GetAgentAsync(administered.Value.Binding.ResourceId, default);
                 Assert.IsNotNull(agent);
-                var directFlow = await dependencyScope.ServiceProvider.GetRequiredService<Agentstration.Flow.Application.FlowService>().GetAsync(workspaceId, new Agentstration.Flow.FlowId("system-direct-agent-dotnet-expert"), default);
+                var directFlow = await dependencyScope.ServiceProvider.GetRequiredService<Agentstration.Flows.Application.FlowService>().GetAsync(workspaceId, new Agentstration.Flows.FlowId("system-direct-agent-dotnet-expert"), default);
                 Assert.IsNotNull(directFlow);
                 Assert.AreEqual(agent.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), directFlow.Value.Metadata["sourceAgentGeneration"]);
                 Assert.AreEqual($"1.0.{agent.Value.Generation - 1}", administered.Published.ResolvedTarget.Version);
@@ -106,22 +107,22 @@ public sealed class WorkplaceApiTests
                 Assert.AreEqual("resource_in_use", exception.Code);
 
                 var flows = dependencyScope.ServiceProvider.GetRequiredService<FlowService>();
-                var systemDelete = await Assert.ThrowsAsync<Agentstration.Flow.FlowValidationException>(() => flows.DeleteAsync(workspaceId, directFlow.Value.Id, directFlow.ETag, default));
+                var systemDelete = await Assert.ThrowsAsync<Agentstration.Flows.FlowValidationException>(() => flows.DeleteAsync(workspaceId, directFlow.Value.Id, directFlow.ETag, default));
                 Assert.AreEqual("system_flow_managed", systemDelete.Code);
-                var referencedSystemDelete = await Assert.ThrowsAsync<Agentstration.Flow.FlowValidationException>(() => flows.DeleteAsync(workspaceId, directFlow.Value.Id, directFlow.ETag, allowSystemManaged: true, default));
+                var referencedSystemDelete = await Assert.ThrowsAsync<Agentstration.Flows.FlowValidationException>(() => flows.DeleteAsync(workspaceId, directFlow.Value.Id, directFlow.ETag, allowSystemManaged: true, default));
                 Assert.AreEqual("flow_in_use", referencedSystemDelete.Code);
                 var referencedFlow = await flows.GetAsync(workspaceId, new("universal-router"), default);
                 Assert.IsNotNull(referencedFlow);
-                var referencedDelete = await Assert.ThrowsAsync<Agentstration.Flow.FlowValidationException>(() => flows.DeleteAsync(workspaceId, referencedFlow.Value.Id, referencedFlow.ETag, default));
+                var referencedDelete = await Assert.ThrowsAsync<Agentstration.Flows.FlowValidationException>(() => flows.DeleteAsync(workspaceId, referencedFlow.Value.Id, referencedFlow.ETag, default));
                 Assert.AreEqual("flow_in_use", referencedDelete.Code);
                 var schemaFlow = await flows.CreateAsync(workspaceId, new CreateFlowCommand(
                     "schema-flow", null, "1.0.0", true,
-                    new Agentstration.Flow.DirectFlowDefinition(new Agentstration.Flow.FlowTargetReference(Agentstration.Flow.FlowTargetKind.Agent, administered.Value.Binding.ResourceId))), default);
-                var graph = new Agentstration.Flow.FlowGraphDefinition
+                    new Agentstration.Flows.DirectFlowDefinition(new Agentstration.Flows.FlowTargetReference(Agentstration.Flows.FlowTargetKind.Agent, administered.Value.Binding.ResourceId))), default);
+                var graph = new Agentstration.Flows.FlowGraphDefinition
                 {
                     EntryStep = "input",
                     InputSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { request = new { type = "string" } } }),
-                    Steps = [new Agentstration.Flow.InputFlowStepDefinition { Name = "input" }, new Agentstration.Flow.OutputFlowStepDefinition { Name = "output" }],
+                    Steps = [new Agentstration.Flows.InputFlowStepDefinition { Name = "input" }, new Agentstration.Flows.OutputFlowStepDefinition { Name = "output" }],
                     Transitions = [new("complete", "input", "completed", "output")]
                 };
                 await flows.UpdateAsync(workspaceId, new("schema-flow"), new UpdateFlowCommand(null, "1.0.0", true, schemaFlow.Value.Definition, Graph: graph), schemaFlow.ETag, default);
@@ -190,7 +191,7 @@ public sealed class WorkplaceApiTests
             var run = await flowRuns.GetAsync(new Agentstration.Resources.WorkspaceId(submitted.Task.WorkspaceId), outputs.Results.Single().FlowRunId!, default);
             Assert.IsNotNull(run);
             Assert.AreEqual("system-direct-agent-dotnet-expert", run.Value.FlowId.Value);
-            Assert.AreEqual(Agentstration.Flow.FlowRunStatus.Succeeded, run.Value.Status);
+            Assert.AreEqual(Agentstration.Flows.FlowRunStatus.Succeeded, run.Value.Status);
         }
         finally
         {
@@ -471,7 +472,7 @@ public sealed class WorkplaceApiTests
             Assert.AreEqual(2, operationalPage.Items[0].FlowRunCount); Assert.AreEqual(2, operationalPage.Items[0].ResultCount); Assert.AreEqual(0, operationalPage.Items[0].ArtifactCount);
             var detail = await client.GetFromJsonAsync<WorkTaskOperationsDetailResponse>($"/api/tasks/{submitted.Task.Id}");
             Assert.IsNotNull(detail); Assert.HasCount(2, detail.FlowRuns); Assert.AreEqual(firstFlowRunId, detail.FlowRuns[1].ParentFlowRunId); Assert.HasCount(2, detail.Results); Assert.HasCount(0, detail.Artifacts);
-            var supervisedRun = await client.GetFromJsonAsync<Agentstration.Flow.FlowRun>($"/api/tasks/{submitted.Task.Id}/flow-runs/{detail.FlowRuns[0].Id}");
+            var supervisedRun = await client.GetFromJsonAsync<Agentstration.Flows.FlowRun>($"/api/tasks/{submitted.Task.Id}/flow-runs/{detail.FlowRuns[0].Id}");
             Assert.AreEqual(submitted.Task.Id.ToString(), supervisedRun?.WorkTaskId);
             using var foreignRunResponse = await client.GetAsync($"/api/tasks/{Guid.NewGuid()}/flow-runs/{detail.FlowRuns[0].Id}");
             Assert.AreEqual(HttpStatusCode.NotFound, foreignRunResponse.StatusCode);

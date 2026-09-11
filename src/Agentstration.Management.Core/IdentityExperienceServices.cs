@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 
 namespace Agentstration.Management.Core;
 
@@ -70,7 +71,7 @@ public sealed class IdentityAdministrationService(
             throw new ArgumentException("Workspace names must contain 2-64 lowercase letters, digits, or hyphens.", nameof(name));
         if (displayName.Length is < 2 or > 120) throw new ArgumentException("Workspace display names must contain 2-120 characters.", nameof(displayName));
         if (await store.FindWorkspaceByNameAsync(context.TenantId, name, cancellationToken) is not null)
-            throw new ControlPlaneConcurrencyException($"Workspace '{name}' already exists in the current tenant.");
+            throw new ResourceConcurrencyException($"Workspace '{name}' already exists in the current tenant.");
         var now = timeProvider.GetUtcNow();
         var workspace = new Workspace(Guid.NewGuid(), context.TenantId, name, displayName, WorkspaceStatus.Active, now);
         await store.AddWorkspaceAsync(workspace, cancellationToken);

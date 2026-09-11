@@ -1,12 +1,13 @@
 using System.Net;
 using System.Text;
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
 
 public sealed class SourceRegistryTrustEvaluationService(
-    IControlPlaneStore store,
+    IResourceStore store,
     ISourceRegistryCacheStore cache,
     ISourceRegistryReader registryReader,
     TimeProvider timeProvider) : ISourceVerificationEvidenceProvider

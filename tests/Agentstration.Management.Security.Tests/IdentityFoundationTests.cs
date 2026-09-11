@@ -1,3 +1,5 @@
+using Agentstration.Runtime.Abstractions;
+using Agentstration.ResourceManagement;
 using System.Net;
 using System.Net.Http.Json;
 using Agentstration.Infrastructure;
@@ -208,7 +210,7 @@ public sealed class IdentityFoundationTests
         var store = fixture.Services.GetRequiredService<IIdentityStore>();
         var duplicate = new TenantMembership(Guid.NewGuid(), context.TenantId, context.UserId, MembershipStatus.Active, DateTimeOffset.UtcNow);
 
-        await Assert.ThrowsAsync<ControlPlaneConcurrencyException>(() => store.AddMembershipAsync(duplicate, default));
+        await Assert.ThrowsAsync<ResourceConcurrencyException>(() => store.AddMembershipAsync(duplicate, default));
     }
 
     [TestMethod]
@@ -246,7 +248,7 @@ public sealed class IdentityFoundationTests
         await using var fixture = await IdentityFixture.CreateAsync();
         using var requestScope = fixture.OpenScope();
         var identity = fixture.Services.GetRequiredService<IIdentityStore>();
-        var resources = fixture.Services.GetRequiredService<IControlPlaneStore>();
+        var resources = fixture.Services.GetRequiredService<IResourceStore>();
         var first = fixture.Context.Current;
         var now = DateTimeOffset.UtcNow;
         var secondWorkspace = new Workspace(Guid.NewGuid(), first.TenantId, "finance", "Finance", WorkspaceStatus.Active, now);
@@ -386,7 +388,7 @@ public sealed class IdentityFoundationTests
                 directory,
                 controlPlaneConnectionString: $"Data Source={Path.Combine(directory, "control-plane.db")}");
             var provider = services.BuildServiceProvider();
-            await provider.GetRequiredService<IControlPlaneStore>().InitializeAsync(default);
+            await provider.GetRequiredService<IResourceStore>().InitializeAsync(default);
             var initialContext = await provider.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
             return new IdentityFixture(directory, provider, initialContext);
         }

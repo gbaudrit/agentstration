@@ -1,5 +1,8 @@
+using Agentstration.Agents;
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Management.Core;
 
@@ -12,7 +15,7 @@ public sealed class RuntimeProfileInUseException(string profileName, IReadOnlyLi
 public sealed record RuntimeProfileUsage(Guid DeploymentUid, string Name, string Environment, string AgentName);
 
 public sealed class RuntimeProfileManagementService(
-    IControlPlaneStore store,
+    IResourceStore store,
     ResourceScopeOperationService scopeOperations,
     IAgentDeploymentReconciler reconciler)
 {
@@ -27,7 +30,7 @@ public sealed class RuntimeProfileManagementService(
         {
             var address = ScopedResourceAddress.Create(scopeRef, resource.Namespace, ResourceKinds.RuntimeProfile, resource.Name);
             if (await store.GetExactAsync<RuntimeProfileResource>(address, token) is not null)
-                throw new ControlPlaneConcurrencyException($"Runtime profile '{resource.Metadata.Name}' already exists in scope '{scopeRef}'.");
+                throw new ResourceConcurrencyException($"Runtime profile '{resource.Metadata.Name}' already exists in scope '{scopeRef}'.");
             return await store.PutExactAsync(scopeRef, resource with { ScopeRef = scopeRef, Generation = 1, Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded } }, null, true, token);
         }, cancellationToken);
     }
@@ -47,7 +50,7 @@ public sealed class RuntimeProfileManagementService(
 
     public async Task<StoredResource<RuntimeProfileResource>> PutAsync(ResourceNamespace @namespace, string name, RuntimeProfileProperties definition, string? ifMatch, CancellationToken cancellationToken)
     {
-        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.RuntimeProfile, name, @namespace));
+        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ResourceNotFoundException(new(ResourceKinds.RuntimeProfile, name, @namespace));
         var updated = existing.Value with
         {
             Generation = checked(existing.Value.Generation + 1),
@@ -79,7 +82,7 @@ public sealed class RuntimeProfileManagementService(
 
     public async Task DeleteAsync(ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
     {
-        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.RuntimeProfile, name, @namespace));
+        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ResourceNotFoundException(new(ResourceKinds.RuntimeProfile, name, @namespace));
         await DeleteOrphanedDeploymentsAsync(@namespace, name, cancellationToken);
         var usages = await GetUsagesAsync(@namespace, name, cancellationToken);
         if (usages.Count > 0) throw new RuntimeProfileInUseException(name, usages);

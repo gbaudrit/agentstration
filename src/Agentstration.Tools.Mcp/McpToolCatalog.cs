@@ -2,8 +2,10 @@ using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Tools;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -213,7 +215,7 @@ public sealed class ToolProviderAdapter(
     }
 }
 
-public sealed class McpToolCatalog(IControlPlaneStore store, ToolProviderAdapter providers) : IToolCatalog
+public sealed class McpToolCatalog(IResourceStore store, ToolProviderAdapter providers) : IToolCatalog
 {
     public async ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(IEnumerable<string> toolIds, CancellationToken cancellationToken = default)
     {
@@ -269,7 +271,7 @@ internal sealed record McpAgentTool(
     bool RequiresApproval) : IAgentTool;
 
 public sealed class McpToolInvoker(
-    IControlPlaneStore store,
+    IResourceStore store,
     ToolProviderAdapter providers,
     Lazy<IToolDefinitionExecutor>? internalTools = null,
     Lazy<IEnumerable<IInternalMcpToolHandler>>? builtInTools = null) : IToolInvoker

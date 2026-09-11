@@ -1,6 +1,6 @@
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Resources;
 
 namespace Agentstration.Application.Tests;
@@ -253,7 +253,7 @@ public sealed partial class FlowTests
             options);
     }
 
-    private static async Task<Agentstration.Flow.Storage.Abstractions.StoredFlow> CreatePublishedGraphAsync(
+    private static async Task<Agentstration.Flows.Storage.Abstractions.StoredFlow> CreatePublishedGraphAsync(
         FlowFixture fixture,
         string name,
         FlowGraphDefinition graph)

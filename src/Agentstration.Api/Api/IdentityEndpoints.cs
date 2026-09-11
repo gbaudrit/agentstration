@@ -1,5 +1,6 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Web.Configuration;
 using Agentstration.Web.Hosting;
 using Agentstration.Web.Security;
@@ -303,7 +304,7 @@ public static class IdentityEndpoints
         {
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "workspace_invalid", detail: exception.Message);
         }
-        catch (ControlPlaneConcurrencyException exception)
+        catch (ResourceConcurrencyException exception)
         {
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "workspace_conflict", detail: exception.Message);
         }
@@ -392,7 +393,7 @@ public static class IdentityEndpoints
         {
             return Results.ValidationProblem(new Dictionary<string, string[]> { [exception.ParamName ?? "identity"] = [exception.Message] });
         }
-        catch (Exception exception) when (exception is InvalidOperationException or ControlPlaneConcurrencyException)
+        catch (Exception exception) when (exception is InvalidOperationException or ResourceConcurrencyException)
         {
             return Results.Conflict(new { error = exception.Message });
         }

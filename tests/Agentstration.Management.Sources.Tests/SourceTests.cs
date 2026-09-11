@@ -1,3 +1,4 @@
+using Agentstration.ResourceManagement;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Json;
@@ -8,7 +9,7 @@ using Agentstration.Infrastructure.Sources;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
-using Agentstration.Management.Storage.Sqlite;
+using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.ModelProviders;
 using Agentstration.Resources;
 using Agentstration.Tools.SourceRegistry;
@@ -1627,7 +1628,7 @@ public sealed class SourceTests
         private readonly string database;
         public SourceManagementService Service => services.GetRequiredService<SourceManagementService>();
         public CurrentRequestContext Context => services.GetRequiredService<CurrentRequestContext>();
-        public IControlPlaneStore Store => services.GetRequiredService<IControlPlaneStore>();
+        public IResourceStore Store => services.GetRequiredService<IResourceStore>();
         public SourceBindingManagementService Bindings => services.GetRequiredService<SourceBindingManagementService>();
         public SourceChannelSnapshotService Snapshots => services.GetRequiredService<SourceChannelSnapshotService>();
         public SourceRefreshScheduler Scheduler => services.GetRequiredService<SourceRefreshScheduler>();

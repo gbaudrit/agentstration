@@ -1,3 +1,4 @@
+using Agentstration.ResourceManagement;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.ModelProviders;
@@ -270,7 +271,7 @@ public sealed class SourceProviderManagementTests
                         : null);
     }
 
-    private sealed class MemoryStore : IControlPlaneStore
+    private sealed class MemoryStore : IResourceStore
     {
         private readonly Dictionary<ScopedResourceAddress, (Resource Value, string ETag, DateTimeOffset At)> values = [];
         private long version;
@@ -310,7 +311,7 @@ public sealed class SourceProviderManagementTests
         public Task<StoredResource<T>> PutExactAsync<T>(ResourceScopeRef scopeRef, T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
         {
             var key = ScopedResourceAddress.Create(scopeRef, resource.Namespace, resource.Kind, resource.Name);
-            if (ifNoneMatch && values.ContainsKey(key)) throw new ControlPlaneConcurrencyException("Already exists.");
+            if (ifNoneMatch && values.ContainsKey(key)) throw new ResourceConcurrencyException("Already exists.");
             var etag = $"\"{Interlocked.Increment(ref version)}\"";
             var value = resource.WithSystemState(resource.Uid == Guid.Empty ? Guid.NewGuid() : resource.Uid, scopeRef, etag);
             values[key] = (value, etag, DateTimeOffset.UnixEpoch);

@@ -2,7 +2,11 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.ModelProviders;
+using Agentstration.Models;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Tools;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Agentstration.Web.Api.Models;
@@ -44,8 +48,8 @@ internal static class ModelManagementHttp
             var status = string.Equals(exception.Code, "extension_unavailable", StringComparison.Ordinal) ? 503 : 422;
             return Problem(exception.Code, "Model profile option migration failed", status, exception.Message);
         }
-        catch (ControlPlaneResourceNotFoundException exception) { return Problem("model-profile-not-found", "Resource not found", 404, exception.Message); }
-        catch (ControlPlaneConcurrencyException exception) { return Problem("resource-version-conflict", "Resource version conflict", 409, exception.Message); }
+        catch (ResourceNotFoundException exception) { return Problem("model-profile-not-found", "Resource not found", 404, exception.Message); }
+        catch (ResourceConcurrencyException exception) { return Problem("resource-version-conflict", "Resource version conflict", 409, exception.Message); }
         catch (RuntimeProfileInUseException exception)
         {
             return Problem("runtime-profile-in-use", "Runtime profile is in use", 409, exception.Message,

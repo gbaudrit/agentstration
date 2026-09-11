@@ -1,16 +1,8 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
-
-public sealed record ResourceScopeTarget(
-    ResourceScopeRef ScopeRef,
-    ResourceScopeKind Kind,
-    string DisplayName,
-    bool CanWrite);
-
-public sealed class ResourceScopeAccessDeniedException(ResourceScopeRef scopeRef)
-    : Exception($"The current principal cannot administer resource scope '{scopeRef}'.");
 
 public sealed class ResourceScopeOperationService(
     ICurrentRequestContext requestContext,
@@ -18,7 +10,7 @@ public sealed class ResourceScopeOperationService(
     IAuthorizationService authorization,
     IPlatformAuthorizationService platformAuthorization,
     IIdentityStore identities,
-    IResourceScopeResolver scopes)
+    IResourceScopeResolver scopes) : IResourceScopeOperations
 {
     public ResourceScopeRef DefaultScopeRef(string kind)
     {

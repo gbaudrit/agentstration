@@ -1,5 +1,5 @@
-using Agentstration.Flow;
-using Agentstration.Flow.Contracts;
+using Agentstration.Flows;
+using Agentstration.Flows.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.FlowDesigner.Backend;
 

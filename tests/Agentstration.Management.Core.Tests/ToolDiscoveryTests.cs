@@ -1,3 +1,6 @@
+using Agentstration.Tools;
+using Agentstration.Resources;
+using Agentstration.ResourceManagement;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
@@ -75,7 +78,7 @@ public sealed class ToolDiscoveryTests
         public override DateTimeOffset GetUtcNow() => DateTimeOffset.UnixEpoch.AddMinutes(Interlocked.Increment(ref ticks));
     }
 
-    private sealed class MemoryStore : IControlPlaneStore
+    private sealed class MemoryStore : IResourceStore
     {
         private readonly Dictionary<ResourceKey, (Resource Value, string ETag, DateTimeOffset At)> values = [];
         private long version;

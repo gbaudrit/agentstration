@@ -4,11 +4,13 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
 
 public sealed partial class PackAuthoringService(
-    IControlPlaneStore store,
+    IResourceStore store,
     IPackArtifactStore artifacts,
     IPackArchiveReader archiveReader,
     PackManagementService installations,
@@ -115,7 +117,7 @@ public sealed partial class PackAuthoringService(
     public async Task<StoredResource<PackProjectResource>> UpdateSourceDocumentAsync(Guid projectId, UpdatePackProjectSourceCommand command, string etag, CancellationToken cancellationToken)
     {
         var current = await RequiredProjectAsync(projectId, cancellationToken);
-        if (!string.Equals(current.ETag, etag, StringComparison.Ordinal)) throw new ControlPlaneConcurrencyException("The Pack Project changed while its source was being edited.");
+        if (!string.Equals(current.ETag, etag, StringComparison.Ordinal)) throw new ResourceConcurrencyException("The Pack Project changed while its source was being edited.");
         var source = await ReadArtifactAsync(current.Value.Definition.SourceArtifact, cancellationToken);
         await using var sourceStream = new MemoryStream(source, writable: false);
         var archive = await archiveReader.ReadAsync(sourceStream, current.Value.Definition.SourceArtifact.FileName, cancellationToken);

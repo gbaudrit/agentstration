@@ -1,3 +1,5 @@
+using Agentstration.Tools;
+using Agentstration.ResourceManagement;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
@@ -116,7 +118,7 @@ public sealed class ToolExecutionHookManagementTests
     private static IReadOnlyDictionary<string, JsonElement> Configuration(params (string Key, JsonElement Value)[] values) =>
         values.ToDictionary(value => value.Key, value => value.Value, StringComparer.Ordinal);
 
-    private sealed class MemoryStore : IControlPlaneStore
+    private sealed class MemoryStore : IResourceStore
     {
         private readonly Dictionary<ResourceKey, (Resource Value, string ETag, DateTimeOffset At)> values = [];
         private long version;

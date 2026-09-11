@@ -1,7 +1,8 @@
+using Agentstration.Agents;
 using Agentstration.Application.Work;
-using Agentstration.Flow.Application;
-using Agentstration.Flow.Storage.PostgreSql;
-using Agentstration.Flow.Storage.Sqlite;
+using Agentstration.Flows.Application;
+using Agentstration.Flows.Storage.PostgreSql;
+using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Infrastructure.Agents;
 using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Bootstrap;
@@ -16,18 +17,22 @@ using Agentstration.Infrastructure.Work;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
-using Agentstration.Management.Storage.PostgreSql;
-using Agentstration.Management.Storage.Sqlite;
 using Agentstration.ModelProviders;
+using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Storage.PostgreSql;
+using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Local;
 using Agentstration.Runtime.Storage.PostgreSql;
 using Agentstration.Runtime.Storage.Sqlite;
+using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Secrets.Local;
+using Agentstration.Tools;
 using Agentstration.Tools.Mcp;
+using Agentstration.Triggers;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Agentstration.Work.Storage.PostgreSql;
@@ -60,6 +65,7 @@ public static class DependencyInjection
         services.TryAddSingleton<CurrentRequestContext>();
         services.TryAddSingleton<ICurrentRequestContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton<IRequestContextScopeFactory>(provider => provider.GetRequiredService<CurrentRequestContext>());
+        services.TryAddSingleton<ITriggerExecutionContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton(new GenAiObservabilityOptions());
         services.TryAddTransient<GenAiHttpPayloadCaptureHandler>();
         services.AddSingleton<IManagementEventPublisher, InProcessManagementEventPublisher>();
@@ -84,11 +90,11 @@ public static class DependencyInjection
         else
             services.AddSingleton<IAgentstrationStorageInitializer, SqliteStorageInitializer>();
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
-            services.AddPostgreSqlControlPlane(storageOptions.ConnectionString!);
+            services.AddPostgreSqlResourceManagement(storageOptions.ConnectionString!);
         else
         {
             controlPlaneConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "control-plane.db")}";
-            services.AddSqliteControlPlane(controlPlaneConnectionString);
+            services.AddSqliteResourceManagement(controlPlaneConnectionString);
         }
         var secretPath = Path.Combine(dataDirectory, "secrets");
         services.AddSingleton(_ => new EnvironmentMasterKeyProvider(Path.Combine(secretPath, "master.key")));
@@ -129,7 +135,7 @@ public static class DependencyInjection
         services.AddSingleton<PrincipalPreferencesService>();
         services.AddSingleton<PersonalAccessTokenService>();
         services.AddSingleton<IAgentDefinitionCompiler, AgentDefinitionCompiler>();
-        services.AddSingleton<IRuntimeAgentResolver, ControlPlaneRuntimeAgentResolver>();
+        services.AddSingleton<IRuntimeAgentResolver, ResourceRuntimeAgentResolver>();
         services.AddSingleton<IModelProfileReferenceValidator, DeferredModelProfileReferenceValidator>();
         if (!useManagedProfileResolver)
             services.AddSingleton<IChatClientResolver, SingleChatClientResolver>();
@@ -313,7 +319,7 @@ public static class DependencyInjection
         services.AddSingleton<IFlowDeletionGuard, ToolDefinitionFlowDeletionGuard>();
         services.AddSingleton<IEntryTargetResolver, EntryTargetResolver>();
         services.AddSingleton<EntryResourceDeletionGuard>();
-        services.AddSingleton<IManagementResourceDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
+        services.AddSingleton<IResourceDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
         services.AddSingleton<IFlowDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
         services.AddSingleton<EntryAdministrationService>();
         services.AddSingleton<IWorkplaceContext, CurrentWorkplaceContext>();

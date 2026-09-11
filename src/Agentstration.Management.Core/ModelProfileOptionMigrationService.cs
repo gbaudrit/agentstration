@@ -1,5 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
+using Agentstration.Models;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
@@ -32,7 +34,7 @@ public sealed class ModelProfileOptionMigrationService(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetVersion);
         var profile = await profiles.GetAsync(@namespace, profileName, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName, @namespace));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName, @namespace));
         var providerAddress = profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ResourceKinds.ModelProvider);
         var provider = await providers.GetConfigurationRequiredAsync(providerAddress.Namespace, providerAddress.Name, cancellationToken);
         if (!profile.Value.Definition.ProviderOptions.TryGetValue(provider.ContributionId, out var source))
@@ -80,12 +82,12 @@ public sealed class ModelProfileOptionMigrationService(
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(ifMatch))
-            throw new ControlPlaneConcurrencyException("Applying an option migration requires If-Match.");
+            throw new ResourceConcurrencyException("Applying an option migration requires If-Match.");
         var preview = await PreviewAsync(@namespace, profileName, targetVersion, cancellationToken);
         if (!string.Equals(ifMatch, preview.ProfileETag, StringComparison.Ordinal))
-            throw new ControlPlaneConcurrencyException($"Model profile '{@namespace}/{profileName}' was modified before the migration could be applied.");
+            throw new ResourceConcurrencyException($"Model profile '{@namespace}/{profileName}' was modified before the migration could be applied.");
         var profile = await profiles.GetAsync(@namespace, profileName, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName, @namespace));
+            ?? throw new ResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName, @namespace));
         var options = new Dictionary<string, VersionedExtensionOptions>(profile.Value.Definition.ProviderOptions, StringComparer.Ordinal)
         {
             [preview.ProviderType] = preview.Target

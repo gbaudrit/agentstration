@@ -1,5 +1,6 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
@@ -15,7 +16,7 @@ public sealed class SourceProviderInUseException(string providerName, IReadOnlyL
 public sealed record SourceProviderStatus(string Provider, string Status, DateTimeOffset CheckedAt, string? Details);
 
 public sealed class SourceProviderManagementService(
-    IControlPlaneStore store,
+    IResourceStore store,
     IResourceReferenceResolver references,
     ResourceScopeOperationService scopeOperations,
     IEnumerable<IExtensionInspector> inspectors,
@@ -57,7 +58,7 @@ public sealed class SourceProviderManagementService(
         return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
             if (await GetExactAsync(scopeRef, resource.Namespace, resource.Name, token) is not null)
-                throw new ControlPlaneConcurrencyException($"Source provider '{resource.Address}' already exists.");
+                throw new ResourceConcurrencyException($"Source provider '{resource.Address}' already exists.");
             var definition = await ValidateDefinitionAsync(resource.Namespace, resource.Definition, scopeRef, token);
             return await store.PutExactAsync(scopeRef, resource with
             {

@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Triggers;
 
 namespace Agentstration.Management.Core;
 
@@ -14,7 +15,7 @@ public sealed class LocalBootstrapOptions
     public string ExternalIdentityIssuer { get; set; } = DevelopmentIssuer;
     public string ExternalIdentitySubject { get; set; } = DevelopmentSubject;
 }
-public sealed class CurrentRequestContext : ICurrentRequestContext, IRequestContextScopeFactory
+public sealed class CurrentRequestContext : ICurrentRequestContext, IRequestContextScopeFactory, ITriggerExecutionContext
 {
     private readonly AsyncLocal<AmbientRequestContext?> ambient = new();
     public bool IsInitialized => AccessMode == ControlPlaneAccessMode.Workspace;
@@ -25,6 +26,7 @@ public sealed class CurrentRequestContext : ICurrentRequestContext, IRequestCont
         { AccessMode: ControlPlaneAccessMode.System } => throw new InvalidOperationException("System operations do not have a workspace request context."),
         _ => throw new InvalidOperationException("The request context has not been initialized.")
     };
+    TriggerExecutionIdentity ITriggerExecutionContext.Current => new(Current.TenantId, Current.WorkspaceId, Current.PrincipalId);
     public IDisposable Push(RequestContext context) => Push(new AmbientRequestContext(ControlPlaneAccessMode.Workspace, context));
     public IDisposable PushTenant(Guid principalId, Guid tenantId, AuthorizationRestriction? restriction = null)
     {

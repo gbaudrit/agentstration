@@ -1,11 +1,13 @@
 using System.Text.Json;
 using Agentstration.Application.Work;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
-using Agentstration.Flow.Storage.Abstractions;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Flows;
 
@@ -34,7 +36,7 @@ public sealed class ToolDefinitionFlowResolver(FlowService flows) : IToolDefinit
 }
 
 public sealed class ToolDefinitionFlowActivationGuard(
-    IControlPlaneStore store,
+    IResourceStore store,
     IRequestContextScopeFactory requestScopes) : IFlowVersionActivationGuard
 {
     public async Task ValidateActivationAsync(WorkspaceId workspaceId, FlowVersion version, CancellationToken cancellationToken)
@@ -60,7 +62,7 @@ public sealed class ToolDefinitionFlowActivationGuard(
 }
 
 public sealed class ToolDefinitionFlowDeletionGuard(
-    IControlPlaneStore store,
+    IResourceStore store,
     IRequestContextScopeFactory requestScopes) : IFlowDeletionGuard
 {
     public async Task ValidateDeleteAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken)
