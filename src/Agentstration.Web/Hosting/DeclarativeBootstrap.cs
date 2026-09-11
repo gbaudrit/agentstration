@@ -3,44 +3,13 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Contracts;
 using Agentstration.Resources;
 
 namespace Agentstration.Web.Hosting;
 
 public sealed class DeclarativeBootstrapException(string message, Exception? innerException = null)
     : InvalidOperationException(message, innerException);
-
-public sealed record BootstrapProfileSelection(
-    IReadOnlyList<string> Profiles,
-    BootstrapApplicationTarget? Target = null,
-    IReadOnlyList<BootstrapBindingSelection>? Bindings = null,
-    BootstrapSourceProfileSelection? Source = null);
-
-public sealed record BootstrapResourcePreview(
-    string Profile,
-    string Location,
-    string Kind,
-    string Name,
-    BootstrapResourceDisposition Disposition,
-    string? Message = null,
-    IReadOnlyList<BootstrapResourcePlanDetail>? Details = null);
-
-public sealed record BootstrapCompositionPreview(
-    IReadOnlyList<BootstrapProfileSummary> Profiles,
-    BootstrapProfileScope Scope,
-    BootstrapApplicationTarget? Target,
-    IReadOnlyList<BootstrapBindingSelection> Bindings,
-    string Digest,
-    IReadOnlyList<BootstrapResourcePreview> Resources,
-    BootstrapSourceProvenance? SourceProvenance = null)
-{
-    public bool CanApply => Resources.All(resource => resource.Disposition != BootstrapResourceDisposition.Invalid);
-}
-
-public sealed record BootstrapExecutionResult(
-    BootstrapCompositionPreview Preview,
-    IReadOnlyList<BootstrapAppliedResource> Resources,
-    string? Error = null);
 
 public sealed class DeclarativeBootstrapService(
     IConfiguration configuration,

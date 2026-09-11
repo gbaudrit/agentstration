@@ -418,9 +418,9 @@ internal static class OpenApiSuccessResponseCatalog
     private static OpenApiSuccessResponse? Bootstrap(string method, string path)
     {
         if (path == "/api/bootstrap/profiles" && method == "GET")
-            return Json<Agentstration.Web.Hosting.BootstrapManagementView>(200, "List bootstrap profiles and applications");
+            return Json<BootstrapManagementView>(200, "List bootstrap profiles and applications");
         if (path == "/api/bootstrap/profiles/preview" && method == "POST")
-            return Json<Agentstration.Web.Hosting.BootstrapCompositionPreview>(200, "Preview bootstrap profiles");
+            return Json<BootstrapCompositionPreview>(200, "Preview bootstrap profiles");
         if (path == "/api/bootstrap/applications" && method == "POST")
             return Json<BootstrapApplicationResource>(201, "Apply bootstrap profiles");
         if (path == "/api/bootstrap/applications/{applicationId}" && method == "GET")
