@@ -4,7 +4,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SecretStrings> Localizer
 
 <PageTitle>@T("Vaults") · Agentstration</PageTitle>
-<PageHeader Title="@T("Vaults")" Description="@T("Vaults.Description")"><Actions><a class="button-primary" href="/vaults/new">@T("CreateVault")</a></Actions></PageHeader>
+<PageHeader Title="@T("Vaults")" Description="@T("Vaults.Description")" TestId="resource-vaults"><Actions><a class="button-primary" href="/vaults/new">@T("CreateVault")</a></Actions></PageHeader>
 <ResourceTabs Label="@T("SecretManagement")"><a href="/secrets">@T("Secrets")</a><a class="active" href="/vaults">@T("Vaults")</a></ResourceTabs>
 @if (loading) { <LoadingState Message="@T("LoadingVaults")" /> }
 else if (error is not null) { <div class="form-alert form-alert-danger">@error.Message</div> }

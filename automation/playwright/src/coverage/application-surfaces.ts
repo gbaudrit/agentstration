@@ -93,6 +93,21 @@ function coveredOperations(id: string, source: string, routes: readonly string[]
   };
 }
 
+function partialResourceAdministration(
+  id: string,
+  source: string,
+  routes: readonly string[],
+  fixtureKeys: readonly string[] = [],
+): ApplicationSurface {
+  return {
+    id, host: 'console', source, routes, fixtureKeys,
+    pageObject: 'src/pages/resource-administration.page.ts',
+    journey: 'inspect-resource-administration',
+    specification: 'tests/resource-administration.spec.ts',
+    coverage: 'partial', trackingIssue: 291,
+  };
+}
+
 export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
     id: 'console-home', host: 'console', source: `${consolePages}/Home.razor`, routes: ['/'], fixtureKeys: [],
@@ -138,11 +153,11 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   coveredConsoleAdministration('bootstrap-account', `${razorPages}/Bootstrap.cshtml`, ['/bootstrap']),
   coveredConsoleAdministration('logout', `${razorPages}/Logout.cshtml`, ['/logout']),
 
-  planned('agents', `${consolePages}/Agents.razor`, ['/agents'], 291),
+  partialResourceAdministration('agents', `${consolePages}/Agents.razor`, ['/agents']),
   coveredFlow('agent-runner', `${consolePages}/AgentRunner.razor`, ['/agents/{Name}/run', '/runs/{RunId}'], ['name', 'runId'], 'inspect-flow-observability'),
   coveredFlow('agent-runs', `${consolePages}/AgentRuns.razor`, ['/agent-runs'], [], 'inspect-flow-observability'),
   planned('namespaced-agent-details', `${consolePages}/NamespacedAgentDetails.razor`, ['/namespaces/{AgentNamespace}/agents/{Name}'], 291, ['agentNamespace', 'name']),
-  planned('deployments', `${consolePages}/Deployments.razor`, ['/deployments'], 291),
+  partialResourceAdministration('deployments', `${consolePages}/Deployments.razor`, ['/deployments']),
 
   coveredFlow('flows', `${consolePages}/Flows.razor`, ['/flows']),
   coveredFlow('flow-details', `${consolePages}/FlowDetails.razor`, ['/flows/{FlowId}', '/namespaces/{FlowNamespace}/flows/{FlowId}'], ['flowId', 'flowNamespace']),
@@ -154,27 +169,27 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   coveredFlow('task-details', `${consolePages}/TaskDetails.razor`, ['/tasks/{TaskId:guid}'], ['taskId'], 'inspect-flow-observability'),
   coveredFlow('task-flow-run-details', `${consolePages}/TaskFlowRunDetails.razor`, ['/tasks/{TaskId:guid}/flowruns/{RunId}'], ['taskId', 'runId'], 'inspect-flow-observability'),
 
-  planned('entries', `${consolePages}/Entries.razor`, ['/entries'], 291),
-  planned('model-profiles', `${consolePages}/ModelProfiles.razor`, ['/modelprofiles'], 291),
-  planned('model-profile-editor', `${consolePages}/ModelProfileEditor.razor`, ['/modelprofiles/new', '/modelprofiles/{Name}'], 291, ['name']),
-  planned('model-providers', `${consolePages}/ModelProviders.razor`, ['/modelproviders'], 291),
-  planned('model-provider-details', `${consolePages}/ModelProviderDetails.razor`, ['/modelproviders/new', '/modelproviders/{Name}'], 291, ['name']),
-  planned('runtime-profiles', `${consolePages}/RuntimeProfiles.razor`, ['/runtimeprofiles'], 291),
-  planned('runtime-profile-editor', `${consolePages}/RuntimeProfileEditor.razor`, ['/runtimeprofiles/new', '/runtimeprofiles/{Name}'], 291, ['name']),
-  planned('secrets', `${consolePages}/Secrets.razor`, ['/secrets'], 291),
-  planned('secret-editor', `${consolePages}/SecretEditor.razor`, ['/secrets/new', '/secrets/{Name}'], 291, ['name']),
-  planned('vaults', `${consolePages}/Vaults.razor`, ['/vaults'], 291),
-  planned('vault-editor', `${consolePages}/VaultEditor.razor`, ['/vaults/new', '/vaults/{Name}'], 291, ['name']),
-  planned('tools', `${consolePages}/Tools.razor`, ['/tools'], 291),
+  partialResourceAdministration('entries', `${consolePages}/Entries.razor`, ['/entries']),
+  partialResourceAdministration('model-profiles', `${consolePages}/ModelProfiles.razor`, ['/modelprofiles']),
+  partialResourceAdministration('model-profile-editor', `${consolePages}/ModelProfileEditor.razor`, ['/modelprofiles/new', '/modelprofiles/{Name}'], ['name']),
+  partialResourceAdministration('model-providers', `${consolePages}/ModelProviders.razor`, ['/modelproviders']),
+  partialResourceAdministration('model-provider-details', `${consolePages}/ModelProviderDetails.razor`, ['/modelproviders/new', '/modelproviders/{Name}'], ['name']),
+  partialResourceAdministration('runtime-profiles', `${consolePages}/RuntimeProfiles.razor`, ['/runtimeprofiles']),
+  partialResourceAdministration('runtime-profile-editor', `${consolePages}/RuntimeProfileEditor.razor`, ['/runtimeprofiles/new', '/runtimeprofiles/{Name}'], ['name']),
+  partialResourceAdministration('secrets', `${consolePages}/Secrets.razor`, ['/secrets']),
+  partialResourceAdministration('secret-editor', `${consolePages}/SecretEditor.razor`, ['/secrets/new', '/secrets/{Name}'], ['name']),
+  partialResourceAdministration('vaults', `${consolePages}/Vaults.razor`, ['/vaults']),
+  partialResourceAdministration('vault-editor', `${consolePages}/VaultEditor.razor`, ['/vaults/new', '/vaults/{Name}'], ['name']),
+  partialResourceAdministration('tools', `${consolePages}/Tools.razor`, ['/tools']),
   planned('tool-details', `${consolePages}/ToolDetails.razor`, ['/tools/{Name}'], 291, ['name']),
-  planned('tool-providers', `${consolePages}/ToolProviders.razor`, ['/tools/providers'], 291),
-  planned('tool-provider-editor', `${consolePages}/ToolProviderEditor.razor`, ['/tools/providers/new', '/tools/providers/{Name}'], 291, ['name']),
-  planned('tool-definitions', `${consolePages}/ToolDefinitions.razor`, ['/tools/definitions'], 291),
-  planned('tool-definition-editor', `${consolePages}/ToolDefinitionEditor.razor`, ['/tools/definitions/new', '/tools/definitions/{Name}'], 291, ['name']),
+  partialResourceAdministration('tool-providers', `${consolePages}/ToolProviders.razor`, ['/tools/providers']),
+  partialResourceAdministration('tool-provider-editor', `${consolePages}/ToolProviderEditor.razor`, ['/tools/providers/new', '/tools/providers/{Name}'], ['name']),
+  partialResourceAdministration('tool-definitions', `${consolePages}/ToolDefinitions.razor`, ['/tools/definitions']),
+  partialResourceAdministration('tool-definition-editor', `${consolePages}/ToolDefinitionEditor.razor`, ['/tools/definitions/new', '/tools/definitions/{Name}'], ['name']),
   planned('tool-governance-audit', `${consolePages}/ToolGovernanceAudit.razor`, ['/tool-governance/{Owner}/{RunId}'], 291, ['owner', 'runId']),
-  planned('triggers', `${consolePages}/Triggers.razor`, ['/triggers'], 291),
+  partialResourceAdministration('triggers', `${consolePages}/Triggers.razor`, ['/triggers']),
   planned('trigger-details', `${consolePages}/TriggerDetails.razor`, ['/triggers/{Name}'], 291, ['name']),
-  planned('trigger-editor', `${consolePages}/TriggerEditor.razor`, ['/triggers/new', '/triggers/{Name}/edit'], 291, ['name']),
+  partialResourceAdministration('trigger-editor', `${consolePages}/TriggerEditor.razor`, ['/triggers/new', '/triggers/{Name}/edit'], ['name']),
 
   coveredDistribution('extensions', `${consolePages}/Extensions.razor`, ['/extensions']),
   coveredDistribution('extension-details', `${consolePages}/ExtensionDetails.razor`, ['/extensions/{RegistrationName}', '/extensions/enrollment/{EnrollmentInstanceId:guid}'], ['registrationName', 'enrollmentInstanceId']),

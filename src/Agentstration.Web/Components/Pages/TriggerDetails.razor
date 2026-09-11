@@ -21,7 +21,7 @@ else if (notFound || stored is null)
 else
 {
     var trigger = stored.Value;
-    <PageHeader Title="@trigger.Definition.DisplayName" Description="@(T("TriggerResourceDescription", trigger.Namespace.Value, trigger.Name))">
+    <PageHeader Title="@trigger.Definition.DisplayName" Description="@(T("TriggerResourceDescription", trigger.Namespace.Value, trigger.Name))" TestId="resource-trigger-details">
         <Metadata><StatusBadge Text="@(trigger.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(trigger.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /><span>@T("Generation", trigger.Generation)</span></Metadata>
         <Actions>
             @if (CanExecute) { <button class="button-primary" disabled="@(!trigger.Definition.Enabled || running)" @onclick="RunNowAsync">@(running ? T("Submitting") : T("RunNow"))</button> }

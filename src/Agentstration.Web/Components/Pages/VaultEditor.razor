@@ -6,7 +6,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SecretStrings> Localizer
 
 <PageTitle>@(IsNew ? T("CreateVault") : $"{Name} · {T("Vault")}") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("CreateVault") : model.DisplayName)" Description="@T("VaultEditor.Description")"><Actions>@if (!IsNew) { <button class="button-danger" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/vaults">@T("Back")</a></Actions></PageHeader>
+<PageHeader Title="@(IsNew ? T("CreateVault") : model.DisplayName)" Description="@T("VaultEditor.Description")" TestId="resource-vault-editor"><Actions>@if (!IsNew) { <button class="button-danger" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/vaults">@T("Back")</a></Actions></PageHeader>
 <ResourceTabs Label="@T("SecretManagement")"><a href="/secrets">@T("Secrets")</a><a class="active" href="/vaults">@T("Vaults")</a></ResourceTabs>
 @if (error is not null) { <div class="form-alert form-alert-danger">@error.Message</div> }
 <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="vault-editor" class="resource-form"><DataAnnotationsValidator /><ValidationSummary />

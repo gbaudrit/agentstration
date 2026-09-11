@@ -24,7 +24,7 @@ else if (notFound)
 }
 else
 {
-    <PageHeader Title="@(IsNew ? T("NewTrigger") : model.DisplayName)" Description="@(IsNew ? T("Editor.NewDescription") : T("Editor.EditDescription", model.Name))">
+    <PageHeader Title="@(IsNew ? T("NewTrigger") : model.DisplayName)" Description="@(IsNew ? T("Editor.NewDescription") : T("Editor.EditDescription", model.Name))" TestId="resource-trigger-editor">
         <Actions><a class="button-secondary" href="@(IsNew ? "/triggers" : $"/triggers/{Uri.EscapeDataString(model.Name)}")">@T("Cancel")</a></Actions>
     </PageHeader>
 

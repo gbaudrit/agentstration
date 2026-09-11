@@ -11,6 +11,7 @@ import { DistributionPage } from './distribution.page.js';
 import { FlowObservabilityPage } from './flow-observability.page.js';
 import { ConsoleAdministrationPage } from './console-administration.page.js';
 import { OperationsPage } from './operations.page.js';
+import { ResourceAdministrationPage } from './resource-administration.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -24,6 +25,7 @@ export class ProductPages {
   public readonly flowObservability: FlowObservabilityPage;
   public readonly consoleAdministration: ConsoleAdministrationPage;
   public readonly operations: OperationsPage;
+  public readonly resourceAdministration: ResourceAdministrationPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -37,6 +39,7 @@ export class ProductPages {
     this.flowObservability = new FlowObservabilityPage(page);
     this.consoleAdministration = new ConsoleAdministrationPage(page);
     this.operations = new OperationsPage(page);
+    this.resourceAdministration = new ResourceAdministrationPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

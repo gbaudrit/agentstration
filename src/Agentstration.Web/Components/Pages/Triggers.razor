@@ -8,7 +8,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<TriggerStrings> Localizer
 
 <PageTitle>@T("Triggers") · Agentstration</PageTitle>
-<PageHeader Title="@T("Triggers")" Description="@T("List.Description")">
+<PageHeader Title="@T("Triggers")" Description="@T("List.Description")" TestId="resource-triggers">
     <Metadata><span>@T(Filtered.Count == 1 ? "TriggerCount.One" : "TriggerCount.Many", Filtered.Count)</span><span>@T("EnabledCount", EnabledCount)</span><span>@T("AttentionCount", AttentionCount)</span></Metadata>
     <Actions>@if (CanManage) { <a class="button-primary" href="/triggers/new">@T("NewTrigger")</a> }</Actions>
 </PageHeader>

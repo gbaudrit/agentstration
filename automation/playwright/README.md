@@ -74,6 +74,12 @@ npm run capture -- --plan examples/inspect-console-administration.capture-plan.j
 
 The journey creates and immediately revokes its personal access token. Run it against a disposable instance or a dedicated campaign Workspace when targeting an external Console.
 
+The resource-administration inventory renders every management list and creation editor without mutating the target instance:
+
+```powershell
+npm run capture -- --plan examples/inspect-resource-administration.capture-plan.json --output .work/resource-administration
+```
+
 The solution-discovery video Flow and Entry are captured with:
 
 ```powershell
