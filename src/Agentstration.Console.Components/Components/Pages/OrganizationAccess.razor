@@ -14,8 +14,8 @@ else
     </DataGrid>
 }
 @code {
-    private sealed record AccessRow(Agentstration.Management.Contracts.OrganizationMemberResponse Member, Agentstration.Management.Contracts.AssignedRoleResponse Assignment);
-    private Agentstration.Management.Contracts.OrganizationAdministrationResponse? view;
+    private sealed record AccessRow(Agentstration.Identity.Contracts.OrganizationMemberResponse Member, Agentstration.Identity.Contracts.AssignedRoleResponse Assignment);
+    private Agentstration.Identity.Contracts.OrganizationAdministrationResponse? view;
     private string T(string key) => Localizer[key].Value;
     private IReadOnlyList<AccessRow> Rows => view?.Members.SelectMany(member => member.Roles.Select(role => new AccessRow(member, role))).ToArray() ?? [];
     protected override async Task OnInitializedAsync() => view = await Client.GetOrganizationAsync(default);

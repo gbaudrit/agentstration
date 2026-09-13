@@ -4,7 +4,9 @@ using Agentstration.Secrets;
 using System.Net;
 using System.Net.Http.Json;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Runtime.Contracts;
+using Agentstration.Secrets.Contracts;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Tests;

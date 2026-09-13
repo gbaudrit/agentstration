@@ -75,7 +75,7 @@ public static class IdentityEndpoints
         CancellationToken cancellationToken) =>
         Results.Ok((await service.ListCurrentAsync(cancellationToken)).Select(token => ToResponse(token, timeProvider.GetUtcNow())));
 
-    private static Agentstration.Management.Contracts.IdentityConsoleContextResponse ToResponse(ConsoleContextView view) =>
+    private static Agentstration.Identity.Contracts.IdentityConsoleContextResponse ToResponse(ConsoleContextView view) =>
         new(
             view.Context,
             view.UserDisplayName,
@@ -84,7 +84,7 @@ public static class IdentityEndpoints
             view.WorkspaceName,
             view.WorkspaceDisplayName,
             view.Permissions,
-            view.AvailableWorkspaces.Select(workspace => new Agentstration.Management.Contracts.IdentityConsoleWorkspaceResponse(
+            view.AvailableWorkspaces.Select(workspace => new Agentstration.Identity.Contracts.IdentityConsoleWorkspaceResponse(
                 workspace.Id,
                 workspace.TenantId,
                 workspace.TenantName,
@@ -94,20 +94,20 @@ public static class IdentityEndpoints
                 workspace.Status,
                 workspace.Permissions)).ToArray());
 
-    private static Agentstration.Management.Contracts.OrganizationAdministrationResponse ToResponse(TenantAdministrationView view) =>
+    private static Agentstration.Identity.Contracts.OrganizationAdministrationResponse ToResponse(TenantAdministrationView view) =>
         new(view.Tenant, view.Workspaces, view.Members.Select(ToResponse).ToArray());
 
-    private static Agentstration.Management.Contracts.OrganizationMemberResponse ToResponse(MemberAdministrationView view) =>
+    private static Agentstration.Identity.Contracts.OrganizationMemberResponse ToResponse(MemberAdministrationView view) =>
         new(
             view.Principal,
             view.Membership,
             view.ExternalIdentities,
-            view.Roles.Select(role => new Agentstration.Management.Contracts.AssignedRoleResponse(role.Role, role.Scope)).ToArray());
+            view.Roles.Select(role => new Agentstration.Identity.Contracts.AssignedRoleResponse(role.Role, role.Scope)).ToArray());
 
-    private static Agentstration.Management.Contracts.WorkspaceMemberResponse ToResponse(WorkspaceMemberView view) =>
+    private static Agentstration.Identity.Contracts.WorkspaceMemberResponse ToResponse(WorkspaceMemberView view) =>
         new(view.Principal, view.Membership, view.Role, view.Inherited);
 
-    private static Agentstration.Management.Contracts.PlatformAdministratorResponse ToResponse(PlatformAdministratorView view) =>
+    private static Agentstration.Identity.Contracts.PlatformAdministratorResponse ToResponse(PlatformAdministratorView view) =>
         new(view.Principal, view.Grant);
 
     private static async Task<IResult> GetAdministrationCapabilitiesAsync(
@@ -117,7 +117,7 @@ public static class IdentityEndpoints
         CancellationToken cancellationToken)
     {
         var context = requestContext.Current;
-        return Results.Ok(new Agentstration.Management.Contracts.IdentityAdministrationCapabilitiesResponse(
+        return Results.Ok(new Agentstration.Identity.Contracts.IdentityAdministrationCapabilitiesResponse(
             context.PrincipalId,
             context.WorkspaceId,
             await platformAuthorization.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken),

@@ -1,5 +1,5 @@
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Web.Hosting;
 using Agentstration.Web.Security;
 

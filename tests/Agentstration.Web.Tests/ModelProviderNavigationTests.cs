@@ -1,6 +1,7 @@
 using Agentstration.Models;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Extensions.Contracts;
+using Agentstration.Models.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;

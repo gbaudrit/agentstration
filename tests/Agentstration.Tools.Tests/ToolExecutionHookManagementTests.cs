@@ -2,7 +2,6 @@ using Agentstration.Tools;
 using Agentstration.ResourceManagement;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
 using Agentstration.Resources;
 
 namespace Agentstration.Tools.Tests;

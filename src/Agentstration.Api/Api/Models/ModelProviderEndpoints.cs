@@ -1,5 +1,6 @@
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Api.Contracts;
+using Agentstration.Models.Contracts;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;

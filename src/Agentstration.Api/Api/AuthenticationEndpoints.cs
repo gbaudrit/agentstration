@@ -83,7 +83,7 @@ public static class AuthenticationEndpoints
         return Results.Ok(new { initialized = await bootstrap.IsInitializedAsync(cancellationToken) });
     }
 
-    private static Agentstration.Management.Contracts.LocalAccountResponse ToResponse(LocalAccountView account) =>
+    private static Agentstration.Identity.Contracts.LocalAccountResponse ToResponse(LocalAccountView account) =>
         new(
             account.AccountId,
             account.PrincipalId,

@@ -6,7 +6,7 @@ using System.Text;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Extensions.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Secrets;

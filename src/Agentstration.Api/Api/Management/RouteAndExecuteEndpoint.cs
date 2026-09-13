@@ -1,5 +1,5 @@
 using Agentstration.Infrastructure;
-using Agentstration.Management.Contracts;
+using Agentstration.Agents.Contracts;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;

@@ -1,6 +1,6 @@
 using Agentstration.Aep.Abstractions;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Extensions.Aep;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;

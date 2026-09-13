@@ -1,7 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 
-namespace Agentstration.Management.Contracts;
+namespace Agentstration.ResourceManagement.Contracts;
 
 public sealed record BootstrapProfileSummary(
     string Name,

@@ -14,7 +14,7 @@ using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Agents.Contracts;
 using Agentstration.Extensions.Aep;
 using Agentstration.Identity;
 using Agentstration.Models;
@@ -552,12 +552,67 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void SourceRegistryToolDependsOnPortableManagementContractsOnly()
+    public void ManagementContractsCatchAllProjectIsRemoved()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+
+        Assert.IsFalse(Directory.Exists(Path.Combine(repositoryRoot, "src", "Agentstration.Management.Contracts")));
+
+        var projectFiles = Directory.EnumerateFiles(repositoryRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase));
+        var staleReferences = projectFiles
+            .Where(path => File.ReadAllText(path).Contains("Agentstration.Management.Contracts", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(repositoryRoot, path))
+            .ToArray();
+
+        Assert.IsEmpty(staleReferences, $"The removed catch-all Contracts project is still referenced by: {string.Join(", ", staleReferences)}");
+    }
+
+    [TestMethod]
+    public void ResourceFamilyContractModulesRemainPortable()
+    {
+        var assemblies = new[]
+        {
+            typeof(Agentstration.Api.Contracts.PagedResponse<>).Assembly,
+            typeof(Agentstration.Agents.Contracts.AgentResourceRequest).Assembly,
+            typeof(Agentstration.Extensions.Contracts.ExtensionResponse).Assembly,
+            typeof(Agentstration.Identity.Contracts.IdentityConsoleContextResponse).Assembly,
+            typeof(Agentstration.Models.Contracts.ModelProviderResponse).Assembly,
+            typeof(Agentstration.ResourceManagement.Contracts.ResourceDeclaration<>).Assembly,
+            typeof(Agentstration.Runtime.Contracts.RuntimeProfileSummaryResponse).Assembly,
+            typeof(Agentstration.Secrets.Contracts.SecretResponse).Assembly,
+            typeof(Agentstration.Sources.Contracts.SourceConsoleDetailView).Assembly,
+            typeof(Agentstration.Tools.Contracts.CreateToolDefinitionRequest).Assembly,
+            typeof(Agentstration.Triggers.Contracts.TriggerSchedulePreviewRequest).Assembly
+        };
+        var forbidden = new[]
+        {
+            "Agentstration.Management.Contracts",
+            "Agentstration.Infrastructure",
+            "Agentstration.Web",
+            ".Storage.",
+            "EntityFramework",
+            "Microsoft.Agents.AI",
+            "YamlDotNet"
+        };
+
+        var references = assemblies
+            .SelectMany(assembly => assembly.GetReferencedAssemblies())
+            .Select(reference => reference.Name)
+            .ToArray();
+
+        Assert.IsFalse(references.Any(reference =>
+            forbidden.Any(value => reference!.Contains(value, StringComparison.Ordinal))));
+    }
+
+    [TestMethod]
+    public void SourceRegistryToolDependsOnSourcesWithoutHostAdapters()
     {
         var references = typeof(SourceRegistryCli).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
 
-        Assert.Contains("Agentstration.Management.Contracts", references);
+        Assert.Contains("Agentstration.Sources", references);
         Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Management.Core", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Management.Contracts", StringComparison.Ordinal)
             || name.Contains("Agentstration.Infrastructure", StringComparison.Ordinal)
             || name.Contains("Agentstration.Web", StringComparison.Ordinal)
             || name.Contains("Storage.Sqlite", StringComparison.Ordinal)

@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Sources;
 using Agentstration.Tools.SourceRegistry;
 
 namespace Agentstration.Tools.SourceRegistry.Tests;

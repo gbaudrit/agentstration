@@ -1,6 +1,7 @@
 using System.Text;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Secrets.Contracts;
 using Agentstration.Identity;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;

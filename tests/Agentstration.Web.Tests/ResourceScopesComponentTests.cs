@@ -1,6 +1,6 @@
 using Agentstration.Agents;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;

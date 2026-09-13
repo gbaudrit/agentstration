@@ -11,14 +11,17 @@ Agentstration.Management.Abstractions
 Plural resource-family modules
   Agents, Extensions, Identity, Models, Packs, Sources, Runtime, Tools and Triggers own their validation and lifecycle use cases
 
-Agentstration.Management.Contracts
-  versioned HTTP request and response contracts
+Agentstration.*.Contracts
+  versioned HTTP request and response contracts owned by Agents, Extensions, Identity, Models, Runtime, Secrets, Sources, Tools and Triggers
+
+Agentstration.ResourceManagement.Contracts and Agentstration.Api.Contracts
+  generic resource/bootstrap contracts and family-neutral HTTP collection envelopes
 
 Agentstration.ResourceManagement.Storage.Sqlite
   EF Core and SQLite implementation of the control-plane store
 ```
 
-`Agentstration.Application` does not own resource-family code. The shared Management contracts and resource-family modules remain independent of Microsoft Agent Framework; concrete agent materialization stays in the Runtime plane.
+`Agentstration.Application` does not own resource-family code. Family-owned contracts and resource-family modules remain independent of Microsoft Agent Framework; concrete agent materialization stays in the Runtime plane.
 
 The standalone host exposes these Minimal API routes:
 

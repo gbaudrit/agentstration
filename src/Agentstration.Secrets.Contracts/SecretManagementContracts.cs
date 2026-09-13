@@ -1,8 +1,7 @@
-using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 
-namespace Agentstration.Management.Contracts;
+namespace Agentstration.Secrets.Contracts;
 
 public sealed record CreateVaultRequest(string Name, VaultProperties Properties, ResourceScopeRef? ScopeRef = null);
 public sealed record PutVaultRequest(VaultProperties Properties);
@@ -14,18 +13,3 @@ public sealed record VaultResponse(VaultResource Resource, string Status);
 public sealed record VaultInitializationResponse(string Status, string KeyFilePath);
 public sealed record SecretUsageResponse(string ResourceType, string Name, string DisplayName, string Url);
 public sealed record SecretUsagesResponse(IReadOnlyList<SecretUsageResponse> Value, int Count);
-public sealed record ResourceScopeTargetResponse(ResourceScopeRef ScopeRef, ResourceScopeKind Kind, string DisplayName, bool CanWrite);
-public sealed record ResourceScopeInventoryItemResponse(
-    Guid Uid,
-    ResourceNamespace Namespace,
-    string Kind,
-    string Name,
-    DateTimeOffset UpdatedAt);
-public sealed record ResourceScopeInventoryNodeResponse(
-    ResourceScopeRef ScopeRef,
-    ResourceScopeKind Kind,
-    string DisplayName,
-    ResourceScopeRef? ParentScopeRef,
-    bool IsCurrent,
-    IReadOnlyList<ResourceScopeInventoryItemResponse> Resources);
-public sealed record ResourceScopeInventoryResponse(IReadOnlyList<ResourceScopeInventoryNodeResponse> Scopes);

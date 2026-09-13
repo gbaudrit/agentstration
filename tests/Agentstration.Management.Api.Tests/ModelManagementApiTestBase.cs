@@ -3,7 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Models.Contracts;
 using Agentstration.Models;
 using Agentstration.ModelProviders;
 using Agentstration.Resources;

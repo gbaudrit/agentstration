@@ -1,12 +1,7 @@
-using System.Text.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.Models;
 using Agentstration.Resources;
-using Agentstration.Runtime.Abstractions;
 
-namespace Agentstration.Management.Contracts;
-
-public sealed record ValueResponse<T>(IReadOnlyList<T> Value);
+namespace Agentstration.Models.Contracts;
 
 public sealed record ModelProviderPropertiesResponse(
     string DisplayName,
@@ -42,28 +37,8 @@ public sealed record CreateModelProviderRequest(
     string Namespace = "default",
     ResourceScopeRef? ScopeRef = null);
 public sealed record PutModelProviderRequest(ModelProviderProperties Properties);
-public sealed record CreateExtensionRegistrationRequest(
-    string Name,
-    ExtensionRegistrationProperties Properties,
-    string Namespace = "default",
-    ResourceScopeRef? ScopeRef = null);
-public sealed record PutExtensionRegistrationRequest(ExtensionRegistrationProperties Properties);
-public sealed record ExtensionDiscoveryResponse(int Sources, int Created, int Updated, int Unchanged);
 public sealed record ModelProviderUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
 public sealed record ModelProviderUsagesResponse(IReadOnlyList<ModelProviderUsageResponse> Value, int Count);
-
-public sealed record ExtensionIdentityResponse(string Id, string Name, string Version, string? Description);
-public sealed record ExtensionContributionResponse(string Kind, string Id);
-public sealed record ExtensionOptionSetVersionResponse(string Version, string SchemaDigest, JsonElement Schema, bool Deprecated);
-public sealed record ExtensionOptionMigrationDescriptorResponse(string FromVersion, string ToVersion);
-public sealed record ExtensionOptionSetResponse(
-    string Id,
-    string ContributionKind,
-    string ContributionId,
-    string Scope,
-    string PreferredVersion,
-    IReadOnlyList<ExtensionOptionSetVersionResponse> Versions,
-    IReadOnlyList<ExtensionOptionMigrationDescriptorResponse> Migrations);
 public sealed record PreviewModelProfileOptionMigrationRequest(string TargetVersion);
 public sealed record ModelProfileOptionMigrationPreviewResponse(
     string ProfileName,
@@ -71,59 +46,6 @@ public sealed record ModelProfileOptionMigrationPreviewResponse(
     string ProviderType,
     VersionedExtensionOptions Source,
     VersionedExtensionOptions Target);
-public sealed record ExtensionOptionUsageResponse(
-    string ProfileName,
-    string ProfileNamespace,
-    string OptionSet,
-    string Version,
-    string SchemaDigest,
-    string Status,
-    IReadOnlyList<string> Issues);
-public sealed record ExtensionProviderBindingResponse(string Name, string Namespace, string ContributionId);
-public sealed record ExtensionResponse(
-    string RegistrationName,
-    string RegistrationNamespace,
-    Uri Endpoint,
-    string Status,
-    ExtensionIdentityResponse? Extension,
-    IReadOnlyList<ExtensionContributionResponse> Contributions,
-    IReadOnlyList<ExtensionOptionSetResponse> OptionSets,
-    IReadOnlyList<ExtensionOptionUsageResponse> Usages,
-    IReadOnlyList<ExtensionProviderBindingResponse> Providers,
-    string? Details,
-    string DiscoverySource,
-    bool RegistrationEnabled = true,
-    AepEnrollmentMode EnrollmentMode = AepEnrollmentMode.Disabled,
-    ResourceScopeRef? RegistrationScopeRef = null);
-
-public sealed record ExtensionInventoryItemResponse(
-    string Key,
-    string? RegistrationName,
-    string RegistrationNamespace,
-    ResourceScopeRef? RegistrationScopeRef,
-    Guid? EnrollmentInstanceId,
-    string DisplayName,
-    string ExtensionId,
-    string? Version,
-    Uri Endpoint,
-    string RegistrationSource,
-    bool RegistrationEnabled,
-    string AvailabilityStatus,
-    AepEnrollmentState? EnrollmentStatus,
-    DateTimeOffset? AnnouncedAt,
-    ExtensionResponse? Extension,
-    IReadOnlyList<ExtensionInventoryConnectionResponse> Connections);
-
-public sealed record ExtensionInventoryConnectionResponse(
-    string RegistrationName,
-    string RegistrationNamespace,
-    ResourceScopeRef? RegistrationScopeRef,
-    string DisplayName,
-    Uri Endpoint,
-    string Source,
-    bool Enabled,
-    AepEnrollmentMode EnrollmentMode,
-    string AvailabilityStatus);
 
 public sealed record CreateModelProfileRequest(
     string Name,
@@ -193,23 +115,3 @@ public sealed record AgentModelResponse(
     ResolvedAgentModelResponse Resolved,
     string Status,
     IReadOnlyList<string> Warnings);
-
-public sealed record CreateRuntimeProfileRequest(
-    string Name,
-    RuntimeProfileProperties Properties,
-    string Namespace = "default",
-    ResourceScopeRef? ScopeRef = null);
-public sealed record PutRuntimeProfileRequest(RuntimeProfileProperties Properties);
-public sealed record RuntimeProfileSummaryResponse(
-    string Id,
-    string Name,
-    RuntimeProfileProperties Properties,
-    int UsageCount,
-    string Namespace = "default",
-    ResourceScopeRef? ScopeRef = null);
-public sealed record RuntimeProfileUsageResponse(
-    string ResourceId,
-    string Name,
-    string Environment,
-    string AgentResourceId);
-public sealed record RuntimeProfileUsagesResponse(IReadOnlyList<RuntimeProfileUsageResponse> Value, int Count);

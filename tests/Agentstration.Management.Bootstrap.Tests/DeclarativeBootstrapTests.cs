@@ -3,7 +3,7 @@ using Agentstration.ResourceManagement;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Extensions;
 using Agentstration.Models;
 using Agentstration.Runtime.Profiles;

@@ -5,7 +5,7 @@ using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Agents.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.Pages;

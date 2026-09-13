@@ -12,7 +12,7 @@
     <ProjectReference Include="../Agentstration.Models.Application/Agentstration.Models.Application.csproj" />
     <ProjectReference Include="../Agentstration.Packs/Agentstration.Packs.csproj" />
     <ProjectReference Include="../Agentstration.Sources/Agentstration.Sources.csproj" />
-    <ProjectReference Include="../Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Profiles/Agentstration.Runtime.Profiles.csproj" />

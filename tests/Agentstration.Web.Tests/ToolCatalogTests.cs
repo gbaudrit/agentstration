@@ -1,6 +1,6 @@
 using Agentstration.Tools;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Tools.Contracts;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;

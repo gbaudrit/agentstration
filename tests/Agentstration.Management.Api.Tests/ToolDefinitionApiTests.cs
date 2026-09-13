@@ -6,7 +6,7 @@ using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Tools.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.AI;

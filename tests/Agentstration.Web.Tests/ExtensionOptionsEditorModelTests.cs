@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Agentstration.Management.Contracts;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Web.Console;
 
 namespace Agentstration.Web.Tests;

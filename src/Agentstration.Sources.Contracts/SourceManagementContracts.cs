@@ -1,7 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 
-namespace Agentstration.Management.Contracts;
+namespace Agentstration.Sources.Contracts;
 
 public sealed record ImportSourceYamlRequest(string Manifest, ResourceScopeRef? ScopeRef = null);
 public sealed record ImportSourceUrlRequest(string Url, ResourceScopeRef? ScopeRef = null);

@@ -4,7 +4,9 @@
     <ProjectReference Include="../../src/Agentstration.Api/Agentstration.Api.csproj" />
     <ProjectReference Include="../../src/Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
     <ProjectReference Include="../../src/Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Api.Contracts/Agentstration.Api.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Sources.Contracts/Agentstration.Sources.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions/Agentstration.Extensions.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.Aep/Agentstration.Extensions.Aep.csproj" />
     <ProjectReference Include="../../src/Agentstration.Identity/Agentstration.Identity.csproj" />

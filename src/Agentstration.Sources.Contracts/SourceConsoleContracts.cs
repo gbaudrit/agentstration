@@ -2,7 +2,7 @@ using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
-namespace Agentstration.Management.Contracts;
+namespace Agentstration.Sources.Contracts;
 
 public sealed record SourceConsoleChannelView(
     SourceChannelDefinition Definition,

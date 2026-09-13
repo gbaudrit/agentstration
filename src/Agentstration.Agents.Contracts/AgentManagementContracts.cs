@@ -1,20 +1,8 @@
-using System.Text.Json.Serialization;
 using Agentstration.Agents;
-using Agentstration.Management.Abstractions;
-using Agentstration.Resources;
-using Agentstration.Triggers;
+using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Runtime.Abstractions;
 
-namespace Agentstration.Management.Contracts;
-
-public record ResourceDeclaration<TDefinition>
-{
-    public required string ApiVersion { get; init; }
-    public required string Kind { get; init; }
-    public required ResourceMetadata Metadata { get; init; }
-    public required TDefinition Definition { get; init; }
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public ResourceScopeRef? ScopeRef { get; init; }
-}
+namespace Agentstration.Agents.Contracts;
 
 public sealed record AgentResourceRequest : ResourceDeclaration<AgentProperties>;
 public sealed record CreateRevisionRequest(string Environment, string RuntimeProfileName, AgentHostingMode HostingMode, string RuntimeProfileNamespace = "default");
@@ -40,6 +28,3 @@ public sealed record AgentRevisionPurgeImpactResponse(
     AgentRevisionRunUsageResponse RunUsage);
 public sealed record RouteAndExecuteRequest(string Input);
 public sealed record RouteAndExecuteResponse(string AgentName, double Confidence, string Reason, string Output);
-public sealed record PagedResponse<T>(IReadOnlyList<T> Value, string? NextLink);
-public sealed record TriggerSchedulePreviewRequest(TriggerSchedule Schedule, int Count = 5);
-public sealed record TriggerSchedulePreviewResponse(IReadOnlyList<DateTimeOffset> Occurrences);

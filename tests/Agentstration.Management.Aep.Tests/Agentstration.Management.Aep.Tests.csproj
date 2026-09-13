@@ -2,7 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
     <ProjectReference Include="../../src/Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions/Agentstration.Extensions.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.Aep/Agentstration.Extensions.Aep.csproj" />
     <ProjectReference Include="../../src/Agentstration.ResourceManagement.Storage.Sqlite/Agentstration.ResourceManagement.Storage.Sqlite.csproj" />

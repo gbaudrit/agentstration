@@ -9,7 +9,7 @@ using YamlDotNet.Core;
 using YamlDotNet.Core.Events;
 using YamlDotNet.Serialization;
 
-namespace Agentstration.Management.Contracts;
+namespace Agentstration.Sources;
 
 public sealed partial class SourceRegistryReader : ISourceRegistryReader
 {

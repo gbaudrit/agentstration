@@ -15,12 +15,11 @@ using Agentstration.Infrastructure.Sources;
 using Agentstration.Infrastructure.Triggers;
 using Agentstration.Infrastructure.Work;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Sources;
 using Agentstration.Identity;
 using Agentstration.Packs;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Runtime.Core;
-using Agentstration.Sources;
 using Agentstration.ModelProviders;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Storage.PostgreSql;
@@ -170,9 +169,9 @@ public static class DependencyInjection
         services.AddSingleton<PackManagementService>();
         services.AddSingleton<PackAuthoringService>();
         services.AddSingleton<PackCompositionService>();
-        services.AddSingleton<Agentstration.Management.Contracts.SourceManifestValidator>();
-        services.AddSingleton<ISourceManifestReader, Agentstration.Management.Contracts.SourceManifestReader>();
-        services.AddSingleton<ISourceVerificationIndexReader, Agentstration.Management.Contracts.SourceVerificationIndexReader>();
+        services.AddSingleton<Agentstration.Sources.SourceManifestValidator>();
+        services.AddSingleton<ISourceManifestReader, Agentstration.Sources.SourceManifestReader>();
+        services.AddSingleton<ISourceVerificationIndexReader, Agentstration.Sources.SourceVerificationIndexReader>();
         services.AddHttpClient<ISourceManifestRetriever, HttpSourceManifestRetriever>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(15);
@@ -185,8 +184,8 @@ public static class DependencyInjection
         sourceVerificationIndexOptions ??= new SourceVerificationIndexOptions();
         if (sourceVerificationIndexOptions.TimeoutSeconds is < 1 or > 60)
             throw new InvalidOperationException("Source verification index timeout must be between 1 and 60 seconds.");
-        if (sourceVerificationIndexOptions.MaximumBytes is < 1024 or > Agentstration.Management.Contracts.SourceVerificationIndexReader.MaximumIndexBytes)
-            throw new InvalidOperationException($"Source verification index maximum bytes must be between 1024 and {Agentstration.Management.Contracts.SourceVerificationIndexReader.MaximumIndexBytes}.");
+        if (sourceVerificationIndexOptions.MaximumBytes is < 1024 or > Agentstration.Sources.SourceVerificationIndexReader.MaximumIndexBytes)
+            throw new InvalidOperationException($"Source verification index maximum bytes must be between 1024 and {Agentstration.Sources.SourceVerificationIndexReader.MaximumIndexBytes}.");
         services.AddSingleton(sourceVerificationIndexOptions);
         services.AddHttpClient<ISourceVerificationIndexProvider, HttpSourceVerificationIndexProvider>(client =>
         {
@@ -204,7 +203,7 @@ public static class DependencyInjection
         services.AddSingleton<SourceChannelCompatibilityEvaluator>();
         services.AddSingleton<ISourceSnapshotArtifactStore>(_ => new FileSystemSourceSnapshotArtifactStore(Path.Combine(dataDirectory, "source-snapshots")));
         services.AddSingleton<ISourceSnapshotContentReader, ZipSourceSnapshotContentReader>();
-        services.AddSingleton<ISourceCatalogManifestReader, Agentstration.Management.Contracts.SourceCatalogManifestReader>();
+        services.AddSingleton<ISourceCatalogManifestReader, Agentstration.Sources.SourceCatalogManifestReader>();
         services.AddSingleton(new SourceMaterializationLimits());
         services.AddSingleton<SourceChannelSnapshotService>();
         services.AddSingleton<SourceRefreshScheduler>();

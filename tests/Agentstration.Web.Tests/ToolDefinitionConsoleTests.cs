@@ -48,8 +48,8 @@ public sealed class ToolDefinitionConsoleTests
         ]);
 
         public Task<ResourceSnapshot<ToolDefinitionResource>> GetAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<ToolDefinitionResource>> CreateAsync(Agentstration.Management.Contracts.CreateToolDefinitionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<ToolDefinitionResource>> UpdateAsync(string name, ResourceNamespace @namespace, Agentstration.Management.Contracts.PutToolDefinitionRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolDefinitionResource>> CreateAsync(Agentstration.Tools.Contracts.CreateToolDefinitionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolDefinitionResource>> UpdateAsync(string name, ResourceNamespace @namespace, Agentstration.Tools.Contracts.PutToolDefinitionRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ToolDefinitionResource>> SetEnabledAsync(string name, ResourceNamespace @namespace, bool enabled, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task DeleteAsync(string name, ResourceNamespace @namespace, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
     }

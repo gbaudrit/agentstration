@@ -1,5 +1,6 @@
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Api.Contracts;
+using Agentstration.Runtime.Contracts;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Runtime.Core;
 using Agentstration.ResourceManagement;

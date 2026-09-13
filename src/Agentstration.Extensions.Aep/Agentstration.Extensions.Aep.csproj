@@ -11,7 +11,7 @@
     <ProjectReference Include="../Agentstration.Extensions/Agentstration.Extensions.csproj" />
     <ProjectReference Include="../Agentstration.Identity/Agentstration.Identity.csproj" />
     <ProjectReference Include="../Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
-    <ProjectReference Include="../Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
     <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />
     <ProjectReference Include="../Agentstration.Secrets/Agentstration.Secrets.csproj" />

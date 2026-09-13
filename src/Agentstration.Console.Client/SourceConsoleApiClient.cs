@@ -1,7 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Sources.Contracts;
 using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;

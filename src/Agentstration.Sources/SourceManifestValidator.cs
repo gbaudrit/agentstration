@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
 using Agentstration.Management.Abstractions;
 
-namespace Agentstration.Management.Contracts;
+namespace Agentstration.Sources;
 
 public sealed partial class SourceManifestValidator
 {

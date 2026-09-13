@@ -1,5 +1,5 @@
 using Agentstration.Agents;
-using Agentstration.Management.Contracts;
+using Agentstration.Agents.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Security;
 

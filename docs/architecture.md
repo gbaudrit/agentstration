@@ -26,7 +26,9 @@ src/
   Agentstration.Flows.Storage.Sqlite/
   Agentstration.Infrastructure/   JSON/EF storage, AI, HTTP, event bus, queues
   Agentstration.Management.Abstractions/ canonical resources, ports, events, resolved specs
-  Agentstration.Management.Contracts/
+  Agentstration.Api.Contracts/    family-neutral HTTP collection contracts
+  Agentstration.*.Contracts/      public contracts owned by each resource family
+  Agentstration.ResourceManagement.Contracts/ generic resource and bootstrap contracts
   Agentstration.Extensions/       Extension registration and inventory use cases
   Agentstration.Extensions.Aep/   AEP enrollment use cases
   Agentstration.Identity/         Identity, authorization, scope and audit use cases
@@ -77,9 +79,9 @@ Web ---> Management / Flow / Runtime public boundaries
 Console.Components ---> Console.Client + shared UI + neutral contracts
 Web ---> Api ---> application/module services and public contracts
 
-Web -> Management contracts + plural resource-family modules
+Web -> family-owned contracts + plural resource-family modules
 Resource-family modules -> Resources + ResourceManagement + narrow family ports
-Management.Contracts -> Management.Abstractions
+Family contracts -> their public family models + neutral resource primitives
 Management.Storage.Sqlite -> Management.Abstractions + EF Core SQLite
 Infrastructure -> SQLite control-plane storage + local/MAF runtime adapters
 Web -> ModelProviders -> Aep.MicrosoftExtensionsAI -> Aep.Client

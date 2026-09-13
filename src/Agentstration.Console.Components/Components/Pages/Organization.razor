@@ -43,7 +43,7 @@ else
 }
 
 @code {
-    private Agentstration.Management.Contracts.OrganizationAdministrationResponse? view;
+    private Agentstration.Identity.Contracts.OrganizationAdministrationResponse? view;
     private string T(string key) => Localizer[key].Value;
     protected override async Task OnInitializedAsync() => view = await Client.GetOrganizationAsync(CancellationToken.None);
 }

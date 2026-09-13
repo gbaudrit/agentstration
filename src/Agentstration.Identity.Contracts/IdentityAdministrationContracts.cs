@@ -1,6 +1,6 @@
 using Agentstration.Management.Abstractions;
 
-namespace Agentstration.Management.Contracts;
+namespace Agentstration.Identity.Contracts;
 
 public sealed record IdentityConsoleWorkspaceResponse(
     Guid Id,
@@ -81,12 +81,3 @@ public static class BuiltInIdentityRoleNames
     public const string Viewer = "Viewer";
     public static IReadOnlyList<string> All { get; } = [Owner, Admin, Member, Viewer];
 }
-
-public sealed record AepEnrollmentSettingsSnapshot(
-    bool PairingCodeEnabled,
-    bool SharedKeyFileEnabled,
-    bool PairingCodeConfigurable,
-    bool SharedKeyFileConfigurable,
-    string? ETag);
-
-public sealed record AepPairingCodeResult(Guid RequestId, string Code, DateTimeOffset ExpiresAt);

@@ -4,7 +4,7 @@ using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 
-namespace Agentstration.Management.Contracts;
+namespace Agentstration.Sources;
 
 public sealed class SourceManifestReader : ISourceManifestReader
 {

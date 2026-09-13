@@ -33,7 +33,9 @@ src/
   Agentstration.Flow.Storage.Sqlite/
   Agentstration.Infrastructure/  Composition adapters for current modules
   Agentstration.Management.Abstractions/ Canonical Management resources, ports, events
-  Agentstration.Management.Contracts/
+  Agentstration.Api.Contracts/   Family-neutral HTTP collection contracts
+  Agentstration.*.Contracts/     Public contracts owned by each resource family
+  Agentstration.ResourceManagement.Contracts/ Generic resource and bootstrap contracts
   Agentstration.Extensions/      Extension registration and inventory use cases
   Agentstration.Extensions.Aep/  AEP enrollment use cases
   Agentstration.Identity/        Identity, authorization, scope and audit use cases
