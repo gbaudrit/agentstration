@@ -18,7 +18,7 @@ Agentstration.Identity.Contracts and Agentstration.Security.Contracts
   identity, authorization, personal-access-token and provider-neutral security-audit contracts
 
 Agentstration.Sources.Contracts
-  Source identity, publication, channel, snapshot, refresh, catalog and provider contracts
+  Source and Source Registry resources, trust, discovery, refresh, network policy and provider contracts
 
 Agentstration.Packs.Contracts
   Pack installation, authoring, composition and source-installation contracts

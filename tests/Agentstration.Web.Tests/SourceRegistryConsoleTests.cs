@@ -159,7 +159,7 @@ public sealed class SourceRegistryConsoleTests
         {
             Uid = uid,
             ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.SourceRegistryRegistration,
+            Kind = SourceRegistryKinds.SourceRegistryRegistration,
             Metadata = new() { Name = name },
             ScopeRef = ResourceScopeRef.Instance,
             ETag = "\"etag\"",
@@ -178,7 +178,7 @@ public sealed class SourceRegistryConsoleTests
         var observed = new SourceRegistryObservedStateResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.SourceRegistryObservedState,
+            Kind = SourceRegistryKinds.SourceRegistryObservedState,
             Metadata = new() { Name = name },
             ScopeRef = ResourceScopeRef.Instance,
             Definition = new()

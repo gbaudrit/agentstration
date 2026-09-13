@@ -8,6 +8,7 @@ using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Secrets.Contracts;
 using Agentstration.Resources;
+using Agentstration.Sources.Contracts;
 
 namespace Agentstration.Management.Tests;
 
@@ -34,13 +35,13 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             ResourceScopePolicy.AllowedScopes(ResourceKinds.Trigger).ToArray());
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Instance },
-            ResourceScopePolicy.AllowedScopes(ResourceKinds.SourceRegistryRegistration).ToArray());
+            ResourceScopePolicy.AllowedScopes(SourceRegistryKinds.SourceRegistryRegistration).ToArray());
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Instance },
-            ResourceScopePolicy.AllowedScopes(ResourceKinds.SourceRegistryObservedState).ToArray());
+            ResourceScopePolicy.AllowedScopes(SourceRegistryKinds.SourceRegistryObservedState).ToArray());
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Instance },
-            ResourceScopePolicy.AllowedScopes(ResourceKinds.SourceRegistryRefreshRecord).ToArray());
+            ResourceScopePolicy.AllowedScopes(SourceRegistryKinds.SourceRegistryRefreshRecord).ToArray());
     }
 
     [TestMethod]

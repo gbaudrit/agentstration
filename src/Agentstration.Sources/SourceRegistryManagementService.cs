@@ -53,7 +53,7 @@ public sealed partial class SourceRegistryManagementService(
                 registration = await store.PutExactAsync(ResourceScopeRef.Instance, new SourceRegistryRegistrationResource
                 {
                     ApiVersion = ManagementApiVersions.CoreV1,
-                    Kind = ResourceKinds.SourceRegistryRegistration,
+                    Kind = SourceRegistryKinds.SourceRegistryRegistration,
                     Metadata = new ResourceMetadata
                     {
                         Name = SourceRegistryWellKnown.OfficialName,
@@ -91,7 +91,7 @@ public sealed partial class SourceRegistryManagementService(
     public async Task<IReadOnlyList<SourceRegistryRegistrationView>> ListAsync(CancellationToken cancellationToken)
     {
         var registrations = await store.ListExactAsync<SourceRegistryRegistrationResource>(
-            ResourceScopeRef.Instance, ResourceKinds.SourceRegistryRegistration, 0, 1000, cancellationToken);
+            ResourceScopeRef.Instance, SourceRegistryKinds.SourceRegistryRegistration, 0, 1000, cancellationToken);
         var result = new List<SourceRegistryRegistrationView>(registrations.Count);
         foreach (var registration in registrations.OrderBy(value => value.Value.Name, StringComparer.Ordinal))
         {
@@ -134,7 +134,7 @@ public sealed partial class SourceRegistryManagementService(
         {
             await ValidateDefinitionAsync(name, definition, cancellationToken);
             var created = await scopeOperations.WriteAsync(
-                ResourceKinds.SourceRegistryRegistration,
+                SourceRegistryKinds.SourceRegistryRegistration,
                 ResourceScopeRef.Instance,
                 AuthorizationPermissions.ResourcesWrite,
                 async token =>
@@ -142,7 +142,7 @@ public sealed partial class SourceRegistryManagementService(
                     var stored = await store.PutExactAsync(ResourceScopeRef.Instance, new SourceRegistryRegistrationResource
                     {
                         ApiVersion = ManagementApiVersions.CoreV1,
-                        Kind = ResourceKinds.SourceRegistryRegistration,
+                        Kind = SourceRegistryKinds.SourceRegistryRegistration,
                         Metadata = new ResourceMetadata { Name = name },
                         ScopeRef = ResourceScopeRef.Instance,
                         Generation = 1,
@@ -222,7 +222,7 @@ public sealed partial class SourceRegistryManagementService(
             await scopeOperations.WriteAsync(existing.Value, ResourceScopeRef.Instance, AuthorizationPermissions.ResourcesDelete, async token =>
             {
                 await store.DeleteExactAsync(
-                    ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default, ResourceKinds.SourceRegistryRegistration, name),
+                    ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default, SourceRegistryKinds.SourceRegistryRegistration, name),
                     ifMatch,
                     token);
                 return true;
@@ -255,7 +255,7 @@ public sealed partial class SourceRegistryManagementService(
     {
         var actor = ActorPrincipalId();
         return await scopeOperations.WriteAsync(
-            ResourceKinds.SourceRegistryRegistration,
+            SourceRegistryKinds.SourceRegistryRegistration,
             ResourceScopeRef.Instance,
             AuthorizationPermissions.ResourcesWrite,
             token => RefreshCoreAsync(name, trigger, retryCount, expectedLastAttemptedAt, actor, token),
@@ -270,7 +270,7 @@ public sealed partial class SourceRegistryManagementService(
         CancellationToken cancellationToken)
     {
         await scopeOperations.WriteAsync(
-            ResourceKinds.SourceRegistryRegistration,
+            SourceRegistryKinds.SourceRegistryRegistration,
             ResourceScopeRef.Instance,
             AuthorizationPermissions.ResourcesWrite,
             async token =>
@@ -306,7 +306,7 @@ public sealed partial class SourceRegistryManagementService(
         var registration = await GetRegistrationStoredAsync(name, cancellationToken)
             ?? throw new SourceRegistryNotFoundException(name);
         return (await store.ListExactAsync<SourceRegistryRefreshRecordResource>(
-                ResourceScopeRef.Instance, ResourceKinds.SourceRegistryRefreshRecord, 0, 1000, cancellationToken))
+                ResourceScopeRef.Instance, SourceRegistryKinds.SourceRegistryRefreshRecord, 0, 1000, cancellationToken))
             .Where(value => value.Value.Definition.RegistrationUid == registration.Value.Uid)
             .OrderByDescending(value => value.Value.Definition.CompletedAt)
             .Take(Math.Clamp(take, 1, 200))
@@ -596,7 +596,7 @@ public sealed partial class SourceRegistryManagementService(
         store.CreateImmutableAsync(new SourceRegistryRefreshRecordResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.SourceRegistryRefreshRecord,
+            Kind = SourceRegistryKinds.SourceRegistryRefreshRecord,
             Metadata = new ResourceMetadata { Name = $"{registration.Uid:N}-{Guid.NewGuid():N}" },
             ScopeRef = ResourceScopeRef.Instance,
             Definition = new SourceRegistryRefreshRecordProperties
@@ -625,7 +625,7 @@ public sealed partial class SourceRegistryManagementService(
         try
         {
             var records = await store.ListExactAsync<SourceRegistryRefreshRecordResource>(
-                ResourceScopeRef.Instance, ResourceKinds.SourceRegistryRefreshRecord, 0, int.MaxValue, cancellationToken);
+                ResourceScopeRef.Instance, SourceRegistryKinds.SourceRegistryRefreshRecord, 0, int.MaxValue, cancellationToken);
             var retained = new HashSet<Guid>();
             var candidates = records
                 .Where(value => value.Value.Definition.RegistrationUid == registration.Uid)
@@ -681,7 +681,7 @@ public sealed partial class SourceRegistryManagementService(
             return await store.PutExactAsync(ResourceScopeRef.Instance, new SourceRegistryObservedStateResource
             {
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.SourceRegistryObservedState,
+                Kind = SourceRegistryKinds.SourceRegistryObservedState,
                 Metadata = new ResourceMetadata { Name = registration.Name },
                 ScopeRef = ResourceScopeRef.Instance,
                 Generation = 1,
@@ -711,14 +711,14 @@ public sealed partial class SourceRegistryManagementService(
         string name,
         CancellationToken cancellationToken) =>
         store.GetExactAsync<SourceRegistryRegistrationResource>(
-            ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default, ResourceKinds.SourceRegistryRegistration, name),
+            ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default, SourceRegistryKinds.SourceRegistryRegistration, name),
             cancellationToken);
 
     private Task<StoredResource<SourceRegistryObservedStateResource>?> GetObservedStoredAsync(
         string name,
         CancellationToken cancellationToken) =>
         store.GetExactAsync<SourceRegistryObservedStateResource>(
-            ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default, ResourceKinds.SourceRegistryObservedState, name),
+            ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default, SourceRegistryKinds.SourceRegistryObservedState, name),
             cancellationToken);
 
     private SourceRegistryObservedStateResource EffectiveObserved(

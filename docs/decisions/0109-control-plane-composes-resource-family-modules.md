@@ -55,6 +55,8 @@ The remaining `Agentstration.Management.Abstractions` compatibility surface is e
 
 Bootstrap follows the same rule without forcing a dependency cycle. Generic resource documents, planning state, results and handler ports live in `Agentstration.ResourceManagement.Contracts`. Identity and Pack kind constants live with those families, while Source profile selections and provenance live in `Agentstration.Sources.Contracts`. The composed profile/application DTOs live in a narrow `Agentstration.Bootstrap.Contracts` façade because they combine generic resource-management and Source contracts; this façade owns no persistence or execution logic. No Bootstrap type remains in `Agentstration.Management.Abstractions`.
 
+Source Registry is part of the Sources family. Its registration and observed-state resources, trust and publisher models, compatibility bounds, discovery/import contracts, network policy, cache/refresh state and provider ports live in `Agentstration.Sources.Contracts`; its readers and use cases live in `Agentstration.Sources`. `Sources.Contracts` and the offline Source Registry tool do not depend on `Agentstration.Management.Abstractions`.
+
 ## Consequences
 
 The solution remains one modular-monolith process and keeps its deterministic offline defaults. Dependencies point from composition and transport toward family modules, while `Resources` has no dependency on resource management, storage, hosts, or provider frameworks. Family modules do not depend on Web or concrete storage.

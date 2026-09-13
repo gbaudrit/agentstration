@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Sources.Contracts;
 
 namespace Agentstration.Packs.Contracts;
 

@@ -33,6 +33,7 @@ using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Storage.Sqlite;
 using Agentstration.Secrets;
 using Agentstration.Sources;
+using Agentstration.Sources.Contracts;
 using Agentstration.Tools;
 using Agentstration.Triggers;
 using Agentstration.Tools.SourceRegistry;
@@ -692,6 +693,24 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void SourceRegistryContractsAreOwnedBySources()
+    {
+        var managementAssembly = typeof(IControlPlaneStore).Assembly;
+        var sourceContractsAssembly = typeof(SourceRegistryRegistrationResource).Assembly;
+
+        Assert.IsFalse(managementAssembly.GetTypes().Any(type =>
+            type.Name.StartsWith("SourceRegistry", StringComparison.Ordinal)
+            || type.Name.StartsWith("ISourceRegistry", StringComparison.Ordinal)));
+        Assert.AreEqual("Agentstration.Sources.Contracts", sourceContractsAssembly.GetName().Name);
+        Assert.AreEqual("Agentstration.Sources.Contracts", typeof(SourceRegistryRegistrationResource).Namespace);
+        Assert.AreEqual("Agentstration.Sources.Contracts", typeof(ISourceRegistryDocumentRetriever).Namespace);
+        Assert.AreEqual("Agentstration.Sources.Contracts", typeof(SourceRegistryImportProvenance).Namespace);
+
+        var managementDirectory = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Management.Abstractions");
+        Assert.IsFalse(File.Exists(Path.Combine(managementDirectory, "SourceRegistryResources.cs")));
+    }
+
+    [TestMethod]
     public void PackContractsAreOwnedOutsideManagementAbstractions()
     {
         var managementAssembly = typeof(IControlPlaneStore).Assembly;
@@ -720,7 +739,6 @@ public sealed class DependencyTests
             "Agentstration.Web",
             ".Storage.",
             "EntityFramework",
-            "Agentstration.Sources",
             "Microsoft.Agents.AI",
             "YamlDotNet",
             "SharpCompress"
@@ -732,6 +750,7 @@ public sealed class DependencyTests
 
         Assert.IsFalse(references.Any(reference =>
             forbidden.Any(value => reference!.Contains(value, StringComparison.Ordinal))));
+        Assert.DoesNotContain("Agentstration.Sources", references);
     }
 
     [TestMethod]
@@ -831,6 +850,7 @@ public sealed class DependencyTests
     {
         var forbidden = new[]
         {
+            "Agentstration.Management.Abstractions",
             "Agentstration.Infrastructure",
             "Agentstration.Web",
             ".Storage.",
@@ -854,8 +874,10 @@ public sealed class DependencyTests
         var references = typeof(SourceRegistryCli).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
 
         Assert.Contains("Agentstration.Sources", references);
+        Assert.Contains("Agentstration.Sources.Contracts", references);
         Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Management.Core", StringComparison.Ordinal)
             || name.Contains("Agentstration.Management.Contracts", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Management.Abstractions", StringComparison.Ordinal)
             || name.Contains("Agentstration.Infrastructure", StringComparison.Ordinal)
             || name.Contains("Agentstration.Web", StringComparison.Ordinal)
             || name.Contains("Storage.Sqlite", StringComparison.Ordinal)

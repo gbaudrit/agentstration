@@ -34,7 +34,7 @@ public sealed class SourceRegistryTrustEvaluationService(
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
         var evaluatedAt = timeProvider.GetUtcNow();
         var registrations = await store.ListExactAsync<SourceRegistryRegistrationResource>(
-            ResourceScopeRef.Instance, ResourceKinds.SourceRegistryRegistration, 0, 1000, cancellationToken);
+            ResourceScopeRef.Instance, SourceRegistryKinds.SourceRegistryRegistration, 0, 1000, cancellationToken);
         var publisherEvidence = new List<SourceRegistryPublisherEvidenceView>();
         var versionEvidence = new List<SourceRegistryVersionEvidenceView>();
         var unavailable = false;
@@ -331,7 +331,7 @@ public sealed class SourceRegistryTrustEvaluationService(
         string name,
         CancellationToken cancellationToken) =>
         (await store.GetExactAsync<SourceRegistryRegistrationResource>(
-            ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default, ResourceKinds.SourceRegistryRegistration, name),
+            ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default, SourceRegistryKinds.SourceRegistryRegistration, name),
             cancellationToken))?.Value;
 
     private async Task<SourceRegistryObservation?> GetObservationAsync(
@@ -339,7 +339,7 @@ public sealed class SourceRegistryTrustEvaluationService(
         CancellationToken cancellationToken)
     {
         var states = await store.ListExactAsync<SourceRegistryObservedStateResource>(
-            ResourceScopeRef.Instance, ResourceKinds.SourceRegistryObservedState, 0, 1000, cancellationToken);
+            ResourceScopeRef.Instance, SourceRegistryKinds.SourceRegistryObservedState, 0, 1000, cancellationToken);
         return states.SingleOrDefault(value => value.Value.Definition.RegistrationUid == registrationUid)
             ?.Value.Definition.Current;
     }

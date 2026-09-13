@@ -107,7 +107,7 @@ public sealed class SourceRegistryInfrastructureTests
         var retriever = new HttpSourceRegistryDocumentRetriever(client, new SourceRegistryTransportOptions(), resolver);
         var context = new SourceRegistryRetrievalContext(
             ResourceScopeRef.Instance,
-            ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.SourceRegistryRegistration, "private"),
+            ResourceAddress.Create(ResourceNamespace.Default, SourceRegistryKinds.SourceRegistryRegistration, "private"),
             new SourceRegistryEndpointPolicy(),
             SourceRegistryAuthenticationMode.StaticBearer,
             new ResourceReference("registry-token", ResourceScopeRef.Instance));
@@ -198,7 +198,7 @@ public sealed class SourceRegistryInfrastructureTests
     private static SourceRegistryRetrievalContext Context(SourceRegistryEndpointPolicy? policy = null) =>
         new(
             ResourceScopeRef.Instance,
-            Agentstration.Resources.ResourceAddress.Create(Agentstration.Resources.ResourceNamespace.Default, ResourceKinds.SourceRegistryRegistration, "test"),
+            Agentstration.Resources.ResourceAddress.Create(Agentstration.Resources.ResourceNamespace.Default, SourceRegistryKinds.SourceRegistryRegistration, "test"),
             policy ?? new SourceRegistryEndpointPolicy(),
             SourceRegistryAuthenticationMode.None,
             null);

@@ -610,7 +610,7 @@ public sealed class SourceRegistryManagementTests
         Assert.IsNotNull(await fixture.Cache.GetAsync(observationId, default));
         var history = await fixture.Store.ListExactAsync<SourceRegistryRefreshRecordResource>(
             ResourceScopeRef.Instance,
-            ResourceKinds.SourceRegistryRefreshRecord,
+            SourceRegistryKinds.SourceRegistryRefreshRecord,
             0,
             100,
             default);
@@ -919,7 +919,7 @@ public sealed class SourceRegistryManagementTests
     {
         Uid = Guid.NewGuid(),
         ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.SourceRegistryRegistration,
+        Kind = SourceRegistryKinds.SourceRegistryRegistration,
         Metadata = new ResourceMetadata { Name = name },
         ScopeRef = ResourceScopeRef.Instance,
         Definition = Registration(indexUrl)

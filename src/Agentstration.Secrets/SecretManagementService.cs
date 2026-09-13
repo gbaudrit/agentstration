@@ -1,10 +1,10 @@
 using Agentstration.Identity.Contracts;
 using Agentstration.Extensions.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
+using Agentstration.Sources.Contracts;
 
 namespace Agentstration.Secrets;
 
@@ -226,7 +226,7 @@ public sealed class SecretManagementService(
         }
         foreach (var registration in await store.ListExactAsync<SourceRegistryRegistrationResource>(
                      ResourceScopeRef.Instance,
-                     ResourceKinds.SourceRegistryRegistration,
+                     SourceRegistryKinds.SourceRegistryRegistration,
                      0,
                      1000,
                      cancellationToken))

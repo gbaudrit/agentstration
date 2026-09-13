@@ -203,7 +203,7 @@ public sealed class SourceRegistryDiscoveryService(
         CancellationToken cancellationToken)
     {
         var registration = (await store.ListExactAsync<SourceRegistryRegistrationResource>(
-                ResourceScopeRef.Instance, ResourceKinds.SourceRegistryRegistration, 0, 1000, cancellationToken))
+                ResourceScopeRef.Instance, SourceRegistryKinds.SourceRegistryRegistration, 0, 1000, cancellationToken))
             .SingleOrDefault(value => value.Value.Uid == selection.RegistrationUid)?.Value
             ?? throw Failure("source_registry_selection_missing", "The selected registry registration no longer exists.");
         var observation = await FindObservationAsync(registration.Uid, selection.ObservationId, cancellationToken)
@@ -257,12 +257,12 @@ public sealed class SourceRegistryDiscoveryService(
         CancellationToken cancellationToken)
     {
         var states = await store.ListExactAsync<SourceRegistryObservedStateResource>(
-            ResourceScopeRef.Instance, ResourceKinds.SourceRegistryObservedState, 0, 1000, cancellationToken);
+            ResourceScopeRef.Instance, SourceRegistryKinds.SourceRegistryObservedState, 0, 1000, cancellationToken);
         var current = states.SingleOrDefault(value => value.Value.Definition.RegistrationUid == registrationUid)
             ?.Value.Definition.Current;
         if (current?.Id == observationId) return current;
         var records = await store.ListExactAsync<SourceRegistryRefreshRecordResource>(
-            ResourceScopeRef.Instance, ResourceKinds.SourceRegistryRefreshRecord, 0, int.MaxValue, cancellationToken);
+            ResourceScopeRef.Instance, SourceRegistryKinds.SourceRegistryRefreshRecord, 0, int.MaxValue, cancellationToken);
         return records.Where(value => value.Value.Definition.RegistrationUid == registrationUid)
             .Select(value => value.Value.Definition.Observation)
             .FirstOrDefault(value => value?.Id == observationId);
@@ -271,9 +271,9 @@ public sealed class SourceRegistryDiscoveryService(
     private async Task<IReadOnlyList<Candidate>> LoadCurrentAsync(CancellationToken cancellationToken)
     {
         var registrations = await store.ListExactAsync<SourceRegistryRegistrationResource>(
-            ResourceScopeRef.Instance, ResourceKinds.SourceRegistryRegistration, 0, 1000, cancellationToken);
+            ResourceScopeRef.Instance, SourceRegistryKinds.SourceRegistryRegistration, 0, 1000, cancellationToken);
         var states = await store.ListExactAsync<SourceRegistryObservedStateResource>(
-            ResourceScopeRef.Instance, ResourceKinds.SourceRegistryObservedState, 0, 1000, cancellationToken);
+            ResourceScopeRef.Instance, SourceRegistryKinds.SourceRegistryObservedState, 0, 1000, cancellationToken);
         var result = new List<Candidate>();
         foreach (var stored in registrations.OrderBy(value => value.Value.Name, StringComparer.Ordinal))
         {

@@ -55,7 +55,7 @@ internal static class SecretEndpoints
                 value.Kind,
                 value.Name,
                 value.DisplayName,
-                value.Kind == ResourceKinds.SourceRegistryRegistration
+                value.Kind == SourceRegistryKinds.SourceRegistryRegistration
                     ? $"/api/sourceregistries/{Uri.EscapeDataString(value.Name)}"
                     : $"/modelproviders/{Uri.EscapeDataString(value.Name)}")).ToArray();
             return Results.Ok(new SecretUsagesResponse(usages, usages.Length));

@@ -3,12 +3,15 @@ using System.Net.Sockets;
 using System.Text.Json.Serialization;
 using Agentstration.Resources;
 
-namespace Agentstration.Management.Abstractions;
+namespace Agentstration.Sources.Contracts;
 
 public static class SourceRegistryKinds
 {
     public const string SourceRegistry = "SourceRegistry";
     public const string SourceRegistryIndex = "SourceRegistryIndex";
+    public const string SourceRegistryRegistration = "SourceRegistryRegistration";
+    public const string SourceRegistryObservedState = "SourceRegistryObservedState";
+    public const string SourceRegistryRefreshRecord = "SourceRegistryRefreshRecord";
 }
 
 public static class SourceRegistryLimits

@@ -1,5 +1,5 @@
-using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Sources.Contracts;
 
 namespace Agentstration.Packs.Contracts;
 

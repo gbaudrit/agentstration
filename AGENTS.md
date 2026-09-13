@@ -45,7 +45,7 @@ src/
   Agentstration.Models.Application/ Model administration use cases
   Agentstration.Packs.Contracts/   Pack installation, authoring and composition contracts
   Agentstration.Packs/           Pack authoring, installation and composition
-  Agentstration.Sources.Contracts/ Source identity, publication, channel, snapshot and provider contracts
+  Agentstration.Sources.Contracts/ Source and Source Registry resources, policies and provider contracts
   Agentstration.Sources/         Source and source-registry use cases
   Agentstration.Management.Storage.Sqlite/
   Agentstration.Runtime.Abstractions/
@@ -87,7 +87,7 @@ Web -> Management / Flow / Runtime public boundaries
 - `Infrastructure` composes the current Management, Runtime, Flow, Work, identity, Pack, Trigger, Tool and provider adapters.
 - `Web` is the composition and transport layer. REST endpoints, Razor components, hosted workers, and MCP tools must delegate to the same application services.
 - Agentstration is the source of truth for agent definitions, immutable revisions, deployments, and desired state. Never persist a concrete `AIAgent`.
-- `Agentstration.Management.Abstractions` retains only compatibility resources awaiting explicit family extraction. Identity, authorization and PAT contracts belong to `Agentstration.Identity.Contracts`; provider-neutral audit contracts belong to `Agentstration.Security.Contracts`; Extension and AEP contracts belong to `Agentstration.Extensions.Contracts`; Pack installation and authoring contracts belong to `Agentstration.Packs.Contracts`; core Source contracts and provider ports belong to `Agentstration.Sources.Contracts`. Generic Bootstrap documents, planning and handler ports belong to `Agentstration.ResourceManagement.Contracts`; Source provenance belongs to `Agentstration.Sources.Contracts`; composed application/API contracts belong to the narrow `Agentstration.Bootstrap.Contracts` façade. Do not create another catch-all Management business module.
+- `Agentstration.Management.Abstractions` retains only compatibility resources awaiting explicit family extraction. Identity, authorization and PAT contracts belong to `Agentstration.Identity.Contracts`; provider-neutral audit contracts belong to `Agentstration.Security.Contracts`; Extension and AEP contracts belong to `Agentstration.Extensions.Contracts`; Pack installation and authoring contracts belong to `Agentstration.Packs.Contracts`; Source and Source Registry contracts, policies, provenance and provider ports belong to `Agentstration.Sources.Contracts`. Generic Bootstrap documents, planning and handler ports belong to `Agentstration.ResourceManagement.Contracts`; composed application/API contracts belong to the narrow `Agentstration.Bootstrap.Contracts` façade. Do not create another catch-all Management business module.
 - Concrete Microsoft Agent Framework types belong only in `Agentstration.Runtime.AgentFramework`.
 - EF Core and SQLite control-plane implementation details belong only in `Agentstration.Management.Storage.Sqlite`.
 - Work Plane EF Core and SQLite details belong only in `Agentstration.Work.Storage.Sqlite`; Work data must not use management or runtime storage.
