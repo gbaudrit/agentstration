@@ -31,7 +31,6 @@ public static class ResourceKinds
     public const string ToolProvider = "ToolProvider";
     public const string ToolExecutionHook = "ToolExecutionHook";
     public const string Trigger = "Trigger";
-    public const string BootstrapApplication = "BootstrapApplication";
     public const string Source = "Source";
     public const string SourceVersion = "SourceVersion";
     public const string SourceConfiguration = "SourceConfiguration";

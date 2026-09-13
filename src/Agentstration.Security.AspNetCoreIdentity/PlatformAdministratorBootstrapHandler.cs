@@ -27,7 +27,7 @@ public sealed class PlatformAdministratorBootstrapHandler(
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public string Kind => BootstrapResourceKinds.PlatformAdministrator;
+    public string Kind => IdentityBootstrapKinds.PlatformAdministrator;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(

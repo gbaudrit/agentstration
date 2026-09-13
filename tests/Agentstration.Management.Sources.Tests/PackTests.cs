@@ -224,7 +224,7 @@ public sealed class PackTests
             var document = new BootstrapResourceDocument
             {
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = BootstrapResourceKinds.PackInstallation,
+                Kind = PackBootstrapKinds.PackInstallation,
                 Metadata = new ResourceMetadata { Name = "tools" },
                 Definition = JsonSerializer.SerializeToElement(new { source = new { path = "tools.zip" } })
             };

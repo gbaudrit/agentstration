@@ -13,6 +13,7 @@
     <ProjectReference Include="../Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
     <ProjectReference Include="../Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.Api.Contracts/Agentstration.Api.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />

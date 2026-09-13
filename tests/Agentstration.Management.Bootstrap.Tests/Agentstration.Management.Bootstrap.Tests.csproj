@@ -1,6 +1,7 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
     <ProjectReference Include="../../src/Agentstration.Runtime.Profiles/Agentstration.Runtime.Profiles.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
     <ProjectReference Include="../../src/Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
     <ProjectReference Include="../../src/Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />

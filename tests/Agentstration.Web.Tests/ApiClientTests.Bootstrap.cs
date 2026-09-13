@@ -52,7 +52,7 @@ public sealed partial class ApiClientTests
     private static BootstrapApplicationResource BootstrapApplication(string name) => new()
     {
         ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.BootstrapApplication,
+        Kind = BootstrapKinds.BootstrapApplication,
         Metadata = new() { Name = name },
         Definition = new BootstrapApplicationProperties
         {

@@ -372,7 +372,7 @@ public sealed class DeclarativeBootstrapTests
         Assert.IsTrue(application.Definition.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Skip));
         using var systemScope = scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
         var history = await scope.ServiceProvider.GetRequiredService<IResourceStore>()
-            .ListAllAsync<BootstrapApplicationResource>(ResourceKinds.BootstrapApplication, default);
+            .ListAllAsync<BootstrapApplicationResource>(BootstrapKinds.BootstrapApplication, default);
         Assert.AreEqual(application.Metadata.Name, history.Single().Value.Metadata.Name);
         Assert.AreEqual(
             application.Metadata.Name,
@@ -426,7 +426,7 @@ public sealed class DeclarativeBootstrapTests
 
         using var systemScope = scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
         var application = (await scope.ServiceProvider.GetRequiredService<IResourceStore>()
-            .ListAllAsync<BootstrapApplicationResource>(ResourceKinds.BootstrapApplication, default)).Single().Value;
+            .ListAllAsync<BootstrapApplicationResource>(BootstrapKinds.BootstrapApplication, default)).Single().Value;
         Assert.AreEqual(BootstrapApplicationStatus.Interrupted, application.Definition.Status);
         Assert.IsNotNull(application.Definition.CompletedAt);
         Assert.IsFalse(string.IsNullOrWhiteSpace(application.Definition.Error));

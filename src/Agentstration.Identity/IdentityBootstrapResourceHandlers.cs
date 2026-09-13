@@ -38,7 +38,7 @@ public sealed class TenantBootstrapResourceHandler(
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public string Kind => BootstrapResourceKinds.Tenant;
+    public string Kind => IdentityBootstrapKinds.Tenant;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -84,7 +84,7 @@ public sealed class WorkspaceBootstrapResourceHandler(
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public string Kind => BootstrapResourceKinds.Workspace;
+    public string Kind => IdentityBootstrapKinds.Workspace;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -97,7 +97,7 @@ public sealed class WorkspaceBootstrapResourceHandler(
         var tenant = await store.FindTenantByNameAsync(tenantName, cancellationToken);
         if (tenant is null)
         {
-            if (!planning.Contains(BootstrapResourceKinds.Tenant, tenantName))
+            if (!planning.Contains(IdentityBootstrapKinds.Tenant, tenantName))
                 throw new InvalidOperationException($"Workspace '{name}' references missing Tenant '{tenantName}'.");
             planning.Register(Kind, name, tenantName);
             return new(BootstrapResourceDisposition.Create);
@@ -144,7 +144,7 @@ public sealed class PrincipalDefaultContextBootstrapResourceHandler(
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public string Kind => BootstrapResourceKinds.PrincipalDefaultContext;
+    public string Kind => IdentityBootstrapKinds.PrincipalDefaultContext;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -155,15 +155,15 @@ public sealed class PrincipalDefaultContextBootstrapResourceHandler(
     {
         var (resourceName, userName, tenantName, workspaceName) = Read(resource);
         var principal = await principals.ResolveByUserNameAsync(userName, cancellationToken);
-        if (principal is null && !planning.Contains(BootstrapResourceKinds.PlatformAdministrator, userName))
+        if (principal is null && !planning.Contains(IdentityBootstrapKinds.PlatformAdministrator, userName))
             throw new InvalidOperationException($"PrincipalDefaultContext references missing local account '{userName}'.");
         var tenant = await store.FindTenantByNameAsync(tenantName, cancellationToken);
-        if (tenant is null && !planning.Contains(BootstrapResourceKinds.Tenant, tenantName))
+        if (tenant is null && !planning.Contains(IdentityBootstrapKinds.Tenant, tenantName))
             throw new InvalidOperationException($"PrincipalDefaultContext references missing Tenant '{tenantName}'.");
         if (tenant is not null && await store.FindWorkspaceByNameAsync(tenant.Id, workspaceName, cancellationToken) is null
-            && !planning.Contains(BootstrapResourceKinds.Workspace, workspaceName, tenantName))
+            && !planning.Contains(IdentityBootstrapKinds.Workspace, workspaceName, tenantName))
             throw new InvalidOperationException($"PrincipalDefaultContext references missing Workspace '{tenantName}/{workspaceName}'.");
-        if (tenant is null && !planning.Contains(BootstrapResourceKinds.Workspace, workspaceName, tenantName))
+        if (tenant is null && !planning.Contains(IdentityBootstrapKinds.Workspace, workspaceName, tenantName))
             throw new InvalidOperationException($"PrincipalDefaultContext references missing Workspace '{tenantName}/{workspaceName}'.");
         if (principal is null)
         {

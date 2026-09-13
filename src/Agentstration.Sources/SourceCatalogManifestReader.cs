@@ -40,7 +40,7 @@ public sealed class SourceCatalogManifestReader : ISourceCatalogManifestReader
     public SourceBootstrapProfileContract ReadBootstrapProfile(string content)
     {
         var document = ReadDocument(content, "Bootstrap Profile descriptor");
-        ValidateEnvelope(document, BootstrapResourceKinds.BootstrapProfile, "Bootstrap Profile descriptor");
+        ValidateEnvelope(document, BootstrapKinds.BootstrapProfile, "Bootstrap Profile descriptor");
         try
         {
             var resource = ResourceManifestSerializer.FromJsonStrict<BootstrapResourceDocument>(document.GetRawText());

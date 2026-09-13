@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Flows.Application/Agentstration.Flows.Application.csproj" />
     <ProjectReference Include="../Agentstration.Flows.Storage.Sqlite/Agentstration.Flows.Storage.Sqlite.csproj" />
     <ProjectReference Include="../Agentstration.Flows.Storage.PostgreSql/Agentstration.Flows.Storage.PostgreSql.csproj" />

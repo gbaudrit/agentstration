@@ -26,8 +26,14 @@ Agentstration.Packs.Contracts
 Agentstration.Extensions.Contracts
   Extension registration, AEP enrollment and transport-authentication contracts
 
-Agentstration.ResourceManagement.Contracts and Agentstration.Api.Contracts
-  generic resource/bootstrap contracts and family-neutral HTTP collection envelopes
+Agentstration.ResourceManagement.Contracts
+  generic resource declarations plus Bootstrap documents, planning results and handler ports
+
+Agentstration.Bootstrap.Contracts
+  composed Bootstrap profile/application transport contracts
+
+Agentstration.Api.Contracts
+  family-neutral HTTP collection envelopes
 
 Agentstration.ResourceManagement.Storage.Sqlite
   EF Core and SQLite implementation of the control-plane store

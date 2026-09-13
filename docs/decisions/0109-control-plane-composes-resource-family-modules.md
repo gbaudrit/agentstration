@@ -53,6 +53,8 @@ The former `Agentstration.Management.Contracts` catch-all is also removed. Publi
 
 The remaining `Agentstration.Management.Abstractions` compatibility surface is extracted by the same ownership rule. Extension registration, AEP enrollment and AEP transport-authentication contracts live in `Agentstration.Extensions.Contracts`; Agent deployment's `ExternalBinding` lives in `Agentstration.Agents.Contracts`. Family kind constants move with their contracts instead of accumulating in the legacy `ResourceKinds` catalogue.
 
+Bootstrap follows the same rule without forcing a dependency cycle. Generic resource documents, planning state, results and handler ports live in `Agentstration.ResourceManagement.Contracts`. Identity and Pack kind constants live with those families, while Source profile selections and provenance live in `Agentstration.Sources.Contracts`. The composed profile/application DTOs live in a narrow `Agentstration.Bootstrap.Contracts` façade because they combine generic resource-management and Source contracts; this façade owns no persistence or execution logic. No Bootstrap type remains in `Agentstration.Management.Abstractions`.
+
 ## Consequences
 
 The solution remains one modular-monolith process and keeps its deterministic offline defaults. Dependencies point from composition and transport toward family modules, while `Resources` has no dependency on resource management, storage, hosts, or provider frameworks. Family modules do not depend on Web or concrete storage.

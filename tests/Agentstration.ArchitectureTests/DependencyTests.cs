@@ -579,6 +579,7 @@ public sealed class DependencyTests
         {
             typeof(Agentstration.Api.Contracts.PagedResponse<>).Assembly,
             typeof(Agentstration.Agents.Contracts.AgentResourceRequest).Assembly,
+            typeof(Agentstration.Bootstrap.Contracts.BootstrapApplicationResource).Assembly,
             typeof(Agentstration.Extensions.Contracts.ExtensionResponse).Assembly,
             typeof(Agentstration.Identity.Contracts.IdentityConsoleContextResponse).Assembly,
             typeof(Agentstration.Models.Contracts.ModelProviderResponse).Assembly,
@@ -774,6 +775,50 @@ public sealed class DependencyTests
         };
         var references = typeof(ExtensionRegistrationResource).Assembly
             .GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .ToArray();
+
+        Assert.IsFalse(references.Any(reference =>
+            forbidden.Any(value => reference!.Contains(value, StringComparison.Ordinal))));
+    }
+
+    [TestMethod]
+    public void BootstrapContractsAreOwnedOutsideManagementAbstractions()
+    {
+        var managementAssembly = typeof(IControlPlaneStore).Assembly;
+
+        Assert.IsFalse(managementAssembly.GetTypes().Any(type =>
+            type.Name.StartsWith("Bootstrap", StringComparison.Ordinal)
+            || type.Name.StartsWith("IBootstrap", StringComparison.Ordinal)));
+        Assert.AreEqual("Agentstration.ResourceManagement.Contracts", typeof(Agentstration.ResourceManagement.Contracts.BootstrapResourceDocument).Namespace);
+        Assert.AreEqual("Agentstration.ResourceManagement.Contracts", typeof(Agentstration.ResourceManagement.Contracts.IBootstrapResourceHandler).Namespace);
+        Assert.AreEqual("Agentstration.Sources.Contracts", typeof(Agentstration.Sources.Contracts.BootstrapSourceProfileSelection).Namespace);
+        Assert.AreEqual("Agentstration.Sources.Contracts", typeof(Agentstration.Sources.Contracts.BootstrapSourceProvenance).Namespace);
+        Assert.AreEqual("Agentstration.Bootstrap.Contracts", typeof(Agentstration.Bootstrap.Contracts.BootstrapApplicationResource).Namespace);
+
+        var managementDirectory = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Management.Abstractions");
+        Assert.IsFalse(File.Exists(Path.Combine(managementDirectory, "BootstrapResources.cs")));
+    }
+
+    [TestMethod]
+    public void BootstrapContractModulesRemainPortable()
+    {
+        var forbidden = new[]
+        {
+            "Agentstration.Management.Abstractions",
+            "Agentstration.Infrastructure",
+            "Agentstration.Web",
+            ".Storage.",
+            "EntityFramework",
+            "Microsoft.Agents.AI",
+            "YamlDotNet"
+        };
+        var references = new[]
+            {
+                typeof(Agentstration.ResourceManagement.Contracts.BootstrapResourceDocument).Assembly,
+                typeof(Agentstration.Bootstrap.Contracts.BootstrapApplicationResource).Assembly
+            }
+            .SelectMany(assembly => assembly.GetReferencedAssemblies())
             .Select(reference => reference.Name)
             .ToArray();
 

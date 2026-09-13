@@ -149,7 +149,7 @@ public sealed class BootstrapProfileManagementService(
         {
             using var systemScope = scopes.PushSystem();
             var application = (await store.GetAsync<BootstrapApplicationResource>(
-                new(ResourceKinds.BootstrapApplication, applicationId),
+                new(BootstrapKinds.BootstrapApplication, applicationId),
                 cancellationToken))?.Value;
             if (application?.Definition.Status != BootstrapApplicationStatus.Running) return application;
             return await SaveApplicationAsync(Interrupt(application), application.ETag, cancellationToken);
@@ -228,7 +228,7 @@ public sealed class BootstrapProfileManagementService(
         var resource = new BootstrapApplicationResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.BootstrapApplication,
+            Kind = BootstrapKinds.BootstrapApplication,
             Metadata = new ResourceMetadata { Name = id.ToString("N") },
             ScopeRef = ApplicationScopeRef(preview),
             Generation = 1,
@@ -313,7 +313,7 @@ public sealed class BootstrapProfileManagementService(
         {
             using var systemScope = scopes.PushSystem();
             var applications = (await store.ListAllAsync<BootstrapApplicationResource>(
-                ResourceKinds.BootstrapApplication,
+                BootstrapKinds.BootstrapApplication,
                 cancellationToken)).Select(value => value.Value).ToArray();
             var recovered = new List<BootstrapApplicationResource>(applications.Length);
             foreach (var application in applications)

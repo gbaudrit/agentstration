@@ -175,7 +175,7 @@ else
             ResourceKinds.AgentDeployment => $"/deployments#deployment-{resourceNamespace}-{name}",
             PackKinds.InstalledPack or PackKinds.PackConfiguration => "/packs",
             ExtensionKinds.ExtensionRegistration => "/extensions",
-            ResourceKinds.BootstrapApplication => "/settings/bootstrap",
+            BootstrapKinds.BootstrapApplication => "/settings/bootstrap",
             _ => null
         };
     }

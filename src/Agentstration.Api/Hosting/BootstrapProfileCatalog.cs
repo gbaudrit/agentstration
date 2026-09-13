@@ -162,8 +162,8 @@ public sealed class BootstrapProfileCatalog(
                 throw new DeclarativeBootstrapException($"Bootstrap profile descriptor '{profile}/{DescriptorFileName}' must contain exactly one document.");
             var document = descriptor[0];
             ValidateEnvelope(document, $"{profile}/{DescriptorFileName}");
-            if (!string.Equals(document.Kind, BootstrapResourceKinds.BootstrapProfile, StringComparison.Ordinal))
-                throw new DeclarativeBootstrapException($"Bootstrap profile descriptor '{profile}/{DescriptorFileName}' must use kind '{BootstrapResourceKinds.BootstrapProfile}'.");
+            if (!string.Equals(document.Kind, BootstrapKinds.BootstrapProfile, StringComparison.Ordinal))
+                throw new DeclarativeBootstrapException($"Bootstrap profile descriptor '{profile}/{DescriptorFileName}' must use kind '{BootstrapKinds.BootstrapProfile}'.");
             if (!string.Equals(document.Metadata.Name, profile, StringComparison.Ordinal))
                 throw new DeclarativeBootstrapException($"Bootstrap profile descriptor metadata.name must match directory '{profile}'.");
             var definition = document.Definition.Deserialize<BootstrapProfileDefinition>(SerializerOptions)

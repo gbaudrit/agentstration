@@ -57,6 +57,7 @@
     <Project Path="src/Agentstration.Resources/Agentstration.Resources.csproj" />
     <Project Path="src/Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
     <Project Path="src/Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />
+    <Project Path="src/Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <Project Path="src/Agentstration.Secrets.Contracts/Agentstration.Secrets.Contracts.csproj" />
     <Project Path="src/Agentstration.Sources/Agentstration.Sources.csproj" />
     <Project Path="src/Agentstration.Sources.Contracts/Agentstration.Sources.Contracts.csproj" />
