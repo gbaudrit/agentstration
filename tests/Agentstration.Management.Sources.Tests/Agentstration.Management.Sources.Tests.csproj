@@ -8,6 +8,7 @@
     <ProjectReference Include="../../src/Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Sources.Contracts/Agentstration.Sources.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions/Agentstration.Extensions.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.Aep/Agentstration.Extensions.Aep.csproj" />
     <ProjectReference Include="../../src/Agentstration.Identity/Agentstration.Identity.csproj" />
     <ProjectReference Include="../../src/Agentstration.Models.Application/Agentstration.Models.Application.csproj" />

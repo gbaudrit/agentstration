@@ -56,7 +56,7 @@ public static class ExtensionEndpoints
         ModelManagementHttp.ExecuteAsync(async () =>
         {
             var stored = await service.GetAsync(ModelManagementHttp.Namespace(resourceNamespace), registrationName, cancellationToken)
-                ?? throw new ExtensionRegistrationNotFoundException(new(ModelManagementHttp.Namespace(resourceNamespace), ResourceKinds.ExtensionRegistration, registrationName));
+                ?? throw new ExtensionRegistrationNotFoundException(new(ModelManagementHttp.Namespace(resourceNamespace), ExtensionKinds.ExtensionRegistration, registrationName));
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
 
@@ -70,7 +70,7 @@ public static class ExtensionEndpoints
             var stored = await service.CreateAsync(new ExtensionRegistrationResource
             {
                 Metadata = new ResourceMetadata { Name = body.Name, Namespace = ModelManagementHttp.Namespace(body.Namespace) },
-                Kind = ResourceKinds.ExtensionRegistration,
+                Kind = ExtensionKinds.ExtensionRegistration,
                 ApiVersion = ManagementApiVersions.CoreV1,
                 Definition = body.Properties,
                 ScopeRef = body.ScopeRef

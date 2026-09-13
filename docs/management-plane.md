@@ -23,6 +23,9 @@ Agentstration.Sources.Contracts
 Agentstration.Packs.Contracts
   Pack installation, authoring, composition and source-installation contracts
 
+Agentstration.Extensions.Contracts
+  Extension registration, AEP enrollment and transport-authentication contracts
+
 Agentstration.ResourceManagement.Contracts and Agentstration.Api.Contracts
   generic resource/bootstrap contracts and family-neutral HTTP collection envelopes
 

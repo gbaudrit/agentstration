@@ -8,6 +8,7 @@ using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Application.Work;
 using Agentstration.Extensions;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Extensions.Git;
 using Agentstration.Extensions.LlamaCpp;
 using Agentstration.Extensions.LocalAI;
@@ -724,6 +725,54 @@ public sealed class DependencyTests
             "SharpCompress"
         };
         var references = typeof(PackManifest).Assembly
+            .GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .ToArray();
+
+        Assert.IsFalse(references.Any(reference =>
+            forbidden.Any(value => reference!.Contains(value, StringComparison.Ordinal))));
+    }
+
+    [TestMethod]
+    public void ExtensionAndAepContractsAreOwnedOutsideManagementAbstractions()
+    {
+        var managementAssembly = typeof(IControlPlaneStore).Assembly;
+        var forbiddenNames = new HashSet<string>(StringComparer.Ordinal)
+        {
+            nameof(ExtensionRegistrationResource),
+            nameof(ExtensionRegistrationProperties),
+            nameof(ExtensionRegistrationSource),
+            nameof(AepTransportAuthenticationMode),
+            nameof(Agentstration.Extensions.Contracts.AepEnrollmentMode),
+            nameof(AepEnrollmentState),
+            nameof(AepEnrollmentSettingsResource),
+            nameof(AepEnrollmentRequestResource),
+            nameof(ExternalBinding)
+        };
+
+        Assert.IsFalse(managementAssembly.GetTypes().Any(type => forbiddenNames.Contains(type.Name)));
+        Assert.AreEqual("Agentstration.Extensions.Contracts", typeof(ExtensionRegistrationResource).Namespace);
+        Assert.AreEqual("Agentstration.Extensions.Contracts", typeof(AepEnrollmentRequestResource).Namespace);
+        Assert.AreEqual("Agentstration.Agents.Contracts", typeof(ExternalBinding).Namespace);
+
+        var managementDirectory = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Management.Abstractions");
+        Assert.IsFalse(File.Exists(Path.Combine(managementDirectory, "ModelResources.cs")));
+    }
+
+    [TestMethod]
+    public void ExtensionContractsRemainPortable()
+    {
+        var forbidden = new[]
+        {
+            "Agentstration.Management.Abstractions",
+            "Agentstration.Infrastructure",
+            "Agentstration.Web",
+            ".Storage.",
+            "EntityFramework",
+            "Microsoft.Agents.AI",
+            "YamlDotNet"
+        };
+        var references = typeof(ExtensionRegistrationResource).Assembly
             .GetReferencedAssemblies()
             .Select(reference => reference.Name)
             .ToArray();

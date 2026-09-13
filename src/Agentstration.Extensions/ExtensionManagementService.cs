@@ -1,3 +1,4 @@
+using Agentstration.Extensions.Contracts;
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
@@ -99,7 +100,7 @@ public sealed class ExtensionManagementService(
 
     private static bool References(ModelProviderConfiguration provider, ExtensionRegistrationResource registration)
     {
-        var address = provider.Extension.Resolve(provider.Namespace, ResourceKinds.ExtensionRegistration);
+        var address = provider.Extension.Resolve(provider.Namespace, ExtensionKinds.ExtensionRegistration);
         return address.Namespace == registration.Namespace
             && string.Equals(address.Name, registration.Name, StringComparison.Ordinal);
     }

@@ -101,7 +101,7 @@ public sealed class BootstrapProfileManagementService(
                 await store.ListAsync<RuntimeProfileResource>(ResourceKinds.RuntimeProfile, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
             BootstrapBindingTargetKind.ExtensionRegistration => Options(
-                await store.ListAsync<ExtensionRegistrationResource>(ResourceKinds.ExtensionRegistration, 0, 1000, cancellationToken),
+                await store.ListAsync<ExtensionRegistrationResource>(ExtensionKinds.ExtensionRegistration, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
             BootstrapBindingTargetKind.Secret => Options(
                 await store.ListAsync<SecretResource>(ResourceKinds.Secret, 0, 1000, cancellationToken),
@@ -113,7 +113,7 @@ public sealed class BootstrapProfileManagementService(
             BootstrapBindingTargetKind.ModelProfile => ResourceKinds.ModelProfile,
             BootstrapBindingTargetKind.ModelProvider => ResourceKinds.ModelProvider,
             BootstrapBindingTargetKind.RuntimeProfile => ResourceKinds.RuntimeProfile,
-            BootstrapBindingTargetKind.ExtensionRegistration => ResourceKinds.ExtensionRegistration,
+            BootstrapBindingTargetKind.ExtensionRegistration => ExtensionKinds.ExtensionRegistration,
             BootstrapBindingTargetKind.Secret => ResourceKinds.Secret,
             _ => throw new DeclarativeBootstrapException($"Unsupported bootstrap binding target kind '{targetKind}'.")
         };

@@ -1,3 +1,4 @@
+using Agentstration.Extensions.Contracts;
 using Agentstration.Security.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Identity;
@@ -8,7 +9,6 @@ using System.Text;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Management.Abstractions;
-using Agentstration.Extensions.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Secrets;
@@ -79,7 +79,7 @@ public sealed class AepEnrollmentService(
         var resource = new AepEnrollmentRequestResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AepEnrollmentRequest,
+            Kind = ExtensionKinds.AepEnrollmentRequest,
             Metadata = new ResourceMetadata { Name = name },
             ScopeRef = scope,
             Generation = 1,
@@ -114,7 +114,7 @@ public sealed class AepEnrollmentService(
         await AuthorizeAsync(context, cancellationToken);
         var isPlatformAdministrator = await platformAuthorization.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken);
         return (await store.ListExactAsync<AepEnrollmentRequestResource>(
-            ResourceScopeRef.Instance, ResourceKinds.AepEnrollmentRequest, 0, 200, cancellationToken))
+            ResourceScopeRef.Instance, ExtensionKinds.AepEnrollmentRequest, 0, 200, cancellationToken))
             .Select(value => Sanitize(value.Value))
             .Where(value => value.Definition.TargetScopeRef is null
                 ? isPlatformAdministrator
@@ -139,7 +139,7 @@ public sealed class AepEnrollmentService(
                 throw new AepEnrollmentException("scope_already_assigned", "The enrollment request is already assigned to another scope.", 409);
             if (stored.Value.Definition.State != AepEnrollmentState.Unpaired) return;
         }
-        var registrationName = await scopeOperations.WriteAsync(ResourceKinds.ExtensionRegistration, targetScopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
+        var registrationName = await scopeOperations.WriteAsync(ExtensionKinds.ExtensionRegistration, targetScopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
             if (stored.Value.Definition.EnrollmentMode != AepEnrollmentMode.SharedKeyFile) return null;
             return await ProvisionAnnouncementAsync(Announcement(stored.Value.Definition), targetScopeRef, token);
@@ -453,7 +453,7 @@ public sealed class AepEnrollmentService(
         }
         finally { CryptographicOperations.ZeroMemory(tokenBytes); }
         var registrationName = $"paired-{request.Definition.InstanceId:N}";
-        var registrationAddress = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ResourceKinds.ExtensionRegistration, registrationName);
+        var registrationAddress = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ExtensionKinds.ExtensionRegistration, registrationName);
         var registrationDefinition = new ExtensionRegistrationProperties
         {
             DisplayName = request.Definition.ExtensionName,
@@ -470,7 +470,7 @@ public sealed class AepEnrollmentService(
             _ = await store.PutExactAsync(scope, new ExtensionRegistrationResource
             {
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ExtensionRegistration,
+                Kind = ExtensionKinds.ExtensionRegistration,
                 Metadata = new ResourceMetadata { Name = registrationName },
                 ScopeRef = scope,
                 Generation = 1,
@@ -528,12 +528,12 @@ public sealed class AepEnrollmentService(
         var registrationName = request.Definition.RegistrationName
             ?? throw new InvalidOperationException("The enrollment registration reference is unavailable.");
         await scopeOperations.WriteAsync(
-            ResourceKinds.ExtensionRegistration,
+            ExtensionKinds.ExtensionRegistration,
             scope,
             AuthorizationPermissions.ResourcesWrite,
             async token =>
             {
-                var address = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ResourceKinds.ExtensionRegistration, registrationName);
+                var address = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ExtensionKinds.ExtensionRegistration, registrationName);
                 var registration = await store.GetExactAsync<ExtensionRegistrationResource>(address, token);
                 if (registration is null || !registration.Value.Definition.Enabled) return true;
                 _ = await store.PutExactAsync(scope, registration.Value with
@@ -651,7 +651,7 @@ public sealed class AepEnrollmentService(
         if (stored.Value.Definition.TargetScopeRef is not { } targetScopeRef)
             throw new AepEnrollmentException("scope_required", "Select an instance, tenant, or workspace scope before enrolling the extension.", 409);
         await scopeOperations.WriteAsync(
-            ResourceKinds.ExtensionRegistration,
+            ExtensionKinds.ExtensionRegistration,
             targetScopeRef,
             AuthorizationPermissions.ResourcesWrite,
             _ => Task.FromResult(true),
@@ -728,7 +728,7 @@ public sealed class AepEnrollmentService(
         Definition = resource.Definition with { CodeSalt = null, CodeDigest = null, CompletionDigest = null }
     };
     private static ScopedResourceAddress Address(ResourceScopeRef scope, string name) =>
-        ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ResourceKinds.AepEnrollmentRequest, name);
+        ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ExtensionKinds.AepEnrollmentRequest, name);
     private static ResourceStatus Succeeded() => new() { ProvisioningState = ProvisioningState.Succeeded };
     private static ResourceScopeRef TargetScope(AepEnrollmentRequestProperties definition) =>
         definition.TargetScopeRef

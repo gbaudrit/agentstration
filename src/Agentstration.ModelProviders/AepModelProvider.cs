@@ -1,5 +1,6 @@
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Management.Abstractions;
 using Agentstration.Models;
 using Agentstration.Runtime.Abstractions;

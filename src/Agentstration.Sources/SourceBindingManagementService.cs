@@ -210,7 +210,7 @@ public sealed class SourceBindingManagementService(
         var extension = await references.ResolveAsync<ExtensionRegistrationResource>(
             provider.Value.Definition.Extension,
             provider.Value.Namespace,
-            ResourceKinds.ExtensionRegistration,
+            ExtensionKinds.ExtensionRegistration,
             RequireScope(provider.Value),
             cancellationToken);
         if (extension is null)

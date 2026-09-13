@@ -220,7 +220,7 @@ public sealed class SourceChannelSnapshotService(
                 ?? throw Invalid("source_binding_provider_missing", $"Source Provider '{selection.Target.Name}' was not found.");
             var providerScope = RequireScope(provider.Value);
             var extension = await references.ResolveAsync<ExtensionRegistrationResource>(
-                provider.Value.Definition.Extension, provider.Value.Namespace, ResourceKinds.ExtensionRegistration, providerScope, cancellationToken)
+                provider.Value.Definition.Extension, provider.Value.Namespace, ExtensionKinds.ExtensionRegistration, providerScope, cancellationToken)
                 ?? throw Invalid("source_binding_extension_missing", $"Extension registration for Source Provider '{provider.Value.Name}' was not found.");
             if (!extension.Value.Definition.Enabled)
                 throw Invalid("source_binding_extension_disabled", $"Extension registration for Source Provider '{provider.Value.Name}' is disabled.");

@@ -98,7 +98,7 @@ public sealed class SourceProviderConsoleTests
         private static ExtensionRegistrationResource Registration(string name, ResourceScopeRef scopeRef) => new()
         {
             ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.ExtensionRegistration,
+            Kind = ExtensionKinds.ExtensionRegistration,
             Metadata = new ResourceMetadata { Name = name },
             ScopeRef = scopeRef,
             Definition = new ExtensionRegistrationProperties { DisplayName = name, Endpoint = new("http://127.0.0.1:5290") }

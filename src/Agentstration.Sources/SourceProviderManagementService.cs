@@ -164,7 +164,7 @@ public sealed class SourceProviderManagementService(
         var extension = await references.ResolveAsync<ExtensionRegistrationResource>(
             provider.Definition.Extension,
             provider.Namespace,
-            ResourceKinds.ExtensionRegistration,
+            ExtensionKinds.ExtensionRegistration,
             ownerScopeRef,
             cancellationToken);
         if (extension is null) return new(name, "unavailable", checkedAt, "The referenced extension registration was not found.");
@@ -238,11 +238,11 @@ public sealed class SourceProviderManagementService(
             throw new SourceProviderValidationException("A display name is required.");
         if (string.IsNullOrWhiteSpace(definition.ContributionId))
             throw new SourceProviderValidationException("An AEP source-provider contribution id is required.");
-        var extensionAddress = definition.Extension.Resolve(ownerNamespace, ResourceKinds.ExtensionRegistration);
+        var extensionAddress = definition.Extension.Resolve(ownerNamespace, ExtensionKinds.ExtensionRegistration);
         var extension = await references.ResolveAsync<ExtensionRegistrationResource>(
             definition.Extension,
             ownerNamespace,
-            ResourceKinds.ExtensionRegistration,
+            ExtensionKinds.ExtensionRegistration,
             ownerScopeRef,
             cancellationToken);
         if (extension is null)

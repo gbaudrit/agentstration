@@ -1247,7 +1247,7 @@ public sealed class SourceTests
             await factory.Services.GetRequiredService<ExtensionRegistrationManagementService>().CreateAsync(new ExtensionRegistrationResource
             {
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ExtensionRegistration,
+                Kind = ExtensionKinds.ExtensionRegistration,
                 Metadata = new ResourceMetadata { Name = providerName },
                 ScopeRef = ResourceScopeRef.Instance,
                 Definition = new ExtensionRegistrationProperties
@@ -1714,7 +1714,7 @@ public sealed class SourceTests
             await registrations.CreateAsync(new ExtensionRegistrationResource
             {
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ExtensionRegistration,
+                Kind = ExtensionKinds.ExtensionRegistration,
                 Metadata = new ResourceMetadata { Name = "source-extension" },
                 ScopeRef = ResourceScopeRef.Instance,
                 Definition = new ExtensionRegistrationProperties

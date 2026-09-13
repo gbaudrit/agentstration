@@ -51,6 +51,8 @@ The former `Agentstration.Management.Core` catch-all is removed. Its remaining s
 
 The former `Agentstration.Management.Contracts` catch-all is also removed. Public transport contracts are owned by their plural resource-family `*.Contracts` assemblies, Runtime Profile contracts join the existing `Agentstration.Runtime.Contracts`, generic resource and bootstrap contracts live in `Agentstration.ResourceManagement.Contracts`, and family-neutral collection envelopes live in `Agentstration.Api.Contracts`. Concrete Source manifest and registry readers belong to `Agentstration.Sources`, not to a Contracts assembly.
 
+The remaining `Agentstration.Management.Abstractions` compatibility surface is extracted by the same ownership rule. Extension registration, AEP enrollment and AEP transport-authentication contracts live in `Agentstration.Extensions.Contracts`; Agent deployment's `ExternalBinding` lives in `Agentstration.Agents.Contracts`. Family kind constants move with their contracts instead of accumulating in the legacy `ResourceKinds` catalogue.
+
 ## Consequences
 
 The solution remains one modular-monolith process and keeps its deterministic offline defaults. Dependencies point from composition and transport toward family modules, while `Resources` has no dependency on resource management, storage, hosts, or provider frameworks. Family modules do not depend on Web or concrete storage.

@@ -184,7 +184,7 @@ public sealed class SourceProviderManagementTests
     private static ExtensionRegistrationResource Extension(ResourceScopeRef? scopeRef = null) => new()
     {
         ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.ExtensionRegistration,
+        Kind = ExtensionKinds.ExtensionRegistration,
         Metadata = new ResourceMetadata { Name = "source-extension" },
         ScopeRef = scopeRef ?? ResourceScopeRef.Instance,
         Definition = new ExtensionRegistrationProperties

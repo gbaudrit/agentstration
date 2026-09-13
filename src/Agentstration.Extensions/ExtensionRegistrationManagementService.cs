@@ -1,3 +1,4 @@
+using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Identity;
 using Agentstration.Management.Abstractions;
@@ -30,7 +31,7 @@ public sealed class ExtensionRegistrationManagementService(
         string name,
         CancellationToken cancellationToken) =>
         store.GetAsync<ExtensionRegistrationResource>(
-            new(ResourceKinds.ExtensionRegistration, name, @namespace),
+            new(ExtensionKinds.ExtensionRegistration, name, @namespace),
             cancellationToken);
 
     public Task<StoredResource<ExtensionRegistrationResource>?> GetExactAsync(
@@ -39,12 +40,12 @@ public sealed class ExtensionRegistrationManagementService(
         string name,
         CancellationToken cancellationToken) =>
         store.GetExactAsync<ExtensionRegistrationResource>(
-            ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.ExtensionRegistration, name),
+            ScopedResourceAddress.Create(scopeRef, @namespace, ExtensionKinds.ExtensionRegistration, name),
             cancellationToken);
 
     public Task<IReadOnlyList<StoredResource<ExtensionRegistrationResource>>> ListAsync(
         CancellationToken cancellationToken) =>
-        store.ListAllAsync<ExtensionRegistrationResource>(ResourceKinds.ExtensionRegistration, cancellationToken);
+        store.ListAllAsync<ExtensionRegistrationResource>(ExtensionKinds.ExtensionRegistration, cancellationToken);
 
     public async Task<StoredResource<ExtensionRegistrationResource>> CreateAsync(
         ExtensionRegistrationResource resource,
@@ -78,7 +79,7 @@ public sealed class ExtensionRegistrationManagementService(
         CancellationToken cancellationToken)
     {
         var existing = await GetAsync(@namespace, name, cancellationToken)
-            ?? throw new ExtensionRegistrationNotFoundException(new(@namespace, ResourceKinds.ExtensionRegistration, name));
+            ?? throw new ExtensionRegistrationNotFoundException(new(@namespace, ExtensionKinds.ExtensionRegistration, name));
         if (existing.Value.Definition.Source != ExtensionRegistrationSource.Manual)
             throw new ExtensionRegistrationValidationException("Configuration and Aspire extension registrations are read-only.");
         var scopeRef = existing.Value.ScopeRef ?? throw new ExtensionRegistrationValidationException("The extension registration has no ownership scope.");
@@ -106,7 +107,7 @@ public sealed class ExtensionRegistrationManagementService(
         CancellationToken cancellationToken)
     {
         var existing = await GetAsync(@namespace, name, cancellationToken)
-            ?? throw new ExtensionRegistrationNotFoundException(new(@namespace, ResourceKinds.ExtensionRegistration, name));
+            ?? throw new ExtensionRegistrationNotFoundException(new(@namespace, ExtensionKinds.ExtensionRegistration, name));
         if (existing.Value.Definition.Source != ExtensionRegistrationSource.Manual)
             throw new ExtensionRegistrationValidationException("Configuration and Aspire extension registrations are read-only.");
         var scopeRef = existing.Value.ScopeRef ?? throw new ExtensionRegistrationValidationException("The extension registration has no ownership scope.");
@@ -115,7 +116,7 @@ public sealed class ExtensionRegistrationManagementService(
         await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
             await store.DeleteExactAsync(
-                ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.ExtensionRegistration, name),
+                ScopedResourceAddress.Create(scopeRef, @namespace, ExtensionKinds.ExtensionRegistration, name),
                 ifMatch,
                 token);
             return true;
@@ -144,7 +145,7 @@ public sealed class ExtensionRegistrationManagementService(
             return await CreateAsync(new ExtensionRegistrationResource
             {
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ExtensionRegistration,
+                Kind = ExtensionKinds.ExtensionRegistration,
                 Metadata = new ResourceMetadata { Name = name },
                 ScopeRef = scopeRef,
                 Definition = validated
@@ -165,7 +166,7 @@ public sealed class ExtensionRegistrationManagementService(
         CancellationToken cancellationToken)
     {
         var registration = await GetAsync(@namespace, name, cancellationToken)
-            ?? throw new ExtensionRegistrationNotFoundException(new(@namespace, ResourceKinds.ExtensionRegistration, name));
+            ?? throw new ExtensionRegistrationNotFoundException(new(@namespace, ExtensionKinds.ExtensionRegistration, name));
         return await GetUsagesAsync(
             registration.Value.ScopeRef ?? throw new ExtensionRegistrationValidationException("The extension registration has no ownership scope."),
             @namespace,
@@ -182,7 +183,7 @@ public sealed class ExtensionRegistrationManagementService(
             .. (await store.ListAllAsync<ModelProviderResource>(ResourceKinds.ModelProvider, cancellationToken))
             .Where(value =>
             {
-                var address = value.Value.Definition.Extension.Resolve(value.Value.Namespace, ResourceKinds.ExtensionRegistration);
+                var address = value.Value.Definition.Extension.Resolve(value.Value.Namespace, ExtensionKinds.ExtensionRegistration);
                 return address.Namespace == @namespace && string.Equals(address.Name, name, StringComparison.Ordinal);
             })
             .Select(value => new ExtensionRegistrationUsage(
@@ -193,7 +194,7 @@ public sealed class ExtensionRegistrationManagementService(
             .. (await store.ListAllAsync<SourceProviderResource>(ResourceKinds.SourceProvider, cancellationToken))
             .Where(value =>
             {
-                var address = value.Value.Definition.Extension.Resolve(value.Value.Namespace, ResourceKinds.ExtensionRegistration);
+                var address = value.Value.Definition.Extension.Resolve(value.Value.Namespace, ExtensionKinds.ExtensionRegistration);
                 return address.Namespace == @namespace
                     && string.Equals(address.Name, name, StringComparison.Ordinal)
                     && (value.Value.Definition.Extension.ScopeRef is null
@@ -253,7 +254,7 @@ public sealed class ExtensionRegistrationManagementService(
             throw new ExtensionRegistrationValidationException("SharedKeyFile enrollment requires staticBearer transport authentication.");
         await ValidateCredentialAsync(@namespace, definition.Credential, ownerScopeRef, cancellationToken);
         var duplicate = (await store.ListVisibleAsync<ExtensionRegistrationResource>(
-                ownerScopeRef, ResourceKinds.ExtensionRegistration, 0, 200, cancellationToken)).FirstOrDefault(value =>
+                ownerScopeRef, ExtensionKinds.ExtensionRegistration, 0, 200, cancellationToken)).FirstOrDefault(value =>
             value.Value.Namespace == @namespace
             && !string.Equals(value.Value.Name, name, StringComparison.Ordinal)
             && Uri.Compare(
@@ -292,7 +293,7 @@ public sealed class ExtensionRegistrationManagementService(
             || registration.ScopeRef is not { } scope)
             return;
         var enrollment = (await store.ListExactAsync<AepEnrollmentRequestResource>(
-            ResourceScopeRef.Instance, ResourceKinds.AepEnrollmentRequest, 0, 200, cancellationToken))
+            ResourceScopeRef.Instance, ExtensionKinds.AepEnrollmentRequest, 0, 200, cancellationToken))
             .FirstOrDefault(value => value.Value.Definition.TargetScopeRef == scope
                 && string.Equals(value.Value.Definition.RegistrationName, registration.Name, StringComparison.Ordinal));
         if (enrollment is null || enrollment.Value.Definition.State is not (AepEnrollmentState.Available or AepEnrollmentState.Disabled)) return;
@@ -314,8 +315,8 @@ public sealed class ExtensionRegistrationManagementService(
 
     private static void ValidateIdentity(ExtensionRegistrationResource resource)
     {
-        if (resource.Kind != ResourceKinds.ExtensionRegistration)
-            throw new ExtensionRegistrationValidationException($"Kind must be '{ResourceKinds.ExtensionRegistration}'.");
+        if (resource.Kind != ExtensionKinds.ExtensionRegistration)
+            throw new ExtensionRegistrationValidationException($"Kind must be '{ExtensionKinds.ExtensionRegistration}'.");
         if (resource.ApiVersion != ManagementApiVersions.CoreV1)
             throw new ExtensionRegistrationValidationException($"ApiVersion must be '{ManagementApiVersions.CoreV1}'.");
         ArgumentException.ThrowIfNullOrWhiteSpace(resource.Metadata.Name);

@@ -1,3 +1,4 @@
+using Agentstration.Extensions.Contracts;
 using Agentstration.Models;
 using System.Net;
 using System.Runtime.CompilerServices;
@@ -374,7 +375,7 @@ public sealed class AepVerticalTests
         var registration = new ExtensionRegistrationResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.ExtensionRegistration,
+            Kind = ExtensionKinds.ExtensionRegistration,
             Metadata = new ResourceMetadata { Name = "paired-extension" },
             ScopeRef = scope,
             Definition = new ExtensionRegistrationProperties
@@ -383,7 +384,7 @@ public sealed class AepVerticalTests
                 Endpoint = httpClient.BaseAddress!,
                 ExpectedExtensionId = "extension.enrolled",
                 AuthenticationMode = AepTransportAuthenticationMode.StaticBearer,
-                EnrollmentMode = Agentstration.Management.Abstractions.AepEnrollmentMode.PairingCode,
+                EnrollmentMode = Agentstration.Extensions.Contracts.AepEnrollmentMode.PairingCode,
                 Credential = new ResourceReference("enrollment-secret", scope)
             }
         };

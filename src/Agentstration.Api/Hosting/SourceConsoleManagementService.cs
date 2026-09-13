@@ -337,7 +337,7 @@ public sealed class SourceConsoleManagementService(
 
     private static bool References(SourceProviderResource provider, ExtensionView extension, string contributionId)
     {
-        var address = provider.Definition.Extension.Resolve(provider.Namespace, ResourceKinds.ExtensionRegistration);
+        var address = provider.Definition.Extension.Resolve(provider.Namespace, ExtensionKinds.ExtensionRegistration);
         return address.Namespace.Value == extension.RegistrationNamespace
             && string.Equals(address.Name, extension.RegistrationName, StringComparison.Ordinal)
             && provider.Definition.Extension.ScopeRef == extension.RegistrationScopeRef

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 

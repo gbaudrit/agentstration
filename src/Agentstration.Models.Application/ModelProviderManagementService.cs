@@ -1,3 +1,4 @@
+using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Identity;
 using Agentstration.Management.Abstractions;
@@ -178,8 +179,8 @@ public sealed class ModelProviderManagementService(
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.DisplayName);
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.ContributionId);
-        var extensionAddress = definition.Extension.Resolve(ownerNamespace, ResourceKinds.ExtensionRegistration);
-        if (await references.ResolveAsync<ExtensionRegistrationResource>(definition.Extension, ownerNamespace, ResourceKinds.ExtensionRegistration, ownerScopeRef, cancellationToken) is null)
+        var extensionAddress = definition.Extension.Resolve(ownerNamespace, ExtensionKinds.ExtensionRegistration);
+        if (await references.ResolveAsync<ExtensionRegistrationResource>(definition.Extension, ownerNamespace, ExtensionKinds.ExtensionRegistration, ownerScopeRef, cancellationToken) is null)
             throw new ModelProviderValidationException($"Referenced extension registration '{extensionAddress}' does not exist or is not visible from '{ownerScopeRef}'.");
         if (FindDiscovery(AepModelProvider.AdapterType) is null)
             throw new ModelProviderValidationException("The AEP model-provider adapter is not registered in this host.");
@@ -192,11 +193,11 @@ public sealed class ModelProviderManagementService(
 
     private async Task<ModelProviderConfiguration> ToConfigurationAsync(ModelProviderResource resource, CancellationToken cancellationToken)
     {
-        var extensionAddress = resource.Definition.Extension.Resolve(resource.Namespace, ResourceKinds.ExtensionRegistration);
+        var extensionAddress = resource.Definition.Extension.Resolve(resource.Namespace, ExtensionKinds.ExtensionRegistration);
         var extension = await references.ResolveAsync<ExtensionRegistrationResource>(
             resource.Definition.Extension,
             resource.Namespace,
-            ResourceKinds.ExtensionRegistration,
+            ExtensionKinds.ExtensionRegistration,
             resource.ScopeRef ?? throw new ModelProviderConfigurationException("The model provider has no ownership scope."),
             cancellationToken)
             ?? throw new ModelProviderConfigurationException($"Extension registration '{extensionAddress}' was not found.");
@@ -230,4 +231,3 @@ public sealed class ModelProviderManagementService(
 
     private IModelProviderDiscovery? FindDiscovery(string providerType) => discoveries.SingleOrDefault(discovery => discovery.CanHandle(providerType));
 }
-

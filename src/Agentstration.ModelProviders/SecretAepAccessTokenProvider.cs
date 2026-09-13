@@ -1,5 +1,6 @@
 using System.Text;
 using Agentstration.Aep.Client;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Secrets.Abstractions;
@@ -22,7 +23,7 @@ internal sealed class SecretAepAccessTokenProvider(
             new SecretReference(address, credential.ScopeRef),
             new SecretResolutionContext(
                 extensionScopeRef,
-                new ResourceAddress(extensionNamespace, ResourceKinds.ExtensionRegistration, extensionName)),
+                new ResourceAddress(extensionNamespace, ExtensionKinds.ExtensionRegistration, extensionName)),
             cancellationToken);
         if (resolved is null)
             throw new AepProtocolException("credential_unavailable", $"The AEP credential Secret '{address}' is unavailable.");

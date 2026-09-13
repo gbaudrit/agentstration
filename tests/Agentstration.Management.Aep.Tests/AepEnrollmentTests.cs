@@ -1,3 +1,4 @@
+using Agentstration.Extensions.Contracts;
 using Agentstration.Security.Contracts;
 using Agentstration.Identity.Contracts;
 using System.Net;

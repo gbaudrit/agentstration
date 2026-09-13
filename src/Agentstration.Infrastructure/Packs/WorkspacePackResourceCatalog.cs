@@ -44,7 +44,7 @@ public sealed class WorkspacePackResourceCatalog(
             .Select(value => RuntimeProfileItem(value.Value)));
         resources.AddRange((await store.ListAsync<SecretResource>(ResourceNamespace.Default, ResourceKinds.Secret, 0, 1000, cancellationToken))
             .Select(value => BindingItem(value.Value, value.Value.Definition.DisplayName, "Secrets are converted to installation bindings; their values are never exported.")));
-        resources.AddRange((await store.ListAsync<ExtensionRegistrationResource>(ResourceNamespace.Default, ResourceKinds.ExtensionRegistration, 0, 1000, cancellationToken))
+        resources.AddRange((await store.ListAsync<ExtensionRegistrationResource>(ResourceNamespace.Default, ExtensionKinds.ExtensionRegistration, 0, 1000, cancellationToken))
             .Select(value => BindingItem(value.Value, value.Value.Definition.DisplayName, "Extension registrations are installation bindings; endpoints and credentials are never exported.")));
         await AddUnsupportedAsync<VaultResource>(resources, ResourceKinds.Vault, "Vaults and their configuration are never copied into a Pack.", cancellationToken);
         await AddUnsupportedAsync<ToolProviderResource>(resources, ResourceKinds.ToolProvider, "Tool Providers are not yet exportable by the Composer.", cancellationToken);
@@ -69,7 +69,7 @@ public sealed class WorkspacePackResourceCatalog(
             ResourceKinds.ModelProvider => await GetModelProviderAsync(resource, cancellationToken),
             ResourceKinds.RuntimeProfile => await GetRuntimeProfileAsync(resource, cancellationToken),
             ResourceKinds.Secret => await GetBindingAsync<SecretResource>(resource, PackBindingTargetKind.Secret, cancellationToken),
-            ResourceKinds.ExtensionRegistration => await GetBindingAsync<ExtensionRegistrationResource>(resource, PackBindingTargetKind.ExtensionRegistration, cancellationToken),
+            ExtensionKinds.ExtensionRegistration => await GetBindingAsync<ExtensionRegistrationResource>(resource, PackBindingTargetKind.ExtensionRegistration, cancellationToken),
             _ => (await ListAsync(cancellationToken)).Where(value => value.Resource.Address == resource.Address).Select(value => new PackCompositionResourceSnapshot(value, [])).SingleOrDefault()
         };
     }
@@ -142,7 +142,7 @@ public sealed class WorkspacePackResourceCatalog(
         var provider = stored.Value;
         var dependencies = new[]
         {
-            BindingDependency(provider.Definition.Extension, provider.Namespace, ResourceKinds.ExtensionRegistration, PackBindingTargetKind.ExtensionRegistration, "extension")
+            BindingDependency(provider.Definition.Extension, provider.Namespace, ExtensionKinds.ExtensionRegistration, PackBindingTargetKind.ExtensionRegistration, "extension")
         };
         return new(ModelProviderItem(provider) with { DependencyCount = dependencies.Length }, dependencies);
     }
@@ -272,7 +272,7 @@ public sealed class WorkspacePackResourceCatalog(
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Accepted }
         };
         var node = JsonSerializer.SerializeToNode(clean, JsonOptions)!.AsObject();
-        var target = provider.Definition.Extension.Resolve(provider.Namespace, ResourceKinds.ExtensionRegistration);
+        var target = provider.Definition.Extension.Resolve(provider.Namespace, ExtensionKinds.ExtensionRegistration);
         node["definition"]!.AsObject()["extension"] = BindingNode(bindings, target);
         return ToElement(node);
     }

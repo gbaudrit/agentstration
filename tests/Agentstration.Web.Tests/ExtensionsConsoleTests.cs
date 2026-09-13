@@ -495,7 +495,7 @@ public sealed class ExtensionsConsoleTests
         private AepEnrollmentRequestResource Enrollment(AepEnrollmentState state) => new()
         {
             ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AepEnrollmentRequest,
+            Kind = ExtensionKinds.AepEnrollmentRequest,
             Metadata = new ResourceMetadata { Name = enrollmentId.ToString("N") },
             Generation = 1,
             Definition = new AepEnrollmentRequestProperties
@@ -518,7 +518,7 @@ public sealed class ExtensionsConsoleTests
             Task.FromResult(new ResourceSnapshot<ExtensionRegistrationResource>(new ExtensionRegistrationResource
             {
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ExtensionRegistration,
+                Kind = ExtensionKinds.ExtensionRegistration,
                 Metadata = new ResourceMetadata { Name = name, Namespace = @namespace },
                 Generation = 1,
                 Definition = new ExtensionRegistrationProperties

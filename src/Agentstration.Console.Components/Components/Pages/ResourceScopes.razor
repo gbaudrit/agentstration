@@ -174,7 +174,7 @@ else
             ResourceKinds.Trigger when resource.Namespace.IsDefault => $"/triggers/{name}",
             ResourceKinds.AgentDeployment => $"/deployments#deployment-{resourceNamespace}-{name}",
             PackKinds.InstalledPack or PackKinds.PackConfiguration => "/packs",
-            ResourceKinds.ExtensionRegistration => "/extensions",
+            ExtensionKinds.ExtensionRegistration => "/extensions",
             ResourceKinds.BootstrapApplication => "/settings/bootstrap",
             _ => null
         };

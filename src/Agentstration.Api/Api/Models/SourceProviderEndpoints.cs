@@ -128,7 +128,7 @@ public static class SourceProviderEndpoints
 
     private static SourceProviderSummaryResponse Map(SourceProviderResource provider, SourceProviderStatus status)
     {
-        var extension = provider.Definition.Extension.Resolve(provider.Namespace, ResourceKinds.ExtensionRegistration);
+        var extension = provider.Definition.Extension.Resolve(provider.Namespace, ExtensionKinds.ExtensionRegistration);
         return new(
             provider.Uid.ToString("D"),
             provider.Name,

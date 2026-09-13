@@ -1,8 +1,14 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Resources;
 
-namespace Agentstration.Management.Abstractions;
+namespace Agentstration.Extensions.Contracts;
+
+public static class ExtensionKinds
+{
+    public const string ExtensionRegistration = "ExtensionRegistration";
+    public const string AepEnrollmentSettings = "AepEnrollmentSettings";
+    public const string AepEnrollmentRequest = "AepEnrollmentRequest";
+}
 
 public enum ExtensionRegistrationSource
 {
@@ -101,13 +107,3 @@ public sealed record AepEnrollmentRequestResource : Resource
 {
     public AepEnrollmentRequestProperties Definition { get; init; } = null!;
 }
-
-public sealed record ExternalBinding
-{
-    public required Guid DeploymentId { get; init; }
-    public required string Provider { get; init; }
-    public required string ExternalResourceId { get; init; }
-    public string? ExternalVersionId { get; init; }
-    public Uri? Endpoint { get; init; }
-}
-

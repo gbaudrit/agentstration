@@ -1,6 +1,6 @@
+using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Management.Abstractions;
-using Agentstration.Extensions.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
@@ -47,7 +47,7 @@ public sealed class AepEnrollmentSettingsService(
         var resource = existing?.Value ?? new AepEnrollmentSettingsResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AepEnrollmentSettings,
+            Kind = ExtensionKinds.AepEnrollmentSettings,
             Metadata = new ResourceMetadata { Name = SettingsName },
             ScopeRef = ResourceScopeRef.Instance
         };
@@ -79,7 +79,7 @@ public sealed class AepEnrollmentSettingsService(
 
     private Task<StoredResource<AepEnrollmentSettingsResource>?> GetStoredAsync(CancellationToken cancellationToken) =>
         store.GetExactAsync<AepEnrollmentSettingsResource>(
-            ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default, ResourceKinds.AepEnrollmentSettings, SettingsName),
+            ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default, ExtensionKinds.AepEnrollmentSettings, SettingsName),
             cancellationToken);
 
     private IRequestContextScopeFactory RequestScopes() => requestContext as IRequestContextScopeFactory

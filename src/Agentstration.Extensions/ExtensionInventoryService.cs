@@ -1,3 +1,4 @@
+using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
@@ -54,7 +55,7 @@ public sealed class ExtensionInventoryService(
         var observed = await extensions.ListAsync(cancellationToken);
         var enrollments = (await store.ListExactAsync<AepEnrollmentRequestResource>(
                 ResourceScopeRef.Instance,
-                ResourceKinds.AepEnrollmentRequest,
+                ExtensionKinds.AepEnrollmentRequest,
                 0,
                 200,
                 cancellationToken))

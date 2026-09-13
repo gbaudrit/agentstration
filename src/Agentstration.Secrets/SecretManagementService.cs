@@ -1,4 +1,5 @@
 using Agentstration.Identity.Contracts;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -209,7 +210,7 @@ public sealed class SecretManagementService(
     public async Task<IReadOnlyList<SecretUsage>> GetSecretUsagesAsync(ResourceScopeRef scopeRef, string name, CancellationToken cancellationToken)
     {
         var usages = new List<SecretUsage>();
-        foreach (var registration in await store.ListAllAsync<ExtensionRegistrationResource>(ResourceKinds.ExtensionRegistration, cancellationToken))
+        foreach (var registration in await store.ListAllAsync<ExtensionRegistrationResource>(ExtensionKinds.ExtensionRegistration, cancellationToken))
         {
             var credential = registration.Value.Definition.Credential;
             if (credential is null || !string.Equals(credential.Name, name, StringComparison.Ordinal)) continue;
