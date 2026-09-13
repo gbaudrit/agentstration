@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Agentstration.Management.Abstractions;
+namespace Agentstration.Sources.Contracts;
 
 public sealed partial class SourceSemanticVersion
 {

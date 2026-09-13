@@ -656,6 +656,61 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void CoreSourceContractsAreOwnedOutsideManagementAbstractions()
+    {
+        var managementAssembly = typeof(IControlPlaneStore).Assembly;
+        var sourceContractsAssembly = typeof(Agentstration.Sources.Contracts.SourceResource).Assembly;
+        var forbiddenNames = new HashSet<string>(StringComparer.Ordinal)
+        {
+            nameof(Agentstration.Sources.Contracts.SourceResource),
+            nameof(Agentstration.Sources.Contracts.SourceVersionResource),
+            nameof(Agentstration.Sources.Contracts.SourceProviderResource),
+            nameof(Agentstration.Sources.Contracts.SourceBindingStatusView),
+            nameof(Agentstration.Sources.Contracts.SourceRefreshSchedule),
+            nameof(Agentstration.Sources.Contracts.SourceSemanticVersion),
+            nameof(Agentstration.Sources.Contracts.ISourceProviderMaterializer),
+            nameof(Agentstration.Sources.Contracts.ISourceManifestRetriever)
+        };
+
+        Assert.IsFalse(managementAssembly.GetTypes().Any(type => forbiddenNames.Contains(type.Name)));
+        Assert.AreEqual("Agentstration.Sources.Contracts", sourceContractsAssembly.GetName().Name);
+        Assert.IsTrue(forbiddenNames.All(name => sourceContractsAssembly.GetTypes().Any(type => type.Name == name)));
+
+        var managementDirectory = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Management.Abstractions");
+        var movedFiles = new[]
+        {
+            "SourceResources.cs",
+            "SourceProviderResources.cs",
+            "SourceBindingViews.cs",
+            "SourceRefreshSchedule.cs",
+            "SourceSemanticVersion.cs"
+        };
+        Assert.IsFalse(movedFiles.Any(file => File.Exists(Path.Combine(managementDirectory, file))));
+    }
+
+    [TestMethod]
+    public void SourceContractsRemainProviderAndSerializationNeutral()
+    {
+        var forbidden = new[]
+        {
+            "Agentstration.Infrastructure",
+            "Agentstration.Web",
+            ".Storage.",
+            "EntityFramework",
+            "Agentstration.Aep",
+            "Microsoft.Agents.AI",
+            "YamlDotNet"
+        };
+        var references = typeof(Agentstration.Sources.Contracts.SourceResource).Assembly
+            .GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .ToArray();
+
+        Assert.IsFalse(references.Any(reference =>
+            forbidden.Any(value => reference!.Contains(value, StringComparison.Ordinal))));
+    }
+
+    [TestMethod]
     public void SourceRegistryToolDependsOnSourcesWithoutHostAdapters()
     {
         var references = typeof(SourceRegistryCli).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();

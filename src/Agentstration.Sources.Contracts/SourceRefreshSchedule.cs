@@ -1,7 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
+using Agentstration.Management.Abstractions;
 
-namespace Agentstration.Management.Abstractions;
+namespace Agentstration.Sources.Contracts;
 
 public static class SourceRefreshSchedule
 {

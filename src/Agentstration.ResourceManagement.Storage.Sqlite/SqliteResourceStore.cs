@@ -5,6 +5,7 @@ using Agentstration.Agents;
 using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Sources.Contracts;
 using Agentstration.Triggers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

@@ -12,5 +12,6 @@
     <ProjectReference Include="../Agentstration.Web.FlowDesigner/Agentstration.Web.FlowDesigner.csproj" />
     <ProjectReference Include="../Agentstration.Workplace.Components/Agentstration.Workplace.Components.csproj" />
     <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Sources.Contracts/Agentstration.Sources.Contracts.csproj" />
   </ItemGroup>
 </Project>

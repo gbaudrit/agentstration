@@ -1,8 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 
-namespace Agentstration.Management.Abstractions;
+namespace Agentstration.Sources.Contracts;
 
 public static class SourceKinds
 {

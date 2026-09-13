@@ -743,7 +743,7 @@ public sealed partial class SourceRegistryManagementService(
                 : status;
     }
 
-    private static bool Contains(SourceCompatibilityBounds bounds, SourceSemanticVersion version)
+    private static bool Contains(SourceRegistryCompatibilityBounds bounds, SourceSemanticVersion version)
     {
         _ = SourceSemanticVersion.TryParse(bounds.MinVersion, out var minimum);
         if (version.CompareTo(minimum) < 0) return false;

@@ -1,6 +1,6 @@
 using Agentstration.Resources;
 
-namespace Agentstration.Management.Abstractions;
+namespace Agentstration.Sources.Contracts;
 
 public sealed record SourceBindingIssue(string Code, string Message, string? Channel = null);
 

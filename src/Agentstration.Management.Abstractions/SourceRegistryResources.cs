@@ -27,9 +27,20 @@ public static class SourceRegistryLimits
 public sealed record SourceRegistryCatalog
 {
     public required string Name { get; init; }
-    public required SourceCompatibility Compatibility { get; init; }
+    public required SourceRegistryCompatibility Compatibility { get; init; }
     public required string RegistryUrl { get; init; }
     public required string RegistryDigest { get; init; }
+}
+
+public sealed record SourceRegistryCompatibilityBounds
+{
+    public string? MinVersion { get; init; }
+    public string? MaxVersionExclusive { get; init; }
+}
+
+public sealed record SourceRegistryCompatibility
+{
+    public SourceRegistryCompatibilityBounds? Agentstration { get; init; }
 }
 
 public sealed record SourceRegistryIndexDefinition
@@ -182,10 +193,17 @@ public sealed record SourceRegistryPublisherTrustView(
 public sealed record SourceRegistryPublisherEvidenceView(
     SourceRegistryPublisherStatus AssertedStatus,
     SourceRegistryPublisherStatus AcceptedStatus,
-    SourcePublisher Publisher,
+    SourceRegistryPublisherIdentity Publisher,
     SourceRegistryTrustPolicy Policy,
     SourceRegistryOriginClassification OriginClassification,
     SourceRegistryEvidence Evidence);
+
+public sealed record SourceRegistryPublisherIdentity
+{
+    public required string Name { get; init; }
+    public string? DisplayName { get; init; }
+    public string? Url { get; init; }
+}
 
 public sealed record SourceRegistryVersionEvidenceView(
     string Publisher,
@@ -198,11 +216,21 @@ public sealed record SourceRegistryVersionEvidenceView(
 
 public sealed record SourceRegistrySourceTrustView(
     SourceRegistryPublisherTrustView Publisher,
-    SourceVerificationStatus VersionStatus,
+    SourceRegistryVerificationStatus VersionStatus,
     string VersionReasonCode,
     string? RequestedManifestDigest,
     DateTimeOffset EvaluatedAt,
     IReadOnlyList<SourceRegistryVersionEvidenceView> Evidence);
+
+[JsonConverter(typeof(JsonStringEnumConverter<SourceRegistryVerificationStatus>))]
+public enum SourceRegistryVerificationStatus
+{
+    [JsonStringEnumMemberName("verified")] Verified,
+    [JsonStringEnumMemberName("unverified")] Unverified,
+    [JsonStringEnumMemberName("unavailable")] Unavailable,
+    [JsonStringEnumMemberName("conflict")] Conflict,
+    [JsonStringEnumMemberName("revoked")] Revoked
+}
 
 [JsonConverter(typeof(JsonStringEnumConverter<SourceRegistryTrustPolicy>))]
 public enum SourceRegistryTrustPolicy
@@ -333,7 +361,7 @@ public enum SourceRegistryRefreshOutcome
 public sealed record SourceRegistryCatalogObservation
 {
     public required string Name { get; init; }
-    public required SourceCompatibility Compatibility { get; init; }
+    public required SourceRegistryCompatibility Compatibility { get; init; }
     public required string RegistryUrl { get; init; }
     public required string RegistryDigest { get; init; }
     public required string CachePath { get; init; }
@@ -457,7 +485,7 @@ public sealed record SourceRegistryDiscoveryQuery
     public bool ConflictsOnly { get; init; }
     public SourceRegistryTrustPolicy? TrustPolicy { get; init; }
     public SourceRegistryPublisherStatus? PublisherStatus { get; init; }
-    public SourceVerificationStatus? VerificationStatus { get; init; }
+    public SourceRegistryVerificationStatus? VerificationStatus { get; init; }
     public int Skip { get; init; }
     public int Take { get; init; } = 50;
 }
@@ -472,7 +500,7 @@ public sealed record SourceRegistryDiscoveryObservation
     public required SourceRegistryOriginClassification OriginClassification { get; init; }
     public required string IndexDigest { get; init; }
     public required string CatalogDigest { get; init; }
-    public required SourceCompatibility Compatibility { get; init; }
+    public required SourceRegistryCompatibility Compatibility { get; init; }
     public required DateTimeOffset FetchedAt { get; init; }
     public required SourceRegistryPublisher Publisher { get; init; }
     public required string ManifestUrl { get; init; }
@@ -483,7 +511,7 @@ public sealed record SourceRegistryDiscoveryObservation
 public sealed record SourceRegistryDiscoveryVersion(
     string Version,
     bool Conflicted,
-    SourceVerificationStatus VerificationStatus,
+    SourceRegistryVerificationStatus VerificationStatus,
     string VerificationReasonCode,
     IReadOnlyList<SourceRegistryDiscoveryObservation> Observations);
 

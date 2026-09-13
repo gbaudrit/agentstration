@@ -127,9 +127,9 @@ public sealed class SourceRegistryDiscoveryService(
 
             var evaluated = await trust.EvaluateSourceAsync(selection.Publisher, selection.SourceName,
                 selection.Version, selected.Version.ManifestDigest, cancellationToken);
-            if (evaluated.VersionStatus == SourceVerificationStatus.Revoked)
+            if (evaluated.VersionStatus == SourceRegistryVerificationStatus.Revoked)
                 throw Failure("source_registry_selection_revoked", "The selected Source publisher is revoked.");
-            if (evaluated.VersionStatus == SourceVerificationStatus.Conflict)
+            if (evaluated.VersionStatus == SourceRegistryVerificationStatus.Conflict)
                 throw Failure("source_registry_selection_conflicted", "The selected Source version has conflicting trusted evidence.");
             var acceptedPublisher = ParseStatus(selected.Publisher.Status) switch
             {
@@ -375,7 +375,7 @@ public sealed class SourceRegistryDiscoveryService(
         return value.State.Definition.Status;
     }
 
-    private bool IsCompatible(SourceCompatibilityBounds? bounds)
+    private bool IsCompatible(SourceRegistryCompatibilityBounds? bounds)
     {
         if (bounds is null || !SourceSemanticVersion.TryParse(versions.CurrentVersion, out var running)
             || !SourceSemanticVersion.TryParse(bounds.MinVersion, out var minimum)) return false;

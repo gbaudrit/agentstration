@@ -49,8 +49,8 @@ public sealed class SourceRegistryConsoleTests
         var observation = Observation();
         var discovered = new SourceRegistryDiscoverySource("contoso", "assistants", "Contoso assistants", "Reusable assistants",
         [
-            new("2026.09", false, SourceVerificationStatus.Verified, "source_version_verified", [observation]),
-            new("2026.08", true, SourceVerificationStatus.Conflict, "source_registry_manifest_digest_conflict",
+            new("2026.09", false, SourceRegistryVerificationStatus.Verified, "source_version_verified", [observation]),
+            new("2026.08", true, SourceRegistryVerificationStatus.Conflict, "source_registry_manifest_digest_conflict",
                 [observation with { Selection = observation.Selection with { Version = "2026.08" }, ManifestDigest = "sha256:other" }])
         ]);
         using var context = Context(new StubSourceRegistriesClient(

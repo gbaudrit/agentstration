@@ -56,7 +56,7 @@ public sealed class SourceRegistryManagementTests
         var sourceTrust = await client.GetFromJsonAsync<SourceRegistrySourceTrustView>(
             "/api/sourceregistries/trust/sources/agentstration/sample/versions/1");
         Assert.IsNotNull(sourceTrust);
-        Assert.AreEqual(SourceVerificationStatus.Unverified, sourceTrust.VersionStatus);
+        Assert.AreEqual(SourceRegistryVerificationStatus.Unverified, sourceTrust.VersionStatus);
 
         using var update = new HttpRequestMessage(HttpMethod.Put, $"/api/sourceregistries/{SourceRegistryWellKnown.OfficialName}")
         {
@@ -242,14 +242,14 @@ public sealed class SourceRegistryManagementTests
         var trusted = await fixture.Trust.EvaluateSourceAsync("agentstration", "sample", "1", digest, default);
 
         Assert.AreEqual(SourceRegistryPublisherStatus.Official, trusted.Publisher.EffectiveStatus);
-        Assert.AreEqual(SourceVerificationStatus.Verified, trusted.VersionStatus);
+        Assert.AreEqual(SourceRegistryVerificationStatus.Verified, trusted.VersionStatus);
         Assert.HasCount(1, trusted.Evidence);
         Assert.AreEqual(refreshed.Observed.Definition.Current!.Id, trusted.Evidence[0].Evidence.ObservationId);
         var verification = new SourceVerificationService(new EmptyVerificationIndex(), [fixture.Trust]);
         var version = SourceVersion(RegistryManifestDigest);
         Assert.AreEqual(SourceVerificationStatus.Verified,
             (await verification.VerifyDefinitionAsync(version, default)).Status);
-        Assert.AreEqual(SourceVerificationStatus.Unverified,
+        Assert.AreEqual(SourceRegistryVerificationStatus.Unverified,
             (await fixture.Trust.EvaluateSourceAsync(
                 "agentstration", "sample", "1", $"sha256:{new string('f', 64)}", default)).VersionStatus);
 
@@ -261,7 +261,7 @@ public sealed class SourceRegistryManagementTests
         var downgraded = await fixture.Trust.EvaluateSourceAsync("agentstration", "sample", "1", digest, default);
 
         Assert.AreEqual(SourceRegistryPublisherStatus.Declared, downgraded.Publisher.EffectiveStatus);
-        Assert.AreEqual(SourceVerificationStatus.Unverified, downgraded.VersionStatus);
+        Assert.AreEqual(SourceRegistryVerificationStatus.Unverified, downgraded.VersionStatus);
         Assert.AreEqual(SourceVerificationStatus.Unverified,
             (await verification.VerifyDefinitionAsync(version, default)).Status);
         Assert.AreEqual(refreshed.Observed.Definition.Current.Id, downgraded.Evidence[0].Evidence.ObservationId);
@@ -280,7 +280,7 @@ public sealed class SourceRegistryManagementTests
         var conflict = await fixture.Trust.EvaluateSourceAsync(
             "agentstration", "sample", "1", RegistryManifestDigest, default);
 
-        Assert.AreEqual(SourceVerificationStatus.Conflict, conflict.VersionStatus);
+        Assert.AreEqual(SourceRegistryVerificationStatus.Conflict, conflict.VersionStatus);
         Assert.HasCount(2, conflict.Evidence);
         Assert.HasCount(2, conflict.Publisher.Evidence);
 
@@ -290,7 +290,7 @@ public sealed class SourceRegistryManagementTests
             "agentstration", "sample", "1", RegistryManifestDigest, default);
 
         Assert.AreEqual(SourceRegistryPublisherStatus.Revoked, revoked.Publisher.EffectiveStatus);
-        Assert.AreEqual(SourceVerificationStatus.Revoked, revoked.VersionStatus);
+        Assert.AreEqual(SourceRegistryVerificationStatus.Revoked, revoked.VersionStatus);
         Assert.HasCount(3, revoked.Evidence);
     }
 

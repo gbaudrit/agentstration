@@ -26,6 +26,7 @@ src/
   Agentstration.Flows.Storage.Sqlite/
   Agentstration.Infrastructure/   JSON/EF storage, AI, HTTP, event bus, queues
   Agentstration.Management.Abstractions/ temporary compatibility resources and ports
+  Agentstration.Sources.Contracts/       Source identity, publication, channel, snapshot and provider contracts
   Agentstration.Api.Contracts/    family-neutral HTTP collection contracts
   Agentstration.*.Contracts/      public contracts owned by each resource family
   Agentstration.ResourceManagement.Contracts/ generic resource and bootstrap contracts
@@ -106,7 +107,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 
 `Agentstration.Web/Program.cs` is deliberately limited to creating the builder, applying the standalone composition, initializing it, and running it. `StandaloneHostComposition` remains in the executable project and is the single place that selects storage and identity providers, registers concrete adapters and workers, configures observability, orders startup initialization, and assembles `Agentstration.Api` with the Console libraries. This is code separation only: direct launch, Aspire, and the Docker image still start one authoritative ASP.NET Core process with one set of stores, queues, schedulers, and workers.
 
-Compatibility resources awaiting extraction remain in `Management.Abstractions`; identity, authorization and PAT contracts are owned by `Identity.Contracts`, and provider-neutral audit contracts by `Security.Contracts`. Validation and use cases live in plural resource-family modules. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
+Compatibility resources awaiting extraction remain in `Management.Abstractions`; identity, authorization and PAT contracts are owned by `Identity.Contracts`, provider-neutral audit contracts by `Security.Contracts`, and core Source contracts and provider ports by `Sources.Contracts`. Validation and use cases live in plural resource-family modules. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
 
 `Agentstration.Resources` contains the neutral namespace, scope-reference, and address value types shared across boundaries. Management resources retain globally unique UIDs and use `(scope, namespace, kind, name)` as their exact logical identity. Canonical scope references are `/instance`, `/tenants/{tenantId}`, and `/workspaces/{workspaceId}`. Existing workspace callers implicitly use their current workspace and the `default` namespace. Relative references inherit their owner's namespace; explicit cross-namespace references retain the supplied namespace. See ADR-0035 and ADR-0079.
 

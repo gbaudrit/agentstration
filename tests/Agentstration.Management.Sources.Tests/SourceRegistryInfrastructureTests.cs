@@ -5,6 +5,7 @@ using Agentstration.Infrastructure.Sources;
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Secrets.Abstractions;
+using Agentstration.Sources.Contracts;
 
 namespace Agentstration.Management.Tests;
 

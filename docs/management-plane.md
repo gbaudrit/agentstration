@@ -17,6 +17,9 @@ Agentstration.*.Contracts
 Agentstration.Identity.Contracts and Agentstration.Security.Contracts
   identity, authorization, personal-access-token and provider-neutral security-audit contracts
 
+Agentstration.Sources.Contracts
+  Source identity, publication, channel, snapshot, refresh, catalog and provider contracts
+
 Agentstration.ResourceManagement.Contracts and Agentstration.Api.Contracts
   generic resource/bootstrap contracts and family-neutral HTTP collection envelopes
 

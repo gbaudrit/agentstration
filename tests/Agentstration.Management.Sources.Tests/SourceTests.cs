@@ -1393,9 +1393,9 @@ public sealed class SourceTests
             Catalog = new SourceRegistryCatalogObservation
             {
                 Name = selection.CatalogName,
-                Compatibility = new SourceCompatibility
+                Compatibility = new SourceRegistryCompatibility
                 {
-                    Agentstration = new SourceCompatibilityBounds { MinVersion = "0.2.0-alpha.1" }
+                    Agentstration = new SourceRegistryCompatibilityBounds { MinVersion = "0.2.0-alpha.1" }
                 },
                 RegistryUrl = "registry-agentstration-0.2.json",
                 RegistryDigest = evidence.CatalogDigest,
@@ -1409,7 +1409,7 @@ public sealed class SourceTests
             FinalManifestUrl = new("https://registry.example/v1/sources/agentstration/official-samples/1/source.yaml"),
             ExpectedManifestDigest = parsed.Digest,
             Trust = new SourceRegistrySourceTrustView(
-                publisherTrust, SourceVerificationStatus.Verified, "source_definition_verified_by_registry",
+                publisherTrust, SourceRegistryVerificationStatus.Verified, "source_definition_verified_by_registry",
                 parsed.Digest, DateTimeOffset.UnixEpoch, [])
         };
     }

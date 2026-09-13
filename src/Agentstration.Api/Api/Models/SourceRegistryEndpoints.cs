@@ -38,7 +38,7 @@ public static class SourceRegistryEndpoints
         bool? conflictsOnly,
         SourceRegistryTrustPolicy? trustPolicy,
         SourceRegistryPublisherStatus? publisherStatus,
-        SourceVerificationStatus? verificationStatus,
+        SourceRegistryVerificationStatus? verificationStatus,
         int? skip,
         int? take,
         SourceRegistryDiscoveryService service,

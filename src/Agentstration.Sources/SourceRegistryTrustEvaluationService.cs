@@ -104,7 +104,7 @@ public sealed class SourceRegistryTrustEvaluationService(
                 publisherEvidence.Add(new(
                     asserted,
                     accepted,
-                    new SourcePublisher
+                    new SourceRegistryPublisherIdentity
                     {
                         Name = declaredPublisher.Name,
                         DisplayName = declaredPublisher.DisplayName,
@@ -137,32 +137,32 @@ public sealed class SourceRegistryTrustEvaluationService(
         var publisherView = Publisher(publisher, publisherEvidence, evaluatedAt);
         var acceptedVersions = versionEvidence.Where(value =>
             value.PublisherStatus is SourceRegistryPublisherStatus.Verified or SourceRegistryPublisherStatus.Official or SourceRegistryPublisherStatus.Revoked).ToArray();
-        SourceVerificationStatus status;
+        SourceRegistryVerificationStatus status;
         string reason;
         if (publisherView.EffectiveStatus == SourceRegistryPublisherStatus.Revoked)
         {
-            status = SourceVerificationStatus.Revoked;
+            status = SourceRegistryVerificationStatus.Revoked;
             reason = "source_registry_publisher_revoked";
         }
         else if (acceptedVersions.Select(value => value.ManifestDigest).Distinct(StringComparer.Ordinal).Skip(1).Any())
         {
-            status = SourceVerificationStatus.Conflict;
+            status = SourceRegistryVerificationStatus.Conflict;
             reason = "source_registry_manifest_digest_conflict";
         }
         else if (manifestDigest is not null && acceptedVersions.Any(value =>
             string.Equals(value.ManifestDigest, manifestDigest, StringComparison.Ordinal)))
         {
-            status = SourceVerificationStatus.Verified;
+            status = SourceRegistryVerificationStatus.Verified;
             reason = "source_definition_verified_by_registry";
         }
         else if (unavailable && acceptedVersions.Length == 0)
         {
-            status = SourceVerificationStatus.Unavailable;
+            status = SourceRegistryVerificationStatus.Unavailable;
             reason = "source_registry_evidence_unavailable";
         }
         else
         {
-            status = SourceVerificationStatus.Unverified;
+            status = SourceRegistryVerificationStatus.Unverified;
             reason = acceptedVersions.Length == 0
                 ? "source_registry_trusted_evidence_not_found"
                 : "source_manifest_digest_not_listed";
@@ -181,7 +181,7 @@ public sealed class SourceRegistryTrustEvaluationService(
             version.Definition.Version,
             version.Definition.ManifestDigest,
             cancellationToken);
-        if (evaluated.VersionStatus == SourceVerificationStatus.Unverified
+        if (evaluated.VersionStatus == SourceRegistryVerificationStatus.Unverified
             && evaluated.Evidence.Count == 0
             && evaluated.Publisher.Evidence.Count == 0)
             return null;
@@ -193,10 +193,17 @@ public sealed class SourceRegistryTrustEvaluationService(
         var verifiedPublisher = evaluated.Publisher.Evidence.FirstOrDefault(value =>
             value.AcceptedStatus is SourceRegistryPublisherStatus.Verified or SourceRegistryPublisherStatus.Official)?.Publisher;
         return new(
-            evaluated.VersionStatus,
+            ToSourceVerificationStatus(evaluated.VersionStatus),
             evaluated.VersionReasonCode,
             version.Definition.PublishedDefinition.Publisher,
-            evaluated.VersionStatus == SourceVerificationStatus.Verified ? verifiedPublisher : null,
+            evaluated.VersionStatus == SourceRegistryVerificationStatus.Verified && verifiedPublisher is not null
+                ? new SourcePublisher
+                {
+                    Name = verifiedPublisher.Name,
+                    DisplayName = verifiedPublisher.DisplayName,
+                    Url = verifiedPublisher.Url
+                }
+                : null,
             evidence is null ? null : new SourceVerificationEvidence
             {
                 Type = "source-registry-observation",
@@ -282,6 +289,16 @@ public sealed class SourceRegistryTrustEvaluationService(
         SourceRegistryPublisherStatuses.Official => SourceRegistryPublisherStatus.Official,
         SourceRegistryPublisherStatuses.Revoked => SourceRegistryPublisherStatus.Revoked,
         _ => throw new SourceValidationException("source_registry_publisher_status_invalid", "The registry publisher status is unsupported.")
+    };
+
+    private static SourceVerificationStatus ToSourceVerificationStatus(SourceRegistryVerificationStatus status) => status switch
+    {
+        SourceRegistryVerificationStatus.Verified => SourceVerificationStatus.Verified,
+        SourceRegistryVerificationStatus.Unverified => SourceVerificationStatus.Unverified,
+        SourceRegistryVerificationStatus.Unavailable => SourceVerificationStatus.Unavailable,
+        SourceRegistryVerificationStatus.Conflict => SourceVerificationStatus.Conflict,
+        SourceRegistryVerificationStatus.Revoked => SourceVerificationStatus.Revoked,
+        _ => throw new ArgumentOutOfRangeException(nameof(status), status, null)
     };
 
     private static SourceRegistryOriginTrustView Origin(

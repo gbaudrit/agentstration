@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Sources;
+using Agentstration.Sources.Contracts;
 using Agentstration.Tools.SourceRegistry;
 
 namespace Agentstration.Tools.SourceRegistry.Tests;

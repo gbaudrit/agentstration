@@ -6,6 +6,7 @@ using Agentstration.Models;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Secrets;
+using Agentstration.Sources.Contracts;
 
 namespace Agentstration.Extensions;
 
