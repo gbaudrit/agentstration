@@ -224,7 +224,7 @@ public sealed class NamespacedAgentDetailsTests
             var resource = new InstalledPackResource
             {
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.InstalledPack,
+                Kind = PackKinds.InstalledPack,
                 Metadata = new ResourceMetadata { Name = "13-agentstration-daily-life-assistant" },
                 Definition = new InstalledPackProperties
                 {

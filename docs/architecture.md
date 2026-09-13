@@ -36,6 +36,7 @@ src/
   Agentstration.Identity/         Identity, authorization, scope and audit use cases
   Agentstration.Security.Contracts/ provider-neutral security audit contracts
   Agentstration.Models.Application/ Model administration use cases
+  Agentstration.Packs.Contracts/    Pack installation, authoring and composition contracts
   Agentstration.Packs/            Pack authoring, installation and composition
   Agentstration.Sources/          Source and source-registry use cases
   Agentstration.ResourceManagement.Storage.Sqlite/

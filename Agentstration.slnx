@@ -34,6 +34,7 @@
     <Project Path="src/Agentstration.Models.Contracts/Agentstration.Models.Contracts.csproj" />
     <Project Path="src/Agentstration.Models.Application/Agentstration.Models.Application.csproj" />
     <Project Path="src/Agentstration.Packs/Agentstration.Packs.csproj" />
+    <Project Path="src/Agentstration.Packs.Contracts/Agentstration.Packs.Contracts.csproj" />
     <Project Path="src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
     <Project Path="src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
     <Project Path="src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />

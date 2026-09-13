@@ -1,12 +1,15 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 
-namespace Agentstration.Management.Abstractions;
+namespace Agentstration.Packs.Contracts;
 
 public static class PackKinds
 {
     public const string Pack = "Pack";
+    public const string InstalledPack = "InstalledPack";
+    public const string PackConfiguration = "PackConfiguration";
 }
 
 public static class PackProvenanceAnnotations
@@ -14,11 +17,6 @@ public static class PackProvenanceAnnotations
     public const string Publisher = "agentstration.io/pack.publisher";
     public const string Name = "agentstration.io/pack.name";
     public const string Version = "agentstration.io/pack.version";
-}
-
-public static class ResourceProvenanceAnnotations
-{
-    public const string BuiltIn = "agentstration.io/builtin";
 }
 
 public sealed record PackManifest
@@ -257,4 +255,3 @@ public interface IPackResourceHandler
     Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
     Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken);
 }
-

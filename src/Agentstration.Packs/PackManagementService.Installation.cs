@@ -11,10 +11,10 @@ namespace Agentstration.Packs;
 public sealed partial class PackManagementService
 {
     public Task<IReadOnlyList<StoredResource<InstalledPackResource>>> ListAsync(CancellationToken cancellationToken) =>
-        store.ListAllAsync<InstalledPackResource>(ResourceKinds.InstalledPack, cancellationToken);
+        store.ListAllAsync<InstalledPackResource>(PackKinds.InstalledPack, cancellationToken);
 
     public Task<StoredResource<InstalledPackResource>?> GetAsync(PackIdentity identity, CancellationToken cancellationToken) =>
-        store.GetAsync<InstalledPackResource>(new(ResourceKinds.InstalledPack, identity.ResourceName), cancellationToken);
+        store.GetAsync<InstalledPackResource>(new(PackKinds.InstalledPack, identity.ResourceName), cancellationToken);
 
     public async Task<PackInstallationPreview> PreviewAsync(PackArchive archive, CancellationToken cancellationToken)
     {
@@ -67,7 +67,7 @@ public sealed partial class PackManagementService
             return await InstallCoreAsync(archive, replaceExisting, bindings, removalOptions, sourceProvenance, null, cancellationToken);
         var targetScopeRef = scopeOperations.TargetScopeRef(archive.Manifest.Definition.TargetScope);
         return await scopeOperations.WriteAsync(
-            ResourceKinds.InstalledPack,
+            PackKinds.InstalledPack,
             targetScopeRef,
             AuthorizationPermissions.ResourcesWrite,
             token => InstallCoreAsync(archive, replaceExisting, bindings, removalOptions, sourceProvenance, targetScopeRef, token),
@@ -109,7 +109,7 @@ public sealed partial class PackManagementService
         var installed = await store.PutAsync(new InstalledPackResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.InstalledPack,
+            Kind = PackKinds.InstalledPack,
             ScopeRef = targetScopeRef,
             Metadata = new ResourceMetadata { Name = identity.ResourceName },
             Generation = 1,
@@ -321,4 +321,3 @@ public sealed partial class PackManagementService
         return await store.PutAsync(updated, current.ETag, false, cancellationToken);
     }
 }
-

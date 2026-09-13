@@ -481,7 +481,7 @@ public sealed class SourceTests
             imported.Source.Source.ETag!,
             default);
         var retained = (await fixture.Store.ListExactAsync<InstalledPackResource>(
-            ResourceScopeRef.Instance, ResourceKinds.InstalledPack, 0, int.MaxValue, default)).Single();
+            ResourceScopeRef.Instance, PackKinds.InstalledPack, 0, int.MaxValue, default)).Single();
         Assert.AreEqual(installed.Value.Uid, retained.Value.Uid);
         Assert.AreEqual(imported.Source.Source.Uid, retained.Value.Definition.SourceProvenance?.SourceUid);
     }

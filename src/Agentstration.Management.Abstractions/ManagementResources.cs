@@ -20,8 +20,6 @@ public static class ResourceKinds
     public const string Flow = "Flow";
     public const string Entry = "Entry";
     public const string ManagementOperation = "ManagementOperation";
-    public const string InstalledPack = "InstalledPack";
-    public const string PackConfiguration = "PackConfiguration";
     public const string ModelProvider = "ModelProvider";
     public const string SourceProvider = "SourceProvider";
     public const string ExtensionRegistration = "ExtensionRegistration";

@@ -21,6 +21,7 @@ using Agentstration.Extensions.Aep;
 using Agentstration.Identity;
 using Agentstration.Models;
 using Agentstration.Packs;
+using Agentstration.Packs.Contracts;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Runtime.Core;
 using Agentstration.ResourceManagement.Storage.Sqlite;
@@ -686,6 +687,49 @@ public sealed class DependencyTests
             "SourceSemanticVersion.cs"
         };
         Assert.IsFalse(movedFiles.Any(file => File.Exists(Path.Combine(managementDirectory, file))));
+    }
+
+    [TestMethod]
+    public void PackContractsAreOwnedOutsideManagementAbstractions()
+    {
+        var managementAssembly = typeof(IControlPlaneStore).Assembly;
+        var packContractsAssembly = typeof(PackManifest).Assembly;
+
+        Assert.IsFalse(managementAssembly.GetTypes().Any(type =>
+            type.Name.StartsWith("Pack", StringComparison.Ordinal)
+            || type.Name.StartsWith("IPack", StringComparison.Ordinal)
+            || type.Name.StartsWith("SourcePack", StringComparison.Ordinal)));
+        Assert.AreEqual("Agentstration.Packs.Contracts", packContractsAssembly.GetName().Name);
+        Assert.AreEqual("Agentstration.Packs.Contracts", typeof(PackManifest).Namespace);
+        Assert.AreEqual("Agentstration.Packs.Contracts", typeof(PackProjectResource).Namespace);
+        Assert.AreEqual("Agentstration.Packs.Contracts", typeof(SourcePackInstallationPreview).Namespace);
+
+        var managementDirectory = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Management.Abstractions");
+        Assert.IsFalse(File.Exists(Path.Combine(managementDirectory, "PackResources.cs")));
+        Assert.IsFalse(File.Exists(Path.Combine(managementDirectory, "PackAuthoringResources.cs")));
+    }
+
+    [TestMethod]
+    public void PackContractsRemainPortable()
+    {
+        var forbidden = new[]
+        {
+            "Agentstration.Infrastructure",
+            "Agentstration.Web",
+            ".Storage.",
+            "EntityFramework",
+            "Agentstration.Sources",
+            "Microsoft.Agents.AI",
+            "YamlDotNet",
+            "SharpCompress"
+        };
+        var references = typeof(PackManifest).Assembly
+            .GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .ToArray();
+
+        Assert.IsFalse(references.Any(reference =>
+            forbidden.Any(value => reference!.Contains(value, StringComparison.Ordinal))));
     }
 
     [TestMethod]

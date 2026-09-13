@@ -71,7 +71,7 @@ public sealed partial class PackManagementService
     }
 
     private Task<StoredResource<PackConfigurationResource>?> GetConfigurationAsync(PackIdentity identity, CancellationToken cancellationToken) =>
-        store.GetAsync<PackConfigurationResource>(new(ResourceKinds.PackConfiguration, identity.ResourceName), cancellationToken);
+        store.GetAsync<PackConfigurationResource>(new(PackKinds.PackConfiguration, identity.ResourceName), cancellationToken);
 
     private async Task SaveConfigurationAsync(PackIdentity identity, IReadOnlyList<PackBindingResolution> bindings, CancellationToken cancellationToken)
     {
@@ -79,7 +79,7 @@ public sealed partial class PackManagementService
         var resource = new PackConfigurationResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.PackConfiguration,
+            Kind = PackKinds.PackConfiguration,
             Metadata = new ResourceMetadata { Name = identity.ResourceName },
             Generation = current is null ? 1 : checked(current.Value.Generation + 1),
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },

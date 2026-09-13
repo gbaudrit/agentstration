@@ -59,9 +59,9 @@ public sealed partial class PackManagementService
             }
 
             if (installed.Value.ScopeRef is { } scopeRef)
-                await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, installed.Value.Namespace, ResourceKinds.InstalledPack, identity.ResourceName), installed.ETag, cancellationToken);
+                await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, installed.Value.Namespace, PackKinds.InstalledPack, identity.ResourceName), installed.ETag, cancellationToken);
             else
-                await store.DeleteAsync(new(ResourceKinds.InstalledPack, identity.ResourceName), installed.ETag, cancellationToken);
+                await store.DeleteAsync(new(PackKinds.InstalledPack, identity.ResourceName), installed.ETag, cancellationToken);
         }
         catch (Exception exception)
         {
@@ -76,4 +76,3 @@ public sealed partial class PackManagementService
         }
     }
 }
-

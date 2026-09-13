@@ -12,13 +12,16 @@ Plural resource-family modules
   Agents, Extensions, Identity, Models, Packs, Sources, Runtime, Tools and Triggers own their validation and lifecycle use cases
 
 Agentstration.*.Contracts
-  versioned HTTP request and response contracts owned by Agents, Extensions, Identity, Models, Runtime, Secrets, Sources, Tools and Triggers
+  versioned contracts owned by Agents, Extensions, Identity, Models, Packs, Runtime, Secrets, Sources, Tools and Triggers
 
 Agentstration.Identity.Contracts and Agentstration.Security.Contracts
   identity, authorization, personal-access-token and provider-neutral security-audit contracts
 
 Agentstration.Sources.Contracts
   Source identity, publication, channel, snapshot, refresh, catalog and provider contracts
+
+Agentstration.Packs.Contracts
+  Pack installation, authoring, composition and source-installation contracts
 
 Agentstration.ResourceManagement.Contracts and Agentstration.Api.Contracts
   generic resource/bootstrap contracts and family-neutral HTTP collection envelopes

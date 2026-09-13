@@ -193,7 +193,7 @@ public sealed class PacksComponentTests
         private readonly InstalledPackResource pack = new()
         {
             ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.InstalledPack,
+            Kind = PackKinds.InstalledPack,
             Metadata = new ResourceMetadata { Name = "13-agentstration-starter" },
             Definition = new InstalledPackProperties
             {
