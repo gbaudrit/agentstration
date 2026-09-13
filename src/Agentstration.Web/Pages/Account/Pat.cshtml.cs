@@ -1,3 +1,4 @@
+using Agentstration.Identity.Contracts;
 using System.ComponentModel.DataAnnotations;
 using Agentstration.Management.Abstractions;
 using Agentstration.Identity;

@@ -1,3 +1,4 @@
+using Agentstration.Identity.Contracts;
 using Agentstration.Management.Abstractions;
 using Agentstration.Identity;
 using Agentstration.ResourceManagement;
@@ -376,7 +377,7 @@ public static class IdentityEndpoints
 
     private static async Task<IResult> LinkExternalIdentityAsync(
         Guid principalId,
-        LinkExternalIdentityRequest request,
+        Agentstration.Identity.Contracts.LinkExternalIdentityRequest request,
         ExternalIdentityAdministrationService service,
         CancellationToken cancellationToken)
     {

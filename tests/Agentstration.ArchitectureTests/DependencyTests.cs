@@ -1,3 +1,5 @@
+using Agentstration.Security.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.Agents;
 using Agentstration.ResourceManagement;
 using Agentstration.Aep.Abstractions;
@@ -597,6 +599,54 @@ public sealed class DependencyTests
         };
 
         var references = assemblies
+            .SelectMany(assembly => assembly.GetReferencedAssemblies())
+            .Select(reference => reference.Name)
+            .ToArray();
+
+        Assert.IsFalse(references.Any(reference =>
+            forbidden.Any(value => reference!.Contains(value, StringComparison.Ordinal))));
+    }
+
+    [TestMethod]
+    public void IdentityAndSecurityContractsAreOwnedOutsideManagementAbstractions()
+    {
+        var managementAssembly = typeof(IControlPlaneStore).Assembly;
+        var forbiddenNames = new HashSet<string>(StringComparer.Ordinal)
+        {
+            nameof(Tenant),
+            nameof(Workspace),
+            nameof(Principal),
+            nameof(IIdentityStore),
+            nameof(PersonalAccessToken),
+            nameof(IPersonalAccessTokenStore),
+            nameof(SecurityAuditEvent),
+            nameof(ISecurityAuditStore),
+            nameof(ISecurityAuditWriter)
+        };
+
+        Assert.IsFalse(managementAssembly.GetTypes().Any(type => forbiddenNames.Contains(type.Name)));
+        Assert.AreEqual("Agentstration.Identity.Contracts", typeof(Principal).Namespace);
+        Assert.AreEqual("Agentstration.Security.Contracts", typeof(SecurityAuditEvent).Namespace);
+    }
+
+    [TestMethod]
+    public void IdentityAndSecurityContractModulesRemainPortable()
+    {
+        var forbidden = new[]
+        {
+            "Agentstration.Management.Abstractions",
+            "Agentstration.Infrastructure",
+            "Agentstration.Web",
+            ".Storage.",
+            "EntityFramework",
+            "Microsoft.AspNetCore.Identity",
+            "Microsoft.Agents.AI"
+        };
+        var references = new[]
+            {
+                typeof(Principal).Assembly,
+                typeof(SecurityAuditEvent).Assembly
+            }
             .SelectMany(assembly => assembly.GetReferencedAssemblies())
             .Select(reference => reference.Name)
             .ToArray();

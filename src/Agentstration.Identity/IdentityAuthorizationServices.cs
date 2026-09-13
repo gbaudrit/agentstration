@@ -1,3 +1,4 @@
+using Agentstration.Identity.Contracts;
 using Agentstration.Management.Abstractions;
 
 namespace Agentstration.Identity;

@@ -1,3 +1,4 @@
+using Agentstration.Identity.Contracts;
 using Agentstration.Management.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 
@@ -58,7 +59,7 @@ public sealed class PlatformAdministratorHandler(
 
 public sealed class WorkspacePermissionHandler(
     ICurrentRequestContext requestContext,
-    Agentstration.Management.Abstractions.IAuthorizationService permissions,
+    Agentstration.Identity.Contracts.IAuthorizationService permissions,
     IHttpContextAccessor httpContextAccessor)
     : AuthorizationHandler<WorkspacePermissionRequirement>
 {
@@ -76,7 +77,7 @@ public sealed class WorkspacePermissionHandler(
 
 public sealed class WorkspaceResourcePermissionHandler(
     ICurrentRequestContext requestContext,
-    Agentstration.Management.Abstractions.IAuthorizationService permissions,
+    Agentstration.Identity.Contracts.IAuthorizationService permissions,
     IHttpContextAccessor httpContextAccessor)
     : AuthorizationHandler<WorkspacePermissionRequirement, Workspace>
 {

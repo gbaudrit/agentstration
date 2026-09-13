@@ -24,6 +24,8 @@
     <ProjectReference Include="../Agentstration.Tools.Mcp/Agentstration.Tools.Mcp.csproj" />
     <ProjectReference Include="../Agentstration.Work.Storage.Sqlite/Agentstration.Work.Storage.Sqlite.csproj" />
     <ProjectReference Include="../Agentstration.Work.Storage.PostgreSql/Agentstration.Work.Storage.PostgreSql.csproj" />
+    <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Agentstration.Management.Api.Tests" />

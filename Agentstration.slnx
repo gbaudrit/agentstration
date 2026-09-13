@@ -52,6 +52,7 @@
     <Project Path="src/Agentstration.Secrets.Local/Agentstration.Secrets.Local.csproj" />
     <Project Path="src/Agentstration.Security.AspNetCoreIdentity/Agentstration.Security.AspNetCoreIdentity.csproj" />
     <Project Path="src/Agentstration.Security.AspNetCoreIdentity.PostgreSql/Agentstration.Security.AspNetCoreIdentity.PostgreSql.csproj" />
+    <Project Path="src/Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
     <Project Path="src/Agentstration.Resources/Agentstration.Resources.csproj" />
     <Project Path="src/Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
     <Project Path="src/Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />

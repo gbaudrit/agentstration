@@ -19,5 +19,7 @@
     <ProjectReference Include="../../src/Agentstration.Secrets.Abstractions/Agentstration.Secrets.Abstractions.csproj" />
     <ProjectReference Include="../../src/Agentstration.Secrets.Local/Agentstration.Secrets.Local.csproj" />
     <ProjectReference Include="../../src/Agentstration.Security.AspNetCoreIdentity/Agentstration.Security.AspNetCoreIdentity.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
   </ItemGroup>
 </Project>

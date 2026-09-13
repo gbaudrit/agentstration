@@ -11,6 +11,7 @@
     <ProjectReference Include="../../src/Agentstration.Secrets.Local/Agentstration.Secrets.Local.csproj" />
     <ProjectReference Include="../../src/Agentstration.Tools.SourceRegistry/Agentstration.Tools.SourceRegistry.csproj" />
     <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />

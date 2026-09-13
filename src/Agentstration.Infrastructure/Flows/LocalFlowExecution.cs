@@ -1,3 +1,4 @@
+using Agentstration.Identity.Contracts;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -36,7 +37,7 @@ public sealed class LocalFlowRunQueue : IFlowRunQueue
 
 public sealed class WorkspaceFlowRunExecutionScope(
     IIdentityStore identities,
-    Agentstration.Management.Abstractions.IAuthorizationService authorization,
+    Agentstration.Identity.Contracts.IAuthorizationService authorization,
     IRequestContextScopeFactory scopeFactory) : IFlowRunExecutionScope
 {
     public async ValueTask ValidateAsync(FlowRunScope scope, CancellationToken cancellationToken)

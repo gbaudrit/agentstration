@@ -25,13 +25,15 @@ src/
   Agentstration.Flows.Storage.Abstractions/
   Agentstration.Flows.Storage.Sqlite/
   Agentstration.Infrastructure/   JSON/EF storage, AI, HTTP, event bus, queues
-  Agentstration.Management.Abstractions/ canonical resources, ports, events, resolved specs
+  Agentstration.Management.Abstractions/ temporary compatibility resources and ports
   Agentstration.Api.Contracts/    family-neutral HTTP collection contracts
   Agentstration.*.Contracts/      public contracts owned by each resource family
   Agentstration.ResourceManagement.Contracts/ generic resource and bootstrap contracts
   Agentstration.Extensions/       Extension registration and inventory use cases
   Agentstration.Extensions.Aep/   AEP enrollment use cases
+  Agentstration.Identity.Contracts/ identity, authorization and PAT contracts
   Agentstration.Identity/         Identity, authorization, scope and audit use cases
+  Agentstration.Security.Contracts/ provider-neutral security audit contracts
   Agentstration.Models.Application/ Model administration use cases
   Agentstration.Packs/            Pack authoring, installation and composition
   Agentstration.Sources/          Source and source-registry use cases
@@ -82,7 +84,7 @@ Web ---> Api ---> application/module services and public contracts
 Web -> family-owned contracts + plural resource-family modules
 Resource-family modules -> Resources + ResourceManagement + narrow family ports
 Family contracts -> their public family models + neutral resource primitives
-Management.Storage.Sqlite -> Management.Abstractions + EF Core SQLite
+ResourceManagement.Storage.* -> family-owned contracts + Management.Abstractions compatibility types + EF Core
 Infrastructure -> SQLite control-plane storage + local/MAF runtime adapters
 Web -> ModelProviders -> Aep.MicrosoftExtensionsAI -> Aep.Client
 Extensions.Ollama -> Aep.AspNetCore + OllamaSharp
@@ -104,7 +106,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 
 `Agentstration.Web/Program.cs` is deliberately limited to creating the builder, applying the standalone composition, initializing it, and running it. `StandaloneHostComposition` remains in the executable project and is the single place that selects storage and identity providers, registers concrete adapters and workers, configures observability, orders startup initialization, and assembles `Agentstration.Api` with the Console libraries. This is code separation only: direct launch, Aspire, and the Docker image still start one authoritative ASP.NET Core process with one set of stores, queues, schedulers, and workers.
 
-Shared compatibility resources and provider-neutral ports remain in `Management.Abstractions`; validation and use cases live in plural resource-family modules. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
+Compatibility resources awaiting extraction remain in `Management.Abstractions`; identity, authorization and PAT contracts are owned by `Identity.Contracts`, and provider-neutral audit contracts by `Security.Contracts`. Validation and use cases live in plural resource-family modules. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
 
 `Agentstration.Resources` contains the neutral namespace, scope-reference, and address value types shared across boundaries. Management resources retain globally unique UIDs and use `(scope, namespace, kind, name)` as their exact logical identity. Canonical scope references are `/instance`, `/tenants/{tenantId}`, and `/workspaces/{workspaceId}`. Existing workspace callers implicitly use their current workspace and the `default` namespace. Relative references inherit their owner's namespace; explicit cross-namespace references retain the supplied namespace. See ADR-0035 and ADR-0079.
 

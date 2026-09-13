@@ -1,3 +1,4 @@
+using Agentstration.Identity.Contracts;
 using System.Globalization;
 using System.Xml;
 using Agentstration.Application.Work;

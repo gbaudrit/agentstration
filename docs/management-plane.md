@@ -6,13 +6,16 @@ Its module boundary is explicit:
 
 ```text
 Agentstration.Management.Abstractions
-  canonical resource envelope, logical keys, structured references, storage ports, lifecycle events, runtime-facing resolved specs
+  temporary compatibility resources and ports awaiting explicit family extraction
 
 Plural resource-family modules
   Agents, Extensions, Identity, Models, Packs, Sources, Runtime, Tools and Triggers own their validation and lifecycle use cases
 
 Agentstration.*.Contracts
   versioned HTTP request and response contracts owned by Agents, Extensions, Identity, Models, Runtime, Secrets, Sources, Tools and Triggers
+
+Agentstration.Identity.Contracts and Agentstration.Security.Contracts
+  identity, authorization, personal-access-token and provider-neutral security-audit contracts
 
 Agentstration.ResourceManagement.Contracts and Agentstration.Api.Contracts
   generic resource/bootstrap contracts and family-neutral HTTP collection envelopes

@@ -1,4 +1,4 @@
-namespace Agentstration.Management.Abstractions;
+namespace Agentstration.Security.Contracts;
 
 public enum SecurityAuditOutcome
 {

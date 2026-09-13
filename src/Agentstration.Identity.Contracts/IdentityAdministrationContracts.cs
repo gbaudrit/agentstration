@@ -1,5 +1,3 @@
-using Agentstration.Management.Abstractions;
-
 namespace Agentstration.Identity.Contracts;
 
 public sealed record IdentityConsoleWorkspaceResponse(

@@ -11,6 +11,7 @@
   <ProjectReference Include="../../src/Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
   <PackageReference Include="bunit" />
   <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <ProjectReference Include="../../src/Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="../../src/Agentstration.Web.Components/wwwroot/design-tokens.css" Link="TestAssets/design-tokens.css" CopyToOutputDirectory="PreserveNewest" />

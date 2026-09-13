@@ -7,6 +7,8 @@
     <ProjectReference Include="../Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
     <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />
     <ProjectReference Include="../Agentstration.Secrets/Agentstration.Secrets.csproj" />
+    <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="YamlDotNet" />

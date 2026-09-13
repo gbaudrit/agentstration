@@ -1,5 +1,6 @@
 extern alias workapi;
 
+using Agentstration.Identity.Contracts;
 using Agentstration.Agents;
 using System.Net;
 using System.Net.Http.Json;

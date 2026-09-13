@@ -1,4 +1,4 @@
-namespace Agentstration.Management.Abstractions;
+namespace Agentstration.Identity.Contracts;
 
 public enum TenantStatus { Active, Disabled }
 public enum WorkspaceStatus { Active, Disabled }

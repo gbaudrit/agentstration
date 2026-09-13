@@ -1,3 +1,4 @@
+using Agentstration.Identity.Contracts;
 using System.Security.Claims;
 using Agentstration.Management.Abstractions;
 using Agentstration.Web.Hosting;

@@ -53,6 +53,7 @@
     <ProjectReference Include="../../src/Agentstration.Workplace.Client/Agentstration.Workplace.Client.csproj" />
     <ProjectReference Include="../../src/Agentstration.Workplace.Components/Agentstration.Workplace.Components.csproj" />
     <ProjectReference Include="../../src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup Condition="'$(UseLocalAepProjects)' != 'true'">
     <PackageReference Include="Agentstration.Aep.Abstractions" />

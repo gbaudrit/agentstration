@@ -1,4 +1,4 @@
-namespace Agentstration.Management.Abstractions;
+namespace Agentstration.Identity.Contracts;
 
 public sealed record PersonalAccessToken(
     Guid Id,
