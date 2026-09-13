@@ -5,6 +5,7 @@ using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using PacksPage = Agentstration.Web.Components.Pages.Packs;
 
 namespace Agentstration.Web.Tests;
 
@@ -37,7 +38,7 @@ public sealed class PacksComponentTests
         using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
 
-        var rendered = context.Render<Packs>();
+        var rendered = context.Render<PacksPage>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
 
         CollectionAssert.AreEqual(new[] { "1", "2", "0", "0" }, rendered.FindAll(".metric-card strong").Select(element => element.TextContent).ToArray());
@@ -56,7 +57,7 @@ public sealed class PacksComponentTests
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
             .NavigateTo("/packs?publisher=agentstration&name=starter");
 
-        var rendered = context.Render<Packs>();
+        var rendered = context.Render<PacksPage>();
 
         rendered.WaitForAssertion(() =>
         {
@@ -70,7 +71,7 @@ public sealed class PacksComponentTests
     {
         using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
-        var rendered = context.Render<Packs>();
+        var rendered = context.Render<PacksPage>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
 
         await rendered.FindAll("button").First(button => button.TextContent.Contains("Install local Pack", StringComparison.Ordinal)).ClickAsync(new());
@@ -97,7 +98,7 @@ public sealed class PacksComponentTests
                 true)
         };
         context.Services.AddSingleton<IPacksClient>(client);
-        var rendered = context.Render<Packs>();
+        var rendered = context.Render<PacksPage>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
 
         await rendered.FindAll("button").First(button => button.TextContent.Contains("Install local Pack", StringComparison.Ordinal)).ClickAsync(new());
@@ -121,7 +122,7 @@ public sealed class PacksComponentTests
     {
         using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
-        var rendered = context.Render<Packs>();
+        var rendered = context.Render<PacksPage>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
 
         await rendered.FindAll("button").Single(button => button.TextContent.Contains("Inspect", StringComparison.Ordinal)).ClickAsync(new());

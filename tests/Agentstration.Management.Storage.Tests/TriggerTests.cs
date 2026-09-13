@@ -8,7 +8,7 @@ using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Triggers;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Identity;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Microsoft.Data.Sqlite;

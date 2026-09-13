@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Identity/Agentstration.Identity.csproj" />
+    <ProjectReference Include="../Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
+    <ProjectReference Include="../Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
+    <ProjectReference Include="../Agentstration.Models/Agentstration.Models.csproj" />
+    <ProjectReference Include="../Agentstration.Models.Application/Agentstration.Models.Application.csproj" />
+    <ProjectReference Include="../Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
+    <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />
+    <ProjectReference Include="../Agentstration.Secrets/Agentstration.Secrets.csproj" />
+  </ItemGroup>
+</Project>

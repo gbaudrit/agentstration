@@ -1,6 +1,6 @@
 using Agentstration.Agents;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Extensions;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;

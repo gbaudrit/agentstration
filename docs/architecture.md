@@ -26,8 +26,13 @@ src/
   Agentstration.Flows.Storage.Sqlite/
   Agentstration.Infrastructure/   JSON/EF storage, AI, HTTP, event bus, queues
   Agentstration.Management.Abstractions/ canonical resources, ports, events, resolved specs
-  Agentstration.Management.Core/  Management validation, use cases, revisions, deployments
   Agentstration.Management.Contracts/
+  Agentstration.Extensions/       Extension registration and inventory use cases
+  Agentstration.Extensions.Aep/   AEP enrollment use cases
+  Agentstration.Identity/         Identity, authorization, scope and audit use cases
+  Agentstration.Models.Application/ Model administration use cases
+  Agentstration.Packs/            Pack authoring, installation and composition
+  Agentstration.Sources/          Source and source-registry use cases
   Agentstration.ResourceManagement.Storage.Sqlite/
   ../aep/                            autonomous future AEP repository subtree
   Agentstration.Extensions.Ollama/   autonomous AEP-to-Ollama service
@@ -41,6 +46,7 @@ src/
   Agentstration.Runtime.Contracts/  Public Runtime Run HTTP contracts
   Agentstration.Runtime.AgentFramework/
   Agentstration.Runtime.Local/
+  Agentstration.Runtime.Profiles/  Runtime-profile administration
   Agentstration.Runtime.Storage.Sqlite/
   Agentstration.Work/              WorkItem aggregate, execution event contracts, runtime port
   Agentstration.Work.Contracts/    versionable HTTP request/response contracts
@@ -49,7 +55,7 @@ src/
 tests/
   Agentstration.Application.Tests/
   Agentstration.ArchitectureTests/
-  Agentstration.Management.Core.Tests/
+  Agentstration.Tools.Tests/
   Agentstration.Management.Storage.Tests/
   Agentstration.Management.Sources.Tests/
   Agentstration.Management.Api.Tests/
@@ -71,8 +77,8 @@ Web ---> Management / Flow / Runtime public boundaries
 Console.Components ---> Console.Client + shared UI + neutral contracts
 Web ---> Api ---> application/module services and public contracts
 
-Web -> Management contracts + core
-Management.Core -> Management.Abstractions + Runtime.Abstractions
+Web -> Management contracts + plural resource-family modules
+Resource-family modules -> Resources + ResourceManagement + narrow family ports
 Management.Contracts -> Management.Abstractions
 Management.Storage.Sqlite -> Management.Abstractions + EF Core SQLite
 Infrastructure -> SQLite control-plane storage + local/MAF runtime adapters
@@ -96,7 +102,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 
 `Agentstration.Web/Program.cs` is deliberately limited to creating the builder, applying the standalone composition, initializing it, and running it. `StandaloneHostComposition` remains in the executable project and is the single place that selects storage and identity providers, registers concrete adapters and workers, configures observability, orders startup initialization, and assembles `Agentstration.Api` with the Console libraries. This is code separation only: direct launch, Aspire, and the Docker image still start one authoritative ASP.NET Core process with one set of stores, queues, schedulers, and workers.
 
-Canonical Management resources and provider-neutral ports live in `Management.Abstractions`; validation and use cases live in `Management.Core`. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
+Shared compatibility resources and provider-neutral ports remain in `Management.Abstractions`; validation and use cases live in plural resource-family modules. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
 
 `Agentstration.Resources` contains the neutral namespace, scope-reference, and address value types shared across boundaries. Management resources retain globally unique UIDs and use `(scope, namespace, kind, name)` as their exact logical identity. Canonical scope references are `/instance`, `/tenants/{tenantId}`, and `/workspaces/{workspaceId}`. Existing workspace callers implicitly use their current workspace and the `default` namespace. Relative references inherit their owner's namespace; explicit cross-namespace references retain the supplied namespace. See ADR-0035 and ADR-0079.
 

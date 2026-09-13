@@ -6,11 +6,17 @@ using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Agents;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Extensions;
+using Agentstration.Extensions.Aep;
+using Agentstration.Identity;
+using Agentstration.Models;
+using Agentstration.Runtime.Profiles;
+using Agentstration.Runtime.Core;
+using Agentstration.Sources;
 using Agentstration.ModelProviders;
+using Agentstration.ResourceManagement;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
-using Agentstration.Runtime.Core;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Security.AspNetCoreIdentity.PostgreSql;
 using Agentstration.Web.Components;
@@ -128,10 +134,26 @@ internal static class StandaloneHostCompositionExtensions
             sourceVerificationIndexOptions: sourceVerificationIndexOptions,
             sourceRegistryTransportOptions: sourceRegistryTransportOptions);
         builder.Services.AddAgentstrationModelProviders(builder.Configuration, useManagedProfileResolver);
+        builder.Services.AddSingleton<ModelProviderManagementService>();
+        builder.Services.AddSingleton<SourceProviderManagementService>();
+        builder.Services.AddSingleton<IModelProviderConfigurationStore>(provider => provider.GetRequiredService<ModelProviderManagementService>());
+        builder.Services.AddSingleton<ModelProfileManagementService>();
+        builder.Services.AddSingleton<ModelProfileOptionMigrationService>();
+        builder.Services.AddSingleton<IModelProfileStore>(provider => provider.GetRequiredService<ModelProfileManagementService>());
+        builder.Services.AddSingleton<IModelDeploymentStore>(provider => provider.GetRequiredService<ModelProfileManagementService>());
+        builder.Services.AddSingleton<IModelProfileReferenceValidator>(provider => provider.GetRequiredService<ModelProfileManagementService>());
+        builder.Services.AddSingleton<ExtensionRegistrationManagementService>();
+        builder.Services.AddSingleton<AepEnrollmentSettingsService>();
+        builder.Services.AddSingleton<AepEnrollmentService>();
+        builder.Services.AddSingleton<IResourceReferenceResolver, ResourceReferenceResolver>();
+        builder.Services.AddSingleton<ResourceScopeOperationService>();
+        builder.Services.AddSingleton<IResourceScopeOperations>(provider => provider.GetRequiredService<ResourceScopeOperationService>());
+        builder.Services.AddSingleton<ResourceScopeInventoryService>();
+        builder.Services.AddSingleton<ExtensionManagementService>();
+        builder.Services.AddSingleton<ExtensionInventoryService>();
         builder.Services.AddSingleton(builder.Configuration
             .GetSection(AepEnrollmentPolicyOptions.SectionName)
             .Get<AepEnrollmentPolicyOptions>() ?? new());
-        builder.Services.AddAgentstrationModelManagement();
         builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
         builder.Services.AddSingleton<IAepEnrollmentAnnouncementProvisioner>(provider => provider.GetRequiredService<ExtensionSourceDiscoveryService>());
         builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();

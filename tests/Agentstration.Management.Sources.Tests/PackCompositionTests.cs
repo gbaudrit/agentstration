@@ -3,7 +3,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Packs;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Microsoft.Data.Sqlite;

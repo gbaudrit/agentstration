@@ -5,7 +5,6 @@ using System.Net;
 using System.Net.Http.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
-using Agentstration.Management.Core;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Tests;

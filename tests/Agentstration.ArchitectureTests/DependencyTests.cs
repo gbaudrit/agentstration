@@ -5,6 +5,7 @@ using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Application.Work;
+using Agentstration.Extensions;
 using Agentstration.Extensions.Git;
 using Agentstration.Extensions.LlamaCpp;
 using Agentstration.Extensions.LocalAI;
@@ -14,16 +15,20 @@ using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
-using Agentstration.Management.Core;
+using Agentstration.Extensions.Aep;
+using Agentstration.Identity;
+using Agentstration.Models;
+using Agentstration.Packs;
+using Agentstration.Runtime.Profiles;
+using Agentstration.Runtime.Core;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.ModelProviders;
-using Agentstration.Models;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
-using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Storage.Sqlite;
 using Agentstration.Secrets;
+using Agentstration.Sources;
 using Agentstration.Tools;
 using Agentstration.Triggers;
 using Agentstration.Tools.SourceRegistry;
@@ -502,16 +507,48 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void ManagementCoreDoesNotReferenceWebInfrastructureConcreteStorageOrAgentFramework()
+    public void ResourceFamilyApplicationModulesDoNotReferenceHostsConcreteStorageOrAgentFramework()
     {
-        var references = typeof(AgentManagementService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        var assemblies = new[]
+        {
+            typeof(AgentManagementService).Assembly,
+            typeof(ExtensionManagementService).Assembly,
+            typeof(AepEnrollmentService).Assembly,
+            typeof(ExternalIdentityAdministrationService).Assembly,
+            typeof(ModelProviderManagementService).Assembly,
+            typeof(PackManagementService).Assembly,
+            typeof(SourceManagementService).Assembly,
+            typeof(RuntimeProfileManagementService).Assembly,
+            typeof(ToolManagementService).Assembly,
+            typeof(TriggerManagementService).Assembly,
+            typeof(SecretManagementService).Assembly
+        };
+
+        var references = assemblies.SelectMany(assembly => assembly.GetReferencedAssemblies()).Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Web", StringComparison.Ordinal)
             || name.Contains("Agentstration.Infrastructure", StringComparison.Ordinal)
-            || name.Contains("Storage.Sqlite", StringComparison.Ordinal)
+            || name.Contains(".Storage.", StringComparison.Ordinal)
             || name.Contains("EntityFramework", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
             || name.Contains("Runtime.Local", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void ManagementCoreCatchAllProjectIsRemoved()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+
+        Assert.IsFalse(Directory.Exists(Path.Combine(repositoryRoot, "src", "Agentstration.Management.Core")));
+
+        var projectFiles = Directory.EnumerateFiles(repositoryRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase));
+        var staleReferences = projectFiles
+            .Where(path => File.ReadAllText(path).Contains("Agentstration.Management.Core", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(repositoryRoot, path))
+            .ToArray();
+
+        Assert.IsEmpty(staleReferences, $"The removed catch-all project is still referenced by: {string.Join(", ", staleReferences)}");
     }
 
     [TestMethod]

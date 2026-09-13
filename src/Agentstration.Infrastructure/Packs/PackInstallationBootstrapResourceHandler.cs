@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Packs;
 
 namespace Agentstration.Infrastructure.Packs;
 

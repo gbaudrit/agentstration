@@ -33,12 +33,18 @@ src/
   Agentstration.Flow.Storage.Sqlite/
   Agentstration.Infrastructure/  Composition adapters for current modules
   Agentstration.Management.Abstractions/ Canonical Management resources, ports, events
-  Agentstration.Management.Core/ Management validation and use cases
   Agentstration.Management.Contracts/
+  Agentstration.Extensions/      Extension registration and inventory use cases
+  Agentstration.Extensions.Aep/  AEP enrollment use cases
+  Agentstration.Identity/        Identity, authorization, scope and audit use cases
+  Agentstration.Models.Application/ Model administration use cases
+  Agentstration.Packs/           Pack authoring, installation and composition
+  Agentstration.Sources/         Source and source-registry use cases
   Agentstration.Management.Storage.Sqlite/
   Agentstration.Runtime.Abstractions/
   Agentstration.Runtime.AgentFramework/
   Agentstration.Runtime.Local/
+  Agentstration.Runtime.Profiles/  Runtime-profile administration
   Agentstration.Work/             WorkItem aggregate and Runtime-facing port
   Agentstration.Work.Contracts/   Public Work Plane transport contracts
   Agentstration.Work.Storage.Abstractions/
@@ -48,7 +54,7 @@ src/
 tests/
   Agentstration.Application.Tests/
   Agentstration.ArchitectureTests/
-  Agentstration.Management.Core.Tests/
+  Agentstration.Tools.Tests/
   Agentstration.Management.Storage.Tests/
   Agentstration.Management.Sources.Tests/
   Agentstration.Management.Api.Tests/
@@ -74,7 +80,7 @@ Web -> Management / Flow / Runtime public boundaries
 - `Infrastructure` composes the current Management, Runtime, Flow, Work, identity, Pack, Trigger, Tool and provider adapters.
 - `Web` is the composition and transport layer. REST endpoints, Razor components, hosted workers, and MCP tools must delegate to the same application services.
 - Agentstration is the source of truth for agent definitions, immutable revisions, deployments, and desired state. Never persist a concrete `AIAgent`.
-- `Agentstration.Management.Abstractions` owns canonical Management resources and provider-neutral ports; `Agentstration.Management.Core` owns Management validation and use cases. Do not place Management types back in the general Domain or Application projects.
+- `Agentstration.Management.Abstractions` retains shared compatibility resources and provider-neutral ports; validation and use cases belong to their plural resource-family modules. Do not create another catch-all Management business module.
 - Concrete Microsoft Agent Framework types belong only in `Agentstration.Runtime.AgentFramework`.
 - EF Core and SQLite control-plane implementation details belong only in `Agentstration.Management.Storage.Sqlite`.
 - Work Plane EF Core and SQLite details belong only in `Agentstration.Work.Storage.Sqlite`; Work data must not use management or runtime storage.

@@ -81,7 +81,7 @@ Packs are a Management/distribution concept above these planes: they install ord
 
 Agent declaration belongs to the Management Plane. It owns the desired state, generation, provisioning status, resource version, canonical resource identifiers, reference validation, and lifecycle events. The Runtime Plane owns dependency resolution, materialization, lifecycle, and execution. Microsoft Agent Framework is an execution implementation detail confined to the runtime adapter and does not appear in Management resources or events.
 
-The module is physically isolated: `Agentstration.Management.Abstractions` contains its canonical resources, ports, and published events, while `Agentstration.Management.Core` contains validation and use cases. No Management model or service remains in the general Domain or Application projects.
+The module is physically isolated: shared compatibility resources and ports remain in `Agentstration.Management.Abstractions`, while agent validation and lifecycle use cases live in `Agentstration.Agents`. Other managed kinds follow the same plural resource-family ownership model. No resource-family service remains in the general Domain or Application projects.
 
 Agents use the Agentstration-native resource envelope in both JSON and YAML:
 
@@ -257,7 +257,7 @@ $body = @{ prompt = "Reply with one short sentence." } | ConvertTo-Json
 Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://localhost:5100/api/diagnostics/models/ollama/chat
 ```
 
-`Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. Autonomous Ollama, llama.cpp, and LocalAI extensions own their native transports, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no dependency on a concrete provider.
+`Agentstration.Models.Application` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. Autonomous Ollama, llama.cpp, and LocalAI extensions own their native transports, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no dependency on a concrete provider.
 
 Current limitations are deliberate: credentials are not stored on provider resources, llama.cpp reasoning output is not represented as a distinct AEP content kind, and image input is not yet effective through the AEP-to-`IChatClient` adapter. Separate Flow Runs are not dispatched in parallel and there is no conversation persistence. Other legacy OpenAI-compatible endpoints still use host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
 

@@ -4,7 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Identity;
 using Agentstration.Security.AspNetCoreIdentity;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;

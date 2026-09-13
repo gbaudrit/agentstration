@@ -47,6 +47,8 @@ Family relationships use small provider-neutral ports: Triggers submits a logica
 
 API transport ownership is addressed separately by FR-363. `Agentstration.Api` and `Agentstration.Web` remain transport/composition layers during this resource-family extraction and do not acquire business ownership.
 
+The former `Agentstration.Management.Core` catch-all is removed. Its remaining services are owned by `Agentstration.Extensions`, `Agentstration.Extensions.Aep`, `Agentstration.Identity`, `Agentstration.Models.Application`, `Agentstration.Packs`, `Agentstration.Sources`, and `Agentstration.Runtime.Profiles`; tool services remain in `Agentstration.Tools`.
+
 ## Consequences
 
 The solution remains one modular-monolith process and keeps its deterministic offline defaults. Dependencies point from composition and transport toward family modules, while `Resources` has no dependency on resource management, storage, hosts, or provider frameworks. Family modules do not depend on Web or concrete storage.

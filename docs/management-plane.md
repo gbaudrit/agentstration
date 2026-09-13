@@ -8,8 +8,8 @@ Its module boundary is explicit:
 Agentstration.Management.Abstractions
   canonical resource envelope, logical keys, structured references, storage ports, lifecycle events, runtime-facing resolved specs
 
-Agentstration.Management.Core
-  validation, idempotent resource use cases, generation tracking, revision compilation, deployment orchestration
+Plural resource-family modules
+  Agents, Extensions, Identity, Models, Packs, Sources, Runtime, Tools and Triggers own their validation and lifecycle use cases
 
 Agentstration.Management.Contracts
   versioned HTTP request and response contracts
@@ -18,7 +18,7 @@ Agentstration.ResourceManagement.Storage.Sqlite
   EF Core and SQLite implementation of the control-plane store
 ```
 
-`Agentstration.Application` does not own Management code. Both central Management projects remain independent of Microsoft Agent Framework; concrete agent materialization stays in the Runtime plane.
+`Agentstration.Application` does not own resource-family code. The shared Management contracts and resource-family modules remain independent of Microsoft Agent Framework; concrete agent materialization stays in the Runtime plane.
 
 The standalone host exposes these Minimal API routes:
 

@@ -4,7 +4,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Agentstration.Infrastructure;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Identity;
 using Agentstration.Resources;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
