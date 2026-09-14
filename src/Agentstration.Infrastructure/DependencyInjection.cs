@@ -307,6 +307,8 @@ public static class DependencyInjection
         services.AddSingleton<ILocalWorkExecutionQueue>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
         services.AddSingleton<WorkItemService>();
         services.AddSingleton<WorkplaceService>();
+        services.AddSingleton<IEntryDiscoveryAuthorization, EntryDiscoveryAuthorization>();
+        services.AddSingleton<EntryDiscoveryService>();
         services.AddSingleton<IWorkOperationsQueryService, WorkOperationsQueryService>();
         services.AddSingleton<WorkNotificationMcpToolDefinitionProvider>();
         services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<WorkNotificationMcpToolDefinitionProvider>());

@@ -13,10 +13,17 @@ public sealed partial class WorkplaceService
 {
     public async Task<EntrySubmission> SubmitAsync(SubmitEntryCommand command, CancellationToken cancellationToken)
     {
-        var dashboards = await repository.ListDashboardsAsync(command.WorkspaceId, cancellationToken);
-        if (!dashboards.Any(dashboard => dashboard.Entries.Any(reference => reference.EntryResourceId == command.EntryId)))
-            throw new WorkValidationException("entry_not_in_workspace", "The Entry is not exposed by a published Dashboard in the selected Workspace.");
-        var entry = await GetEntryAsync(command.WorkspaceId, command.EntryId, cancellationToken); WorkplaceValidation.ValidateSubmission(entry, command.Values);
+        var entry = await GetEntryAsync(command.WorkspaceId, command.EntryId, cancellationToken);
+        if (!EntryExposurePolicy.Allows(entry.Exposure, command.Surface, command.WorkplacePlacement))
+            throw new WorkValidationException("entry_not_exposed", "The Entry is not exposed on the requested surface and placement.");
+        if (command.Surface == EntryExposureSurface.Workplace
+            && command.WorkplacePlacement == EntryWorkplacePlacement.OwningSpace)
+        {
+            var dashboards = await repository.ListDashboardsAsync(command.WorkspaceId, cancellationToken);
+            if (!dashboards.Any(dashboard => dashboard.Entries.Any(reference => reference.EntryResourceId == command.EntryId)))
+                throw new WorkValidationException("entry_not_in_workspace", "The Entry is not exposed by a published Dashboard in the selected Workspace.");
+        }
+        WorkplaceValidation.ValidateSubmission(entry, command.Values);
         var now = timeProvider.GetUtcNow(); var interaction = new WorkplaceInteraction { Id = InteractionId.New(), WorkspaceId = command.WorkspaceId, EntryId = command.EntryId, EntrySnapshot = entry, StartedAt = now, LastActivityAt = now, InputValues = command.Values.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal), Attachments = command.Attachments ?? [] };
         await repository.CreateInteractionAsync(interaction, cancellationToken);
         var initialMessage = new ConversationMessage(Guid.NewGuid(), command.WorkspaceId, interaction.Id, null, ConversationRole.User, Instruction(entry, command.Values), now, Attachments: command.Attachments);

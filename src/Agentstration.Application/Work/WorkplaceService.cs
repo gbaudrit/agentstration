@@ -8,7 +8,13 @@ using Agentstration.Work.Storage.Abstractions;
 
 namespace Agentstration.Application.Work;
 
-public sealed record SubmitEntryCommand(WorkspaceId WorkspaceId, EntryId EntryId, IReadOnlyDictionary<string, JsonElement> Values, IReadOnlyList<WorkAttachment>? Attachments = null);
+public sealed record SubmitEntryCommand(
+    WorkspaceId WorkspaceId,
+    EntryId EntryId,
+    IReadOnlyDictionary<string, JsonElement> Values,
+    IReadOnlyList<WorkAttachment>? Attachments = null,
+    EntryExposureSurface Surface = EntryExposureSurface.Workplace,
+    EntryWorkplacePlacement? WorkplacePlacement = EntryWorkplacePlacement.OwningSpace);
 public sealed record EntrySubmission(WorkplaceInteraction Interaction, WorkplaceAction Action, WorkTask? Task);
 public sealed record PendingActionResolution(PendingAction PendingAction, WorkplaceAction NextAction, WorkplaceInteraction? Interaction, WorkTask? Task);
 public sealed record ConversationContextMessage(Guid Id, ConversationRole Role, string Content, DateTimeOffset CreatedAt);

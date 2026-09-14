@@ -84,6 +84,10 @@ public sealed class EntryAdministrationComponentTests
         Assert.AreEqual("true", rendered.Find("[data-testid='entry-tab-overview']").GetAttribute("aria-selected"));
         await rendered.Find("[data-testid='entry-tab-definition']").ClickAsync(new());
         Assert.IsTrue(rendered.Markup.Contains("Direct Agent Flow", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Find("[data-testid='exposure-workplace']").HasAttribute("checked"));
+        Assert.IsTrue(rendered.Find("[data-testid='placement-owning-space']").HasAttribute("checked"));
+        await rendered.Find("[data-testid='exposure-console']").ChangeAsync(new ChangeEventArgs { Value = true });
+        await rendered.Find("[data-testid='placement-tenant-home']").ChangeAsync(new ChangeEventArgs { Value = true });
         await rendered.Find("[data-testid='icon-picker'] input[type='search']").InputAsync(new ChangeEventArgs { Value = "sparkles" });
         await rendered.Find("[data-testid='icon-picker'] [role='option'][title='sparkles']").ClickAsync(new());
         Assert.IsTrue(rendered.Markup.Contains("keeps handoff participants private", StringComparison.Ordinal));
@@ -109,6 +113,12 @@ public sealed class EntryAdministrationComponentTests
         Assert.AreEqual(EntryParticipantVisibility.Visible, client.SavedEntry.Presentation.Participants.Visibility);
         Assert.AreEqual(EntryProgressVisibility.Detailed, client.SavedEntry.Presentation.Progress.Visibility);
         Assert.AreEqual(EntryTaskDisplay.Visible, client.SavedEntry.Presentation.Task.Display);
+        CollectionAssert.AreEquivalent(
+            new[] { EntryExposureSurface.Workplace, EntryExposureSurface.Console },
+            client.SavedEntry.Exposure.Surfaces.ToArray());
+        CollectionAssert.AreEquivalent(
+            new[] { EntryWorkplacePlacement.OwningSpace, EntryWorkplacePlacement.TenantHome },
+            client.SavedEntry.Exposure.WorkplacePlacements.ToArray());
         Assert.AreEqual("sparkles", client.SavedEntry.Presentation.Icon);
         Assert.HasCount(2, client.SavedEntry.Presentation.Fields);
         Assert.AreEqual("field2", client.SavedEntry.Presentation.Fields.Single(value => value.Role == EntryFieldRole.PrimaryInput).Name);
@@ -136,6 +146,7 @@ public sealed class EntryAdministrationComponentTests
         Assert.IsTrue(yaml.Contains("kind: Entry", StringComparison.Ordinal));
         Assert.IsTrue(yaml.Contains("suggestions:", StringComparison.Ordinal));
         Assert.IsTrue(yaml.Contains("fields:", StringComparison.Ordinal));
+        Assert.IsTrue(yaml.Contains("exposure:", StringComparison.Ordinal));
         await editor.InputAsync(new ChangeEventArgs { Value = yaml.Replace("displayName: Prepare a report", "displayName: YAML entry", StringComparison.Ordinal) });
         await rendered.FindAll("button").Single(value => value.TextContent.Contains("Save YAML draft", StringComparison.Ordinal)).ClickAsync(new());
 
@@ -483,6 +494,8 @@ public sealed class EntryAdministrationComponentTests
             var packNamespace = new Agentstration.Resources.ResourceNamespace("agentstration.daily-life-assistant");
             return Task.FromResult<IReadOnlyList<EntryResponse>>([ToResponse(PublishedEntry("primary")), ToResponse(PublishedEntry("secondary")), ToResponse(PublishedEntry("main", packNamespace))]);
         }
+        public Task<IReadOnlyList<EntryResponse>> GetExposedEntriesAsync(EntryExposureSurface surface, EntryWorkplacePlacement? placement, CancellationToken cancellationToken) =>
+            GetPublishedEntriesAsync(cancellationToken);
 
         public Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken)
         {
@@ -536,6 +549,6 @@ public sealed class EntryAdministrationComponentTests
             },
             ResolvedTarget = new EntryResolvedTarget(FlowResourceId, "1.0.0")
         };
-        private static EntryResponse ToResponse(EntryResource value) => new(value.WorkspaceId.Value, value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt) { Namespace = value.Id.Namespace };
+        private static EntryResponse ToResponse(EntryResource value) => new(value.WorkspaceId.Value, value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Presentation, value.Exposure, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt) { Namespace = value.Id.Namespace };
     }
 }

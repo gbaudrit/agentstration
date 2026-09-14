@@ -142,3 +142,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 110. [ADR-0110 — API transport is composed from family-owned modules](0110-api-transport-is-composed-from-family-modules.md)
 111. [ADR-0111 — The operations Console has an independent process shell](0111-console-has-an-independent-process-shell.md)
 112. [ADR-0112 — The Console BFF authenticates with instance-bound signed requests](0112-console-bff-authenticates-with-instance-bound-signed-requests.md)
+113. [ADR-0113 — Entry exposure separates ownership from presentation](0113-entry-exposure-separates-ownership-from-presentation.md)

@@ -28,6 +28,7 @@ public static class WorkplaceValidation
         if (string.IsNullOrWhiteSpace(entry.DisplayName)) throw new WorkValidationException("entry_display_name_required", "An Entry display name is required.");
         if (string.IsNullOrWhiteSpace(entry.ResolvedTarget.FlowResourceId)) throw new WorkValidationException("entry_target_required", "A published Entry requires a resolved Flow target.");
         _ = FlowReferenceFrom(entry.ResolvedTarget);
+        ValidateExposure(entry.Exposure);
         ValidatePresentation(entry.Presentation);
     }
 
@@ -39,7 +40,29 @@ public static class WorkplaceValidation
             throw new WorkValidationException("entry_identity_mismatch", "Entry id and name must match.");
         if (string.IsNullOrWhiteSpace(entry.DisplayName)) throw new WorkValidationException("entry_display_name_required", "An Entry display name is required.");
         ValidateBinding(entry.Binding);
+        ValidateExposure(entry.Exposure);
         ValidatePresentation(entry.Presentation);
+    }
+
+    private static void ValidateExposure(EntryExposure exposure)
+    {
+        ArgumentNullException.ThrowIfNull(exposure);
+        if (exposure.Version != EntryExposure.CurrentVersion)
+            throw new WorkValidationException("entry_exposure_version_unsupported", $"Entry exposure version '{exposure.Version}' is not supported.");
+        if (exposure.Surfaces is null
+            || exposure.Surfaces.Count == 0
+            || exposure.Surfaces.Any(value => !Enum.IsDefined(value))
+            || exposure.Surfaces.Distinct().Count() != exposure.Surfaces.Count)
+            throw new WorkValidationException("entry_exposure_surfaces_invalid", "Entry exposure requires unique, supported surfaces.");
+        if (exposure.WorkplacePlacements is null
+            || exposure.WorkplacePlacements.Any(value => !Enum.IsDefined(value))
+            || exposure.WorkplacePlacements.Distinct().Count() != exposure.WorkplacePlacements.Count)
+            throw new WorkValidationException("entry_workplace_placements_invalid", "Entry Workplace exposure requires unique, supported placements.");
+        var exposesWorkplace = exposure.Surfaces.Contains(EntryExposureSurface.Workplace);
+        if (exposesWorkplace && exposure.WorkplacePlacements.Count == 0)
+            throw new WorkValidationException("entry_workplace_placement_required", "A Workplace-exposed Entry requires at least one Workplace placement.");
+        if (!exposesWorkplace && exposure.WorkplacePlacements.Count > 0)
+            throw new WorkValidationException("entry_workplace_placements_not_allowed", "An Entry that is not exposed to Workplace cannot declare Workplace placements.");
     }
 
     private static void ValidatePresentation(EntryPresentation presentation)

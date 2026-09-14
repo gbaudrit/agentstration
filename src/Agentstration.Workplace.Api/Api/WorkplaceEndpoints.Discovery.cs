@@ -49,9 +49,30 @@ public static partial class WorkplaceEndpoints
         catch (KeyNotFoundException) { return Results.Ok(ToResponse(await administration.EnsureHomeAsync(workspaceId, token))); }
     });
 
-    private static async Task<IResult> ListEntriesAsync(WorkplaceService service, CancellationToken token) => Results.Ok((await service.ListEntriesAsync(token)).Select(ToResponse));
+    private static Task<IResult> ListEntriesAsync(
+        EntryExposureSurface? surface,
+        EntryWorkplacePlacement? placement,
+        EntryDiscoveryService service,
+        CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var requestedSurface = surface ?? EntryExposureSurface.Workplace;
+        var requestedPlacement = placement ?? (requestedSurface == EntryExposureSurface.Workplace
+            ? EntryWorkplacePlacement.OwningSpace
+            : null);
+        return Results.Ok((await service.DiscoverAsync(requestedSurface, requestedPlacement, token)).Select(ToResponse));
+    });
 
-    private static Task<IResult> GetEntryAsync(string entryName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(ToResponse(await service.GetEntryAsync(EntryResourceId(entryName), token))));
+    private static Task<IResult> GetEntryAsync(string entryName, WorkplaceService service, CancellationToken token) =>
+        GetEntryCoreAsync(EntryResourceId(entryName), service, token);
 
-    private static Task<IResult> GetNamespacedEntryAsync(string @namespace, string entryName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(ToResponse(await service.GetEntryAsync(NamespacedEntryId(@namespace, entryName), token))));
+    private static Task<IResult> GetNamespacedEntryAsync(string @namespace, string entryName, WorkplaceService service, CancellationToken token) =>
+        GetEntryCoreAsync(NamespacedEntryId(@namespace, entryName), service, token);
+
+    private static Task<IResult> GetEntryCoreAsync(EntryId entryId, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var entry = await service.GetEntryAsync(entryId, token);
+        if (!EntryExposurePolicy.Allows(entry.Exposure, EntryExposureSurface.Workplace, EntryWorkplacePlacement.OwningSpace))
+            throw new KeyNotFoundException($"Entry '{entryId}' is not exposed in the current Workplace space.");
+        return Results.Ok(ToResponse(entry));
+    });
 }

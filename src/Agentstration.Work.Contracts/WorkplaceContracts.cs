@@ -17,7 +17,7 @@ public sealed record DashboardEntryReferenceResponse(string EntryResourceId, Das
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
 }
-public sealed record EntryResponse(Guid WorkspaceId, string Id, string Name, string Type, string ApiVersion, string DisplayName, string? Description, EntryPresentation Presentation, EntryResolvedTarget ResolvedTarget, EntryBehavior Behavior, int Version, DateTimeOffset PublishedAt)
+public sealed record EntryResponse(Guid WorkspaceId, string Id, string Name, string Type, string ApiVersion, string DisplayName, string? Description, EntryPresentation Presentation, EntryExposure Exposure, EntryResolvedTarget ResolvedTarget, EntryBehavior Behavior, int Version, DateTimeOffset PublishedAt)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
 }

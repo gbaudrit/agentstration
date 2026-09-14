@@ -121,6 +121,8 @@ When the AppHost Utilities extension is available, standalone sample data includ
 
 Published Workplace Entries always target an immutable Flow version. The Console may present Agent or Flow as an authoring convenience; an Agent selection is normalized at publication through a hidden system-managed Direct Agent Flow. Consequently every submitted Entry follows `Entry -> FlowReference -> FlowRun -> Runtime`.
 
+Every Entry remains owned and executed by exactly one Workspace. Its versioned exposure policy independently selects Workplace and Console presentation; Workplace further distinguishes the owning space from explicit Tenant-home promotion. Existing Entries default to Workplace in their owning space. `GET /api/entries` accepts `surface` and `placement` filters, searches only Workspaces the caller may read, and returns the owning Workspace ID with every result. Exposure never makes sibling Workspace resources visible, and invocation still selects the Entry owner's Workspace before resolving its pinned Flow.
+
 ```text
 Work  = what needs to be accomplished
 Flow  = how the work is routed and processed
