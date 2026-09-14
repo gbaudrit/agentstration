@@ -19,7 +19,13 @@ if (-not $resolvedCoverageRoot.StartsWith($artifactsPrefix, [StringComparison]::
 
 $rawRoot = Join-Path $resolvedCoverageRoot 'raw'
 $reportRoot = Join-Path $resolvedCoverageRoot 'report'
-$coverageFiles = @(Get-ChildItem -LiteralPath $rawRoot -Filter '*.cobertura.xml' -File -Recurse -ErrorAction SilentlyContinue)
+$shardRoots = @('a', 'b') |
+    ForEach-Object { Join-Path $rawRoot $_ } |
+    Where-Object { Test-Path -LiteralPath $_ -PathType Container }
+$inputRoots = if ($shardRoots.Count -gt 0) { $shardRoots } else { @($rawRoot) }
+$coverageFiles = @($inputRoots | ForEach-Object {
+    Get-ChildItem -LiteralPath $_ -Filter '*.cobertura.xml' -File -Recurse -ErrorAction SilentlyContinue
+})
 if ($coverageFiles.Count -eq 0) {
     throw "No Cobertura inputs were found below '$rawRoot'."
 }

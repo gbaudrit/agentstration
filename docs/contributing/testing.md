@@ -7,7 +7,7 @@ Agentstration separates test execution by runtime cost and dependency type. The 
 Fast tests do not start an ASP.NET Core host, open a relational database, spawn a child process, or contact a remote provider. They cover architecture rules, component behavior, mapping, validation, and in-process command behavior.
 
 ```powershell
-dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 336 --max-parallel-test-modules 4
+dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 365 --max-parallel-test-modules 4
 ```
 
 ## Integration lane
@@ -15,14 +15,14 @@ dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --n
 Integration tests exercise a real boundary such as `WebApplicationFactory`, SQLite, Git, persistent Identity, or runtime reconstruction. This lane remains deterministic and offline by default. Tests marked `Integration` for a live model provider are opt-in and report inconclusive unless their documented environment variables are supplied.
 
 ```powershell
-dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 515 --max-parallel-test-modules 2
+dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 524 --max-parallel-test-modules 2
 ```
 
 Run both fast and integration solutions for complete required functional validation. Their union is the functional test inventory represented by the root solution.
 
 ## Functional coverage
 
-CI collects managed-code coverage while running the required Fast and Integration lanes. Performance workloads, live-provider scenarios, test assemblies, generated sources, and files outside product `src` directories are excluded. Coverage is initially report-only: collection or report-generation failures fail CI, but the measured percentage does not.
+CI collects managed-code coverage from the required Fast and Integration inventory on two balanced runners while the uninstrumented functional lanes remain in `build-and-test`. The raw shard reports are merged into one consolidated result after both runners complete. Performance workloads, live-provider scenarios, test assemblies, generated sources, and files outside product `src` directories are excluded. Coverage is initially report-only: collection or report-generation failures fail CI, but the measured percentage does not.
 
 After restoring dependencies and building the root solution, reproduce the CI report locally with:
 
@@ -47,7 +47,7 @@ The report records workload parameters, provider, elapsed time, runtime and OS m
 
 ## CI concurrency and memory diagnostics
 
-The fast, integration, and performance lanes cap concurrent test modules at 4, 2, and 1 respectively. Host-heavy API and Management modules also use one class worker per assembly. CI reruns the designated hosted modules sequentially through `scripts/ci/run-test-module-with-diagnostics.ps1`; each JSON artifact contains the discovered count, duration, process peak working set, process peak private memory, aggregate peak working set for active `dotnet` processes, runtime, and OS. The diagnostic artifact deliberately excludes test output and payloads.
+The fast, integration, and performance lanes cap concurrent test modules at 4, 2, and 1 respectively. Host-heavy API and Management modules also use one class worker per assembly. CI reruns the designated hosted modules sequentially through `scripts/ci/run-test-module-with-diagnostics.ps1` in the dedicated `hosted-module-diagnostics` job. That job runs in parallel with functional coverage and compiles only the designated test projects after restoring the repository graph, so memory safeguards do not extend the `build-and-test` critical path. Each JSON artifact contains the discovered count, duration, process peak working set, process peak private memory, aggregate peak working set for active `dotnet` processes, runtime, and OS. The diagnostic artifact deliberately excludes test output and payloads.
 
 The Management budgets below use Release runs on Windows 11 10.0.26200 with .NET 10.0.10/10.0.11, collected during #298. The consolidated `Agentstration.Api.Tests` baseline was collected on the same Windows build with .NET 10.0.11 during #142: 191 tests in 200 seconds, 1503.7 MiB peak working set, 1176.6 MiB peak private memory, and 1621.2 MiB aggregate `dotnet` working set. A warning is evidence to review the Linux and Windows trend; a failure caps regression relative to the retained baseline. Adjust these values only after retaining representative artifacts from both runner families.
 
