@@ -411,6 +411,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 46. **Delivered reusable notification Flow increment:** bounded internal `work.notification.create` MCP Tool, ordinary Tool projection and governance, Workspace-scoped deterministic delivery, causal receipts, and samples composing parent → delivery Flow → terminal Tool. See ADR-0107.
 47. **Delivered composable Flow Run diagnostics increment:** bounded Workspace-scoped causal projection from invocation origin through nested Flow Runs, Agent steps, logical Tool calls, physical attempts and governance deep links, without duplicating execution state or exposing sensitive payloads. See ADR-0108.
 48. **Delivered shared Entry exposure increment:** Workspace-owned Entries declare a versioned Workplace/Console exposure policy and optional owning-space or Tenant-home Workplace placement. Discovery rechecks per-Workspace authorization and invocation remains inside the Entry owner's Workspace execution boundary. See ADR-0113.
+49. **Delivered Console Entry discovery increment:** the canonical Work API and typed Console client discover Console-targeted Entries with owner-Workspace isolation, presentation metadata, pinned Flow binding, and deterministic executable, disabled, or unavailable readiness. Submission rechecks the same readiness without introducing a Console-only resolver or bypassing the incomplete BFF delegation boundary. See ADR-0114.
 
 ## ADR catalog
 
@@ -468,6 +469,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0059: Tool arguments require explicit bounded retention
 - ADR-0060: Entry owns Workplace execution presentation
 - ADR-0113: Entry exposure separates ownership from presentation
+- ADR-0114: Console Entry discovery projects canonical execution readiness
 - ADR-0061: llama.cpp AEP provider and effective capability resolution
 - ADR-0062: immutable versioned extension option contracts
 - ADR-0081: Source Providers are bounded AEP contributions

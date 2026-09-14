@@ -59,7 +59,14 @@ public static partial class WorkplaceEndpoints
         var requestedPlacement = placement ?? (requestedSurface == EntryExposureSurface.Workplace
             ? EntryWorkplacePlacement.OwningSpace
             : null);
-        return Results.Ok((await service.DiscoverAsync(requestedSurface, requestedPlacement, token)).Select(ToResponse));
+        return Results.Ok((await service.DiscoverAsync(requestedSurface, requestedPlacement, token)).Select(value =>
+            ToResponse(value.Entry) with
+            {
+                Execution = new(
+                    value.Execution.CanInvoke,
+                    value.Execution.Availability,
+                    value.Execution.ReasonCode)
+            }));
     });
 
     private static Task<IResult> GetEntryAsync(string entryName, WorkplaceService service, CancellationToken token) =>

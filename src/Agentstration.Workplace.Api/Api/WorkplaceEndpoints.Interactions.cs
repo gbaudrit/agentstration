@@ -17,13 +17,17 @@ namespace Agentstration.Web;
 
 public static partial class WorkplaceEndpoints
 {
-    private static Task<IResult> SubmitEntryAsync(string workspaceName, string entryName, EntryWorkplacePlacement? placement, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => SubmitCoreAsync(WorkspaceId(workspaceName), EntryResourceId(entryName), placement, request, service, token);
+    private static Task<IResult> SubmitEntryAsync(string workspaceName, string entryName, EntryExposureSurface? surface, EntryWorkplacePlacement? placement, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => SubmitCoreAsync(WorkspaceId(workspaceName), EntryResourceId(entryName), surface, placement, request, service, token);
 
-    private static Task<IResult> SubmitNamespacedEntryAsync(string workspaceName, string @namespace, string entryName, EntryWorkplacePlacement? placement, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => SubmitCoreAsync(WorkspaceId(workspaceName), NamespacedEntryId(@namespace, entryName), placement, request, service, token);
+    private static Task<IResult> SubmitNamespacedEntryAsync(string workspaceName, string @namespace, string entryName, EntryExposureSurface? surface, EntryWorkplacePlacement? placement, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => SubmitCoreAsync(WorkspaceId(workspaceName), NamespacedEntryId(@namespace, entryName), surface, placement, request, service, token);
 
-    private static Task<IResult> SubmitCoreAsync(WorkspaceId workspaceId, EntryId entryId, EntryWorkplacePlacement? placement, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> SubmitCoreAsync(WorkspaceId workspaceId, EntryId entryId, EntryExposureSurface? surface, EntryWorkplacePlacement? placement, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var attachments = request.Attachments?.Select(ToWorkAttachment).ToArray(); var result = await service.SubmitAsync(new SubmitEntryCommand(workspaceId, entryId, request.Values, attachments, WorkplacePlacement: placement ?? EntryWorkplacePlacement.OwningSpace), token);
+        var requestedSurface = surface ?? EntryExposureSurface.Workplace;
+        var requestedPlacement = placement ?? (requestedSurface == EntryExposureSurface.Workplace
+            ? EntryWorkplacePlacement.OwningSpace
+            : null);
+        var attachments = request.Attachments?.Select(ToWorkAttachment).ToArray(); var result = await service.SubmitAsync(new SubmitEntryCommand(workspaceId, entryId, request.Values, attachments, requestedSurface, requestedPlacement), token);
         return Results.Created($"/api/workspaces/{WorkspaceName(workspaceId)}/interactions/{result.Interaction.Id}", new EntrySubmissionResponse(ToResponse(result.Interaction), result.Action, result.Task is null ? null : ToResponse(result.Task)));
     });
 

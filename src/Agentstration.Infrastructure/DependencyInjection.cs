@@ -327,6 +327,7 @@ public static class DependencyInjection
             services.AddSqliteFlowStorage(flowConnectionString);
         }
         services.AddSingleton<FlowService>();
+        services.AddSingleton<IEntryExecutionResolver, EntryExecutionResolver>();
         services.AddSingleton<IToolDefinitionFlowResolver, ToolDefinitionFlowResolver>();
         services.AddSingleton<IFlowVersionActivationGuard, ToolDefinitionFlowActivationGuard>();
         services.AddSingleton<IFlowDeletionGuard, ToolDefinitionFlowDeletionGuard>();
