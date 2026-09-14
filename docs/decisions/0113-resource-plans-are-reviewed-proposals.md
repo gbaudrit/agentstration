@@ -16,6 +16,8 @@ Plan content uses an explicitly versioned functional contract. Later determinist
 
 Every read and write includes Tenant and Workspace scope. Optimistic concurrency prevents agents or users from silently overwriting concurrent refinements. Origin metadata may retain Work and FlowRun causality without transferring ownership of those records.
 
+The authoritative server exposes the vertical through `/api/resource-plans`; alternate presentation surfaces consume that same application boundary.
+
 ## Consequences
 
 - Planning contracts may evolve independently from Management Resource schemas.
