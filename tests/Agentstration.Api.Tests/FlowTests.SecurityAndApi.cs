@@ -1,4 +1,3 @@
-using Agentstration.Identity.Contracts;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -7,6 +6,7 @@ using Agentstration.Flows.Application;
 using Agentstration.Flows.Contracts;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Flows.Storage.Sqlite;
+using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;

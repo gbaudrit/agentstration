@@ -1,13 +1,12 @@
-using Agentstration.Security.Contracts;
-using Agentstration.Identity.Contracts;
-using Agentstration.Agents;
-using Agentstration.ResourceManagement;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
+using Agentstration.Agents;
+using Agentstration.Agents.Contracts;
 using Agentstration.Application.Work;
 using Agentstration.Extensions;
+using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Extensions.Git;
 using Agentstration.Extensions.LlamaCpp;
@@ -16,35 +15,36 @@ using Agentstration.Extensions.Ollama;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
-using Agentstration.Agents.Contracts;
-using Agentstration.Extensions.Aep;
 using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
+using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Packs;
 using Agentstration.Packs.Contracts;
-using Agentstration.Runtime.Profiles;
-using Agentstration.Runtime.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Storage.Sqlite;
-using Agentstration.ModelProviders;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
+using Agentstration.Runtime.Core;
+using Agentstration.Runtime.Profiles;
 using Agentstration.Runtime.Storage.Sqlite;
 using Agentstration.Secrets;
+using Agentstration.Security.Contracts;
 using Agentstration.Sources;
 using Agentstration.Sources.Contracts;
 using Agentstration.Tools;
-using Agentstration.Triggers;
 using Agentstration.Tools.SourceRegistry;
-using Agentstration.Web.Console;
+using Agentstration.Triggers;
 using Agentstration.Web.Components;
+using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Agentstration.Workplace.Client;
 using Agentstration.Workplace.Components;
 using Agentstration.Workplace.Web;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.ArchitectureTests;
 
@@ -298,7 +298,7 @@ public sealed class DependencyTests
                      "SourceRefreshWorker"
                  })
         {
-            Assert.AreEqual(1, CountOccurrences(composition, $"AddHostedService<{worker}>") , worker);
+            Assert.AreEqual(1, CountOccurrences(composition, $"AddHostedService<{worker}>"), worker);
         }
 
         Assert.AreEqual(1, CountOccurrences(apiTransport, "AddSignalR("));

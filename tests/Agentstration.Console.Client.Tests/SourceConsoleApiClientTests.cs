@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
-using Agentstration.Sources.Contracts;
 using Agentstration.Resources;
+using Agentstration.Sources.Contracts;
 using Agentstration.Web.Console;
 
 namespace Agentstration.Web.Tests;

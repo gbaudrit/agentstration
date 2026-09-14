@@ -1,12 +1,12 @@
-using Agentstration.Security.Contracts;
-using Agentstration.Identity.Contracts;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
 using Agentstration.Security.AspNetCoreIdentity;
+using Agentstration.Security.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;

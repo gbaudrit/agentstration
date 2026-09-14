@@ -1,8 +1,8 @@
-using Agentstration.Triggers;
 using System.Net;
 using System.Net.Http.Json;
-using Agentstration.Triggers.Contracts;
 using Agentstration.Resources;
+using Agentstration.Triggers;
+using Agentstration.Triggers.Contracts;
 using Agentstration.Web.Console;
 
 namespace Agentstration.Web.Tests;
@@ -22,7 +22,8 @@ public sealed partial class ApiClientTests
                 Content = JsonContent.Create(trigger),
                 Headers = { ETag = new System.Net.Http.Headers.EntityTagHeaderValue("\"next\"") }
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         var result = await new TriggerApiClient(httpClient).SaveAsync(trigger, "\"current\"", CancellationToken.None);
 
@@ -44,7 +45,8 @@ public sealed partial class ApiClientTests
             {
                 Content = JsonContent.Create(new TriggerSchedulePreviewResponse([DateTimeOffset.UnixEpoch]))
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         var values = await new TriggerApiClient(httpClient).PreviewScheduleAsync(
             new TriggerSchedule { Type = TriggerScheduleType.Interval, Every = "PT1H", StartAt = DateTimeOffset.UnixEpoch },
@@ -62,7 +64,8 @@ public sealed partial class ApiClientTests
         using var httpClient = new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.Conflict)
         {
             Content = JsonContent.Create(new { title = "trigger_disabled", detail = "The Trigger is disabled.", status = 409 })
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         var error = await Assert.ThrowsAsync<AgentstrationApiException>(() =>
             new TriggerApiClient(httpClient).RunNowAsync(ResourceNamespace.Default, "nightly", CancellationToken.None));

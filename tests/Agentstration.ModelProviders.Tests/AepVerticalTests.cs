@@ -1,5 +1,3 @@
-using Agentstration.Extensions.Contracts;
-using Agentstration.Models;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -8,8 +6,10 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Extensions.Ollama;
 using Agentstration.ModelProviders;
+using Agentstration.Models;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Secrets;

@@ -1,6 +1,6 @@
-using Agentstration.Security.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Storage.Sqlite;
+using Agentstration.Security.Contracts;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
