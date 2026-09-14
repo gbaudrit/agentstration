@@ -1,7 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../Agentstration.Agents.Api/Agentstration.Agents.Api.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Api/Agentstration.Flows.Api.csproj" />
+    <ProjectReference Include="../Agentstration.Models.Api/Agentstration.Models.Api.csproj" />
+    <ProjectReference Include="../Agentstration.Secrets.Api/Agentstration.Secrets.Api.csproj" />
     <ProjectReference Include="../Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Tools.Api/Agentstration.Tools.Api.csproj" />
+    <ProjectReference Include="../Agentstration.Triggers.Api/Agentstration.Triggers.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
@@ -13,6 +19,7 @@
     <ProjectReference Include="../Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
     <ProjectReference Include="../Agentstration.Api.Contracts/Agentstration.Api.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Bootstrap.Api/Agentstration.Bootstrap.Api.csproj" />
     <ProjectReference Include="../Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
@@ -23,15 +30,21 @@
     <ProjectReference Include="../Agentstration.Tools.Contracts/Agentstration.Tools.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Triggers.Contracts/Agentstration.Triggers.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Extensions/Agentstration.Extensions.csproj" />
+    <ProjectReference Include="../Agentstration.Extensions.Api/Agentstration.Extensions.Api.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.Aep/Agentstration.Extensions.Aep.csproj" />
     <ProjectReference Include="../Agentstration.Identity/Agentstration.Identity.csproj" />
+    <ProjectReference Include="../Agentstration.Identity.Api/Agentstration.Identity.Api.csproj" />
     <ProjectReference Include="../Agentstration.Models.Application/Agentstration.Models.Application.csproj" />
     <ProjectReference Include="../Agentstration.Packs/Agentstration.Packs.csproj" />
+    <ProjectReference Include="../Agentstration.Packs.Api/Agentstration.Packs.Api.csproj" />
     <ProjectReference Include="../Agentstration.Packs.Contracts/Agentstration.Packs.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Sources/Agentstration.Sources.csproj" />
+    <ProjectReference Include="../Agentstration.Sources.Api/Agentstration.Sources.Api.csproj" />
     <ProjectReference Include="../Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />
+    <ProjectReference Include="../Agentstration.Resources.Api/Agentstration.Resources.Api.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
+    <ProjectReference Include="../Agentstration.Runtime.Api/Agentstration.Runtime.Api.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Contracts/Agentstration.Runtime.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Profiles/Agentstration.Runtime.Profiles.csproj" />
@@ -39,8 +52,10 @@
     <ProjectReference Include="../Agentstration.Security.AspNetCoreIdentity/Agentstration.Security.AspNetCoreIdentity.csproj" />
     <ProjectReference Include="../Agentstration.Tools.Mcp/Agentstration.Tools.Mcp.csproj" />
     <ProjectReference Include="../Agentstration.Work/Agentstration.Work.csproj" />
+    <ProjectReference Include="../Agentstration.Work.Api/Agentstration.Work.Api.csproj" />
     <ProjectReference Include="../Agentstration.Work.Contracts/Agentstration.Work.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Work.Storage.Abstractions/Agentstration.Work.Storage.Abstractions.csproj" />
+    <ProjectReference Include="../Agentstration.Workplace.Api/Agentstration.Workplace.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Agentstration.Web.Tests" />

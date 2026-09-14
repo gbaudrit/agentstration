@@ -6,6 +6,7 @@
     <Project Path="aep/src/Agentstration.Aep.MicrosoftExtensionsAI/Agentstration.Aep.MicrosoftExtensionsAI.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/Agentstration.Agents.Api/Agentstration.Agents.Api.csproj" />
     <Project Path="src/Agentstration.Api.Contracts/Agentstration.Api.Contracts.csproj" />
     <Project Path="src/Agentstration.Api/Agentstration.Api.csproj" />
     <Project Path="src/Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />
@@ -15,9 +16,11 @@
     <Project Path="src/Agentstration.Console.Client/Agentstration.Console.Client.csproj" />
     <Project Path="src/Agentstration.Console.Components/Agentstration.Console.Components.csproj" />
     <Project Path="src/Agentstration.Extensions/Agentstration.Extensions.csproj" />
+    <Project Path="src/Agentstration.Extensions.Api/Agentstration.Extensions.Api.csproj" />
     <Project Path="src/Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <Project Path="src/Agentstration.Extensions.Aep/Agentstration.Extensions.Aep.csproj" />
     <Project Path="src/Agentstration.Flows/Agentstration.Flows.csproj" />
+    <Project Path="src/Agentstration.Flows.Api/Agentstration.Flows.Api.csproj" />
     <Project Path="src/Agentstration.Flows.Application/Agentstration.Flows.Application.csproj" />
     <Project Path="src/Agentstration.Flows.Contracts/Agentstration.Flows.Contracts.csproj" />
     <Project Path="src/Agentstration.Flows.Storage.Abstractions/Agentstration.Flows.Storage.Abstractions.csproj" />
@@ -25,14 +28,17 @@
     <Project Path="src/Agentstration.Flows.Storage.PostgreSql/Agentstration.Flows.Storage.PostgreSql.csproj" />
     <Project Path="src/Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
     <Project Path="src/Agentstration.Identity/Agentstration.Identity.csproj" />
+    <Project Path="src/Agentstration.Identity.Api/Agentstration.Identity.Api.csproj" />
     <Project Path="src/Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
     <Project Path="src/Agentstration.ResourceManagement.Storage.Sqlite/Agentstration.ResourceManagement.Storage.Sqlite.csproj" />
     <Project Path="src/Agentstration.ResourceManagement.Storage.PostgreSql/Agentstration.ResourceManagement.Storage.PostgreSql.csproj" />
     <Project Path="src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <Project Path="src/Agentstration.Models/Agentstration.Models.csproj" />
+    <Project Path="src/Agentstration.Models.Api/Agentstration.Models.Api.csproj" />
     <Project Path="src/Agentstration.Models.Contracts/Agentstration.Models.Contracts.csproj" />
     <Project Path="src/Agentstration.Models.Application/Agentstration.Models.Application.csproj" />
     <Project Path="src/Agentstration.Packs/Agentstration.Packs.csproj" />
+    <Project Path="src/Agentstration.Packs.Api/Agentstration.Packs.Api.csproj" />
     <Project Path="src/Agentstration.Packs.Contracts/Agentstration.Packs.Contracts.csproj" />
     <Project Path="src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
     <Project Path="src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
@@ -40,6 +46,7 @@
     <Project Path="src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
     <Project Path="src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
     <Project Path="src/Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
+    <Project Path="src/Agentstration.Runtime.Api/Agentstration.Runtime.Api.csproj" />
     <Project Path="src/Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />
     <Project Path="src/Agentstration.Runtime.Contracts/Agentstration.Runtime.Contracts.csproj" />
     <Project Path="src/Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
@@ -49,26 +56,33 @@
     <Project Path="src/Agentstration.Runtime.Storage.PostgreSql/Agentstration.Runtime.Storage.PostgreSql.csproj" />
     <Project Path="src/Agentstration.Secrets.Abstractions/Agentstration.Secrets.Abstractions.csproj" />
     <Project Path="src/Agentstration.Secrets/Agentstration.Secrets.csproj" />
+    <Project Path="src/Agentstration.Secrets.Api/Agentstration.Secrets.Api.csproj" />
     <Project Path="src/Agentstration.Secrets.Local/Agentstration.Secrets.Local.csproj" />
     <Project Path="src/Agentstration.Security.AspNetCoreIdentity/Agentstration.Security.AspNetCoreIdentity.csproj" />
     <Project Path="src/Agentstration.Security.AspNetCoreIdentity.PostgreSql/Agentstration.Security.AspNetCoreIdentity.PostgreSql.csproj" />
     <Project Path="src/Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
     <Project Path="src/Agentstration.Resources/Agentstration.Resources.csproj" />
+    <Project Path="src/Agentstration.Resources.Api/Agentstration.Resources.Api.csproj" />
     <Project Path="src/Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
     <Project Path="src/Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />
     <Project Path="src/Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
+    <Project Path="src/Agentstration.Bootstrap.Api/Agentstration.Bootstrap.Api.csproj" />
     <Project Path="src/Agentstration.Secrets.Contracts/Agentstration.Secrets.Contracts.csproj" />
     <Project Path="src/Agentstration.Sources/Agentstration.Sources.csproj" />
+    <Project Path="src/Agentstration.Sources.Api/Agentstration.Sources.Api.csproj" />
     <Project Path="src/Agentstration.Sources.Contracts/Agentstration.Sources.Contracts.csproj" />
     <Project Path="src/Agentstration.Tools.Mcp/Agentstration.Tools.Mcp.csproj" />
     <Project Path="src/Agentstration.Tools/Agentstration.Tools.csproj" />
+    <Project Path="src/Agentstration.Tools.Api/Agentstration.Tools.Api.csproj" />
     <Project Path="src/Agentstration.Tools.Contracts/Agentstration.Tools.Contracts.csproj" />
     <Project Path="src/Agentstration.Tools.SourceRegistry/Agentstration.Tools.SourceRegistry.csproj" />
     <Project Path="src/Agentstration.Web/Agentstration.Web.csproj" />
     <Project Path="src/Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
     <Project Path="src/Agentstration.Web.FlowDesigner/Agentstration.Web.FlowDesigner.csproj" />
     <Project Path="src/Agentstration.Work/Agentstration.Work.csproj" />
+    <Project Path="src/Agentstration.Work.Api/Agentstration.Work.Api.csproj" />
     <Project Path="src/Agentstration.Triggers/Agentstration.Triggers.csproj" />
+    <Project Path="src/Agentstration.Triggers.Api/Agentstration.Triggers.Api.csproj" />
     <Project Path="src/Agentstration.Triggers.Contracts/Agentstration.Triggers.Contracts.csproj" />
     <Project Path="src/Agentstration.Work.Contracts/Agentstration.Work.Contracts.csproj" />
     <Project Path="src/Agentstration.Work.Storage.Abstractions/Agentstration.Work.Storage.Abstractions.csproj" />
@@ -76,6 +90,7 @@
     <Project Path="src/Agentstration.Work.Storage.PostgreSql/Agentstration.Work.Storage.PostgreSql.csproj" />
     <Project Path="src/Agentstration.Workplace.Client/Agentstration.Workplace.Client.csproj" />
     <Project Path="src/Agentstration.Workplace.Components/Agentstration.Workplace.Components.csproj" />
+    <Project Path="src/Agentstration.Workplace.Api/Agentstration.Workplace.Api.csproj" />
     <Project Path="src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">

@@ -34,6 +34,7 @@ src/
   Agentstration.Infrastructure/  Composition adapters for current modules
   Agentstration.Bootstrap.Contracts/ Composed Bootstrap application and transport contracts
   Agentstration.Api.Contracts/   Family-neutral HTTP collection contracts
+  Agentstration.*.Api/           Family-owned endpoint modules composed by Agentstration.Api
   Agentstration.*.Contracts/     Public contracts owned by each resource family
   Agentstration.ResourceManagement.Contracts/ Generic resource and Bootstrap handler contracts
   Agentstration.Extensions/      Extension registration and inventory use cases

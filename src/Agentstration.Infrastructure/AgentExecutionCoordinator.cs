@@ -11,14 +11,14 @@ public sealed class AgentExecutionCoordinator(
     IResourceStore store,
     IAgentResourceQueries agentQueries,
     IAgentRouter router,
-    IRuntimeRegistry runtimes)
+    IRuntimeRegistry runtimes) : IAgentExecutionCoordinator
 {
-    public async Task<(AgentRouteResult Route, AgentExecutionResult Execution)> RouteAndExecuteAsync(
+    public async Task<RoutedAgentExecution> RouteAndExecuteAsync(
         string input,
         CancellationToken cancellationToken)
     {
         var selected = await SelectAgentAsync(input, null, cancellationToken);
-        return (selected.Route, await ExecuteSelectedAsync(selected, input, cancellationToken));
+        return new(selected.Route, await ExecuteSelectedAsync(selected, input, cancellationToken));
     }
 
     public async Task<SelectedAgentRoute> SelectAgentAsync(

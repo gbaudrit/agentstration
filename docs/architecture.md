@@ -2,14 +2,15 @@
 
 ## Outcome and constraints
 
-Agentstration keeps explicit Management Plane, Runtime Plane, and Work Plane boundaries in one modular codebase and one authoritative standalone server. `Agentstration.Web` is the executable composition root, `Agentstration.Api` owns the server-side REST, OpenAPI, MCP, SignalR, request-context, and authorization transport surface, and the Console presentation is compiled in a dedicated Razor component library that consumes typed HTTP clients; the end-user Workplace remains a separate HTTP/SignalR client UI. The Management Plane is authoritative for definitions, revisions, and desired deployment state. The Runtime Plane owns technical execution. The Work Plane owns the functional lifecycle, history, interactions, and results of delegated work. Runtime `AIAgent` objects are reconstructible and never persisted. The default launch is fully local; Foundry, PostgreSQL, Ollama, and OTLP are optional profiles, while Aspire orchestrates the server, Workplace, and optional extensions.
+Agentstration keeps explicit Management Plane, Runtime Plane, and Work Plane boundaries in one modular codebase and one authoritative standalone server. `Agentstration.Web` is the executable composition root, family-owned `Agentstration.*.Api` modules own REST, MCP, SignalR, request-context, and authorization transport, and the lightweight `Agentstration.Api` aggregator composes them with global OpenAPI and health conventions. The Console presentation is compiled in a dedicated Razor component library that consumes typed HTTP clients; the end-user Workplace remains a separate HTTP/SignalR client UI. The Management Plane is authoritative for definitions, revisions, and desired deployment state. The Runtime Plane owns technical execution. The Work Plane owns the functional lifecycle, history, interactions, and results of delegated work. Runtime `AIAgent` objects are reconstructible and never persisted. The default launch is fully local; Foundry, PostgreSQL, Ollama, and OTLP are optional profiles, while Aspire orchestrates the server, Workplace, and optional extensions.
 
 ## Solution tree
 
 ```text
 src/
   Agentstration.AppHost/          Aspire orchestration and dashboard
-  Agentstration.Api/              REST, OpenAPI, MCP, SignalR and HTTP security transport
+  Agentstration.Api/              explicit API-module aggregation, global health and OpenAPI
+  Agentstration.*.Api/            family-owned REST, MCP, SignalR and HTTP security transport
   Agentstration.Web/              authoritative standalone composition, lifecycle, Razor shell and workers
   Agentstration.Console.Client/   typed operations Console HTTP and SignalR clients
   Agentstration.Console.Components/ operations Console routes, presentation state and localization

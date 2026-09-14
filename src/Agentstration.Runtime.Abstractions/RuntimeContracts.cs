@@ -178,6 +178,23 @@ public sealed class RuntimeAgentResolutionException(string code, string message)
 public sealed record AgentRouteRequest(string Input);
 public sealed record RoutableAgent(string AgentId, string Description, IReadOnlyCollection<string> Capabilities);
 public sealed record AgentRouteResult(string AgentId, double Confidence, string Reason);
+public sealed record RoutedAgentExecution(AgentRouteResult Route, AgentExecutionResult Execution);
+
+public interface IAgentExecutionCoordinator
+{
+    Task<RoutedAgentExecution> RouteAndExecuteAsync(string input, CancellationToken cancellationToken);
+}
+
+public sealed record PreparedAgentRuntime(string DeploymentName, string RevisionName, string State);
+
+public interface IAgentRuntimePreparationService
+{
+    Task<PreparedAgentRuntime> PrepareAsync(
+        ResourceNamespace resourceNamespace,
+        string agentName,
+        long generation,
+        CancellationToken cancellationToken);
+}
 public sealed record AgentRuntimeReadiness(
     string AgentId,
     long Generation,

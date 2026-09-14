@@ -139,3 +139,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 107. [ADR-0107 — Notification channels are delivery Flows](0107-notification-channels-are-delivery-flows.md)
 108. [ADR-0108 — Flow Run causality is a bounded read model](0108-flow-run-causality-is-a-read-model.md)
 109. [ADR-0109 — The Control Plane composes plural resource-family modules](0109-control-plane-composes-resource-family-modules.md)
+110. [ADR-0110 — API transport is composed from family-owned modules](0110-api-transport-is-composed-from-family-modules.md)

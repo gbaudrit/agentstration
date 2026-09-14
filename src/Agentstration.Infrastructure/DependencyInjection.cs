@@ -37,6 +37,7 @@ using Agentstration.Tools;
 using Agentstration.Tools.Mcp;
 using Agentstration.Triggers;
 using Agentstration.Work;
+using Agentstration.Work.Contracts;
 using Agentstration.Work.Storage.Abstractions;
 using Agentstration.Work.Storage.PostgreSql;
 using Agentstration.Work.Storage.Sqlite;
@@ -158,6 +159,8 @@ public static class DependencyInjection
         services.AddSingleton(new AgentRevisionRetentionOptions());
         services.AddSingleton<AgentManagementService>();
         services.AddSingleton<AgentExecutionCoordinator>();
+        services.AddSingleton<IAgentExecutionCoordinator>(provider => provider.GetRequiredService<AgentExecutionCoordinator>());
+        services.AddSingleton<IAgentRuntimePreparationService, AgentRuntimePreparationService>();
         services.AddSingleton<IPackArchiveReader, ZipPackArchiveReader>();
         services.AddSingleton<IPackArtifactStore>(_ => new FileSystemPackArtifactStore(Path.Combine(dataDirectory, "pack-artifacts")));
         services.AddSingleton<IPackResourceHandler, ModelProviderPackResourceHandler>();
@@ -173,6 +176,7 @@ public static class DependencyInjection
         services.AddSingleton<PackSourceCatalogHandler>();
         services.AddSingleton<ISourceCatalogHandler>(provider => provider.GetRequiredService<PackSourceCatalogHandler>());
         services.AddSingleton<PackSourceInstallationService>();
+        services.AddSingleton<ISourceScopeResolver, SourceScopeResolver>();
         services.AddSingleton<Agentstration.Sources.SourceManifestValidator>();
         services.AddSingleton<ISourceManifestReader, Agentstration.Sources.SourceManifestReader>();
         services.AddSingleton<ISourceVerificationIndexReader, Agentstration.Sources.SourceVerificationIndexReader>();
@@ -303,6 +307,7 @@ public static class DependencyInjection
         services.AddSingleton<ILocalWorkExecutionQueue>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
         services.AddSingleton<WorkItemService>();
         services.AddSingleton<WorkplaceService>();
+        services.AddSingleton<IWorkOperationsQueryService, WorkOperationsQueryService>();
         services.AddSingleton<WorkNotificationMcpToolDefinitionProvider>();
         services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<WorkNotificationMcpToolDefinitionProvider>());
         services.AddSingleton<WorkNotificationMcpTool>();

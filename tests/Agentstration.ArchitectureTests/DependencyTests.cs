@@ -141,18 +141,72 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void ApiTransportOwnsEndpointsHubsMcpAndSecurity()
+    public void FamilyApiModulesOwnEndpointsHubsMcpAndSecurity()
     {
         var repositoryRoot = FindRepositoryRoot();
         var apiRoot = Path.Combine(repositoryRoot, "src", "Agentstration.Api");
         var hostRoot = Path.Combine(repositoryRoot, "src", "Agentstration.Web");
+        var modules = new[] { "Agents", "Bootstrap", "Extensions", "Flows", "Identity", "Models", "Packs", "Resources", "Runtime", "Secrets", "Sources", "Tools", "Triggers", "Work", "Workplace" };
 
-        Assert.IsGreaterThanOrEqualTo(60, Directory.EnumerateFiles(Path.Combine(apiRoot, "Api"), "*.cs", SearchOption.AllDirectories).Count());
-        Assert.IsTrue(File.Exists(Path.Combine(apiRoot, "Features", "Flows", "FlowRunHub.cs")));
-        Assert.IsTrue(File.Exists(Path.Combine(apiRoot, "Features", "Workplace", "WorkplaceHub.cs")));
-        Assert.IsTrue(File.Exists(Path.Combine(apiRoot, "Api", "AgentstrationMcpHandlers.cs")));
+        foreach (var family in modules)
+        {
+            var moduleRoot = Path.Combine(repositoryRoot, "src", $"Agentstration.{family}.Api");
+            Assert.IsTrue(Directory.Exists(moduleRoot), family);
+            var module = File.ReadAllText(Path.Combine(moduleRoot, $"{family}ApiModule.cs"));
+            Assert.Contains($"Add{family}Api", module, StringComparison.Ordinal, family);
+            Assert.Contains($"Map{family}Api", module, StringComparison.Ordinal, family);
+        }
+        Assert.IsFalse(Directory.Exists(Path.Combine(apiRoot, "Api"))
+            && Directory.EnumerateFiles(Path.Combine(apiRoot, "Api"), "*.cs", SearchOption.AllDirectories).Any());
+        Assert.IsTrue(File.Exists(Path.Combine(repositoryRoot, "src", "Agentstration.Flows.Api", "Features", "FlowRunHub.cs")));
+        Assert.IsTrue(File.Exists(Path.Combine(repositoryRoot, "src", "Agentstration.Workplace.Api", "Features", "WorkplaceHub.cs")));
+        Assert.IsTrue(File.Exists(Path.Combine(repositoryRoot, "src", "Agentstration.Tools.Api", "Api", "AgentstrationMcpHandlers.cs")));
         Assert.IsTrue(File.Exists(Path.Combine(apiRoot, "Configuration", "OpenApiConfiguration.cs")));
         Assert.IsFalse(Directory.Exists(Path.Combine(hostRoot, "Api")));
+    }
+
+    [TestMethod]
+    public void ApiModulesRejectExecutableHostsConsoleAndConcreteStorage()
+    {
+        var src = Path.Combine(FindRepositoryRoot(), "src");
+        var forbidden = new[] { "Agentstration.Web/", "Agentstration.Console.", ".Storage.Sqlite/", ".Storage.PostgreSql/" };
+        var violations = Directory.EnumerateDirectories(src, "Agentstration.*.Api")
+            .SelectMany(directory => Directory.EnumerateFiles(directory, "*.csproj"))
+            .Where(project => forbidden.Any(value => File.ReadAllText(project).Replace('\\', '/').Contains(value, StringComparison.Ordinal)))
+            .Select(Path.GetFileNameWithoutExtension)
+            .ToArray();
+        Assert.IsEmpty(violations, $"Forbidden API module dependencies: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
+    public void ApiAggregatorOnlyComposesModulesAndFamilyNeutralConventions()
+    {
+        var root = FindRepositoryRoot();
+        var aggregator = Path.Combine(root, "src", "Agentstration.Api");
+        var routeComposition = File.ReadAllText(Path.Combine(aggregator, "ApiTransportEndpointRouteBuilderExtensions.cs"));
+        var serviceComposition = File.ReadAllText(Path.Combine(aggregator, "Configuration", "ApiTransportServiceCollectionExtensions.cs"));
+        var families = new[] { "Agents", "Bootstrap", "Extensions", "Flows", "Identity", "Models", "Packs", "Resources", "Runtime", "Secrets", "Sources", "Tools", "Triggers", "Work", "Workplace" };
+        foreach (var family in families)
+        {
+            Assert.AreEqual(1, CountOccurrences(routeComposition, $"Map{family}Api("), family);
+            Assert.AreEqual(1, CountOccurrences(serviceComposition, $"Add{family}Api("), family);
+        }
+        Assert.IsFalse(Directory.EnumerateFiles(aggregator, "*.cs", SearchOption.AllDirectories)
+            .Any(path => path.Contains($"{Path.DirectorySeparatorChar}Api{Path.DirectorySeparatorChar}", StringComparison.Ordinal)));
+        var foundation = File.ReadAllText(Path.Combine(root, "src", "ApiModuleGlobalUsings.cs"));
+        Assert.DoesNotContain("Agentstration.", foundation, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public void CrossFamilyWorkOperationsUseOneQueryProjection()
+    {
+        var root = FindRepositoryRoot();
+        var endpoint = File.ReadAllText(Path.Combine(root, "src", "Agentstration.Workplace.Api", "Api", "WorkOperationsEndpoints.cs"));
+        Assert.Contains("IWorkOperationsQueryService", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("FlowRunService", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("RunsForAsync", endpoint, StringComparison.Ordinal);
+        Assert.IsTrue(File.Exists(Path.Combine(root, "src", "Agentstration.Triggers.Api", "Api", "TriggerConfigurationEndpoints.cs")));
+        Assert.IsTrue(File.Exists(Path.Combine(root, "src", "Agentstration.Triggers.Api", "Api", "TriggerOccurrenceEndpoints.cs")));
     }
 
     [TestMethod]
@@ -160,11 +214,14 @@ public sealed class DependencyTests
     {
         var repositoryRoot = FindRepositoryRoot();
         var hostRoot = Path.Combine(repositoryRoot, "src", "Agentstration.Web");
-        var apiRoot = Path.Combine(repositoryRoot, "src", "Agentstration.Api");
+        var srcRoot = Path.Combine(repositoryRoot, "src");
         var program = File.ReadAllText(Path.Combine(hostRoot, "Program.cs"));
         var composition = File.ReadAllText(Path.Combine(hostRoot, "Hosting", "StandaloneHostComposition.cs"));
         var apiTransport = string.Join(Environment.NewLine, Directory
-            .EnumerateFiles(apiRoot, "*.cs", SearchOption.AllDirectories)
+            .EnumerateDirectories(srcRoot, "Agentstration.*.Api")
+            .Append(Path.Combine(srcRoot, "Agentstration.Api"))
+            .Distinct(StringComparer.Ordinal)
+            .SelectMany(directory => Directory.EnumerateFiles(directory, "*.cs", SearchOption.AllDirectories))
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
             .Select(File.ReadAllText));
 
@@ -917,9 +974,12 @@ public sealed class DependencyTests
     [TestMethod]
     public void ApiEndpointsDoNotImplementClaimOrRoleAuthorizationLogic()
     {
-        var apiRoot = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Api", "Api");
+        var srcRoot = Path.Combine(FindRepositoryRoot(), "src");
         var forbidden = new[] { "User.IsInRole", "User.Claims", "User.FindFirst", "ClaimTypes." };
-        var violations = Directory.EnumerateFiles(apiRoot, "*.cs", SearchOption.AllDirectories)
+        var violations = Directory.EnumerateDirectories(srcRoot, "Agentstration.*.Api")
+            .SelectMany(directory => Directory.Exists(Path.Combine(directory, "Api"))
+                ? Directory.EnumerateFiles(Path.Combine(directory, "Api"), "*.cs", SearchOption.AllDirectories)
+                : [])
             .Where(path => forbidden.Any(value => File.ReadAllText(path).Contains(value, StringComparison.Ordinal)))
             .Select(Path.GetFileName)
             .ToArray();
@@ -996,7 +1056,8 @@ public sealed class DependencyTests
             foreach (var compile in document.Descendants().Where(element => element.Name.LocalName == "Compile"))
             {
                 var include = compile.Attribute("Include")?.Value;
-                if (string.IsNullOrWhiteSpace(include) || include.Contains("$(", StringComparison.Ordinal)) continue;
+                if (string.IsNullOrWhiteSpace(include) || include.Contains("$(", StringComparison.Ordinal)
+                    || string.Equals(include.Replace('\\', '/'), "../ApiModuleGlobalUsings.cs", StringComparison.Ordinal)) continue;
 
                 var normalized = include.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
                 var sourcePath = Path.GetFullPath(Path.Combine(projectDirectory, normalized));
