@@ -25,6 +25,8 @@ public static class ResourcePlanningApiModule
         plans.MapPost("/{id:guid}/change-sets", CreateChangeSetAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         plans.MapGet("/change-sets", ListChangeSetsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         plans.MapGet("/change-sets/{id:guid}", GetChangeSetAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapPost("/change-sets/{id:guid}/validations", ValidateChangeSetAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapGet("/change-sets/{id:guid}/validations", ListChangeSetValidationsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         return endpoints;
     }
 
@@ -152,4 +154,13 @@ public static class ResourcePlanningApiModule
 
     private static Task<IResult> ListChangeSetsAsync(Guid? planId, int? skip, int? take, ResourceChangeSetService service, ICurrentRequestContext context, CancellationToken cancellationToken) => ExecuteAsync(async () =>
         Results.Ok(await service.ListAsync(Scope(RequireWorkspace(context)), planId is null ? null : new ResourcePlanId(planId.Value), skip ?? 0, take ?? 50, cancellationToken)));
+
+    private static Task<IResult> ValidateChangeSetAsync(Guid id, ResourceChangeSetValidationService service, ICurrentRequestContext context, CancellationToken cancellationToken) => ExecuteAsync(async () =>
+    {
+        var current = RequireWorkspace(context);
+        return Results.Ok(await service.ValidateAsync(Scope(current), new(id), current.PrincipalId, cancellationToken));
+    });
+
+    private static Task<IResult> ListChangeSetValidationsAsync(Guid id, ResourceChangeSetValidationService service, ICurrentRequestContext context, CancellationToken cancellationToken) => ExecuteAsync(async () =>
+        Results.Ok(await service.ListAsync(Scope(RequireWorkspace(context)), new(id), cancellationToken)));
 }
