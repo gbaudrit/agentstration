@@ -2,9 +2,9 @@ using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Flows;
 using Agentstration.Infrastructure.Declarative;
+using Agentstration.ResourceManagement;
 using Agentstration.ResourcePlanning;
 using Agentstration.ResourcePlanning.Contracts;
-using Agentstration.Resources;
 
 namespace Agentstration.Management.Tests;
 
