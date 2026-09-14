@@ -12,6 +12,7 @@ using Agentstration.Infrastructure.Events;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Infrastructure.Notifications;
 using Agentstration.Infrastructure.Packs;
+using Agentstration.Infrastructure.ResourcePlanning;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Sources;
 using Agentstration.Infrastructure.Triggers;
@@ -327,6 +328,13 @@ public static class DependencyInjection
         services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<WorkNotificationMcpToolDefinitionProvider>());
         services.AddSingleton<WorkNotificationMcpTool>();
         services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<WorkNotificationMcpTool>());
+        AddInternalTool<ResourcePlanCreateMcpTool>(services);
+        AddInternalTool<ResourcePlanGetMcpTool>(services);
+        AddInternalTool<ResourcePlanRefineMcpTool>(services);
+        AddInternalTool<ResourcePlanSubmitMcpTool>(services);
+        AddInternalTool<ResourcePlanMaterializeMcpTool>(services);
+        AddInternalTool<ResourceChangeSetCreateMcpTool>(services);
+        AddInternalTool<ResourceChangeSetValidateMcpTool>(services);
         services.AddSingleton<InternalMcpToolProjectionService>();
         services.AddSingleton(provider => new Lazy<IEnumerable<IInternalMcpToolHandler>>(
             () => provider.GetServices<IInternalMcpToolHandler>()));
@@ -377,5 +385,12 @@ public static class DependencyInjection
         services.AddSingleton<IToolDefinitionExecutor, ToolDefinitionExecutor>();
         services.AddSingleton(provider => new Lazy<IToolDefinitionExecutor>(provider.GetRequiredService<IToolDefinitionExecutor>));
         return services;
+    }
+
+    private static void AddInternalTool<TTool>(IServiceCollection services) where TTool : class, IInternalMcpToolHandler
+    {
+        services.AddSingleton<TTool>();
+        services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<TTool>());
+        services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<TTool>());
     }
 }
