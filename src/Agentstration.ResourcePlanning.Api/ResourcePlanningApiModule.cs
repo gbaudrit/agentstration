@@ -14,19 +14,19 @@ public static class ResourcePlanningApiModule
     public static IEndpointRouteBuilder MapResourcePlanningApi(this IEndpointRouteBuilder endpoints)
     {
         var plans = endpoints.MapGroup("/api/resource-plans").RequireAuthorization(AgentstrationPolicies.Authenticated);
-        plans.MapPost("/", CreateAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        plans.MapGet("/", ListAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        plans.MapGet("/{id:guid}", GetAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        plans.MapPut("/{id:guid}", RefineAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        plans.MapPost("/{id:guid}/status", ChangeStatusAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        plans.MapGet("/{id:guid}/activities", ListActivitiesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        plans.MapPost("/validate-content", ValidateContent).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        plans.MapPost("/{id:guid}/materializations", MaterializeAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        plans.MapPost("/{id:guid}/change-sets", CreateChangeSetAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        plans.MapGet("/change-sets", ListChangeSetsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        plans.MapGet("/change-sets/{id:guid}", GetChangeSetAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        plans.MapPost("/change-sets/{id:guid}/validations", ValidateChangeSetAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        plans.MapGet("/change-sets/{id:guid}/validations", ListChangeSetValidationsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapPost("/", CreateAsync).Produces<ResourcePlan>(StatusCodes.Status201Created).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapGet("/", ListAsync).Produces<ResourcePlanPage>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapGet("/{id:guid}", GetAsync).Produces<ResourcePlan>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapPut("/{id:guid}", RefineAsync).Produces<ResourcePlan>().RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapPost("/{id:guid}/status", ChangeStatusAsync).Produces<ResourcePlan>().RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapGet("/{id:guid}/activities", ListActivitiesAsync).Produces<ResourcePlanActivity[]>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapPost("/validate-content", ValidateContent).Produces<PlanningValidationResult>().RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapPost("/{id:guid}/materializations", MaterializeAsync).Produces<ResourcePlanMaterialization>().RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapPost("/{id:guid}/change-sets", CreateChangeSetAsync).Produces<ResourceChangeSet>(StatusCodes.Status201Created).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapGet("/change-sets", ListChangeSetsAsync).Produces<ResourceChangeSetPage>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapGet("/change-sets/{id:guid}", GetChangeSetAsync).Produces<ResourceChangeSet>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapPost("/change-sets/{id:guid}/validations", ValidateChangeSetAsync).Produces<ResourceChangeSetValidation>().RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapGet("/change-sets/{id:guid}/validations", ListChangeSetValidationsAsync).Produces<ResourceChangeSetValidation[]>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         return endpoints;
     }
 
