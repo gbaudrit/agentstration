@@ -2,7 +2,6 @@ extern alias UtilitiesExtension;
 
 using System.Net.Http;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
 using Agentstration.Tools.Mcp;
@@ -167,16 +166,16 @@ public sealed class McpToolCatalogTests
 
     private static ToolProviderResource Provider() => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.ToolProvider,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ToolResourceKinds.ToolProvider,
         Metadata = new ResourceMetadata { Name = "local" },
         Definition = new ToolProviderProperties { DisplayName = "Local MCP", ProviderType = ToolProviderType.Mcp, Mcp = new McpToolProviderConfiguration { Transport = McpToolProviderTransport.StreamableHttp, Endpoint = new Uri("http://localhost/mcp") } }
     };
 
     private static ToolResource Tool(string providerId) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.Tool,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ToolResourceKinds.Tool,
         Metadata = new ResourceMetadata { Name = "local.sample_tool" },
         Definition = new ToolResourceProperties
         {
@@ -194,7 +193,7 @@ public sealed class McpToolCatalogTests
         public HttpClient CreateClient(string name) => new(handler, false) { BaseAddress = new Uri("http://localhost/") };
     }
 
-    private sealed class FakeStore(params Resource[] resources) : IControlPlaneStore
+    private sealed class FakeStore(params Resource[] resources) : IResourceStore
     {
         private readonly Dictionary<ResourceKey, Resource> values = resources.ToDictionary(value => new ResourceKey(value.Kind, value.Metadata.Name));
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;

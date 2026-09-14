@@ -643,15 +643,24 @@ public sealed class DependencyTests
             .Select(path => Path.GetRelativePath(repositoryRoot, path))
             .ToArray();
 
-        var sourceFiles = Directory.EnumerateFiles(Path.Combine(repositoryRoot, "src"), "*.cs", SearchOption.AllDirectories)
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase));
-        var staleNamespaces = sourceFiles
-            .Where(path => File.ReadAllText(path).Contains("namespace Agentstration.Management.Abstractions", StringComparison.Ordinal))
+        var removedSymbols = new[]
+        {
+            string.Concat("Agentstration.Management", ".Abstractions"),
+            string.Concat("IControlPlane", "Store"),
+            string.Concat("ManagementApi", "Versions")
+        };
+        var sourceFiles = new[] { "src", "tests" }
+            .SelectMany(directory => Directory.EnumerateFiles(Path.Combine(repositoryRoot, directory), "*.cs", SearchOption.AllDirectories))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !string.Equals(path, Path.Combine(repositoryRoot, "tests", "Agentstration.ArchitectureTests", "DependencyTests.cs"), StringComparison.OrdinalIgnoreCase));
+        var staleUsages = sourceFiles
+            .Where(path => removedSymbols.Any(symbol => File.ReadAllText(path).Contains(symbol, StringComparison.Ordinal)))
             .Select(path => Path.GetRelativePath(repositoryRoot, path))
             .ToArray();
 
         Assert.IsEmpty(staleReferences, $"The removed catch-all Abstractions project is still referenced by: {string.Join(", ", staleReferences)}");
-        Assert.IsEmpty(staleNamespaces, $"The removed catch-all namespace is still declared by: {string.Join(", ", staleNamespaces)}");
+        Assert.IsEmpty(staleUsages, $"Removed Management abstractions are still used by: {string.Join(", ", staleUsages)}");
     }
 
     [TestMethod]

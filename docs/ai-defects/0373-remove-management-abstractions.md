@@ -47,16 +47,15 @@ No architecture rule failed when the compatibility project, namespace, or projec
 
 ## Resolution
 
-PR #364 removes the `Agentstration.Management.Abstractions` project, namespace, solution entry, and project references. Remaining consumers use `IResourceStore`, `ResourceApiVersions`, and family-owned resource-kind constants directly. The obsolete compatibility resources and documentation are removed or updated while persisted wire values remain unchanged.
+PR #364 removes the `Agentstration.Management.Abstractions` project, namespace, solution entry, and project references. Remaining consumers use `IResourceStore`, `ResourceApiVersions`, and family-owned resource-kind constants directly. A final Windows checkout exposed one mixed-line-ending test blob that still used the removed aliases; the test was migrated and normalized before handoff. The obsolete compatibility resources and documentation are removed or updated while persisted wire values remain unchanged.
 
 ## Prevention
 
-Architecture tests now assert that the catch-all project file is absent, no project references it, and no source namespace redeclares it. A focused resource-kind test verifies that family-owned constants preserve the existing wire values. Dependency documentation and ADR-0109 explicitly describe family ownership and prohibit recreating another Management catch-all.
+Architecture tests now assert that the catch-all project file is absent, no project references it, and no product or test C# source uses its namespace, `IControlPlaneStore`, or `ManagementApiVersions`. A focused resource-kind test verifies that family-owned constants preserve the existing wire values. Dependency documentation and ADR-0109 explicitly describe family ownership and prohibit recreating another Management catch-all.
 
 ## Validation
 
 - Release build: succeeded with 0 warnings and 0 errors
-- Architecture guardrails: 71/71 passed, including project removal, absence of residual references, and preservation of persisted resource-kind wire values
-- Functional validation: 870 executed, 867 passed, 3 optional external integrations skipped, 0 failed
-- Test assemblies were executed directly through MSTest in a single-process Release validation because the validation environment did not support the usual `dotnet test` IPC/named-pipe path
+- Architecture guardrails: 75/75 passed, including project removal, absence of residual source/test usages, and preservation of persisted resource-kind wire values
+- Functional validation: 874 executed, 871 passed, 3 optional external integrations skipped, 0 failed
 - Git tree inspection confirmed removal of `src/Agentstration.Management.Abstractions` and addition of focused architecture guards
