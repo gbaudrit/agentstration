@@ -11,6 +11,7 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class ResourcePlanningCompositionTests
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly string SampleRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "samples", "resource-planning"));
 
     [TestMethod]
@@ -36,7 +37,7 @@ public sealed class ResourcePlanningCompositionTests
     public void RepresentativeFunctionalFixtureIsStableAndValid()
     {
         var json = File.ReadAllText(Path.Combine(SampleRoot, "fixtures", "customer-support-plan.json"));
-        var plan = JsonSerializer.Deserialize<FunctionalResourcePlanV1>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var plan = JsonSerializer.Deserialize<FunctionalResourcePlanV1>(json, JsonOptions);
         Assert.IsNotNull(plan);
         var content = FunctionalResourcePlanSerializer.Serialize(plan);
         Assert.IsTrue(new FunctionalResourcePlanValidator().Validate(content).IsValid);
