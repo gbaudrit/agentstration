@@ -1,7 +1,7 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Diagnostics;
 using Agentstration.Agents;
 using Agentstration.Flows;
 using Agentstration.Flows.Storage.Abstractions;
@@ -152,8 +152,20 @@ public sealed class ResourcePlanMaterializationService(
         .Where(value => string.Equals(value.From, logicalId, StringComparison.OrdinalIgnoreCase))
         .Select(value => value.To).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
-    private static string BuildInstructions(PlanningRoleIntent role) => string.Join(Environment.NewLine,
-        new[] { role.Purpose, "", "Responsibilities:", .. role.Responsibilities.Select(value => $"- {value}"), "", "Required capabilities:", .. role.Capabilities.Select(value => $"- {value}") });
+    private static string BuildInstructions(PlanningRoleIntent role)
+    {
+        string[] lines =
+        [
+            role.Purpose,
+            "",
+            "Responsibilities:",
+            .. role.Responsibilities.Select(value => $"- {value}"),
+            "",
+            "Required capabilities:",
+            .. role.Capabilities.Select(value => $"- {value}")
+        ];
+        return string.Join(Environment.NewLine, lines);
+    }
 
     private static string StableName(string logicalId)
     {

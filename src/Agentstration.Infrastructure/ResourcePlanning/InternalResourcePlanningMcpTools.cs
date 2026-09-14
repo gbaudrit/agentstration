@@ -141,10 +141,16 @@ public abstract class ResourcePlanningMcpTool(
         description = "Functional solution intent; never a canonical Agentstration Resource manifest.",
         properties = new
         {
-            solution = new { type = "object" }, roles = new { type = "array" }, workflows = new { type = "array" },
-            integrations = new { type = "array" }, experiences = new { type = "array" }, dependencies = new { type = "array" }, runtime = new { type = "object" }
+            solution = new { type = "object" },
+            roles = new { type = "array" },
+            workflows = new { type = "array" },
+            integrations = new { type = "array" },
+            experiences = new { type = "array" },
+            dependencies = new { type = "array" },
+            runtime = new { type = "object" }
         },
-        required = new[] { "solution" }, additionalProperties = false
+        required = new[] { "solution" },
+        additionalProperties = false
     };
 }
 

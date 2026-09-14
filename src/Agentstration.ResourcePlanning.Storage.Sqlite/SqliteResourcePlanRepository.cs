@@ -229,8 +229,12 @@ public sealed class SqliteResourcePlanRepository(
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         context.Validations.Add(new()
         {
-            Id = validation.Id, TenantId = validation.Scope.TenantId, WorkspaceId = validation.Scope.WorkspaceId.Value,
-            ChangeSetId = validation.ChangeSetId.Value, ChangeSetDigest = validation.ChangeSetDigest, ValidatedAt = validation.ValidatedAt,
+            Id = validation.Id,
+            TenantId = validation.Scope.TenantId,
+            WorkspaceId = validation.Scope.WorkspaceId.Value,
+            ChangeSetId = validation.ChangeSetId.Value,
+            ChangeSetDigest = validation.ChangeSetDigest,
+            ValidatedAt = validation.ValidatedAt,
             Payload = JsonSerializer.Serialize(validation, JsonOptions)
         });
         await SaveCreateAsync(context, cancellationToken);
@@ -259,9 +263,16 @@ public sealed class SqliteResourcePlanRepository(
     private static ResourcePlanSnapshot Snapshot(ResourcePlanDocument value) => new(Deserialize<ResourcePlan>(value.Payload), value.ETag);
     private static ResourceChangeSetDocument ToDocument(ResourceChangeSet value) => new()
     {
-        Id = value.Id.Value, TenantId = value.Scope.TenantId, WorkspaceId = value.Scope.WorkspaceId.Value, PlanId = value.PlanId.Value,
-        PlanRevision = value.PlanRevision, MaterializationDigest = value.MaterializationDigest, Status = value.Status, CreatedAt = value.CreatedAt,
-        Payload = JsonSerializer.Serialize(value, JsonOptions), ETag = NewETag()
+        Id = value.Id.Value,
+        TenantId = value.Scope.TenantId,
+        WorkspaceId = value.Scope.WorkspaceId.Value,
+        PlanId = value.PlanId.Value,
+        PlanRevision = value.PlanRevision,
+        MaterializationDigest = value.MaterializationDigest,
+        Status = value.Status,
+        CreatedAt = value.CreatedAt,
+        Payload = JsonSerializer.Serialize(value, JsonOptions),
+        ETag = NewETag()
     };
     private static ResourceChangeSetSnapshot Snapshot(ResourceChangeSetDocument value) => new(Deserialize<ResourceChangeSet>(value.Payload), value.ETag);
     private static T Deserialize<T>(string payload) => JsonSerializer.Deserialize<T>(payload, JsonOptions) ?? throw new InvalidOperationException("Stored Resource Planning data is invalid.");
