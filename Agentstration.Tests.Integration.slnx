@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/tests/integration/">
+    <Project Path="tests/Agentstration.Console.Web.Tests/Agentstration.Console.Web.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.Tests/Agentstration.Api.Tests.csproj" />
     <Project Path="tests/Agentstration.Application.Tests/Agentstration.Application.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Storage.Tests/Agentstration.Management.Storage.Tests.csproj" />
