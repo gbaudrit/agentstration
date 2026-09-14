@@ -1,6 +1,5 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
-    <ProjectReference Include="../../src/Agentstration.Api/Agentstration.Api.csproj" />
     <ProjectReference Include="../../src/Agentstration.Application/Agentstration.Application.csproj" />
     <ProjectReference Include="../../src/Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
     <ProjectReference Include="../../src/Agentstration.Flows/Agentstration.Flows.csproj" />
@@ -8,14 +7,10 @@
     <ProjectReference Include="../../src/Agentstration.Flows.Contracts/Agentstration.Flows.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Flows.Storage.Abstractions/Agentstration.Flows.Storage.Abstractions.csproj" />
     <ProjectReference Include="../../src/Agentstration.Flows.Storage.Sqlite/Agentstration.Flows.Storage.Sqlite.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
     <ProjectReference Include="../../src/Agentstration.Work/Agentstration.Work.csproj" />
     <ProjectReference Include="../../src/Agentstration.Work.Contracts/Agentstration.Work.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Work.Storage.Abstractions/Agentstration.Work.Storage.Abstractions.csproj" />
     <ProjectReference Include="../../src/Agentstration.Work.Storage.Sqlite/Agentstration.Work.Storage.Sqlite.csproj" />
     <ProjectReference Include="../../src/Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
 </Project>

@@ -1,5 +1,3 @@
-extern alias workapi;
-
 using Agentstration.Identity.Contracts;
 using Agentstration.Agents;
 using System.Net;
@@ -19,9 +17,9 @@ using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
-using WorkApiProgram = workapi::Program;
+using WorkApiProgram = global::Program;
 
-namespace Agentstration.Work.Api.Tests;
+namespace Agentstration.Api.Tests;
 
 [TestClass]
 public sealed class WorkplaceApiTests

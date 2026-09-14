@@ -60,8 +60,11 @@ src/
   Agentstration.Work.Storage.Abstractions/
   Agentstration.Work.Storage.Sqlite/
 tests/
+  Agentstration.Api.Tests/
   Agentstration.Application.Tests/
   Agentstration.ArchitectureTests/
+  Agentstration.Console.Client.Tests/
+  Agentstration.Console.Components.Tests/
   Agentstration.Tools.Tests/
   Agentstration.Management.Storage.Tests/
   Agentstration.Management.Sources.Tests/
