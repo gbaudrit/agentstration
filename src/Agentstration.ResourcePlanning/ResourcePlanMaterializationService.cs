@@ -7,6 +7,7 @@ using Agentstration.Flows;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourcePlanning.Contracts;
+using Agentstration.ResourcePlanning.Storage.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
