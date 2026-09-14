@@ -1,0 +1,22 @@
+@page "/settings/organization/access"
+@inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
+
+<PageTitle>@T("AccessControl") · @T("Organization") · Agentstration</PageTitle>
+<PageHeader Title="@T("AccessControl")" Description="@T("Access.Description")" />
+<OrganizationSettingsNav />
+@if (view is null) { <LoadingState Message="@T("LoadingAccess")" /> }
+else
+{
+    <DataGrid TItem="AccessRow" Items="Rows">
+        <Header><tr><th>@T("Principal")</th><th>@T("Role")</th><th>@T("Scope")</th><th>@T("Inheritance")</th></tr></Header>
+        <Row Context="row"><tr><td>@row.Member.Principal.DisplayName</td><td><strong>@row.Assignment.Role.DisplayName</strong></td><td><code>@row.Assignment.Scope</code></td><td>@if(row.Assignment.Scope.StartsWith("/tenants/",StringComparison.Ordinal)){<StatusBadge Text="@T("Inherited")" Status="UiStatus.Info" />}else{<span>@T("Explicit")</span>}</td></tr></Row>
+    </DataGrid>
+}
+@code {
+    private sealed record AccessRow(Agentstration.Identity.Contracts.OrganizationMemberResponse Member, Agentstration.Identity.Contracts.AssignedRoleResponse Assignment);
+    private Agentstration.Identity.Contracts.OrganizationAdministrationResponse? view;
+    private string T(string key) => Localizer[key].Value;
+    private IReadOnlyList<AccessRow> Rows => view?.Members.SelectMany(member => member.Roles.Select(role => new AccessRow(member, role))).ToArray() ?? [];
+    protected override async Task OnInitializedAsync() => view = await Client.GetOrganizationAsync(default);
+}

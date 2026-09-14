@@ -37,14 +37,14 @@ $lanes = switch ($Shard.ToLowerInvariant()) {
             @{
                 Name = 'Fast'
                 Solution = 'Agentstration.Tests.Fast.slnx'
-                MinimumTests = 139
+                MinimumTests = 365
                 ParallelModules = 4
                 ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/a/fast'
             },
             @{
                 Name = 'Integration coverage shard A'
                 Solution = 'Agentstration.Tests.CoverageA.slnx'
-                MinimumTests = 221
+                MinimumTests = 152
                 ParallelModules = 2
                 ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/a/integration'
             }
@@ -55,7 +55,7 @@ $lanes = switch ($Shard.ToLowerInvariant()) {
             @{
                 Name = 'Integration coverage shard B'
                 Solution = 'Agentstration.Tests.CoverageB.slnx'
-                MinimumTests = 471
+                MinimumTests = 372
                 ParallelModules = 2
                 ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/b/integration'
             }
@@ -66,14 +66,14 @@ $lanes = switch ($Shard.ToLowerInvariant()) {
             @{
                 Name = 'Fast'
                 Solution = 'Agentstration.Tests.Fast.slnx'
-                MinimumTests = 139
+                MinimumTests = 365
                 ParallelModules = 4
                 ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/fast'
             },
             @{
                 Name = 'Integration'
                 Solution = 'Agentstration.Tests.Integration.slnx'
-                MinimumTests = 692
+                MinimumTests = 524
                 ParallelModules = 2
                 ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/integration'
             }

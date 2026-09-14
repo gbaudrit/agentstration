@@ -1,0 +1,128 @@
+@page "/triggers/{Name}"
+@rendermode InteractiveServer
+@inject ITriggerApiClient Client
+@inject NavigationManager Navigation
+@inject NotificationState Notifications
+@inject ConsoleContextState ContextState
+@inject TimeProvider TimeProvider
+@inject Microsoft.Extensions.Localization.IStringLocalizer<TriggerStrings> Localizer
+
+<PageTitle>@T("Trigger") · Agentstration</PageTitle>
+@if (loading)
+{
+    <LoadingState Message="@T("LoadingOperations")" />
+}
+else if (notFound || stored is null)
+{
+    <EmptyState Title="@T("NotFoundTitle")" Message="@T("NotFoundMessage")"><a class="button-secondary" href="/triggers">@T("BackToTriggers")</a></EmptyState>
+}
+else
+{
+    var trigger = stored.Value;
+    <PageHeader Title="@trigger.Definition.DisplayName" Description="@(T("TriggerResourceDescription", trigger.Namespace.Value, trigger.Name))">
+        <Metadata><StatusBadge Text="@(trigger.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(trigger.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /><span>@T("Generation", trigger.Generation)</span></Metadata>
+        <Actions>
+            @if (CanExecute) { <button class="button-primary" disabled="@(!trigger.Definition.Enabled || running)" @onclick="RunNowAsync">@(running ? T("Submitting") : T("RunNow"))</button> }
+            @if (CanManage)
+            {
+                @if (trigger.Definition.Enabled) { <button class="button-secondary" disabled="@changingState" @onclick="DisableAsync">@(changingState ? T("Disabling") : T("Disable"))</button> }
+                else { <button class="button-primary" @onclick="() => confirmEnable = true">@T("Enable")</button> }
+                <a class="button-secondary" href="@($"/triggers/{Uri.EscapeDataString(trigger.Name)}/edit")">@T("Edit")</a>
+                <button class="button-danger" @onclick="() => confirmDelete = true">@T("Delete")</button>
+            }
+            <a class="button-secondary" href="/triggers">@T("Back")</a>
+        </Actions>
+    </PageHeader>
+
+    @if (!string.IsNullOrWhiteSpace(message)) { <div class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")" role="@(hasError ? "alert" : "status")">@message</div> }
+    @if (trigger.Observed.LastOutcome == TriggerLastOutcome.Failed)
+    {
+        <section class="panel trigger-attention"><div class="panel-header"><div><p class="eyebrow">@T("RequiresAttention")</p><h2>@T("LastFiringFailed")</h2></div><StatusBadge Text="@T("Outcome.Failed")" Status="UiStatus.Danger" /></div><p>@(trigger.Observed.LastErrorCode ?? T("UnknownTriggerError"))</p></section>
+    }
+
+    <div class="trigger-detail-grid">
+        <div class="trigger-detail-stack">
+            <section class="panel">
+                <div class="panel-header"><div><p class="eyebrow">@T("When")</p><h2>@T("Schedule")</h2></div><StatusBadge Text="@T($"ScheduleType.{trigger.Definition.Source.Schedule!.Type}")" Status="UiStatus.Info" /></div>
+                <dl class="resource-details"><dt>@T("Definition")</dt><dd>@TriggerUi.ScheduleLabel(trigger.Definition.Source.Schedule, Localizer)</dd><dt>@T("NextOccurrence")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.NextOccurrenceAt)</dd><dt>@T("LastScheduled")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.LastScheduledAt)</dd><dt>@T("LastFired")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.LastFiredAt)</dd><dt>@T("Misfire")</dt><dd>@MisfireLabel(trigger.Definition.MisfirePolicy)</dd><dt>@T("Concurrency")</dt><dd>@ConcurrencyLabel(trigger.Definition.ConcurrencyPolicy)</dd></dl>
+            </section>
+            <section class="panel">
+                <div class="panel-header"><div><p class="eyebrow">@T("What")</p><h2>@T("WorkSubmission")</h2></div></div>
+                <dl class="resource-details"><dt>@T("TargetKind")</dt><dd>@T("Flow")</dd><dt>@T("Flow")</dt><dd><a href="@FlowUrl(trigger)">@trigger.Definition.Target.Flow!.Name</a></dd><dt>@T("Resolution")</dt><dd>@(trigger.Definition.Target.Flow.Version is null ? T("ActiveVersionThenPinned") : T("PinnedVersion", trigger.Definition.Target.Flow.Version))</dd><dt>@T("Input")</dt><dd><pre class="trigger-input">@PrettyInput(trigger.Definition.Input)</pre></dd></dl>
+            </section>
+        </div>
+        <aside class="trigger-detail-stack">
+            <section class="panel">
+                <div class="panel-header"><div><p class="eyebrow">@T("Security")</p><h2>@T("ExecutionIdentity")</h2></div></div>
+                @if (trigger.Definition.ExecutionScope is { } scope)
+                {
+                    <dl class="resource-details"><dt>@T("Principal")</dt><dd><code>@Short(scope.PrincipalId)</code></dd><dt>@T("Workspace")</dt><dd><code>@Short(scope.WorkspaceId)</code></dd><dt>@T("Authorization")</dt><dd>@T("AuthorizationReevaluated")</dd><dt>@T("Revocation")</dt><dd>@T("FailsClosed")</dd></dl>
+                }
+                else { <p>@T("NoExecutionIdentity")</p> }
+            </section>
+            <section class="panel">
+                <div class="panel-header"><div><p class="eyebrow">@T("Observed")</p><h2>@T("CurrentStatus")</h2></div><StatusBadge Text="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" /></div>
+                <dl class="resource-details"><dt>@T("Enabled")</dt><dd>@T(trigger.Definition.Enabled ? "Yes" : "No")</dd><dt>@T("LastOutcome")</dt><dd>@T($"Outcome.{trigger.Observed.LastOutcome}")</dd><dt>@T("ErrorCode")</dt><dd><code>@(trigger.Observed.LastErrorCode ?? "—")</code></dd><dt>@T("Uid")</dt><dd><code>@Short(trigger.Uid)</code></dd></dl>
+            </section>
+        </aside>
+    </div>
+
+    <section class="panel trigger-history">
+        <div class="panel-header"><div><p class="eyebrow">@T("History")</p><h2>@T("TriggerOccurrences")</h2></div><button class="text-button" disabled="@refreshing" @onclick="LoadHistoryAsync">@(refreshing ? T("Refreshing") : T("Refresh"))</button></div>
+        @if (history.Count == 0) { <EmptyState Title="@T("NoOccurrences")" Message="@T("NoOccurrencesMessage")" /> }
+        else
+        {
+            <DataGrid TItem="TriggerOccurrence" Items="history">
+                <Header><tr><th>@T("Kind")</th><th>@T("Scheduled")</th><th>@T("ActuallyFired")</th><th>@T("Outcome")</th><th>@T("GenerationLabel")</th><th>@T("WorkDetails")</th></tr></Header>
+                <Row Context="occurrence"><tr>
+                    <td>@T($"OccurrenceKind.{occurrence.Kind}")</td><td>@TriggerUi.FormatDate(occurrence.ScheduledAt)</td><td>@TriggerUi.FormatDate(occurrence.FiredAt)</td>
+                    <td><StatusBadge Text="@T($"OccurrenceOutcome.{occurrence.Outcome}")" Status="@OccurrenceStatus(occurrence.Outcome)" /></td><td>@occurrence.TriggerGeneration</td>
+                    <td>@if (TaskUrl(occurrence) is { } taskUrl) { <a class="text-button" href="@taskUrl">@T("OpenTask")</a> } else if (occurrence.ErrorCode is not null) { <details><summary>@occurrence.ErrorCode</summary><p>@occurrence.ErrorMessage</p></details> } else { <span>—</span> }</td>
+                </tr></Row>
+            </DataGrid>
+        }
+    </section>
+}
+
+<ConfirmationDialog IsOpen="@confirmEnable" Title="@T("EnableTriggerTitle")" Message="@EnableMessage" ConfirmLabel="@T("EnableTrigger")" OnConfirm="EnableAsync" OnCancel="() => confirmEnable = false" />
+<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteTriggerTitle")" Message="@T("DeleteTriggerMessage")" ConfirmLabel="@T("DeleteTrigger")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+
+@code {
+    [Parameter] public string Name { get; set; } = "";
+    private ResourceSnapshot<TriggerResource>? stored;
+    private IReadOnlyList<TriggerOccurrence> history = [];
+    private bool loading = true, notFound, running, changingState, refreshing, confirmEnable, confirmDelete, hasError;
+    private string? message;
+    private bool CanManage => ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    private bool CanExecute => ContextState.HasPermission(AuthorizationPermissions.RunsExecute);
+    private string EnableMessage => stored is null ? T("EnableThisTrigger") : T("EnableMessage", stored.Value.Definition.DisplayName, TriggerUi.ScheduleLabel(stored.Value.Definition.Source.Schedule, Localizer), stored.Value.Definition.Target.Flow?.Name ?? "—");
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; notFound = false; message = null;
+        try { stored = await Client.GetAsync(ResourceNamespace.Default, Name, CancellationToken.None); if (stored is null) { notFound = true; return; } await LoadHistoryAsync(); }
+        catch (Exception exception) { SetError(exception); }
+        finally { loading = false; }
+    }
+    private async Task LoadHistoryAsync() { if (stored is null) return; refreshing = true; try { history = await Client.ListHistoryAsync(stored.Value.Namespace, stored.Value.Name, 100, CancellationToken.None); } catch (Exception exception) { SetError(exception); } finally { refreshing = false; } }
+    private async Task RunNowAsync() { if (stored is null || running || !CanExecute) return; running = true; ClearMessage(); try { var occurrence = await Client.RunNowAsync(stored.Value.Namespace, stored.Value.Name, CancellationToken.None); SetSuccess(occurrence.WorkItemId is null ? T("RunCompleted", T($"OccurrenceOutcome.{occurrence.Outcome}")) : T("WorkSubmitted", Short(occurrence.WorkItemId))); Notifications.Add(new(Guid.NewGuid(), T("Notification.Fired"), stored.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success)); await ReloadAsync(); } catch (Exception exception) { SetError(exception); } finally { running = false; } }
+    private async Task EnableAsync() { confirmEnable = false; await SetEnabledAsync(true); }
+    private async Task DisableAsync() => await SetEnabledAsync(false);
+    private async Task SetEnabledAsync(bool enabled) { if (stored is null || changingState || !CanManage) return; changingState = true; ClearMessage(); try { stored = await Client.SaveAsync(stored.Value with { Definition = stored.Value.Definition with { Enabled = enabled } }, stored.ETag, CancellationToken.None); SetSuccess(T(enabled ? "EnabledSuccess" : "DisabledSuccess")); Notifications.Add(new(Guid.NewGuid(), T(enabled ? "Notification.Enabled" : "Notification.Disabled"), stored.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), enabled ? UiStatus.Success : UiStatus.Neutral)); await LoadHistoryAsync(); } catch (Exception exception) { SetError(exception); } finally { changingState = false; } }
+    private async Task DeleteAsync() { if (stored is null || !CanManage) return; confirmDelete = false; try { await Client.DeleteAsync(stored.Value.Namespace, stored.Value.Name, stored.ETag, CancellationToken.None); Notifications.Add(new(Guid.NewGuid(), T("Notification.Deleted"), stored.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Neutral)); Navigation.NavigateTo("/triggers"); } catch (Exception exception) { SetError(exception); } }
+    private async Task ReloadAsync() { if (stored is null) return; stored = await Client.GetAsync(stored.Value.Namespace, stored.Value.Name, CancellationToken.None); await LoadHistoryAsync(); }
+    private void ClearMessage() { message = null; hasError = false; }
+    private void SetSuccess(string value) { message = value; hasError = false; }
+    private void SetError(Exception exception) { message = exception.Message; hasError = true; }
+    private static string FlowUrl(TriggerResource value) { var flow = value.Definition.Target.Flow!; return ConsoleResourceUrls.Flow(new FlowId(flow.Name, flow.Namespace ?? value.Namespace)); }
+    private static string? TaskUrl(TriggerOccurrence value) => Guid.TryParse(value.WorkItemId, out var taskId) ? $"/tasks/{taskId:D}" : null;
+    private static string Short(Guid value) => value.ToString("N")[..12];
+    private static string Short(string value) => value.Length <= 12 ? value : value[..12];
+    private static string PrettyInput(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
+    private string MisfireLabel(TriggerMisfirePolicy value) => T(value == TriggerMisfirePolicy.FireOnce ? "Misfire.FireOnceAfterRecovery" : "Misfire.Skip");
+    private string ConcurrencyLabel(TriggerConcurrencyPolicy value) => T(value == TriggerConcurrencyPolicy.Skip ? "Concurrency.SkipActive" : "Concurrency.AllowOverlap");
+    private static UiStatus OutcomeStatus(TriggerLastOutcome value) => value switch { TriggerLastOutcome.Submitted => UiStatus.Success, TriggerLastOutcome.Skipped => UiStatus.Warning, TriggerLastOutcome.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
+    private static UiStatus OccurrenceStatus(TriggerOccurrenceOutcome value) => value switch { TriggerOccurrenceOutcome.Submitted => UiStatus.Success, TriggerOccurrenceOutcome.Skipped => UiStatus.Warning, TriggerOccurrenceOutcome.Failed => UiStatus.Danger, TriggerOccurrenceOutcome.Pending => UiStatus.Info, _ => UiStatus.Neutral };
+}

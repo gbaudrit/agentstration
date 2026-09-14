@@ -149,11 +149,11 @@ jobs:
         if: needs.changes.outputs.dotnet == 'true'
         shell: pwsh
         run: |
-          dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 139 --max-parallel-test-modules 4
+          dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 365 --max-parallel-test-modules 4
           if ($LASTEXITCODE -ne 0) {
             throw 'Fast functional lane failed.'
           }
-          dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 692 --max-parallel-test-modules 2
+          dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 524 --max-parallel-test-modules 2
           if ($LASTEXITCODE -ne 0) {
             throw 'Integration functional lane failed.'
           }
@@ -195,6 +195,7 @@ jobs:
         shell: pwsh
         run: |
           $modules = @(
+            'Agentstration.Api.Tests',
             'Agentstration.Management.Api.Tests',
             'Agentstration.Management.Bootstrap.Tests',
             'Agentstration.Management.Security.Tests',
@@ -217,11 +218,11 @@ jobs:
             '| --- | ---: | ---: | ---: | ---: | ---: | --- |'
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
           $modules = @(
+            @{ Name = 'Agentstration.Api.Tests'; Tests = 191; Warning = 1700; Failure = 2048 },
             @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 43; Warning = 900; Failure = 1024 },
             @{ Name = 'Agentstration.Management.Bootstrap.Tests'; Tests = 23; Warning = 500; Failure = 700 },
             @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 38; Warning = 800; Failure = 1024 },
-            @{ Name = 'Agentstration.Management.Aep.Tests'; Tests = 11; Warning = 450; Failure = 700 },
-            @{ Name = 'Agentstration.Management.Sources.Tests'; Tests = 93; Warning = 550; Failure = 900 }
+            @{ Name = 'Agentstration.Management.Aep.Tests'; Tests = 11; Warning = 450; Failure = 700 }
           )
           foreach ($module in $modules) {
             ./scripts/ci/run-test-module-with-diagnostics.ps1 `

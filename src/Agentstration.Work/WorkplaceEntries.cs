@@ -1,9 +1,14 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Agentstration.Flow;
+using Agentstration.Flows;
 using Agentstration.Resources;
 
 namespace Agentstration.Work;
+
+public static class EntryResourceKinds
+{
+    public const string Entry = "Entry";
+}
 
 public sealed record EntryFieldValidation(int? MinimumLength = null, int? MaximumLength = null, IReadOnlyList<string>? AllowedExtensions = null);
 public sealed record EntryFieldOption(string Value, string Label);

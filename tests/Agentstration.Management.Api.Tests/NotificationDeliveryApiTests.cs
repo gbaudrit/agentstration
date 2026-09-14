@@ -1,12 +1,19 @@
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.Extensions;
+using Agentstration.Extensions.Aep;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Declarative;
 using Agentstration.Infrastructure.Notifications;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
-using Agentstration.Management.Core;
+using Agentstration.Models;
+using Agentstration.Packs;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Runtime.Core;
+using Agentstration.Sources;
+using Agentstration.Tools;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Microsoft.Extensions.AI;
@@ -75,8 +82,8 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             JsonSerializer.SerializeToElement(new { deliveryKey = "spoof", title = "Spoof", message = "Spoof", workspaceId = Guid.NewGuid() }),
             ToolDefinitionCallerKind.Mcp), default));
         Assert.AreEqual("notification_argument_unknown", spoof.Code);
-        var projected = await factory.Services.GetRequiredService<IControlPlaneStore>().GetAsync<ToolResource>(
-            new(ResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.NotificationCreate)), default);
+        var projected = await factory.Services.GetRequiredService<IResourceStore>().GetAsync<ToolResource>(
+            new(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.NotificationCreate)), default);
         Assert.IsNotNull(projected);
         Assert.AreEqual(AgentstrationInternalTools.NotificationCreate, projected.Value.Definition.ExternalId);
         var reserved = await Assert.ThrowsAsync<ToolDefinitionValidationException>(async () => await factory.Services
@@ -155,7 +162,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
 
         var current = await flows.GetAsync(workspaceId, new FlowId("notification-delivery"), default);
         Assert.IsNotNull(current);
-        await AddExternalDeliveryToolAsync(factory.Services.GetRequiredService<IControlPlaneStore>(), scope, schemas);
+        await AddExternalDeliveryToolAsync(factory.Services.GetRequiredService<IResourceStore>(), scope, schemas);
         var updated = await flows.UpdateAsync(workspaceId, current.Value.Id, new UpdateFlowCommand(
             current.Value.Description,
             "2.0.0",
@@ -186,8 +193,8 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         ResourceScopeRef scope,
         (JsonElement Input, JsonElement Output) schemas) => new()
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.ToolDefinition,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolDefinition,
             Metadata = new ResourceMetadata { Name = name },
             ScopeRef = scope,
             Definition = new ToolDefinitionProperties
@@ -272,15 +279,15 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
     }
 
     private static async Task AddExternalDeliveryToolAsync(
-        IControlPlaneStore store,
+        IResourceStore store,
         ResourceScopeRef scope,
         (JsonElement Input, JsonElement Output) schemas)
     {
         var now = DateTimeOffset.UnixEpoch;
         await store.PutAsync(new ToolProviderResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.ToolProvider,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolProvider,
             Metadata = new ResourceMetadata { Name = "third-party" },
             ScopeRef = scope,
             Definition = new ToolProviderProperties
@@ -292,8 +299,8 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         }, null, true, default);
         await store.PutAsync(new ToolResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Tool,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.Tool,
             Metadata = new ResourceMetadata { Name = "third-party.messages.send" },
             ScopeRef = scope,
             Definition = new ToolResourceProperties

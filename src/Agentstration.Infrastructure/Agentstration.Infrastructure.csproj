@@ -1,15 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
-    <ProjectReference Include="../Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
-    <ProjectReference Include="../Agentstration.Flow.Storage.Sqlite/Agentstration.Flow.Storage.Sqlite.csproj" />
-    <ProjectReference Include="../Agentstration.Flow.Storage.PostgreSql/Agentstration.Flow.Storage.PostgreSql.csproj" />
-    <ProjectReference Include="../Agentstration.Management.Storage.Sqlite/Agentstration.Management.Storage.Sqlite.csproj" />
-    <ProjectReference Include="../Agentstration.Management.Storage.PostgreSql/Agentstration.Management.Storage.PostgreSql.csproj" />
-    <ProjectReference Include="../Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
-    <ProjectReference Include="../Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Application/Agentstration.Flows.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Storage.Sqlite/Agentstration.Flows.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Storage.PostgreSql/Agentstration.Flows.Storage.PostgreSql.csproj" />
+    <ProjectReference Include="../Agentstration.ResourceManagement.Storage.Sqlite/Agentstration.ResourceManagement.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../Agentstration.ResourceManagement.Storage.PostgreSql/Agentstration.ResourceManagement.Storage.PostgreSql.csproj" />
+    <ProjectReference Include="../Agentstration.Extensions/Agentstration.Extensions.csproj" />
+    <ProjectReference Include="../Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Extensions.Aep/Agentstration.Extensions.Aep.csproj" />
+    <ProjectReference Include="../Agentstration.Identity/Agentstration.Identity.csproj" />
+    <ProjectReference Include="../Agentstration.Models.Application/Agentstration.Models.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Packs/Agentstration.Packs.csproj" />
+    <ProjectReference Include="../Agentstration.Packs.Contracts/Agentstration.Packs.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Sources/Agentstration.Sources.csproj" />
+    <ProjectReference Include="../Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
+    <ProjectReference Include="../Agentstration.Runtime.Profiles/Agentstration.Runtime.Profiles.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Local/Agentstration.Runtime.Local.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Storage.Sqlite/Agentstration.Runtime.Storage.Sqlite.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Storage.PostgreSql/Agentstration.Runtime.Storage.PostgreSql.csproj" />
@@ -18,6 +27,8 @@
     <ProjectReference Include="../Agentstration.Tools.Mcp/Agentstration.Tools.Mcp.csproj" />
     <ProjectReference Include="../Agentstration.Work.Storage.Sqlite/Agentstration.Work.Storage.Sqlite.csproj" />
     <ProjectReference Include="../Agentstration.Work.Storage.PostgreSql/Agentstration.Work.Storage.PostgreSql.csproj" />
+    <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Agentstration.Management.Api.Tests" />

@@ -1,5 +1,5 @@
 using Agentstration.Application.Work;
-using Agentstration.Management.Abstractions;
+using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 
 namespace Agentstration.Infrastructure.Work;

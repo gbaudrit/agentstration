@@ -1,4 +1,4 @@
-using Agentstration.Management.Abstractions;
+using Agentstration.Agents;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Infrastructure.Events;

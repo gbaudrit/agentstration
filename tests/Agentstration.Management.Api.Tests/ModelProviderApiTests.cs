@@ -2,10 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
-using Agentstration.Management.Core;
+using Agentstration.Api.Contracts;
 using Agentstration.ModelProviders;
+using Agentstration.Models;
+using Agentstration.Models.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.AspNetCore.Hosting;
@@ -55,7 +55,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
 
         var usages = await client.GetFromJsonAsync<ModelProviderUsagesResponse>("/api/modelproviders/ollama-local/usages");
         Assert.IsTrue(usages!.Count >= 1);
-        Assert.IsTrue(usages.Value.Any(usage => usage.ResourceType == ResourceKinds.ModelProfile));
+        Assert.IsTrue(usages.Value.Any(usage => usage.ResourceType == ModelResourceKinds.ModelProfile));
         using var deleted = await client.DeleteAsync("/api/modelproviders/ollama-local");
         Assert.AreEqual(HttpStatusCode.Conflict, deleted.StatusCode);
         Assert.AreEqual("application/problem+json", deleted.Content.Headers.ContentType?.MediaType);

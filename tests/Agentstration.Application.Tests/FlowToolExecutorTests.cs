@@ -1,10 +1,11 @@
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Infrastructure.Flows;
-using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Tools;
 
 namespace Agentstration.Application.Tests;
 
@@ -81,8 +82,8 @@ public sealed class FlowToolExecutorTests
 
     private static ToolResource Tool(bool requiresApproval = false) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.Tool,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ToolResourceKinds.Tool,
         Metadata = new ResourceMetadata { Name = "notification.send" },
         Definition = new ToolResourceProperties
         {
@@ -120,7 +121,7 @@ public sealed class FlowToolExecutorTests
         }
     }
 
-    private sealed class MemoryStore : IControlPlaneStore
+    private sealed class MemoryStore : IResourceStore
     {
         private readonly Dictionary<ResourceKey, (Resource Value, string ETag, DateTimeOffset At)> values = [];
         private long version;

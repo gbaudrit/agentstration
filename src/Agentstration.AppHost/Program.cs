@@ -100,6 +100,8 @@ var sharedKeys = usePairingCode
     : AepDevelopmentSharedKeys.Provision(
         Path.Combine(slotDataPath, "aep-shared-keys"),
         developmentExtensions.Select(extension => extension.ResourceName).ToArray());
+var bffWorkloadCredential = BffDevelopmentWorkloadCredential.Provision(
+    Path.Combine(slotDataPath, "bff-workload", "console-bff"));
 
 var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-console")
     .WithEnvironment("Agentstration__Slot", slot)
@@ -110,6 +112,11 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
         "Agentstration__Bootstrap__InitialBootstrapEnabled",
         initialBootstrapEnabled ? "true" : "false")
     .WithEnvironment("Data__Directory", slotDataPath)
+    .WithEnvironment("Agentstration__BffWorkloadTrust__Enabled", "true")
+    .WithEnvironment("Agentstration__BffWorkloadTrust__InstanceId", instanceId)
+    .WithEnvironment("Agentstration__BffWorkloadTrust__Credentials__0__WorkloadId", "console-bff")
+    .WithEnvironment("Agentstration__BffWorkloadTrust__Credentials__0__CredentialId", "primary")
+    .WithEnvironment("Agentstration__BffWorkloadTrust__Credentials__0__SharedKeyFile", bffWorkloadCredential)
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
 console.WithEnvironment("Agentstration__Extensions__DiscoverOnStartup", "false");

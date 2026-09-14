@@ -1,6 +1,6 @@
 using System.Net;
 using System.Security.Claims;
-using Agentstration.Management.Abstractions;
+using Agentstration.Identity.Contracts;
 using Agentstration.Web.Hosting;
 using Agentstration.Web.Security;
 using Microsoft.AspNetCore.Http;

@@ -1,9 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
+using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -208,7 +210,7 @@ public sealed class IdentityFoundationTests
         var store = fixture.Services.GetRequiredService<IIdentityStore>();
         var duplicate = new TenantMembership(Guid.NewGuid(), context.TenantId, context.UserId, MembershipStatus.Active, DateTimeOffset.UtcNow);
 
-        await Assert.ThrowsAsync<ControlPlaneConcurrencyException>(() => store.AddMembershipAsync(duplicate, default));
+        await Assert.ThrowsAsync<ResourceConcurrencyException>(() => store.AddMembershipAsync(duplicate, default));
     }
 
     [TestMethod]
@@ -246,13 +248,13 @@ public sealed class IdentityFoundationTests
         await using var fixture = await IdentityFixture.CreateAsync();
         using var requestScope = fixture.OpenScope();
         var identity = fixture.Services.GetRequiredService<IIdentityStore>();
-        var resources = fixture.Services.GetRequiredService<IControlPlaneStore>();
+        var resources = fixture.Services.GetRequiredService<IResourceStore>();
         var first = fixture.Context.Current;
         var now = DateTimeOffset.UtcNow;
         var secondWorkspace = new Workspace(Guid.NewGuid(), first.TenantId, "finance", "Finance", WorkspaceStatus.Active, now);
         await identity.AddWorkspaceAsync(secondWorkspace, default);
 
-        var key = new ResourceKey(ResourceKinds.RuntimeProfile, "shared");
+        var key = new ResourceKey(RuntimeProfileResourceKinds.RuntimeProfile, "shared");
         await resources.PutAsync(Profile("shared", first), null, true, default);
         var second = first with { WorkspaceId = secondWorkspace.Id };
         using (fixture.Context.Push(second))
@@ -354,8 +356,8 @@ public sealed class IdentityFoundationTests
     private static RuntimeProfileResource Profile(string id, RequestContext context) => new()
     {
         Metadata = new ResourceMetadata { Name = id },
-        Kind = ResourceKinds.RuntimeProfile,
-        ApiVersion = ManagementApiVersions.CoreV1,
+        Kind = RuntimeProfileResourceKinds.RuntimeProfile,
+        ApiVersion = ResourceApiVersions.CoreV1,
         ScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId),
         Definition = new RuntimeProfileProperties { DisplayName = "Shared", RuntimeType = "Local" }
     };
@@ -386,7 +388,7 @@ public sealed class IdentityFoundationTests
                 directory,
                 controlPlaneConnectionString: $"Data Source={Path.Combine(directory, "control-plane.db")}");
             var provider = services.BuildServiceProvider();
-            await provider.GetRequiredService<IControlPlaneStore>().InitializeAsync(default);
+            await provider.GetRequiredService<IResourceStore>().InitializeAsync(default);
             var initialContext = await provider.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
             return new IdentityFixture(directory, provider, initialContext);
         }

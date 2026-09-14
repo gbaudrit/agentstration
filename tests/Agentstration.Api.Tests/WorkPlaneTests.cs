@@ -1,0 +1,1018 @@
+using System.Collections.Concurrent;
+using System.Data.Common;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Agentstration.Application.Work;
+using Agentstration.Flows;
+using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Resources;
+using Agentstration.Work;
+using Agentstration.Work.Contracts;
+using Agentstration.Work.Storage.Abstractions;
+using Agentstration.Work.Storage.Sqlite;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
+namespace Agentstration.Application.Tests;
+
+[TestClass]
+public sealed class WorkPlaneTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
+    private static readonly WorkspaceId WorkplaceId = new(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+
+    [TestMethod]
+    public void WorkItemCreationValidatesRequiredData()
+    {
+        var item = CreatePending();
+
+        Assert.AreEqual(WorkItemStatus.Pending, item.Status);
+        Assert.AreEqual(1, item.Version);
+        Assert.AreEqual("WorkItemSubmitted", item.History.Single().Type);
+        Assert.Throws<WorkValidationException>(() => WorkItem.Create(WorkItemId.New(), WorkplaceId, "", "instruction", Now));
+        Assert.Throws<WorkValidationException>(() => WorkItem.Create(WorkItemId.New(), WorkplaceId, "analysis", "", Now));
+        Assert.Throws<WorkValidationException>(() => WorkItem.Create(new WorkItemId(Guid.Empty), WorkplaceId, "analysis", "instruction", Now));
+    }
+
+    [TestMethod]
+    public void WorkplaceResourcesEnforcePrimaryEntryAndDeterministicFieldRules()
+    {
+        var entryId = new EntryId("request");
+        var duplicatePrimary = new WorkplaceDashboard
+        {
+            Id = new DashboardId("home"),
+            WorkspaceId = WorkplaceId,
+            Name = "home",
+            DisplayName = "Home",
+            Entries =
+            [
+                new DashboardEntryReference { EntryResourceId = entryId, Role = DashboardItemRole.Primary },
+                new DashboardEntryReference { EntryResourceId = new EntryId(entryId.Value + "-two"), Role = DashboardItemRole.Primary }
+            ]
+        };
+        Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(duplicatePrimary));
+
+        var entry = new EntryResource
+        {
+            WorkspaceId = WorkplaceId,
+            Id = entryId,
+            Name = "request",
+            DisplayName = "Request",
+            Presentation = new EntryPresentation
+            {
+                Kind = EntryPresentationKind.Form,
+                Fields =
+                [
+                    new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Validation = new EntryFieldValidation(3, 20), Role = EntryFieldRole.PrimaryInput },
+                    new EntryFieldDefinition { Name = "detail", Type = EntryFieldType.Choice, Options = [new EntryFieldOption("standard", "Standard")] }
+                ]
+            },
+            ResolvedTarget = new EntryResolvedTarget("router", "1.0.0")
+        };
+        WorkplaceValidation.Validate(entry);
+        Assert.AreEqual(EntryParticipantVisibility.Hidden, entry.Presentation.Participants.Visibility);
+        Assert.AreEqual(EntryProgressVisibility.Compact, entry.Presentation.Progress.Visibility);
+        Assert.AreEqual(EntryTaskDisplay.Auto, entry.Presentation.Task.Display);
+        Assert.AreEqual(EntryResultDisplay.Auto, entry.Presentation.Results.Display);
+        Assert.Throws<WorkValidationException>(() => WorkplaceValidation.ValidateSubmission(entry, new Dictionary<string, System.Text.Json.JsonElement>()));
+        Assert.Throws<WorkValidationException>(() => WorkplaceValidation.ValidateSubmission(entry, new Dictionary<string, System.Text.Json.JsonElement>
+        {
+            ["request"] = System.Text.Json.JsonSerializer.SerializeToElement("valid request"),
+            ["detail"] = System.Text.Json.JsonSerializer.SerializeToElement("unsupported")
+        }));
+
+        var draft = new EntryDraft
+        {
+            WorkspaceId = WorkplaceId,
+            Id = entryId,
+            Name = "request",
+            DisplayName = "Request",
+            Binding = new EntryBinding(EntryBindingKind.Flow, "router"),
+            Presentation = entry.Presentation with
+            {
+                Fields =
+                [
+                    new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput },
+                    new EntryFieldDefinition { Name = "format", Type = EntryFieldType.Choice, Options = [new("short", "Short"), new("short", "Duplicate")] }
+                ]
+            }
+        };
+        var optionError = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(draft));
+        Assert.AreEqual("entry_field_options_invalid", optionError.Code);
+        var presentationError = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(entry with
+        {
+            Presentation = entry.Presentation with { Task = new((EntryTaskDisplay)99) }
+        }));
+        Assert.AreEqual("entry_execution_presentation_invalid", presentationError.Code);
+        var primaryError = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(draft with
+        {
+            Presentation = draft.Presentation with
+            {
+                Fields = draft.Presentation.Fields.Select(value => value with
+                {
+                    Role = EntryFieldRole.Standard,
+                    Options = value.Type == EntryFieldType.Choice ? [new EntryFieldOption("short", "Short")] : value.Options
+                }).ToArray()
+            }
+        }));
+        Assert.AreEqual("entry_primary_input_required", primaryError.Code);
+        var legacyBindingError = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.ValidateBinding(
+            new EntryBinding(EntryBindingKind.Flow, "legacy/router")));
+        Assert.AreEqual("entry_binding_invalid", legacyBindingError.Code);
+    }
+
+    [TestMethod]
+    public void DashboardValidationAllowsNoPrimaryAndNamespacedEntriesButRejectsDuplicates()
+    {
+        var packEntry = new EntryId("weather", new ResourceNamespace("daily-life"));
+        var dashboard = new WorkplaceDashboard
+        {
+            Id = new("home"),
+            WorkspaceId = WorkplaceId,
+            Name = "home",
+            DisplayName = "Home",
+            IsDefault = true,
+            Entries =
+            [
+                new() { EntryResourceId = packEntry, Role = DashboardItemRole.Featured },
+                new() { EntryResourceId = new EntryId("summary"), Role = DashboardItemRole.Standard, Order = 10 }
+            ]
+        };
+
+        WorkplaceValidation.Validate(dashboard);
+        var iconError = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(dashboard with { Icon = "Unsupported icon!" }));
+        Assert.AreEqual("dashboard_icon_invalid", iconError.Code);
+        var error = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(dashboard with
+        {
+            Entries = [dashboard.Entries[0], dashboard.Entries[0] with { Order = 20 }]
+        }));
+        Assert.AreEqual("dashboard_entry_duplicate", error.Code);
+    }
+
+    [TestMethod]
+    public async Task DashboardAdministrationMaintainsOneDefaultAndAllowsEntryReuse()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var workspaceId = WorkplaceId;
+        var entry = new EntryResource
+        {
+            WorkspaceId = workspaceId,
+            Id = new("request"),
+            Name = "request",
+            DisplayName = "Request",
+            Presentation = new EntryPresentation { Fields = [new() { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }] },
+            ResolvedTarget = new("router", "1.0.0"),
+            PublishedAt = Now
+        };
+        await fixture.Workplace.UpsertEntryAsync(entry, default);
+        var service = new DashboardAdministrationService(fixture.Workplace, TimeProvider.System);
+        var home = await service.SaveAsync(new WorkplaceDashboardDraft
+        {
+            Id = new("home"),
+            WorkspaceId = workspaceId,
+            Name = "home",
+            DisplayName = "Home",
+            Icon = DashboardIconDefaults.Home,
+            IsDefault = true,
+            Entries = [new() { EntryResourceId = entry.Id, Role = DashboardItemRole.Primary }]
+        }, default);
+        await service.PublishAsync(workspaceId, home.Id, default);
+        var travel = await service.SaveAsync(new WorkplaceDashboardDraft
+        {
+            Id = new("travel"),
+            WorkspaceId = workspaceId,
+            Name = "travel",
+            DisplayName = "Travel",
+            IsDefault = true,
+            Entries = [new() { EntryResourceId = entry.Id, Role = DashboardItemRole.Featured }]
+        }, default);
+        await service.PublishAsync(workspaceId, travel.Id, default);
+
+        var published = await fixture.Workplace.ListDashboardsAsync(workspaceId, default);
+        Assert.HasCount(2, published);
+        Assert.AreEqual("travel", published.Single(value => value.IsDefault).Name);
+        Assert.AreEqual(DashboardIconDefaults.Home, published.Single(value => value.Name == "home").Icon);
+        Assert.IsTrue(published.All(value => value.Entries.Single().EntryResourceId == entry.Id));
+        var drafts = await fixture.Workplace.ListDashboardDraftsAsync(workspaceId, default);
+        Assert.AreEqual("travel", drafts.Single(value => value.IsDefault).Name);
+
+        await service.SaveAsync(travel with { IsDefault = false }, default);
+        var error = await Assert.ThrowsAsync<WorkValidationException>(() => service.PublishAsync(workspaceId, travel.Id, default));
+        Assert.AreEqual("dashboard_default_required", error.Code);
+    }
+
+    [TestMethod]
+    public void WorkItemSupportsInputAndApprovalLifecycle()
+    {
+        var item = CreatePending();
+        var executionId = WorkExecutionId.New();
+        item.MarkQueued(executionId, null, Guid.NewGuid(), Now.AddSeconds(1));
+        Assert.AreEqual(WorkItemStatus.Queued, item.Status);
+        item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), item.WorkspaceId, item.Id, executionId, Now.AddSeconds(2), "sql-expert"));
+        Assert.AreEqual(WorkItemStatus.Running, item.Status);
+        item.ApplyRuntimeEvent(new WorkExecutionInputRequested(Guid.NewGuid(), item.WorkspaceId, item.Id, executionId, Now.AddSeconds(3), "Which database?"));
+        Assert.AreEqual(WorkItemStatus.WaitingForInput, item.Status);
+        item.ProvideInput(new WorkInput("SQL Server"), "requester-1", Guid.NewGuid(), Now.AddSeconds(4));
+        Assert.AreEqual(WorkItemStatus.Running, item.Status);
+        item.ApplyRuntimeEvent(new WorkExecutionApprovalRequested(Guid.NewGuid(), item.WorkspaceId, item.Id, executionId, Now.AddSeconds(5), "Apply the recommendation?"));
+        Assert.AreEqual(WorkItemStatus.WaitingForApproval, item.Status);
+        item.SubmitApproval(WorkApprovalDecision.Approved, "requester-1", "Approved", Guid.NewGuid(), Now.AddSeconds(6));
+        Assert.AreEqual(WorkItemStatus.Running, item.Status);
+        item.ApplyRuntimeEvent(new WorkExecutionCompleted(Guid.NewGuid(), item.WorkspaceId, item.Id, executionId, Now.AddSeconds(7), Result("Done")));
+        Assert.AreEqual(WorkItemStatus.Completed, item.Status);
+        Assert.AreEqual("Done", item.Result!.Contents.Single().Text);
+        Assert.Throws<WorkTransitionException>(() => item.Cancel(null, Guid.NewGuid(), Now.AddSeconds(8)));
+    }
+
+    [TestMethod]
+    public void WorkItemRejectsInvalidTransitionsAndTerminalMutations()
+    {
+        var pending = CreatePending();
+        Assert.Throws<WorkTransitionException>(() => pending.ProvideInput(new WorkInput("unexpected"), null, Guid.NewGuid(), Now));
+        Assert.Throws<WorkTransitionException>(() => pending.SubmitApproval(WorkApprovalDecision.Approved, null, null, Guid.NewGuid(), Now));
+
+        pending.Cancel(null, Guid.NewGuid(), Now.AddSeconds(1));
+        Assert.AreEqual(WorkItemStatus.Cancelled, pending.Status);
+        Assert.Throws<WorkTransitionException>(() => pending.MarkQueued(WorkExecutionId.New(), null, Guid.NewGuid(), Now.AddSeconds(2)));
+
+        var rejected = Running();
+        rejected.ApplyRuntimeEvent(new WorkExecutionApprovalRequested(Guid.NewGuid(), rejected.WorkspaceId, rejected.Id, rejected.CurrentExecutionId!.Value, Now.AddSeconds(3), "Approve?"));
+        rejected.SubmitApproval(WorkApprovalDecision.Rejected, "requester", "No", Guid.NewGuid(), Now.AddSeconds(4));
+        Assert.AreEqual(WorkItemStatus.Failed, rejected.Status);
+        Assert.AreEqual("approval_rejected", rejected.Error!.Code);
+
+        var failed = Running();
+        failed.ApplyRuntimeEvent(new WorkExecutionFailed(Guid.NewGuid(), failed.WorkspaceId, failed.Id, failed.CurrentExecutionId!.Value, Now.AddSeconds(3),
+            new WorkError("model_timeout", "Timed out", WorkErrorCategory.Timeout, true, Now.AddSeconds(3), failed.CurrentExecutionId)));
+        Assert.AreEqual(WorkItemStatus.Failed, failed.Status);
+        Assert.Throws<WorkTransitionException>(() => failed.Cancel(null, Guid.NewGuid(), Now.AddSeconds(4)));
+    }
+
+    [TestMethod]
+    public void DuplicateRuntimeEventIsIdempotent()
+    {
+        var item = Running();
+        var completed = new WorkExecutionCompleted(Guid.NewGuid(), item.WorkspaceId, item.Id, item.CurrentExecutionId!.Value, Now.AddSeconds(3), Result("Once"));
+        Assert.IsTrue(item.ApplyRuntimeEvent(completed));
+        var version = item.Version;
+        Assert.IsFalse(item.ApplyRuntimeEvent(completed));
+        Assert.AreEqual(version, item.Version);
+        Assert.AreEqual(1, item.History.Count(value => value.EventId == completed.EventId));
+    }
+
+    [TestMethod]
+    public void PauseAndResumeAreIdempotentAndPreserveExecutionCorrelation()
+    {
+        var item = Running();
+        var executionId = item.CurrentExecutionId;
+
+        Assert.IsTrue(item.Pause(Guid.NewGuid(), Now.AddSeconds(3)));
+        Assert.AreEqual(WorkItemStatus.Paused, item.Status);
+        Assert.IsFalse(item.Pause(Guid.NewGuid(), Now.AddSeconds(4)));
+        Assert.AreEqual(executionId, item.CurrentExecutionId);
+
+        Assert.IsTrue(item.Resume(Guid.NewGuid(), Now.AddSeconds(5)));
+        Assert.AreEqual(WorkItemStatus.Running, item.Status);
+        Assert.IsFalse(item.Resume(Guid.NewGuid(), Now.AddSeconds(6)));
+        Assert.AreEqual(executionId, item.CurrentExecutionId);
+        CollectionAssert.IsSubsetOf(new[] { "WorkItemPaused", "WorkItemResumed" }, item.History.Select(value => value.Type).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ApplicationSubmissionPersistsDelegatesAndAppliesRuntimeResult()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var service = fixture.Service;
+        var created = await service.SubmitAsync(new SubmitWorkItemCommand(WorkplaceId, "analysis", "Analyze this", RequesterIdentity: "requester-1"), default);
+
+        Assert.AreEqual(WorkItemStatus.Queued, created.Value.Status);
+        Assert.AreEqual(created.Value.Id, fixture.Gateway.Request!.WorkItemId);
+        Assert.AreEqual(TestWorkExecutionScopeAccessor.Scope, fixture.Gateway.Request.ExecutionScope);
+        Assert.IsTrue(fixture.Gateway.Confirmed);
+        var executionId = created.Value.CurrentExecutionId!.Value;
+        await service.ApplyExecutionEventAsync(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, created.Value.Id, executionId, Now, "dotnet-expert"), default);
+        var completedEvent = new WorkExecutionCompleted(Guid.NewGuid(), WorkplaceId, created.Value.Id, executionId, Now.AddSeconds(1), Result("Analysis complete"));
+        var completed = await service.ApplyExecutionEventAsync(completedEvent, default);
+        var duplicate = await service.ApplyExecutionEventAsync(completedEvent, default);
+
+        Assert.AreEqual(WorkItemStatus.Completed, completed.Value.Status);
+        Assert.AreEqual("Analysis complete", completed.Value.Result!.Contents.Single().Text);
+        Assert.AreEqual(completed.Value.Version, duplicate.Value.Version);
+        Assert.AreEqual(WorkItemStatus.Completed, (await fixture.Repository.GetAsync(WorkplaceId, created.Value.Id, default))!.Value.Status);
+    }
+
+    [TestMethod]
+    public async Task SqliteStorageSupportsFilteringPaginationAndOptimisticConcurrency()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var first = CreatePending("analysis", "requester-a");
+        var second = CreatePending("question", "requester-b");
+        await fixture.Repository.CreateAsync(first, default);
+        await fixture.Repository.CreateAsync(second, default);
+
+        var page = await fixture.Repository.QueryAsync(new WorkItemQuery(WorkplaceId, Take: 1, Type: "analysis"), default);
+        Assert.AreEqual(1, page.Items.Count);
+        Assert.AreEqual("analysis", page.Items.Single().Value.Type);
+
+        var copyA = (await fixture.Repository.GetAsync(WorkplaceId, first.Id, default))!.Value;
+        var copyB = (await fixture.Repository.GetAsync(WorkplaceId, first.Id, default))!.Value;
+        copyA.AddMessage("first update", "a", Guid.NewGuid(), Now.AddMinutes(1));
+        await fixture.Repository.SaveAsync(copyA, 1, default);
+        copyB.AddMessage("stale update", "b", Guid.NewGuid(), Now.AddMinutes(2));
+        await Assert.ThrowsAsync<WorkItemConcurrencyException>(() => fixture.Repository.SaveAsync(copyB, 1, default));
+    }
+
+    [TestMethod]
+    public async Task WorkplaceListsEveryRootTaskBeyondRepositoryPageLimitAndProjectsLatestContinuation()
+    {
+        var commands = new CountingCommandInterceptor();
+        await using var fixture = await WorkFixture.CreateAsync(commandInterceptor: commands);
+        var anchors = new List<WorkItem>();
+        for (var index = 0; index < 205; index++)
+        {
+            var anchor = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry", $"Root {index}", Now.AddSeconds(index),
+                metadata: new Dictionary<string, string>
+                {
+                    ["origin"] = "trigger",
+                    ["workplace.workspaceId"] = WorkplaceId.ToString()
+                });
+            anchors.Add(anchor);
+            await fixture.Repository.CreateAsync(anchor, default);
+        }
+
+        var firstTaskId = WorkTaskId.FromWorkItem(anchors[0].Id);
+        for (var index = 0; index < 210; index++)
+        {
+            var continuation = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry-continuation", $"Continuation {index}", Now.AddMinutes(10).AddSeconds(index),
+                metadata: new Dictionary<string, string>
+                {
+                    ["origin"] = "trigger",
+                    ["workplace.workspaceId"] = WorkplaceId.ToString(),
+                    ["workplace.taskId"] = firstTaskId.ToString()
+                });
+            await fixture.Repository.CreateAsync(continuation, default);
+        }
+        var latest = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry-continuation", "Latest continuation", Now.AddHours(1),
+            metadata: new Dictionary<string, string>
+            {
+                ["origin"] = "trigger",
+                ["workplace.workspaceId"] = WorkplaceId.ToString(),
+                ["workplace.taskId"] = firstTaskId.ToString()
+            });
+        var executionId = WorkExecutionId.New();
+        latest.MarkQueued(executionId, "agent", Guid.NewGuid(), Now.AddHours(1).AddSeconds(1));
+        latest.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, latest.Id, executionId, Now.AddHours(1).AddSeconds(2), "agent"));
+        await fixture.Repository.CreateAsync(latest, default);
+        var secondTaskId = WorkTaskId.FromWorkItem(anchors[1].Id);
+        var olderContinuation = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry-continuation", "Older continuation", Now,
+            metadata: new Dictionary<string, string>
+            {
+                ["origin"] = "trigger",
+                ["workplace.workspaceId"] = WorkplaceId.ToString(),
+                ["workplace.taskId"] = secondTaskId.ToString()
+            });
+        var olderExecutionId = WorkExecutionId.New();
+        olderContinuation.MarkQueued(olderExecutionId, "agent", Guid.NewGuid(), Now);
+        olderContinuation.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, olderContinuation.Id, olderExecutionId, Now, "agent"));
+        await fixture.Repository.CreateAsync(olderContinuation, default);
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub());
+
+        commands.Reset();
+        var tasks = await workplace.ListTasksAsync(WorkplaceId, null, default);
+
+        Assert.HasCount(205, tasks);
+        Assert.AreEqual(WorkTaskStatus.Running, tasks.Single(value => value.Id == firstTaskId).Status);
+        Assert.AreEqual(WorkTaskStatus.Pending, tasks.Single(value => value.Id == secondTaskId).Status);
+        Assert.HasCount(1, commands.CommandTexts.Where(value => value.Contains("ROW_NUMBER()", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsFalse(commands.CommandTexts.Any(value => value.Contains("\"AnchorTaskId\" = @", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task SqliteStorageAllowsTheSameWorkItemIdInDifferentWorkspaces()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var id = WorkItemId.New();
+        var otherWorkspaceId = new WorkspaceId(Guid.NewGuid());
+        await fixture.Repository.CreateAsync(WorkItem.Create(id, WorkplaceId, "analysis", "First", Now), default);
+        await fixture.Repository.CreateAsync(WorkItem.Create(id, otherWorkspaceId, "question", "Second", Now), default);
+
+        Assert.AreEqual("analysis", (await fixture.Repository.GetAsync(WorkplaceId, id, default))?.Value.Type);
+        Assert.AreEqual("question", (await fixture.Repository.GetAsync(otherWorkspaceId, id, default))?.Value.Type);
+        Assert.HasCount(1, (await fixture.Repository.QueryAsync(new WorkItemQuery(WorkplaceId), default)).Items);
+        Assert.HasCount(1, (await fixture.Repository.QueryAsync(new WorkItemQuery(otherWorkspaceId), default)).Items);
+    }
+
+    [TestMethod]
+    public async Task TerminalTaskDeletionRemovesItsWorkHistoryAndDetachesItsInteraction()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var itemId = WorkItemId.New();
+        var taskId = WorkTaskId.FromWorkItem(itemId);
+        var interactionId = InteractionId.New();
+        var item = WorkItem.Create(itemId, WorkplaceId, "entry", "Completed task", Now, metadata: new Dictionary<string, string>
+        {
+            ["origin"] = "trigger",
+            ["workplace.workspaceId"] = WorkplaceId.ToString()
+        });
+        var executionId = WorkExecutionId.New();
+        item.MarkQueued(executionId, "agent", Guid.NewGuid(), Now.AddSeconds(1));
+        item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, itemId, executionId, Now.AddSeconds(2), "agent"));
+        item.ApplyRuntimeEvent(new WorkExecutionCompleted(Guid.NewGuid(), WorkplaceId, itemId, executionId, Now.AddSeconds(3), Result("Done")));
+        await fixture.Repository.CreateAsync(item, default);
+        var continuation = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry-continuation", "Completed continuation", Now.AddSeconds(4), metadata: new Dictionary<string, string>
+        {
+            ["origin"] = "trigger",
+            ["workplace.workspaceId"] = WorkplaceId.ToString(),
+            ["workplace.taskId"] = taskId.ToString()
+        });
+        var continuationExecutionId = WorkExecutionId.New();
+        continuation.MarkQueued(continuationExecutionId, "agent", Guid.NewGuid(), Now.AddSeconds(5));
+        continuation.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, continuation.Id, continuationExecutionId, Now.AddSeconds(6), "agent"));
+        continuation.ApplyRuntimeEvent(new WorkExecutionCompleted(Guid.NewGuid(), WorkplaceId, continuation.Id, continuationExecutionId, Now.AddSeconds(7), Result("Done again")));
+        var stored = await fixture.Repository.CreateAsync(continuation, default);
+        await fixture.Workplace.CreateInteractionAsync(new WorkplaceInteraction
+        {
+            Id = interactionId,
+            WorkspaceId = WorkplaceId,
+            EntryId = new("entry"),
+            Status = InteractionStatus.Idle,
+            StartedAt = Now,
+            LastActivityAt = Now.AddSeconds(3),
+            TaskId = taskId,
+            LastFlowRunId = "flow-run-1"
+        }, default);
+        await fixture.Workplace.AddActivityAsync(new(WorkTaskActivityId.New(), WorkplaceId, taskId, WorkTaskActivityType.TaskCompleted, "Completed", null, Now.AddSeconds(3), WorkActorKind.Agentstration), default);
+        await fixture.Workplace.AddResultAsync(new(WorkTaskResultId.New(), WorkplaceId, taskId, "flow-run-1", WorkTaskResultKind.Text, "Result", JsonSerializer.SerializeToElement("Done"), Now.AddSeconds(3)), default);
+        await fixture.Workplace.AddArtifactAsync(new(WorkTaskArtifactId.New(), WorkplaceId, taskId, "flow-run-1", "result.txt", "text/plain", 4, "artifact-key", Now.AddSeconds(3)), default);
+
+        var artifactStore = new RecordingArtifactStore();
+        await new WorkTaskDeletionService(fixture.Repository, artifactStore).DeleteAsync(WorkplaceId, taskId, stored.ETag, default);
+
+        Assert.IsNull(await fixture.Repository.GetAsync(WorkplaceId, itemId, default));
+        Assert.IsNull(await fixture.Repository.GetAsync(WorkplaceId, continuation.Id, default));
+        Assert.HasCount(0, await fixture.Workplace.ListActivitiesAsync(WorkplaceId, taskId, default));
+        Assert.HasCount(0, await fixture.Workplace.ListResultsAsync(WorkplaceId, taskId, default));
+        Assert.HasCount(0, await fixture.Workplace.ListArtifactsAsync(WorkplaceId, taskId, default));
+        Assert.AreEqual("artifact-key", artifactStore.Deleted.Single().StorageKey);
+        var interaction = await fixture.Workplace.GetInteractionAsync(WorkplaceId, interactionId, default);
+        Assert.IsNull(interaction!.TaskId);
+        Assert.IsNull(interaction.LastFlowRunId);
+    }
+
+    [TestMethod]
+    public async Task TaskDeletionRejectsNonTerminalAndCrossWorkspaceTasks()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var item = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry", "Pending task", Now, metadata: new Dictionary<string, string>
+        {
+            ["origin"] = "trigger",
+            ["workplace.workspaceId"] = WorkplaceId.ToString()
+        });
+        var stored = await fixture.Repository.CreateAsync(item, default);
+        var taskId = WorkTaskId.FromWorkItem(item.Id);
+
+        var conflict = await Assert.ThrowsExactlyAsync<WorkTransitionException>(() =>
+            fixture.Repository.DeleteTaskAsync(WorkplaceId, taskId, stored.ETag, default));
+        Assert.AreEqual("task_not_terminal", conflict.Code);
+        await Assert.ThrowsExactlyAsync<KeyNotFoundException>(() =>
+            fixture.Repository.DeleteTaskAsync(new WorkspaceId(Guid.NewGuid()), taskId, stored.ETag, default));
+        Assert.IsNotNull(await fixture.Repository.GetAsync(WorkplaceId, item.Id, default));
+    }
+
+    [TestMethod]
+    public async Task FileSystemArtifactsCannotBeReadFromAnotherWorkspace()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-artifacts-{Guid.NewGuid():N}");
+        try
+        {
+            var store = new FileSystemArtifactStore(directory);
+            await using var content = new MemoryStream("workspace-owned"u8.ToArray());
+            var reference = await store.SaveAsync(WorkplaceId, new ArtifactContent("result.txt", "text/plain", content), default);
+
+            await using var readable = await store.OpenReadAsync(WorkplaceId, reference, default);
+            using var reader = new StreamReader(readable);
+            Assert.AreEqual("workspace-owned", await reader.ReadToEndAsync(default));
+            await Assert.ThrowsAsync<DirectoryNotFoundException>(() =>
+                store.OpenReadAsync(new WorkspaceId(Guid.NewGuid()), reference, default));
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkplaceProjectionPublishesOnlyArtifactsDeclaredByTheWorkResult()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var itemId = WorkItemId.New();
+        var taskId = WorkTaskId.FromWorkItem(itemId);
+        var interactionId = InteractionId.New();
+        var executionId = WorkExecutionId.New();
+        var item = WorkItem.Create(
+            itemId,
+            WorkplaceId,
+            "entry",
+            "Build a comparison",
+            Now,
+            metadata: new Dictionary<string, string>
+            {
+                ["workplace.workspaceId"] = WorkplaceId.Value.ToString("D"),
+                ["workplace.interactionId"] = interactionId.Value.ToString("D"),
+                ["workplace.taskId"] = taskId.Value.ToString("D")
+            });
+        item.MarkQueued(executionId, "agent", Guid.NewGuid(), Now.AddMilliseconds(500));
+        item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, itemId, executionId, Now.AddSeconds(1), "agent"));
+        var result = new WorkResult(
+            [new WorkResultContent("Comparison ready")],
+            [new WorkArtifact("comparison.csv", new WorkContentReference("stored-comparison.csv", "text/csv"), Size: 42)],
+            new Dictionary<string, string> { ["flowRunId"] = "flow-run-1" },
+            Now.AddSeconds(2));
+        item.ApplyRuntimeEvent(new WorkExecutionCompleted(Guid.NewGuid(), WorkplaceId, itemId, executionId, Now.AddSeconds(2), result));
+
+        var sink = new WorkplaceProjectionSink(fixture.Workplace, []);
+        await sink.PublishAsync(item.ToSnapshot(), default);
+
+        var projected = await fixture.Workplace.ListArtifactsAsync(WorkplaceId, taskId, default);
+        Assert.HasCount(1, projected);
+        var artifact = projected[0];
+        Assert.AreEqual("comparison.csv", artifact.Name);
+        Assert.AreEqual("text/csv", artifact.ContentType);
+        Assert.AreEqual(42, artifact.Length);
+        Assert.AreEqual("stored-comparison.csv", artifact.StorageKey);
+    }
+
+    [TestMethod]
+    public async Task SqliteWorkplaceStorageIsolatesHomonymousEntriesByNamespace()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var firstNamespace = new ResourceNamespace("team-a");
+        var secondNamespace = new ResourceNamespace("team-b");
+        const string entryName = "request";
+        var first = Entry(new EntryId(entryName, firstNamespace));
+        var second = Entry(new EntryId(entryName, secondNamespace));
+
+        await fixture.Workplace.UpsertEntryDraftAsync(first, default);
+        await fixture.Workplace.UpsertEntryDraftAsync(second, default);
+
+        Assert.AreEqual(firstNamespace, (await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, first.Id, default))?.Id.Namespace);
+        Assert.AreEqual(secondNamespace, (await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, second.Id, default))?.Id.Namespace);
+        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, new EntryId(entryName), default));
+        await fixture.Workplace.DeleteEntryDraftAsync(WorkplaceId, first.Id, default);
+        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, first.Id, default));
+        Assert.IsNotNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, second.Id, default));
+    }
+
+    [TestMethod]
+    public async Task EntryRemovalCanExplicitlyDetachDashboardsAndCloseButRetainInteractions()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var draft = Entry(new EntryId("retired", new ResourceNamespace("sample.pack")));
+        var published = new EntryResource
+        {
+            WorkspaceId = draft.WorkspaceId,
+            Id = draft.Id,
+            Name = draft.Name,
+            DisplayName = draft.DisplayName,
+            Presentation = draft.Presentation,
+            ResolvedTarget = new("router", "1.0.0"),
+            PublishedAt = Now
+        };
+        await fixture.Workplace.UpsertEntryDraftAsync(draft, default);
+        await fixture.Workplace.UpsertEntryAsync(published, default);
+        await fixture.Workplace.UpsertDashboardDraftAsync(new WorkplaceDashboardDraft
+        {
+            Id = new("home"),
+            WorkspaceId = WorkplaceId,
+            Name = "home",
+            DisplayName = "Home",
+            IsDefault = true,
+            Entries = [new() { EntryResourceId = draft.Id }],
+            UpdatedAt = Now
+        }, default);
+        await fixture.Workplace.UpsertDashboardAsync(new WorkplaceDashboard
+        {
+            Id = new("home"),
+            WorkspaceId = WorkplaceId,
+            Name = "home",
+            DisplayName = "Home",
+            IsDefault = true,
+            Entries = [new() { EntryResourceId = draft.Id }],
+            PublishedAt = Now
+        }, default);
+        var interaction = new WorkplaceInteraction
+        {
+            Id = InteractionId.New(),
+            WorkspaceId = WorkplaceId,
+            EntryId = draft.Id,
+            EntrySnapshot = published,
+            Status = InteractionStatus.Active,
+            StartedAt = Now,
+            LastActivityAt = Now
+        };
+        await fixture.Workplace.CreateInteractionAsync(interaction, default);
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub());
+        var service = new EntryAdministrationService(fixture.Workplace, new EntryTargetResolverStub(), workplace, TimeProvider.System, new WorkplaceContextStub());
+
+        await service.DeleteAsync(WorkplaceId, draft.Id, removeDashboardReferences: true, closeInteractions: true, default);
+
+        Assert.IsNull(await fixture.Workplace.GetEntryAsync(WorkplaceId, draft.Id, default));
+        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, draft.Id, default));
+        Assert.HasCount(0, (await fixture.Workplace.GetDashboardAsync(WorkplaceId, new("home"), default))!.Entries);
+        var retained = await fixture.Workplace.GetInteractionAsync(WorkplaceId, interaction.Id, default);
+        Assert.AreEqual(InteractionStatus.Closed, retained!.Status);
+        Assert.AreEqual("entry_uninstalled", retained.ClosedReason);
+        Assert.IsNotNull(retained.EntrySnapshot);
+        Assert.AreEqual(published.Id, retained.EntrySnapshot.Id);
+        Assert.AreEqual(published.Version, retained.EntrySnapshot.Version);
+        Assert.AreEqual(published.ResolvedTarget, retained.EntrySnapshot.ResolvedTarget);
+    }
+
+    [TestMethod]
+    public async Task EntryRemovalCancelsCurrentWorkBeforeClosingProcessingInteraction()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var draft = Entry(new EntryId("busy"));
+        await fixture.Workplace.UpsertEntryDraftAsync(draft, default);
+        var itemId = WorkItemId.New();
+        var taskId = WorkTaskId.FromWorkItem(itemId);
+        var executionId = WorkExecutionId.New();
+        var interactionId = InteractionId.New();
+        var item = WorkItem.Create(itemId, WorkplaceId, "entry", "Work in progress", Now, metadata: new Dictionary<string, string>
+        {
+            ["workplace.workspaceId"] = WorkplaceId.Value.ToString("D"),
+            ["workplace.entryId"] = draft.Id.Value,
+            ["workplace.interactionId"] = interactionId.Value.ToString("D"),
+            ["workplace.taskId"] = taskId.Value.ToString("D")
+        });
+        item.MarkQueued(executionId, "agent", Guid.NewGuid(), Now.AddMilliseconds(500));
+        item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, itemId, executionId, Now.AddSeconds(1), "agent"));
+        await fixture.Repository.CreateAsync(item, default);
+        await fixture.Workplace.CreateInteractionAsync(new WorkplaceInteraction
+        {
+            Id = interactionId,
+            WorkspaceId = WorkplaceId,
+            EntryId = draft.Id,
+            Status = InteractionStatus.Processing,
+            StartedAt = Now,
+            LastActivityAt = Now,
+            TaskId = taskId
+        }, default);
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub());
+        var service = new EntryAdministrationService(fixture.Workplace, new EntryTargetResolverStub(), workplace, TimeProvider.System, new WorkplaceContextStub());
+
+        var conflict = await Assert.ThrowsExactlyAsync<WorkValidationException>(() =>
+            service.DeleteAsync(WorkplaceId, draft.Id, removeDashboardReferences: true, closeInteractions: false, default));
+        Assert.AreEqual("entry_interactions_active", conflict.Code);
+
+        await service.DeleteAsync(WorkplaceId, draft.Id, removeDashboardReferences: true, closeInteractions: true, default);
+
+        Assert.AreEqual(WorkItemStatus.Cancelled, (await fixture.Repository.GetAsync(WorkplaceId, itemId, default))!.Value.Status);
+        Assert.AreEqual(InteractionStatus.Closed, (await fixture.Workplace.GetInteractionAsync(WorkplaceId, interactionId, default))!.Status);
+        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, draft.Id, default));
+    }
+
+    [TestMethod]
+    public async Task EntryDeleteApiRemovesDefaultAndNamespacedDrafts()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var workspace = (await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces"))!.Single();
+        var workspaceId = new WorkspaceId(workspace.Id);
+        var defaultDraft = Entry(new EntryId("delete-default")) with { WorkspaceId = workspaceId };
+        var namespacedDraft = Entry(new EntryId("delete-namespaced", new ResourceNamespace("team-a"))) with { WorkspaceId = workspaceId };
+
+        Assert.AreEqual(HttpStatusCode.OK, (await client.PutAsJsonAsync("/api/management/entries/delete-default", defaultDraft)).StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, (await client.PutAsJsonAsync("/api/namespaces/team-a/management/entries/delete-namespaced", namespacedDraft)).StatusCode);
+        Assert.AreEqual(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/management/entries/delete-default")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/namespaces/team-a/management/entries/delete-namespaced")).StatusCode);
+
+        Assert.AreEqual(HttpStatusCode.NotFound, (await client.GetAsync("/api/management/entries/delete-default")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.NotFound, (await client.GetAsync("/api/namespaces/team-a/management/entries/delete-namespaced")).StatusCode);
+    }
+
+    [TestMethod]
+    public async Task TaskDeleteApiRequiresCurrentETagAndRemovesTerminalTask()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var workspace = (await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces"))!.Single();
+        var workspaceId = new WorkspaceId(workspace.Id);
+        var repository = factory.Services.GetRequiredService<IWorkItemRepository>();
+        var item = WorkItem.Create(WorkItemId.New(), workspaceId, "trigger", "Task to delete", Now, metadata: new Dictionary<string, string>
+        {
+            ["origin"] = "trigger",
+            ["workplace.workspaceId"] = workspaceId.ToString()
+        });
+        var executionId = WorkExecutionId.New();
+        item.MarkQueued(executionId, "agent", Guid.NewGuid(), Now.AddSeconds(1));
+        item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), workspaceId, item.Id, executionId, Now.AddSeconds(2), "agent"));
+        item.ApplyRuntimeEvent(new WorkExecutionCompleted(Guid.NewGuid(), workspaceId, item.Id, executionId, Now.AddSeconds(3), Result("Done")));
+        await repository.CreateAsync(item, default);
+
+        using var current = await client.GetAsync($"/api/tasks/{item.Id}");
+        Assert.AreEqual(HttpStatusCode.OK, current.StatusCode);
+        Assert.IsNotNull(current.Headers.ETag);
+        Assert.AreEqual(HttpStatusCode.BadRequest, (await client.DeleteAsync($"/api/tasks/{item.Id}")).StatusCode);
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/tasks/{item.Id}");
+        request.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(current.Headers.ETag.ToString()));
+
+        using var deleted = await client.SendAsync(request);
+
+        Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
+        Assert.IsNull(await repository.GetAsync(workspaceId, item.Id, default));
+    }
+
+    [TestMethod]
+    public async Task WorkApiValidatesCreatesGetsAndReportsUnavailableResult()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IWorkExecutionGateway>();
+                services.AddSingleton<IWorkExecutionGateway, PausedGateway>();
+            });
+        });
+        using var client = factory.CreateClient();
+        var routes = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Select(endpoint => endpoint.RoutePattern.RawText)
+            .Where(route => route is not null)
+            .ToArray();
+        CollectionAssert.IsSubsetOf(new[]
+        {
+            "/api/work/workitems/",
+            "/api/work/workitems/{workItemId:guid}",
+            "/api/work/workitems/{workItemId:guid}/cancel",
+            "/api/work/workitems/{workItemId:guid}/messages",
+            "/api/work/workitems/{workItemId:guid}/input",
+            "/api/work/workitems/{workItemId:guid}/approval",
+            "/api/work/workitems/{workItemId:guid}/events",
+            "/api/work/workitems/{workItemId:guid}/result"
+        }, routes!);
+        using var invalid = await client.PostAsJsonAsync("/api/work/workitems", new CreateWorkItemRequest("", ""));
+        Assert.AreEqual(HttpStatusCode.BadRequest, invalid.StatusCode);
+
+        using var createdResponse = await client.PostAsJsonAsync("/api/work/workitems", new CreateWorkItemRequest("analysis", "Analyze this", "Test work", RequesterIdentity: "requester-1"));
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
+        Assert.IsNotNull(createdResponse.Headers.ETag);
+        var created = await createdResponse.Content.ReadFromJsonAsync<WorkItemResponse>();
+        Assert.IsNotNull(created);
+        Assert.AreEqual(WorkItemStatus.Queued, created.Status);
+
+        using var get = await client.GetAsync($"/api/work/workitems/{created.Id}");
+        Assert.AreEqual(HttpStatusCode.OK, get.StatusCode);
+        using var result = await client.GetAsync($"/api/work/workitems/{created.Id}/result");
+        Assert.AreEqual(HttpStatusCode.Conflict, result.StatusCode);
+        using var missing = await client.GetAsync($"/api/work/workitems/{Guid.NewGuid()}");
+        Assert.AreEqual(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task LocalRuntimeCompletesWorkAndExposesResultThroughCanonicalApi()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+        });
+        using var client = factory.CreateClient();
+        using var response = await client.PostAsJsonAsync("/api/work/workitems", new CreateWorkItemRequest("question", "How can I optimize a SQL query?"));
+        response.EnsureSuccessStatusCode();
+        var created = await response.Content.ReadFromJsonAsync<WorkItemResponse>();
+        Assert.IsNotNull(created);
+
+        WorkItemResponse? current = null;
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            current = await client.GetFromJsonAsync<WorkItemResponse>($"/api/work/workitems/{created.Id}");
+            if (current?.Status is WorkItemStatus.Completed or WorkItemStatus.Failed) break;
+            await Task.Delay(20);
+        }
+
+        Assert.AreEqual(WorkItemStatus.Completed, current!.Status);
+        var result = await client.GetFromJsonAsync<WorkResultResponse>($"/api/work/workitems/{created.Id}/result");
+        Assert.IsNotNull(result);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result.Contents.Single().Text));
+        var events = await client.GetFromJsonAsync<WorkEventResponse[]>($"/api/work/workitems/{created.Id}/events");
+        CollectionAssert.IsSubsetOf(new[] { "WorkItemSubmitted", "WorkItemQueued", "WorkItemStarted", "WorkItemCompleted" }, events!.Select(value => value.Type).ToArray());
+    }
+
+    [TestMethod]
+    public async Task WorkplaceApiRunsPrimaryEntryThroughFlowAndReturnsWorkspaceScopedTask()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+        });
+        using var client = factory.CreateClient();
+        var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces");
+        var workspace = workspaces!.Single(value => value.Name == "default");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(workspace.OrganizationName));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(workspace.OrganizationDisplayName));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(workspace.UserDisplayName));
+        var workspaceRoute = workspace.Id.ToString("D");
+        var dashboard = await client.GetFromJsonAsync<WorkplaceDashboardResponse>($"/api/workspaces/{workspaceRoute}/dashboard");
+        Assert.AreEqual(DashboardIconDefaults.Home, dashboard!.Icon);
+        Assert.AreEqual(DashboardItemRole.Primary, dashboard!.Entries.Single(value => value.Role == DashboardItemRole.Primary).Role);
+
+        using var submittedResponse = await client.PostAsJsonAsync($"/api/workspaces/{workspaceRoute}/entries/universal-request/interactions", new CreateInteractionRequest(
+            new Dictionary<string, System.Text.Json.JsonElement> { ["request"] = System.Text.Json.JsonSerializer.SerializeToElement("Explain dependency injection in .NET") }));
+        Assert.AreEqual(HttpStatusCode.Created, submittedResponse.StatusCode);
+        var submitted = await submittedResponse.Content.ReadFromJsonAsync<EntrySubmissionResponse>();
+        Assert.IsNotNull(submitted?.Task);
+        Assert.IsInstanceOfType<CreateTaskAction>(submitted.Action);
+        var initialMessages = await client.GetFromJsonAsync<ConversationMessage[]>($"/api/workspaces/{workspaceRoute}/interactions/{submitted.Interaction.Id}/messages") ?? [];
+        Assert.IsFalse(initialMessages.Any(value => value.Content == "I’ve started the work and will keep this conversation updated."));
+        Assert.IsFalse(initialMessages.Any(value => value.Content == "I’ll prepare a standard report and highlight the main changes."));
+
+        WorkTaskResponse? task = null;
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            task = await client.GetFromJsonAsync<WorkTaskResponse>($"/api/workspaces/{workspaceRoute}/tasks/{submitted.Task.Id}");
+            if (task?.Status is WorkTaskStatus.Completed or WorkTaskStatus.Failed) break;
+            await Task.Delay(25);
+        }
+        Assert.AreEqual(WorkTaskStatus.Completed, task!.Status);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(task.FlowRunId));
+        Assert.IsNotNull(task.Result);
+
+        using var wrongWorkspace = await client.GetAsync($"/api/workspaces/other/tasks/{task.Id}");
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongWorkspace.StatusCode);
+    }
+
+    private static WorkItem CreatePending(string type = "analysis", string? requester = "requester-1") =>
+        WorkItem.Create(WorkItemId.New(), WorkplaceId, type, "Perform the requested work", Now, requesterIdentity: requester);
+
+    private static WorkItem Running()
+    {
+        var item = CreatePending();
+        var executionId = WorkExecutionId.New();
+        item.MarkQueued(executionId, null, Guid.NewGuid(), Now.AddSeconds(1));
+        item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), item.WorkspaceId, item.Id, executionId, Now.AddSeconds(2), "agent-1"));
+        return item;
+    }
+
+    private static WorkResult Result(string text) => new([new WorkResultContent(text)], [], new Dictionary<string, string>(), Now);
+
+    private sealed class FakeGateway : IWorkExecutionGateway
+    {
+        public WorkExecutionRequest? Request { get; private set; }
+        public bool Confirmed { get; private set; }
+        public Task<WorkExecutionAccepted> RequestExecutionAsync(WorkExecutionRequest request, CancellationToken cancellationToken)
+        {
+            Request = request;
+            return Task.FromResult(new WorkExecutionAccepted(WorkExecutionId.New(), request.RequestedAgentId, Now, Guid.NewGuid()));
+        }
+        public Task ConfirmQueuedAsync(WorkExecutionAccepted accepted, CancellationToken cancellationToken)
+        {
+            Confirmed = true;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class PausedGateway : IWorkExecutionGateway
+    {
+        public Task<WorkExecutionAccepted> RequestExecutionAsync(WorkExecutionRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(new WorkExecutionAccepted(WorkExecutionId.New(), request.RequestedAgentId, Now, Guid.NewGuid()));
+        public Task ConfirmQueuedAsync(WorkExecutionAccepted accepted, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    [TestMethod]
+    public async Task WorkIsRejectedBeforeQueueingWithoutAnExecutionScope()
+    {
+        await using var fixture = await WorkFixture.CreateAsync(withExecutionScope: false);
+
+        var exception = await Assert.ThrowsExactlyAsync<WorkValidationException>(() => fixture.Service.SubmitAsync(
+            new SubmitWorkItemCommand(WorkplaceId, "analysis", "Run"), default));
+
+        Assert.AreEqual("work_execution_scope_required", exception.Code);
+        Assert.IsNull(fixture.Gateway.Request);
+    }
+
+    private sealed class TestWorkExecutionScopeAccessor : IWorkExecutionScopeAccessor
+    {
+        public static FlowRunScope Scope { get; } = new(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            new(Guid.Parse("22222222-2222-2222-2222-222222222222")),
+            Guid.Parse("33333333-3333-3333-3333-333333333333"));
+
+        public FlowRunScope Current => Scope;
+    }
+
+    private sealed class WorkplaceContextStub : IWorkplaceContext
+    {
+        public WorkspaceId WorkspaceId => WorkplaceId;
+    }
+
+    private sealed class RecordingArtifactStore : IArtifactStore
+    {
+        public List<ArtifactReference> Deleted { get; } = [];
+        public Task<ArtifactReference> SaveAsync(WorkspaceId workspaceId, ArtifactContent content, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<Stream> OpenReadAsync(WorkspaceId workspaceId, ArtifactReference reference, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteAsync(WorkspaceId workspaceId, ArtifactReference reference, CancellationToken cancellationToken)
+        {
+            Deleted.Add(reference);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class EntryTargetResolverStub : IEntryTargetResolver
+    {
+        public Task<EntryResolvedTarget> ResolveAsync(EntryDraft draft, CancellationToken cancellationToken) => Task.FromResult(new EntryResolvedTarget("router", "1.0.0"));
+        public Task<IReadOnlyList<EntryDependency>> GetDependenciesAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<EntryDependency>>([]);
+    }
+
+    private static EntryDraft Entry(EntryId id) => new()
+    {
+        WorkspaceId = WorkplaceId,
+        Id = id,
+        Name = id.Value,
+        DisplayName = id.Value,
+        Binding = new EntryBinding(EntryBindingKind.Flow, "router"),
+        Presentation = new EntryPresentation
+        {
+            Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }]
+        }
+    };
+
+    private sealed class WorkFixture : IAsyncDisposable
+    {
+        private readonly string _directory;
+        private readonly ServiceProvider _provider;
+        public WorkItemService Service => _provider.GetRequiredService<WorkItemService>();
+        public IWorkItemRepository Repository => _provider.GetRequiredService<IWorkItemRepository>();
+        public IWorkplaceRepository Workplace => _provider.GetRequiredService<IWorkplaceRepository>();
+        public FakeGateway Gateway => _provider.GetRequiredService<FakeGateway>();
+
+        private WorkFixture(string directory, ServiceProvider provider) { _directory = directory; _provider = provider; }
+
+        public static async Task<WorkFixture> CreateAsync(bool withExecutionScope = true, DbCommandInterceptor? commandInterceptor = null)
+        {
+            var directory = Path.Combine(Path.GetTempPath(), $"agentstration-work-tests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton(TimeProvider.System);
+            var connectionString = $"Data Source={Path.Combine(directory, "work.db")};Pooling=False";
+            if (commandInterceptor is null)
+            {
+                services.AddSqliteWorkPlane(connectionString);
+            }
+            else
+            {
+                services.AddDbContextFactory<WorkDbContext>(options => options.UseSqlite(connectionString).AddInterceptors(commandInterceptor));
+                services.AddSingleton<IWorkItemRepository, SqliteWorkItemRepository>();
+                services.AddSingleton<IWorkplaceRepository, SqliteWorkplaceRepository>();
+            }
+            services.AddSingleton<FakeGateway>();
+            services.AddSingleton<IWorkExecutionGateway>(provider => provider.GetRequiredService<FakeGateway>());
+            if (withExecutionScope) services.AddSingleton<IWorkExecutionScopeAccessor, TestWorkExecutionScopeAccessor>();
+            services.AddSingleton<WorkItemService>();
+            var provider = services.BuildServiceProvider();
+            var fixture = new WorkFixture(directory, provider);
+            await fixture.Service.InitializeAsync(default);
+            return fixture;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await _provider.DisposeAsync();
+            if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);
+        }
+    }
+
+    private sealed class CountingCommandInterceptor : DbCommandInterceptor
+    {
+        private int _count;
+        private readonly ConcurrentQueue<string> _commandTexts = new();
+        public int Count => Volatile.Read(ref _count);
+        public IReadOnlyList<string> CommandTexts => _commandTexts.ToArray();
+        public void Reset()
+        {
+            Interlocked.Exchange(ref _count, 0);
+            _commandTexts.Clear();
+        }
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _count);
+            _commandTexts.Enqueue(command.CommandText);
+            return ValueTask.FromResult(result);
+        }
+    }
+}

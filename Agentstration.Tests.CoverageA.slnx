@@ -6,5 +6,6 @@
     <Project Path="tests/Agentstration.Management.Aep.Tests/Agentstration.Management.Aep.Tests.csproj" />
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
     <Project Path="tests/Agentstration.Workplace.Web.Tests/Agentstration.Workplace.Web.Tests.csproj" />
+    <Project Path="tests/Agentstration.Console.Web.Tests/Agentstration.Console.Web.Tests.csproj" />
   </Folder>
 </Solution>
