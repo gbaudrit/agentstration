@@ -1,0 +1,20 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata: { name: resource-planning-workflow-design }
+definition:
+  displayName: Resource Planning - workflow design
+  description: Durable functional workflow design child Flow.
+  version: 1.0.0
+  enabled: true
+  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-workflow-designer } }
+  graph:
+    entryStep: input
+    steps:
+      - { type: input, name: input, displayName: Roles and intent }
+      - { type: agent, name: design, displayName: Design workflows, agent: { resourceId: resource-planning-workflow-designer }, inputMapping: "${input}" }
+      - { type: output, name: output, displayName: Workflow intents, outputMapping: "${steps.design.output}" }
+    transitions:
+      - { id: input-to-design, fromStep: input, event: completed, toStep: design }
+      - { id: design-to-output, fromStep: design, event: completed, toStep: output }
+  publish: true
+  activate: true
