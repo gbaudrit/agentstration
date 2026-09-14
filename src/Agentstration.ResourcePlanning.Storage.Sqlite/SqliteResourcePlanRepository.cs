@@ -11,6 +11,7 @@ public sealed class ResourcePlanningDbContext(DbContextOptions<ResourcePlanningD
     internal DbSet<ResourcePlanDocument> Plans => Set<ResourcePlanDocument>();
     internal DbSet<ResourcePlanActivityDocument> Activities => Set<ResourcePlanActivityDocument>();
     internal DbSet<ResourceChangeSetDocument> ChangeSets => Set<ResourceChangeSetDocument>();
+    internal DbSet<ResourceChangeSetValidationDocument> Validations => Set<ResourceChangeSetValidationDocument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -38,6 +39,14 @@ public sealed class ResourcePlanningDbContext(DbContextOptions<ResourcePlanningD
         changeSet.Property(value => value.CreatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         changeSet.HasIndex(value => new { value.TenantId, value.WorkspaceId, value.PlanId, value.PlanRevision, value.MaterializationDigest }).IsUnique();
         changeSet.HasIndex(value => new { value.TenantId, value.WorkspaceId, value.CreatedAt, value.Id });
+
+        var validation = modelBuilder.Entity<ResourceChangeSetValidationDocument>();
+        validation.ToTable("ResourceChangeSetValidations");
+        validation.HasKey(value => value.Id);
+        validation.Property(value => value.ChangeSetDigest).HasMaxLength(80);
+        validation.Property(value => value.Payload).IsRequired();
+        validation.Property(value => value.ValidatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
+        validation.HasIndex(value => new { value.TenantId, value.WorkspaceId, value.ChangeSetId, value.ValidatedAt, value.Id });
     }
 }
 
@@ -76,6 +85,17 @@ internal sealed class ResourceChangeSetDocument
     public DateTimeOffset CreatedAt { get; set; }
     public required string Payload { get; set; }
     public required string ETag { get; set; }
+}
+
+internal sealed class ResourceChangeSetValidationDocument
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public Guid ChangeSetId { get; set; }
+    public required string ChangeSetDigest { get; set; }
+    public DateTimeOffset ValidatedAt { get; set; }
+    public required string Payload { get; set; }
 }
 
 public sealed class SqliteResourcePlanRepository(
@@ -202,6 +222,26 @@ public sealed class SqliteResourcePlanRepository(
         document.ETag = NewETag();
         await SaveUpdateAsync(context, cancellationToken);
         return Snapshot(document);
+    }
+
+    public async Task AddValidationAsync(ResourceChangeSetValidation validation, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        context.Validations.Add(new()
+        {
+            Id = validation.Id, TenantId = validation.Scope.TenantId, WorkspaceId = validation.Scope.WorkspaceId.Value,
+            ChangeSetId = validation.ChangeSetId.Value, ChangeSetDigest = validation.ChangeSetDigest, ValidatedAt = validation.ValidatedAt,
+            Payload = JsonSerializer.Serialize(validation, JsonOptions)
+        });
+        await SaveCreateAsync(context, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ResourceChangeSetValidation>> ListValidationsAsync(ResourcePlanScope scope, ResourceChangeSetId id, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payloads = await context.Validations.AsNoTracking().Where(value => value.TenantId == scope.TenantId && value.WorkspaceId == scope.WorkspaceId.Value && value.ChangeSetId == id.Value)
+            .OrderBy(value => value.ValidatedAt).ThenBy(value => value.Id).Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<ResourceChangeSetValidation>).ToArray();
     }
 
     private static ResourcePlanDocument ToDocument(ResourcePlan plan) => new()
