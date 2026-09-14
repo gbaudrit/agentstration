@@ -125,9 +125,9 @@ public abstract class ResourcePlanningMcpTool(
     private static void EnsureOnly(JsonElement arguments, params string[] allowed)
     {
         var names = new HashSet<string>(allowed, StringComparer.Ordinal);
-        var unknown = arguments.EnumerateObject().FirstOrDefault(value => !names.Contains(value.Name));
-        if (unknown.Name is not null)
-            throw new ToolDefinitionInvocationException("resource_planning_argument_unknown", $"Argument '{unknown.Name}' is not declared by the Tool schema.");
+        foreach (var argument in arguments.EnumerateObject())
+            if (!names.Contains(argument.Name))
+                throw new ToolDefinitionInvocationException("resource_planning_argument_unknown", $"Argument '{argument.Name}' is not declared by the Tool schema.");
     }
 
     protected static InternalMcpToolDefinition Define(string name, string displayName, string description, object properties, string[] required) => new(
