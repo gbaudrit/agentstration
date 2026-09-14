@@ -44,6 +44,12 @@ public sealed class WorkplaceApiTests
                 var context = await scope.ServiceProvider.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
                 var identities = scope.ServiceProvider.GetRequiredService<IIdentityStore>();
                 await identities.AddWorkspaceAsync(new Workspace(siblingId, context.TenantId, "sibling", "Sibling", WorkspaceStatus.Active, DateTimeOffset.UtcNow), default);
+                await identities.AddWorkspaceMembershipAsync(new WorkspaceMembership(
+                    Guid.NewGuid(),
+                    siblingId,
+                    context.PrincipalId,
+                    MembershipStatus.Active,
+                    DateTimeOffset.UtcNow), default);
                 var entries = scope.ServiceProvider.GetRequiredService<IWorkplaceRepository>();
                 await entries.UpsertEntryAsync(new EntryResource
                 {
