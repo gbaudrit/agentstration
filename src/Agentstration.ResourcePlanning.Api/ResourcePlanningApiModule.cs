@@ -20,6 +20,7 @@ public static class ResourcePlanningApiModule
         plans.MapPut("/{id:guid}", RefineAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         plans.MapPost("/{id:guid}/status", ChangeStatusAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         plans.MapGet("/{id:guid}/activities", ListActivitiesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapPost("/validate-content", ValidateContent).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         return endpoints;
     }
 
@@ -107,8 +108,11 @@ public static class ResourcePlanningApiModule
         catch (ResourcePlanNotFoundException exception) { return Results.NotFound(Problem("resource_plan_not_found", exception.Message, StatusCodes.Status404NotFound)); }
         catch (ResourcePlanConcurrencyException exception) { return Results.Conflict(Problem("resource_plan_concurrency", exception.Message, StatusCodes.Status409Conflict)); }
         catch (ResourcePlanLifecycleException exception) { return Results.UnprocessableEntity(Problem(exception.Code, exception.Message, StatusCodes.Status422UnprocessableEntity)); }
+        catch (ResourcePlanValidationException exception) { return Results.UnprocessableEntity(new { title = "resource_plan_content_invalid", detail = exception.Message, status = StatusCodes.Status422UnprocessableEntity, errors = exception.Issues }); }
         catch (ArgumentException exception) { return Results.BadRequest(Problem("resource_plan_invalid", exception.Message, StatusCodes.Status400BadRequest)); }
     }
 
     private static object Problem(string title, string detail, int status) => new { title, detail, status };
+
+    private static IResult ValidateContent(ResourcePlanContent content, IResourcePlanContentValidator validator) => Results.Ok(validator.Validate(content));
 }
