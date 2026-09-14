@@ -12,6 +12,7 @@ using Agentstration.Infrastructure.Flows;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourcePlanning;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
@@ -268,6 +269,7 @@ internal static class StandaloneHostCompositionExtensions
                 await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+                await app.Services.GetRequiredService<ResourcePlanService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 if (app.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
                     await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.ApplyDeclarativeBootstrapAsync(app.Lifetime.ApplicationStopping);
