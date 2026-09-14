@@ -6,7 +6,8 @@ namespace Agentstration.ResourcePlanning;
 
 public sealed class ResourcePlanService(
     IResourcePlanRepository repository,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IResourcePlanContentValidator contentValidator)
 {
     public Task InitializeAsync(CancellationToken cancellationToken) => repository.InitializeAsync(cancellationToken);
 
@@ -141,14 +142,17 @@ public sealed class ResourcePlanService(
         if (actorPrincipalId == Guid.Empty) throw new ArgumentException("An actor Principal is required.", nameof(actorPrincipalId));
     }
 
-    private static ResourcePlanContent ValidateContent(ResourcePlanContent content)
+    private ResourcePlanContent ValidateContent(ResourcePlanContent content)
     {
         ArgumentNullException.ThrowIfNull(content);
         if (string.IsNullOrWhiteSpace(content.SchemaVersion) || content.SchemaVersion.Length > 64)
             throw new ArgumentException("Resource Plan content requires a schema version of at most 64 characters.", nameof(content));
         if (content.Document.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
             throw new ArgumentException("Resource Plan content must contain a JSON document.", nameof(content));
-        return content with { SchemaVersion = content.SchemaVersion.Trim(), Document = content.Document.Clone() };
+        var normalized = content with { SchemaVersion = content.SchemaVersion.Trim(), Document = content.Document.Clone() };
+        var validation = contentValidator.Validate(normalized);
+        if (!validation.IsValid) throw new ResourcePlanValidationException(validation.Issues);
+        return normalized;
     }
 
     private static string Required(string value, string name, int maximum)
@@ -173,4 +177,10 @@ public sealed class ResourcePlanService(
 public sealed class ResourcePlanLifecycleException(string code, string message) : Exception(message)
 {
     public string Code { get; } = code;
+}
+
+public sealed class ResourcePlanValidationException(IReadOnlyList<PlanningValidationIssue> issues)
+    : Exception("The functional Resource Plan document is invalid.")
+{
+    public IReadOnlyList<PlanningValidationIssue> Issues { get; } = issues;
 }
