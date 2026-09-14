@@ -27,6 +27,11 @@ public static class SecurityAuditActions
     public const string PersonalAccessTokenCreated = "personal-access-token.created";
     public const string PersonalAccessTokenRevoked = "personal-access-token.revoked";
     public const string PersonalAccessTokensRevoked = "personal-access-token.revoked-all";
+    public const string BffWorkloadEnrolled = "bff-workload.enrolled";
+    public const string BffWorkloadCredentialRotated = "bff-workload.credential-rotated";
+    public const string BffWorkloadCredentialRevoked = "bff-workload.credential-revoked";
+    public const string BffWorkloadAuthenticated = "bff-workload.authenticated";
+    public const string BffWorkloadAuthenticationFailed = "bff-workload.authentication-failed";
     public const string BootstrapProfileApplied = "bootstrap-profile.applied";
     public const string AepEnrollmentAnnounced = "aep-enrollment.announced";
     public const string AepPairingCodeIssued = "aep-enrollment.code-issued";

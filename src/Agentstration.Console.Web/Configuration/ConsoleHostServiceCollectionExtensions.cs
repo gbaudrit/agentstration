@@ -1,4 +1,5 @@
 using Agentstration.Console.Web.Features.Flows;
+using Agentstration.Console.Web.Security;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -18,6 +19,10 @@ public static class ConsoleHostServiceCollectionExtensions
         services.AddOptions<AgentstrationWebOptions>()
             .Bind(configuration.GetSection(AgentstrationWebOptions.SectionName))
             .Validate(Validate, "API base addresses must be absolute HTTP(S) URIs and timeouts must be between 1 and 120 seconds.")
+            .ValidateOnStart();
+        services.AddOptions<BffWorkloadClientOptions>()
+            .Bind(configuration.GetSection(BffWorkloadClientOptions.SectionName))
+            .Validate(value => value.Validate(), "BFF workload client configuration is invalid.")
             .ValidateOnStart();
         services.AddSingleton(TimeProvider.System);
         services.AddAgentstrationWebComponents();
@@ -64,6 +69,12 @@ public static class ConsoleHostServiceCollectionExtensions
         AddClient<ToolsApiClient, IToolsClient>(services, configured.ManagementApi);
         AddClient<ToolDefinitionsApiClient, IToolDefinitionsClient>(services, configured.ManagementApi);
         AddClient<SecretsApiClient, ISecretsClient>(services, configured.ManagementApi, resilient: false);
+        services.AddTransient<BffWorkloadSigningHandler>();
+        Configure(
+            services.AddHttpClient<IBffWorkloadTrustClient, BffWorkloadTrustClient>()
+                .AddHttpMessageHandler<BffWorkloadSigningHandler>(),
+            configured.ManagementApi,
+            resilient: false);
         AddClient<ResourceScopeInventoryApiClient, IResourceScopeInventoryClient>(services, configured.ManagementApi);
         AddClient<ManagementApiClient, IAgentRunnerManagementClient>(services, configured.ManagementApi);
         AddClient<RuntimeApiClient, IAgentRunnerRuntimeClient>(services, configured.RuntimeApi);

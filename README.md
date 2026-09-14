@@ -85,7 +85,15 @@ The operations Console also has an independently hostable process shell. Keep th
 dotnet run --project src/Agentstration.Console.Web
 ```
 
-Open [http://localhost:5190](http://localhost:5190). Its Management, Work, Flow, and Runtime origins are configured independently under `Agentstration:*Api:BaseAddress`. This shell establishes the process and browser-session boundary only; delegated API authentication is delivered by the subsequent secure Console BFF increments, so the standalone host remains the functional default for authenticated operations.
+Open [http://localhost:5190](http://localhost:5190). Its Management, Work, Flow, and Runtime origins are configured independently under `Agentstration:*Api:BaseAddress`. Private BFF calls use a dedicated instance-bound workload credential; interactive session resolution and delegated business tokens remain subsequent increments, so the standalone host remains the functional default for authenticated operations.
+
+For a manually launched separated Console, provision a credential without displaying it:
+
+```powershell
+./scripts/security/provision-bff-workload.ps1 -OutputPath ./.agentstration/bff-workload/console-bff/primary.key
+```
+
+Configure `Agentstration:BffWorkload` on `Agentstration.Console.Web` and `Agentstration:BffWorkloadTrust` on the authoritative `Agentstration.Web` with the same workload ID (`console-bff`), credential ID, credential-file path, and target/authoritative instance ID. Add a second credential entry for overlap, move the Console to it, then set `Revoked=true` on the old server entry. Aspire and Compose provision their development credential automatically; committed configuration never contains its value.
 
 Use `--launch-profile http-NoBootstrap` or `--launch-profile https-NoBootstrap` to start Development without applying initial profiles. These launch profiles retain the catalog path and selected profiles but set `InitialBootstrapEnabled` to `false`. Published applications, Production, and runs using `--no-launch-profile` do not activate the Development profile. Without declarative bootstrap, `/bootstrap` remains available to create the first global local administrator plus the initial Tenant and Workspace interactively.
 
