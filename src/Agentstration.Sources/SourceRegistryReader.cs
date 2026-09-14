@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 using YamlDotNet.Core;
 using YamlDotNet.Core.Events;
 using YamlDotNet.Serialization;
@@ -169,8 +169,8 @@ public sealed partial class SourceRegistryReader : ISourceRegistryReader
 
     private static SourceRegistryManifest ValidateAndNormalize(SourceRegistryManifest manifest)
     {
-        if (manifest.ApiVersion != ManagementApiVersions.CoreV1)
-            throw Invalid("source_registry_api_version_unsupported", $"Supported Source Registry apiVersion is '{ManagementApiVersions.CoreV1}'.");
+        if (manifest.ApiVersion != ResourceApiVersions.CoreV1)
+            throw Invalid("source_registry_api_version_unsupported", $"Supported Source Registry apiVersion is '{ResourceApiVersions.CoreV1}'.");
         if (manifest.Kind != SourceRegistryKinds.SourceRegistry)
             throw Invalid("source_registry_kind_invalid", $"Source Registry kind must be '{SourceRegistryKinds.SourceRegistry}'.");
         if (manifest.Metadata is null || manifest.Definition is null)

@@ -1,4 +1,3 @@
-using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -33,8 +32,8 @@ public sealed class ModelProfileOptionMigrationService(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetVersion);
         var profile = await profiles.GetAsync(@namespace, profileName, cancellationToken)
-            ?? throw new ResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName, @namespace));
-        var providerAddress = profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ResourceKinds.ModelProvider);
+            ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, profileName, @namespace));
+        var providerAddress = profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ModelResourceKinds.ModelProvider);
         var provider = await providers.GetConfigurationRequiredAsync(providerAddress.Namespace, providerAddress.Name, cancellationToken);
         if (!profile.Value.Definition.ProviderOptions.TryGetValue(provider.ContributionId, out var source))
             throw Invalid("option_source_missing", $"Model profile '{profile.Value.Address}' has no native options for contribution '{provider.ContributionId}'.");
@@ -86,7 +85,7 @@ public sealed class ModelProfileOptionMigrationService(
         if (!string.Equals(ifMatch, preview.ProfileETag, StringComparison.Ordinal))
             throw new ResourceConcurrencyException($"Model profile '{@namespace}/{profileName}' was modified before the migration could be applied.");
         var profile = await profiles.GetAsync(@namespace, profileName, cancellationToken)
-            ?? throw new ResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName, @namespace));
+            ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, profileName, @namespace));
         var options = new Dictionary<string, VersionedExtensionOptions>(profile.Value.Definition.ProviderOptions, StringComparer.Ordinal)
         {
             [preview.ProviderType] = preview.Target

@@ -1,4 +1,3 @@
-using Agentstration.Management.Abstractions;
 using Agentstration.Api.Contracts;
 using Agentstration.Tools.Contracts;
 using Agentstration.ResourceManagement;
@@ -35,7 +34,7 @@ internal static class ToolExecutionHookEndpoints
         {
             var @namespace = ModelManagementHttp.Namespace(resourceNamespace);
             var stored = await service.GetAsync(@namespace, hookName, cancellationToken)
-                ?? throw new ResourceNotFoundException(new(ResourceKinds.ToolExecutionHook, hookName, @namespace));
+                ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolExecutionHook, hookName, @namespace));
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
 
@@ -48,8 +47,8 @@ internal static class ToolExecutionHookEndpoints
         {
             var stored = await service.CreateAsync(new ToolExecutionHookResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ToolExecutionHook,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolExecutionHook,
                 Metadata = new ResourceMetadata
                 {
                     Name = body.Name,

@@ -1,4 +1,3 @@
-using Agentstration.Management.Abstractions;
 using Agentstration.Models.Contracts;
 using Agentstration.Extensions;
 using Agentstration.Models;
@@ -145,7 +144,7 @@ internal static class ModelManagementHttp
             resolution.Provider.DisplayName,
             resolution.Provider.ContributionId,
             resolution.ProviderHealth.Status,
-            resolution.Profile.Definition.Provider.Resolve(resolution.Profile.Namespace, ResourceKinds.ModelProvider).Namespace.Value),
+            resolution.Profile.Definition.Provider.Resolve(resolution.Profile.Namespace, ModelResourceKinds.ModelProvider).Namespace.Value),
         new ModelReferenceResponse(
             resolution.Profile.Definition.Model.Name,
             resolution.Model?.Status ?? (resolution.Status == "modelUnavailable" ? "unavailable" : "unknown"),

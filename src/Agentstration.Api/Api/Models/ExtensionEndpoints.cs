@@ -1,5 +1,4 @@
 using Agentstration.Identity.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.Api.Contracts;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Extensions;
@@ -71,7 +70,7 @@ public static class ExtensionEndpoints
             {
                 Metadata = new ResourceMetadata { Name = body.Name, Namespace = ModelManagementHttp.Namespace(body.Namespace) },
                 Kind = ExtensionKinds.ExtensionRegistration,
-                ApiVersion = ManagementApiVersions.CoreV1,
+                ApiVersion = ResourceApiVersions.CoreV1,
                 Definition = body.Properties,
                 ScopeRef = body.ScopeRef
             }, cancellationToken);

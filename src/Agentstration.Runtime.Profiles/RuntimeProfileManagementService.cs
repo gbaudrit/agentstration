@@ -1,7 +1,6 @@
 using Agentstration.Identity.Contracts;
 using Agentstration.Identity;
 using Agentstration.Agents;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -27,10 +26,10 @@ public sealed class RuntimeProfileManagementService(
     public async Task<StoredResource<RuntimeProfileResource>> CreateAsync(RuntimeProfileResource resource, CancellationToken cancellationToken)
     {
         Validate(resource);
-        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ResourceKinds.RuntimeProfile);
+        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(RuntimeProfileResourceKinds.RuntimeProfile);
         return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
-            var address = ScopedResourceAddress.Create(scopeRef, resource.Namespace, ResourceKinds.RuntimeProfile, resource.Name);
+            var address = ScopedResourceAddress.Create(scopeRef, resource.Namespace, RuntimeProfileResourceKinds.RuntimeProfile, resource.Name);
             if (await store.GetExactAsync<RuntimeProfileResource>(address, token) is not null)
                 throw new ResourceConcurrencyException($"Runtime profile '{resource.Metadata.Name}' already exists in scope '{scopeRef}'.");
             return await store.PutExactAsync(scopeRef, resource with { ScopeRef = scopeRef, Generation = 1, Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded } }, null, true, token);
@@ -38,21 +37,21 @@ public sealed class RuntimeProfileManagementService(
     }
 
     public Task<StoredResource<RuntimeProfileResource>?> GetAsync(string name, CancellationToken cancellationToken) =>
-        store.GetAsync<RuntimeProfileResource>(new ResourceKey(ResourceKinds.RuntimeProfile, name), cancellationToken);
+        store.GetAsync<RuntimeProfileResource>(new ResourceKey(RuntimeProfileResourceKinds.RuntimeProfile, name), cancellationToken);
     public Task<StoredResource<RuntimeProfileResource>?> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
-        store.GetAsync<RuntimeProfileResource>(new ResourceKey(ResourceKinds.RuntimeProfile, name, @namespace), cancellationToken);
+        store.GetAsync<RuntimeProfileResource>(new ResourceKey(RuntimeProfileResourceKinds.RuntimeProfile, name, @namespace), cancellationToken);
     public Task<StoredResource<RuntimeProfileResource>?> GetExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
-        store.GetExactAsync<RuntimeProfileResource>(ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.RuntimeProfile, name), cancellationToken);
+        store.GetExactAsync<RuntimeProfileResource>(ScopedResourceAddress.Create(scopeRef, @namespace, RuntimeProfileResourceKinds.RuntimeProfile, name), cancellationToken);
 
     public Task<IReadOnlyList<StoredResource<RuntimeProfileResource>>> ListAsync(CancellationToken cancellationToken) =>
-        store.ListAllAsync<RuntimeProfileResource>(ResourceKinds.RuntimeProfile, cancellationToken);
+        store.ListAllAsync<RuntimeProfileResource>(RuntimeProfileResourceKinds.RuntimeProfile, cancellationToken);
 
     public async Task<StoredResource<RuntimeProfileResource>> PutAsync(string name, RuntimeProfileProperties definition, string? ifMatch, CancellationToken cancellationToken)
         => await PutAsync(ResourceNamespace.Default, name, definition, ifMatch, cancellationToken);
 
     public async Task<StoredResource<RuntimeProfileResource>> PutAsync(ResourceNamespace @namespace, string name, RuntimeProfileProperties definition, string? ifMatch, CancellationToken cancellationToken)
     {
-        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ResourceNotFoundException(new(ResourceKinds.RuntimeProfile, name, @namespace));
+        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ResourceNotFoundException(new(RuntimeProfileResourceKinds.RuntimeProfile, name, @namespace));
         var updated = existing.Value with
         {
             Generation = checked(existing.Value.Generation + 1),
@@ -84,14 +83,14 @@ public sealed class RuntimeProfileManagementService(
 
     public async Task DeleteAsync(ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
     {
-        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ResourceNotFoundException(new(ResourceKinds.RuntimeProfile, name, @namespace));
+        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ResourceNotFoundException(new(RuntimeProfileResourceKinds.RuntimeProfile, name, @namespace));
         await DeleteOrphanedDeploymentsAsync(@namespace, name, cancellationToken);
         var usages = await GetUsagesAsync(@namespace, name, cancellationToken);
         if (usages.Count > 0) throw new RuntimeProfileInUseException(name, usages);
         var scopeRef = existing.Value.ScopeRef ?? throw new RuntimeProfileValidationException("The runtime profile has no ownership scope.");
         await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
-            await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.RuntimeProfile, name), ifMatch, token);
+            await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, @namespace, RuntimeProfileResourceKinds.RuntimeProfile, name), ifMatch, token);
             return true;
         }, cancellationToken);
     }
@@ -107,7 +106,7 @@ public sealed class RuntimeProfileManagementService(
                 ? await store.PutAsync(result.Deployment, deployment.ETag, false, cancellationToken)
                 : deployment;
             await store.DeleteAsync(
-                new ResourceKey(ResourceKinds.AgentDeployment, stored.Value.Metadata.Name, stored.Value.Namespace),
+                new ResourceKey(AgentResourceKinds.AgentDeployment, stored.Value.Metadata.Name, stored.Value.Namespace),
                 stored.ETag,
                 cancellationToken);
         }
@@ -117,10 +116,10 @@ public sealed class RuntimeProfileManagementService(
     {
         if (string.IsNullOrWhiteSpace(deployment.AgentName)) return false;
         var agent = await store.GetAsync<AgentResource>(
-            new ResourceKey(ResourceKinds.Agent, deployment.AgentName, deployment.AgentNamespace), cancellationToken);
+            new ResourceKey(AgentResourceKinds.Agent, deployment.AgentName, deployment.AgentNamespace), cancellationToken);
         if (agent is null) return false;
         var revision = await store.GetAsync<AgentRevision>(
-            new ResourceKey(ResourceKinds.AgentRevision, deployment.RevisionName, deployment.AgentNamespace), cancellationToken);
+            new ResourceKey(AgentResourceKinds.AgentRevision, deployment.RevisionName, deployment.AgentNamespace), cancellationToken);
         return revision?.Value.AgentUid == agent.Value.Uid;
     }
 
@@ -128,14 +127,14 @@ public sealed class RuntimeProfileManagementService(
         ResourceNamespace @namespace,
         string name,
         CancellationToken cancellationToken) =>
-        (await store.ListAllAsync<AgentDeployment>(ResourceKinds.AgentDeployment, cancellationToken))
+        (await store.ListAllAsync<AgentDeployment>(AgentResourceKinds.AgentDeployment, cancellationToken))
             .Where(value => value.Value.RuntimeProfileName == name && value.Value.RuntimeProfileNamespace == @namespace)
             .ToArray();
 
     private static void Validate(RuntimeProfileResource resource)
     {
-        if (resource.Kind != ResourceKinds.RuntimeProfile) throw new RuntimeProfileValidationException($"Kind must be '{ResourceKinds.RuntimeProfile}'.");
-        if (resource.ApiVersion != ManagementApiVersions.CoreV1) throw new RuntimeProfileValidationException($"ApiVersion must be '{ManagementApiVersions.CoreV1}'.");
+        if (resource.Kind != RuntimeProfileResourceKinds.RuntimeProfile) throw new RuntimeProfileValidationException($"Kind must be '{RuntimeProfileResourceKinds.RuntimeProfile}'.");
+        if (resource.ApiVersion != ResourceApiVersions.CoreV1) throw new RuntimeProfileValidationException($"ApiVersion must be '{ResourceApiVersions.CoreV1}'.");
         ArgumentException.ThrowIfNullOrWhiteSpace(resource.Metadata.Name);
         ArgumentException.ThrowIfNullOrWhiteSpace(resource.Definition.DisplayName);
         ArgumentException.ThrowIfNullOrWhiteSpace(resource.Definition.RuntimeType);

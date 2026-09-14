@@ -1,6 +1,5 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
-    <ProjectReference Include="../../src/Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
     <ProjectReference Include="../../src/Agentstration.Tools.Contracts/Agentstration.Tools.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Resources/Agentstration.Resources.csproj" />
     <ProjectReference Include="../../src/Agentstration.Tools/Agentstration.Tools.csproj" />

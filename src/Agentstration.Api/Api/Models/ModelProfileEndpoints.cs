@@ -1,4 +1,3 @@
-using Agentstration.Management.Abstractions;
 using Agentstration.Api.Contracts;
 using Agentstration.Models.Contracts;
 using Agentstration.Models;
@@ -56,7 +55,7 @@ internal sealed class GetModelProfileEndpoint : IModelManagementEndpoint
         {
             var @namespace = ModelManagementHttp.Namespace(resourceNamespace);
             var stored = await service.GetAsync(@namespace, profileName, cancellationToken)
-                ?? throw new ResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName, @namespace));
+                ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, profileName, @namespace));
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
 }
@@ -70,8 +69,8 @@ internal sealed class CreateModelProfileEndpoint : IModelManagementEndpoint
             var stored = await service.CreateAsync(new ModelProfileResource
             {
                 Metadata = new ResourceMetadata { Name = body.Name, Namespace = ModelManagementHttp.Namespace(body.Namespace) },
-                Kind = ResourceKinds.ModelProfile,
-                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ModelResourceKinds.ModelProfile,
+                ApiVersion = ResourceApiVersions.CoreV1,
                 Definition = body.Properties,
                 ScopeRef = body.ScopeRef
             }, cancellationToken);
@@ -109,7 +108,7 @@ internal sealed class GetModelProfileUsagesEndpoint : IModelManagementEndpoint
         {
             var @namespace = ModelManagementHttp.Namespace(resourceNamespace);
             _ = await service.GetAsync(@namespace, profileName, cancellationToken)
-                ?? throw new ResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName, @namespace));
+                ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, profileName, @namespace));
             var usages = await service.GetUsagesAsync(@namespace, profileName, cancellationToken);
             var values = usages.Select(value => new ModelProfileUsageResponse(value.Kind, value.Name, value.Name, value.DisplayName)).ToArray();
             return Results.Ok(new ModelProfileUsagesResponse(values, values.Length));
@@ -124,7 +123,7 @@ internal sealed class ResolveModelProfileEndpoint : IModelManagementEndpoint
         {
             var @namespace = ModelManagementHttp.Namespace(resourceNamespace);
             var profile = await service.GetAsync(@namespace, profileName, cancellationToken)
-                ?? throw new ResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName, @namespace));
+                ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, profileName, @namespace));
             return Results.Ok(ModelManagementHttp.Resolution(await service.ResolveAsync(profile.Value, cancellationToken, includeCapabilityDiagnostics: true)));
         });
 }

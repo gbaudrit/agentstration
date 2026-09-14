@@ -1,7 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Agentstration.Management.Abstractions;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -61,11 +60,11 @@ public sealed partial class PackManagementService
         var @namespace = target.Namespace ?? ResourceNamespace.Default;
         return kind switch
         {
-            PackBindingTargetKind.ModelProfile => await store.GetAsync<ModelProfileResource>(new(ResourceKinds.ModelProfile, target.Name, @namespace), cancellationToken) is not null,
-            PackBindingTargetKind.ModelProvider => await store.GetAsync<ModelProviderResource>(new(ResourceKinds.ModelProvider, target.Name, @namespace), cancellationToken) is not null,
-            PackBindingTargetKind.RuntimeProfile => await store.GetAsync<RuntimeProfileResource>(new(ResourceKinds.RuntimeProfile, target.Name, @namespace), cancellationToken) is not null,
+            PackBindingTargetKind.ModelProfile => await store.GetAsync<ModelProfileResource>(new(ModelResourceKinds.ModelProfile, target.Name, @namespace), cancellationToken) is not null,
+            PackBindingTargetKind.ModelProvider => await store.GetAsync<ModelProviderResource>(new(ModelResourceKinds.ModelProvider, target.Name, @namespace), cancellationToken) is not null,
+            PackBindingTargetKind.RuntimeProfile => await store.GetAsync<RuntimeProfileResource>(new(RuntimeProfileResourceKinds.RuntimeProfile, target.Name, @namespace), cancellationToken) is not null,
             PackBindingTargetKind.ExtensionRegistration => await store.GetAsync<ExtensionRegistrationResource>(new(ExtensionKinds.ExtensionRegistration, target.Name, @namespace), cancellationToken) is not null,
-            PackBindingTargetKind.Secret => await store.GetAsync<SecretResource>(new(ResourceKinds.Secret, target.Name, @namespace), cancellationToken) is not null,
+            PackBindingTargetKind.Secret => await store.GetAsync<SecretResource>(new(SecretResourceKinds.Secret, target.Name, @namespace), cancellationToken) is not null,
             _ => false
         };
     }
@@ -78,7 +77,7 @@ public sealed partial class PackManagementService
         var current = await GetConfigurationAsync(identity, cancellationToken);
         var resource = new PackConfigurationResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = PackKinds.PackConfiguration,
             Metadata = new ResourceMetadata { Name = identity.ResourceName },
             Generation = current is null ? 1 : checked(current.Value.Generation + 1),

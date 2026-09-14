@@ -1,7 +1,7 @@
 using Agentstration.Agents;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
+using Agentstration.Secrets;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
@@ -20,9 +20,9 @@ public sealed class ResourceScopesComponentTests
         var workspaceScope = ResourceScopeRef.Workspace(workspaceId);
         var resources = new ResourceScopeInventoryItemResponse[]
         {
-            new(Guid.NewGuid(), ResourceNamespace.Parse("team-a"), ResourceKinds.Agent, "support agent", DateTimeOffset.UtcNow),
-            new(Guid.NewGuid(), ResourceNamespace.Default, ResourceKinds.Secret, "api key", DateTimeOffset.UtcNow),
-            new(Guid.NewGuid(), ResourceNamespace.Default, ResourceKinds.AgentRevision, "support-agent--000001", DateTimeOffset.UtcNow)
+            new(Guid.NewGuid(), ResourceNamespace.Parse("team-a"), AgentResourceKinds.Agent, "support agent", DateTimeOffset.UtcNow),
+            new(Guid.NewGuid(), ResourceNamespace.Default, SecretResourceKinds.Secret, "api key", DateTimeOffset.UtcNow),
+            new(Guid.NewGuid(), ResourceNamespace.Default, AgentResourceKinds.AgentRevision, "support-agent--000001", DateTimeOffset.UtcNow)
         };
         var inventory = new ResourceScopeInventoryResponse(
         [

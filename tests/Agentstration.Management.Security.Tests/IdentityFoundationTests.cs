@@ -4,7 +4,6 @@ using Agentstration.ResourceManagement;
 using System.Net;
 using System.Net.Http.Json;
 using Agentstration.Infrastructure;
-using Agentstration.Management.Abstractions;
 using Agentstration.Identity;
 using Agentstration.Resources;
 using Microsoft.AspNetCore.Hosting;
@@ -255,7 +254,7 @@ public sealed class IdentityFoundationTests
         var secondWorkspace = new Workspace(Guid.NewGuid(), first.TenantId, "finance", "Finance", WorkspaceStatus.Active, now);
         await identity.AddWorkspaceAsync(secondWorkspace, default);
 
-        var key = new ResourceKey(ResourceKinds.RuntimeProfile, "shared");
+        var key = new ResourceKey(RuntimeProfileResourceKinds.RuntimeProfile, "shared");
         await resources.PutAsync(Profile("shared", first), null, true, default);
         var second = first with { WorkspaceId = secondWorkspace.Id };
         using (fixture.Context.Push(second))
@@ -357,8 +356,8 @@ public sealed class IdentityFoundationTests
     private static RuntimeProfileResource Profile(string id, RequestContext context) => new()
     {
         Metadata = new ResourceMetadata { Name = id },
-        Kind = ResourceKinds.RuntimeProfile,
-        ApiVersion = ManagementApiVersions.CoreV1,
+        Kind = RuntimeProfileResourceKinds.RuntimeProfile,
+        ApiVersion = ResourceApiVersions.CoreV1,
         ScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId),
         Definition = new RuntimeProfileProperties { DisplayName = "Shared", RuntimeType = "Local" }
     };

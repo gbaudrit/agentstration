@@ -1,4 +1,3 @@
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -25,7 +24,7 @@ public sealed class ManagementToolExecutionHookResolver(
             && workspaceScope.Ancestors.All(value => value.Ref != ResourceScopeRef.Tenant(tenantId)))
             return [];
 
-        var resources = await store.ListAllAsync<ToolExecutionHookResource>(ResourceKinds.ToolExecutionHook, cancellationToken);
+        var resources = await store.ListAllAsync<ToolExecutionHookResource>(ToolResourceKinds.ToolExecutionHook, cancellationToken);
         var hooks = new List<IToolExecutionHook>();
         foreach (var stored in resources)
         {

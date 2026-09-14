@@ -1,5 +1,4 @@
 using Agentstration.Identity.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Triggers;
@@ -97,7 +96,7 @@ public sealed class TriggerSchedulerReconciler(
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         using var system = scopes.PushSystem();
-        var triggers = await store.ListAllAsync<TriggerResource>(ResourceKinds.Trigger, cancellationToken);
+        var triggers = await store.ListAllAsync<TriggerResource>(TriggerResourceKinds.Trigger, cancellationToken);
         foreach (var trigger in triggers)
         {
             try { await scheduler.ReconcileAsync(trigger.Value, cancellationToken); }

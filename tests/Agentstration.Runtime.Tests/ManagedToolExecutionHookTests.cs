@@ -2,7 +2,6 @@ using Agentstration.Tools;
 using Agentstration.ResourceManagement;
 using System.Text.Json;
 using Agentstration.Infrastructure.Runtime;
-using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
@@ -119,8 +118,8 @@ public sealed class ManagedToolExecutionHookTests
 
     private static ToolExecutionHookResource Hook() => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.ToolExecutionHook,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ToolResourceKinds.ToolExecutionHook,
         Metadata = new ResourceMetadata { Name = "managed-deny" },
         ScopeRef = ResourceScopeRef.Workspace(Workspace.Value),
         Generation = 1,

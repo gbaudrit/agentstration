@@ -2,7 +2,6 @@ using Agentstration.Identity;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
@@ -91,7 +90,7 @@ public sealed partial class PackManagementService
         var resources = new List<PackResourcePreview>();
         foreach (var resource in resolvedResources)
         {
-            if (resource.ApiVersion != ManagementApiVersions.CoreV1)
+            if (resource.ApiVersion != ResourceApiVersions.CoreV1)
                 throw new PackValidationException("pack_resource_api_version_unsupported", $"Resource '{resource.Path}' uses unsupported apiVersion '{resource.ApiVersion}'.");
             if (!handlers.TryGetValue(resource.Kind, out var handler))
                 throw new PackValidationException("pack_resource_kind_unsupported", $"Resource kind '{resource.Kind}' is not supported by this installation.");

@@ -3,7 +3,6 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
@@ -43,7 +42,7 @@ public sealed partial class PackAuthoringService(
         return await store.PutAsync(new PackProjectResource
         {
             Uid = id,
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = PackAuthoringKinds.PackProject,
             Metadata = new ResourceMetadata { Name = id.ToString("N") },
             Generation = 1,
@@ -178,7 +177,7 @@ public sealed partial class PackAuthoringService(
         var build = await store.CreateImmutableAsync(new PackProjectBuildResource
         {
             Uid = buildId,
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = PackAuthoringKinds.PackProjectBuild,
             Metadata = new ResourceMetadata { Name = buildId.ToString("N") },
             Generation = 1,

@@ -16,7 +16,6 @@ using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Sources;
 using Agentstration.Infrastructure.Triggers;
 using Agentstration.Infrastructure.Work;
-using Agentstration.Management.Abstractions;
 using Agentstration.Sources;
 using Agentstration.Identity;
 using Agentstration.Packs;

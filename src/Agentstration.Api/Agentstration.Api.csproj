@@ -11,7 +11,6 @@
     <ProjectReference Include="../Agentstration.Flows.Contracts/Agentstration.Flows.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Flows.Storage.Abstractions/Agentstration.Flows.Storage.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
-    <ProjectReference Include="../Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.Api.Contracts/Agentstration.Api.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />

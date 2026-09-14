@@ -5,7 +5,6 @@ using Agentstration.ResourceManagement;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
-using Agentstration.Management.Abstractions;
 using Agentstration.Api.Contracts;
 using Agentstration.Sources.Contracts;
 using Agentstration.Identity;
@@ -137,16 +136,16 @@ public sealed class SourceRegistryManagementTests
 
         _ = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, new VaultResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Vault,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Vault,
             Metadata = new ResourceMetadata { Name = "registry-vault" },
             ScopeRef = ResourceScopeRef.Instance,
             Definition = new VaultProperties { DisplayName = "Registry vault", ProviderType = "local" }
         }, null, true, default);
         _ = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, new SecretResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Secret,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Secret,
             Metadata = new ResourceMetadata { Name = "registry-token" },
             ScopeRef = ResourceScopeRef.Instance,
             Definition = new SecretProperties
@@ -918,7 +917,7 @@ public sealed class SourceRegistryManagementTests
     private static SourceRegistryRegistrationResource RegistrationResource(string name, string indexUrl) => new()
     {
         Uid = Guid.NewGuid(),
-        ApiVersion = ManagementApiVersions.CoreV1,
+        ApiVersion = ResourceApiVersions.CoreV1,
         Kind = SourceRegistryKinds.SourceRegistryRegistration,
         Metadata = new ResourceMetadata { Name = name },
         ScopeRef = ResourceScopeRef.Instance,
@@ -927,8 +926,8 @@ public sealed class SourceRegistryManagementTests
 
     private static SourceVersionResource SourceVersion(string digest) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.SourceVersion,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = SourceResourceKinds.SourceVersion,
         Metadata = new ResourceMetadata { Name = "sample-1" },
         Definition = new SourceVersionProperties
         {

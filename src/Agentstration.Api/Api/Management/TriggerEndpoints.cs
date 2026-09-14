@@ -1,5 +1,4 @@
 using Agentstration.Identity.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.Triggers.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -59,7 +58,7 @@ internal sealed class TriggerEndpoints : IManagementEndpoint
     private static Task<IResult> GetNamespacedAsync(string @namespace, string name, HttpResponse response, TriggerManagementService service, CancellationToken token) => GetCoreAsync(ResourceNamespace.Parse(@namespace), name, response, service, token);
     private static Task<IResult> GetCoreAsync(ResourceNamespace @namespace, string name, HttpResponse response, TriggerManagementService service, CancellationToken token) => ManagementHttp.ExecuteAsync(async () =>
     {
-        var stored = await service.GetAsync(@namespace, name, token) ?? throw new ResourceNotFoundException(new(ResourceKinds.Trigger, name, @namespace));
+        var stored = await service.GetAsync(@namespace, name, token) ?? throw new ResourceNotFoundException(new(TriggerResourceKinds.Trigger, name, @namespace));
         return ManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
     });
 
@@ -106,7 +105,7 @@ internal sealed class TriggerEndpoints : IManagementEndpoint
     private static Task<IResult> HistoryNamespacedAsync(string @namespace, string name, int? take, TriggerManagementService management, TriggerFiringService firing, CancellationToken token) => HistoryCoreAsync(ResourceNamespace.Parse(@namespace), name, take, management, firing, token);
     private static Task<IResult> HistoryCoreAsync(ResourceNamespace @namespace, string name, int? take, TriggerManagementService management, TriggerFiringService firing, CancellationToken token) => ManagementHttp.ExecuteAsync(async () =>
     {
-        var trigger = await management.GetAsync(@namespace, name, token) ?? throw new ResourceNotFoundException(new(ResourceKinds.Trigger, name, @namespace));
+        var trigger = await management.GetAsync(@namespace, name, token) ?? throw new ResourceNotFoundException(new(TriggerResourceKinds.Trigger, name, @namespace));
         return Results.Ok(await firing.ListHistoryAsync(trigger.Value.RequireScopeTargetId(ResourceScopeKind.Workspace), trigger.Value.Uid, take ?? 50, token));
     });
 }

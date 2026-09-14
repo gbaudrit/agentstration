@@ -2,7 +2,6 @@ using Agentstration.Identity.Contracts;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Agentstration.Infrastructure.Notifications;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -26,7 +25,7 @@ internal static class AgentstrationMcpHandlers
         var definitions = services.GetRequiredService<ToolDefinitionService>();
         var values = await definitions.ListAsync(cancellationToken);
         var projected = (await services.GetRequiredService<IResourceStore>()
-                .ListAllAsync<ToolResource>(ResourceKinds.Tool, cancellationToken))
+                .ListAllAsync<ToolResource>(ToolResourceKinds.Tool, cancellationToken))
             .Select(value => value.Value)
             .Where(value => value.Namespace.IsDefault && value.Definition.Provider?.Name == AgentstrationToolProvider.Name)
             .ToDictionary(value => value.Definition.ExternalId ?? string.Empty, StringComparer.Ordinal);

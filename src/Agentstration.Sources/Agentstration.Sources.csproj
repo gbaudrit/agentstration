@@ -4,7 +4,6 @@
     <ProjectReference Include="../Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Identity/Agentstration.Identity.csproj" />
-    <ProjectReference Include="../Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <ProjectReference Include="../Agentstration.Packs/Agentstration.Packs.csproj" />
     <ProjectReference Include="../Agentstration.Packs.Contracts/Agentstration.Packs.Contracts.csproj" />

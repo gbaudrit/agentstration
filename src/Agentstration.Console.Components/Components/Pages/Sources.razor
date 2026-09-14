@@ -50,7 +50,7 @@ else if (detail is null)
                 <button class="text-button @(importMode == "yaml" ? "active" : null)" type="button" @onclick='() => SetImportMode("yaml")'>@T("PasteYaml")</button>
             </div>
             <div class="form-grid">
-                <ResourceScopeFormField ResourceKind="@ResourceKinds.Source" @bind-Value="importScope" Disabled="@busy" />
+                <ResourceScopeFormField ResourceKind="@SourceResourceKinds.Source" @bind-Value="importScope" Disabled="@busy" />
                 @if (importMode == "url")
                 {
                     <label class="form-wide"><span>@T("ManifestUrl")</span><input @bind="importUrl" type="url" placeholder="https://example.org/source.yaml" disabled="@busy" /></label>

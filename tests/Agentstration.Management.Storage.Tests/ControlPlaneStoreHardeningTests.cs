@@ -1,7 +1,6 @@
 using Agentstration.Identity.Contracts;
 using Agentstration.Agents;
 using Agentstration.ResourceManagement;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -257,8 +256,8 @@ public sealed class ControlPlaneStoreHardeningTests
         var packNamespace = new ResourceNamespace("agentstration.sample-pack");
         var agent = await fixture.Store.PutAsync(new AgentResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Agent,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
             Metadata = new ResourceMetadata { Name = "sql-expert", Namespace = packNamespace },
             Generation = 3,
             Definition = new AgentProperties
@@ -270,8 +269,8 @@ public sealed class ControlPlaneStoreHardeningTests
         }, null, true, default);
         var revision = await fixture.Store.CreateImmutableAsync(new AgentRevision
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AgentRevision,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.AgentRevision,
             Metadata = new ResourceMetadata { Name = "sql-expert--000003", Namespace = packNamespace },
             AgentUid = agent.Value.Uid,
             AgentName = "sql-expert",
@@ -283,8 +282,8 @@ public sealed class ControlPlaneStoreHardeningTests
         }, default);
         var deployment = await fixture.Store.PutAsync(new AgentDeployment
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AgentDeployment,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.AgentDeployment,
             Metadata = new ResourceMetadata { Name = "sql-expert--g000003", Namespace = packNamespace },
             RevisionName = revision.Value.Metadata.Name,
             AgentName = "sql-expert",
@@ -315,8 +314,8 @@ public sealed class ControlPlaneStoreHardeningTests
 
         await fixture.Store.CreateImmutableAsync(new AgentRevision
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AgentRevision,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.AgentRevision,
             Metadata = new ResourceMetadata { Name = "sql-expert--000004", Namespace = packNamespace },
             AgentUid = agent.Value.Uid,
             AgentName = "sql-expert",
@@ -338,8 +337,8 @@ public sealed class ControlPlaneStoreHardeningTests
         var agentId = Guid.NewGuid();
         var revision = new AgentRevision
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AgentRevision,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.AgentRevision,
             Metadata = new ResourceMetadata { Name = "sql-expert--000003" },
             AgentUid = agentId,
             AgentName = "sql-expert",
@@ -353,7 +352,7 @@ public sealed class ControlPlaneStoreHardeningTests
         var attempts = await Task.WhenAll(CreateAsync(), CreateAsync());
 
         Assert.AreEqual(1, attempts.Count(succeeded => succeeded));
-        Assert.HasCount(1, await fixture.Store.ListAsync<AgentRevision>(ResourceKinds.AgentRevision, 0, 10, default));
+        Assert.HasCount(1, await fixture.Store.ListAsync<AgentRevision>(AgentResourceKinds.AgentRevision, 0, 10, default));
 
         async Task<bool> CreateAsync()
         {

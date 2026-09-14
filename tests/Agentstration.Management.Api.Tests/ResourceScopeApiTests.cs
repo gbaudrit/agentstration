@@ -1,14 +1,16 @@
+using Agentstration.Agents;
+using Agentstration.Models;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Secrets;
 using System.Net;
 using System.Net.Http.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Secrets.Contracts;
 using Agentstration.Resources;
 using Agentstration.Sources.Contracts;
+using Agentstration.Triggers;
 
 namespace Agentstration.Management.Tests;
 
@@ -20,19 +22,19 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
     {
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Tenant },
-            ResourceScopePolicy.AllowedScopes(ResourceKinds.ModelProvider).ToArray());
+            ResourceScopePolicy.AllowedScopes(ModelResourceKinds.ModelProvider).ToArray());
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Workspace },
-            ResourceScopePolicy.AllowedScopes(ResourceKinds.Agent).ToArray());
+            ResourceScopePolicy.AllowedScopes(AgentResourceKinds.Agent).ToArray());
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace },
-            ResourceScopePolicy.AllowedScopes(ResourceKinds.Secret).ToArray());
+            ResourceScopePolicy.AllowedScopes(SecretResourceKinds.Secret).ToArray());
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace },
-            ResourceScopePolicy.AllowedScopes(ResourceKinds.SourceProvider).ToArray());
+            ResourceScopePolicy.AllowedScopes(SourceResourceKinds.SourceProvider).ToArray());
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Workspace },
-            ResourceScopePolicy.AllowedScopes(ResourceKinds.Trigger).ToArray());
+            ResourceScopePolicy.AllowedScopes(TriggerResourceKinds.Trigger).ToArray());
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Instance },
             ResourceScopePolicy.AllowedScopes(SourceRegistryKinds.SourceRegistryRegistration).ToArray());
@@ -50,7 +52,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         await using var factory = Factory();
         using var client = factory.CreateClient();
         var targets = await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
-            $"/api/resource-scopes/targets?kind={ResourceKinds.Secret}");
+            $"/api/resource-scopes/targets?kind={SecretResourceKinds.Secret}");
         Assert.IsNotNull(targets);
         var tenant = targets.Single(value => value.Kind == ResourceScopeKind.Tenant);
         var workspace = targets.Single(value => value.Kind == ResourceScopeKind.Workspace);
@@ -96,7 +98,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         await using var factory = Factory();
         using var client = factory.CreateClient();
         var targets = await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
-            $"/api/resource-scopes/targets?kind={ResourceKinds.Vault}");
+            $"/api/resource-scopes/targets?kind={SecretResourceKinds.Vault}");
         Assert.IsNotNull(targets);
         var tenant = targets.Single(value => value.Kind == ResourceScopeKind.Tenant);
         var workspace = targets.Single(value => value.Kind == ResourceScopeKind.Workspace);
@@ -121,7 +123,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         Assert.IsFalse(tenantNode.IsCurrent);
         Assert.IsTrue(workspaceNode.IsCurrent);
         Assert.IsTrue(tenantNode.Resources.Any(value =>
-            value.Kind == ResourceKinds.Vault && value.Name == "inventory-vault"));
+            value.Kind == SecretResourceKinds.Vault && value.Name == "inventory-vault"));
         Assert.IsFalse(workspaceNode.Resources.Any(value => value.Name == "inventory-vault"));
     }
 
@@ -131,7 +133,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         await using var factory = Factory();
         using var client = factory.CreateClient();
         var targets = await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
-            $"/api/resource-scopes/targets?kind={ResourceKinds.RuntimeProfile}");
+            $"/api/resource-scopes/targets?kind={RuntimeProfileResourceKinds.RuntimeProfile}");
         var tenant = targets!.Single();
 
         using var created = await client.PostAsJsonAsync(

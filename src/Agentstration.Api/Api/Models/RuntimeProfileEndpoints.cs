@@ -1,4 +1,3 @@
-using Agentstration.Management.Abstractions;
 using Agentstration.Api.Contracts;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Runtime.Profiles;
@@ -46,7 +45,7 @@ internal static class RuntimeProfileEndpoints
         {
             var @namespace = ModelManagementHttp.Namespace(resourceNamespace);
             var stored = await service.GetAsync(@namespace, profileName, cancellationToken)
-                ?? throw new ResourceNotFoundException(new(ResourceKinds.RuntimeProfile, profileName, @namespace));
+                ?? throw new ResourceNotFoundException(new(RuntimeProfileResourceKinds.RuntimeProfile, profileName, @namespace));
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
 
@@ -56,8 +55,8 @@ internal static class RuntimeProfileEndpoints
             var stored = await service.CreateAsync(new RuntimeProfileResource
             {
                 Metadata = new ResourceMetadata { Name = body.Name, Namespace = ModelManagementHttp.Namespace(body.Namespace) },
-                Kind = ResourceKinds.RuntimeProfile,
-                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = RuntimeProfileResourceKinds.RuntimeProfile,
+                ApiVersion = ResourceApiVersions.CoreV1,
                 Definition = body.Properties,
                 ScopeRef = body.ScopeRef
             }, cancellationToken);
@@ -83,7 +82,7 @@ internal static class RuntimeProfileEndpoints
         {
             var @namespace = ModelManagementHttp.Namespace(resourceNamespace);
             _ = await service.GetAsync(@namespace, profileName, cancellationToken)
-                ?? throw new ResourceNotFoundException(new(ResourceKinds.RuntimeProfile, profileName, @namespace));
+                ?? throw new ResourceNotFoundException(new(RuntimeProfileResourceKinds.RuntimeProfile, profileName, @namespace));
             var usages = await service.GetUsagesAsync(@namespace, profileName, cancellationToken);
             var values = usages.Select(value => new RuntimeProfileUsageResponse(value.DeploymentUid.ToString("D"), value.Name, value.Environment, value.AgentName)).ToArray();
             return Results.Ok(new RuntimeProfileUsagesResponse(values, values.Length));

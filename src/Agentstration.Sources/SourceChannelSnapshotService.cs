@@ -3,7 +3,6 @@ using Agentstration.Identity;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
@@ -31,7 +30,7 @@ public sealed class SourceChannelSnapshotService(
         CancellationToken cancellationToken)
     {
         var source = (await sources.GetAsync(publisher, name, cancellationToken))?.Source
-            ?? throw NotFound(ResourceKinds.Source, name, publisher);
+            ?? throw NotFound(SourceResourceKinds.Source, name, publisher);
         return await RefreshCoreAsync(source, versionUid, channel, SourceRefreshTrigger.Manual, cancellationToken);
     }
 
@@ -44,7 +43,7 @@ public sealed class SourceChannelSnapshotService(
         CancellationToken cancellationToken)
     {
         var source = (await sources.GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
-            ?? throw NotFound(ResourceKinds.Source, name, publisher);
+            ?? throw NotFound(SourceResourceKinds.Source, name, publisher);
         return await RefreshCoreAsync(source, versionUid, channel, SourceRefreshTrigger.Manual, cancellationToken);
     }
 
@@ -58,7 +57,7 @@ public sealed class SourceChannelSnapshotService(
         CancellationToken cancellationToken)
     {
         var source = (await sources.GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
-            ?? throw NotFound(ResourceKinds.Source, name, publisher);
+            ?? throw NotFound(SourceResourceKinds.Source, name, publisher);
         return await RefreshCoreAsync(source, versionUid, channel, trigger, cancellationToken);
     }
 
@@ -73,7 +72,7 @@ public sealed class SourceChannelSnapshotService(
         CancellationToken cancellationToken)
     {
         var source = (await sources.GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
-            ?? throw NotFound(ResourceKinds.Source, name, publisher);
+            ?? throw NotFound(SourceResourceKinds.Source, name, publisher);
         _ = await RequiredVersionAsync(source, versionUid, cancellationToken);
         var observed = await LoadObservedAsync(scopeRef, source, versionUid, channel, cancellationToken);
         return (await SaveObservedAsync(scopeRef, source, versionUid, channel, observed, timeProvider.GetUtcNow(),
@@ -93,7 +92,7 @@ public sealed class SourceChannelSnapshotService(
         CancellationToken cancellationToken)
     {
         var source = (await sources.GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
-            ?? throw NotFound(ResourceKinds.Source, name, publisher);
+            ?? throw NotFound(SourceResourceKinds.Source, name, publisher);
         _ = await RequiredVersionAsync(source, versionUid, cancellationToken);
         var observed = await LoadObservedAsync(scopeRef, source, versionUid, channel, cancellationToken);
         return (await SaveObservedAsync(scopeRef, source, versionUid, channel, observed, timeProvider.GetUtcNow(),
@@ -109,12 +108,12 @@ public sealed class SourceChannelSnapshotService(
         Guid versionUid,
         string channel,
         CancellationToken cancellationToken) =>
-        await scopeOperations.WriteAsync(ResourceKinds.SourceChannelSnapshot, scopeRef, AuthorizationPermissions.ResourcesRead, async token =>
+        await scopeOperations.WriteAsync(SourceResourceKinds.SourceChannelSnapshot, scopeRef, AuthorizationPermissions.ResourcesRead, async token =>
         {
             var source = (await sources.GetExactAsync(scopeRef, publisher, name, token))?.Source
-                ?? throw NotFound(ResourceKinds.Source, name, publisher);
+                ?? throw NotFound(SourceResourceKinds.Source, name, publisher);
             _ = await RequiredVersionAsync(source, versionUid, token);
-            return (await store.ListExactAsync<SourceChannelSnapshotResource>(scopeRef, ResourceKinds.SourceChannelSnapshot, 0, int.MaxValue, token))
+            return (await store.ListExactAsync<SourceChannelSnapshotResource>(scopeRef, SourceResourceKinds.SourceChannelSnapshot, 0, int.MaxValue, token))
                 .Where(value => value.Value.Definition.SourceVersionUid == versionUid
                     && string.Equals(value.Value.Definition.Channel, channel, StringComparison.Ordinal))
                 .OrderByDescending(value => value.Value.Definition.MaterializedAt)
@@ -140,13 +139,13 @@ public sealed class SourceChannelSnapshotService(
         Guid versionUid,
         string channel,
         CancellationToken cancellationToken) =>
-        await scopeOperations.WriteAsync(ResourceKinds.SourceChannelObservedState, scopeRef, AuthorizationPermissions.ResourcesRead, async token =>
+        await scopeOperations.WriteAsync(SourceResourceKinds.SourceChannelObservedState, scopeRef, AuthorizationPermissions.ResourcesRead, async token =>
         {
             var source = (await sources.GetExactAsync(scopeRef, publisher, name, token))?.Source
-                ?? throw NotFound(ResourceKinds.Source, name, publisher);
+                ?? throw NotFound(SourceResourceKinds.Source, name, publisher);
             _ = await RequiredVersionAsync(source, versionUid, token);
             return (await store.GetExactAsync<SourceChannelObservedResource>(
-                ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceChannelObservedState, StateName(versionUid, channel)), token))?.Value;
+                ScopedResourceAddress.Create(scopeRef, source.Namespace, SourceResourceKinds.SourceChannelObservedState, StateName(versionUid, channel)), token))?.Value;
         }, cancellationToken);
 
     public async Task<SourceChannelStatusView> GetStatusAsync(
@@ -156,10 +155,10 @@ public sealed class SourceChannelSnapshotService(
         Guid versionUid,
         string channelName,
         CancellationToken cancellationToken) =>
-        await scopeOperations.WriteAsync(ResourceKinds.SourceChannelObservedState, scopeRef, AuthorizationPermissions.ResourcesRead, async token =>
+        await scopeOperations.WriteAsync(SourceResourceKinds.SourceChannelObservedState, scopeRef, AuthorizationPermissions.ResourcesRead, async token =>
         {
             var source = (await sources.GetExactAsync(scopeRef, publisher, name, token))?.Source
-                ?? throw NotFound(ResourceKinds.Source, name, publisher);
+                ?? throw NotFound(SourceResourceKinds.Source, name, publisher);
             var version = await RequiredVersionAsync(source, versionUid, token);
             var channel = version.Definition.PublishedDefinition.Channels.SingleOrDefault(value =>
                 string.Equals(value.Name, channelName, StringComparison.Ordinal))
@@ -180,7 +179,7 @@ public sealed class SourceChannelSnapshotService(
         await gate.WaitAsync(cancellationToken);
         try
         {
-            return await scopeOperations.WriteAsync(ResourceKinds.SourceChannelSnapshot, scopeRef, AuthorizationPermissions.ResourcesWrite,
+            return await scopeOperations.WriteAsync(SourceResourceKinds.SourceChannelSnapshot, scopeRef, AuthorizationPermissions.ResourcesWrite,
                 token => RefreshLockedAsync(source, versionUid, channelName, trigger, token), cancellationToken);
         }
         finally
@@ -211,12 +210,12 @@ public sealed class SourceChannelSnapshotService(
                 throw Invalid("source_channel_binding_not_ready", bindingStatus?.Issues.FirstOrDefault()?.Message ?? $"Channel '{channel.Name}' has no ready Source Provider binding.");
 
             var configuration = await store.GetExactAsync<SourceConfigurationResource>(
-                ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceConfiguration, source.Name), cancellationToken)
-                ?? throw NotFound(ResourceKinds.SourceConfiguration, source.Name, source.Namespace.Value);
+                ScopedResourceAddress.Create(scopeRef, source.Namespace, SourceResourceKinds.SourceConfiguration, source.Name), cancellationToken)
+                ?? throw NotFound(SourceResourceKinds.SourceConfiguration, source.Name, source.Namespace.Value);
             var selection = configuration.Value.Definition.Bindings.Single(value =>
                 string.Equals(value.Name, channel.Provider.Binding, StringComparison.Ordinal));
             var provider = await references.ResolveAsync<SourceProviderResource>(
-                selection.Target, source.Namespace, ResourceKinds.SourceProvider, scopeRef, cancellationToken)
+                selection.Target, source.Namespace, SourceResourceKinds.SourceProvider, scopeRef, cancellationToken)
                 ?? throw Invalid("source_binding_provider_missing", $"Source Provider '{selection.Target.Name}' was not found.");
             var providerScope = RequireScope(provider.Value);
             var extension = await references.ResolveAsync<ExtensionRegistrationResource>(
@@ -258,8 +257,8 @@ public sealed class SourceChannelSnapshotService(
             {
                 snapshot = (await store.CreateImmutableAsync(new SourceChannelSnapshotResource
                 {
-                    ApiVersion = ManagementApiVersions.CoreV1,
-                    Kind = ResourceKinds.SourceChannelSnapshot,
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = SourceResourceKinds.SourceChannelSnapshot,
                     Metadata = new() { Namespace = source.Namespace, Name = snapshotName },
                     ScopeRef = scopeRef,
                     Definition = new()
@@ -280,7 +279,7 @@ public sealed class SourceChannelSnapshotService(
             catch (ResourceConcurrencyException)
             {
                 var existing = await store.GetExactAsync<SourceChannelSnapshotResource>(
-                    ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceChannelSnapshot, snapshotName), cancellationToken);
+                    ScopedResourceAddress.Create(scopeRef, source.Namespace, SourceResourceKinds.SourceChannelSnapshot, snapshotName), cancellationToken);
                 if (existing is null) throw;
                 snapshot = existing.Value;
             }
@@ -314,12 +313,12 @@ public sealed class SourceChannelSnapshotService(
 
     private async Task<SourceVersionResource> RequiredVersionAsync(SourceResource source, Guid uid, CancellationToken cancellationToken) =>
         await sources.GetVersionExactAsync(RequireScope(source), source.Definition.Publisher, source.Name, uid, cancellationToken)
-        ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, uid.ToString("D")));
+        ?? throw new ResourceNotFoundException(new(SourceResourceKinds.SourceVersion, uid.ToString("D")));
 
     private Task<StoredResource<SourceChannelObservedResource>?> LoadObservedAsync(
         ResourceScopeRef scopeRef, SourceResource source, Guid versionUid, string channel, CancellationToken cancellationToken) =>
         store.GetExactAsync<SourceChannelObservedResource>(
-            ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceChannelObservedState, StateName(versionUid, channel)), cancellationToken);
+            ScopedResourceAddress.Create(scopeRef, source.Namespace, SourceResourceKinds.SourceChannelObservedState, StateName(versionUid, channel)), cancellationToken);
 
     private async Task<StoredResource<SourceChannelObservedResource>> SaveObservedAsync(
         ResourceScopeRef scopeRef,
@@ -341,8 +340,8 @@ public sealed class SourceChannelSnapshotService(
         var failed = outcome == SourceChannelRefreshOutcome.Failed;
         var resource = new SourceChannelObservedResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.SourceChannelObservedState,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SourceResourceKinds.SourceChannelObservedState,
             Metadata = new() { Namespace = source.Namespace, Name = StateName(versionUid, channel) },
             ScopeRef = scopeRef,
             Uid = current?.Value.Uid ?? Guid.Empty,
@@ -368,8 +367,8 @@ public sealed class SourceChannelSnapshotService(
         var saved = await store.PutExactAsync(scopeRef, resource, current?.ETag, current is null, cancellationToken);
         _ = await store.CreateImmutableAsync(new SourceChannelRefreshRecordResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.SourceChannelRefreshRecord,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SourceResourceKinds.SourceChannelRefreshRecord,
             Metadata = new() { Namespace = source.Namespace, Name = $"refresh-{Guid.NewGuid():N}" },
             ScopeRef = scopeRef,
             Definition = new()

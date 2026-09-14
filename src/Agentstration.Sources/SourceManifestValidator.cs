@@ -1,5 +1,5 @@
 using System.Text.RegularExpressions;
-using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Sources;
 
@@ -8,8 +8,8 @@ public sealed partial class SourceManifestValidator
     public void Validate(PublishedSourceVersionManifest manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
-        if (!string.Equals(manifest.ApiVersion, ManagementApiVersions.CoreV1, StringComparison.Ordinal))
-            throw Invalid("source_api_version_unsupported", $"Supported Source Version apiVersion is '{ManagementApiVersions.CoreV1}'.");
+        if (!string.Equals(manifest.ApiVersion, ResourceApiVersions.CoreV1, StringComparison.Ordinal))
+            throw Invalid("source_api_version_unsupported", $"Supported Source Version apiVersion is '{ResourceApiVersions.CoreV1}'.");
         if (!string.Equals(manifest.Kind, SourceKinds.PublishedSourceVersion, StringComparison.Ordinal))
             throw Invalid("source_kind_invalid", $"Source Version manifest kind must be '{SourceKinds.PublishedSourceVersion}'.");
         if (manifest.Metadata is null) throw Invalid("source_metadata_missing", "Source Version metadata is required.");

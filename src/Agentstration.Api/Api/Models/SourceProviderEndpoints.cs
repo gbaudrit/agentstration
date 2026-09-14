@@ -1,4 +1,3 @@
-using Agentstration.Management.Abstractions;
 using Agentstration.Api.Contracts;
 using Agentstration.Sources.Contracts;
 using Agentstration.Sources;
@@ -46,7 +45,7 @@ public static class SourceProviderEndpoints
         {
             var targetScopeRef = Scope(scopeRef);
             var stored = await service.GetExactAsync(targetScopeRef, ModelManagementHttp.Namespace(resourceNamespace), providerName, cancellationToken)
-                ?? throw new SourceProviderNotFoundException(new(ModelManagementHttp.Namespace(resourceNamespace), ResourceKinds.SourceProvider, providerName));
+                ?? throw new SourceProviderNotFoundException(new(ModelManagementHttp.Namespace(resourceNamespace), SourceResourceKinds.SourceProvider, providerName));
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
 
@@ -73,7 +72,7 @@ public static class SourceProviderEndpoints
             var @namespace = ModelManagementHttp.Namespace(resourceNamespace);
             var targetScopeRef = Scope(scopeRef);
             _ = await service.GetExactAsync(targetScopeRef, @namespace, providerName, cancellationToken)
-                ?? throw new SourceProviderNotFoundException(new(@namespace, ResourceKinds.SourceProvider, providerName));
+                ?? throw new SourceProviderNotFoundException(new(@namespace, SourceResourceKinds.SourceProvider, providerName));
             var usages = (await service.GetUsagesExactAsync(targetScopeRef, @namespace, providerName, cancellationToken))
                 .Select(value => new SourceProviderUsageResponse(value.SourceScopeRef, value.Publisher, value.SourceName, value.BindingName))
                 .ToArray();
@@ -90,8 +89,8 @@ public static class SourceProviderEndpoints
             var stored = await service.CreateAsync(new SourceProviderResource
             {
                 Metadata = new ResourceMetadata { Name = body.Name, Namespace = ModelManagementHttp.Namespace(body.Namespace) },
-                Kind = ResourceKinds.SourceProvider,
-                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = SourceResourceKinds.SourceProvider,
+                ApiVersion = ResourceApiVersions.CoreV1,
                 Definition = body.Properties,
                 ScopeRef = body.ScopeRef
             }, cancellationToken);

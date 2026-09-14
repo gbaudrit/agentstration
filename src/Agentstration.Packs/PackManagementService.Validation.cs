@@ -1,7 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 
 namespace Agentstration.Packs;
@@ -11,8 +10,8 @@ public sealed partial class PackManagementService
     private void ValidateManifest(PackArchive archive)
     {
         var manifest = archive.Manifest;
-        if (manifest.ApiVersion != ManagementApiVersions.CoreV1)
-            throw new PackValidationException("pack_api_version_unsupported", $"Supported Pack apiVersion is '{ManagementApiVersions.CoreV1}'.");
+        if (manifest.ApiVersion != ResourceApiVersions.CoreV1)
+            throw new PackValidationException("pack_api_version_unsupported", $"Supported Pack apiVersion is '{ResourceApiVersions.CoreV1}'.");
         if (manifest.Kind != PackKinds.Pack) throw new PackValidationException("pack_kind_invalid", $"Pack manifest kind must be '{PackKinds.Pack}'.");
         ValidateName(manifest.Metadata.Publisher, "publisher");
         ValidateName(manifest.Metadata.Name, "name");

@@ -4,7 +4,6 @@ using System.Data.Common;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
-using Agentstration.Management.Abstractions;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Resources;
@@ -256,8 +255,8 @@ public sealed class ExtensionSourceDiscoveryService(
         {
             _ = await secrets.CreateVaultAsync(new VaultResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.Vault,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SecretResourceKinds.Vault,
                 Metadata = new ResourceMetadata { Name = vaultName },
                 ScopeRef = targetScopeRef,
                 Definition = new VaultProperties
@@ -281,8 +280,8 @@ public sealed class ExtensionSourceDiscoveryService(
         {
             _ = await secrets.CreateSecretAsync(new SecretResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.Secret,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SecretResourceKinds.Secret,
                 Metadata = new ResourceMetadata { Name = secretName },
                 ScopeRef = targetScopeRef,
                 Definition = new SecretProperties

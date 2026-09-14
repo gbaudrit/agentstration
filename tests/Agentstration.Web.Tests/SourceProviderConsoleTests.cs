@@ -1,4 +1,3 @@
-using Agentstration.Management.Abstractions;
 using Agentstration.Extensions.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Sources.Contracts;
@@ -97,7 +96,7 @@ public sealed class SourceProviderConsoleTests
             new(name, displayName, "1.0.0", null), [new("source-provider", "git")], [], [], [], null, "configuration", RegistrationScopeRef: scopeRef);
         private static ExtensionRegistrationResource Registration(string name, ResourceScopeRef scopeRef) => new()
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ExtensionKinds.ExtensionRegistration,
             Metadata = new ResourceMetadata { Name = name },
             ScopeRef = scopeRef,

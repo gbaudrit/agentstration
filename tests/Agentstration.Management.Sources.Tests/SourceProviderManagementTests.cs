@@ -1,5 +1,4 @@
 using Agentstration.ResourceManagement;
-using Agentstration.Management.Abstractions;
 using Agentstration.Sources.Contracts;
 using Agentstration.Extensions;
 using Agentstration.Identity;
@@ -91,7 +90,7 @@ public sealed class SourceProviderManagementTests
             "source-extension",
             default);
 
-        Assert.AreEqual(ResourceKinds.SourceProvider, usages.Single().Kind);
+        Assert.AreEqual(SourceResourceKinds.SourceProvider, usages.Single().Kind);
     }
 
     [TestMethod]
@@ -102,8 +101,8 @@ public sealed class SourceProviderManagementTests
         var provider = await fixture.SourceProviders.CreateAsync(SourceProvider(), default);
         await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, new SourceConfigurationResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.SourceConfiguration,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SourceResourceKinds.SourceConfiguration,
             Metadata = new ResourceMetadata { Name = "catalog", Namespace = new("agentstration") },
             ScopeRef = ResourceScopeRef.Instance,
             Definition = new SourceConfigurationProperties
@@ -139,8 +138,8 @@ public sealed class SourceProviderManagementTests
         await fixture.SourceProviders.CreateAsync(SourceProvider(tenantScope), default);
         await fixture.Store.PutExactAsync(tenantScope, new SourceConfigurationResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.SourceConfiguration,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SourceResourceKinds.SourceConfiguration,
             Metadata = new ResourceMetadata { Name = "catalog", Namespace = new("agentstration") },
             ScopeRef = tenantScope,
             Definition = new SourceConfigurationProperties
@@ -183,7 +182,7 @@ public sealed class SourceProviderManagementTests
 
     private static ExtensionRegistrationResource Extension(ResourceScopeRef? scopeRef = null) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
+        ApiVersion = ResourceApiVersions.CoreV1,
         Kind = ExtensionKinds.ExtensionRegistration,
         Metadata = new ResourceMetadata { Name = "source-extension" },
         ScopeRef = scopeRef ?? ResourceScopeRef.Instance,
@@ -199,8 +198,8 @@ public sealed class SourceProviderManagementTests
 
     private static SourceProviderResource SourceProvider(ResourceScopeRef? scopeRef = null) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.SourceProvider,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = SourceResourceKinds.SourceProvider,
         Metadata = new ResourceMetadata { Name = "git-local" },
         ScopeRef = scopeRef,
         Definition = new SourceProviderProperties

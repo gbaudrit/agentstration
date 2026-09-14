@@ -2,7 +2,6 @@ using Agentstration.Agents;
 using Agentstration.Application.Work;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Tools;
@@ -43,8 +42,8 @@ public static class InteractiveFlowDemoData
         {
             provider = await tools.PutProviderAsync(new ToolProviderResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ToolProvider,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolProvider,
                 Metadata = new ResourceMetadata
                 {
                     Name = ProviderName,

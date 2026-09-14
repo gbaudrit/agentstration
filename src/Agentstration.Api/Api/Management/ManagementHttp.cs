@@ -1,5 +1,4 @@
 using Agentstration.Agents;
-using Agentstration.Management.Abstractions;
 using Agentstration.Models;
 using Agentstration.Packs;
 using Agentstration.ResourceManagement;
@@ -69,8 +68,8 @@ internal static class ManagementHttp
     public static void RequireApiVersion(HttpRequest request)
     {
         if (request.Query.TryGetValue("api-version", out var version)
-            && !string.Equals(version, ManagementApiVersions.CoreV1, StringComparison.Ordinal))
-            throw new AgentDefinitionValidationException("api_version_not_supported", $"Only api-version={ManagementApiVersions.CoreV1} is supported.");
+            && !string.Equals(version, ResourceApiVersions.CoreV1, StringComparison.Ordinal))
+            throw new AgentDefinitionValidationException("api_version_not_supported", $"Only api-version={ResourceApiVersions.CoreV1} is supported.");
     }
 
     public static string? IfMatch(HttpRequest request) => request.Headers.IfMatch.FirstOrDefault();
@@ -89,7 +88,7 @@ internal static class ManagementHttp
         {
             RequireApiVersion(request);
             var stored = await service.GetDeploymentAsync(name, cancellationToken)
-                ?? throw new ResourceNotFoundException(new(ResourceKinds.AgentDeployment, name));
+                ?? throw new ResourceNotFoundException(new(AgentResourceKinds.AgentDeployment, name));
             var requestedETag = IfMatch(request);
             if (requestedETag is not null && !string.Equals(requestedETag, stored.ETag, StringComparison.Ordinal))
                 throw new ResourceConcurrencyException("The supplied ETag does not match the current deployment.");

@@ -1,6 +1,5 @@
 using Agentstration.Identity.Contracts;
 using Agentstration.Identity;
-using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -24,9 +23,9 @@ public sealed class SourceBindingManagementService(
         CancellationToken cancellationToken)
     {
         var source = (await sources.GetAsync(publisher, name, cancellationToken))?.Source
-            ?? throw NotFound(ResourceKinds.Source, name, publisher);
+            ?? throw NotFound(SourceResourceKinds.Source, name, publisher);
         var version = await sources.GetVersionAsync(publisher, name, versionUid, cancellationToken)
-            ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+            ?? throw new ResourceNotFoundException(new(SourceResourceKinds.SourceVersion, versionUid.ToString("D")));
         return await GetStatusAsync(source, version, cancellationToken);
     }
 
@@ -38,9 +37,9 @@ public sealed class SourceBindingManagementService(
         CancellationToken cancellationToken)
     {
         var source = (await sources.GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
-            ?? throw NotFound(ResourceKinds.Source, name, publisher);
+            ?? throw NotFound(SourceResourceKinds.Source, name, publisher);
         var version = await sources.GetVersionExactAsync(scopeRef, publisher, name, versionUid, cancellationToken)
-            ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+            ?? throw new ResourceNotFoundException(new(SourceResourceKinds.SourceVersion, versionUid.ToString("D")));
         return await GetStatusAsync(source, version, cancellationToken);
     }
 
@@ -53,9 +52,9 @@ public sealed class SourceBindingManagementService(
         CancellationToken cancellationToken)
     {
         var source = (await sources.GetAsync(publisher, name, cancellationToken))?.Source
-            ?? throw NotFound(ResourceKinds.Source, name, publisher);
+            ?? throw NotFound(SourceResourceKinds.Source, name, publisher);
         var version = await sources.GetVersionAsync(publisher, name, versionUid, cancellationToken)
-            ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+            ?? throw new ResourceNotFoundException(new(SourceResourceKinds.SourceVersion, versionUid.ToString("D")));
         return await ConfigureAsync(source, version, selections, ifMatch, cancellationToken);
     }
 
@@ -69,9 +68,9 @@ public sealed class SourceBindingManagementService(
         CancellationToken cancellationToken)
     {
         var source = (await sources.GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
-            ?? throw NotFound(ResourceKinds.Source, name, publisher);
+            ?? throw NotFound(SourceResourceKinds.Source, name, publisher);
         var version = await sources.GetVersionExactAsync(scopeRef, publisher, name, versionUid, cancellationToken)
-            ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+            ?? throw new ResourceNotFoundException(new(SourceResourceKinds.SourceVersion, versionUid.ToString("D")));
         return await ConfigureAsync(source, version, selections, ifMatch, cancellationToken);
     }
 
@@ -105,7 +104,7 @@ public sealed class SourceBindingManagementService(
             var resolved = await references.ResolveAsync<SourceProviderResource>(
                 target,
                 source.Namespace,
-                ResourceKinds.SourceProvider,
+                SourceResourceKinds.SourceProvider,
                 RequireScope(source),
                 cancellationToken);
             if (resolved is null)
@@ -119,14 +118,14 @@ public sealed class SourceBindingManagementService(
 
         var scopeRef = RequireScope(source);
         var updated = await scopeOperations.WriteAsync(
-            ResourceKinds.SourceConfiguration,
+            SourceResourceKinds.SourceConfiguration,
             scopeRef,
             AuthorizationPermissions.ResourcesWrite,
             async token =>
             {
-                var address = ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceConfiguration, source.Name);
+                var address = ScopedResourceAddress.Create(scopeRef, source.Namespace, SourceResourceKinds.SourceConfiguration, source.Name);
                 var current = await store.GetExactAsync<SourceConfigurationResource>(address, token)
-                    ?? throw NotFound(ResourceKinds.SourceConfiguration, source.Name, source.Namespace.Value);
+                    ?? throw NotFound(SourceResourceKinds.SourceConfiguration, source.Name, source.Namespace.Value);
                 var merged = current.Value.Definition.Bindings.ToDictionary(value => value.Name, StringComparer.Ordinal);
                 foreach (var declaration in declarations.Values)
                 {
@@ -155,9 +154,9 @@ public sealed class SourceBindingManagementService(
     {
         var scopeRef = RequireScope(source);
         var configuration = await store.GetExactAsync<SourceConfigurationResource>(
-            ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceConfiguration, source.Name),
+            ScopedResourceAddress.Create(scopeRef, source.Namespace, SourceResourceKinds.SourceConfiguration, source.Name),
             cancellationToken)
-            ?? throw NotFound(ResourceKinds.SourceConfiguration, source.Name, source.Namespace.Value);
+            ?? throw NotFound(SourceResourceKinds.SourceConfiguration, source.Name, source.Namespace.Value);
         var declarations = version.Definition.PublishedDefinition.Bindings;
         var statuses = new List<SourceBindingStatus>(declarations.Count);
         foreach (var declaration in declarations)
@@ -200,7 +199,7 @@ public sealed class SourceBindingManagementService(
         var provider = await references.ResolveAsync<SourceProviderResource>(
             selection.Target,
             source.Namespace,
-            ResourceKinds.SourceProvider,
+            SourceResourceKinds.SourceProvider,
             RequireScope(source),
             cancellationToken);
         if (provider is null)

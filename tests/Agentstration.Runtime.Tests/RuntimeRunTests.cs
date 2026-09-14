@@ -7,7 +7,6 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.Api.Contracts;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Runtime.Core;
@@ -621,8 +620,8 @@ public sealed class RuntimeRunTests
 
         private static AgentResource Agent(string id) => new()
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Agent,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
             Metadata = new ResourceMetadata { Name = "sql-expert" },
             Generation = 3,
             Definition = new AgentProperties
@@ -635,8 +634,8 @@ public sealed class RuntimeRunTests
 
         private static AgentRevision Revision(string id, string agentId, Guid agentUid) => new()
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AgentRevision,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.AgentRevision,
             Metadata = new ResourceMetadata { Name = "sql-expert--000001" },
             AgentUid = agentUid,
             AgentName = agentId,
@@ -665,8 +664,8 @@ public sealed class RuntimeRunTests
 
         private static AgentDeployment Deployment(string revisionId) => new()
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AgentDeployment,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.AgentDeployment,
             Metadata = new ResourceMetadata { Name = "sql-expert" },
             RevisionName = revisionId,
             AgentName = "sql-expert",

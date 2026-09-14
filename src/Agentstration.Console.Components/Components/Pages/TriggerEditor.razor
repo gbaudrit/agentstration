@@ -38,7 +38,7 @@ else
             <div class="form-grid">
                 <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /><small>@T("ImmutableNameHelp")</small></label>
                 <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
-                <ResourceScopeFormField ResourceKind="@ResourceKinds.Trigger" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
+                <ResourceScopeFormField ResourceKind="@TriggerResourceKinds.Trigger" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
                 <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
             </div>
         </section>
@@ -195,7 +195,7 @@ else
             var separator = model.FlowKey.IndexOf('/'); if (separator <= 0) throw new InvalidOperationException(T("SelectFlowTarget"));
             var flowNamespace = ResourceNamespace.Parse(model.FlowKey[..separator]); var flowName = model.FlowKey[(separator + 1)..];
             var definition = new TriggerProperties { DisplayName = model.DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), Enabled = existing?.Value.Definition.Enabled ?? false, Source = new() { Schedule = BuildSchedule() }, Target = new() { Flow = new() { Name = flowName, Namespace = flowNamespace } }, Input = input, MisfirePolicy = model.MisfirePolicy, ConcurrencyPolicy = model.ConcurrencyPolicy, ExecutionScope = existing?.Value.Definition.ExecutionScope };
-            var resource = new TriggerResource { ApiVersion = ManagementApiVersions.CoreV1, Kind = ResourceKinds.Trigger, Metadata = new() { Name = model.Name.Trim() }, Definition = definition, ScopeRef = IsNew ? selectedScope : existing!.Value.ScopeRef };
+            var resource = new TriggerResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = TriggerResourceKinds.Trigger, Metadata = new() { Name = model.Name.Trim() }, Definition = definition, ScopeRef = IsNew ? selectedScope : existing!.Value.ScopeRef };
             var saved = await Client.SaveAsync(resource, IsNew ? null : existing!.ETag, CancellationToken.None);
             Notifications.Add(new(Guid.NewGuid(), IsNew ? T("Notification.Created") : T("Notification.Updated"), saved.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success));
             Navigation.NavigateTo($"/triggers/{Uri.EscapeDataString(saved.Value.Name)}");

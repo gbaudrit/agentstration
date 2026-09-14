@@ -1,4 +1,3 @@
-using Agentstration.Management.Abstractions;
 using Agentstration.Api.Contracts;
 using Agentstration.Models.Contracts;
 using Agentstration.Models;
@@ -40,8 +39,8 @@ internal sealed class CreateModelProviderEndpoint : IModelManagementEndpoint
             var stored = await service.CreateAsync(new ModelProviderResource
             {
                 Metadata = new ResourceMetadata { Name = body.Name, Namespace = ModelManagementHttp.Namespace(body.Namespace) },
-                Kind = ResourceKinds.ModelProvider,
-                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ModelResourceKinds.ModelProvider,
+                ApiVersion = ResourceApiVersions.CoreV1,
                 Definition = body.Properties,
                 ScopeRef = body.ScopeRef
             }, cancellationToken);

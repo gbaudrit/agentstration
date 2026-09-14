@@ -6,7 +6,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.Sources.Contracts;
 using Agentstration.Api.Contracts;
 using Agentstration.Models.Contracts;
@@ -110,8 +109,8 @@ public sealed partial class ApiClientTests
         };
         var deployment = new AgentDeployment
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AgentDeployment,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.AgentDeployment,
             Metadata = new ResourceMetadata { Name = "web-agent--g000004", Namespace = agent.Namespace },
             AgentNamespace = agent.Namespace,
             RevisionName = "web-agent--000004",
@@ -234,8 +233,8 @@ public sealed partial class ApiClientTests
         var scopeRef = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
         var provider = new SourceProviderResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.SourceProvider,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SourceResourceKinds.SourceProvider,
             Metadata = new ResourceMetadata { Name = "git-local", Namespace = new("platform.sources") },
             ScopeRef = scopeRef,
             Definition = new SourceProviderProperties { DisplayName = "Git", Extension = new("git-extension", scopeRef), ContributionId = "git" }
@@ -487,8 +486,8 @@ public sealed partial class ApiClientTests
         var updatedAt = new DateTimeOffset(2026, 8, 21, 9, 30, 0, TimeSpan.Zero);
         var deployment = new AgentDeployment
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AgentDeployment,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.AgentDeployment,
             Metadata = new ResourceMetadata { Name = "sql-expert--g000007", Namespace = new ResourceNamespace("engineering") },
             RevisionName = "sql-expert--000007",
             AgentName = "sql-expert",

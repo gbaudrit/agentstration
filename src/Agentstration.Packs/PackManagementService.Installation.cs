@@ -2,7 +2,6 @@ using Agentstration.Identity.Contracts;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
@@ -108,7 +107,7 @@ public sealed partial class PackManagementService
             : null;
         var installed = await store.PutAsync(new InstalledPackResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = PackKinds.InstalledPack,
             ScopeRef = targetScopeRef,
             Metadata = new ResourceMetadata { Name = identity.ResourceName },

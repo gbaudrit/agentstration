@@ -1,6 +1,5 @@
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
@@ -46,7 +45,7 @@ public sealed class AepEnrollmentSettingsService(
         };
         var resource = existing?.Value ?? new AepEnrollmentSettingsResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ExtensionKinds.AepEnrollmentSettings,
             Metadata = new ResourceMetadata { Name = SettingsName },
             ScopeRef = ResourceScopeRef.Instance

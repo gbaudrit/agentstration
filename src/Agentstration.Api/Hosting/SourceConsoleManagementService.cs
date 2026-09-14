@@ -1,6 +1,5 @@
 using Agentstration.Identity.Contracts;
 using Agentstration.Aep.Abstractions;
-using Agentstration.Management.Abstractions;
 using Agentstration.Sources.Contracts;
 using Agentstration.Extensions;
 using Agentstration.Sources;
@@ -68,14 +67,14 @@ public sealed class SourceConsoleManagementService(
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
         var source = await sources.GetExactAsync(scopeRef, publisher, name, cancellationToken)
-            ?? throw new ResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
+            ?? throw new ResourceNotFoundException(new(SourceResourceKinds.Source, name, new ResourceNamespace(publisher)));
         var versions = await sources.ListVersionsExactAsync(scopeRef, publisher, name, cancellationToken);
         var selectedVersion = versionUid is null
             ? versions.FirstOrDefault()
             : versions.SingleOrDefault(value => value.Uid == versionUid);
         if (selectedVersion is null)
             throw new ResourceNotFoundException(
-                new(ResourceKinds.SourceVersion, versionUid?.ToString("D") ?? name));
+                new(SourceResourceKinds.SourceVersion, versionUid?.ToString("D") ?? name));
 
         var bindingStatus = await bindings.GetStatusExactAsync(
             scopeRef, publisher, name, selectedVersion.Uid, cancellationToken);
@@ -309,8 +308,8 @@ public sealed class SourceConsoleManagementService(
 
         var resource = new SourceProviderResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.SourceProvider,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SourceResourceKinds.SourceProvider,
             Metadata = new ResourceMetadata { Namespace = candidate.RegistrationNamespace, Name = name },
             ScopeRef = candidate.RegistrationScopeRef,
             Definition = new SourceProviderProperties

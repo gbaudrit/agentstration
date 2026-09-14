@@ -4,7 +4,6 @@ using Agentstration.Application.Work;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Tools;
@@ -42,7 +41,7 @@ public sealed class ToolDefinitionFlowActivationGuard(
     public async Task ValidateActivationAsync(WorkspaceId workspaceId, FlowVersion version, CancellationToken cancellationToken)
     {
         using var requestScope = requestScopes.PushSystem();
-        var definitions = await store.ListAllAsync<ToolDefinitionResource>(ResourceKinds.ToolDefinition, cancellationToken);
+        var definitions = await store.ListAllAsync<ToolDefinitionResource>(ToolResourceKinds.ToolDefinition, cancellationToken);
         var contract = ToolDefinitionFlowResolver.Contract(version);
         foreach (var stored in definitions.Where(value =>
                      value.Value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
@@ -68,7 +67,7 @@ public sealed class ToolDefinitionFlowDeletionGuard(
     public async Task ValidateDeleteAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken)
     {
         using var requestScope = requestScopes.PushSystem();
-        var definitions = await store.ListAllAsync<ToolDefinitionResource>(ResourceKinds.ToolDefinition, cancellationToken);
+        var definitions = await store.ListAllAsync<ToolDefinitionResource>(ToolResourceKinds.ToolDefinition, cancellationToken);
         var usage = definitions.Select(value => value.Value).FirstOrDefault(value =>
             value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
             && targetId == workspaceId.Value

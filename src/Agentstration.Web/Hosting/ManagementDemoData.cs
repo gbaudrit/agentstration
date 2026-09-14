@@ -1,5 +1,4 @@
 using Agentstration.Agents;
-using Agentstration.Management.Abstractions;
 using Agentstration.Extensions;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
@@ -22,8 +21,8 @@ public static class ManagementDemoData
         {
             await providers.CreateAsync(new ModelProviderResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ModelProvider,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ModelResourceKinds.ModelProvider,
                 Metadata = new ResourceMetadata { Name = "ollama-local", Tags = new Dictionary<string, string> { ["sample"] = "standalone" } },
                 Definition = new ModelProviderProperties
                 {
@@ -39,8 +38,8 @@ public static class ManagementDemoData
         {
             await providers.CreateAsync(new ModelProviderResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ModelProvider,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ModelResourceKinds.ModelProvider,
                 Metadata = new ResourceMetadata { Name = "llama-cpp-local", Tags = new Dictionary<string, string> { ["sample"] = "standalone" } },
                 Definition = new ModelProviderProperties
                 {
@@ -56,8 +55,8 @@ public static class ManagementDemoData
         {
             await providers.CreateAsync(new ModelProviderResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ModelProvider,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ModelResourceKinds.ModelProvider,
                 Metadata = new ResourceMetadata { Name = "localai-local", Tags = new Dictionary<string, string> { ["sample"] = "standalone" } },
                 Definition = new ModelProviderProperties
                 {
@@ -73,8 +72,8 @@ public static class ManagementDemoData
         {
             await profiles.CreateAsync(new ModelProfileResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ModelProfile,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ModelResourceKinds.ModelProfile,
                 Metadata = new ResourceMetadata { Name = "reasoning-default" },
                 Definition = new ModelProfileProperties
                 {
@@ -108,8 +107,8 @@ public static class ManagementDemoData
         {
             agent = await management.PutAgentAsync(new AgentResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.Agent,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = AgentResourceKinds.Agent,
                 Metadata = new ResourceMetadata
                 {
                     Name = name,
@@ -128,7 +127,7 @@ public static class ManagementDemoData
             }, null, true, cancellationToken);
         }
 
-        var revisions = await store.ListAllAsync<AgentRevision>(ResourceKinds.AgentRevision, cancellationToken);
+        var revisions = await store.ListAllAsync<AgentRevision>(AgentResourceKinds.AgentRevision, cancellationToken);
         var revision = revisions.Where(value => value.Value.AgentUid == agent.Value.Uid).OrderByDescending(value => value.Value.CreatedAt).FirstOrDefault();
         var spec = new AgentDeploymentSpec { Environment = "local", RuntimeProfileName = "maf-builtin", HostingMode = AgentHostingMode.InProcess };
         revision ??= await management.CreateRevisionAsync(name, spec, cancellationToken);

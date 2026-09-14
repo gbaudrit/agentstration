@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 
 namespace Agentstration.Sources;
 
@@ -137,8 +137,8 @@ public sealed class SourceCatalogManifestReader : ISourceCatalogManifestReader
     {
         foreach (var property in document.EnumerateObject())
             if (!EnvelopeProperties.Contains(property.Name)) throw Invalid("source_catalog_envelope_invalid", $"{label} contains unsupported top-level property '{property.Name}'.");
-        if (!document.TryGetProperty("apiVersion", out var apiVersion) || apiVersion.GetString() != ManagementApiVersions.CoreV1)
-            throw Invalid("source_catalog_api_version_invalid", $"{label} must use apiVersion '{ManagementApiVersions.CoreV1}'.");
+        if (!document.TryGetProperty("apiVersion", out var apiVersion) || apiVersion.GetString() != ResourceApiVersions.CoreV1)
+            throw Invalid("source_catalog_api_version_invalid", $"{label} must use apiVersion '{ResourceApiVersions.CoreV1}'.");
         if (!document.TryGetProperty("kind", out var actualKind) || !string.Equals(actualKind.GetString(), kind, StringComparison.Ordinal))
             throw Invalid("source_catalog_kind_mismatch", $"{label} must use declared kind '{kind}'.");
         if (!document.TryGetProperty("definition", out var definition) || definition.ValueKind != JsonValueKind.Object)
@@ -147,7 +147,7 @@ public sealed class SourceCatalogManifestReader : ISourceCatalogManifestReader
 
     private static void ValidateCatalogIdentity(string apiVersion, string kind, string name, string expectedKind)
     {
-        if (apiVersion != ManagementApiVersions.CoreV1 || kind != expectedKind) throw Invalid("source_catalog_invalid", $"Catalog must use '{ManagementApiVersions.CoreV1}' and kind '{expectedKind}'.");
+        if (apiVersion != ResourceApiVersions.CoreV1 || kind != expectedKind) throw Invalid("source_catalog_invalid", $"Catalog must use '{ResourceApiVersions.CoreV1}' and kind '{expectedKind}'.");
         ValidateName(name, "Catalog metadata.name");
     }
 

@@ -8,7 +8,6 @@
     <PackageReference Include="Agentstration.Aep.Client" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.Tools/Agentstration.Tools.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
   </ItemGroup>

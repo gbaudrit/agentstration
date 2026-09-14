@@ -2,7 +2,6 @@ using Agentstration.Security.Contracts;
 using Agentstration.Identity.Contracts;
 using System.Text.Json;
 using Agentstration.Agents;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Sources.Contracts;
@@ -341,7 +340,7 @@ public sealed class SqliteResourceStore(
     public async Task<StoredResource<AgentRevision>?> FindRevisionAsync(Guid agentUid, long generation, CancellationToken cancellationToken) =>
         (await LoadFilteredAsync<AgentRevision>($"""
             SELECT * FROM ControlPlaneResources
-            WHERE Kind = {ResourceKinds.AgentRevision}
+            WHERE Kind = {AgentResourceKinds.AgentRevision}
               AND json_extract(Payload, '$.agentUid') = {agentUid.ToString()}
               AND json_extract(Payload, '$.agentVersion') = {generation}
             """, cancellationToken)).SingleOrDefault();
@@ -352,7 +351,7 @@ public sealed class SqliteResourceStore(
         {
             ControlPlaneAccessMode.System => await LoadFilteredAsync<AgentRevision>($"""
                 SELECT * FROM ControlPlaneResources
-                WHERE Kind = {ResourceKinds.AgentRevision}
+                WHERE Kind = {AgentResourceKinds.AgentRevision}
                   AND json_extract(Payload, '$.agentUid') = {agentUid.ToString()}
                 ORDER BY json_extract(Payload, '$.agentVersion') DESC,
                          json_extract(Payload, '$.createdAt') DESC
@@ -361,7 +360,7 @@ public sealed class SqliteResourceStore(
             ControlPlaneAccessMode.Workspace => await LoadFilteredAsync<AgentRevision>($"""
                 SELECT * FROM ControlPlaneResources
                 WHERE ScopeId = (SELECT Id FROM ResourceScopes WHERE Ref = {ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId).Value})
-                  AND Kind = {ResourceKinds.AgentRevision}
+                  AND Kind = {AgentResourceKinds.AgentRevision}
                   AND json_extract(Payload, '$.agentUid') = {agentUid.ToString()}
                 ORDER BY json_extract(Payload, '$.agentVersion') DESC,
                          json_extract(Payload, '$.createdAt') DESC
@@ -382,7 +381,7 @@ public sealed class SqliteResourceStore(
         {
             ControlPlaneAccessMode.System => await LoadFilteredAsync<AgentDeployment>($"""
                 SELECT * FROM ControlPlaneResources
-                WHERE Kind = {ResourceKinds.AgentDeployment}
+                WHERE Kind = {AgentResourceKinds.AgentDeployment}
                   AND Namespace = {namespaceValue}
                   AND json_extract(Payload, '$.revisionName') = {revisionName}
                 ORDER BY json_extract(Payload, '$.updatedAt') DESC
@@ -391,7 +390,7 @@ public sealed class SqliteResourceStore(
             ControlPlaneAccessMode.Workspace => await LoadFilteredAsync<AgentDeployment>($"""
                 SELECT * FROM ControlPlaneResources
                 WHERE ScopeId = (SELECT Id FROM ResourceScopes WHERE Ref = {ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId).Value})
-                  AND Kind = {ResourceKinds.AgentDeployment}
+                  AND Kind = {AgentResourceKinds.AgentDeployment}
                   AND Namespace = {namespaceValue}
                   AND json_extract(Payload, '$.revisionName') = {revisionName}
                 ORDER BY json_extract(Payload, '$.updatedAt') DESC
@@ -408,7 +407,7 @@ public sealed class SqliteResourceStore(
     public async Task<IReadOnlyList<StoredResource<AgentDeployment>>> ListDeploymentsForAgentAsync(ResourceNamespace @namespace, string agentName, CancellationToken cancellationToken) =>
         (await LoadFilteredAsync<AgentDeployment>($"""
             SELECT * FROM ControlPlaneResources
-            WHERE Kind = {ResourceKinds.AgentDeployment}
+            WHERE Kind = {AgentResourceKinds.AgentDeployment}
               AND Namespace = {@namespace.Value}
               AND json_extract(Payload, '$.agentName') = {agentName}
             """, cancellationToken))
@@ -416,7 +415,7 @@ public sealed class SqliteResourceStore(
         .ToArray();
 
     public Task<IReadOnlyList<StoredResource<AgentDeployment>>> ListDeploymentsAsync(CancellationToken cancellationToken) =>
-        LoadKindAsync<AgentDeployment>(ResourceKinds.AgentDeployment, cancellationToken);
+        LoadKindAsync<AgentDeployment>(AgentResourceKinds.AgentDeployment, cancellationToken);
 
     private async Task<IReadOnlyList<StoredResource<T>>> LoadKindAsync<T>(string kind, CancellationToken cancellationToken) where T : Resource
     {

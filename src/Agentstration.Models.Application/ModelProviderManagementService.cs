@@ -1,7 +1,6 @@
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Identity;
-using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -21,7 +20,7 @@ public sealed class ModelProviderManagementService(
     public async Task ValidateForCreateAsync(ModelProviderResource resource, CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
-        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ResourceKinds.ModelProvider);
+        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ModelResourceKinds.ModelProvider);
         ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
         _ = await ValidateAndNormalizeAsync(resource.Namespace, resource.Definition, scopeRef, cancellationToken);
     }
@@ -29,10 +28,10 @@ public sealed class ModelProviderManagementService(
     public async Task<StoredResource<ModelProviderResource>> CreateAsync(ModelProviderResource resource, CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
-        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ResourceKinds.ModelProvider);
+        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ModelResourceKinds.ModelProvider);
         return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
-            var address = ScopedResourceAddress.Create(scopeRef, resource.Namespace, ResourceKinds.ModelProvider, resource.Name);
+            var address = ScopedResourceAddress.Create(scopeRef, resource.Namespace, ModelResourceKinds.ModelProvider, resource.Name);
             if (await store.GetExactAsync<ModelProviderResource>(address, token) is not null)
                 throw new ResourceConcurrencyException($"Model provider '{resource.Address}' already exists in scope '{scopeRef}'.");
             var definition = await ValidateAndNormalizeAsync(resource.Namespace, resource.Definition, scopeRef, token);
@@ -65,14 +64,14 @@ public sealed class ModelProviderManagementService(
         }, cancellationToken);
     }
 
-    public Task<StoredResource<ModelProviderResource>?> GetAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ModelProviderResource>(new ResourceKey(ResourceKinds.ModelProvider, name), cancellationToken);
-    public Task<StoredResource<ModelProviderResource>?> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => store.GetAsync<ModelProviderResource>(new ResourceKey(ResourceKinds.ModelProvider, name, @namespace), cancellationToken);
+    public Task<StoredResource<ModelProviderResource>?> GetAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ModelProviderResource>(new ResourceKey(ModelResourceKinds.ModelProvider, name), cancellationToken);
+    public Task<StoredResource<ModelProviderResource>?> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => store.GetAsync<ModelProviderResource>(new ResourceKey(ModelResourceKinds.ModelProvider, name, @namespace), cancellationToken);
     public Task<StoredResource<ModelProviderResource>?> GetExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
-        store.GetExactAsync<ModelProviderResource>(ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.ModelProvider, name), cancellationToken);
+        store.GetExactAsync<ModelProviderResource>(ScopedResourceAddress.Create(scopeRef, @namespace, ModelResourceKinds.ModelProvider, name), cancellationToken);
 
     public async Task<IReadOnlyList<ModelProviderView>> ListAsync(CancellationToken cancellationToken)
     {
-        var resources = await store.ListAllAsync<ModelProviderResource>(ResourceKinds.ModelProvider, cancellationToken);
+        var resources = await store.ListAllAsync<ModelProviderResource>(ModelResourceKinds.ModelProvider, cancellationToken);
         return await Task.WhenAll(resources.Select(async resource =>
             await InspectAsync(await ToConfigurationAsync(resource.Value, cancellationToken), true, cancellationToken)));
     }
@@ -106,8 +105,8 @@ public sealed class ModelProviderManagementService(
         await GetUsagesAsync(ResourceNamespace.Default, providerName, cancellationToken);
 
     public async Task<IReadOnlyList<ModelProviderUsage>> GetUsagesAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) =>
-        (await store.ListAllAsync<ModelProfileResource>(ResourceKinds.ModelProfile, cancellationToken))
-            .Where(profile => profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ResourceKinds.ModelProvider).Namespace == @namespace
+        (await store.ListAllAsync<ModelProfileResource>(ModelResourceKinds.ModelProfile, cancellationToken))
+            .Where(profile => profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ModelResourceKinds.ModelProvider).Namespace == @namespace
                 && profile.Value.Definition.Provider.Name == providerName)
             .Select(profile => new ModelProviderUsage(profile.Value.Kind, profile.Value.Metadata.Name, profile.Value.Definition.DisplayName))
             .ToArray();
@@ -123,7 +122,7 @@ public sealed class ModelProviderManagementService(
         var scopeRef = existing.Value.ScopeRef ?? throw new ModelProviderValidationException("The model provider has no ownership scope.");
         await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
-            await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.ModelProvider, name), ifMatch, token);
+            await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, @namespace, ModelResourceKinds.ModelProvider, name), ifMatch, token);
             return true;
         }, cancellationToken);
     }
@@ -158,7 +157,7 @@ public sealed class ModelProviderManagementService(
         CancellationToken cancellationToken)
     {
         var resource = await references.ResolveAsync<ModelProviderResource>(
-            reference, ownerNamespace, ResourceKinds.ModelProvider, consumerScopeRef, cancellationToken)
+            reference, ownerNamespace, ModelResourceKinds.ModelProvider, consumerScopeRef, cancellationToken)
             ?? throw new ModelProviderConfigurationNotFoundException(reference.Name);
         return await ToConfigurationAsync(resource.Value, cancellationToken);
     }
@@ -167,7 +166,7 @@ public sealed class ModelProviderManagementService(
     ValueTask<ModelProviderConfiguration> IModelProviderConfigurationStore.GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => new(GetConfigurationRequiredAsync(@namespace, name, cancellationToken));
 
     async ValueTask<IReadOnlyList<ModelProviderConfiguration>> IModelProviderConfigurationStore.ListAsync(CancellationToken cancellationToken) =>
-        await Task.WhenAll((await store.ListAllAsync<ModelProviderResource>(ResourceKinds.ModelProvider, cancellationToken))
+        await Task.WhenAll((await store.ListAllAsync<ModelProviderResource>(ModelResourceKinds.ModelProvider, cancellationToken))
             .Select(resource => ToConfigurationAsync(resource.Value, cancellationToken)));
 
     private async Task<ModelProviderProperties> ValidateAndNormalizeAsync(
@@ -224,8 +223,8 @@ public sealed class ModelProviderManagementService(
 
     private static void ValidateIdentity(ModelProviderResource resource)
     {
-        if (resource.Kind != ResourceKinds.ModelProvider) throw new ModelProviderValidationException($"Kind must be '{ResourceKinds.ModelProvider}'.");
-        if (resource.ApiVersion != ManagementApiVersions.CoreV1) throw new ModelProviderValidationException($"ApiVersion must be '{ManagementApiVersions.CoreV1}'.");
+        if (resource.Kind != ModelResourceKinds.ModelProvider) throw new ModelProviderValidationException($"Kind must be '{ModelResourceKinds.ModelProvider}'.");
+        if (resource.ApiVersion != ResourceApiVersions.CoreV1) throw new ModelProviderValidationException($"ApiVersion must be '{ResourceApiVersions.CoreV1}'.");
         ArgumentException.ThrowIfNullOrWhiteSpace(resource.Metadata.Name);
     }
 

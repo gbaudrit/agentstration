@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Web.Console;
 
@@ -51,7 +50,7 @@ public sealed partial class ApiClientTests
 
     private static BootstrapApplicationResource BootstrapApplication(string name) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
+        ApiVersion = ResourceApiVersions.CoreV1,
         Kind = BootstrapKinds.BootstrapApplication,
         Metadata = new() { Name = name },
         Definition = new BootstrapApplicationProperties

@@ -1,7 +1,6 @@
 using Agentstration.Identity.Contracts;
 using System.Globalization;
 using Agentstration.Application.Work;
-using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;

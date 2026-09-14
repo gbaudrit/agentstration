@@ -6,7 +6,7 @@ using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
-using Agentstration.Management.Abstractions;
+using Agentstration.Models;
 using Agentstration.Api.Contracts;
 using Agentstration.Agents.Contracts;
 using Agentstration.Resources;
@@ -29,7 +29,7 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
         var deployments = (await deploymentsTask).Value;
         return page.Value.Select(agent =>
         {
-            var modelProfile = agent.Definition.ModelProfile.Resolve(agent.Namespace, ResourceKinds.ModelProfile);
+            var modelProfile = agent.Definition.ModelProfile.Resolve(agent.Namespace, ModelResourceKinds.ModelProfile);
             var deployment = FindCurrentDeployment(agent, deployments);
             return new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), DeploymentStatus(deployment), deployment?.UpdatedAt ?? DateTimeOffset.MinValue, modelProfile.Name)
             {

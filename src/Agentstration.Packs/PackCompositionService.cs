@@ -3,9 +3,13 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using Agentstration.Management.Abstractions;
+using Agentstration.Agents;
+using Agentstration.Flows;
+using Agentstration.Models;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Work;
 
 namespace Agentstration.Packs;
 
@@ -85,7 +89,7 @@ public sealed partial class PackCompositionService(
 
         var manifest = new PackManifest
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = PackKinds.Pack,
             Metadata = new PackMetadata
             {
@@ -122,7 +126,7 @@ public sealed partial class PackCompositionService(
         return await store.PutAsync(new PackProjectResource
         {
             Uid = id,
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = PackAuthoringKinds.PackProject,
             Metadata = new ResourceMetadata { Name = id.ToString("N") },
             Generation = 1,
@@ -269,17 +273,17 @@ public sealed partial class PackCompositionService(
     {
         var directory = resource.Kind switch
         {
-            ResourceKinds.Agent => "agents",
-            ResourceKinds.Flow => "flows",
-            ResourceKinds.Entry => "entries",
-            ResourceKinds.ModelProfile => "model-profiles",
-            ResourceKinds.ModelProvider => "model-providers",
-            ResourceKinds.RuntimeProfile => "runtime-profiles",
+            AgentResourceKinds.Agent => "agents",
+            FlowResourceKinds.Flow => "flows",
+            EntryResourceKinds.Entry => "entries",
+            ModelResourceKinds.ModelProfile => "model-profiles",
+            ModelResourceKinds.ModelProvider => "model-providers",
+            RuntimeProfileResourceKinds.RuntimeProfile => "runtime-profiles",
             _ => $"{resource.Kind.ToLowerInvariant()}s"
         };
         return $"{directory}/{resource.Name}.json";
     }
-    private static int KindOrder(string kind) => kind switch { ResourceKinds.ModelProvider => 10, ResourceKinds.RuntimeProfile => 20, ResourceKinds.ModelProfile => 30, ResourceKinds.Agent => 40, ResourceKinds.Flow => 50, ResourceKinds.Entry => 60, _ => 100 };
+    private static int KindOrder(string kind) => kind switch { ModelResourceKinds.ModelProvider => 10, RuntimeProfileResourceKinds.RuntimeProfile => 20, ModelResourceKinds.ModelProfile => 30, AgentResourceKinds.Agent => 40, FlowResourceKinds.Flow => 50, EntryResourceKinds.Entry => 60, _ => 100 };
     private static string BindingLabel(PackBindingTargetKind kind) => kind switch
     {
         PackBindingTargetKind.Secret => "Secret",

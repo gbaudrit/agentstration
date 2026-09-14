@@ -118,7 +118,7 @@ else
                 <div class="form-grid">
                     <label><span>@T("Name")</span><input @bind="resourceName" disabled="@(!IsNew)" /></label>
                     <label><span>@T("DisplayName")</span><input @bind="displayName" /></label>
-                    <ResourceScopeFormField ResourceKind="@ResourceKinds.Entry" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
+                    <ResourceScopeFormField ResourceKind="@EntryResourceKinds.Entry" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
                     <label class="form-span-2"><span>@T("Description")</span><textarea @bind="description" rows="2"></textarea></label>
                 </div>
             </section>
@@ -385,7 +385,7 @@ else
     private EntryBehavior Behavior() => new(taskMode, allowConversation, streamResponse, new EntryConversationBehavior(allowConversation));
     private Agentstration.Resources.WorkspaceId CurrentWorkspaceId => new(workspaces.FirstOrDefault()?.Id ?? published?.WorkspaceId.Value ?? Guid.Empty);
     private EntryDraft Draft() => new() { WorkspaceId = CurrentWorkspaceId, Id = new(EntryIdValue, EntryResourceNamespace), Name = resourceName.Trim(), DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Presentation = Presentation(), Binding = new(bindingKind, SelectedResource?.ResourceId ?? resourceId, SelectedResource?.Namespace), PublishedBinding = publishedBinding, Behavior = Behavior(), Revision = draftRevision };
-    private RawEntryResource RawResource() => new() { ApiVersion = ManagementApiVersions.CoreV1, Kind = ResourceKinds.Entry, Metadata = new() { Name = resourceName.Trim() }, Definition = new() { DisplayName = displayName.Trim(), Description = NullIfWhiteSpace(description), Presentation = Presentation(), Binding = new(bindingKind, SelectedResource?.ResourceId ?? resourceId, SelectedResource?.Namespace), Behavior = Behavior(), Publish = rawPublish } };
+    private RawEntryResource RawResource() => new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = EntryResourceKinds.Entry, Metadata = new() { Name = resourceName.Trim() }, Definition = new() { DisplayName = displayName.Trim(), Description = NullIfWhiteSpace(description), Presentation = Presentation(), Binding = new(bindingKind, SelectedResource?.ResourceId ?? resourceId, SelectedResource?.Namespace), Behavior = Behavior(), Publish = rawPublish } };
     private void PrepareRawYaml() { rawError = null; try { rawYaml = ResourceManifestSerializer.ToYaml(RawResource()); } catch (Exception exception) { rawError = exception.Message; } }
     private bool ApplyRawYaml()
     {
@@ -393,8 +393,8 @@ else
         try
         {
             var manifest = ResourceManifestSerializer.FromYaml<RawEntryResource>(rawYaml);
-            if (!string.Equals(manifest.ApiVersion, ManagementApiVersions.CoreV1, StringComparison.Ordinal)) throw new ArgumentException(T("ApiVersionRequired", ManagementApiVersions.CoreV1));
-            if (!string.Equals(manifest.Kind, ResourceKinds.Entry, StringComparison.Ordinal)) throw new ArgumentException(T("KindRequired", ResourceKinds.Entry));
+            if (!string.Equals(manifest.ApiVersion, ResourceApiVersions.CoreV1, StringComparison.Ordinal)) throw new ArgumentException(T("ApiVersionRequired", ResourceApiVersions.CoreV1));
+            if (!string.Equals(manifest.Kind, EntryResourceKinds.Entry, StringComparison.Ordinal)) throw new ArgumentException(T("KindRequired", EntryResourceKinds.Entry));
             if (!IsNew && !string.Equals(manifest.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException(T("EntryNameImmutable"));
             resourceName = manifest.Metadata.Name; displayName = manifest.Definition.DisplayName ?? manifest.Metadata.Name; description = manifest.Definition.Description ?? "";
             var presentation = manifest.Definition.Presentation; presentationKind = presentation.Kind; placeholder = presentation.Placeholder ?? ""; icon = presentation.Icon ?? ""; allowAttachments = presentation.AllowAttachments; allowVoiceInput = presentation.AllowVoiceInput; participantsVisibility = presentation.Participants.Visibility; progressVisibility = presentation.Progress.Visibility; taskDisplay = presentation.Task.Display; resultDisplay = presentation.Results.Display;

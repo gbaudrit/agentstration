@@ -1,7 +1,6 @@
 using Agentstration.Tools;
 using Agentstration.ResourceManagement;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 
 namespace Agentstration.Tools.Tests;
@@ -89,8 +88,8 @@ public sealed class ToolExecutionHookManagementTests
 
     private static ToolExecutionHookResource Hook() => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.ToolExecutionHook,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ToolResourceKinds.ToolExecutionHook,
         Metadata = new ResourceMetadata
         {
             Name = "block-lookup",

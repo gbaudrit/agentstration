@@ -1,9 +1,12 @@
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.Agents;
+using Agentstration.Flows;
+using Agentstration.Models;
+using Agentstration.Work;
 using System.IO.Compression;
 using System.Text.Json;
 using Agentstration.Infrastructure.Packs;
-using Agentstration.Management.Abstractions;
 using Agentstration.Packs;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
@@ -80,10 +83,10 @@ public sealed class PackCompositionTests
 
     private sealed class CatalogStub : IPackWorkspaceResourceCatalog
     {
-        public static readonly PackCompositionResourceKey Entry = new(ResourceKinds.Entry, "main-entry");
-        private static readonly PackCompositionResourceKey Flow = new(ResourceKinds.Flow, "main-flow");
-        private static readonly PackCompositionResourceKey Agent = new(ResourceKinds.Agent, "concierge");
-        private static readonly PackCompositionResourceKey Model = new(ResourceKinds.ModelProfile, "reasoning");
+        public static readonly PackCompositionResourceKey Entry = new(EntryResourceKinds.Entry, "main-entry");
+        private static readonly PackCompositionResourceKey Flow = new(FlowResourceKinds.Flow, "main-flow");
+        private static readonly PackCompositionResourceKey Agent = new(AgentResourceKinds.Agent, "concierge");
+        private static readonly PackCompositionResourceKey Model = new(ModelResourceKinds.ModelProfile, "reasoning");
 
         private static readonly IReadOnlyDictionary<ResourceAddress, PackCompositionResourceSnapshot> Values = new Dictionary<ResourceAddress, PackCompositionResourceSnapshot>
         {
@@ -103,8 +106,8 @@ public sealed class PackCompositionTests
         {
             object manifest = resource.Kind switch
             {
-                ResourceKinds.Agent => new { apiVersion = ManagementApiVersions.CoreV1, kind = ResourceKinds.Agent, metadata = new { name = resource.Name }, definition = new { modelProfile = new { binding = bindings[Model.Address] } } },
-                _ => new { apiVersion = ManagementApiVersions.CoreV1, kind = resource.Kind, metadata = new { name = resource.Name }, definition = new { } }
+                AgentResourceKinds.Agent => new { apiVersion = ResourceApiVersions.CoreV1, kind = AgentResourceKinds.Agent, metadata = new { name = resource.Name }, definition = new { modelProfile = new { binding = bindings[Model.Address] } } },
+                _ => new { apiVersion = ResourceApiVersions.CoreV1, kind = resource.Kind, metadata = new { name = resource.Name }, definition = new { } }
             };
             return Task.FromResult(JsonSerializer.SerializeToElement(manifest));
         }

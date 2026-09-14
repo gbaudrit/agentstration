@@ -1,8 +1,8 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 
 namespace Agentstration.Sources;
 
@@ -48,8 +48,8 @@ public sealed partial class SourceVerificationIndexReader : ISourceVerificationI
 
     private static void Validate(VerifiedSourceIndexManifest index)
     {
-        if (!string.Equals(index.ApiVersion, ManagementApiVersions.CoreV1, StringComparison.Ordinal))
-            throw Invalid("source_verification_index_api_version_invalid", $"Verified Source indexes require apiVersion '{ManagementApiVersions.CoreV1}'.");
+        if (!string.Equals(index.ApiVersion, ResourceApiVersions.CoreV1, StringComparison.Ordinal))
+            throw Invalid("source_verification_index_api_version_invalid", $"Verified Source indexes require apiVersion '{ResourceApiVersions.CoreV1}'.");
         if (!string.Equals(index.Kind, SourceVerificationKinds.VerifiedSourceIndex, StringComparison.Ordinal))
             throw Invalid("source_verification_index_kind_invalid", $"Verified Source index kind must be '{SourceVerificationKinds.VerifiedSourceIndex}'.");
         if (index.Definition?.Sources is null)

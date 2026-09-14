@@ -3,7 +3,6 @@ using Agentstration.Agents;
 using Agentstration.Triggers;
 using System.Text.Json;
 using Agentstration.Flows;
-using Agentstration.Management.Abstractions;
 using Agentstration.Agents.Contracts;
 using Agentstration.Models.Contracts;
 using Agentstration.Runtime.Contracts;
@@ -145,8 +144,8 @@ public sealed class DashboardTests
         var fake = new MockApiClient(new FixedTimeProvider(Now));
         var request = new AgentResourceRequest
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Agent,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
             Metadata = new ResourceMetadata { Name = "new-agent" },
             Definition = new AgentProperties
             {
@@ -170,8 +169,8 @@ public sealed class DashboardTests
 
     private static TriggerResource Trigger(string name, bool enabled, TriggerLastOutcome outcome) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.Trigger,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = TriggerResourceKinds.Trigger,
         Metadata = new ResourceMetadata { Name = name },
         Definition = new TriggerProperties
         {

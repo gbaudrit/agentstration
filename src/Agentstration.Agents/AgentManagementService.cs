@@ -1,7 +1,6 @@
 using Agentstration.Security.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Agents;
-using Agentstration.Management.Abstractions;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -165,7 +164,7 @@ public sealed class AgentManagementService(
 
         var revision = new AgentRevision
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = AgentResourceKinds.AgentRevision,
             Metadata = new ResourceMetadata
             {
@@ -283,7 +282,7 @@ public sealed class AgentManagementService(
             ?? throw new ResourceNotFoundException(new(AgentResourceKinds.AgentRevision, revisionName, @namespace));
         return await store.PutAsync(new AgentDeployment
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = AgentResourceKinds.AgentDeployment,
             Metadata = new ResourceMetadata { Name = name, Namespace = @namespace },
             AgentNamespace = @namespace,
@@ -387,7 +386,7 @@ public sealed class AgentManagementService(
     private static void ValidateResource(Resource resource, string expectedKind)
     {
         if (resource.Kind != expectedKind) throw new AgentDefinitionValidationException("resource_kind_mismatch", $"Expected resource kind '{expectedKind}'.");
-        if (resource.ApiVersion != ManagementApiVersions.CoreV1) throw new AgentDefinitionValidationException("api_version_not_supported", $"Supported API version is '{ManagementApiVersions.CoreV1}'.");
+        if (resource.ApiVersion != ResourceApiVersions.CoreV1) throw new AgentDefinitionValidationException("api_version_not_supported", $"Supported API version is '{ResourceApiVersions.CoreV1}'.");
         ValidateName(resource.Metadata.Name, "metadata.name");
     }
 

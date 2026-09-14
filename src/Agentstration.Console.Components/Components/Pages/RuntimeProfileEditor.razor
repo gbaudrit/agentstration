@@ -21,7 +21,7 @@ else
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("RuntimeResource")</h2></div></div><div class="form-grid">
             <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /></label><label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /></label>
             <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /></label>
-            <ResourceScopeFormField ResourceKind="@ResourceKinds.RuntimeProfile" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
+            <ResourceScopeFormField ResourceKind="@RuntimeProfileResourceKinds.RuntimeProfile" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
             <label class="form-span-2"><span>@T("RuntimeType")</span><InputText @bind-Value="model.RuntimeType" /><small>@T("RuntimeTypeHelpPrefix") <code>microsoft-agent-framework</code> @T("RuntimeTypeHelpSuffix")</small></label>
         </div></section>
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Defaults")</p><h2>@T("ExecutionPolicy")</h2></div></div><div class="form-grid">

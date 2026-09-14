@@ -1,7 +1,6 @@
 using Agentstration.Agents;
 using Agentstration.Triggers;
 using System.Globalization;
-using Agentstration.Management.Abstractions;
 using Agentstration.Agents.Contracts;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Resources;
@@ -156,8 +155,8 @@ public sealed class NamespacedAgentDetailsTests
             RequestedNamespace = @namespace;
             var resource = new AgentResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.Agent,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = AgentResourceKinds.Agent,
                 Metadata = new ResourceMetadata
                 {
                     Name = name,
@@ -196,7 +195,7 @@ public sealed class NamespacedAgentDetailsTests
         public Task<IReadOnlyList<PackProjectSourceDocument>> GetPackResourcesAsync(string publisher, string name, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<PackProjectSourceDocument>>([new(
                 "agents/concierge.yaml",
-                ResourceKinds.Agent,
+                AgentResourceKinds.Agent,
                 "concierge",
                 """
                 apiVersion: agentstration.io/v1
@@ -223,7 +222,7 @@ public sealed class NamespacedAgentDetailsTests
         {
             var resource = new InstalledPackResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
+                ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = PackKinds.InstalledPack,
                 Metadata = new ResourceMetadata { Name = "13-agentstration-daily-life-assistant" },
                 Definition = new InstalledPackProperties

@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -253,8 +252,8 @@ public sealed class BootstrapProfileCatalog(
     {
         if (string.IsNullOrWhiteSpace(resource.ApiVersion))
             throw new DeclarativeBootstrapException($"Bootstrap resource '{location}' is missing apiVersion.");
-        if (!string.Equals(resource.ApiVersion, ManagementApiVersions.CoreV1, StringComparison.Ordinal))
-            throw new DeclarativeBootstrapException($"Bootstrap resource '{location}' uses unsupported apiVersion '{resource.ApiVersion}'. Expected '{ManagementApiVersions.CoreV1}'.");
+        if (!string.Equals(resource.ApiVersion, ResourceApiVersions.CoreV1, StringComparison.Ordinal))
+            throw new DeclarativeBootstrapException($"Bootstrap resource '{location}' uses unsupported apiVersion '{resource.ApiVersion}'. Expected '{ResourceApiVersions.CoreV1}'.");
         if (string.IsNullOrWhiteSpace(resource.Kind))
             throw new DeclarativeBootstrapException($"Bootstrap resource '{location}' is missing kind.");
         if (string.IsNullOrWhiteSpace(resource.Metadata.Name))

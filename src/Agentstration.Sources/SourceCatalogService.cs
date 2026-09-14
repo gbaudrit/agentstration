@@ -1,7 +1,6 @@
 using Agentstration.Identity.Contracts;
 using Agentstration.Identity;
 using System.Globalization;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
@@ -24,18 +23,18 @@ public sealed class SourceCatalogService(
         Guid snapshotUid,
         string? locale,
         CancellationToken cancellationToken) =>
-        await scopeOperations.WriteAsync(ResourceKinds.SourceChannelSnapshot, scopeRef, AuthorizationPermissions.ResourcesRead, async token =>
+        await scopeOperations.WriteAsync(SourceResourceKinds.SourceChannelSnapshot, scopeRef, AuthorizationPermissions.ResourcesRead, async token =>
         {
             var source = (await sources.GetExactAsync(scopeRef, publisher, sourceName, token))?.Source
-                ?? throw new ResourceNotFoundException(new(ResourceKinds.Source, sourceName, new ResourceNamespace(publisher)));
+                ?? throw new ResourceNotFoundException(new(SourceResourceKinds.Source, sourceName, new ResourceNamespace(publisher)));
             var version = await sources.GetVersionExactAsync(scopeRef, publisher, sourceName, versionUid, token)
-                ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+                ?? throw new ResourceNotFoundException(new(SourceResourceKinds.SourceVersion, versionUid.ToString("D")));
             var channelDefinition = version.Definition.PublishedDefinition.Channels.SingleOrDefault(value =>
                 string.Equals(value.Name, channel, StringComparison.Ordinal))
                 ?? throw Invalid("source_channel_missing", $"Source Version '{version.Definition.Version}' has no channel named '{channel}'.");
             compatibility.RequireCompatible(channelDefinition);
             var snapshot = await snapshots.GetAsync(scopeRef, publisher, sourceName, versionUid, channel, snapshotUid, token)
-                ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceChannelSnapshot, snapshotUid.ToString("D")));
+                ?? throw new ResourceNotFoundException(new(SourceResourceKinds.SourceChannelSnapshot, snapshotUid.ToString("D")));
             var requestedLocale = ValidateRequestedLocale(locale);
             await using var content = await contentReader.OpenAsync(snapshot.Definition.Artifact, token);
             var results = new List<SourceCatalogView>(version.Definition.PublishedDefinition.Catalogs.Count);

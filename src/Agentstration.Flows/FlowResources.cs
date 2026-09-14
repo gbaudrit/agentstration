@@ -4,6 +4,11 @@ using Agentstration.Resources;
 
 namespace Agentstration.Flows;
 
+public static class FlowResourceKinds
+{
+    public const string Flow = "Flow";
+}
+
 public sealed record FlowResource(
     WorkspaceId WorkspaceId,
     FlowId Id,

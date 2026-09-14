@@ -1,5 +1,4 @@
 using Agentstration.Models;
-using Agentstration.Management.Abstractions;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
@@ -131,8 +130,8 @@ public sealed class ModelProviderNavigationTests
 
         private static ModelProviderResource ProviderResource(string name) => new()
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.ModelProvider,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ModelResourceKinds.ModelProvider,
             Metadata = new ResourceMetadata { Name = name, Namespace = ProviderNamespace },
             Definition = new ModelProviderProperties
             {

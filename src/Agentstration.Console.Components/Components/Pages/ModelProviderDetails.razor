@@ -23,7 +23,7 @@ else
             <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
             <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
             <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
-            <ResourceScopeFormField ResourceKind="@ResourceKinds.ModelProvider" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
+            <ResourceScopeFormField ResourceKind="@ModelResourceKinds.ModelProvider" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
             <label><span>@T("ExtensionRegistration")</span><select value="@model.ExtensionId" @onchange="ExtensionChanged"><option value="">@T("SelectExtension")</option>@foreach (var extension in extensions) { <option value="@ExtensionKey(extension)">@extension.RegistrationNamespace/@extension.RegistrationName — @(extension.Extension?.Name ?? extension.RegistrationName)</option> }</select><ValidationMessage For="() => model.ExtensionId" /></label>
             <label><span>@T("ModelProviderContribution")</span><select @bind="model.ContributionId"><option value="">@T("SelectContribution")</option>@foreach (var contribution in Contributions) { <option value="@contribution.Id">@contribution.Id</option> }</select><ValidationMessage For="() => model.ContributionId" /></label>
         </div></section>

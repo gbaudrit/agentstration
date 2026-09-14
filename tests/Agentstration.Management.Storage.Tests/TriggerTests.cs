@@ -8,7 +8,6 @@ using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Triggers;
-using Agentstration.Management.Abstractions;
 using Agentstration.Identity;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
@@ -187,8 +186,8 @@ public sealed class TriggerTests
 
     private static TriggerResource Resource(string name, bool enabled) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.Trigger,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = TriggerResourceKinds.Trigger,
         Metadata = new() { Name = name },
         Definition = new()
         {

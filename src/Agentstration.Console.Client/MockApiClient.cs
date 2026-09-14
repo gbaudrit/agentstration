@@ -4,7 +4,6 @@ using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.Agents.Contracts;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Resources;
@@ -300,8 +299,8 @@ public sealed class MockApiClient(TimeProvider timeProvider, IReadOnlyList<FlowR
             var resource = new AgentResource
             {
                 Uid = Guid.NewGuid(),
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.Agent,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = AgentResourceKinds.Agent,
                 Metadata = new ResourceMetadata { Name = item.Name },
                 Generation = 1,
                 ETag = etag,

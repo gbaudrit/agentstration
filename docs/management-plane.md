@@ -5,9 +5,6 @@ The management plane is Agentstration's source of truth. It owns agent definitio
 Its module boundary is explicit:
 
 ```text
-Agentstration.Management.Abstractions
-  temporary compatibility resources and ports awaiting explicit family extraction
-
 Plural resource-family modules
   Agents, Extensions, Identity, Models, Packs, Sources, Runtime, Tools and Triggers own their validation and lifecycle use cases
 

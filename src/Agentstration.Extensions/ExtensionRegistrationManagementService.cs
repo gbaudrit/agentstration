@@ -1,7 +1,6 @@
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Identity;
-using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
@@ -144,7 +143,7 @@ public sealed class ExtensionRegistrationManagementService(
         {
             return await CreateAsync(new ExtensionRegistrationResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
+                ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = ExtensionKinds.ExtensionRegistration,
                 Metadata = new ResourceMetadata { Name = name },
                 ScopeRef = scopeRef,
@@ -180,7 +179,7 @@ public sealed class ExtensionRegistrationManagementService(
         string name,
         CancellationToken cancellationToken) =>
         [
-            .. (await store.ListAllAsync<ModelProviderResource>(ResourceKinds.ModelProvider, cancellationToken))
+            .. (await store.ListAllAsync<ModelProviderResource>(ModelResourceKinds.ModelProvider, cancellationToken))
             .Where(value =>
             {
                 var address = value.Value.Definition.Extension.Resolve(value.Value.Namespace, ExtensionKinds.ExtensionRegistration);
@@ -191,7 +190,7 @@ public sealed class ExtensionRegistrationManagementService(
                 value.Value.Name,
                 value.Value.Definition.DisplayName,
                 value.Value.Definition.ContributionId)),
-            .. (await store.ListAllAsync<SourceProviderResource>(ResourceKinds.SourceProvider, cancellationToken))
+            .. (await store.ListAllAsync<SourceProviderResource>(SourceResourceKinds.SourceProvider, cancellationToken))
             .Where(value =>
             {
                 var address = value.Value.Definition.Extension.Resolve(value.Value.Namespace, ExtensionKinds.ExtensionRegistration);
@@ -281,9 +280,9 @@ public sealed class ExtensionRegistrationManagementService(
         CancellationToken cancellationToken)
     {
         if (credential is null) return;
-        var address = credential.Resolve(ownerNamespace, ResourceKinds.Secret);
+        var address = credential.Resolve(ownerNamespace, SecretResourceKinds.Secret);
         if (await references.ResolveAsync<SecretResource>(
-                credential, ownerNamespace, ResourceKinds.Secret, ownerScopeRef, cancellationToken) is null)
+                credential, ownerNamespace, SecretResourceKinds.Secret, ownerScopeRef, cancellationToken) is null)
             throw new ExtensionRegistrationValidationException($"Referenced secret '{address}' does not exist or is not visible from '{ownerScopeRef}'.");
     }
 
@@ -317,8 +316,8 @@ public sealed class ExtensionRegistrationManagementService(
     {
         if (resource.Kind != ExtensionKinds.ExtensionRegistration)
             throw new ExtensionRegistrationValidationException($"Kind must be '{ExtensionKinds.ExtensionRegistration}'.");
-        if (resource.ApiVersion != ManagementApiVersions.CoreV1)
-            throw new ExtensionRegistrationValidationException($"ApiVersion must be '{ManagementApiVersions.CoreV1}'.");
+        if (resource.ApiVersion != ResourceApiVersions.CoreV1)
+            throw new ExtensionRegistrationValidationException($"ApiVersion must be '{ResourceApiVersions.CoreV1}'.");
         ArgumentException.ThrowIfNullOrWhiteSpace(resource.Metadata.Name);
     }
 

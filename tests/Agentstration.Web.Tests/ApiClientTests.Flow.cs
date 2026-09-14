@@ -4,7 +4,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Web.Components;
@@ -89,13 +88,13 @@ public sealed partial class ApiClientTests
         using var flowCatalog = new HttpClient(new StubHandler(request =>
         {
             Assert.AreEqual("/api/resources", request.RequestUri!.AbsolutePath);
-            Assert.AreEqual(ResourceKinds.Flow, Uri.UnescapeDataString(request.RequestUri.Query.Replace("?kind=", "", StringComparison.Ordinal)));
+            Assert.AreEqual(FlowResourceKinds.Flow, Uri.UnescapeDataString(request.RequestUri.Query.Replace("?kind=", "", StringComparison.Ordinal)));
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = JsonContent.Create(new[]
                 {
-                    new ResourcePickerItem("universal-router", "Universal router", null, "1.0.0", "Active", ResourceKinds.Flow),
-                    new ResourcePickerItem("my-flow", "My flow", null, "1.0.0", "Active", ResourceKinds.Flow)
+                    new ResourcePickerItem("universal-router", "Universal router", null, "1.0.0", "Active", FlowResourceKinds.Flow),
+                    new ResourcePickerItem("my-flow", "My flow", null, "1.0.0", "Active", FlowResourceKinds.Flow)
                 })
             };
         }))

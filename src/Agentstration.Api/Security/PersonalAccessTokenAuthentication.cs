@@ -2,7 +2,6 @@ using Agentstration.Identity.Contracts;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Encodings.Web;
-using Agentstration.Management.Abstractions;
 using Agentstration.Identity;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;

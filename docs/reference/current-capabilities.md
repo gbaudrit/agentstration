@@ -81,7 +81,7 @@ Packs are a Management/distribution concept above these planes: they install ord
 
 Agent declaration belongs to the Management Plane. It owns the desired state, generation, provisioning status, resource version, canonical resource identifiers, reference validation, and lifecycle events. The Runtime Plane owns dependency resolution, materialization, lifecycle, and execution. Microsoft Agent Framework is an execution implementation detail confined to the runtime adapter and does not appear in Management resources or events.
 
-The module is physically isolated: shared compatibility resources and ports remain in `Agentstration.Management.Abstractions`, while agent validation and lifecycle use cases live in `Agentstration.Agents`. Other managed kinds follow the same plural resource-family ownership model. No resource-family service remains in the general Domain or Application projects.
+The module is physically isolated: agent resources, kind constants, validation and lifecycle use cases live in `Agentstration.Agents`. Other managed kinds follow the same plural resource-family ownership model; there is no shared Management abstractions assembly. No resource-family service remains in the general Domain or Application projects.
 
 Agents use the Agentstration-native resource envelope in both JSON and YAML:
 

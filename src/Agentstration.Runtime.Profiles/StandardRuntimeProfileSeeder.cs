@@ -1,5 +1,4 @@
 using Agentstration.Identity.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 
@@ -26,8 +25,8 @@ public sealed class StandardRuntimeProfileSeeder(
             {
                 await runtimes.CreateAsync(new RuntimeProfileResource
                 {
-                    ApiVersion = ManagementApiVersions.CoreV1,
-                    Kind = ResourceKinds.RuntimeProfile,
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = RuntimeProfileResourceKinds.RuntimeProfile,
                     Metadata = new ResourceMetadata
                     {
                         Name = "maf-builtin",

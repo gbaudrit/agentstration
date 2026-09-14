@@ -1,5 +1,4 @@
 using Agentstration.Extensions.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Resources;
@@ -107,7 +106,7 @@ public sealed class ExtensionManagementService(
 
     private static bool References(ModelProfileResource profile, ModelProviderConfiguration provider)
     {
-        var address = profile.Definition.Provider.Resolve(profile.Namespace, ResourceKinds.ModelProvider);
+        var address = profile.Definition.Provider.Resolve(profile.Namespace, ModelResourceKinds.ModelProvider);
         return address.Namespace == provider.Namespace
             && string.Equals(address.Name, provider.Name, StringComparison.Ordinal);
     }

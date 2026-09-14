@@ -2,7 +2,6 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Agents;
 using Agentstration.ResourceManagement;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Identity;
@@ -38,8 +37,8 @@ public sealed class ManagementPlaneTests
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
 
-        Assert.AreEqual(ManagementApiVersions.CoreV1, root.GetProperty("apiVersion").GetString());
-        Assert.AreEqual(ResourceKinds.Agent, root.GetProperty("kind").GetString());
+        Assert.AreEqual(ResourceApiVersions.CoreV1, root.GetProperty("apiVersion").GetString());
+        Assert.AreEqual(AgentResourceKinds.Agent, root.GetProperty("kind").GetString());
         Assert.AreEqual("assistant", root.GetProperty("metadata").GetProperty("name").GetString());
         Assert.AreEqual("platform", root.GetProperty("metadata").GetProperty("tags").GetProperty("team").GetString());
         Assert.AreEqual("engineering", root.GetProperty("metadata").GetProperty("annotations").GetProperty("owner").GetString());
@@ -161,7 +160,7 @@ public sealed class ManagementPlaneTests
 
         var created = await fixture.Store.PutAsync(desired, null, true, default);
         await Assert.ThrowsAsync<ResourceConcurrencyException>(() => fixture.Store.PutAsync(Agent("assistant"), null, true, default));
-        var key = new ResourceKey(ResourceKinds.Agent, "assistant");
+        var key = new ResourceKey(AgentResourceKinds.Agent, "assistant");
         var loaded = await fixture.Store.GetAsync<AgentResource>(key, default);
 
         Assert.IsNotNull(loaded);
@@ -182,21 +181,21 @@ public sealed class ManagementPlaneTests
         await fixture.Store.PutAsync(first, null, true, default);
         await fixture.Store.PutAsync(second, null, true, default);
 
-        var loadedFirst = await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant", firstNamespace), default);
-        var loadedSecond = await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant", secondNamespace), default);
+        var loadedFirst = await fixture.Store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, "assistant", firstNamespace), default);
+        var loadedSecond = await fixture.Store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, "assistant", secondNamespace), default);
         Assert.AreEqual(firstNamespace, loadedFirst?.Value.Namespace);
         Assert.AreEqual(secondNamespace, loadedSecond?.Value.Namespace);
-        Assert.IsNull(await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant"), default));
+        Assert.IsNull(await fixture.Store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, "assistant"), default));
 
-        await fixture.Store.DeleteAsync(new ResourceKey(ResourceKinds.Agent, "assistant", firstNamespace), loadedFirst!.ETag, default);
-        Assert.IsNull(await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant", firstNamespace), default));
-        Assert.IsNotNull(await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant", secondNamespace), default));
+        await fixture.Store.DeleteAsync(new ResourceKey(AgentResourceKinds.Agent, "assistant", firstNamespace), loadedFirst!.ETag, default);
+        Assert.IsNull(await fixture.Store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, "assistant", firstNamespace), default));
+        Assert.IsNotNull(await fixture.Store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, "assistant", secondNamespace), default));
     }
 
     private static AgentResource Agent(string name) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.Agent,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = AgentResourceKinds.Agent,
         Metadata = new ResourceMetadata { Name = name },
         Definition = new AgentProperties
         {

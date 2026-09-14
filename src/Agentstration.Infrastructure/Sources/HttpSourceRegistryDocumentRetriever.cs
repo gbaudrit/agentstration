@@ -3,7 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Text;
-using Agentstration.Management.Abstractions;
+using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Infrastructure.Sources;
@@ -176,7 +176,7 @@ public sealed class HttpSourceRegistryDocumentRetriever(
             throw new SourceRetrievalException("source_registry_credential_unavailable", "The registry credential is unavailable.");
         try
         {
-            var address = credential.Resolve(context.Consumer.Namespace, ResourceKinds.Secret);
+            var address = credential.Resolve(context.Consumer.Namespace, SecretResourceKinds.Secret);
             return await secrets.ResolveAsync(
                 new SecretReference(address, credential.ScopeRef),
                 new SecretResolutionContext(context.ConsumerScopeRef, context.Consumer),

@@ -1,7 +1,6 @@
 using Agentstration.Packs;
 using System.Security.Cryptography;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 
 namespace Agentstration.Sources;
@@ -60,16 +59,16 @@ public sealed class SourcePackInstallationService(
         var source = (await sources.GetExactAsync(
             selection.ScopeRef, selection.SourcePublisher, selection.SourceName, cancellationToken))?.Source
             ?? throw new ResourceNotFoundException(
-                new(ResourceKinds.Source, selection.SourceName, new(selection.SourcePublisher)));
+                new(SourceResourceKinds.Source, selection.SourceName, new(selection.SourcePublisher)));
         var version = await sources.GetVersionExactAsync(
             selection.ScopeRef, selection.SourcePublisher, selection.SourceName, selection.SourceVersionUid, cancellationToken)
             ?? throw new ResourceNotFoundException(
-                new(ResourceKinds.SourceVersion, selection.SourceVersionUid.ToString("D")));
+                new(SourceResourceKinds.SourceVersion, selection.SourceVersionUid.ToString("D")));
         var snapshot = await snapshots.GetAsync(
             selection.ScopeRef, selection.SourcePublisher, selection.SourceName, selection.SourceVersionUid,
             selection.Channel, selection.SnapshotUid, cancellationToken)
             ?? throw new ResourceNotFoundException(
-                new(ResourceKinds.SourceChannelSnapshot, selection.SnapshotUid.ToString("D")));
+                new(SourceResourceKinds.SourceChannelSnapshot, selection.SnapshotUid.ToString("D")));
 
         // BrowseAsync re-resolves the exact Source Version and Channel, recalculates compatibility
         // against the running Agentstration version, and verifies Snapshot ownership.

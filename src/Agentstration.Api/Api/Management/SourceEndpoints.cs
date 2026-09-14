@@ -1,5 +1,4 @@
 using Agentstration.Identity.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.Sources.Contracts;
 using Agentstration.Sources;
 using Agentstration.ResourceManagement;
@@ -205,7 +204,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
             await (Scope(scopeRef) is { } scope
                 ? service.GetExactAsync(scope, publisher, name, cancellationToken)
                 : service.GetAsync(publisher, name, cancellationToken))
-            ?? throw new ResourceNotFoundException(new(ResourceKinds.Source, name, new Agentstration.Resources.ResourceNamespace(publisher)))));
+            ?? throw new ResourceNotFoundException(new(SourceResourceKinds.Source, name, new Agentstration.Resources.ResourceNamespace(publisher)))));
 
     private static Task<IResult> DeleteAsync(
         string publisher,
@@ -283,7 +282,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
             await (Scope(scopeRef) is { } scope
                 ? service.GetVersionExactAsync(scope, publisher, name, versionUid, cancellationToken)
                 : service.GetVersionAsync(publisher, name, versionUid, cancellationToken))
-            ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")))));
+            ?? throw new ResourceNotFoundException(new(SourceResourceKinds.SourceVersion, versionUid.ToString("D")))));
 
     private static Task<IResult> UpdateDisplayNameAsync(
         string publisher,
@@ -316,7 +315,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         {
             var scope = await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken);
             var version = await sources.GetVersionExactAsync(scope, publisher, name, versionUid, cancellationToken)
-                ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+                ?? throw new ResourceNotFoundException(new(SourceResourceKinds.SourceVersion, versionUid.ToString("D")));
             return Results.Ok(await verification.VerifyDefinitionAsync(version, cancellationToken));
         });
 
@@ -411,7 +410,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.GetAsync(
             await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken),
             publisher, name, versionUid, channel, snapshotUid, cancellationToken)
-            ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceChannelSnapshot, snapshotUid.ToString("D")))));
+            ?? throw new ResourceNotFoundException(new(SourceResourceKinds.SourceChannelSnapshot, snapshotUid.ToString("D")))));
 
     private static Task<IResult> GetChannelStatusAsync(
         string publisher,
@@ -441,9 +440,9 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         {
             var scope = await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken);
             var version = await sources.GetVersionExactAsync(scope, publisher, name, versionUid, cancellationToken)
-                ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+                ?? throw new ResourceNotFoundException(new(SourceResourceKinds.SourceVersion, versionUid.ToString("D")));
             var snapshot = await snapshots.GetAsync(scope, publisher, name, versionUid, channel, snapshotUid, cancellationToken)
-                ?? throw new ResourceNotFoundException(new(ResourceKinds.SourceChannelSnapshot, snapshotUid.ToString("D")));
+                ?? throw new ResourceNotFoundException(new(SourceResourceKinds.SourceChannelSnapshot, snapshotUid.ToString("D")));
             return Results.Ok(await verification.VerifySnapshotAsync(version, snapshot, cancellationToken));
         });
 
@@ -456,7 +455,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
     {
         if (Scope(value) is { } explicitScope) return explicitScope;
         var source = (await sources.GetAsync(publisher, name, cancellationToken))?.Source
-            ?? throw new ResourceNotFoundException(new(ResourceKinds.Source, name, new Agentstration.Resources.ResourceNamespace(publisher)));
+            ?? throw new ResourceNotFoundException(new(SourceResourceKinds.Source, name, new Agentstration.Resources.ResourceNamespace(publisher)));
         return source.ScopeRef ?? throw new InvalidOperationException("A Source must have an ownership scope.");
     }
 

@@ -5,7 +5,6 @@ using Agentstration.Application.Work;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Infrastructure.Declarative;
-using Agentstration.Management.Abstractions;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Identity;
@@ -45,7 +44,7 @@ internal static class PackProvenance
 
 public sealed class ModelProviderPackResourceHandler(ModelProviderManagementService service) : IPackResourceHandler
 {
-    public string Kind => ResourceKinds.ModelProvider;
+    public string Kind => ModelResourceKinds.ModelProvider;
     public int InstallOrder => 10;
     public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken) { _ = Parse(resource); return Task.CompletedTask; }
     public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await service.GetAsync(@namespace, name, cancellationToken) is not null;
@@ -67,7 +66,7 @@ public sealed class ModelProviderPackResourceHandler(ModelProviderManagementServ
 
 public sealed class RuntimeProfilePackResourceHandler(RuntimeProfileManagementService service) : IPackResourceHandler
 {
-    public string Kind => ResourceKinds.RuntimeProfile;
+    public string Kind => RuntimeProfileResourceKinds.RuntimeProfile;
     public int InstallOrder => 20;
     public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken) { _ = Parse(resource); return Task.CompletedTask; }
     public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await service.GetAsync(@namespace, name, cancellationToken) is not null;
@@ -89,7 +88,7 @@ public sealed class RuntimeProfilePackResourceHandler(RuntimeProfileManagementSe
 
 public sealed class ModelProfilePackResourceHandler(ModelProfileManagementService service) : IPackResourceHandler
 {
-    public string Kind => ResourceKinds.ModelProfile;
+    public string Kind => ModelResourceKinds.ModelProfile;
     public int InstallOrder => 30;
     public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken) { _ = Parse(resource); return Task.CompletedTask; }
     public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await service.GetAsync(@namespace, name, cancellationToken) is not null;
@@ -111,7 +110,7 @@ public sealed class ModelProfilePackResourceHandler(ModelProfileManagementServic
 
 public sealed class AgentPackResourceHandler(AgentManagementService service) : IPackResourceHandler
 {
-    public string Kind => ResourceKinds.Agent;
+    public string Kind => AgentResourceKinds.Agent;
     public int InstallOrder => 40;
     public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken) { _ = Parse(resource); return Task.CompletedTask; }
     public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await service.GetAgentAsync(@namespace, name, cancellationToken) is not null;
@@ -134,7 +133,7 @@ public sealed class AgentPackResourceHandler(AgentManagementService service) : I
 
 public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinitionValidator graphValidator, TimeProvider timeProvider, ICurrentRequestContext requestContext) : IPackResourceHandler
 {
-    public string Kind => ResourceKinds.Flow;
+    public string Kind => FlowResourceKinds.Flow;
     public int InstallOrder => 50;
     public async Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken)
     {
@@ -176,7 +175,7 @@ public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinition
 
 public sealed class EntryPackResourceHandler(EntryAdministrationService service, IWorkplaceRepository repository, TimeProvider timeProvider, ICurrentRequestContext requestContext) : IPackResourceHandler
 {
-    public string Kind => ResourceKinds.Entry;
+    public string Kind => EntryResourceKinds.Entry;
     public int InstallOrder => 60;
     public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken)
     {

@@ -9,10 +9,10 @@ using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Extensions.Ollama;
-using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -374,7 +374,7 @@ public sealed class AepVerticalTests
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
         var registration = new ExtensionRegistrationResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ExtensionKinds.ExtensionRegistration,
             Metadata = new ResourceMetadata { Name = "paired-extension" },
             ScopeRef = scope,
@@ -634,7 +634,7 @@ public sealed class AepVerticalTests
             var value = new SecretValue(Encoding.UTF8.GetBytes(Token));
             return Task.FromResult<ResolvedSecret?>(new ResolvedSecret(
                 secret.Address,
-                new ResourceAddress(secret.Address.Namespace, ResourceKinds.Vault, "test-vault"),
+                new ResourceAddress(secret.Address.Namespace, SecretResourceKinds.Vault, "test-vault"),
                 value));
         }
     }
@@ -650,7 +650,7 @@ public sealed class AepVerticalTests
             if (!tokens.TryGetValue(secret.Address.Name, out var token)) return Task.FromResult<ResolvedSecret?>(null);
             return Task.FromResult<ResolvedSecret?>(new ResolvedSecret(
                 secret.Address,
-                new ResourceAddress(secret.Address.Namespace, ResourceKinds.Vault, "test-vault"),
+                new ResourceAddress(secret.Address.Namespace, SecretResourceKinds.Vault, "test-vault"),
                 new SecretValue(Encoding.UTF8.GetBytes(token))));
         }
     }

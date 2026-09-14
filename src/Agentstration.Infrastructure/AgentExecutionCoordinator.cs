@@ -1,5 +1,4 @@
 using Agentstration.Agents;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -39,7 +38,7 @@ public sealed class AgentExecutionCoordinator(
         var pairs = new List<(AgentDeployment Deployment, AgentRevision Revision)>();
         foreach (var item in ready)
         {
-            var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, item.Value.RevisionName, @namespace), cancellationToken);
+            var revision = await store.GetAsync<AgentRevision>(new ResourceKey(AgentResourceKinds.AgentRevision, item.Value.RevisionName, @namespace), cancellationToken);
             if (revision is not null) pairs.Add((item.Value, revision.Value));
         }
 

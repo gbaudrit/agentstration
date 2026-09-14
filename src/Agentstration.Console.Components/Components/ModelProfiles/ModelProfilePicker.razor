@@ -124,7 +124,7 @@
     private static string ProfileValue(ModelProfileSummaryResponse item) => $"{item.Namespace}:{item.Name}";
 
     private static string ProfileUrl(ModelProfileSummaryResponse item) =>
-        ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(item.Namespace), ResourceKinds.ModelProfile, item.Name));
+        ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(item.Namespace), ModelResourceKinds.ModelProfile, item.Name));
 
     public void Dispose()
     {

@@ -1,7 +1,7 @@
 using Agentstration.Agents;
 using Agentstration.Application.Work;
+using Agentstration.Flows;
 using Agentstration.Flows.Application;
-using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Web.Security;
 using Agentstration.Work;
@@ -88,14 +88,14 @@ public static partial class WorkplaceEndpoints
 
     private static async Task<IResult> ListResourcesAsync(string kind, AgentManagementService agents, FlowService flows, IWorkplaceContext workplaceContext, CancellationToken token)
     {
-        if (string.Equals(kind, ResourceKinds.Agent, StringComparison.Ordinal))
+        if (string.Equals(kind, AgentResourceKinds.Agent, StringComparison.Ordinal))
         {
             var values = await agents.ListAgentsAsync(0, 500, token);
             return Results.Ok(values.Select(value => new ResourcePickerItem(value.Value.Metadata.Name, value.Value.Definition.DisplayName, value.Value.Definition.Description, value.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), value.Value.Status.ProvisioningState.ToString(), kind,
                 new Dictionary<string, string> { ["modelProfile"] = value.Value.Definition.ModelProfile.ResourceId })
             { Namespace = value.Value.Namespace }));
         }
-        if (string.Equals(kind, ResourceKinds.Flow, StringComparison.Ordinal))
+        if (string.Equals(kind, FlowResourceKinds.Flow, StringComparison.Ordinal))
         {
             var page = await flows.ListAsync(workplaceContext.WorkspaceId, 0, 500, token);
             return Results.Ok(page.Items.Where(value => !value.Value.Metadata.TryGetValue("systemManaged", out var system) || !bool.TryParse(system, out var hidden) || !hidden)

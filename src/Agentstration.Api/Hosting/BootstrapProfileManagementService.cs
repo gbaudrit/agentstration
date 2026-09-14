@@ -1,6 +1,5 @@
 using Agentstration.Security.Contracts;
 using Agentstration.Identity.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
@@ -92,29 +91,29 @@ public sealed class BootstrapProfileManagementService(
         var existing = targetKind switch
         {
             BootstrapBindingTargetKind.ModelProfile => Options(
-                await store.ListAsync<ModelProfileResource>(ResourceKinds.ModelProfile, 0, 1000, cancellationToken),
+                await store.ListAsync<ModelProfileResource>(ModelResourceKinds.ModelProfile, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
             BootstrapBindingTargetKind.ModelProvider => Options(
-                await store.ListAsync<ModelProviderResource>(ResourceKinds.ModelProvider, 0, 1000, cancellationToken),
+                await store.ListAsync<ModelProviderResource>(ModelResourceKinds.ModelProvider, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
             BootstrapBindingTargetKind.RuntimeProfile => Options(
-                await store.ListAsync<RuntimeProfileResource>(ResourceKinds.RuntimeProfile, 0, 1000, cancellationToken),
+                await store.ListAsync<RuntimeProfileResource>(RuntimeProfileResourceKinds.RuntimeProfile, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
             BootstrapBindingTargetKind.ExtensionRegistration => Options(
                 await store.ListAsync<ExtensionRegistrationResource>(ExtensionKinds.ExtensionRegistration, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
             BootstrapBindingTargetKind.Secret => Options(
-                await store.ListAsync<SecretResource>(ResourceKinds.Secret, 0, 1000, cancellationToken),
+                await store.ListAsync<SecretResource>(SecretResourceKinds.Secret, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
             _ => throw new DeclarativeBootstrapException($"Unsupported bootstrap binding target kind '{targetKind}'.")
         };
         var resourceKind = targetKind switch
         {
-            BootstrapBindingTargetKind.ModelProfile => ResourceKinds.ModelProfile,
-            BootstrapBindingTargetKind.ModelProvider => ResourceKinds.ModelProvider,
-            BootstrapBindingTargetKind.RuntimeProfile => ResourceKinds.RuntimeProfile,
+            BootstrapBindingTargetKind.ModelProfile => ModelResourceKinds.ModelProfile,
+            BootstrapBindingTargetKind.ModelProvider => ModelResourceKinds.ModelProvider,
+            BootstrapBindingTargetKind.RuntimeProfile => RuntimeProfileResourceKinds.RuntimeProfile,
             BootstrapBindingTargetKind.ExtensionRegistration => ExtensionKinds.ExtensionRegistration,
-            BootstrapBindingTargetKind.Secret => ResourceKinds.Secret,
+            BootstrapBindingTargetKind.Secret => SecretResourceKinds.Secret,
             _ => throw new DeclarativeBootstrapException($"Unsupported bootstrap binding target kind '{targetKind}'.")
         };
         await using var loadedSelection = source is null
@@ -227,7 +226,7 @@ public sealed class BootstrapProfileManagementService(
         var id = Guid.NewGuid();
         var resource = new BootstrapApplicationResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = BootstrapKinds.BootstrapApplication,
             Metadata = new ResourceMetadata { Name = id.ToString("N") },
             ScopeRef = ApplicationScopeRef(preview),

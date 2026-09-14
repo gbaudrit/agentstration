@@ -12,7 +12,6 @@ on:
       - 'Directory.Packages.props'
       - 'global.json'
       - 'scripts/ci/test-source-registry-tool-package.ps1'
-      - 'src/Agentstration.Management.Abstractions/**'
       - 'src/Agentstration.Packs/**'
       - 'src/Agentstration.Packs.Contracts/**'
       - 'src/Agentstration.Resources/**'

@@ -1,7 +1,6 @@
 using Agentstration.Triggers;
 using System.Net;
 using System.Net.Http.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.Triggers.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Console;
@@ -74,8 +73,8 @@ public sealed partial class ApiClientTests
 
     private static TriggerResource Trigger(string name, ResourceNamespace @namespace) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.Trigger,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = TriggerResourceKinds.Trigger,
         Metadata = new ResourceMetadata { Name = name, Namespace = @namespace },
         Definition = new TriggerProperties
         {

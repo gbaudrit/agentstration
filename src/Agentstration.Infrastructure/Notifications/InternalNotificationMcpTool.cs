@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Agentstration.Application.Work;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Tools;
@@ -99,7 +98,7 @@ public sealed class InternalMcpToolProjectionService(
     {
         if (workspaceScope.Kind != ResourceScopeKind.Workspace)
             throw new ToolResourceValidationException("Internal MCP Tools require a Workspace scope.");
-        var providerKey = new ResourceKey(ResourceKinds.ToolProvider, AgentstrationToolProvider.Name, @namespace);
+        var providerKey = new ResourceKey(ToolResourceKinds.ToolProvider, AgentstrationToolProvider.Name, @namespace);
         if (await store.GetAsync<ToolProviderResource>(providerKey, cancellationToken) is { } provider)
         {
             if (provider.Value.Definition.Mcp?.Internal != true || provider.Value.ScopeRef != workspaceScope)
@@ -112,13 +111,13 @@ public sealed class InternalMcpToolProjectionService(
         foreach (var definition in definitions.Select(value => value.Definition))
         {
             var name = AgentstrationToolProvider.ToolResourceName(definition.Name);
-            var key = new ResourceKey(ResourceKinds.Tool, name, @namespace);
+            var key = new ResourceKey(ToolResourceKinds.Tool, name, @namespace);
             var existing = await store.GetAsync<ToolResource>(key, cancellationToken);
             if (existing is not null) continue;
             await store.PutAsync(new ToolResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.Tool,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.Tool,
                 Metadata = new ResourceMetadata { Name = name, Namespace = @namespace },
                 ScopeRef = workspaceScope,
                 Generation = 1,
@@ -144,8 +143,8 @@ public sealed class InternalMcpToolProjectionService(
 
     private static ToolProviderResource Provider(ResourceScopeRef scope, ResourceNamespace @namespace) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.ToolProvider,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ToolResourceKinds.ToolProvider,
         Metadata = new ResourceMetadata { Name = AgentstrationToolProvider.Name, Namespace = @namespace },
         ScopeRef = scope,
         Generation = 1,

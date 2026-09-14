@@ -10,7 +10,6 @@ using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Contracts;
 using Agentstration.Flows.Storage.Abstractions;
-using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -58,7 +57,7 @@ public sealed class WorkplaceApiTests
             {
                 publishedFlow.EnsureSuccessStatusCode();
             }
-            var availableFlows = await client.GetFromJsonAsync<ResourcePickerItem[]>($"/api/resources?kind={ResourceKinds.Flow}") ?? [];
+            var availableFlows = await client.GetFromJsonAsync<ResourcePickerItem[]>($"/api/resources?kind={FlowResourceKinds.Flow}") ?? [];
             Assert.IsTrue(availableFlows.Any(value => value.Name == apiFlowName));
 
             var administered = await client.GetFromJsonAsync<EntryDraftResponse>("/api/management/entries/universal-request");

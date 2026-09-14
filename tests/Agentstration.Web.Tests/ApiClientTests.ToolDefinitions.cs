@@ -2,7 +2,6 @@ using Agentstration.Tools;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.Tools.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Console;
@@ -17,8 +16,8 @@ public sealed partial class ApiClientTests
         HttpRequestMessage? captured = null;
         var resource = new ToolDefinitionResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.ToolDefinition,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolDefinition,
             Metadata = new ResourceMetadata { Name = "notification.send", Namespace = new ResourceNamespace("communications") },
             Definition = new ToolDefinitionProperties
             {

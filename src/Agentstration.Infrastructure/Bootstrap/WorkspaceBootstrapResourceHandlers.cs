@@ -4,7 +4,6 @@ using Agentstration.Application.Work;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Infrastructure.Declarative;
-using Agentstration.Management.Abstractions;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Identity;
@@ -53,7 +52,7 @@ internal static class WorkspaceBootstrapResource
 
 public sealed class ModelProviderBootstrapResourceHandler(ModelProviderManagementService service) : IBootstrapResourceHandler
 {
-    public string Kind => ResourceKinds.ModelProvider;
+    public string Kind => ModelResourceKinds.ModelProvider;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Tenant;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -84,7 +83,7 @@ public sealed class ModelProviderBootstrapResourceHandler(ModelProviderManagemen
 
 public sealed class RuntimeProfileBootstrapResourceHandler(RuntimeProfileManagementService service) : IBootstrapResourceHandler
 {
-    public string Kind => ResourceKinds.RuntimeProfile;
+    public string Kind => RuntimeProfileResourceKinds.RuntimeProfile;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Tenant;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -117,7 +116,7 @@ public sealed class ModelProfileBootstrapResourceHandler(
     ModelProfileManagementService service,
     ModelProviderManagementService providers) : IBootstrapResourceHandler
 {
-    public string Kind => ResourceKinds.ModelProfile;
+    public string Kind => ModelResourceKinds.ModelProfile;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Tenant;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -130,7 +129,7 @@ public sealed class ModelProfileBootstrapResourceHandler(
         if (await service.GetAsync(value.Namespace, value.Name, cancellationToken) is not null)
             return new(BootstrapResourceDisposition.Skip);
         ValidateBasic(value);
-        var provider = value.Definition.Provider.Resolve(value.Namespace, ResourceKinds.ModelProvider);
+        var provider = value.Definition.Provider.Resolve(value.Namespace, ModelResourceKinds.ModelProvider);
         var existingProvider = await providers.GetAsync(provider.Namespace, provider.Name, cancellationToken);
         if (existingProvider is null
             && !WorkspaceBootstrapResource.IsAvailable(planning, provider.Kind, provider.Name, provider.Namespace))
@@ -167,7 +166,7 @@ public sealed class AgentBootstrapResourceHandler(
     ModelProfileManagementService modelProfiles,
     RuntimeProfileManagementService runtimeProfiles) : IBootstrapResourceHandler
 {
-    public string Kind => ResourceKinds.Agent;
+    public string Kind => AgentResourceKinds.Agent;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -180,8 +179,8 @@ public sealed class AgentBootstrapResourceHandler(
         if (await service.GetAgentAsync(value.Namespace, value.Name, cancellationToken) is not null)
             return new(BootstrapResourceDisposition.Skip);
         ValidateBasic(value);
-        var model = value.Definition.ModelProfile.Resolve(value.Namespace, ResourceKinds.ModelProfile);
-        var runtime = value.Definition.RuntimeProfile.Resolve(value.Namespace, ResourceKinds.RuntimeProfile);
+        var model = value.Definition.ModelProfile.Resolve(value.Namespace, ModelResourceKinds.ModelProfile);
+        var runtime = value.Definition.RuntimeProfile.Resolve(value.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
         var modelExists = await modelProfiles.GetAsync(model.Namespace, model.Name, cancellationToken) is not null;
         var runtimeExists = await runtimeProfiles.GetAsync(runtime.Namespace, runtime.Name, cancellationToken) is not null;
         if (!modelExists && !WorkspaceBootstrapResource.IsAvailable(planning, model.Kind, model.Name, model.Namespace))
@@ -217,7 +216,7 @@ public sealed class FlowBootstrapResourceHandler(
     IFlowDefinitionValidator graphValidator,
     TimeProvider timeProvider) : IBootstrapResourceHandler
 {
-    public string Kind => ResourceKinds.Flow;
+    public string Kind => FlowResourceKinds.Flow;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -293,7 +292,7 @@ public sealed class EntryBootstrapResourceHandler(
     FlowService flows,
     TimeProvider timeProvider) : IBootstrapResourceHandler
 {
-    public string Kind => ResourceKinds.Entry;
+    public string Kind => EntryResourceKinds.Entry;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -361,7 +360,7 @@ public sealed class EntryBootstrapResourceHandler(
             var exists = await agents.GetAgentAsync(targetNamespace, draft.Binding.ResourceId, cancellationToken) is not null;
             if (!exists && !WorkspaceBootstrapResource.IsAvailable(
                     planning,
-                    ResourceKinds.Agent,
+                    AgentResourceKinds.Agent,
                     draft.Binding.ResourceId,
                     targetNamespace))
                 throw new InvalidOperationException(

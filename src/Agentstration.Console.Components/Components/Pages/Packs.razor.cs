@@ -1,8 +1,8 @@
 using Agentstration.Identity.Contracts;
 using System.Text.Json;
+using Agentstration.Agents;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.Models.Contracts;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Secrets.Contracts;
@@ -295,9 +295,9 @@ public partial class Packs
     private static string BindingValue(string name, ResourceNamespace @namespace) => $"{@namespace.Value}:{name}";
     private static string? DefinitionFormUrl(ManagedPackResource resource) => resource.Kind switch
     {
-        ResourceKinds.Agent => $"/namespaces/{Uri.EscapeDataString(resource.Namespace.Value)}/agents/{Uri.EscapeDataString(resource.Name)}?view=definition",
-        ResourceKinds.Flow => $"/namespaces/{Uri.EscapeDataString(resource.Namespace.Value)}/flows/{Uri.EscapeDataString(resource.Name)}?view=definition",
-        ResourceKinds.Entry => $"/namespaces/{Uri.EscapeDataString(resource.Namespace.Value)}/entries/{Uri.EscapeDataString(resource.Name)}?view=definition",
+        AgentResourceKinds.Agent => $"/namespaces/{Uri.EscapeDataString(resource.Namespace.Value)}/agents/{Uri.EscapeDataString(resource.Name)}?view=definition",
+        FlowResourceKinds.Flow => $"/namespaces/{Uri.EscapeDataString(resource.Namespace.Value)}/flows/{Uri.EscapeDataString(resource.Name)}?view=definition",
+        EntryResourceKinds.Entry => $"/namespaces/{Uri.EscapeDataString(resource.Namespace.Value)}/entries/{Uri.EscapeDataString(resource.Name)}?view=definition",
         _ => null
     };
     private static string BindingTarget(ResourceReference target) => $"{(target.Namespace ?? ResourceNamespace.Default).Value}/{target.Name}";

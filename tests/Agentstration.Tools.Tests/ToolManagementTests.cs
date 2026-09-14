@@ -1,5 +1,4 @@
 using Agentstration.Tools;
-using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 
 namespace Agentstration.Tools.Tests;
@@ -34,8 +33,8 @@ public sealed class ToolManagementTests
     {
         var valid = new ToolProviderResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.ToolProvider,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolProvider,
             Metadata = new ResourceMetadata { Name = "local" },
             Definition = new ToolProviderProperties
             {
@@ -58,8 +57,8 @@ public sealed class ToolManagementTests
         var resource = new ToolProviderResource
         {
             Metadata = new ResourceMetadata { Name = "local" },
-            Kind = ResourceKinds.ToolProvider,
-            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolProvider,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Definition = new ToolProviderProperties
             {
                 DisplayName = "Local MCP",
@@ -78,8 +77,8 @@ public sealed class ToolManagementTests
     private static ToolResource Tool(ToolResourceProperties properties) => new()
     {
         Metadata = new ResourceMetadata { Name = "search" },
-        Kind = ResourceKinds.Tool,
-        ApiVersion = ManagementApiVersions.CoreV1,
+        Kind = ToolResourceKinds.Tool,
+        ApiVersion = ResourceApiVersions.CoreV1,
         Definition = properties
     };
 }

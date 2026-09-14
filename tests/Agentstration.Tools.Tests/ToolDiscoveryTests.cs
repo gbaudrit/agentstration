@@ -2,7 +2,6 @@ using Agentstration.Tools;
 using Agentstration.Resources;
 using Agentstration.ResourceManagement;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
 
 namespace Agentstration.Tools.Tests;
 
@@ -52,8 +51,8 @@ public sealed class ToolDiscoveryTests
 
     private static ToolProviderResource Provider() => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.ToolProvider,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ToolResourceKinds.ToolProvider,
         Metadata = new ResourceMetadata { Name = "test" },
         Definition = new ToolProviderProperties { DisplayName = "Test", ProviderType = ToolProviderType.Mcp, Mcp = new McpToolProviderConfiguration { Command = "test-mcp", EnvironmentReferences = new Dictionary<string, string> { ["TOKEN"] = "Secrets:Mcp:Token" } } }
     };

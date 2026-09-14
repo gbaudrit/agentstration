@@ -6,6 +6,19 @@ using Agentstration.Resources;
 
 namespace Agentstration.Sources.Contracts;
 
+public static class SourceResourceKinds
+{
+    public const string Source = "Source";
+    public const string SourceVersion = "SourceVersion";
+    public const string SourceConfiguration = "SourceConfiguration";
+    public const string SourceObservedState = "SourceObservedState";
+    public const string SourceImportRecord = "SourceImportRecord";
+    public const string SourceChannelSnapshot = "SourceChannelSnapshot";
+    public const string SourceChannelObservedState = "SourceChannelObservedState";
+    public const string SourceChannelRefreshRecord = "SourceChannelRefreshRecord";
+    public const string SourceProvider = "SourceProvider";
+}
+
 public static class SourceKinds
 {
     public const string PublishedSourceVersion = "SourceVersion";

@@ -2,7 +2,6 @@ using Agentstration.Security.Contracts;
 using Agentstration.Identity.Contracts;
 using System.Text.Json;
 using Agentstration.Agents;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Sources.Contracts;
@@ -346,24 +345,24 @@ public sealed class PostgreSqlResourceStore(
         LoadKindAsync<T>(kind, cancellationToken);
 
     public async Task<StoredResource<AgentRevision>?> FindRevisionAsync(Guid agentUid, long generation, CancellationToken cancellationToken) =>
-        (await LoadKindAsync<AgentRevision>(ResourceKinds.AgentRevision, cancellationToken)).SingleOrDefault(value => value.Value.AgentUid == agentUid && value.Value.AgentVersion == generation);
+        (await LoadKindAsync<AgentRevision>(AgentResourceKinds.AgentRevision, cancellationToken)).SingleOrDefault(value => value.Value.AgentUid == agentUid && value.Value.AgentVersion == generation);
 
     public async Task<StoredResource<AgentRevision>?> FindLatestRevisionAsync(Guid agentUid, CancellationToken cancellationToken) =>
-        (await LoadKindAsync<AgentRevision>(ResourceKinds.AgentRevision, cancellationToken)).Where(value => value.Value.AgentUid == agentUid).OrderByDescending(value => value.Value.AgentVersion).ThenByDescending(value => value.Value.CreatedAt).FirstOrDefault();
+        (await LoadKindAsync<AgentRevision>(AgentResourceKinds.AgentRevision, cancellationToken)).Where(value => value.Value.AgentUid == agentUid).OrderByDescending(value => value.Value.AgentVersion).ThenByDescending(value => value.Value.CreatedAt).FirstOrDefault();
 
     public Task<StoredResource<AgentDeployment>?> FindDeploymentByRevisionAsync(string revisionName, CancellationToken cancellationToken) =>
         FindDeploymentByRevisionAsync(ResourceNamespace.Default, revisionName, cancellationToken);
 
     public async Task<StoredResource<AgentDeployment>?> FindDeploymentByRevisionAsync(ResourceNamespace @namespace, string revisionName, CancellationToken cancellationToken) =>
-        (await LoadKindAsync<AgentDeployment>(ResourceKinds.AgentDeployment, cancellationToken)).Where(value => value.Value.Namespace == @namespace && value.Value.RevisionName == revisionName).OrderByDescending(value => value.Value.UpdatedAt).FirstOrDefault();
+        (await LoadKindAsync<AgentDeployment>(AgentResourceKinds.AgentDeployment, cancellationToken)).Where(value => value.Value.Namespace == @namespace && value.Value.RevisionName == revisionName).OrderByDescending(value => value.Value.UpdatedAt).FirstOrDefault();
 
     public Task<IReadOnlyList<StoredResource<AgentDeployment>>> ListDeploymentsForAgentAsync(string agentName, CancellationToken cancellationToken) => ListDeploymentsForAgentAsync(ResourceNamespace.Default, agentName, cancellationToken);
 
     public async Task<IReadOnlyList<StoredResource<AgentDeployment>>> ListDeploymentsForAgentAsync(ResourceNamespace @namespace, string agentName, CancellationToken cancellationToken) =>
-        (await LoadKindAsync<AgentDeployment>(ResourceKinds.AgentDeployment, cancellationToken)).Where(value => value.Value.Namespace == @namespace && value.Value.AgentName == agentName).OrderByDescending(value => value.Value.UpdatedAt).ToArray();
+        (await LoadKindAsync<AgentDeployment>(AgentResourceKinds.AgentDeployment, cancellationToken)).Where(value => value.Value.Namespace == @namespace && value.Value.AgentName == agentName).OrderByDescending(value => value.Value.UpdatedAt).ToArray();
 
     public Task<IReadOnlyList<StoredResource<AgentDeployment>>> ListDeploymentsAsync(CancellationToken cancellationToken) =>
-        LoadKindAsync<AgentDeployment>(ResourceKinds.AgentDeployment, cancellationToken);
+        LoadKindAsync<AgentDeployment>(AgentResourceKinds.AgentDeployment, cancellationToken);
 
     private async Task<IReadOnlyList<StoredResource<T>>> LoadKindAsync<T>(string kind, CancellationToken cancellationToken) where T : Resource
     {

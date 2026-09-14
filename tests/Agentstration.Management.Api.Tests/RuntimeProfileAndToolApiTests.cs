@@ -6,7 +6,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.Api.Contracts;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Models.Contracts;
@@ -39,8 +38,8 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         var stored = await service.CreateAsync(new RuntimeProfileResource
         {
             Metadata = new ResourceMetadata { Name = id },
-            Kind = ResourceKinds.RuntimeProfile,
-            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = RuntimeProfileResourceKinds.RuntimeProfile,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Definition = new RuntimeProfileProperties
             {
                 DisplayName = "MAF default",
@@ -89,8 +88,8 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
 
         var runtime = await runtimes.CreateAsync(new RuntimeProfileResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.RuntimeProfile,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = RuntimeProfileResourceKinds.RuntimeProfile,
             Metadata = new ResourceMetadata { Name = runtimeName },
             Definition = new RuntimeProfileProperties
             {
@@ -100,8 +99,8 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         }, default);
         var agent = await agents.PutAgentAsync(new AgentResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Agent,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
             Metadata = new ResourceMetadata { Name = agentName },
             Definition = new AgentProperties
             {
@@ -127,7 +126,7 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         Assert.IsNull(await agents.GetDeploymentAsync(deploymentName, default));
         Assert.IsEmpty(await runtimes.GetUsagesAsync(runtimeName, default));
         await runtimes.DeleteAsync(runtimeName, runtime.ETag, default);
-        Assert.IsNull(await store.GetAsync<RuntimeProfileResource>(new(ResourceKinds.RuntimeProfile, runtimeName), default));
+        Assert.IsNull(await store.GetAsync<RuntimeProfileResource>(new(RuntimeProfileResourceKinds.RuntimeProfile, runtimeName), default));
     }
 
     [TestMethod]
@@ -162,8 +161,8 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
 
         static AgentResource Agent(string name) => new()
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Agent,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
             Metadata = new ResourceMetadata { Name = name },
             Definition = new AgentProperties
             {
@@ -189,15 +188,15 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
 
         var runtime = await runtimes.CreateAsync(new RuntimeProfileResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.RuntimeProfile,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = RuntimeProfileResourceKinds.RuntimeProfile,
             Metadata = new ResourceMetadata { Name = runtimeName },
             Definition = new RuntimeProfileProperties { DisplayName = "Orphan cleanup test", RuntimeType = "microsoft-agent-framework" }
         }, default);
         var agent = await agents.PutAgentAsync(new AgentResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Agent,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
             Metadata = new ResourceMetadata { Name = agentName },
             Definition = new AgentProperties
             {
@@ -216,7 +215,7 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         var deployment = await agents.CreateDeploymentAsync(deploymentName, revision.Value.Metadata.Name, spec, default);
         _ = await agents.ReconcileAsync(deployment, default);
 
-        await store.DeleteAsync(new(ResourceKinds.Agent, agentName), agent.ETag, default);
+        await store.DeleteAsync(new(AgentResourceKinds.Agent, agentName), agent.ETag, default);
 
         Assert.IsEmpty(await runtimes.GetUsagesAsync(runtimeName, default));
         await runtimes.DeleteAsync(runtimeName, runtime.ETag, default);

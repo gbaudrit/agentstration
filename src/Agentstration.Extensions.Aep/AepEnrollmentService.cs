@@ -8,7 +8,6 @@ using System.Security.Cryptography;
 using System.Text;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Secrets;
@@ -78,7 +77,7 @@ public sealed class AepEnrollmentService(
         var initialState = AepEnrollmentState.Pending;
         var resource = new AepEnrollmentRequestResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ExtensionKinds.AepEnrollmentRequest,
             Metadata = new ResourceMetadata { Name = name },
             ScopeRef = scope,
@@ -408,16 +407,16 @@ public sealed class AepEnrollmentService(
     {
         var scope = TargetScope(request.Definition);
         var provider = vaultProviders.Single(value => string.Equals(value.ProviderType, "local", StringComparison.OrdinalIgnoreCase));
-        var vaultAddress = ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.Vault, VaultName);
+        var vaultAddress = ResourceAddress.Create(ResourceNamespace.Default, SecretResourceKinds.Vault, VaultName);
         var vaultContext = new SecretVaultContext(scope, vaultAddress, new Dictionary<string, System.Text.Json.JsonElement>());
         if (provider is ISecretVaultInitializer initializer) _ = await initializer.InitializeAsync(vaultContext, cancellationToken);
-        var existingVault = await store.GetExactAsync<VaultResource>(ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ResourceKinds.Vault, VaultName), cancellationToken);
+        var existingVault = await store.GetExactAsync<VaultResource>(ScopedResourceAddress.Create(scope, ResourceNamespace.Default, SecretResourceKinds.Vault, VaultName), cancellationToken);
         if (existingVault is null)
         {
             _ = await store.PutExactAsync(scope, new VaultResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.Vault,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SecretResourceKinds.Vault,
                 Metadata = new ResourceMetadata { Name = VaultName },
                 ScopeRef = scope,
                 Generation = 1,
@@ -426,13 +425,13 @@ public sealed class AepEnrollmentService(
             }, null, true, cancellationToken);
         }
         var secretName = $"aep-{request.Definition.InstanceId:N}";
-        var secretAddress = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ResourceKinds.Secret, secretName);
+        var secretAddress = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, SecretResourceKinds.Secret, secretName);
         if (await store.GetExactAsync<SecretResource>(secretAddress, cancellationToken) is null)
         {
             _ = await store.PutExactAsync(scope, new SecretResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.Secret,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SecretResourceKinds.Secret,
                 Metadata = new ResourceMetadata { Name = secretName },
                 ScopeRef = scope,
                 Generation = 1,
@@ -469,7 +468,7 @@ public sealed class AepEnrollmentService(
         {
             _ = await store.PutExactAsync(scope, new ExtensionRegistrationResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
+                ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = ExtensionKinds.ExtensionRegistration,
                 Metadata = new ResourceMetadata { Name = registrationName },
                 ScopeRef = scope,
@@ -498,7 +497,7 @@ public sealed class AepEnrollmentService(
             ?? throw new InvalidOperationException("The enrollment credential reference is unavailable.");
         using var value = await provider.GetAsync(new SecretVaultContext(
             scope,
-            ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.Vault, VaultName),
+            ResourceAddress.Create(ResourceNamespace.Default, SecretResourceKinds.Vault, VaultName),
             new Dictionary<string, System.Text.Json.JsonElement>()), secretName, cancellationToken)
             ?? throw new InvalidOperationException("The enrollment credential is unavailable.");
         return Encoding.UTF8.GetString(value.AccessValue().Span);
@@ -602,7 +601,7 @@ public sealed class AepEnrollmentService(
 
     private static SecretVaultContext EnrollmentVaultContext(AepEnrollmentRequestResource request) => new(
         TargetScope(request.Definition),
-        ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.Vault, VaultName),
+        ResourceAddress.Create(ResourceNamespace.Default, SecretResourceKinds.Vault, VaultName),
         new Dictionary<string, System.Text.Json.JsonElement>());
 
     private Task AuditAsync(

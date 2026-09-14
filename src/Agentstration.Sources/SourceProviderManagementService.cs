@@ -1,6 +1,5 @@
 using Agentstration.Identity.Contracts;
 using Agentstration.Identity;
-using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -39,23 +38,23 @@ public sealed class SourceProviderManagementService(
         string name,
         CancellationToken cancellationToken) =>
         store.GetExactAsync<SourceProviderResource>(
-            ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.SourceProvider, name),
+            ScopedResourceAddress.Create(scopeRef, @namespace, SourceResourceKinds.SourceProvider, name),
             cancellationToken);
 
     public Task<IReadOnlyList<StoredResource<SourceProviderResource>>> ListAsync(CancellationToken cancellationToken) =>
-        store.ListAllAsync<SourceProviderResource>(ResourceKinds.SourceProvider, cancellationToken);
+        store.ListAllAsync<SourceProviderResource>(SourceResourceKinds.SourceProvider, cancellationToken);
 
     public Task<IReadOnlyList<StoredResource<SourceProviderResource>>> ListVisibleAsync(
         ResourceScopeRef targetScopeRef,
         CancellationToken cancellationToken) =>
-        store.ListVisibleAsync<SourceProviderResource>(targetScopeRef, ResourceKinds.SourceProvider, 0, int.MaxValue, cancellationToken);
+        store.ListVisibleAsync<SourceProviderResource>(targetScopeRef, SourceResourceKinds.SourceProvider, 0, int.MaxValue, cancellationToken);
 
     public async Task<StoredResource<SourceProviderResource>> CreateAsync(
         SourceProviderResource resource,
         CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
-        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ResourceKinds.SourceProvider);
+        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(SourceResourceKinds.SourceProvider);
         ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
         return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
@@ -91,7 +90,7 @@ public sealed class SourceProviderManagementService(
         CancellationToken cancellationToken)
     {
         var existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken)
-            ?? throw new SourceProviderNotFoundException(new(@namespace, ResourceKinds.SourceProvider, name));
+            ?? throw new SourceProviderNotFoundException(new(@namespace, SourceResourceKinds.SourceProvider, name));
         var ownerScopeRef = existing.Value.ScopeRef
             ?? throw new SourceProviderValidationException("The Source Provider has no ownership scope.");
         return await scopeOperations.WriteAsync(existing.Value, ownerScopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
@@ -121,13 +120,13 @@ public sealed class SourceProviderManagementService(
         CancellationToken cancellationToken)
     {
         var usages = new List<SourceProviderUsage>();
-        foreach (var configuration in await store.ListAllAsync<SourceConfigurationResource>(ResourceKinds.SourceConfiguration, cancellationToken))
+        foreach (var configuration in await store.ListAllAsync<SourceConfigurationResource>(SourceResourceKinds.SourceConfiguration, cancellationToken))
         {
             foreach (var binding in configuration.Value.Definition.Bindings.Where(value =>
                          string.Equals(value.TargetKind, SourceKinds.SourceProvider, StringComparison.Ordinal)
                          && value.Target is not null))
             {
-                var address = binding.Target!.Resolve(configuration.Value.Namespace, ResourceKinds.SourceProvider);
+                var address = binding.Target!.Resolve(configuration.Value.Namespace, SourceResourceKinds.SourceProvider);
                 if (address.Namespace != @namespace
                     || !string.Equals(address.Name, name, StringComparison.Ordinal)
                     || binding.Target.ScopeRef != scopeRef) continue;
@@ -157,7 +156,7 @@ public sealed class SourceProviderManagementService(
         CancellationToken cancellationToken)
     {
         var provider = (await GetExactAsync(scopeRef, @namespace, name, cancellationToken))?.Value
-            ?? throw new SourceProviderNotFoundException(new(@namespace, ResourceKinds.SourceProvider, name));
+            ?? throw new SourceProviderNotFoundException(new(@namespace, SourceResourceKinds.SourceProvider, name));
         var checkedAt = timeProvider.GetUtcNow();
         var ownerScopeRef = provider.ScopeRef
             ?? throw new SourceProviderValidationException("The Source Provider has no ownership scope.");
@@ -212,7 +211,7 @@ public sealed class SourceProviderManagementService(
         CancellationToken cancellationToken)
     {
         var existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken)
-            ?? throw new SourceProviderNotFoundException(new(@namespace, ResourceKinds.SourceProvider, name));
+            ?? throw new SourceProviderNotFoundException(new(@namespace, SourceResourceKinds.SourceProvider, name));
         var usages = await GetUsagesExactAsync(scopeRef, @namespace, name, cancellationToken);
         if (usages.Count > 0) throw new SourceProviderInUseException(name, usages);
         var ownerScopeRef = existing.Value.ScopeRef
@@ -220,7 +219,7 @@ public sealed class SourceProviderManagementService(
         await scopeOperations.WriteAsync(existing.Value, ownerScopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
             await store.DeleteExactAsync(
-                ScopedResourceAddress.Create(ownerScopeRef, @namespace, ResourceKinds.SourceProvider, name),
+                ScopedResourceAddress.Create(ownerScopeRef, @namespace, SourceResourceKinds.SourceProvider, name),
                 ifMatch,
                 token);
             return true;
@@ -262,10 +261,10 @@ public sealed class SourceProviderManagementService(
 
     private static void ValidateIdentity(SourceProviderResource resource)
     {
-        if (resource.Kind != ResourceKinds.SourceProvider)
-            throw new SourceProviderValidationException($"Kind must be '{ResourceKinds.SourceProvider}'.");
-        if (resource.ApiVersion != ManagementApiVersions.CoreV1)
-            throw new SourceProviderValidationException($"ApiVersion must be '{ManagementApiVersions.CoreV1}'.");
+        if (resource.Kind != SourceResourceKinds.SourceProvider)
+            throw new SourceProviderValidationException($"Kind must be '{SourceResourceKinds.SourceProvider}'.");
+        if (resource.ApiVersion != ResourceApiVersions.CoreV1)
+            throw new SourceProviderValidationException($"ApiVersion must be '{ResourceApiVersions.CoreV1}'.");
         if (string.IsNullOrWhiteSpace(resource.Name))
             throw new SourceProviderValidationException("A resource name is required.");
     }

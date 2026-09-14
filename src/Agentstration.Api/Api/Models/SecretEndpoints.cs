@@ -1,6 +1,5 @@
 using Agentstration.Identity.Contracts;
 using System.Text;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Secrets.Contracts;
 using Agentstration.Identity;
@@ -33,7 +32,7 @@ internal static class SecretEndpoints
             response.Headers.ETag = stored.ETag;
             return Results.Ok(Response(scope is null ? await service.GetVaultViewAsync(name, token) : await service.GetVaultViewExactAsync(scope.Value, name, token)));
         })).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        vaults.MapPost("/", async (CreateVaultRequest body, HttpResponse response, SecretManagementService service, CancellationToken token) => await Execute(async () => Resource(await service.CreateVaultAsync(new VaultResource { ApiVersion = ManagementApiVersions.CoreV1, Kind = ResourceKinds.Vault, Metadata = new() { Name = body.Name }, ScopeRef = body.ScopeRef, Definition = body.Properties }, token), response, 201))).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        vaults.MapPost("/", async (CreateVaultRequest body, HttpResponse response, SecretManagementService service, CancellationToken token) => await Execute(async () => Resource(await service.CreateVaultAsync(new VaultResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Vault, Metadata = new() { Name = body.Name }, ScopeRef = body.ScopeRef, Definition = body.Properties }, token), response, 201))).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         vaults.MapPut("/{name}", async (string name, string? scopeRef, PutVaultRequest body, HttpRequest request, HttpResponse response, SecretManagementService service, CancellationToken token) => await Execute(async () => Resource(Scope(scopeRef) is { } scope ? await service.PutVaultExactAsync(scope, name, body.Properties, request.Headers.IfMatch.FirstOrDefault(), token) : await service.PutVaultAsync(name, body.Properties, request.Headers.IfMatch.FirstOrDefault(), token), response, 200))).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         vaults.MapPost("/{name}/initialize", async (string name, string? scopeRef, SecretManagementService service, CancellationToken token) => await Execute(async () =>
         {
@@ -60,7 +59,7 @@ internal static class SecretEndpoints
                     : $"/modelproviders/{Uri.EscapeDataString(value.Name)}")).ToArray();
             return Results.Ok(new SecretUsagesResponse(usages, usages.Length));
         })).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        secrets.MapPost("/", async (CreateSecretRequest body, HttpResponse response, SecretManagementService service, CancellationToken token) => await Execute(async () => Resource(await service.CreateSecretAsync(new SecretResource { ApiVersion = ManagementApiVersions.CoreV1, Kind = ResourceKinds.Secret, Metadata = new() { Name = body.Name }, ScopeRef = body.ScopeRef, Definition = body.Properties }, token), response, 201))).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        secrets.MapPost("/", async (CreateSecretRequest body, HttpResponse response, SecretManagementService service, CancellationToken token) => await Execute(async () => Resource(await service.CreateSecretAsync(new SecretResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Secret, Metadata = new() { Name = body.Name }, ScopeRef = body.ScopeRef, Definition = body.Properties }, token), response, 201))).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         secrets.MapPut("/{name}", async (string name, string? scopeRef, PutSecretRequest body, HttpRequest request, HttpResponse response, SecretManagementService service, CancellationToken token) => await Execute(async () => Resource(Scope(scopeRef) is { } scope ? await service.PutSecretExactAsync(scope, name, body.Properties, request.Headers.IfMatch.FirstOrDefault(), token) : await service.PutSecretAsync(name, body.Properties, request.Headers.IfMatch.FirstOrDefault(), token), response, 200))).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         secrets.MapPut("/{name}/value", async (string name, string? scopeRef, SetSecretValueRequest body, SecretManagementService service, CancellationToken token) => await Execute(async () =>
         {

@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using Agentstration.Management.Abstractions;
 using Agentstration.Models.Contracts;
 using Agentstration.Models;
 using Agentstration.Resources;

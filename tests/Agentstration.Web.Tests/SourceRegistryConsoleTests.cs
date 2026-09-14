@@ -1,7 +1,6 @@
 using Agentstration.Secrets;
 using System.Net;
 using System.Net.Http.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Secrets.Contracts;
 using Agentstration.Sources.Contracts;
@@ -158,7 +157,7 @@ public sealed class SourceRegistryConsoleTests
         var registration = new SourceRegistryRegistrationResource
         {
             Uid = uid,
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = SourceRegistryKinds.SourceRegistryRegistration,
             Metadata = new() { Name = name },
             ScopeRef = ResourceScopeRef.Instance,
@@ -177,7 +176,7 @@ public sealed class SourceRegistryConsoleTests
         };
         var observed = new SourceRegistryObservedStateResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = SourceRegistryKinds.SourceRegistryObservedState,
             Metadata = new() { Name = name },
             ScopeRef = ResourceScopeRef.Instance,
@@ -216,8 +215,8 @@ public sealed class SourceRegistryConsoleTests
 
     private static SecretResponse Secret(string name, string displayName, ResourceScopeRef scopeRef) => new(new SecretResource
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.Secret,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = SecretResourceKinds.Secret,
         Metadata = new() { Name = name },
         ScopeRef = scopeRef,
         Definition = new() { DisplayName = displayName, Vault = new("local", scopeRef), Key = name }

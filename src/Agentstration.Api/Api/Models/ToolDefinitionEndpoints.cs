@@ -1,5 +1,4 @@
 using Agentstration.Identity.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.Api.Contracts;
 using Agentstration.Tools.Contracts;
 using Agentstration.ResourceManagement;
@@ -57,7 +56,7 @@ internal static class ToolDefinitionEndpoints
         {
             var ns = ResourceNamespace.Parse(@namespace);
             var stored = await service.GetAsync(name, ns, cancellationToken)
-                ?? throw new ResourceNotFoundException(new(ResourceKinds.ToolDefinition, name, ns));
+                ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolDefinition, name, ns));
             return ModelManagementHttp.ResourceResult(stored, response, 200);
         });
 
@@ -118,8 +117,8 @@ internal static class ToolDefinitionEndpoints
 
     private static ToolDefinitionResource Resource(string name, ResourceNamespace @namespace, ToolDefinitionProperties properties, ResourceScopeRef scopeRef) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.ToolDefinition,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ToolResourceKinds.ToolDefinition,
         Metadata = new ResourceMetadata { Name = name, Namespace = @namespace },
         ScopeRef = scopeRef,
         Definition = properties

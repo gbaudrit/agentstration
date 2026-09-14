@@ -1,6 +1,5 @@
 using Agentstration.Tools;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
@@ -34,8 +33,8 @@ public sealed class ToolDefinitionConsoleTests
         public Task<IReadOnlyList<ToolDefinitionResource>> GetAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ToolDefinitionResource>>([
             new ToolDefinitionResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ToolDefinition,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolDefinition,
                 Metadata = new ResourceMetadata { Name = "notification.send" },
                 ScopeRef = ResourceScopeRef.Workspace(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
                 Definition = new ToolDefinitionProperties

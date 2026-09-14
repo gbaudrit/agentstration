@@ -6,7 +6,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
-using Agentstration.Management.Abstractions;
 using Agentstration.Agents.Contracts;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
@@ -43,8 +42,8 @@ public sealed partial class ApiClientTests
         return new AgentResource
         {
             Metadata = new ResourceMetadata { Name = name },
-            Kind = ResourceKinds.Agent,
-            ApiVersion = ManagementApiVersions.V20260801,
+            Kind = AgentResourceKinds.Agent,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Generation = 1,
             ETag = etag,
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Accepted, ResourceVersion = etag },
@@ -60,8 +59,8 @@ public sealed partial class ApiClientTests
     private static ModelProfileResource CreateModelProfile(string name) => new()
     {
         Metadata = new ResourceMetadata { Name = name },
-        Kind = ResourceKinds.ModelProfile,
-        ApiVersion = ManagementApiVersions.V20260801,
+        Kind = ModelResourceKinds.ModelProfile,
+        ApiVersion = ResourceApiVersions.CoreV1,
         Definition = new ModelProfileProperties
         {
             DisplayName = "Default reasoning",

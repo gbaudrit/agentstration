@@ -4,7 +4,6 @@ using Agentstration.Identity;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Text.RegularExpressions;
-using Agentstration.Management.Abstractions;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Secrets;
@@ -52,7 +51,7 @@ public sealed partial class SourceRegistryManagementService(
             {
                 registration = await store.PutExactAsync(ResourceScopeRef.Instance, new SourceRegistryRegistrationResource
                 {
-                    ApiVersion = ManagementApiVersions.CoreV1,
+                    ApiVersion = ResourceApiVersions.CoreV1,
                     Kind = SourceRegistryKinds.SourceRegistryRegistration,
                     Metadata = new ResourceMetadata
                     {
@@ -141,7 +140,7 @@ public sealed partial class SourceRegistryManagementService(
                 {
                     var stored = await store.PutExactAsync(ResourceScopeRef.Instance, new SourceRegistryRegistrationResource
                     {
-                        ApiVersion = ManagementApiVersions.CoreV1,
+                        ApiVersion = ResourceApiVersions.CoreV1,
                         Kind = SourceRegistryKinds.SourceRegistryRegistration,
                         Metadata = new ResourceMetadata { Name = name },
                         ScopeRef = ResourceScopeRef.Instance,
@@ -595,7 +594,7 @@ public sealed partial class SourceRegistryManagementService(
         CancellationToken cancellationToken) =>
         store.CreateImmutableAsync(new SourceRegistryRefreshRecordResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = SourceRegistryKinds.SourceRegistryRefreshRecord,
             Metadata = new ResourceMetadata { Name = $"{registration.Uid:N}-{Guid.NewGuid():N}" },
             ScopeRef = ResourceScopeRef.Instance,
@@ -680,7 +679,7 @@ public sealed partial class SourceRegistryManagementService(
         {
             return await store.PutExactAsync(ResourceScopeRef.Instance, new SourceRegistryObservedStateResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
+                ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = SourceRegistryKinds.SourceRegistryObservedState,
                 Metadata = new ResourceMetadata { Name = registration.Name },
                 ScopeRef = ResourceScopeRef.Instance,
@@ -805,18 +804,18 @@ public sealed partial class SourceRegistryManagementService(
         if (definition.Credential is not { } credential) return;
         if (credential.ScopeRef is not { } credentialScope || credentialScope != ResourceScopeRef.Instance)
             throw new SourceRegistryOperationException("source_registry_credential_scope_invalid", "The registry credential must explicitly reference an instance-scoped Secret.");
-        var secretAddress = credential.Resolve(ResourceNamespace.Default, ResourceKinds.Secret);
+        var secretAddress = credential.Resolve(ResourceNamespace.Default, SecretResourceKinds.Secret);
         var secret = (await store.GetExactAsync<SecretResource>(
-            ScopedResourceAddress.Create(ResourceScopeRef.Instance, secretAddress.Namespace, ResourceKinds.Secret, secretAddress.Name),
+            ScopedResourceAddress.Create(ResourceScopeRef.Instance, secretAddress.Namespace, SecretResourceKinds.Secret, secretAddress.Name),
             cancellationToken))?.Value;
         if (secret is null)
             throw new SourceRegistryOperationException("source_registry_credential_not_found", "The referenced registry credential Secret was not found.");
         var vaultReference = secret.Definition.Vault;
         if (vaultReference.ScopeRef is { } vaultScope && vaultScope != ResourceScopeRef.Instance)
             throw new SourceRegistryOperationException("source_registry_credential_scope_invalid", "The registry credential Vault must be instance-scoped.");
-        var vaultAddress = vaultReference.Resolve(secret.Namespace, ResourceKinds.Vault);
+        var vaultAddress = vaultReference.Resolve(secret.Namespace, SecretResourceKinds.Vault);
         if (await store.GetExactAsync<VaultResource>(
-                ScopedResourceAddress.Create(ResourceScopeRef.Instance, vaultAddress.Namespace, ResourceKinds.Vault, vaultAddress.Name),
+                ScopedResourceAddress.Create(ResourceScopeRef.Instance, vaultAddress.Namespace, SecretResourceKinds.Vault, vaultAddress.Name),
                 cancellationToken) is null)
             throw new SourceRegistryOperationException("source_registry_credential_vault_not_found", "The registry credential Vault was not found in the instance scope.");
     }

@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using Agentstration.Agents;
-using Agentstration.Management.Abstractions;
 using Agentstration.Agents.Contracts;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
@@ -43,8 +42,8 @@ public sealed class AgentEditorModel
             throw new ArgumentException("Tool names cannot be duplicated.");
         return new AgentResourceRequest
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Agent,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
             Metadata = new ResourceMetadata { Name = Name.Trim(), Namespace = ResourceNamespace.Parse(Namespace), Tags = ParseMap(Tags, "tag"), Annotations = ParseMap(Annotations, "annotation") },
             Definition = (SourceDefinition ?? new AgentProperties
             {

@@ -16,7 +16,6 @@ using Agentstration.Extensions.Ollama;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
-using Agentstration.Management.Abstractions;
 using Agentstration.Agents.Contracts;
 using Agentstration.Extensions.Aep;
 using Agentstration.Identity;
@@ -501,7 +500,7 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void ManagementAbstractionsDoNotReferenceCoreRuntimeStorageOrFrameworks()
+    public void ResourceManagementDoesNotReferenceCoreRuntimeStorageOrFrameworks()
     {
         var references = typeof(IResourceStore).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Management.Core", StringComparison.Ordinal)
@@ -574,6 +573,51 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void ManagementAbstractionsCatchAllProjectIsRemoved()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+
+        Assert.IsFalse(File.Exists(Path.Combine(repositoryRoot, "src", "Agentstration.Management.Abstractions", "Agentstration.Management.Abstractions.csproj")));
+
+        var projectFiles = Directory.EnumerateFiles(repositoryRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase));
+        var staleReferences = projectFiles
+            .Where(path => File.ReadAllText(path).Contains("Agentstration.Management.Abstractions", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(repositoryRoot, path))
+            .ToArray();
+
+        var sourceFiles = Directory.EnumerateFiles(Path.Combine(repositoryRoot, "src"), "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase));
+        var staleNamespaces = sourceFiles
+            .Where(path => File.ReadAllText(path).Contains("namespace Agentstration.Management.Abstractions", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(repositoryRoot, path))
+            .ToArray();
+
+        Assert.IsEmpty(staleReferences, $"The removed catch-all Abstractions project is still referenced by: {string.Join(", ", staleReferences)}");
+        Assert.IsEmpty(staleNamespaces, $"The removed catch-all namespace is still declared by: {string.Join(", ", staleNamespaces)}");
+    }
+
+    [TestMethod]
+    public void ResourceKindCatalogsAreOwnedByTheirFamiliesAndPreserveWireValues()
+    {
+        var expected = new[]
+        {
+            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "ModelProvider", "ModelProfile", "RuntimeProfile",
+            "Secret", "Vault", "Tool", "ToolDefinition", "ToolProvider", "ToolExecutionHook", "Trigger", "Source", "SourceVersion", "SourceProvider"
+        };
+        var actual = new[]
+        {
+            AgentResourceKinds.Agent, AgentResourceKinds.AgentRevision, AgentResourceKinds.AgentDeployment, FlowResourceKinds.Flow,
+            EntryResourceKinds.Entry, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile,
+            SecretResourceKinds.Secret, SecretResourceKinds.Vault, ToolResourceKinds.Tool, ToolResourceKinds.ToolDefinition,
+            ToolResourceKinds.ToolProvider, ToolResourceKinds.ToolExecutionHook, TriggerResourceKinds.Trigger, SourceResourceKinds.Source,
+            SourceResourceKinds.SourceVersion, SourceResourceKinds.SourceProvider
+        };
+
+        CollectionAssert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
     public void ResourceFamilyContractModulesRemainPortable()
     {
         var assemblies = new[]
@@ -612,23 +656,8 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void IdentityAndSecurityContractsAreOwnedOutsideManagementAbstractions()
+    public void IdentityAndSecurityContractsAreOwnedByTheirFamilies()
     {
-        var managementAssembly = typeof(IControlPlaneStore).Assembly;
-        var forbiddenNames = new HashSet<string>(StringComparer.Ordinal)
-        {
-            nameof(Tenant),
-            nameof(Workspace),
-            nameof(Principal),
-            nameof(IIdentityStore),
-            nameof(PersonalAccessToken),
-            nameof(IPersonalAccessTokenStore),
-            nameof(SecurityAuditEvent),
-            nameof(ISecurityAuditStore),
-            nameof(ISecurityAuditWriter)
-        };
-
-        Assert.IsFalse(managementAssembly.GetTypes().Any(type => forbiddenNames.Contains(type.Name)));
         Assert.AreEqual("Agentstration.Identity.Contracts", typeof(Principal).Namespace);
         Assert.AreEqual("Agentstration.Security.Contracts", typeof(SecurityAuditEvent).Namespace);
     }
@@ -660,9 +689,8 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void CoreSourceContractsAreOwnedOutsideManagementAbstractions()
+    public void CoreSourceContractsAreOwnedBySources()
     {
-        var managementAssembly = typeof(IControlPlaneStore).Assembly;
         var sourceContractsAssembly = typeof(Agentstration.Sources.Contracts.SourceResource).Assembly;
         var forbiddenNames = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -676,58 +704,30 @@ public sealed class DependencyTests
             nameof(Agentstration.Sources.Contracts.ISourceManifestRetriever)
         };
 
-        Assert.IsFalse(managementAssembly.GetTypes().Any(type => forbiddenNames.Contains(type.Name)));
         Assert.AreEqual("Agentstration.Sources.Contracts", sourceContractsAssembly.GetName().Name);
         Assert.IsTrue(forbiddenNames.All(name => sourceContractsAssembly.GetTypes().Any(type => type.Name == name)));
-
-        var managementDirectory = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Management.Abstractions");
-        var movedFiles = new[]
-        {
-            "SourceResources.cs",
-            "SourceProviderResources.cs",
-            "SourceBindingViews.cs",
-            "SourceRefreshSchedule.cs",
-            "SourceSemanticVersion.cs"
-        };
-        Assert.IsFalse(movedFiles.Any(file => File.Exists(Path.Combine(managementDirectory, file))));
     }
 
     [TestMethod]
     public void SourceRegistryContractsAreOwnedBySources()
     {
-        var managementAssembly = typeof(IControlPlaneStore).Assembly;
         var sourceContractsAssembly = typeof(SourceRegistryRegistrationResource).Assembly;
 
-        Assert.IsFalse(managementAssembly.GetTypes().Any(type =>
-            type.Name.StartsWith("SourceRegistry", StringComparison.Ordinal)
-            || type.Name.StartsWith("ISourceRegistry", StringComparison.Ordinal)));
         Assert.AreEqual("Agentstration.Sources.Contracts", sourceContractsAssembly.GetName().Name);
         Assert.AreEqual("Agentstration.Sources.Contracts", typeof(SourceRegistryRegistrationResource).Namespace);
         Assert.AreEqual("Agentstration.Sources.Contracts", typeof(ISourceRegistryDocumentRetriever).Namespace);
         Assert.AreEqual("Agentstration.Sources.Contracts", typeof(SourceRegistryImportProvenance).Namespace);
-
-        var managementDirectory = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Management.Abstractions");
-        Assert.IsFalse(File.Exists(Path.Combine(managementDirectory, "SourceRegistryResources.cs")));
     }
 
     [TestMethod]
-    public void PackContractsAreOwnedOutsideManagementAbstractions()
+    public void PackContractsAreOwnedByPacks()
     {
-        var managementAssembly = typeof(IControlPlaneStore).Assembly;
         var packContractsAssembly = typeof(PackManifest).Assembly;
 
-        Assert.IsFalse(managementAssembly.GetTypes().Any(type =>
-            type.Name.StartsWith("Pack", StringComparison.Ordinal)
-            || type.Name.StartsWith("IPack", StringComparison.Ordinal)
-            || type.Name.StartsWith("SourcePack", StringComparison.Ordinal)));
         Assert.AreEqual("Agentstration.Packs.Contracts", packContractsAssembly.GetName().Name);
         Assert.AreEqual("Agentstration.Packs.Contracts", typeof(PackManifest).Namespace);
         Assert.AreEqual("Agentstration.Packs.Contracts", typeof(PackProjectResource).Namespace);
         Assert.AreEqual("Agentstration.Packs.Contracts", typeof(SourcePackInstallationPreview).Namespace);
-
-        var managementDirectory = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Management.Abstractions");
-        Assert.IsFalse(File.Exists(Path.Combine(managementDirectory, "PackResources.cs")));
-        Assert.IsFalse(File.Exists(Path.Combine(managementDirectory, "PackAuthoringResources.cs")));
     }
 
     [TestMethod]
@@ -754,29 +754,11 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void ExtensionAndAepContractsAreOwnedOutsideManagementAbstractions()
+    public void ExtensionAndAepContractsAreOwnedByTheirFamilies()
     {
-        var managementAssembly = typeof(IControlPlaneStore).Assembly;
-        var forbiddenNames = new HashSet<string>(StringComparer.Ordinal)
-        {
-            nameof(ExtensionRegistrationResource),
-            nameof(ExtensionRegistrationProperties),
-            nameof(ExtensionRegistrationSource),
-            nameof(AepTransportAuthenticationMode),
-            nameof(Agentstration.Extensions.Contracts.AepEnrollmentMode),
-            nameof(AepEnrollmentState),
-            nameof(AepEnrollmentSettingsResource),
-            nameof(AepEnrollmentRequestResource),
-            nameof(ExternalBinding)
-        };
-
-        Assert.IsFalse(managementAssembly.GetTypes().Any(type => forbiddenNames.Contains(type.Name)));
         Assert.AreEqual("Agentstration.Extensions.Contracts", typeof(ExtensionRegistrationResource).Namespace);
         Assert.AreEqual("Agentstration.Extensions.Contracts", typeof(AepEnrollmentRequestResource).Namespace);
         Assert.AreEqual("Agentstration.Agents.Contracts", typeof(ExternalBinding).Namespace);
-
-        var managementDirectory = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Management.Abstractions");
-        Assert.IsFalse(File.Exists(Path.Combine(managementDirectory, "ModelResources.cs")));
     }
 
     [TestMethod]
@@ -802,21 +784,13 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void BootstrapContractsAreOwnedOutsideManagementAbstractions()
+    public void BootstrapContractsAreOwnedByExplicitModules()
     {
-        var managementAssembly = typeof(IControlPlaneStore).Assembly;
-
-        Assert.IsFalse(managementAssembly.GetTypes().Any(type =>
-            type.Name.StartsWith("Bootstrap", StringComparison.Ordinal)
-            || type.Name.StartsWith("IBootstrap", StringComparison.Ordinal)));
         Assert.AreEqual("Agentstration.ResourceManagement.Contracts", typeof(Agentstration.ResourceManagement.Contracts.BootstrapResourceDocument).Namespace);
         Assert.AreEqual("Agentstration.ResourceManagement.Contracts", typeof(Agentstration.ResourceManagement.Contracts.IBootstrapResourceHandler).Namespace);
         Assert.AreEqual("Agentstration.Sources.Contracts", typeof(Agentstration.Sources.Contracts.BootstrapSourceProfileSelection).Namespace);
         Assert.AreEqual("Agentstration.Sources.Contracts", typeof(Agentstration.Sources.Contracts.BootstrapSourceProvenance).Namespace);
         Assert.AreEqual("Agentstration.Bootstrap.Contracts", typeof(Agentstration.Bootstrap.Contracts.BootstrapApplicationResource).Namespace);
-
-        var managementDirectory = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Management.Abstractions");
-        Assert.IsFalse(File.Exists(Path.Combine(managementDirectory, "BootstrapResources.cs")));
     }
 
     [TestMethod]
