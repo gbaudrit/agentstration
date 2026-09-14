@@ -1,11 +1,11 @@
-using Agentstration.Management.Abstractions;
+using Agentstration.Identity.Contracts;
 using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Infrastructure.Runtime;
 
 public sealed class WorkspaceRuntimeRunExecutionScope(
     IIdentityStore identities,
-    Agentstration.Management.Abstractions.IAuthorizationService authorization,
+    Agentstration.Identity.Contracts.IAuthorizationService authorization,
     IRequestContextScopeFactory scopeFactory) : IRuntimeRunExecutionScope
 {
     public async ValueTask ValidateAsync(RuntimeRunScope scope, CancellationToken cancellationToken)

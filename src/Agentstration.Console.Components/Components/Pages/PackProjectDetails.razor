@@ -287,7 +287,7 @@ else
     }
 
     private void MarkDirty() { dirty = true; message = null; preview = null; selectedBuild = null; bindingSelections.Clear(); }
-    private static bool CanUseForm(PackProjectSourceDocument source) => string.Equals(source.Kind, ResourceKinds.Agent, StringComparison.Ordinal);
+    private static bool CanUseForm(PackProjectSourceDocument source) => string.Equals(source.Kind, AgentResourceKinds.Agent, StringComparison.Ordinal);
     private void SelectSource(PackProjectSourceDocument source, SourceView view) { selectedSource = source; sourceYaml = source.Source; sourceView = view; message = null; agentSourceForm = null; }
     private void CloseSource() { selectedSource = null; sourceYaml = string.Empty; agentSourceForm = null; }
     private async Task SaveSourceAsync()

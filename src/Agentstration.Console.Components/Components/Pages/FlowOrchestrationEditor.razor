@@ -33,7 +33,7 @@ else
     }
     <EditForm Model="model" OnValidSubmit="SaveAsync">
         <fieldset class="panel orchestration-metadata" disabled="@IsReadOnly">
-            <div class="form-columns"><label>@T("TechnicalName")<input value="@model.Name" readonly /></label><label>@T("CurrentDefinitionVersion")<InputText @bind-Value="model.Version" /></label><ResourceScopeFormField ResourceKind="@ResourceKinds.Flow" @bind-Value="selectedScope" Disabled="true" /></div>
+            <div class="form-columns"><label>@T("TechnicalName")<input value="@model.Name" readonly /></label><label>@T("CurrentDefinitionVersion")<InputText @bind-Value="model.Version" /></label><ResourceScopeFormField ResourceKind="@FlowResourceKinds.Flow" @bind-Value="selectedScope" Disabled="true" /></div>
             <label>@T("Description")<InputTextArea @bind-Value="model.Description" /></label>
             <label class="check-option"><InputCheckbox @bind-Value="model.Enabled" /> @T("Enabled")</label>
         </fieldset>

@@ -1,9 +1,10 @@
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
-using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Tools;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -213,7 +214,7 @@ public sealed class ToolProviderAdapter(
     }
 }
 
-public sealed class McpToolCatalog(IControlPlaneStore store, ToolProviderAdapter providers) : IToolCatalog
+public sealed class McpToolCatalog(IResourceStore store, ToolProviderAdapter providers) : IToolCatalog
 {
     public async ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(IEnumerable<string> toolIds, CancellationToken cancellationToken = default)
     {
@@ -221,7 +222,7 @@ public sealed class McpToolCatalog(IControlPlaneStore store, ToolProviderAdapter
         foreach (var id in toolIds.Distinct(StringComparer.Ordinal))
         {
             var identity = ToolResourceIdentity.ParseCatalogId(id);
-            var tool = await store.GetAsync<ToolResource>(new ResourceKey(ResourceKinds.Tool, identity.Name, identity.Namespace), cancellationToken) ?? throw new ToolResolutionException("tool_not_found", $"Tool resource '{id}' was not found.");
+            var tool = await store.GetAsync<ToolResource>(new ResourceKey(ToolResourceKinds.Tool, identity.Name, identity.Namespace), cancellationToken) ?? throw new ToolResolutionException("tool_not_found", $"Tool resource '{id}' was not found.");
             if (!tool.Value.Definition.Enabled) throw new ToolResolutionException("tool_disabled", $"Tool resource '{id}' is disabled.");
             if (tool.Value.Definition.Discovery?.Available != true) throw new ToolResolutionException("tool_unavailable", $"Tool resource '{id}' is no longer available from its provider.");
             if (tool.Value.Definition.Provider is null) throw new ToolResolutionException("tool_mapping_invalid", $"Tool resource '{id}' has no ToolProvider mapping.");
@@ -233,7 +234,7 @@ public sealed class McpToolCatalog(IControlPlaneStore store, ToolProviderAdapter
                      value.Definition.Provider!.Name,
                      Namespace: value.Definition.Provider.Namespace ?? value.Namespace)))
         {
-            var provider = await store.GetAsync<ToolProviderResource>(new ResourceKey(ResourceKinds.ToolProvider, group.Key.Name, group.Key.Namespace), cancellationToken) ?? throw new ToolResolutionException("tool_provider_not_found", $"ToolProvider '{group.Key.Name}' was not found.");
+            var provider = await store.GetAsync<ToolProviderResource>(new ResourceKey(ToolResourceKinds.ToolProvider, group.Key.Name, group.Key.Namespace), cancellationToken) ?? throw new ToolResolutionException("tool_provider_not_found", $"ToolProvider '{group.Key.Name}' was not found.");
             if (!provider.Value.Definition.Enabled) throw new ToolResolutionException("tool_provider_disabled", $"ToolProvider '{provider.Value.Metadata.Name}' is disabled.");
             if (provider.Value.Definition.Mcp?.Internal == true)
                 resolved.AddRange(group.Select(Tool));
@@ -269,14 +270,14 @@ internal sealed record McpAgentTool(
     bool RequiresApproval) : IAgentTool;
 
 public sealed class McpToolInvoker(
-    IControlPlaneStore store,
+    IResourceStore store,
     ToolProviderAdapter providers,
     Lazy<IToolDefinitionExecutor>? internalTools = null,
     Lazy<IEnumerable<IInternalMcpToolHandler>>? builtInTools = null) : IToolInvoker
 {
     public async ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
     {
-        var tool = await store.GetAsync<ToolResource>(new ResourceKey(ResourceKinds.Tool, context.ToolId, context.ToolNamespace ?? default), cancellationToken)
+        var tool = await store.GetAsync<ToolResource>(new ResourceKey(ToolResourceKinds.Tool, context.ToolId, context.ToolNamespace ?? default), cancellationToken)
             ?? throw new ToolResolutionException("tool_not_found", $"Tool resource '{context.ToolId}' was not found.");
         if (!tool.Value.Definition.Enabled) throw new ToolResolutionException("tool_disabled", $"Tool resource '{context.ToolId}' is disabled.");
         if (tool.Value.Definition.Discovery?.Available != true) throw new ToolResolutionException("tool_unavailable", $"Tool resource '{context.ToolId}' is no longer available from its provider.");
@@ -286,7 +287,7 @@ public sealed class McpToolInvoker(
             throw new ToolResolutionException("tool_provider_mismatch", $"Tool resource '{context.ToolId}' no longer maps to provider '{context.ToolProviderId}'.");
         if (context.ExternalToolId is not null && !string.Equals(context.ExternalToolId, tool.Value.Definition.ExternalId, StringComparison.Ordinal))
             throw new ToolResolutionException("external_tool_mismatch", $"Tool resource '{context.ToolId}' no longer maps to external Tool '{context.ExternalToolId}'.");
-        var provider = await store.GetAsync<ToolProviderResource>(new ResourceKey(ResourceKinds.ToolProvider, providerId, context.ToolProviderNamespace ?? default), cancellationToken)
+        var provider = await store.GetAsync<ToolProviderResource>(new ResourceKey(ToolResourceKinds.ToolProvider, providerId, context.ToolProviderNamespace ?? default), cancellationToken)
             ?? throw new ToolResolutionException("tool_provider_not_found", $"ToolProvider '{providerId}' was not found.");
         if (!provider.Value.Definition.Enabled) throw new ToolResolutionException("tool_provider_disabled", $"ToolProvider '{providerId}' is disabled.");
         if (provider.Value.Definition.Mcp?.Internal == true)

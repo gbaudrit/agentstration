@@ -1,12 +1,20 @@
+using Agentstration.Agents.Api;
+using Agentstration.Bootstrap.Api;
+using Agentstration.Flows.Api;
+using Agentstration.Extensions.Api;
 using Agentstration.Infrastructure;
-using Agentstration.Web.Api;
+using Agentstration.Identity.Api;
+using Agentstration.Models.Api;
+using Agentstration.Packs.Api;
+using Agentstration.Secrets.Api;
+using Agentstration.Runtime.Api;
+using Agentstration.Resources.Api;
+using Agentstration.Sources.Api;
+using Agentstration.Tools.Api;
+using Agentstration.Triggers.Api;
+using Agentstration.Work.Api;
+using Agentstration.Workplace.Api;
 using Agentstration.Web.Configuration;
-using Agentstration.Web.Features.Flows;
-using Agentstration.Web.Features.Workplace;
-using Agentstration.Web.Security;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.SignalR;
-using ModelContextProtocol.AspNetCore;
 
 namespace Agentstration.Web;
 
@@ -21,25 +29,22 @@ public static class ApiTransportEndpointRouteBuilderExtensions
         app.MapGet("/health/ready", (IAgentstrationStorageInitializer storage) => storage.IsReady
             ? Results.Ok(new { status = "ready" })
             : Results.StatusCode(StatusCodes.Status503ServiceUnavailable)).AllowAnonymous();
-        app.MapAgentstrationAuthentication();
-        app.MapAgentstrationLocalAccountAdministration();
-        app.MapAgentstrationIdentityApi();
-        app.MapAgentstrationBootstrapProfiles();
-        app.MapAgentstrationManagementApi();
-        app.MapAgentstrationModelManagementApi();
-        app.MapAgentstrationAepEnrollment();
-        app.MapAgentstrationWorkApi();
-        app.MapAgentstrationWorkplaceApi();
-        app.MapAgentstrationWorkOperationsApi();
-        app.MapAgentstrationFlowApi();
-        app.MapAgentstrationRuntimeApi();
-        app.MapAgentstrationToolGovernanceAuditApi();
-        app.MapHub<FlowRunHub>("/hubs/flow-runs")
-            .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
-        app.MapHub<WorkplaceHub>("/hubs/workplace")
-            .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
-        if (app.Environment.IsDevelopment()) app.MapOllamaDiagnostics();
-        app.MapMcp("/mcp").RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        app.MapIdentityApi();
+        app.MapBootstrapApi();
+        app.MapAgentsApi();
+        app.MapTriggersApi();
+        app.MapSourcesApi();
+        app.MapModelsApi();
+        app.MapPacksApi();
+        app.MapSecretsApi();
+        app.MapToolsApi();
+        app.MapResourcesApi();
+        app.MapExtensionsApi();
+        app.MapWorkApi();
+        app.MapWorkplaceApi();
+        app.MapFlowsApi();
+        app.MapRuntimeApi();
+        if (app.Environment.IsDevelopment()) app.MapModelDiagnostics();
         return app;
     }
 }

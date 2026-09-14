@@ -1,7 +1,9 @@
+using Agentstration.Secrets;
 using System.Net;
 using System.Net.Http.Json;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Secrets.Contracts;
+using Agentstration.Sources.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
@@ -46,8 +48,8 @@ public sealed class SourceRegistryConsoleTests
         var observation = Observation();
         var discovered = new SourceRegistryDiscoverySource("contoso", "assistants", "Contoso assistants", "Reusable assistants",
         [
-            new("2026.09", false, SourceVerificationStatus.Verified, "source_version_verified", [observation]),
-            new("2026.08", true, SourceVerificationStatus.Conflict, "source_registry_manifest_digest_conflict",
+            new("2026.09", false, SourceRegistryVerificationStatus.Verified, "source_version_verified", [observation]),
+            new("2026.08", true, SourceRegistryVerificationStatus.Conflict, "source_registry_manifest_digest_conflict",
                 [observation with { Selection = observation.Selection with { Version = "2026.08" }, ManifestDigest = "sha256:other" }])
         ]);
         using var context = Context(new StubSourceRegistriesClient(
@@ -155,8 +157,8 @@ public sealed class SourceRegistryConsoleTests
         var registration = new SourceRegistryRegistrationResource
         {
             Uid = uid,
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.SourceRegistryRegistration,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SourceRegistryKinds.SourceRegistryRegistration,
             Metadata = new() { Name = name },
             ScopeRef = ResourceScopeRef.Instance,
             ETag = "\"etag\"",
@@ -174,8 +176,8 @@ public sealed class SourceRegistryConsoleTests
         };
         var observed = new SourceRegistryObservedStateResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.SourceRegistryObservedState,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SourceRegistryKinds.SourceRegistryObservedState,
             Metadata = new() { Name = name },
             ScopeRef = ResourceScopeRef.Instance,
             Definition = new()
@@ -213,8 +215,8 @@ public sealed class SourceRegistryConsoleTests
 
     private static SecretResponse Secret(string name, string displayName, ResourceScopeRef scopeRef) => new(new SecretResource
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.Secret,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = SecretResourceKinds.Secret,
         Metadata = new() { Name = name },
         ScopeRef = scopeRef,
         Definition = new() { DisplayName = displayName, Vault = new("local", scopeRef), Key = name }

@@ -2,9 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using Agentstration.Infrastructure.Sources;
-using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
+using Agentstration.Sources.Contracts;
 
 namespace Agentstration.Management.Tests;
 
@@ -106,7 +107,7 @@ public sealed class SourceRegistryInfrastructureTests
         var retriever = new HttpSourceRegistryDocumentRetriever(client, new SourceRegistryTransportOptions(), resolver);
         var context = new SourceRegistryRetrievalContext(
             ResourceScopeRef.Instance,
-            ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.SourceRegistryRegistration, "private"),
+            ResourceAddress.Create(ResourceNamespace.Default, SourceRegistryKinds.SourceRegistryRegistration, "private"),
             new SourceRegistryEndpointPolicy(),
             SourceRegistryAuthenticationMode.StaticBearer,
             new ResourceReference("registry-token", ResourceScopeRef.Instance));
@@ -197,7 +198,7 @@ public sealed class SourceRegistryInfrastructureTests
     private static SourceRegistryRetrievalContext Context(SourceRegistryEndpointPolicy? policy = null) =>
         new(
             ResourceScopeRef.Instance,
-            Agentstration.Resources.ResourceAddress.Create(Agentstration.Resources.ResourceNamespace.Default, ResourceKinds.SourceRegistryRegistration, "test"),
+            Agentstration.Resources.ResourceAddress.Create(Agentstration.Resources.ResourceNamespace.Default, SourceRegistryKinds.SourceRegistryRegistration, "test"),
             policy ?? new SourceRegistryEndpointPolicy(),
             SourceRegistryAuthenticationMode.None,
             null);
@@ -220,7 +221,7 @@ public sealed class SourceRegistryInfrastructureTests
             Resolutions++;
             return Task.FromResult<ResolvedSecret?>(new(
                 secret.Address,
-                ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.Vault, "registry-vault"),
+                ResourceAddress.Create(ResourceNamespace.Default, SecretResourceKinds.Vault, "registry-vault"),
                 new SecretValue(Encoding.UTF8.GetBytes(token))));
         }
     }

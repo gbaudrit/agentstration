@@ -1,4 +1,6 @@
-using Agentstration.Management.Abstractions;
+using Agentstration.Agents;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Infrastructure;
@@ -6,17 +8,17 @@ namespace Agentstration.Infrastructure;
 public sealed record SelectedAgentRoute(AgentRouteResult Route, string DeploymentId);
 
 public sealed class AgentExecutionCoordinator(
-    IControlPlaneStore store,
+    IResourceStore store,
     IAgentResourceQueries agentQueries,
     IAgentRouter router,
-    IRuntimeRegistry runtimes)
+    IRuntimeRegistry runtimes) : IAgentExecutionCoordinator
 {
-    public async Task<(AgentRouteResult Route, AgentExecutionResult Execution)> RouteAndExecuteAsync(
+    public async Task<RoutedAgentExecution> RouteAndExecuteAsync(
         string input,
         CancellationToken cancellationToken)
     {
         var selected = await SelectAgentAsync(input, null, cancellationToken);
-        return (selected.Route, await ExecuteSelectedAsync(selected, input, cancellationToken));
+        return new(selected.Route, await ExecuteSelectedAsync(selected, input, cancellationToken));
     }
 
     public async Task<SelectedAgentRoute> SelectAgentAsync(
@@ -36,7 +38,7 @@ public sealed class AgentExecutionCoordinator(
         var pairs = new List<(AgentDeployment Deployment, AgentRevision Revision)>();
         foreach (var item in ready)
         {
-            var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, item.Value.RevisionName, @namespace), cancellationToken);
+            var revision = await store.GetAsync<AgentRevision>(new ResourceKey(AgentResourceKinds.AgentRevision, item.Value.RevisionName, @namespace), cancellationToken);
             if (revision is not null) pairs.Add((item.Value, revision.Value));
         }
 

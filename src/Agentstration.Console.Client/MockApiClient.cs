@@ -1,13 +1,14 @@
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Contracts;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Agents;
+using Agentstration.Flows;
+using Agentstration.Flows.Contracts;
+using Agentstration.Agents.Contracts;
+using Agentstration.Runtime.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.Contracts;
+using Agentstration.Triggers;
 
 namespace Agentstration.Web.Console;
 
@@ -298,8 +299,8 @@ public sealed class MockApiClient(TimeProvider timeProvider, IReadOnlyList<FlowR
             var resource = new AgentResource
             {
                 Uid = Guid.NewGuid(),
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.Agent,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = AgentResourceKinds.Agent,
                 Metadata = new ResourceMetadata { Name = item.Name },
                 Generation = 1,
                 ETag = etag,

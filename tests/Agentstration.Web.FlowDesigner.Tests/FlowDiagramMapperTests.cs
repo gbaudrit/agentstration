@@ -1,4 +1,4 @@
-using Agentstration.Flow;
+using Agentstration.Flows;
 using Agentstration.Web.FlowDesigner.Diagramming;
 using Agentstration.Web.FlowDesigner.State;
 using Blazor.Diagrams.Core.Anchors;

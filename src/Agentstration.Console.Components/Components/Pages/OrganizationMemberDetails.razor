@@ -17,7 +17,7 @@ else
     <section class="panel" style="margin-top:18px">
         <div class="panel-header"><div><h2>@T("CurrentWorkspaceMembership")</h2><p class="muted">@T("WorkspaceMembershipHelp")</p></div></div>
         @if (!string.IsNullOrWhiteSpace(message)) { <p class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")">@message</p> }
-        <div class="form-grid"><label><span>@T("Role")</span><select @bind="selectedRole">@foreach(var role in Agentstration.Management.Contracts.BuiltInIdentityRoleNames.All){<option value="@role">@role</option>}</select></label></div>
+        <div class="form-grid"><label><span>@T("Role")</span><select @bind="selectedRole">@foreach(var role in Agentstration.Identity.Contracts.BuiltInIdentityRoleNames.All){<option value="@role">@role</option>}</select></label></div>
         <div class="form-actions"><button class="button-primary" @onclick="SaveMembershipAsync">@T("SaveRole")</button>@if(workspaceMembership is not null){<button class="button-secondary" @onclick="RemoveMembershipAsync">@T("RemoveFromWorkspace")</button>}</div>
     </section>
     @if (canManagePlatformAdministrators)
@@ -57,8 +57,8 @@ else
 
 @code {
     [Parameter] public Guid UserId { get; set; }
-    private Agentstration.Management.Contracts.OrganizationMemberResponse? member;
-    private Agentstration.Management.Contracts.WorkspaceMemberResponse? workspaceMembership; private string selectedRole = Agentstration.Management.Contracts.BuiltInIdentityRoleNames.Viewer; private string? message; private bool hasError;
+    private Agentstration.Identity.Contracts.OrganizationMemberResponse? member;
+    private Agentstration.Identity.Contracts.WorkspaceMemberResponse? workspaceMembership; private string selectedRole = Agentstration.Identity.Contracts.BuiltInIdentityRoleNames.Viewer; private string? message; private bool hasError;
     private bool canManagePlatformAdministrators; private bool targetIsPlatformAdministrator; private string? platformMessage; private bool platformError;
     private string newIssuer = ""; private string newSubject = ""; private string? identityMessage; private bool identityError;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
@@ -68,7 +68,7 @@ else
         var workspaceId = ContextState.Current?.WorkspaceId ?? throw new InvalidOperationException("The Console context is unavailable.");
         member = (await Client.GetOrganizationAsync(default)).Members.SingleOrDefault(value => value.Principal.Id == UserId);
         workspaceMembership = (await Client.GetWorkspaceMembersAsync(workspaceId, default)).SingleOrDefault(value => value.Principal.Id == UserId);
-        selectedRole = workspaceMembership?.Role ?? Agentstration.Management.Contracts.BuiltInIdentityRoleNames.Viewer;
+        selectedRole = workspaceMembership?.Role ?? Agentstration.Identity.Contracts.BuiltInIdentityRoleNames.Viewer;
         canManagePlatformAdministrators = (await Client.GetCapabilitiesAsync(default)).IsPlatformAdministrator;
         if (canManagePlatformAdministrators)
             targetIsPlatformAdministrator = (await Client.GetPlatformAdministratorsAsync(default)).Any(value => value.Principal.Id == UserId);

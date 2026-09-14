@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.ResourceManagement.Contracts;
 
 namespace Agentstration.Web.Console;
 

@@ -72,7 +72,7 @@ else
                 <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
                 <label><span>@T("Handler")</span><InputText @bind-Value="model.Handler" /><ValidationMessage For="() => model.Handler" /></label>
                 <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
-                <ResourceScopeFormField ResourceKind="@ResourceKinds.Agent" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
+                <ResourceScopeFormField ResourceKind="@AgentResourceKinds.Agent" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
             </div>
             @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">@T("Uid"): <code>@resourceId</code></p> }
         </section>
@@ -247,8 +247,8 @@ else
         try
         {
             var request = ResourceManifestSerializer.FromYaml<AgentResourceRequest>(rawYaml);
-            if (!string.Equals(request.ApiVersion, ManagementApiVersions.CoreV1, StringComparison.Ordinal)) throw new ArgumentException(T("ApiVersionRequired", ManagementApiVersions.CoreV1));
-            if (!string.Equals(request.Kind, ResourceKinds.Agent, StringComparison.Ordinal)) throw new ArgumentException(T("KindRequired", ResourceKinds.Agent));
+            if (!string.Equals(request.ApiVersion, ResourceApiVersions.CoreV1, StringComparison.Ordinal)) throw new ArgumentException(T("ApiVersionRequired", ResourceApiVersions.CoreV1));
+            if (!string.Equals(request.Kind, AgentResourceKinds.Agent, StringComparison.Ordinal)) throw new ArgumentException(T("KindRequired", AgentResourceKinds.Agent));
             if (!request.Metadata.Namespace.IsDefault) throw new ArgumentException(T("PackAgentReadOnly"));
             if (!IsNew && !string.Equals(request.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException(T("AgentNameImmutable"));
             model = AgentEditorModel.FromRequest(request);
@@ -284,7 +284,7 @@ else
     private static string ResourceName(string name) => name;
     private static string ProfileUrl(AgentModelResponse value)
     {
-        return ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(value.Declared.ModelProfile.Namespace), ResourceKinds.ModelProfile, value.Declared.ModelProfile.ResourceId));
+        return ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(value.Declared.ModelProfile.Namespace), ModelResourceKinds.ModelProfile, value.Declared.ModelProfile.ResourceId));
     }
 
     private void RuntimeProfileChanged(ChangeEventArgs args)

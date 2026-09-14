@@ -3,13 +3,11 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Contracts;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Agents;
+using Agentstration.Flows;
+using Agentstration.Flows.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.Contracts;
 using Agentstration.Web.Components.Models;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -69,7 +67,7 @@ public sealed class EntryAdministrationApiClient(HttpClient httpClient, IHttpCli
 
     public async Task<IReadOnlyList<ResourcePickerItem>> GetResourcesAsync(EntryBindingKind kind, CancellationToken cancellationToken)
     {
-        var resourceKind = kind == EntryBindingKind.Agent ? ResourceKinds.Agent : ResourceKinds.Flow;
+        var resourceKind = kind == EntryBindingKind.Agent ? AgentResourceKinds.Agent : FlowResourceKinds.Flow;
         var catalogClient = httpClientFactory.CreateClient(kind == EntryBindingKind.Agent ? AgentResourceCatalogClient : FlowResourceCatalogClient);
         return await ApiResponse.ReadAsync<ResourcePickerItem[]>(catalogClient, $"api/resources?kind={Uri.EscapeDataString(resourceKind)}", cancellationToken);
     }

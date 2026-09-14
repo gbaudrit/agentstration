@@ -1,10 +1,14 @@
 using System.Globalization;
-using Agentstration.Management.Abstractions;
+using Agentstration.Agents;
+using Agentstration.Flows;
+using Agentstration.Models;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
+using Agentstration.Work;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using PacksPage = Agentstration.Web.Components.Pages.Packs;
 
 namespace Agentstration.Web.Tests;
 
@@ -37,7 +41,7 @@ public sealed class PacksComponentTests
         using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
 
-        var rendered = context.Render<Packs>();
+        var rendered = context.Render<PacksPage>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
 
         CollectionAssert.AreEqual(new[] { "1", "2", "0", "0" }, rendered.FindAll(".metric-card strong").Select(element => element.TextContent).ToArray());
@@ -56,7 +60,7 @@ public sealed class PacksComponentTests
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
             .NavigateTo("/packs?publisher=agentstration&name=starter");
 
-        var rendered = context.Render<Packs>();
+        var rendered = context.Render<PacksPage>();
 
         rendered.WaitForAssertion(() =>
         {
@@ -70,7 +74,7 @@ public sealed class PacksComponentTests
     {
         using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
-        var rendered = context.Render<Packs>();
+        var rendered = context.Render<PacksPage>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
 
         await rendered.FindAll("button").First(button => button.TextContent.Contains("Install local Pack", StringComparison.Ordinal)).ClickAsync(new());
@@ -93,11 +97,11 @@ public sealed class PacksComponentTests
                     Version = "1.1.0",
                     DisplayName = "Starter Pack"
                 },
-                [new("agents/assistant.yaml", ResourceKinds.Agent, "assistant", true)],
+                [new("agents/assistant.yaml", AgentResourceKinds.Agent, "assistant", true)],
                 true)
         };
         context.Services.AddSingleton<IPacksClient>(client);
-        var rendered = context.Render<Packs>();
+        var rendered = context.Render<PacksPage>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
 
         await rendered.FindAll("button").First(button => button.TextContent.Contains("Install local Pack", StringComparison.Ordinal)).ClickAsync(new());
@@ -121,7 +125,7 @@ public sealed class PacksComponentTests
     {
         using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
-        var rendered = context.Render<Packs>();
+        var rendered = context.Render<PacksPage>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
 
         await rendered.FindAll("button").Single(button => button.TextContent.Contains("Inspect", StringComparison.Ordinal)).ClickAsync(new());
@@ -191,8 +195,8 @@ public sealed class PacksComponentTests
 
         private readonly InstalledPackResource pack = new()
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.InstalledPack,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = PackKinds.InstalledPack,
             Metadata = new ResourceMetadata { Name = "13-agentstration-starter" },
             Definition = new InstalledPackProperties
             {
@@ -209,8 +213,8 @@ public sealed class PacksComponentTests
                 ],
                 ManagedResources =
                 [
-                    new ManagedPackResource { Namespace = new ResourceNamespace("agentstration.starter"), Kind = ResourceKinds.ModelProfile, Name = "reasoning-default", Path = "profiles/reasoning.yaml", VersionToken = "v1" },
-                    new ManagedPackResource { Namespace = new ResourceNamespace("agentstration.starter"), Kind = ResourceKinds.Agent, Name = "assistant", Path = "agents/assistant.yaml", VersionToken = "v1" }
+                    new ManagedPackResource { Namespace = new ResourceNamespace("agentstration.starter"), Kind = ModelResourceKinds.ModelProfile, Name = "reasoning-default", Path = "profiles/reasoning.yaml", VersionToken = "v1" },
+                    new ManagedPackResource { Namespace = new ResourceNamespace("agentstration.starter"), Kind = AgentResourceKinds.Agent, Name = "assistant", Path = "agents/assistant.yaml", VersionToken = "v1" }
                 ]
             }
         };
@@ -229,47 +233,47 @@ public sealed class PacksComponentTests
         public Task<ResourceSnapshot<PackProjectResource>> ForkAsync(string publisher, string name, ForkPackCommand command, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<PackCompositionCatalogItem>> GetCompositionResourcesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PackCompositionCatalogItem>>
         ([
-            new() { Resource = new(ResourceKinds.Entry, "daily-assistant"), DisplayName = "Daily Assistant", Status = "Published" },
-            new() { Resource = new(ResourceKinds.Agent, "concierge"), DisplayName = "Concierge", Status = "Accepted" },
-            new() { Resource = new(ResourceKinds.ModelProfile, "reasoning"), DisplayName = "Reasoning" }
+            new() { Resource = new(EntryResourceKinds.Entry, "daily-assistant"), DisplayName = "Daily Assistant", Status = "Published" },
+            new() { Resource = new(AgentResourceKinds.Agent, "concierge"), DisplayName = "Concierge", Status = "Accepted" },
+            new() { Resource = new(ModelResourceKinds.ModelProfile, "reasoning"), DisplayName = "Reasoning" }
         ]);
         public Task<PackCompositionPreview> PreviewCompositionAsync(PreviewPackCompositionCommand command, CancellationToken cancellationToken)
         {
-            var entrySelected = command.Resources.Any(resource => resource.Kind == ResourceKinds.Entry && resource.Name == "daily-assistant");
-            var agentSelected = command.Resources.Any(resource => resource.Kind == ResourceKinds.Agent && resource.Name == "concierge");
+            var entrySelected = command.Resources.Any(resource => resource.Kind == EntryResourceKinds.Entry && resource.Name == "daily-assistant");
+            var agentSelected = command.Resources.Any(resource => resource.Kind == AgentResourceKinds.Agent && resource.Name == "concierge");
             var included = new List<PackCompositionPreviewResource>();
             if (entrySelected)
             {
                 included.Add(new(
-                    new(ResourceKinds.Entry, "daily-assistant"),
+                    new(EntryResourceKinds.Entry, "daily-assistant"),
                     "Daily Assistant",
                     "entries/daily-assistant.json",
                     true,
-                    [new() { Target = new(ResourceKinds.Flow, "main"), Relationship = "flow" }]));
+                    [new() { Target = new(FlowResourceKinds.Flow, "main"), Relationship = "flow" }]));
                 included.Add(new(
-                    new(ResourceKinds.Flow, "main"),
+                    new(FlowResourceKinds.Flow, "main"),
                     "Main",
                     "flows/main.json",
                     false,
-                    [new() { Target = new(ResourceKinds.Agent, "concierge"), Relationship = "graphAgent" }]));
+                    [new() { Target = new(AgentResourceKinds.Agent, "concierge"), Relationship = "graphAgent" }]));
             }
             if (entrySelected || agentSelected)
             {
                 included.Add(new(
-                    new(ResourceKinds.Agent, "concierge"),
+                    new(AgentResourceKinds.Agent, "concierge"),
                     "Concierge",
                     "agents/concierge.json",
                     agentSelected,
                     [new()
                     {
-                        Target = new(ResourceKinds.ModelProfile, "reasoning"),
+                        Target = new(ModelResourceKinds.ModelProfile, "reasoning"),
                         Relationship = "modelProfile",
                         Mode = PackCompositionDependencyMode.Binding,
                         BindingTargetKind = PackBindingTargetKind.ModelProfile
                     }]));
             }
-            IReadOnlyList<PackCompositionPreviewBinding> bindings = included.Any(resource => resource.Resource.Kind == ResourceKinds.Agent)
-                ? [new("model-reasoning", PackBindingTargetKind.ModelProfile, "Reasoning", new(ResourceKinds.ModelProfile, "reasoning"), [new(ResourceKinds.Agent, "concierge")])]
+            IReadOnlyList<PackCompositionPreviewBinding> bindings = included.Any(resource => resource.Resource.Kind == AgentResourceKinds.Agent)
+                ? [new("model-reasoning", PackBindingTargetKind.ModelProfile, "Reasoning", new(ModelResourceKinds.ModelProfile, "reasoning"), [new(AgentResourceKinds.Agent, "concierge")])]
                 : [];
             return Task.FromResult(new PackCompositionPreview(included, bindings, []));
         }

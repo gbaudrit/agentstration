@@ -1,8 +1,13 @@
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
-using Agentstration.Management.Core;
+using Agentstration.Identity.Contracts;
+using Agentstration.Agents;
+using Agentstration.ResourceManagement;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Extensions;
+using Agentstration.Models;
+using Agentstration.Runtime.Profiles;
+using Agentstration.Runtime.Core;
 using Agentstration.Resources;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Web.Hosting;
@@ -148,7 +153,7 @@ public sealed class DeclarativeBootstrapTests
         File.Delete(Path.Combine(directory.Path, "00-unknown.yaml"));
         await File.WriteAllTextAsync(
             Path.Combine(directory.Path, "00-version.yaml"),
-            Resource("Recording", "one").Replace(ManagementApiVersions.CoreV1, "agentstration.io/v2", StringComparison.Ordinal));
+            Resource("Recording", "one").Replace(ResourceApiVersions.CoreV1, "agentstration.io/v2", StringComparison.Ordinal));
         var unsupported = await Assert.ThrowsAsync<DeclarativeBootstrapException>(
             () => Service(directory.Path, new RecordingHandler(), directory.Path).ApplyAsync(default));
         StringAssert.Contains(unsupported.Message, "unsupported apiVersion 'agentstration.io/v2'");
@@ -220,7 +225,7 @@ public sealed class DeclarativeBootstrapTests
         var profile = Directory.CreateDirectory(Path.Combine(directory.Path, "bound-agents"));
         await File.WriteAllTextAsync(Path.Combine(profile.FullName, "profile.yaml"), ProfileWithBinding("bound-agents"));
         await File.WriteAllTextAsync(Path.Combine(profile.FullName, "10-resource.yaml"), $$"""
-            apiVersion: {{ManagementApiVersions.CoreV1}}
+            apiVersion: {{ResourceApiVersions.CoreV1}}
             kind: Recording
             metadata:
               name: bound-resource
@@ -261,7 +266,7 @@ public sealed class DeclarativeBootstrapTests
         var profile = Directory.CreateDirectory(Path.Combine(directory.Path, "default-binding"));
         await File.WriteAllTextAsync(Path.Combine(profile.FullName, "profile.yaml"), ProfileWithBinding("default-binding", includeDefault: true));
         await File.WriteAllTextAsync(Path.Combine(profile.FullName, "10-resource.yaml"), $$"""
-            apiVersion: {{ManagementApiVersions.CoreV1}}
+            apiVersion: {{ResourceApiVersions.CoreV1}}
             kind: Recording
             metadata:
               name: bound-resource
@@ -365,8 +370,8 @@ public sealed class DeclarativeBootstrapTests
         Assert.IsFalse(string.IsNullOrWhiteSpace(application.ETag));
         Assert.IsTrue(application.Definition.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Skip));
         using var systemScope = scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
-        var history = await scope.ServiceProvider.GetRequiredService<IControlPlaneStore>()
-            .ListAllAsync<BootstrapApplicationResource>(ResourceKinds.BootstrapApplication, default);
+        var history = await scope.ServiceProvider.GetRequiredService<IResourceStore>()
+            .ListAllAsync<BootstrapApplicationResource>(BootstrapKinds.BootstrapApplication, default);
         Assert.AreEqual(application.Metadata.Name, history.Single().Value.Metadata.Name);
         Assert.AreEqual(
             application.Metadata.Name,
@@ -386,7 +391,7 @@ public sealed class DeclarativeBootstrapTests
                 Resources = []
             }
         };
-        _ = await scope.ServiceProvider.GetRequiredService<IControlPlaneStore>().PutAsync(stale, null, true, default);
+        _ = await scope.ServiceProvider.GetRequiredService<IResourceStore>().PutAsync(stale, null, true, default);
         var recovered = await management.GetApplicationAsync(staleName, principal.Id, default);
         Assert.AreEqual(BootstrapApplicationStatus.Interrupted, recovered?.Definition.Status);
         Assert.IsNotNull(recovered?.Definition.CompletedAt);
@@ -419,8 +424,8 @@ public sealed class DeclarativeBootstrapTests
             () => management.ApplyAsync(selection, preview.Digest, principal.Id, default));
 
         using var systemScope = scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
-        var application = (await scope.ServiceProvider.GetRequiredService<IControlPlaneStore>()
-            .ListAllAsync<BootstrapApplicationResource>(ResourceKinds.BootstrapApplication, default)).Single().Value;
+        var application = (await scope.ServiceProvider.GetRequiredService<IResourceStore>()
+            .ListAllAsync<BootstrapApplicationResource>(BootstrapKinds.BootstrapApplication, default)).Single().Value;
         Assert.AreEqual(BootstrapApplicationStatus.Interrupted, application.Definition.Status);
         Assert.IsNotNull(application.Definition.CompletedAt);
         Assert.IsFalse(string.IsNullOrWhiteSpace(application.Definition.Error));
@@ -821,7 +826,7 @@ public sealed class DeclarativeBootstrapTests
     }
 
     private static string PlatformAdministrator() => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: PlatformAdministrator
         metadata:
           name: bootstrap-admin
@@ -833,7 +838,7 @@ public sealed class DeclarativeBootstrapTests
         """;
 
     private static string Tenant(string name, string displayName) => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: Tenant
         metadata:
           name: {{name}}
@@ -842,7 +847,7 @@ public sealed class DeclarativeBootstrapTests
         """;
 
     private static string Workspace(string name, string displayName, string tenantName) => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: Workspace
         metadata:
           name: {{name}}
@@ -853,7 +858,7 @@ public sealed class DeclarativeBootstrapTests
         """;
 
     private static string DefaultContext(string localAccount, string tenantName, string workspaceName) => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: PrincipalDefaultContext
         metadata:
           name: {{localAccount}}
@@ -867,7 +872,7 @@ public sealed class DeclarativeBootstrapTests
         """;
 
     private static string Resource(string kind, string name) => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: {{kind}}
         metadata:
           name: {{name}}
@@ -875,7 +880,7 @@ public sealed class DeclarativeBootstrapTests
         """;
 
     private static string Profile(string name, string targetScope) => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: BootstrapProfile
         metadata:
           name: {{name}}
@@ -885,7 +890,7 @@ public sealed class DeclarativeBootstrapTests
         """;
 
     private static string ProfileWithBinding(string name, bool includeDefault = false, string defaultTargetName = "reasoning-default") => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: BootstrapProfile
         metadata:
           name: {{name}}
@@ -901,7 +906,7 @@ public sealed class DeclarativeBootstrapTests
         """;
 
     private static string ModelProvider() => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: ModelProvider
         metadata:
           name: bootstrap-provider
@@ -913,7 +918,7 @@ public sealed class DeclarativeBootstrapTests
         """;
 
     private static string RuntimeProfile() => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: RuntimeProfile
         metadata:
           name: bootstrap-runtime
@@ -927,7 +932,7 @@ public sealed class DeclarativeBootstrapTests
         """;
 
     private static string ModelProfile() => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: ModelProfile
         metadata:
           name: bootstrap-model
@@ -942,7 +947,7 @@ public sealed class DeclarativeBootstrapTests
         """;
 
     private static string Agent() => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: Agent
         metadata:
           name: bootstrap-agent
@@ -957,7 +962,7 @@ public sealed class DeclarativeBootstrapTests
         """;
 
     private static string Flow() => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: Flow
         metadata:
           name: bootstrap-flow
@@ -975,7 +980,7 @@ public sealed class DeclarativeBootstrapTests
         """;
 
     private static string Entry() => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: Entry
         metadata:
           name: bootstrap-entry
@@ -1004,7 +1009,7 @@ public sealed class DeclarativeBootstrapTests
         """;
 
     private static string InactiveFlow() => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: Flow
         metadata:
           name: inactive-flow
@@ -1022,7 +1027,7 @@ public sealed class DeclarativeBootstrapTests
         """;
 
     private static string InactiveFlowEntry() => $$"""
-        apiVersion: {{ManagementApiVersions.CoreV1}}
+        apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: Entry
         metadata:
           name: inactive-flow-entry

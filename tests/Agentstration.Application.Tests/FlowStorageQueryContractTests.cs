@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Data.Common;
 using System.Text.Json;
-using Agentstration.Flow;
+using Agentstration.Flows;
 using Agentstration.Resources;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -70,12 +70,12 @@ public sealed partial class FlowTests
             Assert.IsTrue(commands.CommandTexts.All(value => value.Contains("\"PrincipalId\" =", StringComparison.Ordinal)));
         }
 
-        async Task<IReadOnlyList<Agentstration.Flow.Storage.Abstractions.StoredFlowRun>> ReadAllAsync(
+        async Task<IReadOnlyList<Agentstration.Flows.Storage.Abstractions.StoredFlowRun>> ReadAllAsync(
             FlowId? flowId,
             FlowRunStatus? status,
             int take)
         {
-            var items = new List<Agentstration.Flow.Storage.Abstractions.StoredFlowRun>();
+            var items = new List<Agentstration.Flows.Storage.Abstractions.StoredFlowRun>();
             for (var skip = 0; ; skip += take)
             {
                 var page = await fixture.Repository.ListRunsAsync(TestScope, flowId, status, skip, take, default);

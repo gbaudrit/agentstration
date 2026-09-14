@@ -1,4 +1,4 @@
-using Agentstration.Management.Contracts;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components;
 using Agentstration.Web.Console;

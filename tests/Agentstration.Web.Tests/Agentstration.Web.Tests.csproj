@@ -1,13 +1,25 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <Using Include="Agentstration.ResourceManagement" />
+    <Using Include="Agentstration.Resources" />
+    <Using Include="Agentstration.Tools" />
+    <ProjectReference Include="../../src/Agentstration.Agents/Agentstration.Agents.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Flows/Agentstration.Flows.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Models/Agentstration.Models.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Secrets/Agentstration.Secrets.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Work/Agentstration.Work.csproj" />
     <ProjectReference Include="../../src/Agentstration.Api/Agentstration.Api.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
     <ProjectReference Include="../../src/Agentstration.Console.Components/Agentstration.Console.Components.csproj" />
     <ProjectReference Include="../../src/Agentstration.Tools.Mcp/Agentstration.Tools.Mcp.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" Aliases="UtilitiesExtension" />
+    <ProjectReference Include="../../src/Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
   <ProjectReference Include="../../src/Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
   <PackageReference Include="bunit" />
   <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <ProjectReference Include="../../src/Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Packs.Contracts/Agentstration.Packs.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="../../src/Agentstration.Web.Components/wwwroot/design-tokens.css" Link="TestAssets/design-tokens.css" CopyToOutputDirectory="PreserveNewest" />

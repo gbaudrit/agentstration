@@ -1,10 +1,15 @@
+using Agentstration.Security.Contracts;
+using Agentstration.Identity.Contracts;
+using Agentstration.Secrets;
+using Agentstration.ResourceManagement;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
-using Agentstration.Management.Core;
-using Agentstration.Management.Storage.Sqlite;
+using Agentstration.Api.Contracts;
+using Agentstration.Sources.Contracts;
+using Agentstration.Identity;
+using Agentstration.Sources;
+using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Web.Api.Models;
 using Microsoft.AspNetCore.Hosting;
@@ -50,7 +55,7 @@ public sealed class SourceRegistryManagementTests
         var sourceTrust = await client.GetFromJsonAsync<SourceRegistrySourceTrustView>(
             "/api/sourceregistries/trust/sources/agentstration/sample/versions/1");
         Assert.IsNotNull(sourceTrust);
-        Assert.AreEqual(SourceVerificationStatus.Unverified, sourceTrust.VersionStatus);
+        Assert.AreEqual(SourceRegistryVerificationStatus.Unverified, sourceTrust.VersionStatus);
 
         using var update = new HttpRequestMessage(HttpMethod.Put, $"/api/sourceregistries/{SourceRegistryWellKnown.OfficialName}")
         {
@@ -131,16 +136,16 @@ public sealed class SourceRegistryManagementTests
 
         _ = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, new VaultResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Vault,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Vault,
             Metadata = new ResourceMetadata { Name = "registry-vault" },
             ScopeRef = ResourceScopeRef.Instance,
             Definition = new VaultProperties { DisplayName = "Registry vault", ProviderType = "local" }
         }, null, true, default);
         _ = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, new SecretResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Secret,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Secret,
             Metadata = new ResourceMetadata { Name = "registry-token" },
             ScopeRef = ResourceScopeRef.Instance,
             Definition = new SecretProperties
@@ -236,14 +241,14 @@ public sealed class SourceRegistryManagementTests
         var trusted = await fixture.Trust.EvaluateSourceAsync("agentstration", "sample", "1", digest, default);
 
         Assert.AreEqual(SourceRegistryPublisherStatus.Official, trusted.Publisher.EffectiveStatus);
-        Assert.AreEqual(SourceVerificationStatus.Verified, trusted.VersionStatus);
+        Assert.AreEqual(SourceRegistryVerificationStatus.Verified, trusted.VersionStatus);
         Assert.HasCount(1, trusted.Evidence);
         Assert.AreEqual(refreshed.Observed.Definition.Current!.Id, trusted.Evidence[0].Evidence.ObservationId);
         var verification = new SourceVerificationService(new EmptyVerificationIndex(), [fixture.Trust]);
         var version = SourceVersion(RegistryManifestDigest);
         Assert.AreEqual(SourceVerificationStatus.Verified,
             (await verification.VerifyDefinitionAsync(version, default)).Status);
-        Assert.AreEqual(SourceVerificationStatus.Unverified,
+        Assert.AreEqual(SourceRegistryVerificationStatus.Unverified,
             (await fixture.Trust.EvaluateSourceAsync(
                 "agentstration", "sample", "1", $"sha256:{new string('f', 64)}", default)).VersionStatus);
 
@@ -255,7 +260,7 @@ public sealed class SourceRegistryManagementTests
         var downgraded = await fixture.Trust.EvaluateSourceAsync("agentstration", "sample", "1", digest, default);
 
         Assert.AreEqual(SourceRegistryPublisherStatus.Declared, downgraded.Publisher.EffectiveStatus);
-        Assert.AreEqual(SourceVerificationStatus.Unverified, downgraded.VersionStatus);
+        Assert.AreEqual(SourceRegistryVerificationStatus.Unverified, downgraded.VersionStatus);
         Assert.AreEqual(SourceVerificationStatus.Unverified,
             (await verification.VerifyDefinitionAsync(version, default)).Status);
         Assert.AreEqual(refreshed.Observed.Definition.Current.Id, downgraded.Evidence[0].Evidence.ObservationId);
@@ -274,7 +279,7 @@ public sealed class SourceRegistryManagementTests
         var conflict = await fixture.Trust.EvaluateSourceAsync(
             "agentstration", "sample", "1", RegistryManifestDigest, default);
 
-        Assert.AreEqual(SourceVerificationStatus.Conflict, conflict.VersionStatus);
+        Assert.AreEqual(SourceRegistryVerificationStatus.Conflict, conflict.VersionStatus);
         Assert.HasCount(2, conflict.Evidence);
         Assert.HasCount(2, conflict.Publisher.Evidence);
 
@@ -284,7 +289,7 @@ public sealed class SourceRegistryManagementTests
             "agentstration", "sample", "1", RegistryManifestDigest, default);
 
         Assert.AreEqual(SourceRegistryPublisherStatus.Revoked, revoked.Publisher.EffectiveStatus);
-        Assert.AreEqual(SourceVerificationStatus.Revoked, revoked.VersionStatus);
+        Assert.AreEqual(SourceRegistryVerificationStatus.Revoked, revoked.VersionStatus);
         Assert.HasCount(3, revoked.Evidence);
     }
 
@@ -604,7 +609,7 @@ public sealed class SourceRegistryManagementTests
         Assert.IsNotNull(await fixture.Cache.GetAsync(observationId, default));
         var history = await fixture.Store.ListExactAsync<SourceRegistryRefreshRecordResource>(
             ResourceScopeRef.Instance,
-            ResourceKinds.SourceRegistryRefreshRecord,
+            SourceRegistryKinds.SourceRegistryRefreshRecord,
             0,
             100,
             default);
@@ -912,8 +917,8 @@ public sealed class SourceRegistryManagementTests
     private static SourceRegistryRegistrationResource RegistrationResource(string name, string indexUrl) => new()
     {
         Uid = Guid.NewGuid(),
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.SourceRegistryRegistration,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = SourceRegistryKinds.SourceRegistryRegistration,
         Metadata = new ResourceMetadata { Name = name },
         ScopeRef = ResourceScopeRef.Instance,
         Definition = Registration(indexUrl)
@@ -921,8 +926,8 @@ public sealed class SourceRegistryManagementTests
 
     private static SourceVersionResource SourceVersion(string digest) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.SourceVersion,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = SourceResourceKinds.SourceVersion,
         Metadata = new ResourceMetadata { Name = "sample-1" },
         Definition = new SourceVersionProperties
         {
@@ -1159,10 +1164,10 @@ public sealed class SourceRegistryManagementTests
                 .BuildServiceProvider();
             var context = services.GetRequiredService<CurrentRequestContext>();
             using (context.PushSystem())
-                await services.GetRequiredService<IControlPlaneStore>().InitializeAsync(default);
+                await services.GetRequiredService<IResourceStore>().InitializeAsync(default);
             var documents = new FakeDocuments();
             var service = new SourceRegistryManagementService(
-                services.GetRequiredService<IControlPlaneStore>(),
+                services.GetRequiredService<IResourceStore>(),
                 new SourceRegistryIndexReader(),
                 new SourceRegistryReader(),
                 new SourceRegistryRuntimeReferenceResolver(),
@@ -1213,7 +1218,7 @@ public sealed class SourceRegistryManagementTests
             Task.FromResult<ResolvedResourceScope?>(scopeRef == ResourceScopeRef.Instance ? new(Instance, []) : null);
     }
 
-    private sealed class MemoryStore : IControlPlaneStore
+    private sealed class MemoryStore : IResourceStore
     {
         private readonly Dictionary<ScopedResourceAddress, (Resource Value, string ETag, DateTimeOffset At)> values = [];
         private long version;
@@ -1229,8 +1234,8 @@ public sealed class SourceRegistryManagementTests
         public Task<StoredResource<T>> PutExactAsync<T>(ResourceScopeRef scopeRef, T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
         {
             var key = ScopedResourceAddress.Create(scopeRef, resource.Namespace, resource.Kind, resource.Name);
-            if (ifNoneMatch && values.ContainsKey(key)) throw new ControlPlaneConcurrencyException("Already exists.");
-            if (ifMatch is not null && (!values.TryGetValue(key, out var current) || current.ETag != ifMatch)) throw new ControlPlaneConcurrencyException("ETag mismatch.");
+            if (ifNoneMatch && values.ContainsKey(key)) throw new ResourceConcurrencyException("Already exists.");
+            if (ifMatch is not null && (!values.TryGetValue(key, out var current) || current.ETag != ifMatch)) throw new ResourceConcurrencyException("ETag mismatch.");
             var etag = $"\"{Interlocked.Increment(ref version)}\"";
             var value = resource.WithSystemState(resource.Uid == Guid.Empty ? Guid.NewGuid() : resource.Uid, scopeRef, etag);
             values[key] = (value, etag, DateTimeOffset.UnixEpoch);

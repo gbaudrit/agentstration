@@ -50,7 +50,7 @@ else if (detail is null)
                 <button class="text-button @(importMode == "yaml" ? "active" : null)" type="button" @onclick='() => SetImportMode("yaml")'>@T("PasteYaml")</button>
             </div>
             <div class="form-grid">
-                <ResourceScopeFormField ResourceKind="@ResourceKinds.Source" @bind-Value="importScope" Disabled="@busy" />
+                <ResourceScopeFormField ResourceKind="@SourceResourceKinds.Source" @bind-Value="importScope" Disabled="@busy" />
                 @if (importMode == "url")
                 {
                     <label class="form-wide"><span>@T("ManifestUrl")</span><input @bind="importUrl" type="url" placeholder="https://example.org/source.yaml" disabled="@busy" /></label>
@@ -465,7 +465,7 @@ else
         finally { deletingSource = false; }
     }
     private void CloseDeleteSource() { if (!deletingSource) { confirmDeleteSource = false; deleteError = null; } }
-    private async Task PreviewPackAsync(SourceConsoleChannelView channel, SourceCatalogView catalog, SourcePackEntryView entry)
+    private async Task PreviewPackAsync(SourceConsoleChannelView channel, SourceCatalogView catalog, SourceCatalogEntryView entry)
     {
         packSelection = new(ScopeRef(), Publisher!, Name!, detail!.SelectedVersion.Uid, channel.Definition.Name,
             channel.Status.Refresh!.Definition.CurrentSnapshotUid!.Value, catalog.Provenance.CatalogName, entry.Name);
@@ -542,8 +542,8 @@ else
     }
     private ResourceScopeRef? PackTargetScope() => packPreview?.TargetScope switch { ResourceScopeKind.Instance => ResourceScopeRef.Instance, ResourceScopeKind.Tenant => ResourceScopeRef.Tenant(ContextState.Current?.TenantId ?? Guid.Empty), _ => ResourceScopeRef.Workspace(ContextState.Current?.WorkspaceId ?? Guid.Empty) };
     private string PackResourceCount(int count) => F(count == 1 ? "PackResourceCount.One" : "PackResourceCount.Many", count);
-    private bool IsPackInstalled(SourcePackEntryView entry) => installedPackIdentities.Contains(PackIdentityKey(detail!.SelectedVersion.Definition.PublishedDefinition.Publisher.Name, entry.Name));
-    private string PackUrl(SourcePackEntryView entry) => $"/packs?publisher={Uri.EscapeDataString(detail!.SelectedVersion.Definition.PublishedDefinition.Publisher.Name)}&name={Uri.EscapeDataString(entry.Name)}";
+    private bool IsPackInstalled(SourceCatalogEntryView entry) => installedPackIdentities.Contains(PackIdentityKey(detail!.SelectedVersion.Definition.PublishedDefinition.Publisher.Name, entry.Name));
+    private string PackUrl(SourceCatalogEntryView entry) => $"/packs?publisher={Uri.EscapeDataString(detail!.SelectedVersion.Definition.PublishedDefinition.Publisher.Name)}&name={Uri.EscapeDataString(entry.Name)}";
     private static string PackIdentityKey(string publisher, string name) => $"{publisher}\n{name}";
     private string BindingKindLabel(PackBindingTargetKind kind) => T($"BindingTargetKind.{kind}");
     private static UiStatus ChangeTone(PackResourceChange change) => change switch { PackResourceChange.Add => UiStatus.Success, PackResourceChange.Conflict => UiStatus.Danger, PackResourceChange.Remove => UiStatus.Warning, _ => UiStatus.Info };

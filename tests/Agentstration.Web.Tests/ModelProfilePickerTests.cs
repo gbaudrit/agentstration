@@ -1,5 +1,5 @@
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Models;
+using Agentstration.Models.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components.ModelProfiles;
 using Agentstration.Web.Console;

@@ -149,11 +149,11 @@ else if (agent is not null)
     private bool deploying;
     private PageTab activeTab;
     private ResourceNamespace AgentResourceNamespace => ResourceNamespace.Parse(AgentNamespace);
-    private ResourceAddress ModelProfileAddress => agent?.Definition.ModelProfile.Resolve(AgentResourceNamespace, ResourceKinds.ModelProfile)
-        ?? ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.ModelProfile, "unavailable");
+    private ResourceAddress ModelProfileAddress => agent?.Definition.ModelProfile.Resolve(AgentResourceNamespace, ModelResourceKinds.ModelProfile)
+        ?? ResourceAddress.Create(ResourceNamespace.Default, ModelResourceKinds.ModelProfile, "unavailable");
     private string ModelProfileUrl => ConsoleResourceUrls.ModelProfile(ModelProfileAddress);
-    private ResourceAddress RuntimeProfileAddress => agent?.Definition.RuntimeProfile.Resolve(AgentResourceNamespace, ResourceKinds.RuntimeProfile)
-        ?? ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.RuntimeProfile, "unavailable");
+    private ResourceAddress RuntimeProfileAddress => agent?.Definition.RuntimeProfile.Resolve(AgentResourceNamespace, RuntimeProfileResourceKinds.RuntimeProfile)
+        ?? ResourceAddress.Create(ResourceNamespace.Default, RuntimeProfileResourceKinds.RuntimeProfile, "unavailable");
     private string RuntimeProfileUrl => ConsoleResourceUrls.RuntimeProfile(RuntimeProfileAddress);
     private string PackIdentity => ownerPack is null ? T("UnknownPack") : $"{ownerPack.Definition.Publisher}/{ownerPack.Definition.PackName}";
     private string PackUrl => ownerPack is null ? "/packs" : $"/packs?publisher={Uri.EscapeDataString(ownerPack.Definition.Publisher)}&name={Uri.EscapeDataString(ownerPack.Definition.PackName)}";
@@ -246,15 +246,15 @@ else if (agent is not null)
         {
             ownerPack = (await PacksClient.GetPackAsync(publisher, packName, cancellation.Token)).Value;
             originalSource = (await PacksClient.GetPackResourcesAsync(publisher, packName, cancellation.Token))
-                .SingleOrDefault(resource => string.Equals(resource.Kind, ResourceKinds.Agent, StringComparison.Ordinal)
+                .SingleOrDefault(resource => string.Equals(resource.Kind, AgentResourceKinds.Agent, StringComparison.Ordinal)
                     && string.Equals(resource.Name, agent.Metadata.Name, StringComparison.Ordinal));
             modelBindings = ownerPack.Definition.Bindings
                 .Where(binding => binding.TargetKind == PackBindingTargetKind.ModelProfile
-                    && binding.Target.Resolve(ResourceNamespace.Default, ResourceKinds.ModelProfile) == ModelProfileAddress)
+                    && binding.Target.Resolve(ResourceNamespace.Default, ModelResourceKinds.ModelProfile) == ModelProfileAddress)
                 .ToArray();
             runtimeBindings = ownerPack.Definition.Bindings
                 .Where(binding => binding.TargetKind == PackBindingTargetKind.RuntimeProfile
-                    && binding.Target.Resolve(ResourceNamespace.Default, ResourceKinds.RuntimeProfile) == RuntimeProfileAddress)
+                    && binding.Target.Resolve(ResourceNamespace.Default, RuntimeProfileResourceKinds.RuntimeProfile) == RuntimeProfileAddress)
                 .ToArray();
         }
         catch (AgentstrationApiException) { }

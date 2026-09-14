@@ -1,4 +1,4 @@
-using Agentstration.Flow;
+using Agentstration.Flows;
 
 namespace Agentstration.Web.FlowDesigner.Components;
 
