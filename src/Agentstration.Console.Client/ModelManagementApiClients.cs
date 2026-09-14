@@ -1,8 +1,12 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Api.Contracts;
+using Agentstration.Extensions.Contracts;
+using Agentstration.Models.Contracts;
+using Agentstration.Runtime.Contracts;
+using Agentstration.Models;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Web.Console;
 

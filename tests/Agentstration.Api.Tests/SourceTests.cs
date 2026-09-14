@@ -1,3 +1,6 @@
+using Agentstration.Security.Contracts;
+using Agentstration.Identity.Contracts;
+using Agentstration.ResourceManagement;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Json;
@@ -5,10 +8,13 @@ using System.Security.Cryptography;
 using System.Text;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Infrastructure.Sources;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
-using Agentstration.Management.Core;
-using Agentstration.Management.Storage.Sqlite;
+using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Sources.Contracts;
+using Agentstration.Extensions;
+using Agentstration.Identity;
+using Agentstration.Packs;
+using Agentstration.Sources;
+using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.ModelProviders;
 using Agentstration.Resources;
 using Agentstration.Tools.SourceRegistry;
@@ -374,13 +380,16 @@ public sealed class SourceTests
     public void CatalogManifestRejectsNonCanonicalAndMissingDefaultLocales()
     {
         var reader = new SourceCatalogManifestReader();
-        var nonCanonical = Assert.ThrowsExactly<SourceValidationException>(() => reader.ReadCatalog(
-            BootstrapCatalog().Replace("fr-FR", "fr-fr", StringComparison.Ordinal), SourceCatalogKinds.Bootstrap));
+        var nonCanonical = Assert.ThrowsExactly<SourceValidationException>(() => reader.ReadBootstrapCatalog(
+            reader.ReadCatalog(
+                BootstrapCatalog().Replace("fr-FR", "fr-fr", StringComparison.Ordinal),
+                SourceCatalogKinds.Bootstrap)));
         Assert.AreEqual("source_catalog_locale_invalid", nonCanonical.Code);
 
-        var missingDefault = Assert.ThrowsExactly<SourceValidationException>(() => reader.ReadCatalog(
-            BootstrapCatalog().Replace("defaultLocale: fr-FR", "defaultLocale: de-DE", StringComparison.Ordinal),
-            SourceCatalogKinds.Bootstrap));
+        var missingDefault = Assert.ThrowsExactly<SourceValidationException>(() => reader.ReadBootstrapCatalog(
+            reader.ReadCatalog(
+                BootstrapCatalog().Replace("defaultLocale: fr-FR", "defaultLocale: de-DE", StringComparison.Ordinal),
+                SourceCatalogKinds.Bootstrap)));
         Assert.AreEqual("source_catalog_default_locale_missing", missingDefault.Code);
     }
 
@@ -394,7 +403,7 @@ public sealed class SourceTests
             ("catalogs/packs.yaml", PackCatalog()),
             ("catalogs/packs/who-am-i.zip", "immutable pack bytes"));
         var imported = await fixture.Service.ImportYamlAsync(
-            ManifestWithCatalog("1", SourceCatalogKinds.Pack, "catalogs/packs.yaml"), default);
+            ManifestWithCatalog("1", PackCatalogKinds.Pack, "catalogs/packs.yaml"), default);
         _ = await fixture.Bindings.ConfigureAsync(
             "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
         var refreshed = await fixture.Snapshots.RefreshExactAsync(
@@ -417,7 +426,7 @@ public sealed class SourceTests
         fixture.Materializer.Content = CatalogArchiveBytes(
             ("catalogs/packs.yaml", Encoding.UTF8.GetBytes(PackCatalog())),
             ("catalogs/packs/who-am-i.zip", pack));
-        var manifest = ManifestWithCatalog("1", SourceCatalogKinds.Pack, "catalogs/packs.yaml");
+        var manifest = ManifestWithCatalog("1", PackCatalogKinds.Pack, "catalogs/packs.yaml");
         var imported = await fixture.Service.ImportRegistryAsync(
             manifest, RegistryProvenance(manifest), ResourceScopeRef.Instance, default);
         _ = await fixture.Bindings.ConfigureAsync(
@@ -474,7 +483,7 @@ public sealed class SourceTests
             imported.Source.Source.ETag!,
             default);
         var retained = (await fixture.Store.ListExactAsync<InstalledPackResource>(
-            ResourceScopeRef.Instance, ResourceKinds.InstalledPack, 0, int.MaxValue, default)).Single();
+            ResourceScopeRef.Instance, PackKinds.InstalledPack, 0, int.MaxValue, default)).Single();
         Assert.AreEqual(installed.Value.Uid, retained.Value.Uid);
         Assert.AreEqual(imported.Source.Source.Uid, retained.Value.Definition.SourceProvenance?.SourceUid);
     }
@@ -489,7 +498,7 @@ public sealed class SourceTests
             ("catalogs/packs.yaml", Encoding.UTF8.GetBytes(PackCatalog())),
             ("catalogs/packs/who-am-i.zip", PackArchive("other", "who-am-i")));
         var imported = await fixture.Service.ImportYamlAsync(
-            ManifestWithCatalog("1", SourceCatalogKinds.Pack, "catalogs/packs.yaml"), default);
+            ManifestWithCatalog("1", PackCatalogKinds.Pack, "catalogs/packs.yaml"), default);
         _ = await fixture.Bindings.ConfigureAsync(
             "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
         var refreshed = await fixture.Snapshots.RefreshExactAsync(
@@ -511,14 +520,14 @@ public sealed class SourceTests
     {
         var kinds = new[]
         {
-            ResourceKinds.Source,
-            ResourceKinds.SourceVersion,
-            ResourceKinds.SourceConfiguration,
-            ResourceKinds.SourceObservedState,
-            ResourceKinds.SourceImportRecord,
-            ResourceKinds.SourceChannelSnapshot,
-            ResourceKinds.SourceChannelObservedState,
-            ResourceKinds.SourceChannelRefreshRecord
+            SourceResourceKinds.Source,
+            SourceResourceKinds.SourceVersion,
+            SourceResourceKinds.SourceConfiguration,
+            SourceResourceKinds.SourceObservedState,
+            SourceResourceKinds.SourceImportRecord,
+            SourceResourceKinds.SourceChannelSnapshot,
+            SourceResourceKinds.SourceChannelObservedState,
+            SourceResourceKinds.SourceChannelRefreshRecord
         };
 
         foreach (var kind in kinds)
@@ -546,7 +555,7 @@ public sealed class SourceTests
         StringAssert.Contains(conflict.Message, "different manifest digest");
         Assert.HasCount(1, await fixture.Service.ListVersionsAsync("agentstration", "official-samples", default));
 
-        var records = await fixture.Store.ListAllAsync<SourceImportRecordResource>(ResourceKinds.SourceImportRecord, default);
+        var records = await fixture.Store.ListAllAsync<SourceImportRecordResource>(SourceResourceKinds.SourceImportRecord, default);
         CollectionAssert.AreEquivalent(
             new[] { SourceImportOutcome.Created, SourceImportOutcome.Unchanged, SourceImportOutcome.Rejected },
             records.Select(value => value.Value.Definition.Outcome).ToArray());
@@ -594,13 +603,13 @@ public sealed class SourceTests
 
         Assert.IsNull(await fixture.Service.GetExactAsync(
             ResourceScopeRef.Instance, "agentstration", "official-samples", default));
-        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceVersionResource>(ResourceScopeRef.Instance, ResourceKinds.SourceVersion, 0, int.MaxValue, default));
-        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceConfigurationResource>(ResourceScopeRef.Instance, ResourceKinds.SourceConfiguration, 0, int.MaxValue, default));
-        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceObservedResource>(ResourceScopeRef.Instance, ResourceKinds.SourceObservedState, 0, int.MaxValue, default));
-        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceImportRecordResource>(ResourceScopeRef.Instance, ResourceKinds.SourceImportRecord, 0, int.MaxValue, default));
-        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceChannelSnapshotResource>(ResourceScopeRef.Instance, ResourceKinds.SourceChannelSnapshot, 0, int.MaxValue, default));
-        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceChannelObservedResource>(ResourceScopeRef.Instance, ResourceKinds.SourceChannelObservedState, 0, int.MaxValue, default));
-        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceChannelRefreshRecordResource>(ResourceScopeRef.Instance, ResourceKinds.SourceChannelRefreshRecord, 0, int.MaxValue, default));
+        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceVersionResource>(ResourceScopeRef.Instance, SourceResourceKinds.SourceVersion, 0, int.MaxValue, default));
+        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceConfigurationResource>(ResourceScopeRef.Instance, SourceResourceKinds.SourceConfiguration, 0, int.MaxValue, default));
+        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceObservedResource>(ResourceScopeRef.Instance, SourceResourceKinds.SourceObservedState, 0, int.MaxValue, default));
+        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceImportRecordResource>(ResourceScopeRef.Instance, SourceResourceKinds.SourceImportRecord, 0, int.MaxValue, default));
+        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceChannelSnapshotResource>(ResourceScopeRef.Instance, SourceResourceKinds.SourceChannelSnapshot, 0, int.MaxValue, default));
+        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceChannelObservedResource>(ResourceScopeRef.Instance, SourceResourceKinds.SourceChannelObservedState, 0, int.MaxValue, default));
+        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceChannelRefreshRecordResource>(ResourceScopeRef.Instance, SourceResourceKinds.SourceChannelRefreshRecord, 0, int.MaxValue, default));
 
         var reimported = await fixture.Service.ImportYamlAsync(
             Manifest("1", "Published name", includeChannel: true)
@@ -998,10 +1007,10 @@ public sealed class SourceTests
         Assert.AreEqual(SourceRefreshTrigger.Manual, refreshed.Source.Observed.Definition.LastTrigger);
         Assert.AreEqual(1, fixture.Retriever.RetrieveCount);
         var versions = await fixture.Store.ListExactAsync<SourceVersionResource>(ResourceScopeRef.Instance,
-            ResourceKinds.SourceVersion, 0, int.MaxValue, default);
+            SourceResourceKinds.SourceVersion, 0, int.MaxValue, default);
         Assert.HasCount(1, versions);
         var records = await fixture.Store.ListExactAsync<SourceImportRecordResource>(ResourceScopeRef.Instance,
-            ResourceKinds.SourceImportRecord, 0, int.MaxValue, default);
+            SourceResourceKinds.SourceImportRecord, 0, int.MaxValue, default);
         Assert.HasCount(2, records);
         Assert.HasCount(1, records.Where(value => value.Value.Definition.Trigger == SourceRefreshTrigger.Manual));
     }
@@ -1092,7 +1101,7 @@ public sealed class SourceTests
         Assert.AreEqual(snapshotUid, skipped.Definition.CurrentSnapshotUid);
         Assert.AreEqual(1, fixture.Materializer.MaterializeCount);
         var history = await fixture.Store.ListExactAsync<SourceChannelRefreshRecordResource>(
-            ResourceScopeRef.Instance, ResourceKinds.SourceChannelRefreshRecord, 0, int.MaxValue, default);
+            ResourceScopeRef.Instance, SourceResourceKinds.SourceChannelRefreshRecord, 0, int.MaxValue, default);
         CollectionAssert.AreEqual(new[] { SourceChannelRefreshOutcome.Created, SourceChannelRefreshOutcome.Skipped },
             history.OrderBy(value => value.Value.Definition.AttemptedAt)
                 .Select(value => value.Value.Definition.Outcome).ToArray());
@@ -1129,13 +1138,13 @@ public sealed class SourceTests
         clock.Advance(TimeSpan.FromSeconds(29));
         await fixture.Scheduler.RunDueAsync(default);
         var firstWindow = await fixture.Store.ListExactAsync<SourceChannelRefreshRecordResource>(
-            ResourceScopeRef.Instance, ResourceKinds.SourceChannelRefreshRecord, 0, int.MaxValue, default);
+            ResourceScopeRef.Instance, SourceResourceKinds.SourceChannelRefreshRecord, 0, int.MaxValue, default);
         Assert.HasCount(1, firstWindow);
 
         clock.Advance(TimeSpan.FromSeconds(1));
         await fixture.Scheduler.RunDueAsync(default);
         var secondWindow = await fixture.Store.ListExactAsync<SourceChannelRefreshRecordResource>(
-            ResourceScopeRef.Instance, ResourceKinds.SourceChannelRefreshRecord, 0, int.MaxValue, default);
+            ResourceScopeRef.Instance, SourceResourceKinds.SourceChannelRefreshRecord, 0, int.MaxValue, default);
         Assert.HasCount(2, secondWindow);
         var observed = await fixture.Snapshots.GetObservedAsync(ResourceScopeRef.Instance, "agentstration",
             "official-samples", imported.Version.Uid, "stable", default);
@@ -1239,8 +1248,8 @@ public sealed class SourceTests
         {
             await factory.Services.GetRequiredService<ExtensionRegistrationManagementService>().CreateAsync(new ExtensionRegistrationResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ExtensionRegistration,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ExtensionKinds.ExtensionRegistration,
                 Metadata = new ResourceMetadata { Name = providerName },
                 ScopeRef = ResourceScopeRef.Instance,
                 Definition = new ExtensionRegistrationProperties
@@ -1253,8 +1262,8 @@ public sealed class SourceTests
             }, default);
             await factory.Services.GetRequiredService<SourceProviderManagementService>().CreateAsync(new SourceProviderResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.SourceProvider,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SourceResourceKinds.SourceProvider,
                 Metadata = new ResourceMetadata { Name = providerName },
                 ScopeRef = ResourceScopeRef.Instance,
                 Definition = new SourceProviderProperties
@@ -1386,9 +1395,9 @@ public sealed class SourceTests
             Catalog = new SourceRegistryCatalogObservation
             {
                 Name = selection.CatalogName,
-                Compatibility = new SourceCompatibility
+                Compatibility = new SourceRegistryCompatibility
                 {
-                    Agentstration = new SourceCompatibilityBounds { MinVersion = "0.2.0-alpha.1" }
+                    Agentstration = new SourceRegistryCompatibilityBounds { MinVersion = "0.2.0-alpha.1" }
                 },
                 RegistryUrl = "registry-agentstration-0.2.json",
                 RegistryDigest = evidence.CatalogDigest,
@@ -1402,7 +1411,7 @@ public sealed class SourceTests
             FinalManifestUrl = new("https://registry.example/v1/sources/agentstration/official-samples/1/source.yaml"),
             ExpectedManifestDigest = parsed.Digest,
             Trust = new SourceRegistrySourceTrustView(
-                publisherTrust, SourceVerificationStatus.Verified, "source_definition_verified_by_registry",
+                publisherTrust, SourceRegistryVerificationStatus.Verified, "source_definition_verified_by_registry",
                 parsed.Digest, DateTimeOffset.UnixEpoch, [])
         };
     }
@@ -1554,7 +1563,7 @@ public sealed class SourceTests
         string manifestDigest,
         IReadOnlyList<VerifiedSourceChannelDefinition>? channels = null) => new()
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = SourceVerificationKinds.VerifiedSourceIndex,
             Definition = new VerifiedSourceIndexDefinition
             {
@@ -1627,12 +1636,12 @@ public sealed class SourceTests
         private readonly string database;
         public SourceManagementService Service => services.GetRequiredService<SourceManagementService>();
         public CurrentRequestContext Context => services.GetRequiredService<CurrentRequestContext>();
-        public IControlPlaneStore Store => services.GetRequiredService<IControlPlaneStore>();
+        public IResourceStore Store => services.GetRequiredService<IResourceStore>();
         public SourceBindingManagementService Bindings => services.GetRequiredService<SourceBindingManagementService>();
         public SourceChannelSnapshotService Snapshots => services.GetRequiredService<SourceChannelSnapshotService>();
         public SourceRefreshScheduler Scheduler => services.GetRequiredService<SourceRefreshScheduler>();
         public SourceCatalogService Catalogs => services.GetRequiredService<SourceCatalogService>();
-        public SourcePackInstallationService SourcePacks => services.GetRequiredService<SourcePackInstallationService>();
+        public PackSourceInstallationService SourcePacks => services.GetRequiredService<PackSourceInstallationService>();
         public ISourceSnapshotContentReader ContentReader => services.GetRequiredService<ISourceSnapshotContentReader>();
         public SourceVerificationService Verification => services.GetRequiredService<SourceVerificationService>();
         public FakeSourceVerificationIndexProvider VerificationIndex => services.GetRequiredService<FakeSourceVerificationIndexProvider>();
@@ -1690,11 +1699,14 @@ public sealed class SourceTests
             collection.AddSingleton(new SourceMaterializationLimits());
             collection.AddSingleton<SourceChannelSnapshotService>();
             collection.AddSingleton<SourceRefreshScheduler>();
+            collection.AddSingleton<ISourceCatalogContentResolver, SourceCatalogContentResolver>();
+            collection.AddSingleton<PackSourceCatalogHandler>();
+            collection.AddSingleton<ISourceCatalogHandler>(provider => provider.GetRequiredService<PackSourceCatalogHandler>());
             collection.AddSingleton<SourceCatalogService>();
             collection.AddSingleton<IPackArchiveReader, ZipPackArchiveReader>();
             collection.AddSingleton<IPackResourceHandler, SourcePackRecordingHandler>();
             collection.AddSingleton<PackManagementService>();
-            collection.AddSingleton<SourcePackInstallationService>();
+            collection.AddSingleton<PackSourceInstallationService>();
             var services = collection.BuildServiceProvider();
             var fixture = new Fixture(services, database, ownsDatabase);
             using (fixture.Context.PushSystem()) await fixture.Store.InitializeAsync(default);
@@ -1706,8 +1718,8 @@ public sealed class SourceTests
             var registrations = services.GetRequiredService<ExtensionRegistrationManagementService>();
             await registrations.CreateAsync(new ExtensionRegistrationResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ExtensionRegistration,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ExtensionKinds.ExtensionRegistration,
                 Metadata = new ResourceMetadata { Name = "source-extension" },
                 ScopeRef = ResourceScopeRef.Instance,
                 Definition = new ExtensionRegistrationProperties
@@ -1719,8 +1731,8 @@ public sealed class SourceTests
             }, default);
             await services.GetRequiredService<SourceProviderManagementService>().CreateAsync(new SourceProviderResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.SourceProvider,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SourceResourceKinds.SourceProvider,
                 Metadata = new ResourceMetadata { Name = "git-local" },
                 ScopeRef = ResourceScopeRef.Instance,
                 Definition = new SourceProviderProperties

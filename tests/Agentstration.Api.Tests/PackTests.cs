@@ -1,18 +1,26 @@
+using Agentstration.Identity.Contracts;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets;
+using Agentstration.Agents;
+using Agentstration.ResourceManagement;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Contracts;
+using Agentstration.Flows;
+using Agentstration.Flows.Contracts;
 using Agentstration.Infrastructure.Packs;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
-using Agentstration.Management.Core;
-using Agentstration.Management.Storage.Sqlite;
-using Agentstration.Resources;
+using Agentstration.Api.Contracts;
 using Agentstration.Runtime.Contracts;
+using Agentstration.Models;
+using Agentstration.Packs;
+using Agentstration.Runtime.Profiles;
+using Agentstration.Runtime.Core;
+using Agentstration.ResourceManagement.Storage.Sqlite;
+using Agentstration.Resources;
+using Agentstration.Work;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -66,10 +74,10 @@ public sealed class PackTests
 
         var catalog = await client.GetFromJsonAsync<PackCompositionCatalogItem[]>("/api/pack-projects/composer/resources")
             ?? throw new AssertFailedException("The Pack Composer catalog response was empty.");
-        var agent = catalog.Single(item => item.Resource.Kind == ResourceKinds.Agent && item.Resource.Name == "dotnet-expert");
-        var modelProfile = catalog.Single(item => item.Resource.Kind == ResourceKinds.ModelProfile && item.Resource.Name == "reasoning-default");
-        var modelProvider = catalog.Single(item => item.Resource.Kind == ResourceKinds.ModelProvider && item.Resource.Name == "ollama-local");
-        var runtimeProfile = catalog.Single(item => item.Resource.Kind == ResourceKinds.RuntimeProfile && item.Resource.Name == "maf-builtin");
+        var agent = catalog.Single(item => item.Resource.Kind == AgentResourceKinds.Agent && item.Resource.Name == "dotnet-expert");
+        var modelProfile = catalog.Single(item => item.Resource.Kind == ModelResourceKinds.ModelProfile && item.Resource.Name == "reasoning-default");
+        var modelProvider = catalog.Single(item => item.Resource.Kind == ModelResourceKinds.ModelProvider && item.Resource.Name == "ollama-local");
+        var runtimeProfile = catalog.Single(item => item.Resource.Kind == RuntimeProfileResourceKinds.RuntimeProfile && item.Resource.Name == "maf-builtin");
         Assert.AreEqual(PackCompositionAvailability.Selectable, agent.Availability);
         Assert.AreEqual(PackCompositionAvailability.Selectable, modelProfile.Availability);
         Assert.AreEqual(PackCompositionAvailability.Selectable, modelProvider.Availability);
@@ -94,7 +102,7 @@ public sealed class PackTests
         preview = await previewResponse.Content.ReadFromJsonAsync<PackCompositionPreview>();
         Assert.IsNotNull(preview);
         CollectionAssert.AreEquivalent(
-            new[] { ResourceKinds.Agent, ResourceKinds.ModelProfile },
+            new[] { AgentResourceKinds.Agent, ModelResourceKinds.ModelProfile },
             preview.Resources.Select(resource => resource.Resource.Kind).ToArray());
         CollectionAssert.AreEquivalent(
             new[] { PackBindingTargetKind.ModelProvider, PackBindingTargetKind.RuntimeProfile },
@@ -124,9 +132,9 @@ public sealed class PackTests
         Assert.IsNotNull(project);
         Assert.AreEqual(PackProjectSourceKind.WorkspaceSnapshot, project.Definition.SourceKind);
         Assert.HasCount(4, project.Definition.SourceResources);
-        Assert.IsTrue(project.Definition.SourceResources.Any(resource => resource.Kind == ResourceKinds.ModelProfile && resource.Name == "reasoning-default"));
-        Assert.IsTrue(project.Definition.SourceResources.Any(resource => resource.Kind == ResourceKinds.ModelProvider && resource.Name == "ollama-local"));
-        Assert.IsTrue(project.Definition.SourceResources.Any(resource => resource.Kind == ResourceKinds.RuntimeProfile && resource.Name == "maf-builtin"));
+        Assert.IsTrue(project.Definition.SourceResources.Any(resource => resource.Kind == ModelResourceKinds.ModelProfile && resource.Name == "reasoning-default"));
+        Assert.IsTrue(project.Definition.SourceResources.Any(resource => resource.Kind == ModelResourceKinds.ModelProvider && resource.Name == "ollama-local"));
+        Assert.IsTrue(project.Definition.SourceResources.Any(resource => resource.Kind == RuntimeProfileResourceKinds.RuntimeProfile && resource.Name == "maf-builtin"));
     }
 
     [TestMethod]
@@ -215,8 +223,8 @@ public sealed class PackTests
             }
             var document = new BootstrapResourceDocument
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = BootstrapResourceKinds.PackInstallation,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = PackBootstrapKinds.PackInstallation,
                 Metadata = new ResourceMetadata { Name = "tools" },
                 Definition = JsonSerializer.SerializeToElement(new { source = new { path = "tools.zip" } })
             };
@@ -307,8 +315,8 @@ public sealed class PackTests
         await using var fixture = await PackFixture.CreateAsync();
         _ = await fixture.Store.PutAsync(new ModelProfileResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.ModelProfile,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ModelResourceKinds.ModelProfile,
             Metadata = new ResourceMetadata { Name = "shared-chat" },
             Definition = new ModelProfileProperties
             {
@@ -319,8 +327,8 @@ public sealed class PackTests
         }, null, true, default);
         _ = await fixture.Store.PutAsync(new SecretResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Secret,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Secret,
             Metadata = new ResourceMetadata { Name = "shared-key" },
             Definition = new SecretProperties
             {
@@ -331,8 +339,8 @@ public sealed class PackTests
         }, null, true, default);
         _ = await fixture.Store.PutAsync(new RuntimeProfileResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.RuntimeProfile,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = RuntimeProfileResourceKinds.RuntimeProfile,
             Metadata = new ResourceMetadata { Name = "shared-runtime", Namespace = new ResourceNamespace("shared.platform") },
             Definition = new RuntimeProfileProperties
             {
@@ -344,12 +352,12 @@ public sealed class PackTests
         var service = new PackManagementService(fixture.Store, [handler], TimeProvider.System);
         var document = new PackResourceDocument(
             "resources/consumer.json",
-            ManagementApiVersions.CoreV1,
+            ResourceApiVersions.CoreV1,
             "Consumer",
             "consumer",
             JsonSerializer.SerializeToElement(new
             {
-                apiVersion = ManagementApiVersions.CoreV1,
+                apiVersion = ResourceApiVersions.CoreV1,
                 kind = "Consumer",
                 metadata = new { name = "consumer" },
                 definition = new
@@ -362,7 +370,7 @@ public sealed class PackTests
         var archive = new PackArchive(
             new PackManifest
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
+                ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = PackKinds.Pack,
                 Metadata = new PackMetadata { Publisher = "agentstration", Name = "test-pack", Version = "1.0.0" },
                 Definition = new PackDefinition
@@ -432,8 +440,8 @@ public sealed class PackTests
         var runtimeProfiles = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
         var runtime = await runtimeProfiles.CreateAsync(new RuntimeProfileResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.RuntimeProfile,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = RuntimeProfileResourceKinds.RuntimeProfile,
             Metadata = new ResourceMetadata { Name = "pack-runtime", Namespace = runtimeNamespace },
             Definition = new RuntimeProfileProperties
             {
@@ -505,11 +513,11 @@ public sealed class PackTests
         Assert.IsNotNull(prepared);
         Assert.AreEqual("Ready", prepared.State);
 
-        var store = factory.Services.GetRequiredService<IControlPlaneStore>();
-        await store.DeleteAsync(new(ResourceKinds.Agent, "assistant", packNamespace), agent.ETag, default);
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        await store.DeleteAsync(new(AgentResourceKinds.Agent, "assistant", packNamespace), agent.ETag, default);
         await runtimeProfiles.DeleteAsync(runtimeNamespace, "pack-runtime", runtime.ETag, default);
         Assert.IsNull(await store.GetAsync<AgentDeployment>(
-            new(ResourceKinds.AgentDeployment, deployment.Value.Metadata.Name, packNamespace), default));
+            new(AgentResourceKinds.AgentDeployment, deployment.Value.Metadata.Name, packNamespace), default));
     }
 
     [TestMethod]
@@ -576,7 +584,7 @@ public sealed class PackTests
         var packService = factory.Services.GetRequiredService<PackManagementService>();
         var runtimeProfiles = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
         Assert.IsNotNull(await runtimeProfiles.GetAsync(new ResourceNamespace("agentstration.test-pack"), "pack-runtime", default));
-        var controlStore = factory.Services.GetRequiredService<IControlPlaneStore>();
+        var controlStore = factory.Services.GetRequiredService<IResourceStore>();
         var retained = await packService.GetAsync(new("agentstration", "test-pack"), default);
         Assert.IsNotNull(retained);
         _ = await controlStore.PutAsync(retained.Value with
@@ -635,7 +643,7 @@ public sealed class PackTests
         Assert.HasCount(3, preview.Bindings.Single(binding => binding.Name == "conversational-model").UsedBy);
         Assert.HasCount(3, preview.Bindings.Single(binding => binding.Name == "local-runtime").UsedBy);
         CollectionAssert.AreEquivalent(
-            new[] { ResourceKinds.Agent, ResourceKinds.Agent, ResourceKinds.Agent, ResourceKinds.Flow, ResourceKinds.Entry },
+            new[] { AgentResourceKinds.Agent, AgentResourceKinds.Agent, AgentResourceKinds.Agent, FlowResourceKinds.Flow, EntryResourceKinds.Entry },
             preview.Resources.Select(resource => resource.Kind).ToArray());
 
         using var installContent = InstallationContent(
@@ -816,7 +824,7 @@ public sealed class PackTests
     private static PackArchive Archive(params PackResourceDocument[] resources) => new(
         new PackManifest
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Kind = PackKinds.Pack,
             Metadata = new PackMetadata { Publisher = "agentstration", Name = "test-pack", Version = "1.0.0" },
             Definition = new PackDefinition { Resources = resources.Select(value => value.Path).ToArray() }
@@ -826,12 +834,12 @@ public sealed class PackTests
     {
         var document = JsonSerializer.SerializeToElement(new
         {
-            apiVersion = ManagementApiVersions.CoreV1,
+            apiVersion = ResourceApiVersions.CoreV1,
             kind,
             metadata = new { name },
             definition = new { }
         });
-        return new($"resources/{name}.json", ManagementApiVersions.CoreV1, kind, name, document);
+        return new($"resources/{name}.json", ResourceApiVersions.CoreV1, kind, name, document);
     }
 
     private static MemoryStream CreateZip(IReadOnlyDictionary<string, string> files)
@@ -946,9 +954,9 @@ public sealed class PackTests
         }
     }
 
-    private sealed class PackFixture(string directory, ServiceProvider provider, IControlPlaneStore store) : IAsyncDisposable
+    private sealed class PackFixture(string directory, ServiceProvider provider, IResourceStore store) : IAsyncDisposable
     {
-        public IControlPlaneStore Store { get; } = store;
+        public IResourceStore Store { get; } = store;
         public static async Task<PackFixture> CreateAsync()
         {
             var directory = Path.Combine(Path.GetTempPath(), "agentstration-pack-tests", Guid.NewGuid().ToString("N"));
@@ -958,7 +966,7 @@ public sealed class PackTests
                 .AddSingleton<ICurrentRequestContext, SystemOperationRequestContext>()
                 .AddSqliteControlPlane($"Data Source={Path.Combine(directory, "management.db")};Pooling=False")
                 .BuildServiceProvider();
-            var store = provider.GetRequiredService<IControlPlaneStore>();
+            var store = provider.GetRequiredService<IResourceStore>();
             await store.InitializeAsync(default);
             return new(directory, provider, store);
         }

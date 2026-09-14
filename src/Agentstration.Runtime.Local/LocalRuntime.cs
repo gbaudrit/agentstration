@@ -1,7 +1,8 @@
 using System.Collections.Concurrent;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Agents;
 using Agentstration.ModelProviders;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.AI;
 
@@ -116,7 +117,7 @@ public sealed class SharedHostAgentProvisioner(IEnumerable<IAgentRuntimeFactory>
 
 public sealed class LocalAgentDeploymentReconciler(
     IEnumerable<IAgentDeploymentProvisioner> provisioners,
-    IControlPlaneStore store,
+    IResourceStore store,
     IRuntimeRegistry registry) : IAgentDeploymentReconciler
 {
     public async Task<AgentDeploymentReconciliationResult> ReconcileAsync(AgentDeployment deployment, CancellationToken cancellationToken)
@@ -154,7 +155,7 @@ public sealed class LocalAgentDeploymentReconciler(
         }
 
         if (current is not null) await provisioner.DeprovisionAsync(deployment, cancellationToken);
-        var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, deployment.RevisionName, deployment.AgentNamespace), cancellationToken);
+        var revision = await store.GetAsync<AgentRevision>(new ResourceKey(AgentResourceKinds.AgentRevision, deployment.RevisionName, deployment.AgentNamespace), cancellationToken);
         if (revision is null) return Failed(deployment, $"Revision '{deployment.RevisionName}' does not exist.");
         var result = await provisioner.ProvisionAsync(revision.Value, deployment, cancellationToken);
         if (!result.Succeeded) return Failed(deployment, result.Error ?? "Provisioning failed.");

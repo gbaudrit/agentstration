@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Contracts;
+using Agentstration.Flows;
+using Agentstration.Flows.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.FlowDesigner.Components;

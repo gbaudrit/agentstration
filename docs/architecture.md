@@ -2,14 +2,15 @@
 
 ## Outcome and constraints
 
-Agentstration keeps explicit Management Plane, Runtime Plane, and Work Plane boundaries in one modular codebase and one authoritative standalone server. `Agentstration.Web` is the executable composition root, `Agentstration.Api` owns the server-side REST, OpenAPI, MCP, SignalR, request-context, and authorization transport surface, and the Console presentation is compiled in a dedicated Razor component library that consumes typed HTTP clients; the end-user Workplace remains a separate HTTP/SignalR client UI. The Management Plane is authoritative for definitions, revisions, and desired deployment state. The Runtime Plane owns technical execution. The Work Plane owns the functional lifecycle, history, interactions, and results of delegated work. Runtime `AIAgent` objects are reconstructible and never persisted. The default launch is fully local; Foundry, PostgreSQL, Ollama, and OTLP are optional profiles, while Aspire orchestrates the server, Workplace, and optional extensions.
+Agentstration keeps explicit Management Plane, Runtime Plane, and Work Plane boundaries in one modular codebase and one authoritative standalone server. `Agentstration.Web` is the executable composition root, family-owned `Agentstration.*.Api` modules own REST, MCP, SignalR, request-context, and authorization transport, and the lightweight `Agentstration.Api` aggregator composes them with global OpenAPI and health conventions. The Console presentation is compiled in a dedicated Razor component library that consumes typed HTTP clients; the end-user Workplace remains a separate HTTP/SignalR client UI. The Management Plane is authoritative for definitions, revisions, and desired deployment state. The Runtime Plane owns technical execution. The Work Plane owns the functional lifecycle, history, interactions, and results of delegated work. Runtime `AIAgent` objects are reconstructible and never persisted. The default launch is fully local; Foundry, PostgreSQL, Ollama, and OTLP are optional profiles, while Aspire orchestrates the server, Workplace, and optional extensions.
 
 ## Solution tree
 
 ```text
 src/
   Agentstration.AppHost/          Aspire orchestration and dashboard
-  Agentstration.Api/              REST, OpenAPI, MCP, SignalR and HTTP security transport
+  Agentstration.Api/              explicit API-module aggregation, global health and OpenAPI
+  Agentstration.*.Api/            family-owned REST, MCP, SignalR and HTTP security transport
   Agentstration.Web/              authoritative standalone composition, lifecycle, Razor shell and workers
   Agentstration.Console.Client/   typed operations Console HTTP and SignalR clients
   Agentstration.Console.Components/ operations Console routes, presentation state and localization
@@ -19,16 +20,27 @@ src/
   Agentstration.Workplace.Components/ reusable Workplace business components
   Agentstration.Workplace.Web/    standalone end-user Blazor host
   Agentstration.Application/      use cases and module contracts
-  Agentstration.Flow/             provider-neutral Flow definitions and references
-  Agentstration.Flow.Application/ Flow CRUD, publication, activation, resolution
-  Agentstration.Flow.Contracts/   public Flow API contracts
-  Agentstration.Flow.Storage.Abstractions/
-  Agentstration.Flow.Storage.Sqlite/
+  Agentstration.Flows/             provider-neutral Flow definitions and references
+  Agentstration.Flows.Application/ Flow CRUD, publication, activation, resolution
+  Agentstration.Flows.Contracts/   public Flow API contracts
+  Agentstration.Flows.Storage.Abstractions/
+  Agentstration.Flows.Storage.Sqlite/
   Agentstration.Infrastructure/   JSON/EF storage, AI, HTTP, event bus, queues
-  Agentstration.Management.Abstractions/ canonical resources, ports, events, resolved specs
-  Agentstration.Management.Core/  Management validation, use cases, revisions, deployments
-  Agentstration.Management.Contracts/
-  Agentstration.Management.Storage.Sqlite/
+  Agentstration.Bootstrap.Contracts/      composed Bootstrap profile/application contracts
+  Agentstration.Sources.Contracts/       Source and Source Registry resources, policies and provider contracts
+  Agentstration.Api.Contracts/    family-neutral HTTP collection contracts
+  Agentstration.*.Contracts/      public contracts owned by each resource family
+  Agentstration.ResourceManagement.Contracts/ generic resource and Bootstrap handler contracts
+  Agentstration.Extensions/       Extension registration and inventory use cases
+  Agentstration.Extensions.Aep/   AEP enrollment use cases
+  Agentstration.Identity.Contracts/ identity, authorization and PAT contracts
+  Agentstration.Identity/         Identity, authorization, scope and audit use cases
+  Agentstration.Security.Contracts/ provider-neutral security audit contracts
+  Agentstration.Models.Application/ Model administration use cases
+  Agentstration.Packs.Contracts/    Pack installation, authoring and composition contracts
+  Agentstration.Packs/            Pack authoring, installation and composition
+  Agentstration.Sources/          Source and source-registry use cases
+  Agentstration.ResourceManagement.Storage.Sqlite/
   ../aep/                            autonomous future AEP repository subtree
   Agentstration.Extensions.Ollama/   autonomous AEP-to-Ollama service
   Agentstration.Extensions.LlamaCpp/ autonomous AEP-to-llama.cpp service
@@ -41,6 +53,7 @@ src/
   Agentstration.Runtime.Contracts/  Public Runtime Run HTTP contracts
   Agentstration.Runtime.AgentFramework/
   Agentstration.Runtime.Local/
+  Agentstration.Runtime.Profiles/  Runtime-profile administration
   Agentstration.Runtime.Storage.Sqlite/
   Agentstration.Work/              WorkItem aggregate, execution event contracts, runtime port
   Agentstration.Work.Contracts/    versionable HTTP request/response contracts
@@ -52,7 +65,7 @@ tests/
   Agentstration.ArchitectureTests/
   Agentstration.Console.Client.Tests/
   Agentstration.Console.Components.Tests/
-  Agentstration.Management.Core.Tests/
+  Agentstration.Tools.Tests/
   Agentstration.Management.Storage.Tests/
   Agentstration.Management.Sources.Tests/
   Agentstration.Management.Api.Tests/
@@ -74,10 +87,11 @@ Web ---> Management / Flow / Runtime public boundaries
 Console.Components ---> Console.Client + shared UI + neutral contracts
 Web ---> Api ---> application/module services and public contracts
 
-Web -> Management contracts + core
-Management.Core -> Management.Abstractions + Runtime.Abstractions
-Management.Contracts -> Management.Abstractions
-Management.Storage.Sqlite -> Management.Abstractions + EF Core SQLite
+Web -> family-owned contracts + plural resource-family modules
+Resource-family modules -> Resources + ResourceManagement + narrow family ports
+Family contracts -> their public family models + neutral resource primitives
+Bootstrap.Contracts -> ResourceManagement.Contracts + Sources.Contracts + Resources
+ResourceManagement.Storage.* -> family-owned contracts + ResourceManagement + EF Core
 Infrastructure -> SQLite control-plane storage + local/MAF runtime adapters
 Web -> ModelProviders -> Aep.MicrosoftExtensionsAI -> Aep.Client
 Extensions.Ollama -> Aep.AspNetCore + OllamaSharp
@@ -99,7 +113,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 
 `Agentstration.Web/Program.cs` is deliberately limited to creating the builder, applying the standalone composition, initializing it, and running it. `StandaloneHostComposition` remains in the executable project and is the single place that selects storage and identity providers, registers concrete adapters and workers, configures observability, orders startup initialization, and assembles `Agentstration.Api` with the Console libraries. This is code separation only: direct launch, Aspire, and the Docker image still start one authoritative ASP.NET Core process with one set of stores, queues, schedulers, and workers.
 
-Canonical Management resources and provider-neutral ports live in `Management.Abstractions`; validation and use cases live in `Management.Core`. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
+Management abstractions and kind constants are owned by their resource families; the former compatibility assembly has been removed. Identity, authorization and PAT contracts are owned by `Identity.Contracts`, provider-neutral audit contracts by `Security.Contracts`, Extension registration and AEP contracts by `Extensions.Contracts`, and all Source and Source Registry contracts, policies, provenance and provider ports by `Sources.Contracts`. Generic Bootstrap documents, planning and handler ports are owned by `ResourceManagement.Contracts`; composed application and HTTP contracts live in the narrow `Bootstrap.Contracts` façade. Validation and use cases live in plural resource-family modules. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
 
 `Agentstration.Resources` contains the neutral namespace, scope-reference, and address value types shared across boundaries. Management resources retain globally unique UIDs and use `(scope, namespace, kind, name)` as their exact logical identity. Canonical scope references are `/instance`, `/tenants/{tenantId}`, and `/workspaces/{workspaceId}`. Existing workspace callers implicitly use their current workspace and the `default` namespace. Relative references inherit their owner's namespace; explicit cross-namespace references retain the supplied namespace. See ADR-0035 and ADR-0079.
 
@@ -385,7 +399,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 37. **Delivered optional Source verification increment:** a bounded lazily loaded static index can match an immutable Source Version by exact identity, opaque version, and canonical manifest digest. Channel evidence independently matches an exact revision and complete snapshot digest; URLs, domains, publisher declarations, and locales never establish trust. Missing or failed index access leaves Agentstration usable offline and never invalidates retained local state. See ADR-0088.
 38. **Delivered Source Bootstrap application increment:** a compatible pinned Source catalog entry and exact locale variant are adapted into the existing administrative Bootstrap preview and application pipeline. Confirmation pins version, Channel Snapshot, catalog, entry, locale, path, target, and bindings in one digest; successful history retains complete Source and provider provenance while local Bootstrap remains unchanged. See ADR-0089.
 39. **Delivered Source Provider administration increment:** Platform administrators explicitly configure instance-, tenant-, or workspace-owned Source Providers from visible AEP contributions through ETag-protected APIs and the Console. Observed status and Source-binding usages remain visible, referenced providers cannot be deleted, and Source binding edits never select a provider implicitly. See ADR-0081, ADR-0084, and ADR-0102.
-40. **Delivered Source Pack installation increment:** compatible Pack catalog entries from an exact pinned Source snapshot are resolved server-side, previewed, and installed through the existing Pack lifecycle. Confirmation supplies a digest over the complete pin, Pack identity, bindings, target, options, and conflict state; the server rebuilds the preview and rejects stale confirmation. Complete Source and Pack provenance is retained independently, and local archive installation remains unchanged. See ADR-0095.
+40. **Delivered Source Pack installation increment:** the Pack family resolves compatible Pack catalog entries from an exact pinned Source snapshot through provider-neutral Source content ports, then previews and installs them through the existing Pack lifecycle. Confirmation supplies a digest over the complete pin, Pack identity, bindings, target, options, and conflict state; the server rebuilds the preview and rejects stale confirmation. `PackCatalog` schemas and handlers belong to Packs, Sources never reference Pack assemblies, complete Source and Pack provenance is retained independently, and local archive installation remains unchanged. See ADR-0095.
 41. **Delivered independent Source and Channel refresh increment:** mutable local policies schedule Source-definition HTTP fetch and per-Channel materialization independently, with disabled offline defaults, exact Channel overrides, conditional requests, deterministic jitter, bounded timeout and retry/backoff, persisted observed outcomes, and keyed concurrency. Compatibility-unknown or incompatible Channels are skipped without losing their last snapshot; Registry refresh remains a separate concern. See ADR-0097.
 42. **Delivered Source registry lifecycle increment:** Platform administrators manage independent official, community, and private Registry endpoints as instance-owned, ETag-protected registrations with explicit trust, network, authentication, refresh, and cache policies. Opt-in periodic refresh reuses the Source scheduling worker with persisted timeout/backoff/jitter, last-known-good, staleness, recovery, and bounded cache-retention state. Credentials remain instance-scoped Secret references resolved only for same-origin requests, while deletion preserves retained observations for provenance. See ADR-0098 and ADR-0101.
 43. **Delivered Source registry trust increment:** Registry origin, publisher assertion, exact SourceVersion verification, and Snapshot verification remain independent decisions. Current trust is recalculated from local registration policy and immutable cached observations; revocation and conflicting accepted digests fail closed, while every contributing observation remains exposed as provenance. Agentstration-owned HTTPS host classification is informational, and only the stable built-in official registration receives official-origin classification. See ADR-0103.

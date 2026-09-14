@@ -30,7 +30,7 @@ else
                 <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
                 <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
                 <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
-                <ResourceScopeFormField ResourceKind="@ResourceKinds.ModelProfile" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
+                <ResourceScopeFormField ResourceKind="@ModelResourceKinds.ModelProfile" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
                 <label class="form-span-2"><span>@T("DescriptionLabel")</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
             </div>
         </section>
@@ -163,7 +163,7 @@ else
         get
         {
             if (model is null) return string.Empty;
-            try { return JsonSerializer.Serialize(new { apiVersion = ManagementApiVersions.CoreV1, kind = ResourceKinds.ModelProfile, metadata = new { name = model.Name, @namespace = model.Namespace }, definition = model.ToProperties() }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }); }
+            try { return JsonSerializer.Serialize(new { apiVersion = ResourceApiVersions.CoreV1, kind = ModelResourceKinds.ModelProfile, metadata = new { name = model.Name, @namespace = model.Namespace }, definition = model.ToProperties() }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }); }
             catch (ArgumentException) { return T("DeclarativeDefinitionUnavailable"); }
         }
     }

@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
+using Agentstration.Agents;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 

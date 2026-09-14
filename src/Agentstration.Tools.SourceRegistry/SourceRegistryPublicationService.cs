@@ -1,6 +1,6 @@
 using System.Text;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Sources.Contracts;
+using Agentstration.Sources;
 
 namespace Agentstration.Tools.SourceRegistry;
 
@@ -19,7 +19,7 @@ public sealed record SourceRegistryPublicationShard(
     string Name,
     string RelativePath,
     string FullPath,
-    SourceCompatibilityBounds? Compatibility,
+    SourceRegistryCompatibilityBounds? Compatibility,
     ParsedSourceRegistry Registry);
 
 public sealed record SourceRegistryPublicationFile(
@@ -29,7 +29,7 @@ public sealed record SourceRegistryPublicationFile(
     string Source,
     string Version,
     string Digest,
-    SourceCompatibilityBounds? ShardCompatibility);
+    SourceRegistryCompatibilityBounds? ShardCompatibility);
 
 public sealed class SourceRegistryPublicationService
 {
@@ -135,7 +135,7 @@ public sealed class SourceRegistryPublicationService
         return new(SourceRegistryPublicationKind.Shard, registry, null, [], manifests.Values.OrderBy(value => value.RelativePath, StringComparer.Ordinal).ToArray(), sources.Count, observations.Count);
     }
 
-    private async Task ValidateShardContentsAsync(ParsedSourceRegistry shard, SourceCompatibilityBounds? bounds, string root, Uri baseUri,
+    private async Task ValidateShardContentsAsync(ParsedSourceRegistry shard, SourceRegistryCompatibilityBounds? bounds, string root, Uri baseUri,
         Dictionary<string, string> occupied, Dictionary<string, SourceRegistryPublicationFile> manifests,
         Dictionary<string, string> observations, HashSet<string> sources, CancellationToken cancellationToken)
     {
@@ -175,13 +175,13 @@ public sealed class SourceRegistryPublicationService
         }
     }
 
-    private static void ValidateShardMembership(ParsedSourceManifest source, string path, SourceCompatibilityBounds? shard)
+    private static void ValidateShardMembership(ParsedSourceManifest source, string path, SourceRegistryCompatibilityBounds? shard)
     {
         if (shard is null || source.Manifest.Definition.Channels.Any(channel => Intersects(channel.Compatibility!.Agentstration!, shard))) return;
         throw Invalid("source_registry_shard_compatibility_missing", $"Manifest '{path}' has no Channel whose Agentstration compatibility intersects its shard interval.");
     }
 
-    private static bool Intersects(SourceCompatibilityBounds left, SourceCompatibilityBounds right)
+    private static bool Intersects(SourceCompatibilityBounds left, SourceRegistryCompatibilityBounds right)
     {
         _ = SourceSemanticVersion.TryParse(left.MinVersion, out var leftMinimum);
         _ = SourceSemanticVersion.TryParse(right.MinVersion, out var rightMinimum);

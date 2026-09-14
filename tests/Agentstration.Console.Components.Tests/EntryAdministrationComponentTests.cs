@@ -1,5 +1,6 @@
 using System.Globalization;
-using Agentstration.Management.Abstractions;
+using Agentstration.Agents;
+using Agentstration.Flows;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Agentstration.Work;
@@ -472,8 +473,8 @@ public sealed class EntryAdministrationComponentTests
         {
             RequestedKinds.Add(kind);
             var item = kind == EntryBindingKind.Agent
-                ? new ResourcePickerItem(AgentResourceId, "Deterministic agent", "Local agent", "1", "Succeeded", ResourceKinds.Agent, new Dictionary<string, string> { ["modelProfile"] = "deterministic" })
-                : new ResourcePickerItem(FlowResourceId, "Router", "Published router", "1.0.0", "Active", ResourceKinds.Flow);
+                ? new ResourcePickerItem(AgentResourceId, "Deterministic agent", "Local agent", "1", "Succeeded", AgentResourceKinds.Agent, new Dictionary<string, string> { ["modelProfile"] = "deterministic" })
+                : new ResourcePickerItem(FlowResourceId, "Router", "Published router", "1.0.0", "Active", FlowResourceKinds.Flow);
             return Task.FromResult<IReadOnlyList<ResourcePickerItem>>([item]);
         }
 

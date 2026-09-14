@@ -3,13 +3,15 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Contracts;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Agents;
+using Agentstration.Flows;
+using Agentstration.Flows.Contracts;
+using Agentstration.Models;
+using Agentstration.Api.Contracts;
+using Agentstration.Agents.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.Contracts;
+using Agentstration.Triggers;
 using Agentstration.Web.Components.Models;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -27,7 +29,7 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
         var deployments = (await deploymentsTask).Value;
         return page.Value.Select(agent =>
         {
-            var modelProfile = agent.Definition.ModelProfile.Resolve(agent.Namespace, ResourceKinds.ModelProfile);
+            var modelProfile = agent.Definition.ModelProfile.Resolve(agent.Namespace, ModelResourceKinds.ModelProfile);
             var deployment = FindCurrentDeployment(agent, deployments);
             return new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), DeploymentStatus(deployment), deployment?.UpdatedAt ?? DateTimeOffset.MinValue, modelProfile.Name)
             {

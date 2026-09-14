@@ -22,3 +22,5 @@ A compatible pinned Source snapshot can expose Pack archives through an explicit
 ## Consequences
 
 Source remains a discovery and distribution boundary. Local archive installation continues unchanged, and Packs discovered through Sources have the same operational semantics and safety checks as every other installed Pack.
+
+The Pack family owns the Source-discovered Pack use case and the `PackCatalog` schema. It implements the Source catalog-handler contract and consumes a narrow Source-owned resolver that returns an exact compatible Source Version, immutable Channel Snapshot, catalog document and bounded descendant content. `Sources` never references Pack assemblies or invokes the Pack lifecycle; Registry continues to discover and verify Sources only.

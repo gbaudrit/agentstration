@@ -66,7 +66,7 @@ The Management budgets below use Release runs on Windows 11 10.0.26200 with .NET
 | `Agentstration.ArchitectureTests` | Fast | Assembly dependency rules |
 | `Agentstration.Console.Client.Tests` | Fast | HTTP and SignalR mappings, pagination, errors, retries, and credential forwarding without an authoritative server |
 | `Agentstration.Console.Components.Tests` | Fast | Console Razor behavior, presentation state, permissions, localization, and static assets with mocked clients |
-| `Agentstration.Management.Core.Tests` | Fast | Pure Management validation and in-memory use cases |
+| `Agentstration.Tools.Tests` | Fast | Pure tool validation and in-memory use cases |
 | `Agentstration.Tools.SourceRegistry.Tests` | Fast | In-process CLI and manifest validation |
 | `Agentstration.Web.Components.Tests` | Fast | bUnit component behavior |
 | `Agentstration.Web.FlowDesigner.Tests` | Fast | bUnit and graph projection behavior |

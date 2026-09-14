@@ -1,11 +1,12 @@
+using Agentstration.Identity.Contracts;
 using System.Text.Json;
 using Agentstration.Application.Work;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
-using Agentstration.Flow.Storage.Abstractions;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Flows.Storage.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Flows;
 
@@ -34,13 +35,13 @@ public sealed class ToolDefinitionFlowResolver(FlowService flows) : IToolDefinit
 }
 
 public sealed class ToolDefinitionFlowActivationGuard(
-    IControlPlaneStore store,
+    IResourceStore store,
     IRequestContextScopeFactory requestScopes) : IFlowVersionActivationGuard
 {
     public async Task ValidateActivationAsync(WorkspaceId workspaceId, FlowVersion version, CancellationToken cancellationToken)
     {
         using var requestScope = requestScopes.PushSystem();
-        var definitions = await store.ListAllAsync<ToolDefinitionResource>(ResourceKinds.ToolDefinition, cancellationToken);
+        var definitions = await store.ListAllAsync<ToolDefinitionResource>(ToolResourceKinds.ToolDefinition, cancellationToken);
         var contract = ToolDefinitionFlowResolver.Contract(version);
         foreach (var stored in definitions.Where(value =>
                      value.Value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
@@ -60,13 +61,13 @@ public sealed class ToolDefinitionFlowActivationGuard(
 }
 
 public sealed class ToolDefinitionFlowDeletionGuard(
-    IControlPlaneStore store,
+    IResourceStore store,
     IRequestContextScopeFactory requestScopes) : IFlowDeletionGuard
 {
     public async Task ValidateDeleteAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken)
     {
         using var requestScope = requestScopes.PushSystem();
-        var definitions = await store.ListAllAsync<ToolDefinitionResource>(ResourceKinds.ToolDefinition, cancellationToken);
+        var definitions = await store.ListAllAsync<ToolDefinitionResource>(ToolResourceKinds.ToolDefinition, cancellationToken);
         var usage = definitions.Select(value => value.Value).FirstOrDefault(value =>
             value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
             && targetId == workspaceId.Value

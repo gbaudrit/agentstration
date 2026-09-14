@@ -1,15 +1,17 @@
+using Agentstration.Identity.Contracts;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Channels;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
-using Agentstration.Flow.Storage.Abstractions;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Agents;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Flows.Storage.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
+using Agentstration.Tools;
 using Agentstration.Tools.Mcp;
 using Agentstration.Work;
 
@@ -34,7 +36,7 @@ public sealed class LocalFlowRunQueue : IFlowRunQueue
 
 public sealed class WorkspaceFlowRunExecutionScope(
     IIdentityStore identities,
-    Agentstration.Management.Abstractions.IAuthorizationService authorization,
+    Agentstration.Identity.Contracts.IAuthorizationService authorization,
     IRequestContextScopeFactory scopeFactory) : IFlowRunExecutionScope
 {
     public async ValueTask ValidateAsync(FlowRunScope scope, CancellationToken cancellationToken)
@@ -100,7 +102,7 @@ public sealed class LocalFlowRunCancellationRegistry : IFlowRunCancellationRegis
 
 public sealed class ManagedFlowAgentExecutor(
     AgentExecutionCoordinator execution,
-    IControlPlaneStore store,
+    IResourceStore store,
     IAgentResourceQueries agentQueries,
     AgentManagementService agents) : IFlowAgentExecutor
 {
@@ -114,7 +116,7 @@ public sealed class ManagedFlowAgentExecutor(
             : input.GetRawText();
         var targetNamespace = target.Namespace ?? Agentstration.Resources.ResourceNamespace.Default;
         var agent = await agents.GetAgentAsync(targetNamespace, ResourceName(target.Id), cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, ResourceName(target.Id), targetNamespace));
+            ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, ResourceName(target.Id), targetNamespace));
         var prepared = await agents.PrepareLocalRuntimeAsync(targetNamespace, agent.Value.Metadata.Name, agent.Value.Generation, cancellationToken);
         if (prepared.Value.OperationalState != OperationalState.Ready)
             throw new InvalidOperationException(prepared.Value.LastError ?? $"Agent '{target.Id}' could not be prepared for local execution.");
@@ -122,7 +124,7 @@ public sealed class ManagedFlowAgentExecutor(
         var deployment = (await agentQueries.ListDeploymentsAsync(cancellationToken))
             .SingleOrDefault(value => value.Value.AgentNamespace == targetNamespace && value.Value.Uid.ToString("N") == selected.DeploymentId)
             ?? throw new InvalidOperationException("The selected agent deployment no longer exists.");
-        var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, deployment.Value.RevisionName, targetNamespace), cancellationToken)
+        var revision = await store.GetAsync<AgentRevision>(new ResourceKey(AgentResourceKinds.AgentRevision, deployment.Value.RevisionName, targetNamespace), cancellationToken)
             ?? throw new InvalidOperationException("The selected agent revision no longer exists.");
         var result = await execution.ExecuteSelectedAsync(selected, prompt, cancellationToken);
         return new FlowAgentExecutionResult(
@@ -156,7 +158,7 @@ public sealed class ManagedFlowOrchestrationEngine(
         {
             var targetNamespace = reference.Namespace ?? Agentstration.Resources.ResourceNamespace.Default;
             var agent = await agents.GetAgentAsync(targetNamespace, reference.Id, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, reference.Id, targetNamespace));
+                ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, reference.Id, targetNamespace));
             var prepared = await agents.PrepareLocalRuntimeAsync(targetNamespace, agent.Value.Metadata.Name, agent.Value.Generation, cancellationToken);
             if (prepared.Value.OperationalState != OperationalState.Ready)
                 throw new InvalidOperationException(prepared.Value.LastError ?? $"Agent '{targetNamespace}/{reference.Id}' could not be prepared for local execution.");
@@ -167,10 +169,10 @@ public sealed class ManagedFlowOrchestrationEngine(
     }
 }
 
-public sealed class ManagementFlowResourceReferenceResolver(IControlPlaneStore store, IFlowRepository flows) : IFlowResourceReferenceResolver
+public sealed class ManagementFlowResourceReferenceResolver(IResourceStore store, IFlowRepository flows) : IFlowResourceReferenceResolver
 {
     public async Task<bool> ExistsAsync(string resourceId, CancellationToken cancellationToken) =>
-        await store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, resourceId), cancellationToken) is not null;
+        await store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, resourceId), cancellationToken) is not null;
 
     public async Task<ResolvedFlowCall?> ResolveFlowAsync(
         WorkspaceId workspaceId,
@@ -206,7 +208,7 @@ public sealed class ManagementFlowResourceReferenceResolver(IControlPlaneStore s
         _ = workspaceId;
         var toolNamespace = reference.ResolveNamespace(ownerNamespace);
         var stored = await store.GetAsync<ToolResource>(
-            new ResourceKey(ResourceKinds.Tool, reference.ResourceId, toolNamespace),
+            new ResourceKey(ToolResourceKinds.Tool, reference.ResourceId, toolNamespace),
             cancellationToken);
         if (stored is null || stored.Value.Definition.Schema is null) return null;
         var tool = stored.Value;
@@ -246,7 +248,7 @@ public sealed class ManagementFlowResourceReferenceResolver(IControlPlaneStore s
 }
 
 public sealed class ManagedFlowToolExecutor(
-    IControlPlaneStore store,
+    IResourceStore store,
     IToolExecutionPipeline pipeline) : IFlowToolExecutor
 {
     public async Task<JsonElement?> ExecuteAsync(
@@ -256,7 +258,7 @@ public sealed class ManagedFlowToolExecutor(
         ArgumentNullException.ThrowIfNull(request);
         var toolNamespace = request.Tool.ResolveNamespace(request.OwnerFlowId.Namespace);
         var stored = await store.GetAsync<ToolResource>(
-            new ResourceKey(ResourceKinds.Tool, request.Tool.ResourceId, toolNamespace),
+            new ResourceKey(ToolResourceKinds.Tool, request.Tool.ResourceId, toolNamespace),
             cancellationToken);
         if (stored is null)
             throw Error("tool_not_found", $"Tool resource '{toolNamespace}/{request.Tool.ResourceId}' was not found.");

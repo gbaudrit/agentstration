@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Agentstration.Management.Contracts;
+using Agentstration.Extensions.Contracts;
 
 namespace Agentstration.Web.Console;
 

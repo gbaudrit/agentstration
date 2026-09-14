@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Agentstration.Application.Work;
-using Agentstration.Flow;
+using Agentstration.Flows;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;

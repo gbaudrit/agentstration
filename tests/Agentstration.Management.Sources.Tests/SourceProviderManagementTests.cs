@@ -1,5 +1,8 @@
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
+using Agentstration.Sources.Contracts;
+using Agentstration.Extensions;
+using Agentstration.Identity;
+using Agentstration.Sources;
 using Agentstration.ModelProviders;
 using Agentstration.Resources;
 
@@ -87,7 +90,7 @@ public sealed class SourceProviderManagementTests
             "source-extension",
             default);
 
-        Assert.AreEqual(ResourceKinds.SourceProvider, usages.Single().Kind);
+        Assert.AreEqual(SourceResourceKinds.SourceProvider, usages.Single().Kind);
     }
 
     [TestMethod]
@@ -98,8 +101,8 @@ public sealed class SourceProviderManagementTests
         var provider = await fixture.SourceProviders.CreateAsync(SourceProvider(), default);
         await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, new SourceConfigurationResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.SourceConfiguration,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SourceResourceKinds.SourceConfiguration,
             Metadata = new ResourceMetadata { Name = "catalog", Namespace = new("agentstration") },
             ScopeRef = ResourceScopeRef.Instance,
             Definition = new SourceConfigurationProperties
@@ -135,8 +138,8 @@ public sealed class SourceProviderManagementTests
         await fixture.SourceProviders.CreateAsync(SourceProvider(tenantScope), default);
         await fixture.Store.PutExactAsync(tenantScope, new SourceConfigurationResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.SourceConfiguration,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SourceResourceKinds.SourceConfiguration,
             Metadata = new ResourceMetadata { Name = "catalog", Namespace = new("agentstration") },
             ScopeRef = tenantScope,
             Definition = new SourceConfigurationProperties
@@ -179,8 +182,8 @@ public sealed class SourceProviderManagementTests
 
     private static ExtensionRegistrationResource Extension(ResourceScopeRef? scopeRef = null) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.ExtensionRegistration,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ExtensionKinds.ExtensionRegistration,
         Metadata = new ResourceMetadata { Name = "source-extension" },
         ScopeRef = scopeRef ?? ResourceScopeRef.Instance,
         Definition = new ExtensionRegistrationProperties
@@ -195,8 +198,8 @@ public sealed class SourceProviderManagementTests
 
     private static SourceProviderResource SourceProvider(ResourceScopeRef? scopeRef = null) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.SourceProvider,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = SourceResourceKinds.SourceProvider,
         Metadata = new ResourceMetadata { Name = "git-local" },
         ScopeRef = scopeRef,
         Definition = new SourceProviderProperties
@@ -270,7 +273,7 @@ public sealed class SourceProviderManagementTests
                         : null);
     }
 
-    private sealed class MemoryStore : IControlPlaneStore
+    private sealed class MemoryStore : IResourceStore
     {
         private readonly Dictionary<ScopedResourceAddress, (Resource Value, string ETag, DateTimeOffset At)> values = [];
         private long version;
@@ -310,7 +313,7 @@ public sealed class SourceProviderManagementTests
         public Task<StoredResource<T>> PutExactAsync<T>(ResourceScopeRef scopeRef, T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
         {
             var key = ScopedResourceAddress.Create(scopeRef, resource.Namespace, resource.Kind, resource.Name);
-            if (ifNoneMatch && values.ContainsKey(key)) throw new ControlPlaneConcurrencyException("Already exists.");
+            if (ifNoneMatch && values.ContainsKey(key)) throw new ResourceConcurrencyException("Already exists.");
             var etag = $"\"{Interlocked.Increment(ref version)}\"";
             var value = resource.WithSystemState(resource.Uid == Guid.Empty ? Guid.NewGuid() : resource.Uid, scopeRef, etag);
             values[key] = (value, etag, DateTimeOffset.UnixEpoch);

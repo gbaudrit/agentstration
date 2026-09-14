@@ -123,7 +123,7 @@
                         <div class="enrollment-action-layout">
                             @if (requiresScope)
                             {
-                                <div class="enrollment-scope"><ResourceScopeFormField ResourceKind="@ResourceKinds.ExtensionRegistration" Value="@EnrollmentScope(enrollment)" ValueChanged="scope => SetEnrollmentScope(enrollment, scope)" /></div>
+                                <div class="enrollment-scope"><ResourceScopeFormField ResourceKind="@ExtensionKinds.ExtensionRegistration" Value="@EnrollmentScope(enrollment)" ValueChanged="scope => SetEnrollmentScope(enrollment, scope)" /></div>
                             }
                             @if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.PairingCode && CanRotate(enrollment.Definition.State))
                             {
@@ -181,7 +181,7 @@
             <label>@T("Name")<InputText @bind-Value="form.Name" /></label>
             <label>@T("Namespace")<InputText @bind-Value="form.Namespace" /></label>
             <label>@T("DisplayName")<InputText @bind-Value="form.DisplayName" /></label>
-            <ResourceScopeFormField ResourceKind="@ResourceKinds.ExtensionRegistration" RequiredKind="@ResourceScopeKind.Tenant" @bind-Value="selectedScope" />
+            <ResourceScopeFormField ResourceKind="@ExtensionKinds.ExtensionRegistration" RequiredKind="@ResourceScopeKind.Tenant" @bind-Value="selectedScope" />
             <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></label>
             <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /><small>@T("ExpectedExtensionId.Help")</small></label>
             <label>@T("AuthenticationMode")<InputSelect @bind-Value="form.AuthenticationMode"><option value="@AepTransportAuthenticationMode.None">@T("Authentication.None")</option><option value="@AepTransportAuthenticationMode.StaticBearer">@T("Authentication.StaticBearer")</option></InputSelect></label>

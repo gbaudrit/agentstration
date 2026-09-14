@@ -1,10 +1,13 @@
+using Agentstration.Models;
+using Agentstration.Agents;
+using Agentstration.Triggers;
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Flows;
+using Agentstration.Agents.Contracts;
+using Agentstration.Models.Contracts;
+using Agentstration.Runtime.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.Contracts;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Console;
 using Agentstration.Work;
@@ -141,8 +144,8 @@ public sealed class DashboardTests
         var fake = new MockApiClient(new FixedTimeProvider(Now));
         var request = new AgentResourceRequest
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Agent,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
             Metadata = new ResourceMetadata { Name = "new-agent" },
             Definition = new AgentProperties
             {
@@ -166,8 +169,8 @@ public sealed class DashboardTests
 
     private static TriggerResource Trigger(string name, bool enabled, TriggerLastOutcome outcome) => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.Trigger,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = TriggerResourceKinds.Trigger,
         Metadata = new ResourceMetadata { Name = name },
         Definition = new TriggerProperties
         {
@@ -242,7 +245,7 @@ public sealed class DashboardTests
         public Task<WorkTaskOperationsPageResponse> GetTasksAsync(string? workspaceId, WorkTaskStatus? status, string? search, bool? hasPendingAction, int page, int pageSize, string sort, string direction, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<WorkTaskOperationsCountersResponse> GetTaskSummaryAsync(string? workspaceId, CancellationToken cancellationToken) => Task.FromResult(counters);
         public Task<WorkTaskOperationsDetailResponse> GetTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<Agentstration.Flow.FlowRun> GetTaskFlowRunAsync(Guid taskId, string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<Agentstration.Flows.FlowRun> GetTaskFlowRunAsync(Guid taskId, string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<PendingActionContract> RespondTaskPendingActionAsync(Guid taskId, Guid actionId, IReadOnlyDictionary<string, System.Text.Json.JsonElement> values, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task PauseTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();

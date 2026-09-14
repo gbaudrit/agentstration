@@ -1,6 +1,8 @@
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
-using Agentstration.Management.Core;
+using Agentstration.Identity.Contracts;
+using Agentstration.Extensions.Contracts;
+using Agentstration.Models.Contracts;
+using Agentstration.Sources.Contracts;
+using Agentstration.Models;
 using Agentstration.Resources;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -491,8 +493,8 @@ public sealed class ExtensionsConsoleTests
 
         private AepEnrollmentRequestResource Enrollment(AepEnrollmentState state) => new()
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AepEnrollmentRequest,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ExtensionKinds.AepEnrollmentRequest,
             Metadata = new ResourceMetadata { Name = enrollmentId.ToString("N") },
             Generation = 1,
             Definition = new AepEnrollmentRequestProperties
@@ -514,8 +516,8 @@ public sealed class ExtensionsConsoleTests
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
             Task.FromResult(new ResourceSnapshot<ExtensionRegistrationResource>(new ExtensionRegistrationResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ExtensionRegistration,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ExtensionKinds.ExtensionRegistration,
                 Metadata = new ResourceMetadata { Name = name, Namespace = @namespace },
                 Generation = 1,
                 Definition = new ExtensionRegistrationProperties

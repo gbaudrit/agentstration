@@ -1,4 +1,5 @@
 @page "/settings/organization/security-audit"
+@using Agentstration.Security.Contracts
 @inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
@@ -20,7 +21,7 @@ else if (events.Count == 0)
 }
 else
 {
-    <DataGrid TItem="Agentstration.Management.Abstractions.SecurityAuditEvent" Items="events">
+    <DataGrid TItem="Agentstration.Security.Contracts.SecurityAuditEvent" Items="events">
         <Header><tr><th>@T("Time")</th><th>@T("Action")</th><th>@T("Outcome")</th><th>@T("Actor")</th><th>@T("Target")</th><th>@T("Scope")</th><th>@T("Correlation")</th></tr></Header>
         <Row Context="entry"><tr>
             <td>@entry.OccurredAt.ToLocalTime().ToString("g")</td>
@@ -35,7 +36,7 @@ else
 }
 
 @code {
-    private IReadOnlyList<Agentstration.Management.Abstractions.SecurityAuditEvent> events = [];
+    private IReadOnlyList<Agentstration.Security.Contracts.SecurityAuditEvent> events = [];
     private bool loading = true;
     private bool denied;
     private string T(string key) => Localizer[key].Value;

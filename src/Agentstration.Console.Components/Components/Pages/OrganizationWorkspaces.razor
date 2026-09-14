@@ -23,14 +23,14 @@ else
             @if (!string.IsNullOrWhiteSpace(operationError)) { <p class="inline-warning" role="alert">@operationError</p> }
         </section>
     }
-    <DataGrid TItem="Agentstration.Management.Abstractions.Workspace" Items="workspaces">
+    <DataGrid TItem="Agentstration.Identity.Contracts.Workspace" Items="workspaces">
         <Header><tr><th>@T("Workspace")</th><th>@T("TechnicalName")</th><th>@T("Status")</th><th>@T("Created")</th><th>@T("Context")</th></tr></Header>
         <Row Context="workspace"><tr><td><strong>@workspace.DisplayName</strong><br /><small>@workspace.Id</small></td><td><code>@workspace.Name</code></td><td><StatusBadge Text="@T($"Status.{workspace.Status}")" Status="UiStatus.Success" /></td><td>@workspace.CreatedAt.ToLocalTime().ToString("g")</td><td>@if(workspace.Id == ContextState.Current?.WorkspaceId){<StatusBadge Text="@T("Current")" Status="UiStatus.Info" />}</td></tr></Row>
     </DataGrid>
 }
 
 @code {
-    private IReadOnlyList<Agentstration.Management.Abstractions.Workspace> workspaces = [];
+    private IReadOnlyList<Agentstration.Identity.Contracts.Workspace> workspaces = [];
     private string displayName = string.Empty;
     private string technicalName = string.Empty;
     private string? loadError;

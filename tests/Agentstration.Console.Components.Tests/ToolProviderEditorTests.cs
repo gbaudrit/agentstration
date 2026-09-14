@@ -1,5 +1,5 @@
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Tools;
+using Agentstration.Tools.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
@@ -40,8 +40,8 @@ public sealed class ToolProviderEditorTests
     {
         private static readonly ToolProviderResource Provider = new()
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.ToolProvider,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolProvider,
             Metadata = new ResourceMetadata { Name = "microsoft-learn" },
             Generation = 1,
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
