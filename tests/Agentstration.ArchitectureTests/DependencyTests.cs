@@ -156,6 +156,23 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void ConsoleBffWorkloadTrustIsPrivateAndCredentialTypeSpecific()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var endpoint = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Agentstration.Identity.Api", "Api", "BffWorkloadEndpoints.cs"));
+        var signer = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Agentstration.Console.Web", "Security", "BffWorkloadSigningHandler.cs"));
+        var registration = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Agentstration.Console.Web", "Configuration", "ConsoleHostServiceCollectionExtensions.cs"));
+
+        StringAssert.Contains(endpoint, "/api/internal/bff/");
+        StringAssert.Contains(endpoint, "RequireAuthorization(AgentstrationPolicies.BffWorkload)");
+        StringAssert.Contains(endpoint, "ExcludeFromDescription()");
+        StringAssert.Contains(registration, "AddHttpMessageHandler<BffWorkloadSigningHandler>()");
+        Assert.IsFalse(signer.Contains("PersonalAccessToken", StringComparison.Ordinal));
+        Assert.IsFalse(signer.Contains("Aep", StringComparison.Ordinal));
+        Assert.IsFalse(signer.Contains("Cookie", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void ApiTransportDoesNotReferenceConsoleOrExecutableHostAssemblies()
     {
         var references = typeof(Agentstration.Web.ApiTransportEndpointRouteBuilderExtensions).Assembly

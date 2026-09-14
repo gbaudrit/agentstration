@@ -4,12 +4,13 @@ services:
   aep-key-provisioner:
     image: alpine:3.22
     command: >-
-      sh -ec 'provision() { target="$$1/token"; if [ ! -f "$$target" ]; then temporary="$$target.tmp"; head -c 32 /dev/urandom | base64 | tr -d "\r\n" > "$$temporary"; chmod 600 "$$temporary"; mv "$$temporary" "$$target"; fi; test "$$(wc -c < "$$target")" -ge 32; }; provision /keys/ollama; provision /keys/llamacpp; provision /keys/localai; provision /keys/utilities'
+      sh -ec 'provision() { target="$$1/token"; if [ ! -f "$$target" ]; then temporary="$$target.tmp"; head -c 32 /dev/urandom | base64 | tr -d "\r\n" > "$$temporary"; chmod 600 "$$temporary"; mv "$$temporary" "$$target"; fi; test "$$(wc -c < "$$target")" -ge 32; }; provision /keys/ollama; provision /keys/llamacpp; provision /keys/localai; provision /keys/utilities; provision /keys/bff'
     volumes:
       - aep-ollama-key:/keys/ollama
       - aep-llamacpp-key:/keys/llamacpp
       - aep-localai-key:/keys/localai
       - aep-utilities-key:/keys/utilities
+      - bff-workload-key:/keys/bff
     restart: "no"
 
   ollama-extension:
@@ -57,6 +58,12 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       AI__Provider: Deterministic
       Data__Directory: /data
+      Agentstration__InstanceId: compose
+      Agentstration__BffWorkloadTrust__Enabled: "true"
+      Agentstration__BffWorkloadTrust__InstanceId: compose
+      Agentstration__BffWorkloadTrust__Credentials__0__WorkloadId: console-bff
+      Agentstration__BffWorkloadTrust__Credentials__0__CredentialId: primary
+      Agentstration__BffWorkloadTrust__Credentials__0__SharedKeyFile: /run/bff-key/token
       Agentstration__Aep__Transport__AllowedHttpHosts__0: ollama-extension
       Agentstration__Aep__Transport__AllowedHttpHosts__1: llama-cpp-extension
       Agentstration__Aep__Transport__AllowedHttpHosts__2: localai-extension
@@ -87,6 +94,7 @@ services:
       - aep-llamacpp-key:/run/aep-keys/llamacpp:ro
       - aep-localai-key:/run/aep-keys/localai:ro
       - aep-utilities-key:/run/aep-keys/utilities:ro
+      - bff-workload-key:/run/bff-key:ro
     depends_on:
       aep-key-provisioner: { condition: service_completed_successfully }
       ollama-extension: { condition: service_started }
@@ -100,3 +108,4 @@ volumes:
   aep-llamacpp-key:
   aep-localai-key:
   aep-utilities-key:
+  bff-workload-key:

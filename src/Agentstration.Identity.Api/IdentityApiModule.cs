@@ -1,4 +1,5 @@
 using Agentstration.Identity.Contracts;
+using Agentstration.Identity.Api.Security;
 using Agentstration.Web;
 using Agentstration.Web.Configuration;
 using Agentstration.Web.Security;
@@ -20,6 +21,12 @@ public static class IdentityApiModule
     {
         services.AddOptions<AgentstrationApiOptions>()
             .Bind(configuration.GetSection(AgentstrationApiOptions.SectionName));
+        services.AddOptions<BffWorkloadTrustOptions>()
+            .Bind(configuration.GetSection(BffWorkloadTrustOptions.SectionName))
+            .Validate(value => value.Validate(), "BFF workload trust configuration is invalid.")
+            .ValidateOnStart();
+        services.AddSingleton<IBffWorkloadReplayCache, BffWorkloadReplayCache>();
+        services.AddHostedService<BffWorkloadTrustAuditService>();
         var options = configuration.GetSection($"{AgentstrationApiOptions.SectionName}:Authentication")
             .Get<ApiAuthenticationOptions>() ?? new();
         services.AddHttpContextAccessor();
@@ -32,6 +39,7 @@ public static class IdentityApiModule
         endpoints.MapAgentstrationAuthentication();
         endpoints.MapAgentstrationLocalAccountAdministration();
         endpoints.MapAgentstrationIdentityApi();
+        endpoints.MapBffWorkloadEndpoints();
         return endpoints;
     }
 
@@ -58,6 +66,8 @@ public static class IdentityApiModule
                 {
                     policy.ForwardDefaultSelector = context =>
                     {
+                        if (context.Request.Path.StartsWithSegments("/api/internal/bff"))
+                            return AgentstrationAuthenticationDefaults.BffWorkloadScheme;
                         var bearer = context.Request.Headers.Authorization.ToString()
                             .StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
                         var personalAccessToken = context.Request.Headers.Authorization.ToString()
@@ -87,6 +97,9 @@ public static class IdentityApiModule
                 .AddCookie(IdentityConstants.TwoFactorUserIdScheme)
                 .AddScheme<AuthenticationSchemeOptions, PersonalAccessTokenAuthenticationHandler>(
                     PersonalAccessTokenAuthenticationDefaults.Scheme,
+                    _ => { })
+                .AddScheme<AuthenticationSchemeOptions, BffWorkloadAuthenticationHandler>(
+                    AgentstrationAuthenticationDefaults.BffWorkloadScheme,
                     _ => { });
 
             if (oidc || hybrid)
@@ -123,7 +136,10 @@ public static class IdentityApiModule
             if (!environment.IsDevelopment() && !environment.IsEnvironment("Testing"))
                 throw new InvalidOperationException($"Authentication mode '{options.Mode}' is permitted only in Development or Testing.");
             services.AddAuthentication(DevelopmentAuthenticationHandler.SchemeName)
-                .AddScheme<AuthenticationSchemeOptions, DevelopmentAuthenticationHandler>(DevelopmentAuthenticationHandler.SchemeName, _ => { });
+                .AddScheme<AuthenticationSchemeOptions, DevelopmentAuthenticationHandler>(DevelopmentAuthenticationHandler.SchemeName, _ => { })
+                .AddScheme<AuthenticationSchemeOptions, BffWorkloadAuthenticationHandler>(
+                    AgentstrationAuthenticationDefaults.BffWorkloadScheme,
+                    _ => { });
         }
 
         services.AddSingleton<IAuthorizationHandler, WorkspacePermissionHandler>();
@@ -133,6 +149,13 @@ public static class IdentityApiModule
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
             .AddPolicy(AgentstrationPolicies.Authenticated, policy => policy.RequireAuthenticatedUser())
+            .AddPolicy(AgentstrationPolicies.BffWorkload, policy =>
+            {
+                policy.AuthenticationSchemes.Add(AgentstrationAuthenticationDefaults.BffWorkloadScheme);
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim(BffWorkloadAuthentication.WorkloadClaim);
+                policy.RequireClaim(BffWorkloadAuthentication.CredentialClaim);
+            })
             .AddPolicy(AgentstrationPolicies.PlatformAdmin, policy =>
             {
                 policy.RequireAuthenticatedUser();

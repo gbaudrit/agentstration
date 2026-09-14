@@ -3,6 +3,7 @@ namespace Agentstration.Web.Security;
 /// <summary>Stable authorization policy names shared by the composed HTTP modules.</summary>
 public static class AgentstrationPolicies
 {
+    public const string BffWorkload = "agentstration:bff-workload";
     public const string Authenticated = "agentstration:authenticated";
     public const string PlatformAdmin = "agentstration:platform-admin";
     public const string WorkspaceReader = "agentstration:workspace-reader";
