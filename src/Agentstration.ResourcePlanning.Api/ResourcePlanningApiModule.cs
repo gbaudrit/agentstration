@@ -21,6 +21,7 @@ public static class ResourcePlanningApiModule
         plans.MapPost("/{id:guid}/status", ChangeStatusAsync).Produces<ResourcePlan>().WithSummary("Change Resource Plan status").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         plans.MapGet("/{id:guid}/activities", ListActivitiesAsync).Produces<ResourcePlanActivity[]>().WithSummary("List Resource Plan activities").RequireAuthorization(AgentstrationPolicies.CanReadResources);
         plans.MapPost("/validate-content", ValidateContent).Produces<PlanningValidationResult>().WithSummary("Validate functional planning content").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapPost("/{id:guid}/materializations", MaterializeAsync).Produces<ResourcePlanMaterialization>().WithSummary("Materialize a Resource Plan").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         return endpoints;
     }
 
@@ -115,4 +116,11 @@ public static class ResourcePlanningApiModule
     private static object Problem(string title, string detail, int status) => new { title, detail, status };
 
     private static IResult ValidateContent(ResourcePlanContent content, IResourcePlanContentValidator validator) => Results.Ok(validator.Validate(content));
+
+    private static Task<IResult> MaterializeAsync(
+        Guid id,
+        ResourcePlanMaterializationService service,
+        ICurrentRequestContext context,
+        CancellationToken cancellationToken) => ExecuteAsync(async () =>
+            Results.Ok(await service.MaterializeAsync(Scope(RequireWorkspace(context)), new(id), cancellationToken)));
 }
