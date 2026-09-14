@@ -57,8 +57,9 @@ public sealed class ResourceChangeSetService(
         try { return await repository.CreateAsync(changeSet, cancellationToken); }
         catch (ResourcePlanConcurrencyException)
         {
-            return await repository.FindAsync(scope, planId, materialization.PlanRevision, materialization.Digest, cancellationToken)
-                ?? throw;
+            var replay = await repository.FindAsync(scope, planId, materialization.PlanRevision, materialization.Digest, cancellationToken);
+            if (replay is null) throw;
+            return replay;
         }
     }
 
