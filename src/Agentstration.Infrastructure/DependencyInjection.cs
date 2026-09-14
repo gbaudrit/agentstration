@@ -106,7 +106,7 @@ public static class DependencyInjection
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
             services.AddPostgreSqlResourcePlanning(storageOptions.ConnectionString!);
         else
-            services.AddSqliteResourcePlanning($"Data Source={Path.Combine(dataDirectory, "resource-planning.db")}");
+            services.AddSqliteResourcePlanning($"Data Source={Path.Combine(dataDirectory, "resource-planning.db")};Pooling=False");
         services.AddSingleton<ResourcePlanService>();
         var secretPath = Path.Combine(dataDirectory, "secrets");
         services.AddSingleton(_ => new EnvironmentMasterKeyProvider(Path.Combine(secretPath, "master.key")));
