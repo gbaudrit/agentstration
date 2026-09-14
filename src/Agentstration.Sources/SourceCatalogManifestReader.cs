@@ -17,23 +17,31 @@ public sealed class SourceCatalogManifestReader : ISourceCatalogManifestReader
         "apiVersion", "kind", "metadata", "definition"
     };
 
-    public ParsedSourceCatalog ReadCatalog(string content, string declaredKind)
+    public SourceCatalogDocument ReadCatalog(string content, string declaredKind)
     {
         var document = ReadDocument(content, "Source catalog");
         ValidateEnvelope(document, declaredKind, "Source catalog");
+        if (!document.TryGetProperty("metadata", out var metadata) || metadata.ValueKind != JsonValueKind.Object
+            || !metadata.TryGetProperty("name", out var nameProperty) || nameProperty.ValueKind != JsonValueKind.String)
+            throw Invalid("source_catalog_name_invalid", "Source catalog metadata.name is required.");
+        var name = nameProperty.GetString()!;
+        ValidateName(name, "Catalog metadata.name");
+        return new(document.Clone(), declaredKind, name);
+    }
+
+    public BootstrapCatalogManifest ReadBootstrapCatalog(SourceCatalogDocument catalog)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        if (!string.Equals(catalog.Kind, SourceCatalogKinds.Bootstrap, StringComparison.Ordinal))
+            throw Invalid("source_catalog_kind_mismatch", $"Source catalog must use declared kind '{SourceCatalogKinds.Bootstrap}'.");
         try
         {
-            return declaredKind switch
-            {
-                SourceCatalogKinds.Bootstrap => Bootstrap(ResourceManifestSerializer.FromJsonStrict<BootstrapCatalogManifest>(document.GetRawText())),
-                SourceCatalogKinds.Pack => Pack(ResourceManifestSerializer.FromJsonStrict<PackCatalogManifest>(document.GetRawText())),
-                _ => throw Invalid("source_catalog_kind_unsupported", $"Catalog kind '{declaredKind}' is not supported.")
-            };
+            return Bootstrap(ResourceManifestSerializer.FromJsonStrict<BootstrapCatalogManifest>(catalog.Value.GetRawText()));
         }
         catch (SourceValidationException) { throw; }
         catch (JsonException exception)
         {
-            throw Invalid("source_catalog_invalid", $"Source catalog '{declaredKind}' is invalid: {exception.Message}");
+            throw Invalid("source_catalog_invalid", $"Source catalog '{catalog.Kind}' is invalid: {exception.Message}");
         }
     }
 
@@ -69,7 +77,7 @@ public sealed class SourceCatalogManifestReader : ISourceCatalogManifestReader
         }
     }
 
-    private static ParsedSourceCatalog Bootstrap(BootstrapCatalogManifest manifest)
+    private static BootstrapCatalogManifest Bootstrap(BootstrapCatalogManifest manifest)
     {
         ValidateCatalogIdentity(manifest.ApiVersion, manifest.Kind, manifest.Metadata.Name, SourceCatalogKinds.Bootstrap);
         if (string.IsNullOrWhiteSpace(manifest.Definition.DisplayName))
@@ -95,23 +103,7 @@ public sealed class SourceCatalogManifestReader : ISourceCatalogManifestReader
             if (!locales.Contains(entry.DefaultLocale))
                 throw Invalid("source_catalog_default_locale_missing", $"Default locale '{entry.DefaultLocale}' has no variant for '{entry.Name}'.");
         }
-        return new(manifest.Kind, manifest.Metadata.Name, manifest, null);
-    }
-
-    private static ParsedSourceCatalog Pack(PackCatalogManifest manifest)
-    {
-        ValidateCatalogIdentity(manifest.ApiVersion, manifest.Kind, manifest.Metadata.Name, SourceCatalogKinds.Pack);
-        if (string.IsNullOrWhiteSpace(manifest.Definition.DisplayName))
-            throw Invalid("source_catalog_display_name_missing", "PackCatalog definition.displayName is required.");
-        ValidateCount(manifest.Definition.Entries.Count);
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var entry in manifest.Definition.Entries)
-        {
-            ValidateName(entry.Name, "Pack catalog entry");
-            if (!names.Add(entry.Name)) throw Invalid("source_catalog_entry_duplicate", $"Pack catalog entry '{entry.Name}' is declared more than once.");
-            if (string.IsNullOrWhiteSpace(entry.Path)) throw Invalid("source_catalog_path_invalid", $"Pack catalog entry '{entry.Name}' requires a path.");
-        }
-        return new(manifest.Kind, manifest.Metadata.Name, null, manifest);
+        return manifest;
     }
 
     private static JsonElement ReadDocument(string content, string label)

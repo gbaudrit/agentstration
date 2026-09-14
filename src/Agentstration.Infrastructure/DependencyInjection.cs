@@ -170,6 +170,9 @@ public static class DependencyInjection
         services.AddSingleton<PackManagementService>();
         services.AddSingleton<PackAuthoringService>();
         services.AddSingleton<PackCompositionService>();
+        services.AddSingleton<PackSourceCatalogHandler>();
+        services.AddSingleton<ISourceCatalogHandler>(provider => provider.GetRequiredService<PackSourceCatalogHandler>());
+        services.AddSingleton<PackSourceInstallationService>();
         services.AddSingleton<Agentstration.Sources.SourceManifestValidator>();
         services.AddSingleton<ISourceManifestReader, Agentstration.Sources.SourceManifestReader>();
         services.AddSingleton<ISourceVerificationIndexReader, Agentstration.Sources.SourceVerificationIndexReader>();
@@ -208,8 +211,8 @@ public static class DependencyInjection
         services.AddSingleton(new SourceMaterializationLimits());
         services.AddSingleton<SourceChannelSnapshotService>();
         services.AddSingleton<SourceRefreshScheduler>();
+        services.AddSingleton<ISourceCatalogContentResolver, SourceCatalogContentResolver>();
         services.AddSingleton<SourceCatalogService>();
-        services.AddSingleton<SourcePackInstallationService>();
         services.AddSingleton<ISourceRegistryIndexReader, SourceRegistryIndexReader>();
         services.AddSingleton<ISourceRegistryReader, SourceRegistryReader>();
         services.AddSingleton<ISourceRegistryReferenceResolver, SourceRegistryRuntimeReferenceResolver>();

@@ -1,5 +1,6 @@
 using Agentstration.Identity.Contracts;
 using Agentstration.Aep.Abstractions;
+using Agentstration.Packs;
 using Agentstration.Sources.Contracts;
 using Agentstration.Extensions;
 using Agentstration.Sources;
@@ -15,7 +16,7 @@ public sealed class SourceConsoleManagementService(
     ExtensionManagementService extensions,
     SourceChannelSnapshotService snapshots,
     SourceCatalogService catalogs,
-    SourcePackInstallationService sourcePacks,
+    PackSourceInstallationService sourcePacks,
     SourceVerificationService verification,
     IResourceScopeResolver resourceScopes,
     IPlatformAuthorizationService platformAuthorization)

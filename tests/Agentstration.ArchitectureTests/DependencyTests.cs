@@ -728,6 +728,29 @@ public sealed class DependencyTests
         Assert.AreEqual("Agentstration.Packs.Contracts", typeof(PackManifest).Namespace);
         Assert.AreEqual("Agentstration.Packs.Contracts", typeof(PackProjectResource).Namespace);
         Assert.AreEqual("Agentstration.Packs.Contracts", typeof(SourcePackInstallationPreview).Namespace);
+        Assert.AreEqual("Agentstration.Packs.Contracts", typeof(PackCatalogManifest).Namespace);
+    }
+
+    [TestMethod]
+    public void PacksConsumeSourcesWithoutAReverseDependency()
+    {
+        var sourceAssemblies = new[]
+        {
+            typeof(SourceResource).Assembly,
+            typeof(SourceManagementService).Assembly
+        };
+        var forbiddenReferences = sourceAssemblies
+            .SelectMany(assembly => assembly.GetReferencedAssemblies()
+                .Where(reference => reference.Name!.StartsWith("Agentstration.Packs", StringComparison.Ordinal))
+                .Select(reference => $"{assembly.GetName().Name} -> {reference.Name}"))
+            .ToArray();
+
+        Assert.IsEmpty(forbiddenReferences,
+            $"Sources must remain a generic distribution boundary: {string.Join(", ", forbiddenReferences)}");
+        Assert.AreEqual("Agentstration.Packs", typeof(PackSourceInstallationService).Namespace);
+        Assert.AreEqual("Agentstration.Packs", typeof(PackSourceCatalogHandler).Namespace);
+        Assert.Contains("Agentstration.Sources.Contracts",
+            typeof(PackSourceInstallationService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name));
     }
 
     [TestMethod]

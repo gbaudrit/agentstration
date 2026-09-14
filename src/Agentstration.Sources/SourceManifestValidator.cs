@@ -60,8 +60,7 @@ public sealed partial class SourceManifestValidator
         {
             if (string.IsNullOrWhiteSpace(catalog.Kind) || string.IsNullOrWhiteSpace(catalog.Path))
                 throw Invalid("source_catalog_invalid", "Catalog kind and path are required.");
-            if (catalog.Kind is not (SourceCatalogKinds.Bootstrap or SourceCatalogKinds.Pack))
-                throw Invalid("source_catalog_kind_unsupported", $"Catalog kind '{catalog.Kind}' is not supported.");
+            ValidateIdentifier(catalog.Kind, "definition.catalogs[].kind");
             _ = SourceDescendantPath.Normalize(catalog.Path, $"Catalog '{catalog.Kind}' path");
         }
         EnsureUnique(catalogs.Select(value => $"{value.Kind}:{value.Path}"), "source_catalog_duplicate", "catalog");

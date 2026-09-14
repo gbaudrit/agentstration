@@ -515,7 +515,6 @@ public interface ISourceSnapshotArtifactStore
 public static class SourceCatalogKinds
 {
     public const string Bootstrap = "BootstrapCatalog";
-    public const string Pack = "PackCatalog";
 }
 
 public static class SourceCatalogLimits
@@ -551,34 +550,7 @@ public sealed record BootstrapCatalogManifest
     public required BootstrapCatalogProperties Definition { get; init; }
 }
 
-public sealed record PackCatalogEntry
-{
-    public required string Name { get; init; }
-    public string? DisplayName { get; init; }
-    public string? Description { get; init; }
-    public required string Path { get; init; }
-}
-
-public sealed record PackCatalogProperties
-{
-    public required string DisplayName { get; init; }
-    public string? Description { get; init; }
-    public IReadOnlyList<PackCatalogEntry> Entries { get; init; } = [];
-}
-
-public sealed record PackCatalogManifest
-{
-    public required string ApiVersion { get; init; }
-    public required string Kind { get; init; }
-    public ResourceMetadata Metadata { get; init; } = new();
-    public required PackCatalogProperties Definition { get; init; }
-}
-
-public sealed record ParsedSourceCatalog(
-    string Kind,
-    string Name,
-    BootstrapCatalogManifest? Bootstrap,
-    PackCatalogManifest? Pack);
+public sealed record SourceCatalogDocument(JsonElement Value, string Kind, string Name);
 
 public sealed record SourceBootstrapBindingContract(string Name, BootstrapBindingTargetKind TargetKind, bool Required);
 public sealed record SourceBootstrapProfileContract(
@@ -588,7 +560,8 @@ public sealed record SourceBootstrapProfileContract(
 
 public interface ISourceCatalogManifestReader
 {
-    ParsedSourceCatalog ReadCatalog(string content, string declaredKind);
+    SourceCatalogDocument ReadCatalog(string content, string declaredKind);
+    BootstrapCatalogManifest ReadBootstrapCatalog(SourceCatalogDocument catalog);
     SourceBootstrapProfileContract ReadBootstrapProfile(string content);
 }
 
@@ -602,6 +575,34 @@ public interface ISourceSnapshotContent : IAsyncDisposable
 public interface ISourceSnapshotContentReader
 {
     Task<ISourceSnapshotContent> OpenAsync(SourceSnapshotArtifactReference reference, CancellationToken cancellationToken);
+}
+
+public sealed record SourceCatalogContentSelection(
+    ResourceScopeRef ScopeRef,
+    string SourcePublisher,
+    string SourceName,
+    Guid SourceVersionUid,
+    string Channel,
+    Guid SnapshotUid,
+    string CatalogKind,
+    string CatalogName);
+
+public interface IResolvedSourceCatalogContent : IAsyncDisposable
+{
+    SourceResource Source { get; }
+    SourceVersionResource Version { get; }
+    SourceChannelSnapshotResource Snapshot { get; }
+    SourceCatalogDocument Catalog { get; }
+    SourceCatalogProvenance Provenance { get; }
+    IReadOnlyCollection<string> Paths { get; }
+    Task<byte[]> ReadBytesAsync(string normalizedPath, int maximumBytes, CancellationToken cancellationToken);
+}
+
+public interface ISourceCatalogContentResolver
+{
+    Task<IResolvedSourceCatalogContent> ResolveAsync(
+        SourceCatalogContentSelection selection,
+        CancellationToken cancellationToken);
 }
 
 public sealed record SourceCatalogProvenance(
@@ -622,14 +623,27 @@ public sealed record SourceBootstrapEntryView(
     IReadOnlyList<SourceBootstrapVariantView> Variants,
     string ResolvedLocale,
     string ResolvedPath);
-public sealed record SourcePackEntryView(string Name, string? DisplayName, string? Description, string Path);
+public sealed record SourceCatalogEntryView(string Name, string? DisplayName, string? Description, string Path);
 
 public sealed record SourceCatalogView(
     SourceCatalogProvenance Provenance,
     string DisplayName,
     string? Description,
     IReadOnlyList<SourceBootstrapEntryView> BootstrapEntries,
-    IReadOnlyList<SourcePackEntryView> PackEntries);
+    IReadOnlyList<SourceCatalogEntryView> PackEntries);
+
+public interface ISourceCatalogHandler
+{
+    string Kind { get; }
+
+    Task<SourceCatalogView> BrowseAsync(
+        SourceCatalogDocument catalog,
+        ISourceSnapshotContent content,
+        SourceCatalogProvenance provenance,
+        string catalogPath,
+        string? locale,
+        CancellationToken cancellationToken);
+}
 
 public static class SourceDescendantPath
 {

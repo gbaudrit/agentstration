@@ -12,6 +12,7 @@ public sealed class SourceCatalogService(
     SourceChannelCompatibilityEvaluator compatibility,
     ISourceSnapshotContentReader contentReader,
     ISourceCatalogManifestReader manifests,
+    IEnumerable<ISourceCatalogHandler> catalogHandlers,
     ResourceScopeOperationService scopeOperations)
 {
     public async Task<IReadOnlyList<SourceCatalogView>> BrowseAsync(
@@ -49,9 +50,18 @@ public sealed class SourceCatalogService(
                 var provenance = new SourceCatalogProvenance(
                     source.Uid, version.Uid, version.Definition.Version, channel, snapshot.Uid,
                     snapshot.Definition.Artifact.Sha256, parsed.Kind, parsed.Name, catalogPath);
-                results.Add(parsed.Bootstrap is { } bootstrap
-                    ? await BootstrapAsync(content, provenance, bootstrap, catalogPath, requestedLocale, token)
-                    : Pack(content, provenance, parsed.Pack!, catalogPath));
+                if (string.Equals(parsed.Kind, SourceCatalogKinds.Bootstrap, StringComparison.Ordinal))
+                {
+                    results.Add(await BootstrapAsync(
+                        content, provenance, manifests.ReadBootstrapCatalog(parsed), catalogPath, requestedLocale, token));
+                    continue;
+                }
+
+                var handler = catalogHandlers.SingleOrDefault(candidate =>
+                    string.Equals(candidate.Kind, parsed.Kind, StringComparison.Ordinal))
+                    ?? throw Invalid("source_catalog_kind_unsupported", $"Catalog kind '{parsed.Kind}' is not supported.");
+                results.Add(await handler.BrowseAsync(
+                    parsed, content, provenance, catalogPath, requestedLocale, token));
             }
             return results;
         }, cancellationToken);
@@ -94,23 +104,6 @@ public sealed class SourceCatalogService(
             entries.Add(new(entry.Name, entry.DefaultLocale, variants, resolved.Locale, resolved.Path));
         }
         return new(provenance, catalog.Definition.DisplayName, catalog.Definition.Description, entries, []);
-    }
-
-    private static SourceCatalogView Pack(
-        ISourceSnapshotContent content,
-        SourceCatalogProvenance provenance,
-        PackCatalogManifest catalog,
-        string catalogPath)
-    {
-        var catalogDirectory = SourceDescendantPath.Parent(catalogPath);
-        var entries = catalog.Definition.Entries.Select(entry =>
-        {
-            var path = SourceDescendantPath.Combine(catalogDirectory, entry.Path, $"Pack catalog entry '{entry.Name}' path");
-            if (!content.Paths.Contains(path, StringComparer.Ordinal))
-                throw Invalid("source_content_missing", $"Pack catalog entry '{entry.Name}' references missing snapshot content '{path}'.");
-            return new SourcePackEntryView(entry.Name, entry.DisplayName, entry.Description, path);
-        }).ToArray();
-        return new(provenance, catalog.Definition.DisplayName, catalog.Definition.Description, [], entries);
     }
 
     private static string? ValidateRequestedLocale(string? locale)

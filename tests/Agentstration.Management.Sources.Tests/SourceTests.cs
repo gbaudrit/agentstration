@@ -380,13 +380,16 @@ public sealed class SourceTests
     public void CatalogManifestRejectsNonCanonicalAndMissingDefaultLocales()
     {
         var reader = new SourceCatalogManifestReader();
-        var nonCanonical = Assert.ThrowsExactly<SourceValidationException>(() => reader.ReadCatalog(
-            BootstrapCatalog().Replace("fr-FR", "fr-fr", StringComparison.Ordinal), SourceCatalogKinds.Bootstrap));
+        var nonCanonical = Assert.ThrowsExactly<SourceValidationException>(() => reader.ReadBootstrapCatalog(
+            reader.ReadCatalog(
+                BootstrapCatalog().Replace("fr-FR", "fr-fr", StringComparison.Ordinal),
+                SourceCatalogKinds.Bootstrap)));
         Assert.AreEqual("source_catalog_locale_invalid", nonCanonical.Code);
 
-        var missingDefault = Assert.ThrowsExactly<SourceValidationException>(() => reader.ReadCatalog(
-            BootstrapCatalog().Replace("defaultLocale: fr-FR", "defaultLocale: de-DE", StringComparison.Ordinal),
-            SourceCatalogKinds.Bootstrap));
+        var missingDefault = Assert.ThrowsExactly<SourceValidationException>(() => reader.ReadBootstrapCatalog(
+            reader.ReadCatalog(
+                BootstrapCatalog().Replace("defaultLocale: fr-FR", "defaultLocale: de-DE", StringComparison.Ordinal),
+                SourceCatalogKinds.Bootstrap)));
         Assert.AreEqual("source_catalog_default_locale_missing", missingDefault.Code);
     }
 
@@ -400,7 +403,7 @@ public sealed class SourceTests
             ("catalogs/packs.yaml", PackCatalog()),
             ("catalogs/packs/who-am-i.zip", "immutable pack bytes"));
         var imported = await fixture.Service.ImportYamlAsync(
-            ManifestWithCatalog("1", SourceCatalogKinds.Pack, "catalogs/packs.yaml"), default);
+            ManifestWithCatalog("1", PackCatalogKinds.Pack, "catalogs/packs.yaml"), default);
         _ = await fixture.Bindings.ConfigureAsync(
             "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
         var refreshed = await fixture.Snapshots.RefreshExactAsync(
@@ -423,7 +426,7 @@ public sealed class SourceTests
         fixture.Materializer.Content = CatalogArchiveBytes(
             ("catalogs/packs.yaml", Encoding.UTF8.GetBytes(PackCatalog())),
             ("catalogs/packs/who-am-i.zip", pack));
-        var manifest = ManifestWithCatalog("1", SourceCatalogKinds.Pack, "catalogs/packs.yaml");
+        var manifest = ManifestWithCatalog("1", PackCatalogKinds.Pack, "catalogs/packs.yaml");
         var imported = await fixture.Service.ImportRegistryAsync(
             manifest, RegistryProvenance(manifest), ResourceScopeRef.Instance, default);
         _ = await fixture.Bindings.ConfigureAsync(
@@ -495,7 +498,7 @@ public sealed class SourceTests
             ("catalogs/packs.yaml", Encoding.UTF8.GetBytes(PackCatalog())),
             ("catalogs/packs/who-am-i.zip", PackArchive("other", "who-am-i")));
         var imported = await fixture.Service.ImportYamlAsync(
-            ManifestWithCatalog("1", SourceCatalogKinds.Pack, "catalogs/packs.yaml"), default);
+            ManifestWithCatalog("1", PackCatalogKinds.Pack, "catalogs/packs.yaml"), default);
         _ = await fixture.Bindings.ConfigureAsync(
             "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
         var refreshed = await fixture.Snapshots.RefreshExactAsync(
@@ -1638,7 +1641,7 @@ public sealed class SourceTests
         public SourceChannelSnapshotService Snapshots => services.GetRequiredService<SourceChannelSnapshotService>();
         public SourceRefreshScheduler Scheduler => services.GetRequiredService<SourceRefreshScheduler>();
         public SourceCatalogService Catalogs => services.GetRequiredService<SourceCatalogService>();
-        public SourcePackInstallationService SourcePacks => services.GetRequiredService<SourcePackInstallationService>();
+        public PackSourceInstallationService SourcePacks => services.GetRequiredService<PackSourceInstallationService>();
         public ISourceSnapshotContentReader ContentReader => services.GetRequiredService<ISourceSnapshotContentReader>();
         public SourceVerificationService Verification => services.GetRequiredService<SourceVerificationService>();
         public FakeSourceVerificationIndexProvider VerificationIndex => services.GetRequiredService<FakeSourceVerificationIndexProvider>();
@@ -1696,11 +1699,14 @@ public sealed class SourceTests
             collection.AddSingleton(new SourceMaterializationLimits());
             collection.AddSingleton<SourceChannelSnapshotService>();
             collection.AddSingleton<SourceRefreshScheduler>();
+            collection.AddSingleton<ISourceCatalogContentResolver, SourceCatalogContentResolver>();
+            collection.AddSingleton<PackSourceCatalogHandler>();
+            collection.AddSingleton<ISourceCatalogHandler>(provider => provider.GetRequiredService<PackSourceCatalogHandler>());
             collection.AddSingleton<SourceCatalogService>();
             collection.AddSingleton<IPackArchiveReader, ZipPackArchiveReader>();
             collection.AddSingleton<IPackResourceHandler, SourcePackRecordingHandler>();
             collection.AddSingleton<PackManagementService>();
-            collection.AddSingleton<SourcePackInstallationService>();
+            collection.AddSingleton<PackSourceInstallationService>();
             var services = collection.BuildServiceProvider();
             var fixture = new Fixture(services, database, ownsDatabase);
             using (fixture.Context.PushSystem()) await fixture.Store.InitializeAsync(default);

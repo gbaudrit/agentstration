@@ -1,15 +1,13 @@
-using Agentstration.Packs;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Agentstration.ResourceManagement;
+using Agentstration.Sources.Contracts;
 
-namespace Agentstration.Sources;
+namespace Agentstration.Packs;
 
-public sealed class SourcePackInstallationService(
-    SourceManagementService sources,
-    SourceChannelSnapshotService snapshots,
-    SourceCatalogService catalogs,
-    ISourceSnapshotContentReader contentReader,
+public sealed class PackSourceInstallationService(
+    ISourceCatalogContentResolver sourceCatalogs,
+    PackSourceCatalogHandler packCatalogs,
     IPackArchiveReader archiveReader,
     PackManagementService packs)
 {
@@ -56,76 +54,82 @@ public sealed class SourcePackInstallationService(
     private async Task<ResolvedPack> ResolveAsync(SourcePackSelection selection, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(selection);
-        var source = (await sources.GetExactAsync(
-            selection.ScopeRef, selection.SourcePublisher, selection.SourceName, cancellationToken))?.Source
-            ?? throw new ResourceNotFoundException(
-                new(SourceResourceKinds.Source, selection.SourceName, new(selection.SourcePublisher)));
-        var version = await sources.GetVersionExactAsync(
-            selection.ScopeRef, selection.SourcePublisher, selection.SourceName, selection.SourceVersionUid, cancellationToken)
-            ?? throw new ResourceNotFoundException(
-                new(SourceResourceKinds.SourceVersion, selection.SourceVersionUid.ToString("D")));
-        var snapshot = await snapshots.GetAsync(
-            selection.ScopeRef, selection.SourcePublisher, selection.SourceName, selection.SourceVersionUid,
-            selection.Channel, selection.SnapshotUid, cancellationToken)
-            ?? throw new ResourceNotFoundException(
-                new(SourceResourceKinds.SourceChannelSnapshot, selection.SnapshotUid.ToString("D")));
-
-        // BrowseAsync re-resolves the exact Source Version and Channel, recalculates compatibility
-        // against the running Agentstration version, and verifies Snapshot ownership.
-        var discovered = await catalogs.BrowseAsync(
-            selection.ScopeRef, selection.SourcePublisher, selection.SourceName, selection.SourceVersionUid,
-            selection.Channel, selection.SnapshotUid, null, cancellationToken);
-        var catalog = discovered.SingleOrDefault(value =>
-            value.Provenance.CatalogKind == SourceCatalogKinds.Pack
-            && string.Equals(value.Provenance.CatalogName, selection.CatalogName, StringComparison.Ordinal))
-            ?? throw Invalid("source_pack_catalog_missing", $"Pinned snapshot has no Pack catalog named '{selection.CatalogName}'.");
-        var entry = catalog.PackEntries.SingleOrDefault(value =>
-            string.Equals(value.Name, selection.EntryName, StringComparison.Ordinal))
-            ?? throw Invalid("source_pack_entry_missing", $"Pack catalog '{selection.CatalogName}' has no entry named '{selection.EntryName}'.");
-
-        await using var content = await contentReader.OpenAsync(snapshot.Definition.Artifact, cancellationToken);
-        var bytes = await content.ReadBytesAsync(entry.Path, MaximumArchiveBytes, cancellationToken);
-        var archiveDigest = $"sha256:{Convert.ToHexStringLower(SHA256.HashData(bytes))}";
-        await using var stream = new MemoryStream(bytes, writable: false);
-        var archive = await archiveReader.ReadAsync(stream, entry.Path, cancellationToken);
-        if (!string.Equals(archive.Manifest.Metadata.Name, entry.Name, StringComparison.Ordinal))
-            throw Invalid("source_pack_identity_mismatch", $"Catalog entry '{entry.Name}' contains Pack '{archive.Manifest.Metadata.Name}'.");
-        var declaredPublisher = version.Definition.PublishedDefinition.Publisher.Name;
-        if (!string.Equals(archive.Manifest.Metadata.Publisher, declaredPublisher, StringComparison.Ordinal))
-            throw Invalid("source_pack_publisher_mismatch", $"Pack publisher '{archive.Manifest.Metadata.Publisher}' does not match Source publisher '{declaredPublisher}'. The Pack identity is not rewritten or presented as verified.");
-
-        var pin = new SourcePackInstallationPin(
-            version.Uid,
-            version.Definition.Version,
-            version.Definition.ManifestDigest,
-            selection.Channel,
-            snapshot.Uid,
-            snapshot.Definition.Artifact.Sha256,
-            catalog.Provenance.CatalogName,
-            catalog.Provenance.CatalogPath,
-            entry.Name,
-            entry.Path,
-            archiveDigest,
-            version.Definition.Origin?.Registry);
-        var provenance = new SourcePackProvenance
+        IResolvedSourceCatalogContent resolved;
+        try
         {
-            SourceUid = source.Uid,
-            SourceName = source.Name,
-            SourcePublisher = source.Definition.Publisher,
-            SourceVersionUid = version.Uid,
-            SourceVersion = version.Definition.Version,
-            ManifestDigest = version.Definition.ManifestDigest,
-            Channel = selection.Channel,
-            ProviderRevision = snapshot.Definition.ResolvedRevision,
-            SnapshotUid = snapshot.Uid,
-            SnapshotDigest = snapshot.Definition.Artifact.Sha256,
-            CatalogName = catalog.Provenance.CatalogName,
-            CatalogPath = catalog.Provenance.CatalogPath,
-            EntryName = entry.Name,
-            EntryPath = entry.Path,
-            Registry = version.Definition.Origin?.Registry
-        };
-        return new(archive, pin, provenance);
+            resolved = await sourceCatalogs.ResolveAsync(
+                new(
+                    selection.ScopeRef,
+                    selection.SourcePublisher,
+                    selection.SourceName,
+                    selection.SourceVersionUid,
+                    selection.Channel,
+                    selection.SnapshotUid,
+                    PackCatalogKinds.Pack,
+                    selection.CatalogName),
+                cancellationToken);
+        }
+        catch (SourceValidationException exception) when (exception.Code == "source_catalog_missing")
+        {
+            throw Invalid("source_pack_catalog_missing", $"Pinned snapshot has no Pack catalog named '{selection.CatalogName}'.");
+        }
+
+        await using (resolved)
+        {
+            var catalog = packCatalogs.Read(resolved.Catalog);
+            var entry = catalog.Definition.Entries.SingleOrDefault(value =>
+                string.Equals(value.Name, selection.EntryName, StringComparison.Ordinal))
+                ?? throw Invalid("source_pack_entry_missing", $"Pack catalog '{selection.CatalogName}' has no entry named '{selection.EntryName}'.");
+            var entryPath = SourceDescendantPath.Combine(
+                SourceDescendantPath.Parent(resolved.Provenance.CatalogPath),
+                entry.Path,
+                $"Pack catalog entry '{entry.Name}' path");
+            if (!resolved.Paths.Contains(entryPath, StringComparer.Ordinal))
+                throw Invalid("source_content_missing", $"Pack catalog entry '{entry.Name}' references missing snapshot content '{entryPath}'.");
+
+            var bytes = await resolved.ReadBytesAsync(entryPath, MaximumArchiveBytes, cancellationToken);
+            var archiveDigest = $"sha256:{Convert.ToHexStringLower(SHA256.HashData(bytes))}";
+            await using var stream = new MemoryStream(bytes, writable: false);
+            var archive = await archiveReader.ReadAsync(stream, entryPath, cancellationToken);
+            if (!string.Equals(archive.Manifest.Metadata.Name, entry.Name, StringComparison.Ordinal))
+                throw Invalid("source_pack_identity_mismatch", $"Catalog entry '{entry.Name}' contains Pack '{archive.Manifest.Metadata.Name}'.");
+            var declaredPublisher = resolved.Version.Definition.PublishedDefinition.Publisher.Name;
+            if (!string.Equals(archive.Manifest.Metadata.Publisher, declaredPublisher, StringComparison.Ordinal))
+                throw Invalid("source_pack_publisher_mismatch", $"Pack publisher '{archive.Manifest.Metadata.Publisher}' does not match Source publisher '{declaredPublisher}'. The Pack identity is not rewritten or presented as verified.");
+
+            var pin = new SourcePackInstallationPin(
+                resolved.Version.Uid,
+                resolved.Version.Definition.Version,
+                resolved.Version.Definition.ManifestDigest,
+                selection.Channel,
+                resolved.Snapshot.Uid,
+                resolved.Snapshot.Definition.Artifact.Sha256,
+                resolved.Provenance.CatalogName,
+                resolved.Provenance.CatalogPath,
+                entry.Name,
+                entryPath,
+                archiveDigest,
+                resolved.Version.Definition.Origin?.Registry);
+            var provenance = new SourcePackProvenance
+            {
+                SourceUid = resolved.Source.Uid,
+                SourceName = resolved.Source.Name,
+                SourcePublisher = resolved.Source.Definition.Publisher,
+                SourceVersionUid = resolved.Version.Uid,
+                SourceVersion = resolved.Version.Definition.Version,
+                ManifestDigest = resolved.Version.Definition.ManifestDigest,
+                Channel = selection.Channel,
+                ProviderRevision = resolved.Snapshot.Definition.ResolvedRevision,
+                SnapshotUid = resolved.Snapshot.Uid,
+                SnapshotDigest = resolved.Snapshot.Definition.Artifact.Sha256,
+                CatalogName = resolved.Provenance.CatalogName,
+                CatalogPath = resolved.Provenance.CatalogPath,
+                EntryName = entry.Name,
+                EntryPath = entryPath,
+                Registry = resolved.Version.Definition.Origin?.Registry
+            };
+            return new(archive, pin, provenance);
+        }
     }
 
     private static SourcePackInstallationPreview CreatePreview(

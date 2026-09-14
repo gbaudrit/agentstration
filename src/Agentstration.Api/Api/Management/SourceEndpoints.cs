@@ -1,4 +1,5 @@
 using Agentstration.Identity.Contracts;
+using Agentstration.Packs;
 using Agentstration.Sources.Contracts;
 using Agentstration.Sources;
 using Agentstration.ResourceManagement;
@@ -141,7 +142,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         string? scopeRef,
         SourcePackPreviewRequest request,
         SourceManagementService sources,
-        SourcePackInstallationService service,
+        PackSourceInstallationService service,
         CancellationToken cancellationToken) =>
         ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.PreviewAsync(
             new(
@@ -170,7 +171,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         SourcePackInstallRequest request,
         HttpResponse response,
         SourceManagementService sources,
-        SourcePackInstallationService service,
+        PackSourceInstallationService service,
         CancellationToken cancellationToken) =>
         ManagementHttp.ExecuteAsync(async () =>
         {

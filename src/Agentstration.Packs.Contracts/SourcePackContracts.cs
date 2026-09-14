@@ -3,6 +3,34 @@ using Agentstration.Sources.Contracts;
 
 namespace Agentstration.Packs.Contracts;
 
+public static class PackCatalogKinds
+{
+    public const string Pack = "PackCatalog";
+}
+
+public sealed record PackCatalogEntry
+{
+    public required string Name { get; init; }
+    public string? DisplayName { get; init; }
+    public string? Description { get; init; }
+    public required string Path { get; init; }
+}
+
+public sealed record PackCatalogProperties
+{
+    public required string DisplayName { get; init; }
+    public string? Description { get; init; }
+    public IReadOnlyList<PackCatalogEntry> Entries { get; init; } = [];
+}
+
+public sealed record PackCatalogManifest
+{
+    public required string ApiVersion { get; init; }
+    public required string Kind { get; init; }
+    public ResourceMetadata Metadata { get; init; } = new();
+    public required PackCatalogProperties Definition { get; init; }
+}
+
 public sealed record SourcePackSelection(
     ResourceScopeRef ScopeRef,
     string SourcePublisher,
