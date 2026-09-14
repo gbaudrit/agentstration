@@ -14,13 +14,13 @@ public static class ResourcePlanningApiModule
     public static IEndpointRouteBuilder MapResourcePlanningApi(this IEndpointRouteBuilder endpoints)
     {
         var plans = endpoints.MapGroup("/api/resource-plans").RequireAuthorization(AgentstrationPolicies.Authenticated);
-        plans.MapPost("/", CreateAsync).Produces<ResourcePlan>(StatusCodes.Status201Created).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        plans.MapGet("/", ListAsync).Produces<ResourcePlanPage>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        plans.MapGet("/{id:guid}", GetAsync).Produces<ResourcePlan>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        plans.MapPut("/{id:guid}", RefineAsync).Produces<ResourcePlan>().RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        plans.MapPost("/{id:guid}/status", ChangeStatusAsync).Produces<ResourcePlan>().RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        plans.MapGet("/{id:guid}/activities", ListActivitiesAsync).Produces<ResourcePlanActivity[]>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        plans.MapPost("/validate-content", ValidateContent).Produces<PlanningValidationResult>().RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapPost("/", CreateAsync).Produces<ResourcePlan>(StatusCodes.Status201Created).WithSummary("Create a Resource Plan").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapGet("/", ListAsync).Produces<ResourcePlanPage>().WithSummary("List Resource Plans").RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapGet("/{id:guid}", GetAsync).Produces<ResourcePlan>().WithSummary("Get a Resource Plan").RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapPut("/{id:guid}", RefineAsync).Produces<ResourcePlan>().WithSummary("Refine a Resource Plan").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapPost("/{id:guid}/status", ChangeStatusAsync).Produces<ResourcePlan>().WithSummary("Change Resource Plan status").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapGet("/{id:guid}/activities", ListActivitiesAsync).Produces<ResourcePlanActivity[]>().WithSummary("List Resource Plan activities").RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapPost("/validate-content", ValidateContent).Produces<PlanningValidationResult>().WithSummary("Validate functional planning content").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         return endpoints;
     }
 
