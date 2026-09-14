@@ -21,7 +21,7 @@ public sealed class ResourcePlanServiceTests
         await connection.OpenAsync();
         var options = new DbContextOptionsBuilder<ResourcePlanningDbContext>().UseSqlite(connection).Options;
         var repository = new SqliteResourcePlanRepository(new TestDbContextFactory(options));
-        var service = new ResourcePlanService(repository, TimeProvider.System);
+        var service = new ResourcePlanService(repository, TimeProvider.System, new FunctionalResourcePlanValidator());
         await service.InitializeAsync(default);
         var created = await service.CreateAsync(Scope, Create("Initial", "work-1", "flow-1"), Actor, default);
         Assert.AreEqual(ResourcePlanStatus.Draft, created.Value.Status);
@@ -44,7 +44,7 @@ public sealed class ResourcePlanServiceTests
         await connection.OpenAsync();
         var options = new DbContextOptionsBuilder<ResourcePlanningDbContext>().UseSqlite(connection).Options;
         var repository = new SqliteResourcePlanRepository(new TestDbContextFactory(options));
-        var service = new ResourcePlanService(repository, TimeProvider.System);
+        var service = new ResourcePlanService(repository, TimeProvider.System, new FunctionalResourcePlanValidator());
         await service.InitializeAsync(default);
         var created = await service.CreateAsync(Scope, Create("Plan"), Actor, default);
         var foreign = Scope with { WorkspaceId = new WorkspaceId(Guid.NewGuid()) };
@@ -57,7 +57,7 @@ public sealed class ResourcePlanServiceTests
     public async Task AppliedPlanCanOnlyBeArchived()
     {
         var repository = new MemoryRepository();
-        var service = new ResourcePlanService(repository, TimeProvider.System);
+        var service = new ResourcePlanService(repository, TimeProvider.System, new FunctionalResourcePlanValidator());
         var current = await service.CreateAsync(Scope, Create("Plan"), Actor, default);
         foreach (var status in new[] { ResourcePlanStatus.Ready, ResourcePlanStatus.Materialized, ResourcePlanStatus.Validated, ResourcePlanStatus.Applied })
             current = await service.ChangeStatusAsync(Scope, current.Value.Id, new(status), current.ETag, Actor, default);
@@ -69,7 +69,10 @@ public sealed class ResourcePlanServiceTests
 
     private static CreateResourcePlanRequest Create(string title, string? workItem = null, string? flowRun = null) =>
         new(title, "Create a coordinated assistant", null, Content("initial"), workItem, flowRun);
-    private static ResourcePlanContent Content(string value) => new("resource-planning.agentstration.io/v1", JsonSerializer.SerializeToElement(new { value }));
+    private static ResourcePlanContent Content(string value) => FunctionalResourcePlanSerializer.Serialize(new()
+    {
+        Solution = new(value, ["A usable outcome"])
+    });
 
     private sealed class TestDbContextFactory(DbContextOptions<ResourcePlanningDbContext> options) : IDbContextFactory<ResourcePlanningDbContext>
     {
