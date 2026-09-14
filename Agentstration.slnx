@@ -25,6 +25,7 @@
   <Folder Name="/src/Console/">
     <Project Path="src/Agentstration.Console.Client/Agentstration.Console.Client.csproj" />
     <Project Path="src/Agentstration.Console.Components/Agentstration.Console.Components.csproj" />
+    <Project Path="src/Agentstration.Console.Web/Agentstration.Console.Web.csproj" />
     <Project Path="src/Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
     <Project Path="src/Agentstration.Web.FlowDesigner/Agentstration.Web.FlowDesigner.csproj" />
   </Folder>
@@ -138,6 +139,7 @@
   <Folder Name="/tests/Console/">
     <Project Path="tests/Agentstration.Console.Client.Tests/Agentstration.Console.Client.Tests.csproj" />
     <Project Path="tests/Agentstration.Console.Components.Tests/Agentstration.Console.Components.Tests.csproj" />
+    <Project Path="tests/Agentstration.Console.Web.Tests/Agentstration.Console.Web.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Extensions/">
     <Project Path="tests/Agentstration.Management.Aep.Tests/Agentstration.Management.Aep.Tests.csproj" />

@@ -10,7 +10,7 @@ ADR-0109 assigns business behavior to plural resource families, but a single end
 
 ## Decision
 
-Every family with a public HTTP, MCP, or SignalR surface owns an `Agentstration.{Family}.Api` project. Each module exposes explicit `Add{Family}Api` and `Map{Family}Api` extensions. `Agentstration.Api` is a lightweight aggregator that calls those extensions in a visible order and retains only global health and OpenAPI conventions. `Agentstration.Web` remains the sole executable host.
+Every family with a public HTTP, MCP, or SignalR surface owns an `Agentstration.{Family}.Api` project. Each module exposes explicit `Add{Family}Api` and `Map{Family}Api` extensions. `Agentstration.Api` is a lightweight aggregator that calls those extensions in a visible order and retains only global health and OpenAPI conventions. `Agentstration.Web` remains the sole authoritative API host. ADR-0111 later adds an independent Console process shell without moving API ownership.
 
 Transport ownership is:
 

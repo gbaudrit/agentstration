@@ -2,7 +2,7 @@
 
 ## Outcome and constraints
 
-Agentstration keeps explicit Management Plane, Runtime Plane, and Work Plane boundaries in one modular codebase and one authoritative standalone server. `Agentstration.Web` is the executable composition root, family-owned `Agentstration.*.Api` modules own REST, MCP, SignalR, request-context, and authorization transport, and the lightweight `Agentstration.Api` aggregator composes them with global OpenAPI and health conventions. The Console presentation is compiled in a dedicated Razor component library that consumes typed HTTP clients; the end-user Workplace remains a separate HTTP/SignalR client UI. The Management Plane is authoritative for definitions, revisions, and desired deployment state. The Runtime Plane owns technical execution. The Work Plane owns the functional lifecycle, history, interactions, and results of delegated work. Runtime `AIAgent` objects are reconstructible and never persisted. The default launch is fully local; Foundry, PostgreSQL, Ollama, and OTLP are optional profiles, while Aspire orchestrates the server, Workplace, and optional extensions.
+Agentstration keeps explicit Management Plane, Runtime Plane, and Work Plane boundaries in one modular codebase and one authoritative standalone server. `Agentstration.Web` remains the all-in-one executable composition root, family-owned `Agentstration.*.Api` modules own REST, MCP, SignalR, request-context, and authorization transport, and the lightweight `Agentstration.Api` aggregator composes them with global OpenAPI and health conventions. `Agentstration.Console.Web` is an independently hostable operations Console process shell that consumes typed clients but owns no authoritative API, store, worker, or business service. The end-user Workplace remains a separate HTTP/SignalR client UI. The Management Plane is authoritative for definitions, revisions, and desired deployment state. The Runtime Plane owns technical execution. The Work Plane owns the functional lifecycle, history, interactions, and results of delegated work. Runtime `AIAgent` objects are reconstructible and never persisted. The default launch is fully local; Foundry, PostgreSQL, Ollama, and OTLP are optional profiles, while Aspire orchestrates the server, Workplace, and optional extensions.
 
 ## Solution tree
 
@@ -14,6 +14,7 @@ src/
   Agentstration.Web/              authoritative standalone composition, lifecycle, Razor shell and workers
   Agentstration.Console.Client/   typed operations Console HTTP and SignalR clients
   Agentstration.Console.Components/ operations Console routes, presentation state and localization
+  Agentstration.Console.Web/      independent operations Console/BFF process shell
   Agentstration.Web.Components/   reusable Razor components and console design system
   Agentstration.Web.FlowDesigner/ Flow-specific Razor UI, editor state, Z diagrams, Monaco
   Agentstration.Workplace.Client/ typed HTTP and reconnecting SignalR client
@@ -65,6 +66,7 @@ tests/
   Agentstration.ArchitectureTests/
   Agentstration.Console.Client.Tests/
   Agentstration.Console.Components.Tests/
+  Agentstration.Console.Web.Tests/
   Agentstration.Tools.Tests/
   Agentstration.Management.Storage.Tests/
   Agentstration.Management.Sources.Tests/
@@ -85,6 +87,7 @@ Core dependency direction:
 Web ---> Infrastructure ---> Application ---> Work
 Web ---> Management / Flow / Runtime public boundaries
 Console.Components ---> Console.Client + shared UI + neutral contracts
+Console.Web ---> Console.Components + Console.Client + shared UI
 Web ---> Api ---> application/module services and public contracts
 
 Web -> family-owned contracts + plural resource-family modules
@@ -111,7 +114,7 @@ Runtime.Storage.Sqlite -> Runtime.Abstractions + EF Core SQLite
 Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 ```
 
-`Agentstration.Web/Program.cs` is deliberately limited to creating the builder, applying the standalone composition, initializing it, and running it. `StandaloneHostComposition` remains in the executable project and is the single place that selects storage and identity providers, registers concrete adapters and workers, configures observability, orders startup initialization, and assembles `Agentstration.Api` with the Console libraries. This is code separation only: direct launch, Aspire, and the Docker image still start one authoritative ASP.NET Core process with one set of stores, queues, schedulers, and workers.
+`Agentstration.Web/Program.cs` is deliberately limited to creating the builder, applying the standalone composition, initializing it, and running it. `StandaloneHostComposition` remains in the executable project and is the single place that selects storage and identity providers, registers concrete adapters and workers, configures observability, orders startup initialization, and assembles `Agentstration.Api` with the Console libraries. The independently runnable `Agentstration.Console.Web` hosts the same Console routes and shared static assets with interactive server rendering, its own cookie/antiforgery/culture pipeline, liveness/readiness endpoints, and separately configurable Management, Work, Flow, and Runtime origins. It intentionally contains no authoritative server implementation. Secure delegated API credentials are a later BFF increment; until then, `Agentstration.Web` remains the functional authenticated standalone default. See ADR-0111.
 
 Management abstractions and kind constants are owned by their resource families; the former compatibility assembly has been removed. Identity, authorization and PAT contracts are owned by `Identity.Contracts`, provider-neutral audit contracts by `Security.Contracts`, Extension registration and AEP contracts by `Extensions.Contracts`, and all Source and Source Registry contracts, policies, provenance and provider ports by `Sources.Contracts`. Generic Bootstrap documents, planning and handler ports are owned by `ResourceManagement.Contracts`; composed application and HTTP contracts live in the narrow `Bootstrap.Contracts` façade. Validation and use cases live in plural resource-family modules. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
 

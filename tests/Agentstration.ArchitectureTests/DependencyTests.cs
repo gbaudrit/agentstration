@@ -121,6 +121,41 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void IndependentConsoleHostReferencesOnlyConsoleAndNeutralUiProjects()
+    {
+        var root = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Console.Web");
+        var project = File.ReadAllText(Path.Combine(root, "Agentstration.Console.Web.csproj")).Replace('\\', '/');
+        var sources = string.Join(Environment.NewLine, Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Select(File.ReadAllText));
+
+        foreach (var allowed in new[]
+                 {
+                     "Agentstration.Console.Client",
+                     "Agentstration.Console.Components",
+                     "Agentstration.Web.Components",
+                     "Agentstration.Web.FlowDesigner"
+                 })
+            Assert.Contains($"../{allowed}/{allowed}.csproj", project, StringComparison.Ordinal);
+
+        foreach (var forbidden in new[]
+                 {
+                     "Agentstration.Api/",
+                     "Agentstration.Application/",
+                     "Agentstration.Infrastructure/",
+                     ".Storage.Sqlite/",
+                     ".Storage.PostgreSql/",
+                     "Agentstration.Runtime.Core/",
+                     "Agentstration.Security.AspNetCoreIdentity/"
+                 })
+            Assert.DoesNotContain(forbidden, project, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("Agentstration.Web.Hosting", sources, StringComparison.Ordinal);
+        Assert.DoesNotContain("Agentstration.Web.Api", sources, StringComparison.Ordinal);
+        Assert.DoesNotContain("ICurrentRequestContext", sources, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
     public void ApiTransportDoesNotReferenceConsoleOrExecutableHostAssemblies()
     {
         var references = typeof(Agentstration.Web.ApiTransportEndpointRouteBuilderExtensions).Assembly
@@ -1090,6 +1125,7 @@ public sealed class DependencyTests
                      "Agentstration.Api.Tests",
                      "Agentstration.Console.Client.Tests",
                      "Agentstration.Console.Components.Tests",
+                     "Agentstration.Console.Web.Tests",
                      "Agentstration.Web.Tests"
                  })
         {
