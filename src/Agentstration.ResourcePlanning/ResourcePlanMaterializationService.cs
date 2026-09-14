@@ -139,7 +139,7 @@ public sealed class ResourcePlanMaterializationService(
 
     private static FlowDefinition CreateFlowDefinition(PlanningWorkflowIntent workflow, IReadOnlyList<FlowTargetReference> participants) => workflow.Collaboration switch
     {
-        PlanningCollaborationStyle.Single => new DirectFlowDefinition(participants[0]),
+        PlanningCollaborationStyle.Individual => new DirectFlowDefinition(participants[0]),
         PlanningCollaborationStyle.Ordered => new OrchestrationFlowDefinition(participants, new SequentialOrchestrationPattern()),
         PlanningCollaborationStyle.Parallel => new OrchestrationFlowDefinition(participants, new ConcurrentOrchestrationPattern()),
         PlanningCollaborationStyle.Delegated => new OrchestrationFlowDefinition(participants, new HandoffOrchestrationPattern(participants[0].Id, participants.Zip(participants.Skip(1), (from, to) => new FlowHandoff(from.Id, to.Id)).ToArray(), Autonomous: true)),
