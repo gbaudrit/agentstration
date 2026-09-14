@@ -1,9 +1,9 @@
-using Agentstration.Identity.Contracts;
-using Agentstration.Identity;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 

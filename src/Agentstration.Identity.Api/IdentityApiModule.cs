@@ -1,5 +1,5 @@
-using Agentstration.Identity.Contracts;
 using Agentstration.Identity.Api.Security;
+using Agentstration.Identity.Contracts;
 using Agentstration.Web;
 using Agentstration.Web.Configuration;
 using Agentstration.Web.Security;

@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
-using Agentstration.Models.Contracts;
 using Agentstration.Models;
+using Agentstration.Models.Contracts;
 using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;

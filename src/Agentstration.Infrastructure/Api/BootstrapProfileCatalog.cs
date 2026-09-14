@@ -1,11 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Resources;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using Agentstration.ResourceManagement.Contracts;
-using Agentstration.ResourceManagement;
-using Agentstration.Resources;
 
 namespace Agentstration.Web.Hosting;
 

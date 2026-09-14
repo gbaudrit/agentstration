@@ -1,6 +1,6 @@
-using Agentstration.Identity.Contracts;
-using Agentstration.Identity;
 using System.Globalization;
+using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 

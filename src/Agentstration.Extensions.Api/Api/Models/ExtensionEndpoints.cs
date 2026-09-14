@@ -1,7 +1,7 @@
-using Agentstration.Identity.Contracts;
 using Agentstration.Api.Contracts;
-using Agentstration.Extensions.Contracts;
 using Agentstration.Extensions;
+using Agentstration.Extensions.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Security;
 

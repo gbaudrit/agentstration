@@ -1,7 +1,7 @@
 using Agentstration.Identity.Contracts;
-using Agentstration.Sources.Contracts;
-using Agentstration.Sources;
 using Agentstration.ResourceManagement;
+using Agentstration.Sources;
+using Agentstration.Sources.Contracts;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;

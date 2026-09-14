@@ -1,5 +1,5 @@
-using Agentstration.Identity.Contracts;
 using System.Text.Json;
+using Agentstration.Identity.Contracts;
 
 namespace Agentstration.Identity;
 

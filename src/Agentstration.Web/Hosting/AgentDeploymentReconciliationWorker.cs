@@ -1,5 +1,5 @@
-using Agentstration.Identity.Contracts;
 using Agentstration.Agents;
+using Agentstration.Identity.Contracts;
 
 namespace Agentstration.Web.Hosting;
 

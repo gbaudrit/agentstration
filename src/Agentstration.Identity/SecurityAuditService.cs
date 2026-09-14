@@ -1,6 +1,6 @@
-using Agentstration.Security.Contracts;
-using Agentstration.Identity.Contracts;
 using System.Diagnostics;
+using Agentstration.Identity.Contracts;
+using Agentstration.Security.Contracts;
 
 namespace Agentstration.Identity;
 

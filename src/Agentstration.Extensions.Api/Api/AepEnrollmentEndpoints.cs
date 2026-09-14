@@ -1,7 +1,7 @@
-using Agentstration.Identity.Contracts;
 using Agentstration.Aep.Abstractions;
-using Agentstration.Extensions.Contracts;
 using Agentstration.Extensions.Aep;
+using Agentstration.Extensions.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Web.Security;

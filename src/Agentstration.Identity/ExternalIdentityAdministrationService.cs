@@ -1,6 +1,6 @@
-using Agentstration.Security.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.Security.Contracts;
 
 namespace Agentstration.Identity;
 

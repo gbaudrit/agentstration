@@ -1,5 +1,5 @@
-using Agentstration.Identity.Contracts;
 using Agentstration.Bootstrap.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Sources.Contracts;
 using Agentstration.Web.Security;

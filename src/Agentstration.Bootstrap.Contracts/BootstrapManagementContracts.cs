@@ -1,6 +1,6 @@
 using Agentstration.ResourceManagement.Contracts;
-using Agentstration.Sources.Contracts;
 using Agentstration.Resources;
+using Agentstration.Sources.Contracts;
 
 namespace Agentstration.Bootstrap.Contracts;
 

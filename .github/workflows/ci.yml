@@ -195,6 +195,7 @@ jobs:
         shell: pwsh
         run: |
           $modules = @(
+            'Agentstration.Api.Tests',
             'Agentstration.Management.Api.Tests',
             'Agentstration.Management.Bootstrap.Tests',
             'Agentstration.Management.Security.Tests',

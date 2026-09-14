@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
-using Agentstration.Sources.Contracts;
 using Agentstration.Resources;
+using Agentstration.Sources.Contracts;
 
 namespace Agentstration.Web.Console;
 

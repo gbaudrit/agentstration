@@ -1,6 +1,6 @@
-using Agentstration.Security.Contracts;
 using System.Net.Http.Json;
 using Agentstration.Identity.Contracts;
+using Agentstration.Security.Contracts;
 
 namespace Agentstration.Web.Console;
 

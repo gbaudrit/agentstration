@@ -1,5 +1,5 @@
-using Agentstration.Security.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.Security.Contracts;
 using Agentstration.Triggers;
 
 namespace Agentstration.Identity;

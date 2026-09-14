@@ -1,5 +1,5 @@
-using Agentstration.Identity.Contracts;
 using System.Globalization;
+using Agentstration.Identity.Contracts;
 
 namespace Agentstration.Identity;
 

@@ -1,6 +1,6 @@
 using Agentstration.Agents;
-using Agentstration.Models.Contracts;
 using Agentstration.Models;
+using Agentstration.Models.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Web.Security;

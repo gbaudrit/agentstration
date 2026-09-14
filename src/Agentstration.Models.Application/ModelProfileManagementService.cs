@@ -1,6 +1,6 @@
-using Agentstration.Identity.Contracts;
-using Agentstration.Identity;
 using Agentstration.Agents;
+using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;

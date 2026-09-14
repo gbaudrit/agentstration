@@ -1,17 +1,17 @@
-using Agentstration.Extensions.Contracts;
-using Agentstration.Security.Contracts;
-using Agentstration.Identity.Contracts;
-using Agentstration.Identity;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
+using Agentstration.Extensions.Contracts;
+using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
+using Agentstration.Security.Contracts;
 
 namespace Agentstration.Extensions.Aep;
 

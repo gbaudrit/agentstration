@@ -1,9 +1,9 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Agentstration.ResourceManagement.Contracts;
-using Agentstration.Secrets.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
+using Agentstration.Secrets.Contracts;
 
 namespace Agentstration.Web.Console;
 

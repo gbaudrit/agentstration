@@ -1,12 +1,12 @@
-using Agentstration.Security.Contracts;
-using Agentstration.Identity.Contracts;
 using Agentstration.Bootstrap.Contracts;
-using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Secrets;
+using Agentstration.Security.Contracts;
 
 namespace Agentstration.Web.Hosting;
 

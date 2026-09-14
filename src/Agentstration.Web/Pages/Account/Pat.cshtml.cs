@@ -1,6 +1,6 @@
-using Agentstration.Identity.Contracts;
 using System.ComponentModel.DataAnnotations;
 using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
 using Agentstration.Web.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

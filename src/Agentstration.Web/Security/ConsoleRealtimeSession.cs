@@ -1,5 +1,5 @@
-using Agentstration.Identity.Contracts;
 using System.Net;
+using Agentstration.Identity.Contracts;
 using Agentstration.Web.Console;
 using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Http.Connections.Client;
