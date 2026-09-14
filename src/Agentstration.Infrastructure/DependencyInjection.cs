@@ -327,7 +327,6 @@ public static class DependencyInjection
         services.AddSingleton<WorkNotificationMcpToolDefinitionProvider>();
         services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<WorkNotificationMcpToolDefinitionProvider>());
         services.AddSingleton<WorkNotificationMcpTool>();
-        services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<WorkNotificationMcpTool>());
         AddInternalTool<ResourcePlanCreateMcpTool>(services);
         AddInternalTool<ResourcePlanGetMcpTool>(services);
         AddInternalTool<ResourcePlanRefineMcpTool>(services);
@@ -335,6 +334,7 @@ public static class DependencyInjection
         AddInternalTool<ResourcePlanMaterializeMcpTool>(services);
         AddInternalTool<ResourceChangeSetCreateMcpTool>(services);
         AddInternalTool<ResourceChangeSetValidateMcpTool>(services);
+        services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<WorkNotificationMcpTool>());
         services.AddSingleton<InternalMcpToolProjectionService>();
         services.AddSingleton(provider => new Lazy<IEnumerable<IInternalMcpToolHandler>>(
             () => provider.GetServices<IInternalMcpToolHandler>()));
