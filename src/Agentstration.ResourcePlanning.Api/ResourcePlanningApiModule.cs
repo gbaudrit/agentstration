@@ -22,6 +22,9 @@ public static class ResourcePlanningApiModule
         plans.MapGet("/{id:guid}/activities", ListActivitiesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         plans.MapPost("/validate-content", ValidateContent).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         plans.MapPost("/{id:guid}/materializations", MaterializeAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapPost("/{id:guid}/change-sets", CreateChangeSetAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        plans.MapGet("/change-sets", ListChangeSetsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapGet("/change-sets/{id:guid}", GetChangeSetAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         return endpoints;
     }
 
@@ -107,9 +110,11 @@ public static class ResourcePlanningApiModule
     {
         try { return await action(); }
         catch (ResourcePlanNotFoundException exception) { return Results.NotFound(Problem("resource_plan_not_found", exception.Message, StatusCodes.Status404NotFound)); }
+        catch (ResourceChangeSetNotFoundException exception) { return Results.NotFound(Problem("resource_change_set_not_found", exception.Message, StatusCodes.Status404NotFound)); }
         catch (ResourcePlanConcurrencyException exception) { return Results.Conflict(Problem("resource_plan_concurrency", exception.Message, StatusCodes.Status409Conflict)); }
         catch (ResourcePlanLifecycleException exception) { return Results.UnprocessableEntity(Problem(exception.Code, exception.Message, StatusCodes.Status422UnprocessableEntity)); }
         catch (ResourcePlanValidationException exception) { return Results.UnprocessableEntity(new { title = "resource_plan_content_invalid", detail = exception.Message, status = StatusCodes.Status422UnprocessableEntity, errors = exception.Issues }); }
+        catch (ResourcePlanMaterializationException exception) { return Results.UnprocessableEntity(new { title = "resource_plan_materialization_failed", detail = exception.Message, status = StatusCodes.Status422UnprocessableEntity, errors = exception.Diagnostics }); }
         catch (ArgumentException exception) { return Results.BadRequest(Problem("resource_plan_invalid", exception.Message, StatusCodes.Status400BadRequest)); }
     }
 
@@ -123,4 +128,28 @@ public static class ResourcePlanningApiModule
         ICurrentRequestContext context,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
             Results.Ok(await service.MaterializeAsync(Scope(RequireWorkspace(context)), new(id), cancellationToken)));
+
+    private static Task<IResult> CreateChangeSetAsync(
+        Guid id,
+        HttpResponse response,
+        ResourceChangeSetService service,
+        ICurrentRequestContext context,
+        CancellationToken cancellationToken) => ExecuteAsync(async () =>
+    {
+        var current = RequireWorkspace(context);
+        var stored = await service.CreateAsync(Scope(current), new(id), current.PrincipalId, cancellationToken);
+        response.Headers.ETag = stored.ETag;
+        response.Headers.Location = $"/api/resource-plans/change-sets/{stored.Value.Id}";
+        return Results.Json(stored.Value, statusCode: StatusCodes.Status201Created);
+    });
+
+    private static Task<IResult> GetChangeSetAsync(Guid id, HttpResponse response, ResourceChangeSetService service, ICurrentRequestContext context, CancellationToken cancellationToken) => ExecuteAsync(async () =>
+    {
+        var stored = await service.GetAsync(Scope(RequireWorkspace(context)), new(id), cancellationToken);
+        response.Headers.ETag = stored.ETag;
+        return Results.Ok(stored.Value);
+    });
+
+    private static Task<IResult> ListChangeSetsAsync(Guid? planId, int? skip, int? take, ResourceChangeSetService service, ICurrentRequestContext context, CancellationToken cancellationToken) => ExecuteAsync(async () =>
+        Results.Ok(await service.ListAsync(Scope(RequireWorkspace(context)), planId is null ? null : new ResourcePlanId(planId.Value), skip ?? 0, take ?? 50, cancellationToken)));
 }
