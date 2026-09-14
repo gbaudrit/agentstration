@@ -21,6 +21,9 @@ using Agentstration.Packs;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Storage.PostgreSql;
 using Agentstration.ResourceManagement.Storage.Sqlite;
+using Agentstration.ResourcePlanning;
+using Agentstration.ResourcePlanning.Storage.PostgreSql;
+using Agentstration.ResourcePlanning.Storage.Sqlite;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
@@ -100,6 +103,11 @@ public static class DependencyInjection
             controlPlaneConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "control-plane.db")}";
             services.AddSqliteResourceManagement(controlPlaneConnectionString);
         }
+        if (storageProvider == AgentstrationStorageProvider.PostgreSql)
+            services.AddPostgreSqlResourcePlanning(storageOptions.ConnectionString!);
+        else
+            services.AddSqliteResourcePlanning($"Data Source={Path.Combine(dataDirectory, "resource-planning.db")};Pooling=False");
+        services.AddSingleton<ResourcePlanService>();
         var secretPath = Path.Combine(dataDirectory, "secrets");
         services.AddSingleton(_ => new EnvironmentMasterKeyProvider(Path.Combine(secretPath, "master.key")));
         services.AddSingleton<IMasterKeyProvider>(provider => provider.GetRequiredService<EnvironmentMasterKeyProvider>());
