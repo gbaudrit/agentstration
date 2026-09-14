@@ -4,6 +4,7 @@ using Agentstration.Flows;
 using Agentstration.Infrastructure.Declarative;
 using Agentstration.ResourcePlanning;
 using Agentstration.ResourcePlanning.Contracts;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Tests;
 
