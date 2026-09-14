@@ -50,7 +50,7 @@ public sealed record PlanningWorkflowIntent(
 [JsonConverter(typeof(JsonStringEnumConverter<PlanningCollaborationStyle>))]
 public enum PlanningCollaborationStyle
 {
-    Single,
+    Individual,
     Ordered,
     Parallel,
     Delegated,
