@@ -1,9 +1,14 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Agentstration.Console.Web;
+using Agentstration.Console.Web.Security;
+using Agentstration.Identity.Contracts;
 using Agentstration.Web.Configuration;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -26,19 +31,22 @@ public sealed class ConsoleHostTests
     }
 
     [TestMethod]
-    public async Task ConsoleShellOwnsRoutesAndSharedStaticAssets()
+    public async Task ConsoleShellProtectsRoutesAndOwnsLocalizedLoginAndStaticAssets()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         using var response = await client.GetAsync("/");
-        var html = await response.Content.ReadAsStringAsync();
+        using var login = await client.GetAsync("/login");
+        var html = await login.Content.ReadAsStringAsync();
         var script = await client.GetStringAsync("/_content/Agentstration.Console.Components/app.js");
         var styles = await client.GetStringAsync("/_content/Agentstration.Console.Components/app.css");
 
-        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
-        StringAssert.Contains(html, "_framework/blazor.web.js");
-        StringAssert.Contains(html, "_content/Agentstration.Console.Components/app.css");
+        Assert.AreEqual(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.AreEqual("/login", response.Headers.Location?.AbsolutePath);
+        Assert.AreEqual(HttpStatusCode.OK, login.StatusCode);
+        StringAssert.Contains(html, "Sign in");
+        StringAssert.Contains(html, "__RequestVerificationToken");
         StringAssert.Contains(script, "agentstrationEnrollment");
         StringAssert.Contains(styles, ".task-summary-grid");
     }
@@ -57,9 +65,51 @@ public sealed class ConsoleHostTests
         Assert.AreEqual("http://127.0.0.1:5104/", endpointOptions.RuntimeApi.BaseAddress);
         Assert.AreEqual(ConsoleAuthenticationDefaults.Cookie, cookies.Cookie.Name);
         Assert.AreEqual("returnUrl", cookies.ReturnUrlParameter);
+        Assert.AreEqual(CookieSecurePolicy.Always, cookies.Cookie.SecurePolicy);
+        Assert.IsInstanceOfType<IBffServerSessionStore>(cookies.SessionStore);
     }
 
-    private static WebApplicationFactory<Program> CreateFactory() =>
+    [TestMethod]
+    public async Task LocalLoginCreatesOpaqueServerSessionAndLogoutInvalidatesIt()
+    {
+        var identity = new BffSessionIdentityResponse(
+            Guid.NewGuid(), "Console user", BffSessionAuthenticationMethods.Local, "local", Guid.NewGuid(), Guid.NewGuid());
+        var authority = new StubSessionAuthorityClient(identity);
+        await using var factory = CreateFactory(authority);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost")
+        });
+
+        var loginHtml = await client.GetStringAsync("/login");
+        using var login = await client.PostAsync("/login", Form(
+            Token(loginHtml),
+            ("Input.UserName", "console-user"),
+            ("Input.Password", "correct-password"),
+            ("ReturnUrl", "https://attacker.invalid/escape")));
+
+        Assert.AreEqual(HttpStatusCode.Redirect, login.StatusCode);
+        Assert.AreEqual("/", login.Headers.Location?.OriginalString ?? string.Empty);
+        var cookiePrefix = $"{ConsoleAuthenticationDefaults.Cookie}=";
+        var setCookie = login.Headers.GetValues("Set-Cookie")
+            .Last(value => value.StartsWith(cookiePrefix, StringComparison.Ordinal)
+                && !value.StartsWith($"{cookiePrefix};", StringComparison.Ordinal));
+        Assert.IsFalse(setCookie.Contains(identity.PrincipalId.ToString("D"), StringComparison.OrdinalIgnoreCase));
+        Assert.IsTrue(setCookie.Contains("secure", StringComparison.OrdinalIgnoreCase));
+
+        using var authenticated = await client.GetAsync("/");
+        Assert.AreEqual(HttpStatusCode.OK, authenticated.StatusCode);
+        Assert.IsTrue(authority.Validations > 0);
+
+        var logoutHtml = await client.GetStringAsync("/logout");
+        using var logout = await client.PostAsync("/logout", Form(Token(logoutHtml)));
+        Assert.AreEqual(HttpStatusCode.Redirect, logout.StatusCode);
+        using var afterLogout = await client.GetAsync("/");
+        Assert.AreEqual(HttpStatusCode.Redirect, afterLogout.StatusCode);
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(IBffSessionAuthorityClient? authority = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Agentstration:ManagementApi:BaseAddress", "http://127.0.0.1:5101/");
@@ -70,5 +120,44 @@ public sealed class ConsoleHostTests
             builder.UseSetting("Agentstration:FlowApi:TimeoutSeconds", "1");
             builder.UseSetting("Agentstration:RuntimeApi:BaseAddress", "http://127.0.0.1:5104/");
             builder.UseSetting("Agentstration:RuntimeApi:TimeoutSeconds", "1");
+            if (authority is not null)
+                builder.ConfigureTestServices(services =>
+                    services.AddSingleton<IBffSessionAuthorityClient>(authority));
         });
+
+    private static FormUrlEncodedContent Form(string token, params (string Key, string Value)[] values)
+    {
+        var fields = values.ToDictionary(value => value.Key, value => value.Value, StringComparer.Ordinal);
+        fields["__RequestVerificationToken"] = token;
+        return new(fields);
+    }
+
+    private static string Token(string html)
+    {
+        var match = Regex.Match(
+            html,
+            "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"",
+            RegexOptions.CultureInvariant);
+        Assert.IsTrue(match.Success, "The antiforgery token was not rendered.");
+        return WebUtility.HtmlDecode(match.Groups[1].Value);
+    }
+
+    private sealed class StubSessionAuthorityClient(BffSessionIdentityResponse identity) : IBffSessionAuthorityClient
+    {
+        public int Validations { get; private set; }
+
+        public Task<BffLocalAuthenticationResult> AuthenticateLocalAsync(
+            string userName,
+            string password,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new BffLocalAuthenticationResult(BffLocalAuthenticationOutcome.Succeeded, identity));
+
+        public Task<BffSessionValidationResponse> ValidateAsync(
+            BffSessionValidationRequest request,
+            CancellationToken cancellationToken)
+        {
+            Validations++;
+            return Task.FromResult(new BffSessionValidationResponse(true, identity));
+        }
+    }
 }
