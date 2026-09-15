@@ -342,6 +342,7 @@ public sealed class EntryBootstrapResourceHandler(
             DisplayName = value.Definition.DisplayName ?? value.Metadata.Name,
             Description = value.Definition.Description,
             Presentation = value.Definition.Presentation,
+            Exposure = value.Definition.Exposure,
             Binding = value.Definition.Binding,
             Behavior = value.Definition.Behavior,
             UpdatedAt = now

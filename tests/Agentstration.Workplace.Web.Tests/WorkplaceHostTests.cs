@@ -383,6 +383,7 @@ public sealed class WorkplaceHostTests
             displayName,
             $"Description for {displayName}",
             new EntryPresentation { Placeholder = placeholder, Icon = "sparkle" },
+            new EntryExposure(),
             new EntryResolvedTarget($"{id}-flow", "v1"),
             new EntryBehavior(),
             1,

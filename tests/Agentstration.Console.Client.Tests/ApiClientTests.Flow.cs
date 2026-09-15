@@ -101,6 +101,60 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task ConsoleEntryClientUsesCanonicalConsoleDiscoveryAndOwnerWorkspaceInvocation()
+    {
+        var workspaceId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        var @namespace = new ResourceNamespace("agentstration.assistant");
+        var requests = new List<(HttpMethod Method, string PathAndQuery)>();
+        var now = DateTimeOffset.UtcNow;
+        var interaction = new InteractionResponse(
+            Guid.NewGuid(),
+            workspaceId,
+            "assistant",
+            InteractionStatus.Active,
+            now,
+            now,
+            new Dictionary<string, JsonElement>(),
+            [],
+            [],
+            null,
+            null,
+            new RespondAction("Ready"),
+            1);
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add((request.Method, request.RequestUri!.PathAndQuery));
+            return request.Method == HttpMethod.Get
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(Array.Empty<EntryResponse>()) }
+                : new HttpResponseMessage(HttpStatusCode.Created)
+                {
+                    Content = JsonContent.Create(new EntrySubmissionResponse(interaction, new RespondAction("Ready"), null))
+                };
+        }))
+        { BaseAddress = new Uri("http://work-api/") };
+        IEntryAdministrationApiClient client = new EntryAdministrationApiClient(
+            httpClient,
+            new StubHttpClientFactory(_ => httpClient));
+
+        _ = await client.GetConsoleEntriesAsync(default);
+        _ = await client.SubmitConsoleEntryAsync(
+            workspaceId,
+            @namespace,
+            "assistant",
+            new CreateInteractionRequest(new Dictionary<string, JsonElement>
+            {
+                ["request"] = JsonSerializer.SerializeToElement("Hello")
+            }),
+            default);
+
+        CollectionAssert.AreEqual(new[]
+        {
+            (HttpMethod.Get, "/api/entries?surface=Console"),
+            (HttpMethod.Post, $"/api/workspaces/{workspaceId:D}/namespaces/{@namespace.Value}/entries/assistant/interactions?surface=Console")
+        }, requests);
+    }
+
+    [TestMethod]
     public async Task FlowAuthoringClientPreservesETagAndPublishesImmutableVersion()
     {
         var now = new DateTimeOffset(2026, 8, 13, 10, 0, 0, TimeSpan.Zero);

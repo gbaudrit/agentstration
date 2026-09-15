@@ -5,6 +5,12 @@ metadata:
 definition:
   displayName: Découvrir Agentstration
   description: Échangez avec une équipe d'agents spécialisés pour découvrir la solution et poser vos questions.
+  exposure:
+    version: 1
+    surfaces:
+      - workplace
+    workplacePlacements:
+      - owningSpace
   presentation:
     kind: prompt
     placeholder: Que souhaitez-vous savoir sur Agentstration ?
