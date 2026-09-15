@@ -165,21 +165,29 @@ public sealed class WorkPlaneTests
             Surfaces = [EntryExposureSurface.Workplace],
             WorkplacePlacements = [EntryWorkplacePlacement.TenantHome]
         }), default);
+        await fixture.Workplace.UpsertEntryAsync(PublishedEntry(hiddenWorkspace, "unauthorized-console", new EntryExposure
+        {
+            Surfaces = [EntryExposureSurface.Console],
+            WorkplacePlacements = []
+        }), default);
         var discovery = new EntryDiscoveryService(fixture.Workplace, new EntryDiscoveryAuthorizationStub(
         [
             new(WorkplaceId, true),
             new(siblingWorkspace, false)
-        ]));
+        ]), new EntryExecutionResolverStub(entry => entry.WorkspaceId == hiddenWorkspace
+            ? throw new AssertFailedException("An unauthorized Entry must not be resolved.")
+            : EntryExecutionResolution.Executable));
 
         var owningSpace = await discovery.DiscoverAsync(EntryExposureSurface.Workplace, EntryWorkplacePlacement.OwningSpace, default);
         var tenantHome = await discovery.DiscoverAsync(EntryExposureSurface.Workplace, EntryWorkplacePlacement.TenantHome, default);
         var console = await discovery.DiscoverAsync(EntryExposureSurface.Console, null, default);
 
-        Assert.AreEqual("current", owningSpace.Single().Name);
-        Assert.AreEqual("promoted", tenantHome.Single().Name);
-        Assert.AreEqual(siblingWorkspace, tenantHome.Single().WorkspaceId);
-        Assert.AreEqual("console", console.Single().Name);
-        Assert.AreEqual(siblingWorkspace, console.Single().WorkspaceId);
+        Assert.AreEqual("current", owningSpace.Single().Entry.Name);
+        Assert.AreEqual("promoted", tenantHome.Single().Entry.Name);
+        Assert.AreEqual(siblingWorkspace, tenantHome.Single().Entry.WorkspaceId);
+        Assert.AreEqual("console", console.Single().Entry.Name);
+        Assert.AreEqual(siblingWorkspace, console.Single().Entry.WorkspaceId);
+        Assert.IsTrue(console.Single().Execution.CanInvoke);
     }
 
     [TestMethod]
@@ -436,7 +444,7 @@ public sealed class WorkPlaneTests
         olderContinuation.MarkQueued(olderExecutionId, "agent", Guid.NewGuid(), Now);
         olderContinuation.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, olderContinuation.Id, olderExecutionId, Now, "agent"));
         await fixture.Repository.CreateAsync(olderContinuation, default);
-        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub());
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub(), new EntryExecutionResolverStub());
 
         commands.Reset();
         var tasks = await workplace.ListTasksAsync(WorkplaceId, null, default);
@@ -672,7 +680,7 @@ public sealed class WorkPlaneTests
             LastActivityAt = Now
         };
         await fixture.Workplace.CreateInteractionAsync(interaction, default);
-        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub());
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub(), new EntryExecutionResolverStub());
         var service = new EntryAdministrationService(fixture.Workplace, new EntryTargetResolverStub(), workplace, TimeProvider.System, new WorkplaceContextStub());
 
         await service.DeleteAsync(WorkplaceId, draft.Id, removeDashboardReferences: true, closeInteractions: true, default);
@@ -719,7 +727,7 @@ public sealed class WorkPlaneTests
             LastActivityAt = Now,
             TaskId = taskId
         }, default);
-        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub());
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub(), new EntryExecutionResolverStub());
         var service = new EntryAdministrationService(fixture.Workplace, new EntryTargetResolverStub(), workplace, TimeProvider.System, new WorkplaceContextStub());
 
         var conflict = await Assert.ThrowsExactlyAsync<WorkValidationException>(() =>
@@ -991,6 +999,13 @@ public sealed class WorkPlaneTests
     {
         public Task<IReadOnlyList<EntryDiscoveryWorkspace>> ListReadableWorkspacesInCurrentTenantAsync(CancellationToken cancellationToken) =>
             Task.FromResult(workspaces);
+    }
+
+    private sealed class EntryExecutionResolverStub(
+        Func<EntryResource, EntryExecutionResolution>? resolve = null) : IEntryExecutionResolver
+    {
+        public Task<EntryExecutionResolution> ResolveAsync(EntryResource entry, CancellationToken cancellationToken) =>
+            Task.FromResult(resolve?.Invoke(entry) ?? EntryExecutionResolution.Executable);
     }
 
     private static EntryResource PublishedEntry(WorkspaceId workspaceId, string name, EntryExposure exposure) => new()

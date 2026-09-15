@@ -5,6 +5,7 @@ using Agentstration.Work.Storage.Abstractions;
 namespace Agentstration.Application.Work;
 
 public sealed record EntryDiscoveryWorkspace(WorkspaceId WorkspaceId, bool IsCurrent);
+public sealed record ResolvedEntryDiscovery(EntryResource Entry, EntryExecutionResolution Execution);
 
 public interface IEntryDiscoveryAuthorization
 {
@@ -13,9 +14,10 @@ public interface IEntryDiscoveryAuthorization
 
 public sealed class EntryDiscoveryService(
     IWorkplaceRepository repository,
-    IEntryDiscoveryAuthorization authorization)
+    IEntryDiscoveryAuthorization authorization,
+    IEntryExecutionResolver executionResolver)
 {
-    public async Task<IReadOnlyList<EntryResource>> DiscoverAsync(
+    public async Task<IReadOnlyList<ResolvedEntryDiscovery>> DiscoverAsync(
         EntryExposureSurface surface,
         EntryWorkplacePlacement? workplacePlacement,
         CancellationToken cancellationToken)
@@ -35,12 +37,16 @@ public sealed class EntryDiscoveryService(
                 && EntryExposurePolicy.Allows(value.Exposure, surface, workplacePlacement)));
         }
 
-        return result
+        var ordered = result
             .OrderBy(value => value.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(value => value.WorkspaceId.Value)
             .ThenBy(value => value.Id.Namespace.Value, StringComparer.Ordinal)
             .ThenBy(value => value.Id.Value, StringComparer.Ordinal)
             .ToArray();
+        var resolved = new List<ResolvedEntryDiscovery>(ordered.Length);
+        foreach (var entry in ordered)
+            resolved.Add(new(entry, await executionResolver.ResolveAsync(entry, cancellationToken)));
+        return resolved;
     }
 
     private static void ValidateQuery(

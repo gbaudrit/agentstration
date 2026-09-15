@@ -10,6 +10,13 @@ public static class EntryResourceKinds
     public const string Entry = "Entry";
 }
 
+public enum EntryExecutionAvailability
+{
+    Executable,
+    Disabled,
+    Unavailable
+}
+
 public sealed record EntryFieldValidation(int? MinimumLength = null, int? MaximumLength = null, IReadOnlyList<string>? AllowedExtensions = null);
 public sealed record EntryFieldOption(string Value, string Label);
 public sealed record EntrySuggestion(string Label, string Value);

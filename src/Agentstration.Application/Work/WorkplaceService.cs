@@ -50,6 +50,7 @@ public sealed partial class WorkplaceService(
     IEnumerable<IWorkplaceEventSink> eventSinks,
     IEnumerable<IWorkplaceExternalInputResponder> externalInputResponders,
     IWorkplaceContext context,
+    IEntryExecutionResolver entryExecutionResolver,
     RootFlowSubmissionService? rootFlows = null)
 {
     private const int WorkItemQueryPageSize = 200;

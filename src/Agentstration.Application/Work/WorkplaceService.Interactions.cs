@@ -16,6 +16,13 @@ public sealed partial class WorkplaceService
         var entry = await GetEntryAsync(command.WorkspaceId, command.EntryId, cancellationToken);
         if (!EntryExposurePolicy.Allows(entry.Exposure, command.Surface, command.WorkplacePlacement))
             throw new WorkValidationException("entry_not_exposed", "The Entry is not exposed on the requested surface and placement.");
+        var execution = await entryExecutionResolver.ResolveAsync(entry, cancellationToken);
+        if (!execution.CanInvoke)
+            throw new WorkValidationException(
+                execution.ReasonCode ?? "entry_execution_unavailable",
+                execution.Availability == EntryExecutionAvailability.Disabled
+                    ? "The Entry target is disabled."
+                    : "The Entry target is unavailable.");
         if (command.Surface == EntryExposureSurface.Workplace
             && command.WorkplacePlacement == EntryWorkplacePlacement.OwningSpace)
         {

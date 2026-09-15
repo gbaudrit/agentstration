@@ -119,10 +119,14 @@ public sealed class WorkplaceApiTests
                 }
             };
             (await client.PutAsJsonAsync("/api/management/entries/console-only", consoleOnly)).EnsureSuccessStatusCode();
-            (await client.PostAsync("/api/management/entries/console-only/publish", null)).EnsureSuccessStatusCode();
+            using var publishResponse = await client.PostAsync("/api/management/entries/console-only/publish", null);
+            publishResponse.EnsureSuccessStatusCode();
+            var published = await publishResponse.Content.ReadFromJsonAsync<EntryResource>();
+            Assert.IsNotNull(published);
 
             var workplace = await client.GetFromJsonAsync<EntryResponse[]>("/api/entries") ?? [];
             var console = await client.GetFromJsonAsync<EntryResponse[]>("/api/entries?surface=Console") ?? [];
+            var executable = console.Single(value => value.Name == "console-only");
             using var directWorkplaceRead = await client.GetAsync("/api/entries/console-only");
             using var workplaceInvocation = await client.PostAsJsonAsync(
                 "/api/workspaces/default/entries/console-only/interactions",
@@ -132,11 +136,91 @@ public sealed class WorkplaceApiTests
                 }));
 
             Assert.IsFalse(workplace.Any(value => value.Name == "console-only"));
-            Assert.IsTrue(console.Any(value => value.Name == "console-only"
-                && value.Exposure.Surfaces.SequenceEqual([EntryExposureSurface.Console])));
+            Assert.IsTrue(executable.Exposure.Surfaces.SequenceEqual([EntryExposureSurface.Console]));
+            Assert.AreEqual(true, executable.Execution?.CanInvoke);
+            Assert.AreEqual(EntryExecutionAvailability.Executable, executable.Execution?.Availability);
             Assert.AreEqual(HttpStatusCode.NotFound, directWorkplaceRead.StatusCode);
             Assert.AreEqual(HttpStatusCode.BadRequest, workplaceInvocation.StatusCode);
             StringAssert.Contains(await workplaceInvocation.Content.ReadAsStringAsync(), "entry_not_exposed");
+
+            using (var scope = factory.Services.CreateScope())
+            {
+                var context = await scope.ServiceProvider.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+                var workspaceId = new WorkspaceId(context.WorkspaceId);
+                var flows = scope.ServiceProvider.GetRequiredService<FlowService>();
+                var flowId = new FlowId(published.ResolvedTarget.FlowResourceId, published.ResolvedTarget.Namespace);
+                var flow = await flows.GetAsync(workspaceId, flowId, default);
+                Assert.IsNotNull(flow);
+                await flows.UpdateAsync(workspaceId, flowId, new UpdateFlowCommand(
+                    flow.Value.Description,
+                    flow.Value.Version,
+                    false,
+                    flow.Value.Definition,
+                    flow.Value.Metadata,
+                    flow.Value.Graph,
+                    flow.Value.DisplayName), flow.ETag, default);
+
+                var entries = scope.ServiceProvider.GetRequiredService<IWorkplaceRepository>();
+                await entries.UpsertEntryAsync(published with
+                {
+                    Id = new("console-unavailable"),
+                    Name = "console-unavailable",
+                    DisplayName = "Unavailable Console Entry",
+                    ResolvedTarget = new("missing-flow", "1.0.0")
+                }, default);
+                await entries.UpsertEntryAsync(published with
+                {
+                    Id = new("console-version-unavailable"),
+                    Name = "console-version-unavailable",
+                    DisplayName = "Unavailable Console Entry version",
+                    ResolvedTarget = published.ResolvedTarget with { Version = "99.0.0" }
+                }, default);
+                await entries.UpsertEntryAsync(published with
+                {
+                    Id = new("console-immediate"),
+                    Name = "console-immediate",
+                    DisplayName = "Immediate Console Entry",
+                    ResolvedTarget = new("unused-immediate-flow", "1.0.0"),
+                    Behavior = new EntryBehavior(TaskCreationMode.Never)
+                }, default);
+                await entries.UpsertEntryDraftAsync(consoleOnly with
+                {
+                    Id = new("console-draft-only"),
+                    Name = "console-draft-only",
+                    DisplayName = "Draft-only Console Entry"
+                }, default);
+            }
+
+            console = await client.GetFromJsonAsync<EntryResponse[]>("/api/entries?surface=Console") ?? [];
+            var disabled = console.Single(value => value.Name == "console-only");
+            var unavailable = console.Single(value => value.Name == "console-unavailable");
+            var versionUnavailable = console.Single(value => value.Name == "console-version-unavailable");
+            Assert.AreEqual(false, disabled.Execution?.CanInvoke);
+            Assert.AreEqual(EntryExecutionAvailability.Disabled, disabled.Execution?.Availability);
+            Assert.AreEqual("entry_flow_disabled", disabled.Execution?.ReasonCode);
+            Assert.AreEqual(false, unavailable.Execution?.CanInvoke);
+            Assert.AreEqual(EntryExecutionAvailability.Unavailable, unavailable.Execution?.Availability);
+            Assert.AreEqual("entry_flow_unavailable", unavailable.Execution?.ReasonCode);
+            Assert.AreEqual(false, versionUnavailable.Execution?.CanInvoke);
+            Assert.AreEqual(EntryExecutionAvailability.Unavailable, versionUnavailable.Execution?.Availability);
+            Assert.AreEqual("entry_flow_version_unavailable", versionUnavailable.Execution?.ReasonCode);
+            Assert.IsFalse(console.Any(value => value.Name == "console-draft-only"));
+
+            using var disabledInvocation = await client.PostAsJsonAsync(
+                "/api/workspaces/default/entries/console-only/interactions?surface=Console",
+                new CreateInteractionRequest(new Dictionary<string, JsonElement>
+                {
+                    ["request"] = JsonSerializer.SerializeToElement("Do not run")
+                }));
+            using var immediateInvocation = await client.PostAsJsonAsync(
+                "/api/workspaces/default/entries/console-immediate/interactions?surface=Console",
+                new CreateInteractionRequest(new Dictionary<string, JsonElement>
+                {
+                    ["request"] = JsonSerializer.SerializeToElement("Respond immediately")
+                }));
+            Assert.AreEqual(HttpStatusCode.BadRequest, disabledInvocation.StatusCode);
+            StringAssert.Contains(await disabledInvocation.Content.ReadAsStringAsync(), "entry_flow_disabled");
+            Assert.AreEqual(HttpStatusCode.Created, immediateInvocation.StatusCode);
         }
         finally
         {
