@@ -1,10 +1,12 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Agentstration.Identity.Contracts;
 using Agentstration.Security.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
@@ -28,6 +30,80 @@ public sealed partial class SecurityApiTests
             StringAssert.Contains(body, "instance-a");
             Assert.IsFalse(body.Contains(fixture.Secret, StringComparison.Ordinal));
             Assert.IsFalse(body.Contains(fixture.Directory, StringComparison.OrdinalIgnoreCase));
+        }
+        finally { fixture.Dispose(); }
+    }
+
+    [TestMethod]
+    public async Task BffLocalSessionAuthenticationReturnsAuthoritativePrincipalAndRevalidatesContext()
+    {
+        var fixture = BffFixture.Create();
+        try
+        {
+            await using var factory = fixture.Factory();
+            using var client = UnredirectedClient(factory);
+            await BootstrapAsync(client, "bff-session-user");
+            using var login = fixture.SignedRequest(
+                "primary",
+                "/api/internal/bff/sessions/local",
+                method: HttpMethod.Post,
+                json: JsonSerializer.Serialize(new BffLocalSessionRequest("bff-session-user", LocalPassword)));
+            using var loginResponse = await client.SendAsync(login);
+            var identity = await loginResponse.Content.ReadFromJsonAsync<BffSessionIdentityResponse>();
+
+            Assert.AreEqual(HttpStatusCode.OK, loginResponse.StatusCode);
+            Assert.IsNotNull(identity);
+            Assert.AreEqual(BffSessionAuthenticationMethods.Local, identity.AuthenticationMethod);
+            Assert.AreNotEqual(Guid.Empty, identity.TenantId);
+            Assert.AreNotEqual(Guid.Empty, identity.WorkspaceId);
+
+            using var validate = fixture.SignedRequest(
+                "primary",
+                "/api/internal/bff/sessions/validate",
+                method: HttpMethod.Post,
+                json: JsonSerializer.Serialize(new BffSessionValidationRequest(
+                    identity.PrincipalId,
+                    identity.TenantId,
+                    identity.WorkspaceId,
+                    identity.AuthenticationMethod,
+                    identity.Provider,
+                    identity.AuthenticationVersion)));
+            using var validateResponse = await client.SendAsync(validate);
+            var validation = await validateResponse.Content.ReadFromJsonAsync<BffSessionValidationResponse>();
+            Assert.AreEqual(HttpStatusCode.OK, validateResponse.StatusCode);
+            Assert.IsTrue(validation?.Active);
+
+            using (var scope = factory.Services.CreateScope())
+            {
+                var users = scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>();
+                var account = await users.FindByNameAsync("bff-session-user")
+                    ?? throw new AssertFailedException("The local account was not created.");
+                var revoked = await users.UpdateSecurityStampAsync(account);
+                Assert.IsTrue(revoked.Succeeded);
+            }
+            using var revokedSession = fixture.SignedRequest(
+                "primary",
+                "/api/internal/bff/sessions/validate",
+                method: HttpMethod.Post,
+                json: JsonSerializer.Serialize(new BffSessionValidationRequest(
+                    identity.PrincipalId,
+                    identity.TenantId,
+                    identity.WorkspaceId,
+                    identity.AuthenticationMethod,
+                    identity.Provider,
+                    identity.AuthenticationVersion)));
+            using var revokedResponse = await client.SendAsync(revokedSession);
+            var revokedValidation = await revokedResponse.Content.ReadFromJsonAsync<BffSessionValidationResponse>();
+            Assert.AreEqual(HttpStatusCode.OK, revokedResponse.StatusCode);
+            Assert.IsFalse(revokedValidation?.Active);
+
+            using var invalid = fixture.SignedRequest(
+                "primary",
+                "/api/internal/bff/sessions/local",
+                method: HttpMethod.Post,
+                json: JsonSerializer.Serialize(new BffLocalSessionRequest("bff-session-user", "wrong-password")));
+            using var invalidResponse = await client.SendAsync(invalid);
+            Assert.AreEqual(HttpStatusCode.Unauthorized, invalidResponse.StatusCode);
         }
         finally { fixture.Dispose(); }
     }
@@ -163,13 +239,22 @@ public sealed partial class SecurityApiTests
             string path = "/api/internal/bff/trust",
             string? nonce = null,
             string targetInstance = "instance-a",
-            string? signatureOverride = null)
+            string? signatureOverride = null,
+            HttpMethod? method = null,
+            string? json = null)
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, path);
+            method ??= HttpMethod.Get;
+            var content = json is null ? [] : Encoding.UTF8.GetBytes(json);
+            var request = new HttpRequestMessage(method, path);
+            if (json is not null)
+                request.Content = new ByteArrayContent(content)
+                {
+                    Headers = { ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json") }
+                };
             var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             nonce ??= BffWorkloadAuthentication.CreateNonce();
-            var hash = BffWorkloadAuthentication.HashContent([]);
-            var canonical = BffWorkloadAuthentication.Canonicalize("GET", path, targetInstance, timestamp, nonce, hash);
+            var hash = BffWorkloadAuthentication.HashContent(content);
+            var canonical = BffWorkloadAuthentication.Canonicalize(method.Method, path, targetInstance, timestamp, nonce, hash);
             var key = Encoding.UTF8.GetBytes(credentialId == "primary" ? Secret : nextSecret);
             request.Headers.Add(BffWorkloadAuthentication.WorkloadHeader, "console-bff");
             request.Headers.Add(BffWorkloadAuthentication.CredentialHeader, credentialId);

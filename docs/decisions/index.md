@@ -144,3 +144,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 112. [ADR-0112 — The Console BFF authenticates with instance-bound signed requests](0112-console-bff-authenticates-with-instance-bound-signed-requests.md)
 113. [ADR-0113 — Entry exposure separates ownership from presentation](0113-entry-exposure-separates-ownership-from-presentation.md)
 114. [ADR-0114 — Console Entry discovery projects canonical execution readiness](0114-console-entry-discovery-projects-canonical-execution-readiness.md)
+115. [ADR-0115 — The Console BFF owns opaque server-side sessions](0115-console-bff-owns-opaque-server-sessions.md)

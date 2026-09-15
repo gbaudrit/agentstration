@@ -87,3 +87,8 @@ public sealed record LocalAccountView(
 public sealed record LocalAccountSecurityView(Guid AccountId, string UserName, string? Email);
 public sealed record LocalAccountSecurityResult(bool Succeeded, IReadOnlyList<string> Errors);
 public enum LocalLoginOutcome { Succeeded, Failed, LockedOut }
+public sealed record LocalCredentialValidation(
+    LocalLoginOutcome Outcome,
+    Guid? AccountId = null,
+    Guid? PrincipalId = null,
+    string? AuthenticationVersion = null);

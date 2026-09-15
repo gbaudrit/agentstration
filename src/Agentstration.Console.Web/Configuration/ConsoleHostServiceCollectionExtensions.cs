@@ -24,7 +24,13 @@ public static class ConsoleHostServiceCollectionExtensions
             .Bind(configuration.GetSection(BffWorkloadClientOptions.SectionName))
             .Validate(value => value.Validate(), "BFF workload client configuration is invalid.")
             .ValidateOnStart();
+        services.AddOptions<BffSessionOptions>()
+            .Bind(configuration.GetSection(BffSessionOptions.SectionName))
+            .Validate(value => value.Validate(), "BFF session configuration is invalid.")
+            .ValidateOnStart();
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IBffServerSessionStore, InMemoryBffSessionStore>();
+        services.AddSingleton<IPostConfigureOptions<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>, BffCookieConfiguration>();
         services.AddAgentstrationWebComponents();
         services.AddSingleton<IConsoleRealtimeConnectionConfigurator, NoOpConsoleRealtimeConnectionConfigurator>();
         services.AddScoped<IConsoleContextProvider, ConsoleContextProvider>();
@@ -72,6 +78,11 @@ public static class ConsoleHostServiceCollectionExtensions
         services.AddTransient<BffWorkloadSigningHandler>();
         Configure(
             services.AddHttpClient<IBffWorkloadTrustClient, BffWorkloadTrustClient>()
+                .AddHttpMessageHandler<BffWorkloadSigningHandler>(),
+            configured.ManagementApi,
+            resilient: false);
+        Configure(
+            services.AddHttpClient<IBffSessionAuthorityClient, BffSessionAuthorityClient>()
                 .AddHttpMessageHandler<BffWorkloadSigningHandler>(),
             configured.ManagementApi,
             resilient: false);
