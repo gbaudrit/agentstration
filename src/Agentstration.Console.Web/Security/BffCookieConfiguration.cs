@@ -1,7 +1,7 @@
+using Agentstration.Identity.Contracts;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
-using Agentstration.Identity.Contracts;
 
 namespace Agentstration.Console.Web.Security;
 
@@ -20,6 +20,12 @@ public sealed class BffCookieConfiguration(
 
     private static async Task ValidatePrincipalAsync(CookieValidatePrincipalContext context)
     {
+        if (context.Principal is null)
+        {
+            context.RejectPrincipal();
+            return;
+        }
+
         var request = BffSessionClaims.ValidationRequest(context.Principal);
         if (request is null)
         {

@@ -1,9 +1,9 @@
 using System.Security.Claims;
 using Agentstration.Identity.Api.Security;
 using Agentstration.Identity.Contracts;
-using Agentstration.Web.Security;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Web.Configuration;
+using Agentstration.Web.Security;
 using Microsoft.Extensions.Options;
 
 namespace Agentstration.Identity.Api;

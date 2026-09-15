@@ -7,6 +7,7 @@ using Agentstration.Web.Console;
 using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.FlowDesigner.DependencyInjection;
 using Microsoft.AspNetCore.Http.Connections.Client;
+using Microsoft.Extensions.Options;
 
 namespace Agentstration.Console.Web.Configuration;
 

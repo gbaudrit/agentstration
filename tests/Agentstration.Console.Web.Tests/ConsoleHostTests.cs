@@ -6,6 +6,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Web.Configuration;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
