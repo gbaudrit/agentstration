@@ -43,7 +43,7 @@ public sealed class ConsoleHostTests
         var styles = await client.GetStringAsync("/_content/Agentstration.Console.Components/app.css");
 
         Assert.AreEqual(HttpStatusCode.Redirect, response.StatusCode);
-        StringAssert.StartsWith(response.Headers.Location?.OriginalString ?? string.Empty, "/login");
+        Assert.AreEqual("/login", response.Headers.Location?.AbsolutePath);
         Assert.AreEqual(HttpStatusCode.OK, login.StatusCode);
         StringAssert.Contains(html, "Sign in");
         StringAssert.Contains(html, "__RequestVerificationToken");
@@ -91,8 +91,10 @@ public sealed class ConsoleHostTests
 
         Assert.AreEqual(HttpStatusCode.Redirect, login.StatusCode);
         Assert.AreEqual("/", login.Headers.Location?.OriginalString ?? string.Empty);
+        var cookiePrefix = $"{ConsoleAuthenticationDefaults.Cookie}=";
         var setCookie = login.Headers.GetValues("Set-Cookie")
-            .Single(value => value.Contains(ConsoleAuthenticationDefaults.Cookie, StringComparison.Ordinal));
+            .Last(value => value.StartsWith(cookiePrefix, StringComparison.Ordinal)
+                && !value.StartsWith($"{cookiePrefix};", StringComparison.Ordinal));
         Assert.IsFalse(setCookie.Contains(identity.PrincipalId.ToString("D"), StringComparison.OrdinalIgnoreCase));
         Assert.IsTrue(setCookie.Contains("secure", StringComparison.OrdinalIgnoreCase));
 
