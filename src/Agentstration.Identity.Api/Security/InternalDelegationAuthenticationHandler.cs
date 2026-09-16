@@ -1,11 +1,11 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Agentstration.Identity.Contracts;
+using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
-using Agentstration.Web.Hosting;
 
 namespace Agentstration.Identity.Api.Security;
 

@@ -1,8 +1,8 @@
+using Agentstration.Console.Web.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Agentstration.Console.Web.Security;
 
 namespace Agentstration.Console.Web.Pages;
 

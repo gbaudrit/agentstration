@@ -1,5 +1,5 @@
-using Agentstration.Identity.Contracts;
 using Agentstration.Identity.Api.Security;
+using Agentstration.Identity.Contracts;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Web.Security;
 
