@@ -4,7 +4,11 @@ import { repositoryRoot } from '../fixtures/repository.js';
 
 export interface DiscoveredRoute { source: string; route: string; }
 
-const routeRoots = ['src/Agentstration.Web', 'src/Agentstration.Workplace.Web'] as const;
+const routeRoots = [
+  'src/Agentstration.Web',
+  'src/Agentstration.Console.Components',
+  'src/Agentstration.Workplace.Web',
+] as const;
 
 export async function discoverProductRoutes(root = repositoryRoot): Promise<readonly DiscoveredRoute[]> {
   const files = (await Promise.all(routeRoots.map(routeRoot => collectFiles(path.join(root, routeRoot)))))
