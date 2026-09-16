@@ -1,3 +1,4 @@
+using Agentstration.Identity.Api.Security;
 using Agentstration.Identity.Contracts;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Web.Security;
@@ -22,9 +23,19 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
         }
 
         var personalAccessTokenClaim = httpContext.User.FindFirst(PersonalAccessTokenClaimTypes.TokenId)?.Value;
+        var internalSessionClaim = httpContext.User.FindFirst(InternalDelegationDefaults.SessionClaim)?.Value;
+        var internalPrincipalId = Guid.Empty;
+        var internalWorkspaceId = Guid.Empty;
+        var isInternalDelegation = !string.IsNullOrWhiteSpace(internalSessionClaim)
+            && Guid.TryParse(httpContext.User.FindFirst("sub")?.Value,
+                out internalPrincipalId)
+            && Guid.TryParse(httpContext.User.FindFirst(InternalDelegationDefaults.WorkspaceClaim)?.Value,
+                out internalWorkspaceId);
         var accountClaim = httpContext.User.FindFirst(LocalIdentityClaimTypes.AccountId)?.Value;
         Principal? principal;
-        if (Guid.TryParse(personalAccessTokenClaim, out _)
+        if (isInternalDelegation)
+            principal = await identityStore.GetPrincipalAsync(internalPrincipalId, httpContext.RequestAborted);
+        else if (Guid.TryParse(personalAccessTokenClaim, out _)
             && Guid.TryParse(httpContext.User.FindFirst(PersonalAccessTokenClaimTypes.PrincipalId)?.Value, out var personalAccessTokenPrincipalId))
             principal = await identityStore.GetPrincipalAsync(personalAccessTokenPrincipalId, httpContext.RequestAborted);
         else if (Guid.TryParse(accountClaim, out var accountId))
@@ -45,6 +56,11 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
 
         httpContext.Features.Set(new ResolvedPrincipalFeature(principal.Id, principal.DisplayName));
         var requestedWorkspaceId = RequestedWorkspace(httpContext);
+        if (isInternalDelegation && requestedWorkspaceId is not null && requestedWorkspaceId != internalWorkspaceId)
+        {
+            await next(httpContext);
+            return;
+        }
         var isPersonalAccessToken = Guid.TryParse(personalAccessTokenClaim, out var personalAccessTokenId);
         var personalAccessTokenWorkspaceId = Guid.TryParse(
             httpContext.User.FindFirst(PersonalAccessTokenClaimTypes.WorkspaceId)?.Value,
@@ -55,7 +71,14 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
             principal.Id,
             httpContext.RequestAborted);
         Workspace? workspace;
-        if (isPersonalAccessToken)
+        if (isInternalDelegation)
+        {
+            workspace = isPlatformAdministrator
+                ? await identityStore.GetWorkspaceAsync(internalWorkspaceId, httpContext.RequestAborted)
+                : await ResolveMembershipWorkspaceAsync(
+                    identityStore, principal.Id, internalWorkspaceId, httpContext.RequestAborted);
+        }
+        else if (isPersonalAccessToken)
         {
             if (personalAccessTokenWorkspaceId is not { } restrictedWorkspaceId
                 || requestedWorkspaceId is not null && requestedWorkspaceId != restrictedWorkspaceId)

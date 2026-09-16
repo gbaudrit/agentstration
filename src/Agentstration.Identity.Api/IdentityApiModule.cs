@@ -25,6 +25,12 @@ public static class IdentityApiModule
             .Bind(configuration.GetSection(BffWorkloadTrustOptions.SectionName))
             .Validate(value => value.Validate(), "BFF workload trust configuration is invalid.")
             .ValidateOnStart();
+        services.AddOptions<InternalDelegationOptions>()
+            .Bind(configuration.GetSection(InternalDelegationOptions.SectionName))
+            .Validate(value => value.Validate(), "Internal delegation configuration is invalid.")
+            .ValidateOnStart();
+        services.AddSingleton<InternalDelegationKeys>();
+        services.AddScoped<InternalDelegationService>();
         services.AddSingleton<IBffWorkloadReplayCache, BffWorkloadReplayCache>();
         services.AddScoped<BffSessionAuthorityService>();
         services.AddHostedService<BffWorkloadTrustAuditService>();
@@ -69,6 +75,8 @@ public static class IdentityApiModule
                     {
                         if (context.Request.Path.StartsWithSegments("/api/internal/bff"))
                             return AgentstrationAuthenticationDefaults.BffWorkloadScheme;
+                        if (IsInternalDelegation(context))
+                            return InternalDelegationDefaults.Scheme;
                         var bearer = context.Request.Headers.Authorization.ToString()
                             .StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
                         var personalAccessToken = context.Request.Headers.Authorization.ToString()
@@ -101,6 +109,9 @@ public static class IdentityApiModule
                     _ => { })
                 .AddScheme<AuthenticationSchemeOptions, BffWorkloadAuthenticationHandler>(
                     AgentstrationAuthenticationDefaults.BffWorkloadScheme,
+                    _ => { })
+                .AddScheme<AuthenticationSchemeOptions, InternalDelegationAuthenticationHandler>(
+                    InternalDelegationDefaults.Scheme,
                     _ => { });
 
             if (oidc || hybrid)
@@ -136,10 +147,28 @@ public static class IdentityApiModule
                 throw new InvalidOperationException($"Unsupported authentication mode '{options.Mode}'.");
             if (!environment.IsDevelopment() && !environment.IsEnvironment("Testing"))
                 throw new InvalidOperationException($"Authentication mode '{options.Mode}' is permitted only in Development or Testing.");
-            services.AddAuthentication(DevelopmentAuthenticationHandler.SchemeName)
+            services.AddAuthentication(authenticationOptions =>
+                {
+                    authenticationOptions.DefaultScheme = AgentstrationAuthenticationDefaults.PolicyScheme;
+                    authenticationOptions.DefaultChallengeScheme = AgentstrationAuthenticationDefaults.PolicyScheme;
+                })
+                .AddPolicyScheme(AgentstrationAuthenticationDefaults.PolicyScheme, "Agentstration development authentication", policy =>
+                {
+                    policy.ForwardDefaultSelector = context =>
+                    {
+                        if (context.Request.Path.StartsWithSegments("/api/internal/bff"))
+                            return AgentstrationAuthenticationDefaults.BffWorkloadScheme;
+                        return IsInternalDelegation(context)
+                            ? InternalDelegationDefaults.Scheme
+                            : DevelopmentAuthenticationHandler.SchemeName;
+                    };
+                })
                 .AddScheme<AuthenticationSchemeOptions, DevelopmentAuthenticationHandler>(DevelopmentAuthenticationHandler.SchemeName, _ => { })
                 .AddScheme<AuthenticationSchemeOptions, BffWorkloadAuthenticationHandler>(
                     AgentstrationAuthenticationDefaults.BffWorkloadScheme,
+                    _ => { })
+                .AddScheme<AuthenticationSchemeOptions, InternalDelegationAuthenticationHandler>(
+                    InternalDelegationDefaults.Scheme,
                     _ => { });
         }
 
@@ -184,6 +213,14 @@ public static class IdentityApiModule
     {
         policy.RequireAuthenticatedUser();
         policy.AddRequirements(new WorkspacePermissionRequirement(permission));
+    }
+
+    private static bool IsInternalDelegation(HttpContext context)
+    {
+        var authorization = context.Request.Headers.Authorization.ToString();
+        return authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            && authorization.AsSpan("Bearer ".Length)
+                .StartsWith(InternalDelegationDefaults.TokenPrefix, StringComparison.Ordinal);
     }
 
     private static Task ApiStatusOrRedirect(RedirectContext<CookieAuthenticationOptions> context, int statusCode)

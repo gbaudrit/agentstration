@@ -1,5 +1,6 @@
 using Agentstration.Console.Web.Features.Flows;
 using Agentstration.Console.Web.Security;
+using Agentstration.Identity.Contracts;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Configuration;
@@ -31,6 +32,8 @@ public static class ConsoleHostServiceCollectionExtensions
             .ValidateOnStart();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IBffServerSessionStore, InMemoryBffSessionStore>();
+        services.AddSingleton<BffDelegationTokenCache>();
+        services.AddScoped<BffDelegationTokenProvider>();
         services.AddSingleton<IPostConfigureOptions<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>, BffCookieConfiguration>();
         services.AddAgentstrationWebComponents();
         services.AddSingleton<IConsoleRealtimeConnectionConfigurator, NoOpConsoleRealtimeConnectionConfigurator>();
@@ -42,23 +45,23 @@ public static class ConsoleHostServiceCollectionExtensions
         services.AddScoped<IFlowDesignerResourceProvider, FlowDesignerResourceProvider>();
 
         var configured = configuration.GetSection(AgentstrationWebOptions.SectionName).Get<AgentstrationWebOptions>() ?? new();
-        AddClient<RuntimeApiClient, IRuntimeApiClient>(services, configured.RuntimeApi);
-        AddClient(services, CleanupApiClient.RuntimeClient, configured.RuntimeApi);
-        AddClient(services, CleanupApiClient.FlowClient, configured.FlowApi);
-        AddClient(services, CleanupApiClient.ManagementClient, configured.ManagementApi);
-        AddClient(services, CleanupApiClient.WorkClient, configured.WorkApi);
+        AddClient<RuntimeApiClient, IRuntimeApiClient>(services, configured.RuntimeApi, InternalDelegationAudiences.Runtime);
+        AddClient(services, CleanupApiClient.RuntimeClient, configured.RuntimeApi, InternalDelegationAudiences.Runtime);
+        AddClient(services, CleanupApiClient.FlowClient, configured.FlowApi, InternalDelegationAudiences.Flow);
+        AddClient(services, CleanupApiClient.ManagementClient, configured.ManagementApi, InternalDelegationAudiences.Management);
+        AddClient(services, CleanupApiClient.WorkClient, configured.WorkApi, InternalDelegationAudiences.Work);
         services.AddScoped<ICleanupApiClient, CleanupApiClient>();
         services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
-        AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi);
-        AddClient<EntryAdministrationApiClient, IEntryAdministrationApiClient>(services, configured.WorkApi);
-        AddClient(services, EntryAdministrationApiClient.AgentResourceCatalogClient, configured.ManagementApi);
-        AddClient(services, EntryAdministrationApiClient.FlowResourceCatalogClient, configured.FlowApi);
+        AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi, InternalDelegationAudiences.Work);
+        AddClient<EntryAdministrationApiClient, IEntryAdministrationApiClient>(services, configured.WorkApi, InternalDelegationAudiences.Work);
+        AddClient(services, EntryAdministrationApiClient.AgentResourceCatalogClient, configured.ManagementApi, InternalDelegationAudiences.Management);
+        AddClient(services, EntryAdministrationApiClient.FlowResourceCatalogClient, configured.FlowApi, InternalDelegationAudiences.Flow);
         services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(
             new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"),
             provider.GetRequiredService<IConsoleRealtimeConnectionConfigurator>(),
             provider.GetRequiredService<ILogger<WorkOperationsRealtimeClient>>()));
-        AddClient<FlowApiClient, IFlowApiClient>(services, configured.FlowApi);
-        AddClient<ToolGovernanceAuditApiClient, IToolGovernanceAuditClient>(services, configured.RuntimeApi);
+        AddClient<FlowApiClient, IFlowApiClient>(services, configured.FlowApi, InternalDelegationAudiences.Flow);
+        AddClient<ToolGovernanceAuditApiClient, IToolGovernanceAuditClient>(services, configured.RuntimeApi, InternalDelegationAudiences.Runtime);
         AddClient<ManagementApiClient, IManagementApiClient>(services, configured.ManagementApi);
         AddClient<IdentityAdministrationApiClient, IIdentityAdministrationApiClient>(services, configured.ManagementApi);
         AddClient<HttpUserPreferencesClient, IUserPreferencesClient>(services, configured.ManagementApi, resilient: false);
@@ -88,31 +91,59 @@ public static class ConsoleHostServiceCollectionExtensions
                 .AddHttpMessageHandler<BffWorkloadSigningHandler>(),
             configured.ManagementApi,
             resilient: false);
+        Configure(
+            services.AddHttpClient<IBffDelegationClient, BffDelegationClient>()
+                .AddHttpMessageHandler<BffWorkloadSigningHandler>(),
+            configured.ManagementApi,
+            resilient: false);
         AddClient<ResourceScopeInventoryApiClient, IResourceScopeInventoryClient>(services, configured.ManagementApi);
         AddClient<ManagementApiClient, IAgentRunnerManagementClient>(services, configured.ManagementApi);
-        AddClient<RuntimeApiClient, IAgentRunnerRuntimeClient>(services, configured.RuntimeApi);
+        AddClient<RuntimeApiClient, IAgentRunnerRuntimeClient>(services, configured.RuntimeApi, InternalDelegationAudiences.Runtime);
+        services.AddScoped<IHttpClientFactory, BffDelegatingHttpClientFactory>();
         return services;
     }
 
     private static void AddClient<TImplementation, TContract>(
         IServiceCollection services,
         ApiEndpointOptions options,
+        string audience = InternalDelegationAudiences.Management,
         bool resilient = true)
         where TImplementation : class, TContract
-        where TContract : class => Configure(services.AddHttpClient<TContract, TImplementation>(), options, resilient);
+        where TContract : class
+    {
+        var name = typeof(TContract).Name;
+        Configure(services.AddHttpClient(name), options, resilient);
+        services.AddSingleton(new BffDelegationTarget(name, audience, new Uri(options.BaseAddress, UriKind.Absolute)));
+        services.AddScoped<TContract>(provider =>
+        {
+            var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(name);
+            return ActivatorUtilities.CreateInstance<TImplementation>(provider, client);
+        });
+    }
 
-    private static void AddClient(IServiceCollection services, string name, ApiEndpointOptions options) =>
+    private static void AddClient(IServiceCollection services, string name, ApiEndpointOptions options, string audience)
+    {
         Configure(services.AddHttpClient(name), options, resilient: true);
+        services.AddSingleton(new BffDelegationTarget(name, audience, new Uri(options.BaseAddress, UriKind.Absolute)));
+    }
 
     private static void Configure(IHttpClientBuilder builder, ApiEndpointOptions options, bool resilient)
     {
+        builder.RedactLoggedHeaders(name =>
+            string.Equals(name, "Authorization", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Cookie", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, BffWorkloadAuthentication.SignatureHeader, StringComparison.OrdinalIgnoreCase));
         builder.ConfigureHttpClient(client =>
         {
             client.BaseAddress = new Uri(options.BaseAddress, UriKind.Absolute);
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
             client.DefaultRequestHeaders.Add("X-Agentstration-Client", "Agentstration.Console.Web");
         });
-        builder.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        builder.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            AllowAutoRedirect = false,
+            UseCookies = false
+        });
         if (!resilient) return;
         builder.AddStandardResilienceHandler(resilience =>
         {

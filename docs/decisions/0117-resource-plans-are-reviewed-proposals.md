@@ -1,4 +1,4 @@
-# ADR-0116: Resource Plans are reviewed proposals
+# ADR-0117: Resource Plans are reviewed proposals
 
 ## Status
 
