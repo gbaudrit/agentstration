@@ -45,7 +45,9 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   await expect(page.locator('.resource-plan-graph-details')).toContainText('triage');
   await page.getByRole('tab', { name: 'Validation' }).click();
   await page.getByRole('button', { name: 'Revalidate' }).click();
-  await expect(page.getByText('Ready', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Blocked', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('.resource-plan-issues')).toContainText('resource_change_model_profile_invalid');
+  await expect(page.locator('.resource-plan-issues')).toContainText("Agent 'triage' references ModelProfile 'default/default'");
   await page.getByRole('tab', { name: 'Activity' }).click();
   await expect(page.locator('a[href="/flow-runs/e2e-flow-run"]')).toBeVisible();
 
