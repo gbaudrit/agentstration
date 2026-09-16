@@ -1,9 +1,11 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 using Agentstration.Console.Web;
 using Agentstration.Console.Web.Security;
 using Agentstration.Identity.Contracts;
 using Agentstration.Web.Configuration;
+using Agentstration.Web.Console;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -11,6 +13,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Http;
 
 namespace Agentstration.Console.Web.Tests;
 
@@ -67,6 +70,68 @@ public sealed class ConsoleHostTests
         Assert.AreEqual("returnUrl", cookies.ReturnUrlParameter);
         Assert.AreEqual(CookieSecurePolicy.Always, cookies.Cookie.SecurePolicy);
         Assert.IsInstanceOfType<IBffServerSessionStore>(cookies.SessionStore);
+        var logging = factory.Services.GetRequiredService<IOptionsMonitor<HttpClientFactoryOptions>>()
+            .Get(nameof(IIdentityAdministrationApiClient));
+        Assert.IsTrue(logging.ShouldRedactHeaderValue("Authorization"));
+        Assert.IsTrue(logging.ShouldRedactHeaderValue(BffWorkloadAuthentication.SignatureHeader));
+    }
+
+    [TestMethod]
+    public async Task NamedApiClientsRequireAnActiveBffSession()
+    {
+        using var factory = CreateFactory();
+        using var scope = factory.Services.CreateScope();
+        var clients = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
+        foreach (var name in new[]
+        {
+            CleanupApiClient.RuntimeClient, CleanupApiClient.FlowClient,
+            CleanupApiClient.ManagementClient, CleanupApiClient.WorkClient,
+            EntryAdministrationApiClient.AgentResourceCatalogClient,
+            EntryAdministrationApiClient.FlowResourceCatalogClient
+        })
+        {
+            using var client = clients.CreateClient(name);
+            using var response = await client.GetAsync("api/identity/context");
+            Assert.AreEqual(HttpStatusCode.Unauthorized, response.StatusCode, name);
+        }
+    }
+
+    [TestMethod]
+    public async Task SeparatedManagementClientAttachesDelegationWithoutSharingTheBrowserTicket()
+    {
+        var identity = new BffSessionIdentityResponse(Guid.NewGuid(), "Console user",
+            BffSessionAuthenticationMethods.Local, "local", Guid.NewGuid(), Guid.NewGuid(), "version");
+        var capture = new DelegationCaptureHandler();
+        await using var factory = CreateFactory(new StubSessionAuthorityClient(identity))
+            .WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            {
+                services.Configure<BffWorkloadClientOptions>(options =>
+                {
+                    options.Enabled = true;
+                    options.WorkloadId = "console-bff";
+                    options.CredentialId = "test";
+                    options.TargetInstanceId = "test";
+                    options.SharedKeyFile = "unused-test-key";
+                });
+                services.AddSingleton<IBffDelegationClient>(new StubDelegationClient());
+                services.Configure<HttpClientFactoryOptions>(nameof(IIdentityAdministrationApiClient), options =>
+                    options.HttpMessageHandlerBuilderActions.Add(builder => builder.PrimaryHandler = capture));
+            }));
+        var principal = BffSessionClaims.Create(identity);
+        var store = factory.Services.GetRequiredService<IBffServerSessionStore>();
+        await store.StoreAsync(new Microsoft.AspNetCore.Authentication.AuthenticationTicket(
+            principal, ConsoleAuthenticationDefaults.Scheme));
+        using var scope = factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+        context.HttpContext = new DefaultHttpContext { User = principal };
+        using var client = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>()
+            .CreateClient(nameof(IIdentityAdministrationApiClient));
+        using var response = await client.GetAsync("api/identity/context");
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.AreEqual("agd_management", capture.Authorization?.Parameter);
+        Assert.AreEqual("Bearer", capture.Authorization?.Scheme);
+        Assert.IsFalse(capture.HasCookie);
     }
 
     [TestMethod]
@@ -190,6 +255,24 @@ public sealed class ConsoleHostTests
         {
             Validations++;
             return Task.FromResult(new BffSessionValidationResponse(Active, Active ? identity : null));
+        }
+    }
+
+    private sealed class StubDelegationClient : IBffDelegationClient
+    {
+        public Task<BffDelegationResponse?> IssueAsync(BffDelegationRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult<BffDelegationResponse?>(new("agd_management", DateTimeOffset.UtcNow.AddMinutes(2)));
+    }
+
+    private sealed class DelegationCaptureHandler : HttpMessageHandler
+    {
+        public AuthenticationHeaderValue? Authorization { get; private set; }
+        public bool HasCookie { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Authorization = request.Headers.Authorization;
+            HasCookie = request.Headers.Contains("Cookie");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
         }
     }
 }
