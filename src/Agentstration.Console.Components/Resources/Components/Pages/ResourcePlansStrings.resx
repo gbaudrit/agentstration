@@ -22,8 +22,10 @@
   <data name="Stale" xml:space="preserve"><value>Stale</value></data>
   <data name="NotValidated" xml:space="preserve"><value>Not validated</value></data>
   <data name="Page" xml:space="preserve"><value>Page {0}</value></data>
+  <data name="Pages" xml:space="preserve"><value>Plan pages</value></data>
   <data name="Previous" xml:space="preserve"><value>Previous</value></data>
   <data name="Next" xml:space="preserve"><value>Next</value></data>
+  <data name="Open" xml:space="preserve"><value>Open</value></data>
   <data name="DetailDescription" xml:space="preserve"><value>Review the functional proposal and its materialized changes.</value></data>
   <data name="BackToPlans" xml:space="preserve"><value>Back to plans</value></data>
   <data name="NotFound" xml:space="preserve"><value>Plan not found</value></data>
@@ -43,6 +45,7 @@
   <data name="Workflows" xml:space="preserve"><value>Workflows</value></data>
   <data name="Integrations" xml:space="preserve"><value>Integrations</value></data>
   <data name="Experiences" xml:space="preserve"><value>Experiences</value></data>
+  <data name="NothingPlanned" xml:space="preserve"><value>Nothing planned for this plan.</value></data>
   <data name="FunctionalBoundary" xml:space="preserve"><value>Functional intent is separate from the concrete Resources proposed by Agentstration.</value></data>
   <data name="NoChangeSets" xml:space="preserve"><value>No ChangeSet exists for this plan revision. Re-materialize to review a proposal.</value></data>
   <data name="ChangeSet" xml:space="preserve"><value>ChangeSet</value></data>
@@ -55,6 +58,12 @@
   <data name="Proposed" xml:space="preserve"><value>Proposed</value></data>
   <data name="Graph" xml:space="preserve"><value>Dependency graph</value></data>
   <data name="GraphLabel" xml:space="preserve"><value>Directed dependency graph of proposed Resources</value></data>
+  <data name="GraphHint" xml:space="preserve"><value>Select a resource to see its details. Arrows point from a dependency to the resource that uses it.</value></data>
+  <data name="CloseNodeDetails" xml:space="preserve"><value>Close resource details</value></data>
+  <data name="ResourceKind" xml:space="preserve"><value>Resource type</value></data>
+  <data name="Operation" xml:space="preserve"><value>Change</value></data>
+  <data name="ResourceName" xml:space="preserve"><value>Proposed name</value></data>
+  <data name="NoDependencies" xml:space="preserve"><value>None</value></data>
   <data name="ValidatedAt" xml:space="preserve"><value>Validated:</value></data>
   <data name="StaleValidation" xml:space="preserve"><value>Validation is stale</value></data>
   <data name="NoIssues" xml:space="preserve"><value>No validation issues.</value></data>

@@ -5,8 +5,8 @@ namespace Agentstration.Web.Console;
 
 public sealed record ResourcePlanFieldDifference(string Path, string? Current, string? Proposed);
 public sealed record ResourcePlanGraphNode(string LogicalId, string Kind, ResourceChangeOperation Operation, int X, int Y);
-public sealed record ResourcePlanGraphEdge(string From, string To, int X1, int Y1, int X2, int Y2);
-public sealed record ResourcePlanGraph(IReadOnlyList<ResourcePlanGraphNode> Nodes, IReadOnlyList<ResourcePlanGraphEdge> Edges, int Width, int Height);
+public sealed record ResourcePlanGraphEdge(string From, string To);
+public sealed record ResourcePlanGraph(IReadOnlyList<ResourcePlanGraphNode> Nodes, IReadOnlyList<ResourcePlanGraphEdge> Edges);
 
 public static class ResourcePlanReviewProjection
 {
@@ -45,24 +45,29 @@ public static class ResourcePlanReviewProjection
 
     public static ResourcePlanGraph Graph(ResourceChangeSet changeSet)
     {
-        var nodes = new List<ResourcePlanGraphNode>();
-        var byId = new Dictionary<string, ResourcePlanGraphNode>(StringComparer.OrdinalIgnoreCase);
-        foreach (var change in changeSet.Changes.OrderBy(value => value.Order))
+        var changes = changeSet.Changes.OrderBy(value => value.Order).ToArray();
+        var depths = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var change in changes)
         {
-            var depth = change.DependsOn.Where(byId.ContainsKey).Select(value => (byId[value].X - 24) / 240 + 1).DefaultIfEmpty(0).Max();
-            var node = new ResourcePlanGraphNode(change.LogicalId, change.Proposed.Kind, change.Operation,
-                24 + depth * 240, 24 + nodes.Count * 92);
-            nodes.Add(node);
-            byId.TryAdd(node.LogicalId, node);
+            var depth = change.DependsOn.Where(depths.ContainsKey).Select(value => depths[value] + 1).DefaultIfEmpty(0).Max();
+            depths.TryAdd(change.LogicalId, depth);
         }
-        var edges = changeSet.Changes.SelectMany(change => change.DependsOn.Select(dependency => (change.LogicalId, dependency)))
-            .Where(pair => byId.ContainsKey(pair.LogicalId) && byId.ContainsKey(pair.dependency))
-            .Select(pair => new ResourcePlanGraphEdge(pair.dependency, pair.LogicalId,
-                byId[pair.dependency].X + 188, byId[pair.dependency].Y + 26,
-                byId[pair.LogicalId].X, byId[pair.LogicalId].Y + 26))
+        var layerCounts = changes.GroupBy(change => depths[change.LogicalId]).ToDictionary(group => group.Key, group => group.Count());
+        var maximumRows = layerCounts.Values.DefaultIfEmpty(1).Max();
+        var layerRows = new Dictionary<int, int>();
+        var nodes = changes.Select(change =>
+        {
+            var depth = depths[change.LogicalId];
+            var row = layerRows.GetValueOrDefault(depth);
+            layerRows[depth] = row + 1;
+            return new ResourcePlanGraphNode(change.LogicalId, change.Proposed.Kind, change.Operation,
+                depth * 300, (maximumRows - layerCounts[depth]) * 85 + row * 170);
+        }).ToArray();
+        var edges = changes.SelectMany(change => change.DependsOn.Select(dependency => (change.LogicalId, dependency)))
+            .Where(pair => depths.ContainsKey(pair.LogicalId) && depths.ContainsKey(pair.dependency))
+            .Select(pair => new ResourcePlanGraphEdge(pair.dependency, pair.LogicalId))
             .ToArray();
-        return new(nodes, edges, Math.Max(260, nodes.Select(value => value.X + 220).DefaultIfEmpty(0).Max()),
-            Math.Max(90, nodes.Count * 92 + 24));
+        return new(nodes, edges);
     }
 
     private static void Flatten(JsonElement value, string path, IDictionary<string, string> fields)

@@ -16,17 +16,6 @@
 else if (plan is null) { <EmptyState Title="@T("NotFound")" Message="@T("NotFoundDescription")" /> }
 else
 {
-    <section class="panel resource-plan-identity" aria-label="@T("PlanIdentity")">
-        <StatusBadge Text="@T($"Status.{plan.Value.Status}")" Status="@Tone(plan.Value.Status)" />
-        <span>@T("Revision", plan.Value.Revision)</span>
-        <span>@T("Workspace") <code>@plan.Value.Scope.WorkspaceId.Value.ToString("D")</code></span>
-        <span>@T("Updated") @plan.Value.UpdatedAt.ToLocalTime().ToString("g")</span>
-        @if (selected is not null && ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))
-        {
-            <StatusBadge Text="@T("StaleChangeSet")" Status="UiStatus.Warning" />
-        }
-    </section>
-
     <div class="resource-plan-actions">
         <button class="button-secondary" type="button" @onclick="MaterializeAsync" disabled="@(!CanReview || busy || !CanMaterialize)">@T("Rematerialize")</button>
         <button class="button-secondary" type="button" @onclick="CreateChangeSetAsync" disabled="@(!CanReview || busy || materialization?.CanCreateChangeSet != true)">@T("CreateChangeSet")</button>
@@ -50,23 +39,66 @@ else
         }
     </nav>
 
-    <section class="panel resource-plan-view" role="tabpanel" id="panel-@activeView" aria-labelledby="tab-@activeView">
+    <section class="panel resource-plan-view @(activeView == "Overview" ? "resource-plan-overview" : null)" role="tabpanel" id="panel-@activeView" aria-labelledby="tab-@activeView">
+        @if (activeView != "Overview" && selected is not null && ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))
+        {
+            <div class="resource-plan-stale-notice"><StatusBadge Text="@T("StaleChangeSet")" Status="UiStatus.Warning" /></div>
+        }
         @if (activeView == "Overview")
         {
-            <h2>@T("FunctionalIntent")</h2>
-            <p>@plan.Value.Goal</p>
-            @if (!string.IsNullOrWhiteSpace(plan.Value.Description)) { <p>@plan.Value.Description</p> }
+            <header class="resource-plan-intent">
+                <h2>@T("FunctionalIntent")</h2>
+                <p class="resource-plan-goal">@plan.Value.Goal</p>
+                @if (!string.IsNullOrWhiteSpace(plan.Value.Description)) { <p class="resource-plan-description">@plan.Value.Description</p> }
+                <div class="resource-plan-overview-meta" aria-label="@T("PlanIdentity")">
+                    <StatusBadge Text="@T($"Status.{plan.Value.Status}")" Status="@Tone(plan.Value.Status)" />
+                    <span>@T("Revision", plan.Value.Revision)</span>
+                    <span>@T("Workspace") <code>@plan.Value.Scope.WorkspaceId.Value.ToString("D")</code></span>
+                    <span>@T("Updated") <time datetime="@plan.Value.UpdatedAt.ToString("O")">@plan.Value.UpdatedAt.ToLocalTime().ToString("g")</time></span>
+                    @if (selected is not null && ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))
+                    {
+                        <StatusBadge Text="@T("StaleChangeSet")" Status="UiStatus.Warning" />
+                    }
+                </div>
+            </header>
             @if (functional is not null)
             {
-                <div class="resource-plan-overview-grid">
-                    <article><h3>@T("Solution")</h3><p>@functional.Solution.Summary</p><ul>@foreach (var outcome in functional.Solution.Outcomes) { <li>@outcome</li> }</ul></article>
-                    <article><h3>@T("Roles") <small>@functional.Roles.Count</small></h3><ul>@foreach (var role in functional.Roles) { <li><strong>@role.DisplayName</strong><span>@role.Purpose</span></li> }</ul></article>
-                    <article><h3>@T("Workflows") <small>@functional.Workflows.Count</small></h3><ul>@foreach (var workflow in functional.Workflows) { <li><strong>@workflow.DisplayName</strong><span>@workflow.Objective</span></li> }</ul></article>
-                    <article><h3>@T("Integrations") <small>@functional.Integrations.Count</small></h3><ul>@foreach (var integration in functional.Integrations) { <li><strong>@integration.DisplayName</strong><span>@integration.Purpose</span></li> }</ul></article>
-                    <article><h3>@T("Experiences") <small>@functional.Experiences.Count</small></h3><ul>@foreach (var experience in functional.Experiences) { <li><strong>@experience.DisplayName</strong><span>@experience.Purpose</span></li> }</ul></article>
+                <div class="resource-plan-overview-main">
+                    <article class="resource-plan-solution">
+                        <h3>@T("Solution")</h3>
+                        <p>@functional.Solution.Summary</p>
+                        @if (functional.Solution.Outcomes.Count > 0)
+                        {
+                            <ul class="resource-plan-outcomes">@foreach (var outcome in functional.Solution.Outcomes) { <li>@outcome</li> }</ul>
+                        }
+                    </article>
+                    <div class="resource-plan-overview-details">
+                        <article class="resource-plan-detail-card">
+                            <h3>@T("Roles") <span class="resource-plan-count">@functional.Roles.Count</span></h3>
+                            @if (functional.Roles.Count == 0) { <p class="resource-plan-empty">@T("NothingPlanned")</p> }
+                            else { <ol>@foreach (var role in functional.Roles) { <li><strong>@role.DisplayName</strong><span>@role.Purpose</span></li> }</ol> }
+                        </article>
+                        <article class="resource-plan-detail-card">
+                            <h3>@T("Workflows") <span class="resource-plan-count">@functional.Workflows.Count</span></h3>
+                            @if (functional.Workflows.Count == 0) { <p class="resource-plan-empty">@T("NothingPlanned")</p> }
+                            else { <ol>@foreach (var workflow in functional.Workflows) { <li><strong>@workflow.DisplayName</strong><span>@workflow.Objective</span></li> }</ol> }
+                        </article>
+                    </div>
+                </div>
+                <div class="resource-plan-overview-secondary">
+                    <article class="resource-plan-secondary-card">
+                        <h3>@T("Integrations") <span class="resource-plan-count">@functional.Integrations.Count</span></h3>
+                        @if (functional.Integrations.Count == 0) { <p class="resource-plan-empty">@T("NothingPlanned")</p> }
+                        else { <ul>@foreach (var integration in functional.Integrations) { <li><strong>@integration.DisplayName</strong><span>@integration.Purpose</span></li> }</ul> }
+                    </article>
+                    <article class="resource-plan-secondary-card">
+                        <h3>@T("Experiences") <span class="resource-plan-count">@functional.Experiences.Count</span></h3>
+                        @if (functional.Experiences.Count == 0) { <p class="resource-plan-empty">@T("NothingPlanned")</p> }
+                        else { <ul>@foreach (var experience in functional.Experiences) { <li><strong>@experience.DisplayName</strong><span>@experience.Purpose</span></li> }</ul> }
+                    </article>
                 </div>
             }
-            <p class="muted">@T("FunctionalBoundary")</p>
+            <p class="resource-plan-boundary"><span aria-hidden="true">ⓘ</span>@T("FunctionalBoundary")</p>
         }
         else if (activeView == "Changes")
         {
@@ -108,11 +140,25 @@ else
             else
             {
                 var graph = ResourcePlanReviewProjection.Graph(selected.Value);
-                <div class="resource-plan-graph-scroll"><svg viewBox="@($"0 0 {graph.Width} {graph.Height}")" role="img" aria-label="@T("GraphLabel")" style="@($"min-width:{graph.Width}px")">
-                    @foreach (var edge in graph.Edges) { <line x1="@edge.X1" y1="@edge.Y1" x2="@edge.X2" y2="@edge.Y2" class="resource-plan-edge" /> }
-                    @foreach (var node in graph.Nodes) { <g><rect x="@node.X" y="@node.Y" width="188" height="52" rx="8" class="resource-plan-node" /><text x="@(node.X + 10)" y="@(node.Y + 22)">@node.LogicalId</text><text x="@(node.X + 10)" y="@(node.Y + 40)" class="resource-plan-node-meta">@T($"Operation.{node.Operation}") · @node.Kind</text></g> }
-                </svg></div>
-                <ol class="resource-plan-graph-list">@foreach (var change in selected.Value.Changes.OrderBy(value => value.Order)) { <li><strong>@change.LogicalId</strong> · @change.Proposed.Kind @if (change.DependsOn.Count > 0) { <span>@T("DependsOn") @string.Join(", ", change.DependsOn)</span> }</li> }</ol>
+                <div class="resource-plan-graph-layout @(SelectedGraphChange is not null ? "has-selection" : null)">
+                    <div class="resource-plan-graph-canvas">
+                        <FlowTopologyViewer Graph="@GraphTopology(graph)" SelectedKey="selectedGraphKey" SelectedKeyChanged="SelectGraphNode" InitiallyFit="true" ShowStateLegend="false" />
+                        <p class="resource-plan-graph-hint">@T("GraphHint")</p>
+                    </div>
+                    @if (SelectedGraphChange is { } change)
+                    {
+                        <aside class="resource-plan-graph-details" aria-live="polite">
+                            <header><h3>@change.LogicalId</h3><button type="button" @onclick="() => selectedGraphKey = null" aria-label="@T("CloseNodeDetails")">×</button></header>
+                            <dl>
+                                <dt>@T("ResourceKind")</dt><dd>@change.Proposed.Kind</dd>
+                                <dt>@T("Operation")</dt><dd><StatusBadge Text="@T($"Operation.{change.Operation}")" Status="@OperationTone(change.Operation)" /></dd>
+                                <dt>@T("ResourceName")</dt><dd><code>@change.Proposed.Metadata.Name</code></dd>
+                                <dt>@T("DependsOn")</dt><dd>@(change.DependsOn.Count == 0 ? T("NoDependencies") : string.Join(", ", change.DependsOn))</dd>
+                            </dl>
+                        </aside>
+                    }
+                </div>
+                <ol class="sr-only">@foreach (var graphChange in selected.Value.Changes.OrderBy(value => value.Order)) { <li>@graphChange.LogicalId · @graphChange.Proposed.Kind @if (graphChange.DependsOn.Count > 0) { <span>@T("DependsOn") @string.Join(", ", graphChange.DependsOn)</span> }</li> }</ol>
             }
         }
         else if (activeView == "Validation")
@@ -151,6 +197,7 @@ else
     private IReadOnlyList<ResourcePlanActivity> activities = [];
     private IReadOnlyList<ResourceChangeSetSnapshot> changeSets = [];
     private ResourceChangeSetSnapshot? selected;
+    private string? selectedGraphKey;
     private IReadOnlyList<ResourceChangeSetValidation> validations = [];
     private ResourcePlanMaterialization? materialization;
     private FunctionalResourcePlanV1? functional;
@@ -164,7 +211,33 @@ else
     private bool CanReview => ContextState.HasPermission("resources/write");
     private bool CanMaterialize => plan?.Value.Status is ResourcePlanStatus.Ready or ResourcePlanStatus.Materialized or ResourcePlanStatus.Validated;
     private ResourceChangeSetValidation? latestValidation => selected is null ? null : ResourcePlanReviewProjection.LatestValidation(selected.Value, validations);
+    private ResourceChange? SelectedGraphChange
+    {
+        get
+        {
+            if (selected is null || selectedGraphKey is null || !selectedGraphKey.StartsWith("resource:", StringComparison.Ordinal)
+                || !int.TryParse(selectedGraphKey.AsSpan("resource:".Length), out var index)) return null;
+            return selected.Value.Changes.OrderBy(value => value.Order).ElementAtOrDefault(index);
+        }
+    }
     private string T(string key, params object[] args) => Localizer[key, args].Value;
+
+    private FlowTopologyGraph GraphTopology(ResourcePlanGraph graph)
+    {
+        var ids = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var nodes = graph.Nodes.Select((node, index) =>
+        {
+            var id = $"resource:{index}";
+            ids.TryAdd(node.LogicalId, id);
+            return new FlowTopologyNode(id, id, node.LogicalId, node.Kind, node.X, node.Y, T($"Operation.{node.Operation}"));
+        }).ToArray();
+        var edges = graph.Edges.Where(edge => ids.ContainsKey(edge.From) && ids.ContainsKey(edge.To))
+            .Select((edge, index) => new FlowTopologyEdge($"dependency:{index}", ids[edge.From], ids[edge.To]))
+            .ToArray();
+        return new(nodes, edges, "resource-plan", T("GraphLabel"));
+    }
+
+    private void SelectGraphNode(string key) => selectedGraphKey = key;
 
     protected override void OnInitialized() => ContextState.Changed += OnContextChanged;
     protected override async Task OnParametersSetAsync()
@@ -177,6 +250,7 @@ else
         contextVersion++;
         plan = null;
         selected = null;
+        selectedGraphKey = null;
         changeSets = [];
         validations = [];
         materialization = null;
@@ -193,7 +267,7 @@ else
             var loadedPlan = await Client.GetPlanAsync(Id, lifetime.Token);
             if (loadedPlan is null)
             {
-                if (version == contextVersion) { plan = null; activities = []; changeSets = []; selected = null; }
+                if (version == contextVersion) { plan = null; activities = []; changeSets = []; selected = null; selectedGraphKey = null; }
                 return;
             }
             var loadedFunctional = loadedPlan.Value.Content.Document.Deserialize<FunctionalResourcePlanV1>(JsonOptions);
@@ -208,6 +282,7 @@ else
             activities = loadedActivities;
             changeSets = loadedSets;
             selected = loadedSelected;
+            selectedGraphKey = null;
             validations = loadedValidations;
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -225,7 +300,7 @@ else
         try
         {
             IReadOnlyList<ResourceChangeSetValidation> nextValidations = next is null ? [] : await Client.ListValidationsAsync(next.Value.Id.Value, lifetime.Token);
-            if (version == contextVersion) { selected = next; validations = nextValidations; }
+            if (version == contextVersion) { selected = next; selectedGraphKey = null; validations = nextValidations; }
         }
         catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
     }
@@ -253,6 +328,7 @@ else
             if (version != contextVersion) return;
             changeSets = page.Items.OrderByDescending(value => value.Value.PlanRevision).ThenByDescending(value => value.Value.CreatedAt).ToArray();
             selected = changeSets.FirstOrDefault(value => value.Value.Id == created.Value.Id);
+            selectedGraphKey = null;
             await LoadValidationsAsync();
             if (version != contextVersion) return;
             activeView = "Changes";

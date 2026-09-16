@@ -39,8 +39,10 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   await expect(page.getByText('Create', { exact: true }).first()).toBeVisible();
 
   await page.getByRole('tab', { name: 'Graph' }).click();
-  await expect(page.locator('.resource-plan-node')).toHaveCount(2);
-  await expect(page.locator('.resource-plan-edge')).toHaveCount(1);
+  await expect(page.locator('.topology-node')).toHaveCount(2);
+  await expect(page.locator('.topology-edge')).toHaveCount(1);
+  await page.locator('.topology-node').first().click();
+  await expect(page.locator('.resource-plan-graph-details')).toContainText('triage');
   await page.getByRole('tab', { name: 'Validation' }).click();
   await page.getByRole('button', { name: 'Revalidate' }).click();
   await expect(page.getByText('Ready', { exact: true }).first()).toBeVisible();
@@ -60,6 +62,6 @@ test('review a Resource Plan from intent through changes, graph, validation, act
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('tab', { name: 'Graph' }).click();
-  await expect(page.locator('.resource-plan-graph-scroll')).toBeVisible();
+  await expect(page.locator('.topology-viewport')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
 });

@@ -22,8 +22,10 @@
   <data name="Stale" xml:space="preserve"><value>Obsolète</value></data>
   <data name="NotValidated" xml:space="preserve"><value>Non validé</value></data>
   <data name="Page" xml:space="preserve"><value>Page {0}</value></data>
+  <data name="Pages" xml:space="preserve"><value>Pagination des plans</value></data>
   <data name="Previous" xml:space="preserve"><value>Précédent</value></data>
   <data name="Next" xml:space="preserve"><value>Suivant</value></data>
+  <data name="Open" xml:space="preserve"><value>Ouvrir</value></data>
   <data name="DetailDescription" xml:space="preserve"><value>Examinez la proposition fonctionnelle et ses changements matérialisés.</value></data>
   <data name="BackToPlans" xml:space="preserve"><value>Retour aux plans</value></data>
   <data name="NotFound" xml:space="preserve"><value>Plan introuvable</value></data>
@@ -43,6 +45,7 @@
   <data name="Workflows" xml:space="preserve"><value>Workflows</value></data>
   <data name="Integrations" xml:space="preserve"><value>Intégrations</value></data>
   <data name="Experiences" xml:space="preserve"><value>Expériences</value></data>
+  <data name="NothingPlanned" xml:space="preserve"><value>Aucun élément prévu pour ce plan.</value></data>
   <data name="FunctionalBoundary" xml:space="preserve"><value>L’intention fonctionnelle est distincte des ressources concrètes proposées par Agentstration.</value></data>
   <data name="NoChangeSets" xml:space="preserve"><value>Aucun ChangeSet pour cette révision. Rematérialisez le plan pour examiner une proposition.</value></data>
   <data name="ChangeSet" xml:space="preserve"><value>ChangeSet</value></data>
@@ -55,6 +58,12 @@
   <data name="Proposed" xml:space="preserve"><value>Proposé</value></data>
   <data name="Graph" xml:space="preserve"><value>Graphe des dépendances</value></data>
   <data name="GraphLabel" xml:space="preserve"><value>Graphe orienté des dépendances des ressources proposées</value></data>
+  <data name="GraphHint" xml:space="preserve"><value>Sélectionnez une ressource pour voir ses détails. Les flèches vont d’une dépendance vers la ressource qui l’utilise.</value></data>
+  <data name="CloseNodeDetails" xml:space="preserve"><value>Fermer les détails de la ressource</value></data>
+  <data name="ResourceKind" xml:space="preserve"><value>Type de ressource</value></data>
+  <data name="Operation" xml:space="preserve"><value>Changement</value></data>
+  <data name="ResourceName" xml:space="preserve"><value>Nom proposé</value></data>
+  <data name="NoDependencies" xml:space="preserve"><value>Aucune</value></data>
   <data name="ValidatedAt" xml:space="preserve"><value>Validé le :</value></data>
   <data name="StaleValidation" xml:space="preserve"><value>Validation obsolète</value></data>
   <data name="NoIssues" xml:space="preserve"><value>Aucun problème de validation.</value></data>

@@ -7,21 +7,24 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ResourcePlansStrings> Localizer
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("ListDescription")">
-    <Actions><button class="button-secondary" type="button" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button></Actions>
-</PageHeader>
+<PageHeader Title="@T("Title")" Description="@T("ListDescription")" />
 
-<section class="panel resource-plan-filters" aria-label="@T("Filters")">
-    <label for="resource-plan-status">@T("Status")</label>
-    <select id="resource-plan-status" @bind="statusFilter" @bind:after="ApplyFilterAsync">
-        <option value="">@T("AllStatuses")</option>
-        @foreach (var status in Enum.GetValues<ResourcePlanStatus>())
-        {
-            <option value="@status">@T($"Status.{status}")</option>
-        }
-    </select>
-    <span>@T("CurrentWorkspace", ContextState.Current?.WorkspaceDisplayName ?? "—")</span>
-</section>
+<ResourceToolbar Label="@T("Filters")">
+    <ChildContent>
+        <label for="resource-plan-status">@T("Status")</label>
+        <select id="resource-plan-status" @bind="statusFilter" @bind:after="ApplyFilterAsync">
+            <option value="">@T("AllStatuses")</option>
+            @foreach (var status in Enum.GetValues<ResourcePlanStatus>())
+            {
+                <option value="@status">@T($"Status.{status}")</option>
+            }
+        </select>
+    </ChildContent>
+    <Actions>
+        <span class="resource-plan-workspace">@T("CurrentWorkspace", ContextState.Current?.WorkspaceDisplayName ?? "—")</span>
+        <button class="button-secondary" type="button" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button>
+    </Actions>
+</ResourceToolbar>
 
 @if (!string.IsNullOrWhiteSpace(error))
 {
@@ -37,26 +40,21 @@ else if (page is not null && page.Items.Count == 0)
 }
 else if (page is not null)
 {
-    <section class="panel resource-plan-list" aria-label="@T("ListLabel")">
-        <div class="resource-plan-table-scroll">
-            <table>
-                <thead><tr><th>@T("Plan")</th><th>@T("Status")</th><th>@T("Scope")</th><th>@T("Changes")</th><th>@T("Validation")</th><th>@T("Updated")</th></tr></thead>
-                <tbody>
-                @foreach (var item in page.Items)
-                {
-                    var summary = summaries.GetValueOrDefault(item.Value.Id.Value);
-                    <tr>
-                        <td><a href="@($"/resource-plans/{item.Value.Id.Value:D}")"><strong>@item.Value.Title</strong></a><small>@item.Value.Goal</small></td>
-                        <td><StatusBadge Text="@T($"Status.{item.Value.Status}")" Status="@Tone(item.Value.Status)" /><small>@T("Revision", item.Value.Revision)</small></td>
-                        <td><code>@item.Value.Scope.WorkspaceId.Value.ToString("D")</code></td>
-                        <td>@(summary?.Changes.ToString() ?? "—") @if (summary?.Stale == true) { <StatusBadge Text="@T("Stale")" Status="UiStatus.Warning" /> }</td>
-                        <td>@(summary?.Readiness is null ? T("NotValidated") : T($"Readiness.{summary.Readiness}"))</td>
-                        <td>@item.Value.UpdatedAt.ToLocalTime().ToString("g")</td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </div>
+    <section class="resource-plan-list" aria-label="@T("ListLabel")">
+        <DataGrid TItem="ResourcePlanSnapshot" Items="page.Items">
+            <Header><tr><th>@T("Plan")</th><th>@T("Status")</th><th>@T("Changes")</th><th>@T("Validation")</th><th>@T("Updated")</th><th><span class="sr-only">@T("Open")</span></th></tr></Header>
+            <Row Context="item">
+                @{ var summary = summaries.GetValueOrDefault(item.Value.Id.Value); }
+                <tr>
+                    <td><a class="resource-name-link" href="@($"/resource-plans/{item.Value.Id.Value:D}")">@item.Value.Title</a><span class="resource-secondary resource-plan-goal">@item.Value.Goal</span></td>
+                    <td><StatusBadge Text="@T($"Status.{item.Value.Status}")" Status="@Tone(item.Value.Status)" /><span class="resource-secondary">@T("Revision", item.Value.Revision)</span></td>
+                    <td><strong class="resource-plan-change-count">@(summary?.Changes.ToString() ?? "—")</strong> @if (summary?.Stale == true) { <StatusBadge Text="@T("Stale")" Status="UiStatus.Warning" /> }</td>
+                    <td><StatusBadge Text="@(summary?.Readiness is null ? T("NotValidated") : T($"Readiness.{summary.Readiness}"))" Status="@ReadinessTone(summary?.Readiness)" /></td>
+                    <td><time datetime="@item.Value.UpdatedAt.ToString("O")">@item.Value.UpdatedAt.ToLocalTime().ToString("g")</time></td>
+                    <td><a class="text-button" href="@($"/resource-plans/{item.Value.Id.Value:D}")">@T("Open")</a></td>
+                </tr>
+            </Row>
+        </DataGrid>
         <nav class="resource-plan-pagination" aria-label="@T("Pages")">
             <span>@T("Page", skip / PageSize + 1)</span>
             <div><button class="button-secondary" type="button" @onclick="PreviousAsync" disabled="@(loading || skip == 0)">@T("Previous")</button>
@@ -158,6 +156,13 @@ else if (page is not null)
         ResourcePlanStatus.Validated or ResourcePlanStatus.Applied => UiStatus.Success,
         ResourcePlanStatus.Failed or ResourcePlanStatus.Cancelled => UiStatus.Danger,
         ResourcePlanStatus.Ready or ResourcePlanStatus.Materialized => UiStatus.Info,
+        _ => UiStatus.Neutral
+    };
+
+    private static UiStatus ReadinessTone(ResourceChangeSetReadiness? readiness) => readiness switch
+    {
+        ResourceChangeSetReadiness.Ready => UiStatus.Success,
+        ResourceChangeSetReadiness.Blocked => UiStatus.Danger,
         _ => UiStatus.Neutral
     };
 
