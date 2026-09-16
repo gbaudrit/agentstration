@@ -15,6 +15,7 @@ These instructions apply to `automation/playwright`.
 - A checkpoint represents a stable user-visible or domain state after the relevant wait condition succeeds. Emit checkpoints after meaningful blocks, not after arbitrary sleeps or individual DOM operations.
 - Workspace creation and selection belong to the workspace page object and journey. Other journeys may select a prepared campaign workspace, but must not silently create, delete, or replace one.
 - Treat a campaign Workspace as test-data isolation, not as localization state. Locale, theme, viewport, product revision, and output evidence remain separate campaign dimensions.
+- For a new scenario tracked by a `test-scenario-task` child issue, verify that the maintainer's UX validation is recorded and the UX pull request has merged before implementing the journey. Continue to maintain existing browser tests and smoke coverage in the UX pull request; this gate applies to the new scenario only.
 
 ## Validation
 

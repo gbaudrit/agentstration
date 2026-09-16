@@ -51,6 +51,8 @@ npx playwright test --ui
 - Wait for URL, health, enabled controls, and visible domain state. Do not add arbitrary sleeps to functional journeys.
 - Use typed scenario input. Keep release copy, storyboards, and publication-specific data outside this repository.
 
+For a new Console or Workplace UX journey, the [UX test scenario follow-up](github-governance.md#ux-test-scenario-follow-up) is a separate technical task. It starts after maintainer UX validation and the UX pull request merge. The UX pull request still maintains existing browser tests and runs the required smoke checks.
+
 ## Stable automation contracts
 
 The Playwright workspace keeps its shared vocabulary in three explicit catalogs:
