@@ -109,6 +109,37 @@ public sealed class ConsoleHostTests
         Assert.AreEqual(HttpStatusCode.Redirect, afterLogout.StatusCode);
     }
 
+    [TestMethod]
+    public async Task AuthorityRevocationCannotBeUndoneByReplayingTheBrowserCookie()
+    {
+        var identity = new BffSessionIdentityResponse(
+            Guid.NewGuid(), "Console user", BffSessionAuthenticationMethods.Local, "local", Guid.NewGuid(), Guid.NewGuid());
+        var authority = new StubSessionAuthorityClient(identity);
+        await using var factory = CreateFactory(authority);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost")
+        });
+
+        var loginHtml = await client.GetStringAsync("/login");
+        using var login = await client.PostAsync("/login", Form(
+            Token(loginHtml),
+            ("Input.UserName", "console-user"),
+            ("Input.Password", "correct-password")));
+        Assert.AreEqual(HttpStatusCode.Redirect, login.StatusCode);
+
+        using var authenticated = await client.GetAsync("/");
+        Assert.AreEqual(HttpStatusCode.OK, authenticated.StatusCode);
+        authority.Active = false;
+        using var revoked = await client.GetAsync("/");
+        Assert.AreEqual(HttpStatusCode.Redirect, revoked.StatusCode);
+
+        authority.Active = true;
+        using var replayed = await client.GetAsync("/");
+        Assert.AreEqual(HttpStatusCode.Redirect, replayed.StatusCode);
+    }
+
     private static WebApplicationFactory<Program> CreateFactory(IBffSessionAuthorityClient? authority = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -145,6 +176,7 @@ public sealed class ConsoleHostTests
     private sealed class StubSessionAuthorityClient(BffSessionIdentityResponse identity) : IBffSessionAuthorityClient
     {
         public int Validations { get; private set; }
+        public bool Active { get; set; } = true;
 
         public Task<BffLocalAuthenticationResult> AuthenticateLocalAsync(
             string userName,
@@ -157,7 +189,7 @@ public sealed class ConsoleHostTests
             CancellationToken cancellationToken)
         {
             Validations++;
-            return Task.FromResult(new BffSessionValidationResponse(true, identity));
+            return Task.FromResult(new BffSessionValidationResponse(Active, Active ? identity : null));
         }
     }
 }

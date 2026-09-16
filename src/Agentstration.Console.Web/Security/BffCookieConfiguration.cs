@@ -22,14 +22,14 @@ public sealed class BffCookieConfiguration(
     {
         if (context.Principal is null)
         {
-            context.RejectPrincipal();
+            await RejectAndRevokeAsync(context);
             return;
         }
 
         var request = BffSessionClaims.ValidationRequest(context.Principal);
         if (request is null)
         {
-            context.RejectPrincipal();
+            await RejectAndRevokeAsync(context);
             return;
         }
 
@@ -44,17 +44,23 @@ public sealed class BffCookieConfiguration(
         {
             context.HttpContext.RequestServices.GetRequiredService<ILogger<BffCookieConfiguration>>()
                 .LogWarning("The authoritative identity service could not validate the BFF session.");
-            context.RejectPrincipal();
+            await RejectAndRevokeAsync(context);
             return;
         }
 
         if (!validation.Active || validation.Identity is null)
         {
-            context.RejectPrincipal();
+            await RejectAndRevokeAsync(context);
             return;
         }
 
         context.ReplacePrincipal(BffSessionClaims.Create(validation.Identity));
         context.ShouldRenew = true;
+    }
+
+    private static async Task RejectAndRevokeAsync(CookieValidatePrincipalContext context)
+    {
+        context.RejectPrincipal();
+        await context.HttpContext.SignOutAsync(ConsoleAuthenticationDefaults.Scheme);
     }
 }

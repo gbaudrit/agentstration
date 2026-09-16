@@ -53,6 +53,49 @@ public sealed class InMemoryBffSessionStoreTests
     }
 
     [TestMethod]
+    public async Task ConcurrentRenewalCannotRestoreARemovedSession()
+    {
+        var time = new MutableTimeProvider(DateTimeOffset.UtcNow);
+        var store = new InMemoryBffSessionStore(Options.Create(new BffSessionOptions()), time);
+        var identity = new BffSessionIdentityResponse(
+            Guid.NewGuid(), "Test user", BffSessionAuthenticationMethods.Local, "local", Guid.NewGuid(), Guid.NewGuid());
+        var ticket = new AuthenticationTicket(BffSessionClaims.Create(identity), ConsoleAuthenticationDefaults.Scheme);
+        var key = await store.StoreAsync(ticket);
+
+        var renewals = Enumerable.Range(0, 100).Select(_ => Task.Run(async () =>
+        {
+            await store.RetrieveAsync(key);
+            await store.RenewAsync(key, ticket);
+        })).ToArray();
+        await store.RemoveAsync(key);
+        await Task.WhenAll(renewals);
+        await store.RenewAsync(key, ticket);
+
+        Assert.IsNull(await store.RetrieveAsync(key));
+        Assert.IsNull(await store.FindAsync(key));
+    }
+
+    [TestMethod]
+    public async Task RenewalDoesNotRestoreAnExpiredSession()
+    {
+        var time = new MutableTimeProvider(new DateTimeOffset(2026, 9, 15, 20, 0, 0, TimeSpan.Zero));
+        var store = new InMemoryBffSessionStore(Options.Create(new BffSessionOptions
+        {
+            IdleTimeoutMinutes = 5
+        }), time);
+        var identity = new BffSessionIdentityResponse(
+            Guid.NewGuid(), "Test user", BffSessionAuthenticationMethods.Local, "local", Guid.NewGuid(), Guid.NewGuid());
+        var ticket = new AuthenticationTicket(BffSessionClaims.Create(identity), ConsoleAuthenticationDefaults.Scheme);
+        var key = await store.StoreAsync(ticket);
+
+        time.Advance(TimeSpan.FromMinutes(6));
+        await store.RenewAsync(key, ticket);
+
+        Assert.IsNull(await store.RetrieveAsync(key));
+        Assert.IsNull(await store.FindAsync(key));
+    }
+
+    [TestMethod]
     public async Task AbsoluteExpiryCannotBeExtendedByActivity()
     {
         var time = new MutableTimeProvider(new DateTimeOffset(2026, 9, 15, 20, 0, 0, TimeSpan.Zero));

@@ -55,45 +55,75 @@ public sealed class InMemoryBffSessionStore(
         }
     }
 
-    public Task RenewAsync(string key, AuthenticationTicket ticket)
+    public async Task RenewAsync(string key, AuthenticationTicket ticket)
     {
-        if (sessions.TryGetValue(key, out var existing))
+        await storeGate.WaitAsync();
+        try
         {
             var now = timeProvider.GetUtcNow();
-            sessions[key] = new(ticket, Session(
-                ticket,
-                key,
-                existing.Session.CreatedAt,
-                now,
-                existing.Session.AbsoluteExpiresAt));
+            if (!sessions.TryGetValue(key, out var existing)) return;
+            if (IsExpired(existing.Session, now))
+            {
+                sessions.TryRemove(key, out _);
+                return;
+            }
+            sessions[key] = new(ticket, Session(ticket, key, existing.Session.CreatedAt,
+                now, existing.Session.AbsoluteExpiresAt));
         }
-        return Task.CompletedTask;
+        finally
+        {
+            storeGate.Release();
+        }
     }
 
-    public Task<AuthenticationTicket?> RetrieveAsync(string key)
+    public async Task<AuthenticationTicket?> RetrieveAsync(string key)
     {
-        if (!sessions.TryGetValue(key, out var stored)) return Task.FromResult<AuthenticationTicket?>(null);
-        var now = timeProvider.GetUtcNow();
-        var idleExpiry = stored.Session.LastSeenAt.AddMinutes(options.Value.IdleTimeoutMinutes);
-        if (now >= idleExpiry || now >= stored.Session.AbsoluteExpiresAt)
+        await storeGate.WaitAsync();
+        try
+        {
+            if (!sessions.TryGetValue(key, out var stored)) return null;
+            var now = timeProvider.GetUtcNow();
+            if (IsExpired(stored.Session, now))
+            {
+                sessions.TryRemove(key, out _);
+                return null;
+            }
+            sessions[key] = stored with { Session = stored.Session with { LastSeenAt = now } };
+            return stored.Ticket;
+        }
+        finally
+        {
+            storeGate.Release();
+        }
+    }
+
+    public async Task RemoveAsync(string key)
+    {
+        await storeGate.WaitAsync();
+        try
         {
             sessions.TryRemove(key, out _);
-            return Task.FromResult<AuthenticationTicket?>(null);
         }
-        sessions[key] = stored with { Session = stored.Session with { LastSeenAt = now } };
-        return Task.FromResult<AuthenticationTicket?>(stored.Ticket);
+        finally
+        {
+            storeGate.Release();
+        }
     }
 
-    public Task RemoveAsync(string key)
+    public async Task<BffServerSession?> FindAsync(string key, CancellationToken cancellationToken = default)
     {
-        sessions.TryRemove(key, out _);
-        return Task.CompletedTask;
-    }
-
-    public Task<BffServerSession?> FindAsync(string key, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(sessions.TryGetValue(key, out var value) ? value.Session : null);
+        await storeGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (!sessions.TryGetValue(key, out var value)) return null;
+            if (!IsExpired(value.Session, timeProvider.GetUtcNow())) return value.Session;
+            sessions.TryRemove(key, out _);
+            return null;
+        }
+        finally
+        {
+            storeGate.Release();
+        }
     }
 
     private static BffServerSession Session(
@@ -124,11 +154,14 @@ public sealed class InMemoryBffSessionStore(
     {
         foreach (var value in sessions)
         {
-            if (now >= value.Value.Session.AbsoluteExpiresAt
-                || now >= value.Value.Session.LastSeenAt.AddMinutes(options.Value.IdleTimeoutMinutes))
+            if (IsExpired(value.Value.Session, now))
                 sessions.TryRemove(value.Key, out _);
         }
     }
+
+    private bool IsExpired(BffServerSession session, DateTimeOffset now) =>
+        now >= session.AbsoluteExpiresAt ||
+        now >= session.LastSeenAt.AddMinutes(options.Value.IdleTimeoutMinutes);
 
     private sealed record StoredSession(AuthenticationTicket Ticket, BffServerSession Session);
 }
