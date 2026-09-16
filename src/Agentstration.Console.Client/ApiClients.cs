@@ -112,6 +112,11 @@ public interface IEntryAdministrationApiClient
         @namespace.IsDefault ? GetDependenciesAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Entries.");
     Task<IReadOnlyList<ResourcePickerItem>> GetResourcesAsync(EntryBindingKind kind, CancellationToken cancellationToken);
     Task<IReadOnlyList<EntryResponse>> GetPublishedEntriesAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<EntryResponse>> GetExposedEntriesAsync(EntryExposureSurface surface, EntryWorkplacePlacement? placement, CancellationToken cancellationToken);
+    Task<IReadOnlyList<EntryResponse>> GetConsoleEntriesAsync(CancellationToken cancellationToken) =>
+        GetExposedEntriesAsync(EntryExposureSurface.Console, null, cancellationToken);
+    Task<EntrySubmissionResponse> SubmitConsoleEntryAsync(Guid workspaceId, ResourceNamespace @namespace, string name, CreateInteractionRequest request, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support Console Entry submission.");
     Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkplaceDashboardDraftResponse>> GetDashboardsAsync(string workspaceName, CancellationToken cancellationToken);
     Task<WorkplaceDashboardDraftResponse> GetDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken);

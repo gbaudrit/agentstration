@@ -77,6 +77,8 @@ public sealed class WorkPlaneTests
             ResolvedTarget = new EntryResolvedTarget("router", "1.0.0")
         };
         WorkplaceValidation.Validate(entry);
+        Assert.IsTrue(EntryExposurePolicy.Allows(entry.Exposure, EntryExposureSurface.Workplace, EntryWorkplacePlacement.OwningSpace));
+        Assert.IsFalse(EntryExposurePolicy.Allows(entry.Exposure, EntryExposureSurface.Console));
         Assert.AreEqual(EntryParticipantVisibility.Hidden, entry.Presentation.Participants.Visibility);
         Assert.AreEqual(EntryProgressVisibility.Compact, entry.Presentation.Progress.Visibility);
         Assert.AreEqual(EntryTaskDisplay.Auto, entry.Presentation.Task.Display);
@@ -126,6 +128,66 @@ public sealed class WorkPlaneTests
         var legacyBindingError = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.ValidateBinding(
             new EntryBinding(EntryBindingKind.Flow, "legacy/router")));
         Assert.AreEqual("entry_binding_invalid", legacyBindingError.Code);
+        var invalidExposure = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(draft with
+        {
+            Exposure = new EntryExposure
+            {
+                Surfaces = [EntryExposureSurface.Console],
+                WorkplacePlacements = [EntryWorkplacePlacement.OwningSpace]
+            }
+        }));
+        Assert.AreEqual("entry_workplace_placements_not_allowed", invalidExposure.Code);
+        Assert.IsFalse(EntryExposurePolicy.Allows(
+            new EntryExposure { Version = EntryExposure.CurrentVersion + 1 },
+            EntryExposureSurface.Workplace,
+            EntryWorkplacePlacement.OwningSpace));
+    }
+
+    [TestMethod]
+    public async Task EntryDiscoveryFiltersSurfacePlacementAndAuthorizedWorkspace()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var siblingWorkspace = new WorkspaceId(Guid.Parse("33333333-3333-3333-3333-333333333333"));
+        var hiddenWorkspace = new WorkspaceId(Guid.Parse("44444444-4444-4444-4444-444444444444"));
+        await fixture.Workplace.UpsertEntryAsync(PublishedEntry(WorkplaceId, "current", new()), default);
+        await fixture.Workplace.UpsertEntryAsync(PublishedEntry(siblingWorkspace, "promoted", new EntryExposure
+        {
+            Surfaces = [EntryExposureSurface.Workplace],
+            WorkplacePlacements = [EntryWorkplacePlacement.TenantHome]
+        }), default);
+        await fixture.Workplace.UpsertEntryAsync(PublishedEntry(siblingWorkspace, "console", new EntryExposure
+        {
+            Surfaces = [EntryExposureSurface.Console],
+            WorkplacePlacements = []
+        }), default);
+        await fixture.Workplace.UpsertEntryAsync(PublishedEntry(hiddenWorkspace, "unauthorized", new EntryExposure
+        {
+            Surfaces = [EntryExposureSurface.Workplace],
+            WorkplacePlacements = [EntryWorkplacePlacement.TenantHome]
+        }), default);
+        await fixture.Workplace.UpsertEntryAsync(PublishedEntry(hiddenWorkspace, "unauthorized-console", new EntryExposure
+        {
+            Surfaces = [EntryExposureSurface.Console],
+            WorkplacePlacements = []
+        }), default);
+        var discovery = new EntryDiscoveryService(fixture.Workplace, new EntryDiscoveryAuthorizationStub(
+        [
+            new(WorkplaceId, true),
+            new(siblingWorkspace, false)
+        ]), new EntryExecutionResolverStub(entry => entry.WorkspaceId == hiddenWorkspace
+            ? throw new AssertFailedException("An unauthorized Entry must not be resolved.")
+            : EntryExecutionResolution.Executable));
+
+        var owningSpace = await discovery.DiscoverAsync(EntryExposureSurface.Workplace, EntryWorkplacePlacement.OwningSpace, default);
+        var tenantHome = await discovery.DiscoverAsync(EntryExposureSurface.Workplace, EntryWorkplacePlacement.TenantHome, default);
+        var console = await discovery.DiscoverAsync(EntryExposureSurface.Console, null, default);
+
+        Assert.AreEqual("current", owningSpace.Single().Entry.Name);
+        Assert.AreEqual("promoted", tenantHome.Single().Entry.Name);
+        Assert.AreEqual(siblingWorkspace, tenantHome.Single().Entry.WorkspaceId);
+        Assert.AreEqual("console", console.Single().Entry.Name);
+        Assert.AreEqual(siblingWorkspace, console.Single().Entry.WorkspaceId);
+        Assert.IsTrue(console.Single().Execution.CanInvoke);
     }
 
     [TestMethod]
@@ -382,7 +444,7 @@ public sealed class WorkPlaneTests
         olderContinuation.MarkQueued(olderExecutionId, "agent", Guid.NewGuid(), Now);
         olderContinuation.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, olderContinuation.Id, olderExecutionId, Now, "agent"));
         await fixture.Repository.CreateAsync(olderContinuation, default);
-        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub());
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub(), new EntryExecutionResolverStub());
 
         commands.Reset();
         var tasks = await workplace.ListTasksAsync(WorkplaceId, null, default);
@@ -618,7 +680,7 @@ public sealed class WorkPlaneTests
             LastActivityAt = Now
         };
         await fixture.Workplace.CreateInteractionAsync(interaction, default);
-        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub());
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub(), new EntryExecutionResolverStub());
         var service = new EntryAdministrationService(fixture.Workplace, new EntryTargetResolverStub(), workplace, TimeProvider.System, new WorkplaceContextStub());
 
         await service.DeleteAsync(WorkplaceId, draft.Id, removeDashboardReferences: true, closeInteractions: true, default);
@@ -665,7 +727,7 @@ public sealed class WorkPlaneTests
             LastActivityAt = Now,
             TaskId = taskId
         }, default);
-        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub());
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub(), new EntryExecutionResolverStub());
         var service = new EntryAdministrationService(fixture.Workplace, new EntryTargetResolverStub(), workplace, TimeProvider.System, new WorkplaceContextStub());
 
         var conflict = await Assert.ThrowsExactlyAsync<WorkValidationException>(() =>
@@ -932,6 +994,34 @@ public sealed class WorkPlaneTests
         public Task<EntryResolvedTarget> ResolveAsync(EntryDraft draft, CancellationToken cancellationToken) => Task.FromResult(new EntryResolvedTarget("router", "1.0.0"));
         public Task<IReadOnlyList<EntryDependency>> GetDependenciesAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<EntryDependency>>([]);
     }
+
+    private sealed class EntryDiscoveryAuthorizationStub(IReadOnlyList<EntryDiscoveryWorkspace> workspaces) : IEntryDiscoveryAuthorization
+    {
+        public Task<IReadOnlyList<EntryDiscoveryWorkspace>> ListReadableWorkspacesInCurrentTenantAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(workspaces);
+    }
+
+    private sealed class EntryExecutionResolverStub(
+        Func<EntryResource, EntryExecutionResolution>? resolve = null) : IEntryExecutionResolver
+    {
+        public Task<EntryExecutionResolution> ResolveAsync(EntryResource entry, CancellationToken cancellationToken) =>
+            Task.FromResult(resolve?.Invoke(entry) ?? EntryExecutionResolution.Executable);
+    }
+
+    private static EntryResource PublishedEntry(WorkspaceId workspaceId, string name, EntryExposure exposure) => new()
+    {
+        WorkspaceId = workspaceId,
+        Id = new(name),
+        Name = name,
+        DisplayName = name,
+        Presentation = new EntryPresentation
+        {
+            Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }]
+        },
+        Exposure = exposure,
+        ResolvedTarget = new("router", "1.0.0"),
+        PublishedAt = Now
+    };
 
     private static EntryDraft Entry(EntryId id) => new()
     {

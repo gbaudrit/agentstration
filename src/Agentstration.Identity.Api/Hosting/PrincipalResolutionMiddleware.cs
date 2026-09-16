@@ -151,6 +151,8 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
     {
         if (context.Request.RouteValues.TryGetValue("workspaceId", out var routeValue)
             && Guid.TryParse(routeValue?.ToString(), out var routeWorkspace)) return routeWorkspace;
+        if (context.Request.RouteValues.TryGetValue("workspaceName", out routeValue)
+            && Guid.TryParse(routeValue?.ToString(), out routeWorkspace)) return routeWorkspace;
         if (Guid.TryParse(context.Request.Headers[WorkspaceHeader].FirstOrDefault(), out var headerWorkspace)) return headerWorkspace;
         if (Guid.TryParse(context.Request.Cookies[RequestContextMiddleware.WorkspaceCookie], out var cookieWorkspace)) return cookieWorkspace;
         return null;

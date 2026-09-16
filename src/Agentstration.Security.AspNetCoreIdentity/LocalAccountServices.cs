@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Agentstration.Identity.Contracts;
 using Agentstration.Security.Contracts;
 using Microsoft.AspNetCore.DataProtection;
@@ -215,25 +217,29 @@ public sealed class LocalAuthenticationService(
     IIdentityStore identityStore,
     ISecurityAuditWriter audit)
 {
-    public async Task<LocalLoginOutcome> PasswordSignInAsync(
+    public async Task<LocalCredentialValidation> ValidateCredentialsAsync(
         string userName,
         string password,
-        bool rememberMe,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(password))
         {
             await audit.WriteAsync(new(SecurityAuditActions.LocalLogin, SecurityAuditOutcome.Failed,
                 ReasonCode: "missing-credentials"), cancellationToken);
-            return LocalLoginOutcome.Failed;
+            return new(LocalLoginOutcome.Failed);
         }
+
         var normalized = userName.Trim();
-        var result = await signIn.PasswordSignInAsync(normalized, password, rememberMe, lockoutOnFailure: true);
         var account = await users.FindByNameAsync(normalized);
+        var result = account is null
+            ? SignInResult.Failed
+            : await signIn.CheckPasswordSignInAsync(account, password, lockoutOnFailure: true);
         var principalId = account is null
             ? null
             : (await identityStore.FindLocalIdentityAsync(account.Id, cancellationToken))?.PrincipalId;
-        var outcome = result.Succeeded ? LocalLoginOutcome.Succeeded : result.IsLockedOut ? LocalLoginOutcome.LockedOut : LocalLoginOutcome.Failed;
+        var outcome = result.Succeeded
+            ? LocalLoginOutcome.Succeeded
+            : result.IsLockedOut ? LocalLoginOutcome.LockedOut : LocalLoginOutcome.Failed;
         await audit.WriteAsync(new(
             SecurityAuditActions.LocalLogin,
             result.Succeeded ? SecurityAuditOutcome.Succeeded : SecurityAuditOutcome.Failed,
@@ -246,7 +252,38 @@ public sealed class LocalAuthenticationService(
                 LocalLoginOutcome.Failed => "invalid-credentials",
                 _ => null
             }), cancellationToken);
-        return outcome;
+        return new(outcome, account?.Id, principalId, AuthenticationVersion(account?.SecurityStamp));
+    }
+
+    public async Task<bool> ValidateSessionAsync(
+        Guid principalId,
+        string authenticationVersion,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(authenticationVersion)) return false;
+        var link = await identityStore.FindLocalIdentityByPrincipalAsync(principalId, cancellationToken);
+        if (link is null) return false;
+        var account = await users.FindByIdAsync(link.AccountId.ToString("D"));
+        return account is not null
+            && !await users.IsLockedOutAsync(account)
+            && string.Equals(AuthenticationVersion(account.SecurityStamp), authenticationVersion, StringComparison.Ordinal);
+    }
+
+    public async Task<LocalLoginOutcome> PasswordSignInAsync(
+        string userName,
+        string password,
+        bool rememberMe,
+        CancellationToken cancellationToken)
+    {
+        var validation = await ValidateCredentialsAsync(userName, password, cancellationToken);
+        if (validation.Outcome != LocalLoginOutcome.Succeeded || validation.AccountId is not { } accountId)
+            return validation.Outcome;
+
+        var account = await users.FindByIdAsync(accountId.ToString("D"));
+        if (account is null) return LocalLoginOutcome.Failed;
+        await signIn.SignInAsync(account, rememberMe);
+        return LocalLoginOutcome.Succeeded;
     }
 
     public async Task SignOutAsync(CancellationToken cancellationToken)
@@ -254,5 +291,10 @@ public sealed class LocalAuthenticationService(
         await signIn.SignOutAsync();
         await audit.WriteAsync(new(SecurityAuditActions.LocalLogout), cancellationToken);
     }
+
+    private static string? AuthenticationVersion(string? securityStamp) =>
+        string.IsNullOrWhiteSpace(securityStamp)
+            ? null
+            : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(securityStamp)));
 }
 

@@ -10,6 +10,7 @@ using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+builder.Services.AddRazorPages();
 builder.Services.AddAgentstrationConsoleHost(builder.Configuration);
 builder.Services.AddAgentstrationLocalization(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
@@ -19,6 +20,8 @@ builder.Services.AddAuthentication(ConsoleAuthenticationDefaults.Scheme)
         options.Cookie.Name = ConsoleAuthenticationDefaults.Cookie;
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.IsEssential = true;
         options.LoginPath = "/login";
         options.ReturnUrlParameter = "returnUrl";
     });
@@ -52,9 +55,11 @@ app.MapHealthChecks("/health/live");
 app.MapHealthChecks("/health/ready");
 app.MapAgentstrationCultureEndpoint().AllowAnonymous();
 app.MapStaticAssets();
+app.MapRazorPages();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
-    .AddAdditionalAssemblies(typeof(ConsoleRouteAssembly).Assembly);
+    .AddAdditionalAssemblies(typeof(ConsoleRouteAssembly).Assembly)
+    .RequireAuthorization();
 await app.RunAsync();
 
 public partial class Program;

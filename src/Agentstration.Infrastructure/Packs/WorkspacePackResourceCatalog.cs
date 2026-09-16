@@ -306,6 +306,7 @@ public sealed class WorkspacePackResourceCatalog(
                 DisplayName = entry.DisplayName,
                 Description = entry.Description,
                 Presentation = entry.Presentation,
+                Exposure = entry.Exposure,
                 Binding = Relative(entry.Binding, entry.Id.Namespace),
                 Behavior = entry.Behavior,
                 Publish = true
