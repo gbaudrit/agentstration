@@ -22,7 +22,8 @@ public sealed class ResourcePlansApiClientTests
             if (request.RequestUri.AbsolutePath.Contains("/resource-plans/", StringComparison.Ordinal))
                 return new HttpResponseMessage(HttpStatusCode.NotFound);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new ResourcePlanPage([], false)) };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }));
+        http.BaseAddress = new Uri("http://localhost/");
         var client = new ResourcePlansApiClient(http);
         var planId = Guid.NewGuid();
         var changeSetId = Guid.NewGuid();

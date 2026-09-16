@@ -107,8 +107,11 @@ public sealed class ResourcePlanReviewTests
             new ResourceMetadata { Name = logicalId }, JsonSerializer.SerializeToElement(new { displayName }));
         var current = new CurrentResourceEvidence(null, 1, "\"old\"", JsonSerializer.SerializeToElement(new
         {
-            apiVersion = "agentstration.io/v1", kind = "Agent", scopeRef = ResourceScopeRef.Workspace(Scope.WorkspaceId.Value),
-            metadata = new { name = logicalId }, definition = new { displayName = "Old name" }
+            apiVersion = "agentstration.io/v1",
+            kind = "Agent",
+            scopeRef = ResourceScopeRef.Workspace(Scope.WorkspaceId.Value),
+            metadata = new { name = logicalId },
+            definition = new { displayName = "Old name" }
         }), "old");
         return new(order, logicalId, ResourceChangeOperation.Update, proposed, current, dependsOn, "new");
     }
