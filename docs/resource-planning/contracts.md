@@ -4,6 +4,12 @@ Resource Planning agents exchange functional intent through `resource-planning.a
 
 The contract deliberately excludes `apiVersion`/`kind` Resource envelopes, ETags, persistence DTOs, concrete Flow graphs, provider bindings, Resource IDs, and internal scope IDs. Those details belong to deterministic platform materializers.
 
+## Materialization defaults and validation
+
+The current materializer assigns every proposed Agent the ModelProfile reference `default/default` and RuntimeProfile reference `default/maf-builtin`. These are deterministic materialization options, not values selected by an agent or discovered from the Workspace. Materialization does not create either resource or require them to exist, so a fresh local instance can still produce a reviewable ChangeSet.
+
+ChangeSet validation resolves those references in the target Workspace. If the ModelProfile is missing or invalid, validation records a `resource_change_model_profile_invalid` issue against each affected Agent and marks the ChangeSet `Blocked`. Create or repair the referenced ModelProfile, then revalidate. Validation never silently substitutes another available profile.
+
 ## Evolution
 
 - Additive optional properties may be introduced within `v1`; readers ignore unknown JSON properties.

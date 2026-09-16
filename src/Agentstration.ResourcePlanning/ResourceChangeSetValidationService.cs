@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Flows;
+using Agentstration.Models;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourcePlanning.Contracts;
 using Agentstration.ResourcePlanning.Storage.Abstractions;
@@ -105,7 +106,16 @@ public sealed class CanonicalPlannedResourceValidator(AgentManagementService age
             if (change.Proposed.Kind == AgentResourceKinds.Agent)
             {
                 var definition = change.Proposed.Definition.Deserialize<AgentProperties>(JsonOptions) ?? throw new JsonException("Agent definition is empty.");
-                await agents.ValidateForCreateAsync(new AgentResource { ApiVersion = change.Proposed.ApiVersion, Kind = change.Proposed.Kind, ScopeRef = change.Proposed.ScopeRef, Metadata = change.Proposed.Metadata, Definition = definition }, cancellationToken);
+                try
+                {
+                    await agents.ValidateForCreateAsync(new AgentResource { ApiVersion = change.Proposed.ApiVersion, Kind = change.Proposed.Kind, ScopeRef = change.Proposed.ScopeRef, Metadata = change.Proposed.Metadata, Definition = definition }, cancellationToken);
+                }
+                catch (ModelProfileValidationException exception)
+                {
+                    var profile = definition.ModelProfile.Resolve(change.Proposed.Metadata.Namespace, ModelResourceKinds.ModelProfile);
+                    return [new("resource_change_model_profile_invalid", $"changes[{change.Order}].proposed.definition.modelProfile",
+                        $"Agent '{change.Proposed.Metadata.Name}' references ModelProfile '{profile.Namespace}/{profile.Name}': {exception.Message} Create or repair that ModelProfile, then revalidate the ChangeSet.")];
+                }
             }
             else if (change.Proposed.Kind == FlowResourceKinds.Flow)
             {
@@ -135,7 +145,9 @@ public sealed class CanonicalPlannedResourceValidator(AgentManagementService age
             }
             return [];
         }
-        catch (Exception exception) when (exception is ArgumentException or JsonException or FlowValidationException or WorkValidationException or ResourceNotFoundException)
+        catch (Exception exception) when (exception is ArgumentException or JsonException or FlowValidationException or WorkValidationException
+            or AgentDefinitionValidationException or ResourceNotFoundException or ResourceReferenceOutsideScopeException
+            or ResourceReferenceAmbiguousException or ResourceScopePolicyException)
         {
             return [new("resource_change_canonical_invalid", $"changes[{change.Order}].proposed", exception.Message)];
         }

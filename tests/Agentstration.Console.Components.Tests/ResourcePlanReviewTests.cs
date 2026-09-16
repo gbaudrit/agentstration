@@ -105,6 +105,29 @@ public sealed class ResourcePlanReviewTests
         });
     }
 
+    [TestMethod]
+    public void DetailShowsBlockedModelProfileIssueAfterRevalidation()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        var set = ChangeSet(Plan.Revision, [Change(0, "triage", [], "Triage")]);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IResourcePlansApiClient>(new FakeClient(set, blockOnValidate: true));
+        context.Services.AddSingleton(new ConsoleContextState(new FakeContextProvider()));
+        context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default).GetAwaiter().GetResult();
+
+        var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
+        rendered.WaitForElement("#tab-Validation");
+        rendered.FindAll("button").Single(value => value.TextContent.Contains("Revalider", StringComparison.Ordinal)).Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.Contains("resource_change_model_profile_invalid", rendered.Markup, StringComparison.Ordinal);
+            Assert.Contains("changes[0].proposed.definition.modelProfile", rendered.Markup, StringComparison.Ordinal);
+            Assert.Contains("ModelProfile 'default/default'", rendered.Markup, StringComparison.Ordinal);
+        });
+    }
+
     private static ResourceChange Change(int order, string logicalId, IReadOnlyList<string> dependsOn, string displayName)
     {
         var proposed = new PlannedResourceDocument("agentstration.io/v1", "Agent", ResourceScopeRef.Workspace(Scope.WorkspaceId.Value),
@@ -127,7 +150,7 @@ public sealed class ResourcePlanReviewTests
     private static ResourceChangeSetValidation Validation(ResourceChangeSet set, string digest) => new(
         Guid.NewGuid(), set.Id, digest, set.PlanId, set.PlanRevision, Scope, ResourceChangeSetReadiness.Ready, [], Guid.NewGuid(), DateTimeOffset.UnixEpoch);
 
-    private sealed class FakeClient(ResourceChangeSetSnapshot set) : IResourcePlansApiClient
+    private sealed class FakeClient(ResourceChangeSetSnapshot set, bool blockOnValidate = false) : IResourcePlansApiClient
     {
         private IReadOnlyList<ResourceChangeSetValidation> validations = [Validation(set.Value, "old-digest")];
         public int ValidationCalls { get; private set; }
@@ -141,7 +164,12 @@ public sealed class ResourcePlanReviewTests
         public Task<ResourceChangeSetValidation> ValidateChangeSetAsync(Guid changeSetId, CancellationToken cancellationToken)
         {
             ValidationCalls++;
-            var result = Validation(set.Value, set.Value.Digest) with { ValidatedAt = DateTimeOffset.UtcNow };
+            var result = Validation(set.Value, set.Value.Digest) with
+            {
+                ValidatedAt = DateTimeOffset.UtcNow,
+                Readiness = blockOnValidate ? ResourceChangeSetReadiness.Blocked : ResourceChangeSetReadiness.Ready,
+                Issues = blockOnValidate ? [new("resource_change_model_profile_invalid", "changes[0].proposed.definition.modelProfile", "Agent 'triage' references ModelProfile 'default/default'.")] : []
+            };
             validations = [.. validations, result];
             return Task.FromResult(result);
         }
