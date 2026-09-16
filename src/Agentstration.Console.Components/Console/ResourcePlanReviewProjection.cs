@@ -43,6 +43,65 @@ public static class ResourcePlanReviewProjection
             .ToArray();
     }
 
+    public static IReadOnlyList<ResourcePlanFieldDifference> ReviewFields(ResourceChange change) => Differences(change)
+        .Where(value => value.Path.StartsWith("definition.", StringComparison.Ordinal))
+        .Where(value => change.Operation != ResourceChangeOperation.Create || !IsEmpty(value.Proposed))
+        .OrderBy(value => ReviewRank(value.Path))
+        .ThenBy(value => value.Path, StringComparer.Ordinal)
+        .ToArray();
+
+    public static IReadOnlyList<ResourcePlanFieldDifference> HighlightFields(ResourceChange change)
+    {
+        string[] paths = change.Proposed.Kind switch
+        {
+            "Agent" => ["definition.modelProfile.name", "definition.runtimeProfile.name", "definition.behaviors"],
+            "Flow" => ["definition.spec.flowKind", "definition.spec.pattern.strategy", "definition.version"],
+            "Entry" => ["definition.presentation.kind", "definition.binding.resourceId", "definition.behavior.allowConversation"],
+            _ => []
+        };
+        var differences = ReviewFields(change).ToDictionary(value => value.Path, StringComparer.Ordinal);
+        return paths.Where(differences.ContainsKey).Select(path => differences[path]).ToArray();
+    }
+
+    public static string DisplayName(ResourceChange change) => DefinitionText(change, "displayName") ?? change.LogicalId;
+
+    public static string? Description(ResourceChange change) => DefinitionText(change, "description");
+
+    public static string? ModelProfile(ResourceChange change)
+    {
+        if (!change.Proposed.Definition.TryGetProperty("modelProfile", out var profile) || profile.ValueKind != JsonValueKind.Object
+            || !profile.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String) return null;
+        var profileName = name.GetString();
+        if (string.IsNullOrWhiteSpace(profileName)) return null;
+        var profileNamespace = profile.TryGetProperty("namespace", out var @namespace) && @namespace.ValueKind == JsonValueKind.String
+            ? @namespace.GetString() : null;
+        return $"{(string.IsNullOrWhiteSpace(profileNamespace) ? change.Proposed.Metadata.Namespace.Value : profileNamespace)}/{profileName}";
+    }
+
+    public static ResourceChange? ChangeForIssue(ResourceChangeSet changeSet, ResourceChangeSetValidationIssue issue)
+    {
+        const string prefix = "changes[";
+        if (!issue.Path.StartsWith(prefix, StringComparison.Ordinal)) return null;
+        var closing = issue.Path.IndexOf(']', prefix.Length);
+        return closing > prefix.Length && int.TryParse(issue.Path.AsSpan(prefix.Length, closing - prefix.Length), out var order)
+            ? changeSet.Changes.FirstOrDefault(value => value.Order == order) : null;
+    }
+
+    public static string FormatValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "—";
+        if (!value.StartsWith('[')) return value;
+        try
+        {
+            using var json = JsonDocument.Parse(value);
+            if (json.RootElement.ValueKind != JsonValueKind.Array) return value;
+            var items = json.RootElement.EnumerateArray().ToArray();
+            return items.Length == 0 ? "—" : items.All(item => item.ValueKind == JsonValueKind.String)
+                ? string.Join(", ", items.Select(item => item.GetString())) : value;
+        }
+        catch (JsonException) { return value; }
+    }
+
     public static ResourcePlanGraph Graph(ResourceChangeSet changeSet)
     {
         var changes = changeSet.Changes.OrderBy(value => value.Order).ToArray();
@@ -82,4 +141,24 @@ public static class ResourcePlanReviewProjection
         else
             fields[path] = value.ToString();
     }
+
+    private static string? DefinitionText(ResourceChange change, string property) =>
+        change.Proposed.Definition.ValueKind == JsonValueKind.Object
+        && change.Proposed.Definition.TryGetProperty(property, out var value)
+        && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+
+    private static bool IsEmpty(string? value) => string.IsNullOrWhiteSpace(value) || value is "[]" or "{}";
+
+    private static int ReviewRank(string path) => path switch
+    {
+        "definition.displayName" => 0,
+        "definition.description" => 1,
+        "definition.modelProfile.name" => 2,
+        "definition.runtimeProfile.name" => 3,
+        "definition.spec.flowKind" or "definition.presentation.kind" => 4,
+        "definition.spec.pattern.strategy" or "definition.binding.resourceId" => 5,
+        "definition.instructions" => 6,
+        "definition.behaviors" => 7,
+        _ => 10
+    };
 }

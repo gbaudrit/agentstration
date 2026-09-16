@@ -37,6 +37,14 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   await page.getByRole('button', { name: 'Create ChangeSet' }).click();
   await expect(page.locator('.resource-plan-change')).toHaveCount(2);
   await expect(page.getByText('Create', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('.resource-plan-change-summary')).toContainText('2');
+  await expect(page.locator('.resource-plan-change').nth(1).locator('.resource-plan-change-highlights')).toContainText('Sequential');
+  await expect(page.locator('.resource-plan-change-diff').first()).not.toHaveAttribute('open', '');
+  await page.locator('.resource-plan-change-diff summary').first().click();
+  await expect(page.locator('.resource-plan-change-diff').first()).toContainText('Model profile');
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   await page.getByRole('tab', { name: 'Graph' }).click();
   await expect(page.locator('.topology-node')).toHaveCount(2);
@@ -46,8 +54,13 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   await page.getByRole('tab', { name: 'Validation' }).click();
   await page.getByRole('button', { name: 'Revalidate' }).click();
   await expect(page.getByText('Blocked', { exact: true }).first()).toBeVisible();
-  await expect(page.locator('.resource-plan-issues')).toContainText('resource_change_model_profile_invalid');
-  await expect(page.locator('.resource-plan-issues')).toContainText("Agent 'triage' references ModelProfile 'default/default'");
+  await expect(page.locator('.resource-plan-issue-content h3').first()).toHaveText('Model profile needs attention');
+  await expect(page.locator('.resource-plan-issue-content').first()).toContainText('default/default');
+  await expect(page.locator('.resource-plan-issue-action').first()).toBeVisible();
+  await expect(page.locator('.resource-plan-issue-technical').first()).not.toHaveAttribute('open', '');
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole('tab', { name: 'Activity' }).click();
   await expect(page.locator('a[href="/flow-runs/e2e-flow-run"]')).toBeVisible();
 

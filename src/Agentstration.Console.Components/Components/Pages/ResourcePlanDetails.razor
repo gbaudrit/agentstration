@@ -102,31 +102,47 @@ else
         }
         else if (activeView == "Changes")
         {
-            <h2>@T("Changes")</h2>
+            <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ConcreteProposal")</p><h2>@T("Changes")</h2><p>@T("ChangesIntro")</p></div></div>
             @if (changeSets.Count == 0) { <p>@T("NoChangeSets")</p> }
             else
             {
-                <label for="change-set-select">@T("ChangeSet")</label>
-                <select id="change-set-select" value="@selected?.Value.Id.Value.ToString("D")" @onchange="SelectChangeSetAsync">
+                <div class="resource-plan-change-set-picker"><label for="change-set-select">@T("ChangeSet")</label><select id="change-set-select" value="@selected?.Value.Id.Value.ToString("D")" @onchange="SelectChangeSetAsync">
                     @foreach (var item in changeSets) { <option value="@item.Value.Id.Value.ToString("D")">@T("ChangeSetOption", item.Value.PlanRevision, item.Value.CreatedAt.ToLocalTime().ToString("g"))</option> }
-                </select>
+                </select></div>
                 @if (selected is not null)
                 {
-                    <p>@T("ChangeSetRevision", selected.Value.PlanRevision) · <code>@selected.Value.Digest</code></p>
+                    <div class="resource-plan-change-set-meta"><span>@T("ChangeSetRevision", selected.Value.PlanRevision)</span><span>@T("CreatedAt", selected.Value.CreatedAt.ToLocalTime().ToString("g"))</span><details><summary>@T("TechnicalDetails")</summary><code>@selected.Value.Digest</code></details></div>
+                    <div class="resource-plan-change-summary" aria-label="@T("ChangeSummary")">
+                        @foreach (var operation in Enum.GetValues<ResourceChangeOperation>())
+                        {
+                            var count = selected.Value.Changes.Count(value => value.Operation == operation);
+                            <div><strong>@count</strong><span>@OperationCountLabel(operation, count)</span></div>
+                        }
+                    </div>
                     @foreach (var change in selected.Value.Changes.OrderBy(value => value.Order))
                     {
+                        var reviewFields = ResourcePlanReviewProjection.ReviewFields(change);
                         <article class="resource-plan-change">
-                            <header><div><h3>@change.LogicalId</h3><small>@change.Proposed.Kind · @change.Proposed.Metadata.Name</small></div><StatusBadge Text="@T($"Operation.{change.Operation}")" Status="@OperationTone(change.Operation)" /></header>
-                            @if (change.DependsOn.Count > 0) { <p>@T("DependsOn") @string.Join(", ", change.DependsOn)</p> }
-                            @if (change.Operation == ResourceChangeOperation.NoOp) { <p>@T("NoDifferences")</p> }
+                            <header><div class="resource-plan-change-identity"><span class="resource-plan-change-number">@(change.Order + 1)</span><div><p class="resource-plan-change-kind">@ResourceKindLabel(change.Proposed.Kind)</p><h3>@ResourcePlanReviewProjection.DisplayName(change)</h3><small>@change.Proposed.Metadata.Namespace/@change.Proposed.Metadata.Name</small></div></div><StatusBadge Text="@T($"Operation.{change.Operation}")" Status="@OperationTone(change.Operation)" /></header>
+                            @if (ResourcePlanReviewProjection.Description(change) is { Length: > 0 } description) { <p class="resource-plan-change-description">@description</p> }
+                            @if (change.DependsOn.Count > 0) { <p class="resource-plan-change-dependencies"><strong>@T("DependsOn")</strong> @string.Join(", ", change.DependsOn)</p> }
+                            @if (change.Operation == ResourceChangeOperation.NoOp) { <p class="resource-plan-change-empty">@T("NoDifferences")</p> }
                             else
                             {
-                                <div class="resource-plan-table-scroll"><table><thead><tr><th>@T("Field")</th><th>@T("Current")</th><th>@T("Proposed")</th></tr></thead><tbody>
-                                @foreach (var difference in ResourcePlanReviewProjection.Differences(change))
-                                {
-                                    <tr><th scope="row"><code>@difference.Path</code></th><td><code>@(difference.Current ?? "—")</code></td><td><code>@(difference.Proposed ?? "—")</code></td></tr>
-                                }
-                                </tbody></table></div>
+                                <div class="resource-plan-change-highlights">
+                                    @foreach (var difference in ResourcePlanReviewProjection.HighlightFields(change))
+                                    {
+                                        <div><span>@FieldLabel(difference.Path)</span><strong>@DisplayValue(difference.Path, difference.Proposed)</strong></div>
+                                    }
+                                </div>
+                                <details class="resource-plan-change-diff"><summary>@(reviewFields.Count == 1 ? T("ShowField") : T("ShowFields", reviewFields.Count))</summary>
+                                    <div class="resource-plan-table-scroll"><table><thead><tr><th>@T("Field")</th><th>@T("Current")</th><th>@T("Proposed")</th></tr></thead><tbody>
+                                    @foreach (var difference in reviewFields)
+                                    {
+                                        <tr><th scope="row"><strong>@FieldLabel(difference.Path)</strong><code>@difference.Path</code></th><td><span class="resource-plan-diff-value">@DisplayValue(difference.Path, difference.Current)</span></td><td><span class="resource-plan-diff-value">@DisplayValue(difference.Path, difference.Proposed)</span></td></tr>
+                                    }
+                                    </tbody></table></div>
+                                </details>
                             }
                         </article>
                     }
@@ -163,16 +179,33 @@ else
         }
         else if (activeView == "Validation")
         {
-            <h2>@T("Validation")</h2>
+            <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ReviewResult")</p><h2>@T("Validation")</h2><p>@T("ValidationIntro")</p></div></div>
             @if (selected is null) { <p>@T("NoChangeSets")</p> }
             else if (latestValidation is null) { <p>@T("NotValidated")</p> }
             else
             {
-                <StatusBadge Text="@T($"Readiness.{latestValidation.Readiness}")" Status="@(latestValidation.Readiness == ResourceChangeSetReadiness.Ready ? UiStatus.Success : UiStatus.Danger)" />
-                @if (ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, latestValidation)) { <StatusBadge Text="@T("StaleValidation")" Status="UiStatus.Warning" /> }
-                <p>@T("ValidatedAt") @latestValidation.ValidatedAt.ToLocalTime().ToString("g")</p>
-                @if (latestValidation.Issues.Count == 0) { <p>@T("NoIssues")</p> }
-                else { <ul class="resource-plan-issues">@foreach (var issue in latestValidation.Issues) { <li><strong>@issue.Code</strong><code>@issue.Path</code><span>@issue.Message</span></li> }</ul> }
+                <div class="resource-plan-validation-summary @(latestValidation.Readiness == ResourceChangeSetReadiness.Ready ? "is-ready" : "is-blocked")" role="status">
+                    <span class="resource-plan-validation-symbol" aria-hidden="true">@(latestValidation.Readiness == ResourceChangeSetReadiness.Ready ? "✓" : "!")</span>
+                    <div><p class="resource-plan-validation-kicker">@T("ValidationState")</p><h3>@(latestValidation.Readiness == ResourceChangeSetReadiness.Ready ? T("ValidationReadyTitle") : latestValidation.Issues.Count == 1 ? T("ValidationIssueSingular") : T("ValidationIssuePlural", latestValidation.Issues.Count))</h3><p>@(latestValidation.Readiness == ResourceChangeSetReadiness.Ready ? T("ValidationReadyDescription") : T("ValidationBlockedDescription"))</p>
+                        <div class="resource-plan-validation-meta"><StatusBadge Text="@T($"Readiness.{latestValidation.Readiness}")" Status="@(latestValidation.Readiness == ResourceChangeSetReadiness.Ready ? UiStatus.Success : UiStatus.Danger)" /><span>@T("ValidatedAt") <time datetime="@latestValidation.ValidatedAt.ToString("O")">@latestValidation.ValidatedAt.ToLocalTime().ToString("g")</time></span>@if (ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, latestValidation)) { <StatusBadge Text="@T("StaleValidation")" Status="UiStatus.Warning" /> }</div>
+                    </div>
+                </div>
+                @if (latestValidation.Issues.Count == 0) { <p class="resource-plan-validation-empty">@T("NoIssues")</p> }
+                else
+                {
+                    <ol class="resource-plan-issues">
+                    @foreach (var issue in latestValidation.Issues)
+                    {
+                        var affected = ResourcePlanReviewProjection.ChangeForIssue(selected.Value, issue);
+                        <li class="@(issue.Severity == ResourceChangeSetValidationSeverity.Warning ? "is-warning" : "is-error")"><span class="resource-plan-issue-symbol" aria-hidden="true">!</span><div class="resource-plan-issue-content"><p class="resource-plan-issue-category">@T($"Severity.{issue.Severity}")@if (affected is not null) { <span> · @ResourceKindLabel(affected.Proposed.Kind)</span> }</p><h3>@IssueTitle(issue.Code)</h3>
+                            @if (affected is not null) { <p class="resource-plan-issue-resource">@ResourcePlanReviewProjection.DisplayName(affected) <code>@affected.LogicalId</code></p> }
+                            <p>@IssueDescription(issue.Code, affected)</p>
+                            @if (issue.Code == "resource_change_model_profile_invalid") { <p class="resource-plan-issue-action">@T("Issue.ModelProfile.Action")</p> }
+                            <details class="resource-plan-issue-technical"><summary>@T("TechnicalDetails")</summary><code>@issue.Code</code><code>@issue.Path</code><p>@issue.Message</p></details>
+                        </div></li>
+                    }
+                    </ol>
+                }
             }
         }
         else
@@ -221,6 +254,52 @@ else
         }
     }
     private string T(string key, params object[] args) => Localizer[key, args].Value;
+    private string OperationCountLabel(ResourceChangeOperation operation, int count) => T($"Operation{(count == 1 ? string.Empty : "Plural")}.{operation}");
+    private string DisplayValue(string path, string? value)
+    {
+        if (value?.Equals("true", StringComparison.OrdinalIgnoreCase) == true) return T("Yes");
+        if (value?.Equals("false", StringComparison.OrdinalIgnoreCase) == true) return T("No");
+        if (value is not null)
+        {
+            var localized = Localizer[$"Value.{path}.{value}"];
+            if (!localized.ResourceNotFound) return localized.Value;
+        }
+        return ResourcePlanReviewProjection.FormatValue(value);
+    }
+    private string ResourceKindLabel(string kind) => kind switch
+    {
+        "Agent" => T("Kind.Agent"),
+        "Flow" => T("Kind.Flow"),
+        "Entry" => T("Kind.Entry"),
+        _ => kind
+    };
+    private string FieldLabel(string path)
+    {
+        var value = Localizer[$"Field.{path}"];
+        if (!value.ResourceNotFound) return value.Value;
+        if (path.StartsWith("definition.spec.", StringComparison.Ordinal)) return T("Field.FlowSpec");
+        if (path.StartsWith("definition.presentation.", StringComparison.Ordinal)) return T("Field.Presentation");
+        if (path.StartsWith("definition.binding.", StringComparison.Ordinal)) return T("Field.Binding");
+        return T("Field.Other");
+    }
+    private string IssueTitle(string code) => code switch
+    {
+        "resource_change_model_profile_invalid" => T("Issue.ModelProfile.Title"),
+        "resource_change_canonical_invalid" => T("Issue.Canonical.Title"),
+        "resource_change_create_conflict" => T("Issue.Conflict.Title"),
+        "resource_change_current_missing" or "resource_change_stale" => T("Issue.Stale.Title"),
+        "resource_change_dependency_missing" or "resource_change_dependency_order_invalid" => T("Issue.Dependency.Title"),
+        _ => T("Issue.Generic.Title")
+    };
+    private string IssueDescription(string code, ResourceChange? change) => code switch
+    {
+        "resource_change_model_profile_invalid" => T("Issue.ModelProfile.Description", change is null ? T("UnknownProfile") : ResourcePlanReviewProjection.ModelProfile(change) ?? T("UnknownProfile")),
+        "resource_change_canonical_invalid" => T("Issue.Canonical.Description"),
+        "resource_change_create_conflict" => T("Issue.Conflict.Description"),
+        "resource_change_current_missing" or "resource_change_stale" => T("Issue.Stale.Description"),
+        "resource_change_dependency_missing" or "resource_change_dependency_order_invalid" => T("Issue.Dependency.Description"),
+        _ => T("Issue.Generic.Description")
+    };
 
     private FlowTopologyGraph GraphTopology(ResourcePlanGraph graph)
     {
@@ -343,7 +422,7 @@ else
         if (plan is null || selected is null || !CanReview || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value) || busy) return;
         busy = true; error = null; message = null;
         var version = contextVersion;
-        try { _ = await Client.ValidateChangeSetAsync(selected.Value.Id.Value, lifetime.Token); if (version == contextVersion) { await LoadValidationsAsync(); if (version == contextVersion) { activeView = "Validation"; message = T("Validated"); } } }
+        try { var result = await Client.ValidateChangeSetAsync(selected.Value.Id.Value, lifetime.Token); if (version == contextVersion) { await LoadValidationsAsync(); if (version == contextVersion) { activeView = "Validation"; message = result.Readiness == ResourceChangeSetReadiness.Ready ? T("Validated") : null; } } }
         catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
         finally { EndBusy(); }
     }

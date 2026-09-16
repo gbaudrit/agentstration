@@ -32,9 +32,9 @@
   <data name="NotFoundDescription" xml:space="preserve"><value>Ce plan est indisponible dans l’espace courant.</value></data>
   <data name="PlanIdentity" xml:space="preserve"><value>Identité du plan</value></data>
   <data name="Workspace" xml:space="preserve"><value>Espace</value></data>
-  <data name="StaleChangeSet" xml:space="preserve"><value>ChangeSet d’une ancienne révision</value></data>
+  <data name="StaleChangeSet" xml:space="preserve"><value>Jeu de changements d’une ancienne révision</value></data>
   <data name="Rematerialize" xml:space="preserve"><value>Rematérialiser</value></data>
-  <data name="CreateChangeSet" xml:space="preserve"><value>Créer un ChangeSet</value></data>
+  <data name="CreateChangeSet" xml:space="preserve"><value>Créer un jeu de changements</value></data>
   <data name="Revalidate" xml:space="preserve"><value>Revalider</value></data>
   <data name="Materialization" xml:space="preserve"><value>Matérialisation actuelle</value></data>
   <data name="Proposals" xml:space="preserve"><value>{0} propositions</value></data>
@@ -47,8 +47,8 @@
   <data name="Experiences" xml:space="preserve"><value>Expériences</value></data>
   <data name="NothingPlanned" xml:space="preserve"><value>Aucun élément prévu pour ce plan.</value></data>
   <data name="FunctionalBoundary" xml:space="preserve"><value>L’intention fonctionnelle est distincte des ressources concrètes proposées par Agentstration.</value></data>
-  <data name="NoChangeSets" xml:space="preserve"><value>Aucun ChangeSet pour cette révision. Rematérialisez le plan pour examiner une proposition.</value></data>
-  <data name="ChangeSet" xml:space="preserve"><value>ChangeSet</value></data>
+  <data name="NoChangeSets" xml:space="preserve"><value>Aucun jeu de changements pour cette révision. Rematérialisez le plan pour examiner une proposition.</value></data>
+  <data name="ChangeSet" xml:space="preserve"><value>Jeu de changements</value></data>
   <data name="ChangeSetOption" xml:space="preserve"><value>Révision {0} · {1}</value></data>
   <data name="ChangeSetRevision" xml:space="preserve"><value>Révision du plan {0}</value></data>
   <data name="DependsOn" xml:space="preserve"><value>Dépend de :</value></data>
@@ -67,6 +67,79 @@
   <data name="ValidatedAt" xml:space="preserve"><value>Validé le :</value></data>
   <data name="StaleValidation" xml:space="preserve"><value>Validation obsolète</value></data>
   <data name="NoIssues" xml:space="preserve"><value>Aucun problème de validation.</value></data>
+  <data name="ConcreteProposal" xml:space="preserve"><value>Proposition concrète</value></data>
+  <data name="ChangesIntro" xml:space="preserve"><value>Examinez les ressources qu’Agentstration propose de créer ou de modifier. Dépliez les détails d’une carte pour comparer ses champs.</value></data>
+  <data name="CreatedAt" xml:space="preserve"><value>Créé le {0}</value></data>
+  <data name="ChangeSummary" xml:space="preserve"><value>Résumé des changements</value></data>
+  <data name="ShowFields" xml:space="preserve"><value>Comparer {0} champs</value></data>
+  <data name="ShowField" xml:space="preserve"><value>Comparer 1 champ</value></data>
+  <data name="Yes" xml:space="preserve"><value>Oui</value></data>
+  <data name="No" xml:space="preserve"><value>Non</value></data>
+  <data name="OperationPlural.Create" xml:space="preserve"><value>Créations</value></data>
+  <data name="OperationPlural.Update" xml:space="preserve"><value>Mises à jour</value></data>
+  <data name="OperationPlural.Delete" xml:space="preserve"><value>Suppressions</value></data>
+  <data name="OperationPlural.NoOp" xml:space="preserve"><value>Sans changement</value></data>
+  <data name="TechnicalDetails" xml:space="preserve"><value>Détails techniques</value></data>
+  <data name="Kind.Agent" xml:space="preserve"><value>Agent</value></data>
+  <data name="Kind.Flow" xml:space="preserve"><value>Flow</value></data>
+  <data name="Kind.Entry" xml:space="preserve"><value>Entrée</value></data>
+  <data name="Field.Other" xml:space="preserve"><value>Autre propriété</value></data>
+  <data name="Field.FlowSpec" xml:space="preserve"><value>Configuration du Flow</value></data>
+  <data name="Field.Presentation" xml:space="preserve"><value>Présentation</value></data>
+  <data name="Field.Binding" xml:space="preserve"><value>Cible de l’entrée</value></data>
+  <data name="Field.definition.displayName" xml:space="preserve"><value>Nom affiché</value></data>
+  <data name="Field.definition.description" xml:space="preserve"><value>Description</value></data>
+  <data name="Field.definition.instructions" xml:space="preserve"><value>Instructions</value></data>
+  <data name="Field.definition.behaviors" xml:space="preserve"><value>Capacités</value></data>
+  <data name="Field.definition.handler" xml:space="preserve"><value>Type d’agent</value></data>
+  <data name="Field.definition.modelProfile.name" xml:space="preserve"><value>Profil de modèle</value></data>
+  <data name="Field.definition.modelProfile.namespace" xml:space="preserve"><value>Espace du profil de modèle</value></data>
+  <data name="Field.definition.runtimeProfile.name" xml:space="preserve"><value>Profil d’exécution</value></data>
+  <data name="Field.definition.runtimeProfile.namespace" xml:space="preserve"><value>Espace du profil d’exécution</value></data>
+  <data name="Field.definition.tools" xml:space="preserve"><value>Outils</value></data>
+  <data name="Field.definition.version" xml:space="preserve"><value>Version</value></data>
+  <data name="Field.definition.enabled" xml:space="preserve"><value>Activé</value></data>
+  <data name="Field.definition.spec.flowKind" xml:space="preserve"><value>Type de Flow</value></data>
+  <data name="Field.definition.spec.pattern.strategy" xml:space="preserve"><value>Mode de collaboration</value></data>
+  <data name="Field.definition.presentation.kind" xml:space="preserve"><value>Type d’expérience</value></data>
+  <data name="Field.definition.binding.resourceId" xml:space="preserve"><value>Flow associé</value></data>
+  <data name="Field.definition.behavior.allowConversation" xml:space="preserve"><value>Conversation autorisée</value></data>
+  <data name="Field.definition.publish" xml:space="preserve"><value>Publication</value></data>
+  <data name="Field.definition.activate" xml:space="preserve"><value>Activation</value></data>
+  <data name="Value.definition.spec.flowKind.direct" xml:space="preserve"><value>Direct</value></data>
+  <data name="Value.definition.spec.flowKind.routing" xml:space="preserve"><value>Routage</value></data>
+  <data name="Value.definition.spec.flowKind.workflow" xml:space="preserve"><value>Workflow</value></data>
+  <data name="Value.definition.spec.flowKind.orchestration" xml:space="preserve"><value>Orchestration</value></data>
+  <data name="Value.definition.spec.flowKind.composite" xml:space="preserve"><value>Composite</value></data>
+  <data name="Value.definition.spec.pattern.strategy.sequential" xml:space="preserve"><value>Séquentiel</value></data>
+  <data name="Value.definition.spec.pattern.strategy.concurrent" xml:space="preserve"><value>Parallèle</value></data>
+  <data name="Value.definition.spec.pattern.strategy.handoff" xml:space="preserve"><value>Passation</value></data>
+  <data name="Value.definition.spec.pattern.strategy.groupChat" xml:space="preserve"><value>Discussion de groupe</value></data>
+  <data name="Value.definition.spec.pattern.strategy.magentic" xml:space="preserve"><value>Adaptatif</value></data>
+  <data name="ReviewResult" xml:space="preserve"><value>Résultat de la revue</value></data>
+  <data name="ValidationIntro" xml:space="preserve"><value>Vérifiez les points à corriger avant l’application des ressources.</value></data>
+  <data name="ValidationState" xml:space="preserve"><value>État de la proposition</value></data>
+  <data name="ValidationReadyTitle" xml:space="preserve"><value>Prêt pour la suite</value></data>
+  <data name="ValidationReadyDescription" xml:space="preserve"><value>Aucun blocage détecté. Examinez les éventuels avertissements ci-dessous.</value></data>
+  <data name="ValidationIssueSingular" xml:space="preserve"><value>1 point à corriger</value></data>
+  <data name="ValidationIssuePlural" xml:space="preserve"><value>{0} points à corriger</value></data>
+  <data name="ValidationBlockedDescription" xml:space="preserve"><value>Corrigez les points ci-dessous, puis relancez la validation.</value></data>
+  <data name="Severity.Error" xml:space="preserve"><value>Blocage</value></data>
+  <data name="Severity.Warning" xml:space="preserve"><value>Avertissement</value></data>
+  <data name="UnknownProfile" xml:space="preserve"><value>inconnu</value></data>
+  <data name="Issue.ModelProfile.Title" xml:space="preserve"><value>Profil de modèle à configurer</value></data>
+  <data name="Issue.ModelProfile.Description" xml:space="preserve"><value>Le profil de modèle « {0} » référencé par cette ressource est absent ou invalide.</value></data>
+  <data name="Issue.ModelProfile.Action" xml:space="preserve"><value>Créez ou corrigez ce profil, puis relancez la validation.</value></data>
+  <data name="Issue.Canonical.Title" xml:space="preserve"><value>Ressource proposée invalide</value></data>
+  <data name="Issue.Canonical.Description" xml:space="preserve"><value>Cette ressource ne respecte pas les règles de validation. Consultez les détails techniques pour connaître la cause précise.</value></data>
+  <data name="Issue.Conflict.Title" xml:space="preserve"><value>Ressource déjà existante</value></data>
+  <data name="Issue.Conflict.Description" xml:space="preserve"><value>La ressource a changé depuis la matérialisation. Rematérialisez le plan avant de poursuivre.</value></data>
+  <data name="Issue.Stale.Title" xml:space="preserve"><value>Ressource actuelle modifiée</value></data>
+  <data name="Issue.Stale.Description" xml:space="preserve"><value>La comparaison enregistrée n’est plus actuelle. Rematérialisez le plan avant de poursuivre.</value></data>
+  <data name="Issue.Dependency.Title" xml:space="preserve"><value>Dépendance à corriger</value></data>
+  <data name="Issue.Dependency.Description" xml:space="preserve"><value>Une ressource requise manque ou est dans le mauvais ordre. Vérifiez les dépendances, puis rematérialisez.</value></data>
+  <data name="Issue.Generic.Title" xml:space="preserve"><value>Revue nécessaire</value></data>
+  <data name="Issue.Generic.Description" xml:space="preserve"><value>Cette proposition nécessite une intervention. Consultez les détails techniques pour connaître la cause précise.</value></data>
   <data name="Activity" xml:space="preserve"><value>Activité et provenance</value></data>
   <data name="Principal" xml:space="preserve"><value>Principal</value></data>
   <data name="Work" xml:space="preserve"><value>Work d’origine</value></data>
@@ -74,8 +147,8 @@
   <data name="FlowRun" xml:space="preserve"><value>Flow Run</value></data>
   <data name="Correlation" xml:space="preserve"><value>Corrélation</value></data>
   <data name="Materialized" xml:space="preserve"><value>{0} ressources proposées matérialisées.</value></data>
-  <data name="ChangeSetCreated" xml:space="preserve"><value>ChangeSet prêt pour la revue.</value></data>
-  <data name="Validated" xml:space="preserve"><value>Validation du ChangeSet enregistrée.</value></data>
+  <data name="ChangeSetCreated" xml:space="preserve"><value>Jeu de changements prêt pour la revue.</value></data>
+  <data name="Validated" xml:space="preserve"><value>Validation de la proposition enregistrée.</value></data>
   <data name="Status.Draft" xml:space="preserve"><value>Brouillon</value></data>
   <data name="Status.Ready" xml:space="preserve"><value>Prêt</value></data>
   <data name="Status.Materialized" xml:space="preserve"><value>Matérialisé</value></data>

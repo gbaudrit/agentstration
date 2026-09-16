@@ -51,6 +51,28 @@ public sealed class ResourcePlanReviewTests
     }
 
     [TestMethod]
+    public void ReviewProjectionKeepsReadableDefinitionChangesAndLocatesAffectedResource()
+    {
+        var change = Change(0, "triage", [], "Triage");
+        var set = ChangeSet(Plan.Revision, [change]);
+        var issue = new ResourceChangeSetValidationIssue("resource_change_model_profile_invalid", "changes[0].proposed.definition.modelProfile", "Missing profile");
+
+        Assert.AreEqual("Triage", ResourcePlanReviewProjection.DisplayName(change));
+        CollectionAssert.AreEqual(new[] { "definition.displayName" }, ResourcePlanReviewProjection.ReviewFields(change).Select(value => value.Path).ToArray());
+        Assert.AreEqual(change, ResourcePlanReviewProjection.ChangeForIssue(set.Value, issue));
+        Assert.AreEqual("Rédaction, Analyse", ResourcePlanReviewProjection.FormatValue("[\"Rédaction\",\"Analyse\"]"));
+
+        var flow = change with { Proposed = change.Proposed with
+        {
+            Kind = "Flow",
+            Definition = JsonSerializer.SerializeToElement(new { displayName = "Routing", version = "1.0.0", enabled = true,
+                spec = new { flowKind = "orchestration", pattern = new { strategy = "sequential" } }, publish = true, activate = true })
+        } };
+        CollectionAssert.AreEqual(new[] { "definition.spec.flowKind", "definition.spec.pattern.strategy", "definition.version" },
+            ResourcePlanReviewProjection.HighlightFields(flow).Select(value => value.Path).ToArray());
+    }
+
+    [TestMethod]
     public void DetailRendersFiveViewsAndKeepsStaleReviewReadOnly()
     {
         using var culture = new TestCultureScope("en-US");
@@ -71,6 +93,8 @@ public sealed class ResourcePlanReviewTests
         });
         rendered.Find("#tab-Changes").Click();
         Assert.Contains("definition.displayName", rendered.Markup, StringComparison.Ordinal);
+        Assert.AreEqual(1, rendered.FindAll(".resource-plan-change").Count);
+        Assert.Contains("Compare 1 field", rendered.Find(".resource-plan-change-diff summary").TextContent, StringComparison.Ordinal);
         rendered.Find("#tab-Graph").Click();
         Assert.AreEqual(1, rendered.FindAll(".topology-node").Count);
         Assert.AreEqual(0, rendered.FindAll(".topology-legend").Count);
@@ -101,7 +125,7 @@ public sealed class ResourcePlanReviewTests
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual(1, client.ValidationCalls);
-            Assert.Contains("Validation du ChangeSet enregistrée", rendered.Markup, StringComparison.Ordinal);
+            Assert.Contains("Validation de la proposition enregistrée", rendered.Markup, StringComparison.Ordinal);
         });
     }
 
@@ -109,7 +133,8 @@ public sealed class ResourcePlanReviewTests
     public void DetailShowsBlockedModelProfileIssueAfterRevalidation()
     {
         using var culture = new TestCultureScope("fr-FR");
-        var set = ChangeSet(Plan.Revision, [Change(0, "triage", [], "Triage")]);
+        var change = Change(0, "triage", [], "Triage");
+        var set = ChangeSet(Plan.Revision, [change with { Proposed = change.Proposed with { Definition = JsonSerializer.SerializeToElement(new { displayName = "Triage", modelProfile = new { name = "default" } }) } }]);
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourcePlansApiClient>(new FakeClient(set, blockOnValidate: true));
@@ -122,9 +147,11 @@ public sealed class ResourcePlanReviewTests
 
         rendered.WaitForAssertion(() =>
         {
-            Assert.Contains("resource_change_model_profile_invalid", rendered.Markup, StringComparison.Ordinal);
-            Assert.Contains("changes[0].proposed.definition.modelProfile", rendered.Markup, StringComparison.Ordinal);
-            Assert.Contains("ModelProfile 'default/default'", rendered.Markup, StringComparison.Ordinal);
+            Assert.AreEqual("Profil de modèle à configurer", rendered.Find(".resource-plan-issue-content h3").TextContent);
+            Assert.Contains("profil de modèle « default/default »", rendered.Find(".resource-plan-issue-content").TextContent, StringComparison.Ordinal);
+            Assert.Contains("Créez ou corrigez ce profil", rendered.Find(".resource-plan-issue-action").TextContent, StringComparison.Ordinal);
+            Assert.IsFalse(rendered.Find(".resource-plan-issue-technical").HasAttribute("open"));
+            Assert.DoesNotContain("Validation de la proposition enregistrée", rendered.Markup, StringComparison.Ordinal);
         });
     }
 
