@@ -6,6 +6,7 @@ body:
     attributes:
       value: |
         Use this form for engineering work whose primary motivation is technical. Use the feature form when the primary outcome is a new user-facing or product capability.
+        For a deferred UX test scenario, add the test-scenario-task label, link the parent feature request under Dependencies, and wait for recorded maintainer UX validation and merge before starting the scenario.
   - type: dropdown
     id: category
     attributes:
