@@ -80,6 +80,12 @@ The resource-administration inventory renders every management list and creation
 npm run capture -- --plan examples/inspect-resource-administration.capture-plan.json --output .work/resource-administration
 ```
 
+The local Ollama extension backs a fully offline create/update/delete journey for a model provider, model profile, and runtime profile:
+
+```powershell
+npm run capture -- --plan examples/exercise-model-administration.capture-plan.json --output .work/model-administration
+```
+
 The solution-discovery video Flow and Entry are captured with:
 
 ```powershell

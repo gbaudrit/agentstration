@@ -30,7 +30,7 @@ else
     @if (selected is null) { <EmptyState Title="@T("NoDashboard")" Message="@T("NoDashboardMessage")" /> }
     else
     {
-        <div class="workspace-editor-grid" data-testid="dashboard-editor">
+        <div class="workspace-editor-grid" data-testid="dashboard-editor" data-interactive="@(interactive ? "true" : "false")">
             <section class="panel form-section workspace-settings" aria-labelledby="dashboard-settings-title">
                 <div class="panel-header">
                     <div><p class="eyebrow">@T("Details")</p><h2 id="dashboard-settings-title">@T("DashboardSettings")</h2><p>@T("DashboardSettingsHelp")</p></div>
@@ -124,6 +124,9 @@ else
     [SupplyParameterFromQuery(Name = "entry")] public string? RequestedEntryName { get; set; }
     [SupplyParameterFromQuery(Name = "entryNamespace")] public string? RequestedEntryNamespace { get; set; }
     private bool loading = true, busy, error, creating, isDefault;
+    private bool interactive;
+
+    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
     private string workspaceId = "", dashboardName = "", name = "", displayName = "", description = "", icon = DashboardIconDefaults.Grid, message = "";
     private IReadOnlyList<WorkplaceWorkspaceResponse> workspaces = [];
     private IReadOnlyList<WorkplaceDashboardDraftResponse> dashboards = [];

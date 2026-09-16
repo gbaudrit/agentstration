@@ -1,4 +1,4 @@
-import { type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 
 type OperationsMarker = keyof Pick<typeof TestIds.operations, 'accessDenied' | 'management' | 'cleanup'>;
@@ -13,10 +13,13 @@ export class OperationsPage {
   }
 
   public async validateCleanupConfirmation(): Promise<boolean> {
+    await this.page.locator(`[data-testid="${TestIds.operations.cleanup}"][data-interactive="true"]`).waitFor({ state: 'visible' });
     const candidate = this.page.locator('[data-testid="operations-cleanup"] .cleanup-row input[type="checkbox"]').first();
     if (!await candidate.isVisible()) return false;
     await candidate.check();
-    await this.page.getByTestId(TestIds.operations.cleanupOpenConfirmation).click();
+    const openConfirmation = this.page.getByTestId(TestIds.operations.cleanupOpenConfirmation);
+    await expect(openConfirmation).toBeEnabled();
+    await openConfirmation.click();
     const confirm = this.page.getByTestId(TestIds.operations.cleanupConfirm);
     await confirm.waitFor({ state: 'visible' });
     if (!await confirm.isDisabled()) throw new Error('Cleanup confirmation must require explicit acknowledgement.');

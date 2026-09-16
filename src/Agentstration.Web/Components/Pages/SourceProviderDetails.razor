@@ -12,7 +12,7 @@
     <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">@T("Delete")</button> }<a class="button-secondary" href="/sourceproviders">@T("Back")</a></Actions>
 </PageHeader>
 
-<div data-testid="distribution-source-provider-details">
+<div data-testid="distribution-source-provider-details" data-interactive="@(interactive ? "true" : "false")">
 @if (model is null)
 {
     <LoadingState Message="@T("Loading")" />
@@ -78,6 +78,8 @@ else
     private string? etag;
     private bool saving;
     private bool confirmDelete;
+    private bool interactive;
+    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
     private ResourceScopeRef? selectedScope;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);

@@ -1,4 +1,4 @@
-<form class="prompt-entry" @onsubmit="SubmitAsync" @onsubmit:preventDefault="true" aria-busy="@(Busy || submitting)">
+<form class="prompt-entry" @onsubmit="SubmitAsync" @onsubmit:preventDefault="true" aria-busy="@(Busy || submitting)" data-testid="workplace-prompt-form" data-interactive="@(interactive ? "true" : "false")">
     <div class="entry-heading">
         <div>
             <h2>@Definition.DisplayName</h2>
@@ -35,6 +35,9 @@
     private string request = string.Empty;
     private string? error;
     private bool submitting;
+    private bool interactive;
+
+    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
 
     private async Task HandleKeyDown(KeyboardEventArgs args)
     {

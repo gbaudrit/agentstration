@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit, selectFirstAvailable } from './controls.js';
 
@@ -95,7 +95,10 @@ export class EntryEditorPage {
   private async bindTarget(kind: 'Agent' | 'Flow', resourceName: string, namespace: string): Promise<void> {
     await this.page.getByTestId(TestIds.entryEditor.targetKind).selectOption(kind);
     const target = this.page.getByTestId(TestIds.entryEditor.targetResource);
-    await target.locator('option').nth(1).waitFor({ state: 'attached' });
+    await expect.poll(async () => {
+      const values = await target.locator('option').evaluateAll(elements => elements.map(element => (element as HTMLOptionElement).value));
+      return values.includes(`${namespace}:${resourceName}`) || values.includes(resourceName);
+    }).toBe(true);
     await selectFirstAvailable(target, [`${namespace}:${resourceName}`, resourceName], `Entry target ${kind}`);
   }
 
