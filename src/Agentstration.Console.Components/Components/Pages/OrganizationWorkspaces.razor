@@ -1,4 +1,5 @@
 @page "/settings/organization/workspaces"
+@implements IDisposable
 @inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
 @inject ConsoleContextState ContextState
 @inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
@@ -43,7 +44,13 @@ else
     private bool CanCreate => ContextState.HasPermission(AuthorizationPermissions.WorkspacesWrite);
     private bool CanSubmit => !busy && displayName.Trim().Length >= 2 && technicalName.Trim().Length >= 2;
 
-    protected override async Task OnInitializedAsync() => await ReloadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        ContextState.Changed += OnContextChanged;
+        await ReloadAsync();
+    }
+    private void OnContextChanged() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => ContextState.Changed -= OnContextChanged;
     protected override void OnAfterRender(bool firstRender)
     {
         if (!firstRender) return;

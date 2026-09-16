@@ -77,7 +77,6 @@ export async function startProductHosts(): Promise<ProductHosts> {
     Data__FlowPath: path.join(dataDirectory, 'flow-plane.db'),
     Data__RuntimePath: path.join(dataDirectory, 'runtime-plane.db'),
     AI__Provider: 'Deterministic',
-    Agentstration__Authentication__Mode: 'Development',
     Agentstration__Bootstrap__Path: bootstrapPath,
     Agentstration__Bootstrap__InitialBootstrapEnabled: 'true',
     Agentstration__Bootstrap__InitialProfiles__0: 'development',
