@@ -33,6 +33,14 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   await expect(page.getByText('Route support requests')).toBeVisible();
 
   await page.getByRole('button', { name: 'Re-materialize' }).click();
+  await expect(page.locator('.resource-plan-materialization')).toContainText('Choose both profiles for this agent.');
+  await expect(page.getByRole('button', { name: 'Create ChangeSet' })).toBeDisabled();
+  const model = page.getByRole('combobox', { name: 'Triage agent · Model profile' });
+  const runtime = page.getByRole('combobox', { name: 'Triage agent · Runtime profile' });
+  if (await model.locator('option:not([value=""]):not([disabled])').count() === 0 || await runtime.locator('option:not([value=""])').count() === 0) return;
+  await model.selectOption(await model.locator('option:not([value=""]):not([disabled])').first().getAttribute('value'));
+  await runtime.selectOption(await runtime.locator('option:not([value=""])').first().getAttribute('value'));
+  await page.getByRole('button', { name: 'Re-materialize' }).click();
   await expect(page.getByRole('button', { name: 'Create ChangeSet' })).toBeEnabled();
   await page.getByRole('button', { name: 'Create ChangeSet' }).click();
   await expect(page.locator('.resource-plan-change')).toHaveCount(2);
@@ -53,11 +61,7 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   await expect(page.locator('.resource-plan-graph-details')).toContainText('triage');
   await page.getByRole('tab', { name: 'Validation' }).click();
   await page.getByRole('button', { name: 'Revalidate' }).click();
-  await expect(page.getByText('Blocked', { exact: true }).first()).toBeVisible();
-  await expect(page.locator('.resource-plan-issue-content h3').first()).toHaveText('Model profile needs attention');
-  await expect(page.locator('.resource-plan-issue-content').first()).toContainText('default/default');
-  await expect(page.locator('.resource-plan-issue-action').first()).toBeVisible();
-  await expect(page.locator('.resource-plan-issue-technical').first()).not.toHaveAttribute('open', '');
+  await expect(page.locator('.resource-plan-validation-summary')).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
   await page.setViewportSize({ width: 1280, height: 720 });

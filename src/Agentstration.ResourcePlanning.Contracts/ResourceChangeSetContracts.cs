@@ -30,7 +30,8 @@ public sealed record ResourceChangeSet(
     IReadOnlyList<ResourceChange> Changes,
     IReadOnlyList<ResourcePlanMaterializationDiagnostic> Diagnostics,
     Guid CreatedByPrincipalId,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<ResourcePlanResolvedBinding>? ResolvedBindings = null);
 
 public sealed record ResourceChangeSetSnapshot(ResourceChangeSet Value, string ETag);
 public sealed record ResourceChangeSetPage(IReadOnlyList<ResourceChangeSetSnapshot> Items, bool HasMore);

@@ -6,6 +6,12 @@ namespace Agentstration.ResourcePlanning.Contracts;
 public enum ResourcePlanMaterializationSeverity { Information, Warning, Error }
 public enum ResourcePlanProposedOperation { Create, Update, NoOp }
 
+public sealed record ResourcePlanAgentBinding(string LogicalId, ResourceReference ModelProfile, ResourceReference RuntimeProfile);
+
+public sealed record ResourcePlanMaterializationRequest(IReadOnlyList<ResourcePlanAgentBinding> Bindings, string? ExpectedDigest = null);
+
+public sealed record ResourcePlanResolvedBinding(string LogicalId, string Field, ResourceReference Reference, Guid? Uid, long Revision, string? ETag, string Digest);
+
 public sealed record PlannedResourceDocument(
     string ApiVersion,
     string Kind,
@@ -42,7 +48,8 @@ public sealed record ResourcePlanMaterialization(
     ResourcePlanScope Scope,
     IReadOnlyList<MaterializedResourceProposal> Proposals,
     IReadOnlyList<ResourcePlanMaterializationDiagnostic> Diagnostics,
-    string Digest)
+    string Digest,
+    IReadOnlyList<ResourcePlanResolvedBinding>? ResolvedBindings = null)
 {
     public bool CanCreateChangeSet => Diagnostics.All(value => value.Severity != ResourcePlanMaterializationSeverity.Error);
 }

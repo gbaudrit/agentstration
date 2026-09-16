@@ -11,9 +11,14 @@ public sealed class ResourceChangeSetService(
     TimeProvider timeProvider)
 {
     public async Task<ResourceChangeSetSnapshot> CreateAsync(ResourcePlanScope scope, ResourcePlanId planId, Guid actorPrincipalId, CancellationToken cancellationToken)
+        => await CreateAsync(scope, planId, actorPrincipalId, new([]), cancellationToken);
+
+    public async Task<ResourceChangeSetSnapshot> CreateAsync(ResourcePlanScope scope, ResourcePlanId planId, Guid actorPrincipalId, ResourcePlanMaterializationRequest request, CancellationToken cancellationToken)
     {
         if (actorPrincipalId == Guid.Empty) throw new ArgumentException("An actor Principal is required.", nameof(actorPrincipalId));
-        var materialization = await materializer.MaterializeAsync(scope, planId, cancellationToken);
+        var materialization = await materializer.MaterializeAsync(scope, planId, request, cancellationToken);
+        if (request.ExpectedDigest is { } expectedDigest && !string.Equals(expectedDigest, materialization.Digest, StringComparison.Ordinal))
+            throw new ResourcePlanMaterializationException([new("planning_materialization_stale", "expectedDigest", "The materialization changed. Review a fresh preview before creating the ChangeSet.")]);
         if (!materialization.CanCreateChangeSet)
             throw new ResourcePlanMaterializationException(materialization.Diagnostics);
         var existing = await repository.FindAsync(scope, planId, materialization.PlanRevision, materialization.Digest, cancellationToken);
@@ -53,7 +58,8 @@ public sealed class ResourceChangeSetService(
             changes,
             materialization.Diagnostics,
             actorPrincipalId,
-            timeProvider.GetUtcNow());
+            timeProvider.GetUtcNow(),
+            materialization.ResolvedBindings);
         try { return await repository.CreateAsync(changeSet, cancellationToken); }
         catch (ResourcePlanConcurrencyException)
         {

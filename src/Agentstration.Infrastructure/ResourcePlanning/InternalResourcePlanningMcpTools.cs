@@ -43,6 +43,7 @@ public abstract class ResourcePlanningMcpTool(
         catch (ResourcePlanConcurrencyException exception) { throw Failure("resource_plan_concurrency", exception); }
         catch (ResourcePlanLifecycleException exception) { throw Failure(exception.Code, exception); }
         catch (ResourcePlanValidationException exception) { throw Failure("resource_plan_content_invalid", exception); }
+        catch (ResourcePlanMaterializationException exception) { throw Failure("resource_plan_materialization_failed", exception); }
         catch (ArgumentException exception) { throw Failure("resource_planning_arguments_invalid", exception); }
         catch (JsonException exception) { throw Failure("resource_planning_arguments_invalid", exception); }
     }
@@ -86,8 +87,8 @@ public abstract class ResourcePlanningMcpTool(
 
     private async Task<JsonElement?> MaterializeAsync(ResourcePlanScope scope, InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
-        EnsureOnly(invocation.Arguments, "planId");
-        return JsonSerializer.SerializeToElement(await materializer.MaterializeAsync(scope, new(RequiredGuid(invocation.Arguments, "planId")), cancellationToken), JsonOptions);
+        EnsureOnly(invocation.Arguments, "planId", "bindings");
+        return JsonSerializer.SerializeToElement(await materializer.MaterializeAsync(scope, new(RequiredGuid(invocation.Arguments, "planId")), BindingRequest(invocation.Arguments), cancellationToken), JsonOptions);
     }
 
     private async Task<JsonElement?> SubmitAsync(ResourcePlanScope scope, InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
@@ -100,8 +101,8 @@ public abstract class ResourcePlanningMcpTool(
 
     private async Task<JsonElement?> CreateChangeSetAsync(ResourcePlanScope scope, InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
-        EnsureOnly(invocation.Arguments, "planId");
-        var stored = await changeSets.CreateAsync(scope, new(RequiredGuid(invocation.Arguments, "planId")), invocation.PrincipalId, cancellationToken);
+        EnsureOnly(invocation.Arguments, "planId", "bindings", "expectedDigest");
+        var stored = await changeSets.CreateAsync(scope, new(RequiredGuid(invocation.Arguments, "planId")), invocation.PrincipalId, BindingRequest(invocation.Arguments), cancellationToken);
         return JsonSerializer.SerializeToElement(new { changeSet = stored.Value, etag = stored.ETag }, JsonOptions);
     }
 
@@ -112,6 +113,9 @@ public abstract class ResourcePlanningMcpTool(
     }
 
     private static JsonElement Snapshot(ResourcePlanSnapshot stored) => JsonSerializer.SerializeToElement(new { plan = stored.Value, etag = stored.ETag }, JsonOptions);
+    private static ResourcePlanMaterializationRequest BindingRequest(JsonElement arguments) => new(
+        arguments.TryGetProperty("bindings", out var bindings) ? bindings.Deserialize<ResourcePlanAgentBinding[]>(JsonOptions) ?? throw new JsonException("Bindings must be an array.") : [],
+        OptionalString(arguments, "expectedDigest"));
     private static ToolDefinitionInvocationException Failure(string code, Exception exception) => new(code, exception.Message, exception);
     private static JsonElement Required(JsonElement arguments, string name) =>
         arguments.TryGetProperty(name, out var value) ? value : throw new ToolDefinitionInvocationException("resource_planning_argument_required", $"Argument '{name}' is required.");
@@ -136,6 +140,7 @@ public abstract class ResourcePlanningMcpTool(
         JsonSerializer.SerializeToElement(new { type = "object", additionalProperties = true }));
 
     protected static object StringProperty(string? description = null) => new { type = "string", description };
+    protected static object BindingsProperty() => new { type = "array", description = "Explicit Model Profile and Runtime Profile references for each planned role.", items = new { type = "object", properties = new { logicalId = StringProperty(), modelProfile = new { type = "object", properties = new { name = StringProperty(), scopeRef = StringProperty(), @namespace = StringProperty() }, required = new[] { "name" } }, runtimeProfile = new { type = "object", properties = new { name = StringProperty(), scopeRef = StringProperty(), @namespace = StringProperty() }, required = new[] { "name" } } }, required = new[] { "logicalId", "modelProfile", "runtimeProfile" }, additionalProperties = false } };
     protected static object FunctionalPlanProperty() => new
     {
         type = "object",
@@ -191,14 +196,14 @@ public sealed class ResourcePlanSubmitMcpTool(ResourcePlanService plans, Resourc
 public sealed class ResourcePlanMaterializeMcpTool(ResourcePlanService plans, ResourcePlanMaterializationService materializer, ResourceChangeSetService changeSets, ResourceChangeSetValidationService validations)
     : ResourcePlanningMcpTool(plans, materializer, changeSets, validations)
 {
-    public override InternalMcpToolDefinition Definition { get; } = Define(AgentstrationInternalTools.ResourcePlanMaterialize, "Materialize Resource Plan", "Computes deterministic proposed changes without applying them.", new { planId = StringProperty() }, ["planId"]);
+    public override InternalMcpToolDefinition Definition { get; } = Define(AgentstrationInternalTools.ResourcePlanMaterialize, "Materialize Resource Plan", "Computes deterministic proposed changes with explicit Agent profile bindings without applying them.", new { planId = StringProperty(), bindings = BindingsProperty() }, ["planId"]);
     protected override ResourcePlanningToolOperation Operation => ResourcePlanningToolOperation.Materialize;
 }
 
 public sealed class ResourceChangeSetCreateMcpTool(ResourcePlanService plans, ResourcePlanMaterializationService materializer, ResourceChangeSetService changeSets, ResourceChangeSetValidationService validations)
     : ResourcePlanningMcpTool(plans, materializer, changeSets, validations)
 {
-    public override InternalMcpToolDefinition Definition { get; } = Define(AgentstrationInternalTools.ResourceChangeSetCreate, "Create Resource ChangeSet", "Creates an idempotent review boundary from deterministic materialization without applying it.", new { planId = StringProperty() }, ["planId"]);
+    public override InternalMcpToolDefinition Definition { get; } = Define(AgentstrationInternalTools.ResourceChangeSetCreate, "Create Resource ChangeSet", "Creates an idempotent review boundary with explicit Agent profile bindings without applying it.", new { planId = StringProperty(), bindings = BindingsProperty(), expectedDigest = StringProperty("Digest returned by the reviewed materialization.") }, ["planId"]);
     protected override ResourcePlanningToolOperation Operation => ResourcePlanningToolOperation.CreateChangeSet;
 }
 

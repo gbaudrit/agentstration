@@ -9,9 +9,9 @@ public interface IResourcePlansApiClient
     Task<ResourcePlanPage> ListPlansAsync(ResourcePlanStatus? status, int skip, int take, CancellationToken cancellationToken);
     Task<ResourcePlanSnapshot?> GetPlanAsync(Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(Guid id, CancellationToken cancellationToken);
-    Task<ResourcePlanMaterialization> MaterializeAsync(Guid id, CancellationToken cancellationToken);
+    Task<ResourcePlanMaterialization> MaterializeAsync(Guid id, ResourcePlanMaterializationRequest request, CancellationToken cancellationToken);
     Task<ResourceChangeSetPage> ListChangeSetsAsync(Guid planId, int skip, int take, CancellationToken cancellationToken);
-    Task<ResourceChangeSetSnapshot> CreateChangeSetAsync(Guid planId, CancellationToken cancellationToken);
+    Task<ResourceChangeSetSnapshot> CreateChangeSetAsync(Guid planId, ResourcePlanMaterializationRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<ResourceChangeSetValidation>> ListValidationsAsync(Guid changeSetId, CancellationToken cancellationToken);
     Task<ResourceChangeSetValidation> ValidateChangeSetAsync(Guid changeSetId, CancellationToken cancellationToken);
 }
@@ -37,16 +37,16 @@ public sealed class ResourcePlansApiClient(HttpClient httpClient) : IResourcePla
     public Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(Guid id, CancellationToken cancellationToken) =>
         ReadListAsync<ResourcePlanActivity>($"{BasePath}/{id:D}/activities", cancellationToken);
 
-    public Task<ResourcePlanMaterialization> MaterializeAsync(Guid id, CancellationToken cancellationToken) =>
-        PostAsync<ResourcePlanMaterialization>($"{BasePath}/{id:D}/materializations", cancellationToken);
+    public Task<ResourcePlanMaterialization> MaterializeAsync(Guid id, ResourcePlanMaterializationRequest request, CancellationToken cancellationToken) =>
+        PostAsync<ResourcePlanMaterialization>($"{BasePath}/{id:D}/materializations", request, cancellationToken);
 
     public Task<ResourceChangeSetPage> ListChangeSetsAsync(Guid planId, int skip, int take, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<ResourceChangeSetPage>(httpClient,
             $"{BasePath}/change-sets?planId={planId:D}&skip={Math.Max(0, skip)}&take={Math.Clamp(take, 1, 200)}", cancellationToken);
 
-    public async Task<ResourceChangeSetSnapshot> CreateChangeSetAsync(Guid planId, CancellationToken cancellationToken)
+    public async Task<ResourceChangeSetSnapshot> CreateChangeSetAsync(Guid planId, ResourcePlanMaterializationRequest request, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsync($"{BasePath}/{planId:D}/change-sets", null, cancellationToken);
+        using var response = await httpClient.PostAsJsonAsync($"{BasePath}/{planId:D}/change-sets", request, cancellationToken);
         return await ReadSnapshotAsync<ResourceChangeSet, ResourceChangeSetSnapshot>(response, (value, etag) => new(value, etag), cancellationToken);
     }
 
@@ -60,8 +60,11 @@ public sealed class ResourcePlansApiClient(HttpClient httpClient) : IResourcePla
         await ApiResponse.ReadAsync<T[]>(httpClient, path, cancellationToken);
 
     private async Task<T> PostAsync<T>(string path, CancellationToken cancellationToken)
+        => await PostAsync<T>(path, null, cancellationToken);
+
+    private async Task<T> PostAsync<T>(string path, object? request, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsync(path, null, cancellationToken);
+        using var response = request is null ? await httpClient.PostAsync(path, null, cancellationToken) : await httpClient.PostAsJsonAsync(path, request, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<T>(cancellationToken)
             ?? throw new AgentstrationApiException("Agentstration API returned an empty Resource Planning response.", Guid.NewGuid().ToString("N"));

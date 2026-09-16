@@ -177,4 +177,18 @@
   <data name="Activity.Failed" xml:space="preserve"><value>Échec</value></data>
   <data name="Activity.Archived" xml:space="preserve"><value>Archivage</value></data>
   <data name="Activity.Cancelled" xml:space="preserve"><value>Annulation</value></data>
+  <data name="BindingsTitle" xml:space="preserve"><value>Profils des agents</value></data>
+  <data name="BindingsIntro" xml:space="preserve"><value>Choisissez les profils de modèle et d’exécution de chaque agent avant la matérialisation.</value></data>
+  <data name="ModelProfile" xml:space="preserve"><value>Profil de modèle</value></data>
+  <data name="RuntimeProfile" xml:space="preserve"><value>Profil d’exécution</value></data>
+  <data name="SelectProfile" xml:space="preserve"><value>Choisir un profil</value></data>
+  <data name="ReviewedBindings" xml:space="preserve"><value>Profils des agents examinés</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_required" xml:space="preserve"><value>Choisissez les deux profils de cet agent.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_not_found" xml:space="preserve"><value>Le profil choisi n’est pas disponible dans cet espace.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_unavailable" xml:space="preserve"><value>Le profil choisi n’est pas prêt.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_incompatible" xml:space="preserve"><value>La configuration du profil choisi est invalide.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_outside_scope" xml:space="preserve"><value>Le profil choisi est hors de cet espace.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_ambiguous" xml:space="preserve"><value>Choisissez un profil avec un périmètre précis.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_unknown_role" xml:space="preserve"><value>Ce binding ne correspond à aucun agent prévu.</value></data>
+  <data name="MaterializationDiagnostic.planning_materialization_stale" xml:space="preserve"><value>Actualisez l’aperçu avant de créer le ChangeSet.</value></data>
 </root>

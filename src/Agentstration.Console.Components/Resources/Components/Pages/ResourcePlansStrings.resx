@@ -177,4 +177,18 @@
   <data name="Activity.Failed" xml:space="preserve"><value>Failed</value></data>
   <data name="Activity.Archived" xml:space="preserve"><value>Archived</value></data>
   <data name="Activity.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="BindingsTitle" xml:space="preserve"><value>Agent bindings</value></data>
+  <data name="BindingsIntro" xml:space="preserve"><value>Choose the model and runtime profiles for each planned agent before materializing.</value></data>
+  <data name="ModelProfile" xml:space="preserve"><value>Model profile</value></data>
+  <data name="RuntimeProfile" xml:space="preserve"><value>Runtime profile</value></data>
+  <data name="SelectProfile" xml:space="preserve"><value>Select a profile</value></data>
+  <data name="ReviewedBindings" xml:space="preserve"><value>Reviewed agent profiles</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_required" xml:space="preserve"><value>Choose both profiles for this agent.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_not_found" xml:space="preserve"><value>The selected profile is not available in this workspace.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_unavailable" xml:space="preserve"><value>The selected profile is not ready.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_incompatible" xml:space="preserve"><value>The selected profile has an invalid configuration.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_outside_scope" xml:space="preserve"><value>The selected profile is outside this workspace.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_ambiguous" xml:space="preserve"><value>Choose a profile with an exact scope.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_unknown_role" xml:space="preserve"><value>This binding does not match a planned agent.</value></data>
+  <data name="MaterializationDiagnostic.planning_materialization_stale" xml:space="preserve"><value>Refresh the preview before creating the ChangeSet.</value></data>
 </root>

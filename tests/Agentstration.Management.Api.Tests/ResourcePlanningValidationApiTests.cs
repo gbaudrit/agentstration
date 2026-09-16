@@ -12,7 +12,7 @@ namespace Agentstration.Management.Tests;
 public sealed class ResourcePlanningValidationApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
-    public async Task MissingDefaultModelProfileBlocksValidationAndPersistsAgentIssue()
+    public async Task MissingExplicitProfilesBlockMaterializationAndChangeSetCreation()
     {
         await using var factory = Factory();
         var context = await GetBootstrapContextAsync(factory);
@@ -27,25 +27,22 @@ public sealed class ResourcePlanningValidationApiTests : ModelManagementApiTestB
         });
         var created = await plans.CreateAsync(scope, new("Support", "Resolve requests", null, content), context.PrincipalId, default);
         var ready = await plans.ChangeStatusAsync(scope, created.Value.Id, new(ResourcePlanStatus.Ready), created.ETag, context.PrincipalId, default);
-        var changeSet = await changeSets.CreateAsync(scope, ready.Value.Id, context.PrincipalId, default);
-
         using var client = factory.CreateClient();
-        using var response = await client.PostAsync($"/api/resource-plans/change-sets/{changeSet.Value.Id.Value}/validations", null);
+        using var emptyPreview = await client.PostAsync($"/api/resource-plans/{ready.Value.Id.Value}/materializations", null);
+        Assert.AreEqual(HttpStatusCode.OK, emptyPreview.StatusCode);
+        var missingSelection = await emptyPreview.Content.ReadFromJsonAsync<ResourcePlanMaterialization>();
+        Assert.IsNotNull(missingSelection);
+        Assert.IsTrue(missingSelection.Diagnostics.Any(value => value.Code == "planning_binding_required"));
+        var bindings = new ResourcePlanMaterializationRequest([new("resolution", new("missing-model"), new("missing-runtime"))]);
+        using var preview = await client.PostAsJsonAsync($"/api/resource-plans/{ready.Value.Id.Value}/materializations", bindings);
+        Assert.AreEqual(HttpStatusCode.OK, preview.StatusCode);
+        var materialization = await preview.Content.ReadFromJsonAsync<ResourcePlanMaterialization>();
+        Assert.IsNotNull(materialization);
+        Assert.IsFalse(materialization.CanCreateChangeSet);
+        Assert.AreEqual(2, materialization.Diagnostics.Count(value => value.Code == "planning_binding_not_found"));
 
-        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
-        var validation = await response.Content.ReadFromJsonAsync<ResourceChangeSetValidation>();
-        Assert.IsNotNull(validation);
-        Assert.AreEqual(ResourceChangeSetReadiness.Blocked, validation.Readiness);
-        var issue = validation.Issues.Single(value => value.Code == "resource_change_model_profile_invalid");
-        Assert.AreEqual("changes[0].proposed.definition.modelProfile", issue.Path);
-        Assert.Contains("resolution", issue.Message, StringComparison.Ordinal);
-        Assert.Contains("default/default", issue.Message, StringComparison.Ordinal);
-        Assert.AreEqual(ResourceChangeSetStatus.Proposed, (await changeSets.GetAsync(scope, changeSet.Value.Id, default)).Value.Status);
-
-        var recorded = await client.GetFromJsonAsync<IReadOnlyList<ResourceChangeSetValidation>>(
-            $"/api/resource-plans/change-sets/{changeSet.Value.Id.Value}/validations");
-        Assert.IsNotNull(recorded);
-        Assert.HasCount(1, recorded);
-        Assert.AreEqual(validation.Id, recorded[0].Id);
+        using var response = await client.PostAsJsonAsync($"/api/resource-plans/{ready.Value.Id.Value}/change-sets", bindings);
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.HasCount(0, (await changeSets.ListAsync(scope, ready.Value.Id, 0, 10, default)).Items);
     }
 }

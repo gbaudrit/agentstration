@@ -1,6 +1,10 @@
 using System.Text.Json;
+using Agentstration.Models;
+using Agentstration.Models.Contracts;
 using Agentstration.ResourcePlanning.Contracts;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Contracts;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -90,6 +94,7 @@ public sealed class ResourcePlanReviewTests
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourcePlansApiClient>(new FakeClient(set));
+        RegisterProfiles(context);
         context.Services.AddSingleton(new ConsoleContextState(new FakeContextProvider()));
         context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default).GetAwaiter().GetResult();
 
@@ -126,6 +131,7 @@ public sealed class ResourcePlanReviewTests
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourcePlansApiClient>(client);
+        RegisterProfiles(context);
         context.Services.AddSingleton(new ConsoleContextState(new FakeContextProvider()));
         context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default).GetAwaiter().GetResult();
 
@@ -148,6 +154,7 @@ public sealed class ResourcePlanReviewTests
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourcePlansApiClient>(new FakeClient(set, blockOnValidate: true));
+        RegisterProfiles(context);
         context.Services.AddSingleton(new ConsoleContextState(new FakeContextProvider()));
         context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default).GetAwaiter().GetResult();
 
@@ -163,6 +170,34 @@ public sealed class ResourcePlanReviewTests
             Assert.IsFalse(rendered.Find(".resource-plan-issue-technical").HasAttribute("open"));
             Assert.DoesNotContain("Validation de la proposition enregistrée", rendered.Markup, StringComparison.Ordinal);
         });
+    }
+
+    [TestMethod]
+    public void DetailPassesSelectedProfilesAndReviewedDigestToChangeSet()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var set = ChangeSet(Plan.Revision, [Change(0, "triage", [], "Triage")]);
+        var client = new FakeClient(set, supportMaterialization: true);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IResourcePlansApiClient>(client);
+        RegisterProfiles(context, true);
+        context.Services.AddSingleton(new ConsoleContextState(new FakeContextProvider()));
+        context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default).GetAwaiter().GetResult();
+
+        var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
+        rendered.WaitForElement(".resource-plan-binding-card");
+        rendered.FindAll(".resource-plan-binding-card select")[0].Change("0");
+        rendered.FindAll(".resource-plan-binding-card select")[1].Change("0");
+        rendered.FindAll("button").Single(value => value.TextContent.Contains("Re-materialize", StringComparison.Ordinal)).Click();
+        rendered.WaitForAssertion(() => Assert.IsTrue(client.LastMaterializationRequest?.Bindings.Count == 1));
+        var binding = client.LastMaterializationRequest!.Bindings.Single();
+        Assert.AreEqual("triage", binding.LogicalId);
+        Assert.AreEqual("model-a", binding.ModelProfile.Name);
+        Assert.AreEqual("runtime-a", binding.RuntimeProfile.Name);
+        Assert.AreEqual(ResourceScopeRef.Workspace(Scope.WorkspaceId.Value), binding.ModelProfile.ScopeRef);
+        rendered.FindAll("button").Single(value => value.TextContent.Contains("Create ChangeSet", StringComparison.Ordinal)).Click();
+        rendered.WaitForAssertion(() => Assert.AreEqual("reviewed", client.LastChangeSetRequest?.ExpectedDigest));
     }
 
     private static ResourceChange Change(int order, string logicalId, IReadOnlyList<string> dependsOn, string displayName)
@@ -187,16 +222,59 @@ public sealed class ResourcePlanReviewTests
     private static ResourceChangeSetValidation Validation(ResourceChangeSet set, string digest) => new(
         Guid.NewGuid(), set.Id, digest, set.PlanId, set.PlanRevision, Scope, ResourceChangeSetReadiness.Ready, [], Guid.NewGuid(), DateTimeOffset.UnixEpoch);
 
-    private sealed class FakeClient(ResourceChangeSetSnapshot set, bool blockOnValidate = false) : IResourcePlansApiClient
+    private static void RegisterProfiles(BunitContext context, bool withProfiles = false)
+    {
+        context.Services.AddSingleton<IModelProfilesClient>(new EmptyModelProfilesClient(withProfiles));
+        context.Services.AddSingleton<IRuntimeProfilesClient>(new EmptyRuntimeProfilesClient(withProfiles));
+    }
+
+    private sealed class EmptyModelProfilesClient(bool withProfiles) : IModelProfilesClient
+    {
+        public Task<IReadOnlyList<ModelProfileSummaryResponse>> GetModelProfilesAsync(string? search, string? provider, string? status, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ModelProfileSummaryResponse>>(
+            withProfiles ? [new("model-a", "model-a", new("Model A", null, new("provider", "provider"), new("model"), new(), new(), new(), "available", 0), ScopeRef: ResourceScopeRef.Workspace(Scope.WorkspaceId.Value))] : []);
+        public Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(string profileName, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProfileResource>> CreateModelProfileAsync(CreateModelProfileRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProfileResource>> UpdateModelProfileAsync(string profileName, PutModelProfileRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteModelProfileAsync(string profileName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(string profileName, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(string profileName, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProfileResource>> ApplyOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class EmptyRuntimeProfilesClient(bool withProfiles) : IRuntimeProfilesClient
+    {
+        public Task<IReadOnlyList<RuntimeProfileSummaryResponse>> GetRuntimeProfilesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<RuntimeProfileSummaryResponse>>(
+            withProfiles ? [new("runtime-a", "runtime-a", new() { DisplayName = "Runtime A", RuntimeType = "maf" }, 0, ScopeRef: ResourceScopeRef.Workspace(Scope.WorkspaceId.Value))] : []);
+        public Task<ResourceSnapshot<RuntimeProfileResource>> GetRuntimeProfileAsync(string profileName, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<RuntimeProfileResource>> CreateRuntimeProfileAsync(CreateRuntimeProfileRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<RuntimeProfileResource>> UpdateRuntimeProfileAsync(string profileName, PutRuntimeProfileRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteRuntimeProfileAsync(string profileName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RuntimeProfileUsagesResponse> GetRuntimeProfileUsagesAsync(string profileName, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class FakeClient(ResourceChangeSetSnapshot set, bool blockOnValidate = false, bool supportMaterialization = false) : IResourcePlansApiClient
     {
         private IReadOnlyList<ResourceChangeSetValidation> validations = [Validation(set.Value, "old-digest")];
         public int ValidationCalls { get; private set; }
+        public ResourcePlanMaterializationRequest? LastMaterializationRequest { get; private set; }
+        public ResourcePlanMaterializationRequest? LastChangeSetRequest { get; private set; }
         public Task<ResourcePlanPage> ListPlansAsync(ResourcePlanStatus? status, int skip, int take, CancellationToken cancellationToken) => Task.FromResult(new ResourcePlanPage([new(Plan, "\"plan\"")], false));
         public Task<ResourcePlanSnapshot?> GetPlanAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<ResourcePlanSnapshot?>(id == Plan.Id.Value ? new(Plan, "\"plan\"") : null);
         public Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResourcePlanActivity>>([new(Guid.NewGuid(), Plan.Id, Scope, 1, ResourcePlanActivityType.Created, Guid.NewGuid(), null, DateTimeOffset.UnixEpoch)]);
-        public Task<ResourcePlanMaterialization> MaterializeAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourcePlanMaterialization> MaterializeAsync(Guid id, ResourcePlanMaterializationRequest request, CancellationToken cancellationToken)
+        {
+            if (!supportMaterialization) throw new NotSupportedException();
+            LastMaterializationRequest = request;
+            return Task.FromResult(new ResourcePlanMaterialization(Plan.Id, Plan.Revision, ResourcePlanningContractVersions.V1, "1.1.0", Scope, [], [], "reviewed"));
+        }
         public Task<ResourceChangeSetPage> ListChangeSetsAsync(Guid planId, int skip, int take, CancellationToken cancellationToken) => Task.FromResult(new ResourceChangeSetPage([set], false));
-        public Task<ResourceChangeSetSnapshot> CreateChangeSetAsync(Guid planId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceChangeSetSnapshot> CreateChangeSetAsync(Guid planId, ResourcePlanMaterializationRequest request, CancellationToken cancellationToken)
+        {
+            if (!supportMaterialization) throw new NotSupportedException();
+            LastChangeSetRequest = request;
+            return Task.FromResult(set);
+        }
         public Task<IReadOnlyList<ResourceChangeSetValidation>> ListValidationsAsync(Guid changeSetId, CancellationToken cancellationToken) => Task.FromResult(validations);
         public Task<ResourceChangeSetValidation> ValidateChangeSetAsync(Guid changeSetId, CancellationToken cancellationToken)
         {

@@ -2,6 +2,8 @@
 @rendermode InteractiveServer
 @implements IDisposable
 @inject IResourcePlansApiClient Client
+@inject IModelProfilesClient ModelProfilesClient
+@inject IRuntimeProfilesClient RuntimeProfilesClient
 @inject ConsoleContextState ContextState
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ResourcePlansStrings> Localizer
 
@@ -27,7 +29,7 @@ else
             <strong>@T("Materialization")</strong><span>@T("Proposals", materialization.Proposals.Count)</span><code>@materialization.Digest</code>
             @foreach (var diagnostic in materialization.Diagnostics)
             {
-                <p class="resource-plan-issue"><strong>@diagnostic.Code</strong> · @diagnostic.Path · @diagnostic.Message</p>
+                <p class="resource-plan-issue"><strong>@DiagnosticLabel(diagnostic)</strong> · @diagnostic.Path</p>
             }
         </section>
     }
@@ -97,6 +99,36 @@ else
                         else { <ul>@foreach (var experience in functional.Experiences) { <li><strong>@experience.DisplayName</strong><span>@experience.Purpose</span></li> }</ul> }
                     </article>
                 </div>
+                @if (functional.Roles.Count > 0)
+                {
+                    <section class="resource-plan-bindings" aria-label="@T("BindingsTitle")">
+                        <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ConcreteProposal")</p><h2>@T("BindingsTitle")</h2><p>@T("BindingsIntro")</p></div></div>
+                        <div class="resource-plan-binding-list">
+                            @foreach (var role in functional.Roles)
+                            {
+                                <article class="resource-plan-binding-card">
+                                    <div><strong>@role.DisplayName</strong><small>@role.LogicalId</small></div>
+                                    <label><span>@T("ModelProfile")</span><select aria-label="@($"{role.DisplayName} · {T("ModelProfile")}")" value="@SelectedModelIndex(role.LogicalId)" @onchange="args => SelectModel(role.LogicalId, args)" disabled="@busy">
+                                        <option value="">@T("SelectProfile")</option>
+                                        @for (var index = 0; index < modelProfiles.Count; index++)
+                                        {
+                                            var profile = modelProfiles[index];
+                                            <option value="@index" disabled="@IsInvalidModel(profile)">@profile.Properties.DisplayName · @profile.Namespace/@profile.Name</option>
+                                        }
+                                    </select></label>
+                                    <label><span>@T("RuntimeProfile")</span><select aria-label="@($"{role.DisplayName} · {T("RuntimeProfile")}")" value="@SelectedRuntimeIndex(role.LogicalId)" @onchange="args => SelectRuntime(role.LogicalId, args)" disabled="@busy">
+                                        <option value="">@T("SelectProfile")</option>
+                                        @for (var index = 0; index < runtimeProfiles.Count; index++)
+                                        {
+                                            var profile = runtimeProfiles[index];
+                                            <option value="@index">@profile.Properties.DisplayName · @profile.Namespace/@profile.Name</option>
+                                        }
+                                    </select></label>
+                                </article>
+                            }
+                        </div>
+                    </section>
+                }
             }
             <p class="resource-plan-boundary"><span aria-hidden="true">ⓘ</span>@T("FunctionalBoundary")</p>
         }
@@ -119,6 +151,16 @@ else
                             <div><strong>@count</strong><span>@OperationCountLabel(operation, count)</span></div>
                         }
                     </div>
+                    @if (selected.Value.ResolvedBindings is { Count: > 0 } reviewedBindings)
+                    {
+                        <div class="resource-plan-reviewed-bindings">
+                            <h3>@T("ReviewedBindings")</h3>
+                            @foreach (var binding in reviewedBindings.OrderBy(value => value.LogicalId, StringComparer.Ordinal).ThenBy(value => value.Field, StringComparer.Ordinal))
+                            {
+                                <p><strong>@binding.LogicalId</strong><span>@T(binding.Field == "modelProfile" ? "ModelProfile" : "RuntimeProfile")</span><code>@(binding.Reference.Namespace ?? ResourceNamespace.Default)/@binding.Reference.Name</code></p>
+                            }
+                        </div>
+                    }
                     @foreach (var change in selected.Value.Changes.OrderBy(value => value.Order))
                     {
                         var reviewFields = ResourcePlanReviewProjection.ReviewFields(change);
@@ -234,6 +276,10 @@ else
     private IReadOnlyList<ResourceChangeSetValidation> validations = [];
     private ResourcePlanMaterialization? materialization;
     private FunctionalResourcePlanV1? functional;
+    private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
+    private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
+    private readonly Dictionary<string, ResourceReference> modelBindings = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ResourceReference> runtimeBindings = new(StringComparer.OrdinalIgnoreCase);
     private string activeView = "Overview";
     private string? error;
     private string? message;
@@ -254,6 +300,44 @@ else
         }
     }
     private string T(string key, params object[] args) => Localizer[key, args].Value;
+    private string DiagnosticLabel(ResourcePlanMaterializationDiagnostic diagnostic)
+    {
+        var localized = Localizer[$"MaterializationDiagnostic.{diagnostic.Code}"];
+        return localized.ResourceNotFound ? diagnostic.Message : localized.Value;
+    }
+    private static bool IsInvalidModel(ModelProfileSummaryResponse profile) => ModelManagementUi.IsInvalid(profile);
+    private static bool IsVisible(ResourceScopeRef? scopeRef, ResourcePlanScope scope) => scopeRef is { } candidate
+        && (candidate == ResourceScopeRef.Instance || candidate == ResourceScopeRef.Tenant(scope.TenantId) || candidate == ResourceScopeRef.Workspace(scope.WorkspaceId.Value));
+    private static ResourceReference Reference(string name, string @namespace, ResourceScopeRef? scope) => new(name, scope, ResourceNamespace.Parse(@namespace));
+    private string SelectedModelIndex(string role) => modelBindings.TryGetValue(role, out var reference)
+        ? modelProfiles.Select((profile, index) => (profile, index)).Where(item => Reference(item.profile.Name, item.profile.Namespace, item.profile.ScopeRef) == reference).Select(item => item.index.ToString(System.Globalization.CultureInfo.InvariantCulture)).FirstOrDefault() ?? string.Empty
+        : string.Empty;
+    private string SelectedRuntimeIndex(string role) => runtimeBindings.TryGetValue(role, out var reference)
+        ? runtimeProfiles.Select((profile, index) => (profile, index)).Where(item => Reference(item.profile.Name, item.profile.Namespace, item.profile.ScopeRef) == reference).Select(item => item.index.ToString(System.Globalization.CultureInfo.InvariantCulture)).FirstOrDefault() ?? string.Empty
+        : string.Empty;
+    private void SelectModel(string role, ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var index) && index >= 0 && index < modelProfiles.Count && !IsInvalidModel(modelProfiles[index]))
+        {
+            var profile = modelProfiles[index];
+            modelBindings[role] = Reference(profile.Name, profile.Namespace, profile.ScopeRef);
+        }
+        else modelBindings.Remove(role);
+        materialization = null;
+    }
+    private void SelectRuntime(string role, ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var index) && index >= 0 && index < runtimeProfiles.Count)
+        {
+            var profile = runtimeProfiles[index];
+            runtimeBindings[role] = Reference(profile.Name, profile.Namespace, profile.ScopeRef);
+        }
+        else runtimeBindings.Remove(role);
+        materialization = null;
+    }
+    private ResourcePlanMaterializationRequest BindingRequest() => new(functional?.Roles
+        .Where(role => modelBindings.ContainsKey(role.LogicalId) && runtimeBindings.ContainsKey(role.LogicalId))
+        .Select(role => new ResourcePlanAgentBinding(role.LogicalId, modelBindings[role.LogicalId], runtimeBindings[role.LogicalId])).ToArray() ?? []);
     private string OperationCountLabel(ResourceChangeOperation operation, int count) => T($"Operation{(count == 1 ? string.Empty : "Plural")}.{operation}");
     private string DisplayValue(string path, string? value)
     {
@@ -321,7 +405,7 @@ else
     protected override void OnInitialized() => ContextState.Changed += OnContextChanged;
     protected override async Task OnParametersSetAsync()
     {
-        if (loadedId != Id) { loadedId = Id; plan = null; contextVersion++; }
+        if (loadedId != Id) { loadedId = Id; plan = null; modelBindings.Clear(); runtimeBindings.Clear(); contextVersion++; }
         await LoadAsync();
     }
     private void OnContextChanged() => _ = InvokeAsync(async () =>
@@ -333,6 +417,8 @@ else
         changeSets = [];
         validations = [];
         materialization = null;
+        modelBindings.Clear();
+        runtimeBindings.Clear();
         await LoadAsync();
     });
 
@@ -350,6 +436,8 @@ else
                 return;
             }
             var loadedFunctional = loadedPlan.Value.Content.Document.Deserialize<FunctionalResourcePlanV1>(JsonOptions);
+            var loadedModelProfiles = await ModelProfilesClient.GetModelProfilesAsync(null, null, null, lifetime.Token);
+            var loadedRuntimeProfiles = await RuntimeProfilesClient.GetRuntimeProfilesAsync(lifetime.Token);
             var loadedActivities = await Client.ListActivitiesAsync(Id, lifetime.Token);
             var page = await Client.ListChangeSetsAsync(Id, 0, 200, lifetime.Token);
             var loadedSets = page.Items.OrderByDescending(value => value.Value.PlanRevision).ThenByDescending(value => value.Value.CreatedAt).ToArray();
@@ -358,6 +446,8 @@ else
             if (version != contextVersion) return;
             plan = loadedPlan;
             functional = loadedFunctional;
+            modelProfiles = loadedModelProfiles.Where(profile => IsVisible(profile.ScopeRef, loadedPlan.Value.Scope)).ToArray();
+            runtimeProfiles = loadedRuntimeProfiles.Where(profile => IsVisible(profile.ScopeRef, loadedPlan.Value.Scope)).ToArray();
             activities = loadedActivities;
             changeSets = loadedSets;
             selected = loadedSelected;
@@ -389,7 +479,7 @@ else
         if (plan is null || !CanReview || !CanMaterialize || busy) return;
         busy = true; error = null; message = null;
         var version = contextVersion;
-        try { var result = await Client.MaterializeAsync(Id, lifetime.Token); if (version == contextVersion) { materialization = result; message = T("Materialized", result.Proposals.Count); } }
+        try { var result = await Client.MaterializeAsync(Id, BindingRequest(), lifetime.Token); if (version == contextVersion) { materialization = result; message = T("Materialized", result.Proposals.Count); } }
         catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
         finally { EndBusy(); }
     }
@@ -401,7 +491,7 @@ else
         var version = contextVersion;
         try
         {
-            var created = await Client.CreateChangeSetAsync(Id, lifetime.Token);
+            var created = await Client.CreateChangeSetAsync(Id, BindingRequest() with { ExpectedDigest = materialization!.Digest }, lifetime.Token);
             if (version != contextVersion) return;
             var page = await Client.ListChangeSetsAsync(Id, 0, 200, lifetime.Token);
             if (version != contextVersion) return;

@@ -5,6 +5,8 @@ using Agentstration.ResourcePlanning.Storage.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Web.Security;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Routing;
 
 namespace Agentstration.ResourcePlanning.Api;
@@ -126,20 +128,22 @@ public static class ResourcePlanningApiModule
 
     private static Task<IResult> MaterializeAsync(
         Guid id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] ResourcePlanMaterializationRequest? request,
         ResourcePlanMaterializationService service,
         ICurrentRequestContext context,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
-            Results.Ok(await service.MaterializeAsync(Scope(RequireWorkspace(context)), new(id), cancellationToken)));
+            Results.Ok(await service.MaterializeAsync(Scope(RequireWorkspace(context)), new(id), request ?? new([]), cancellationToken)));
 
     private static Task<IResult> CreateChangeSetAsync(
         Guid id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] ResourcePlanMaterializationRequest? request,
         HttpResponse response,
         ResourceChangeSetService service,
         ICurrentRequestContext context,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
     {
         var current = RequireWorkspace(context);
-        var stored = await service.CreateAsync(Scope(current), new(id), current.PrincipalId, cancellationToken);
+        var stored = await service.CreateAsync(Scope(current), new(id), current.PrincipalId, request ?? new([]), cancellationToken);
         response.Headers.ETag = stored.ETag;
         response.Headers.Location = $"/api/resource-plans/change-sets/{stored.Value.Id}";
         return Results.Json(stored.Value, statusCode: StatusCodes.Status201Created);

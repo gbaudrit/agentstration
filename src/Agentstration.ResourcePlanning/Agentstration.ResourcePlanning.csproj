@@ -7,6 +7,7 @@
     <ProjectReference Include="../Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
     <ProjectReference Include="../Agentstration.ResourcePlanning.Contracts/Agentstration.ResourcePlanning.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.ResourcePlanning.Storage.Abstractions/Agentstration.ResourcePlanning.Storage.Abstractions.csproj" />
+    <ProjectReference Include="../Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.Work/Agentstration.Work.csproj" />
     <ProjectReference Include="../Agentstration.Work.Storage.Abstractions/Agentstration.Work.Storage.Abstractions.csproj" />
   </ItemGroup>

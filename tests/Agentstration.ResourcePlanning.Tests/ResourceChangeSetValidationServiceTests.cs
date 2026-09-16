@@ -30,7 +30,7 @@ public sealed class ResourceChangeSetValidationServiceTests
         var state = new EmptyStateReader();
         var materializer = new ResourcePlanMaterializationService(plans, contentValidator, state, new());
         var changeSets = new ResourceChangeSetService(materializer, repository, TimeProvider.System);
-        var changeSet = await changeSets.CreateAsync(scope, ready.Value.Id, actor, default);
+        var changeSet = await changeSets.CreateAsync(scope, ready.Value.Id, actor, new([new("assistant", new("model-a"), new("runtime-a"))]), default);
         var service = new ResourceChangeSetValidationService(changeSets, repository, state, [new AcceptingValidator()], TimeProvider.System);
 
         var result = await service.ValidateAsync(scope, changeSet.Value.Id, actor, default);
@@ -45,6 +45,8 @@ public sealed class ResourceChangeSetValidationServiceTests
     private sealed class EmptyStateReader : IResourcePlanningStateReader
     {
         public Task<CurrentResourceEvidence?> GetAsync(PlannedResourceDocument resource, CancellationToken cancellationToken) => Task.FromResult<CurrentResourceEvidence?>(null);
+        public Task<CurrentResourceEvidence?> ResolveBindingAsync(ResourcePlanScope scope, string kind, ResourceReference reference, CancellationToken cancellationToken) =>
+            Task.FromResult<CurrentResourceEvidence?>(new(Guid.Empty, 1, "\"profile\"", System.Text.Json.JsonSerializer.SerializeToElement(new { kind, reference.Name }), $"{kind}:{reference.Name}"));
     }
 
     private sealed class AcceptingValidator : IPlannedResourceValidator
