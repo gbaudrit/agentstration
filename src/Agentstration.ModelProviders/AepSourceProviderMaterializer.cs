@@ -1,7 +1,7 @@
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
-using Agentstration.Management.Abstractions;
 using Agentstration.Secrets.Abstractions;
+using Agentstration.Sources.Contracts;
 
 namespace Agentstration.ModelProviders;
 

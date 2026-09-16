@@ -2,7 +2,7 @@
 
 The Console exposes Entry authoring at `/entries`. An administrator can select an Agent or Flow, preview with the same renderer as Workplace without executing it, validate references, inspect dependencies, and publish a pinned Flow target. Agent selection automatically creates or versions a hidden Direct Agent Flow; the Console never calls Runtime directly for Entry execution.
 
-`Agentstration.Web` is the official administration and operations console for Agentstration. It remains the existing single ASP.NET Core host: REST, MCP, workers, and the Blazor UI ship as one executable modular monolith.
+`Agentstration.Web` is the official standalone composition host for Agentstration. Its thin entry point assembles the dedicated API transport, Console client and component projects with storage, identity, providers, workers, observability, and ordered startup initialization. REST, MCP, workers, and the Blazor UI still ship as one executable modular monolith with one authoritative set of stores.
 
 ## Stack and rendering
 
@@ -108,4 +108,4 @@ Interactive Server components invoke canonical APIs through server-side typed cl
 
 ## Tests
 
-`Agentstration.Web.Tests` covers API client mapping, model discovery, profile filtering and selection rules, conditional request headers, Problem Details, editor and runner payload mapping, simulated CRUD, SSE processing, retry, and dashboard aggregation. `Agentstration.Web.Components.Tests` covers focused UI state services. Both use MSTest and remain offline.
+`Agentstration.Api.Tests` owns hosted transport behavior. `Agentstration.Console.Client.Tests` covers client mappings, conditional requests, Problem Details, streaming, and retries without starting the authoritative server. `Agentstration.Console.Components.Tests` covers Console presentation behavior with mocked clients. `Agentstration.Web.Tests` is reserved for combined standalone composition, startup, storage, workers, and lifecycle. All use MSTest and remain offline by default.

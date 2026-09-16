@@ -1,9 +1,21 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Agentstration.Flow;
+using Agentstration.Flows;
 using Agentstration.Resources;
 
 namespace Agentstration.Work;
+
+public static class EntryResourceKinds
+{
+    public const string Entry = "Entry";
+}
+
+public enum EntryExecutionAvailability
+{
+    Executable,
+    Disabled,
+    Unavailable
+}
 
 public sealed record EntryFieldValidation(int? MinimumLength = null, int? MaximumLength = null, IReadOnlyList<string>? AllowedExtensions = null);
 public sealed record EntryFieldOption(string Value, string Label);
@@ -12,6 +24,40 @@ public sealed record EntryParticipantsPresentation(EntryParticipantVisibility Vi
 public sealed record EntryProgressPresentation(EntryProgressVisibility Visibility = EntryProgressVisibility.Compact);
 public sealed record EntryTaskPresentation(EntryTaskDisplay Display = EntryTaskDisplay.Auto);
 public sealed record EntryResultsPresentation(EntryResultDisplay Display = EntryResultDisplay.Auto);
+
+public sealed record EntryExposure
+{
+    public const int CurrentVersion = 1;
+
+    public int Version { get; init; } = CurrentVersion;
+    public IReadOnlyList<EntryExposureSurface> Surfaces { get; init; } = [EntryExposureSurface.Workplace];
+    public IReadOnlyList<EntryWorkplacePlacement> WorkplacePlacements { get; init; } = [EntryWorkplacePlacement.OwningSpace];
+}
+
+public static class EntryExposurePolicy
+{
+    public static bool Allows(
+        EntryExposure? exposure,
+        EntryExposureSurface surface,
+        EntryWorkplacePlacement? workplacePlacement = null)
+    {
+        if (exposure is null
+            || exposure.Version != EntryExposure.CurrentVersion
+            || !Enum.IsDefined(surface)
+            || exposure.Surfaces is null
+            || exposure.WorkplacePlacements is null
+            || exposure.Surfaces.Any(value => !Enum.IsDefined(value))
+            || exposure.WorkplacePlacements.Any(value => !Enum.IsDefined(value))
+            || !exposure.Surfaces.Contains(surface))
+            return false;
+
+        return surface != EntryExposureSurface.Workplace
+            ? workplacePlacement is null
+            : workplacePlacement is { } placement
+              && Enum.IsDefined(placement)
+              && exposure.WorkplacePlacements.Contains(placement);
+    }
+}
 
 public sealed record EntryFieldDefinition
 {
@@ -61,6 +107,7 @@ public sealed record EntryDraft
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public required EntryPresentation Presentation { get; init; }
+    public EntryExposure Exposure { get; init; } = new();
     public required EntryBinding Binding { get; init; }
     public EntryBinding? PublishedBinding { get; init; }
     public EntryBehavior Behavior { get; init; } = new();
@@ -78,6 +125,7 @@ public sealed record EntryResource
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public required EntryPresentation Presentation { get; init; }
+    public EntryExposure Exposure { get; init; } = new();
     public required EntryResolvedTarget ResolvedTarget { get; init; }
     public EntryBehavior Behavior { get; init; } = new();
     public int Version { get; init; } = 1;

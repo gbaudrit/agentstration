@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Agentstration.Flow;
+using Agentstration.Flows;
 using Agentstration.Resources;
 
 namespace Agentstration.Work;
@@ -55,6 +55,8 @@ public enum EntryFieldType { Prompt, Text, Textarea, Number, Boolean, Choice, Mu
 public enum EntryFieldRole { Standard, PrimaryInput }
 public enum EntryBindingKind { Agent, Flow }
 public enum EntryVersionStrategy { Pinned }
+public enum EntryExposureSurface { Workplace, Console }
+public enum EntryWorkplacePlacement { OwningSpace, TenantHome }
 public enum TaskCreationMode { Automatic, OnDemand, Never }
 public enum InteractionStatus { Active, WaitingForUser, ConvertedToTask, Completed, Cancelled, Failed, Processing, Idle, Closed }
 public enum WorkTaskStatus { Draft, Pending, Running, ActionRequired, Paused, Completed, Failed, Cancelled }

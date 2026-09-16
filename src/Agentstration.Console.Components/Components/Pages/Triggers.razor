@@ -1,0 +1,80 @@
+@page "/triggers"
+@rendermode InteractiveServer
+@using Agentstration.Resources
+@inject ITriggerApiClient Client
+@inject ConsoleContextState ContextState
+@inject Microsoft.Extensions.Localization.IStringLocalizer<TriggerStrings> Localizer
+
+<PageTitle>@T("Triggers") · Agentstration</PageTitle>
+<PageHeader Title="@T("Triggers")" Description="@T("List.Description")" TestId="resource-triggers">
+    <Metadata><span>@T(Filtered.Count == 1 ? "TriggerCount.One" : "TriggerCount.Many", Filtered.Count)</span><span>@T("EnabledCount", EnabledCount)</span><span>@T("AttentionCount", AttentionCount)</span></Metadata>
+    <Actions>@if (CanManage) { <a class="button-primary" href="/triggers/new">@T("NewTrigger")</a> }</Actions>
+</PageHeader>
+
+@if (loading)
+{
+    <LoadingState Message="@T("LoadingTriggers")" />
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <ErrorState Title="@T("TriggersUnavailable")" Message="@error" OnRetry="LoadAsync" />
+}
+else
+{
+    <div class="filter-bar">
+        <SearchBox @bind-Value="search" Placeholder="@T("SearchPlaceholder")" />
+        <select @bind="state" aria-label="@T("FilterStateAriaLabel")">
+            <option value="">@T("State.All")</option><option value="enabled">@T("Enabled")</option><option value="disabled">@T("Disabled")</option><option value="attention">@T("RequiresAttention")</option>
+        </select>
+        <select @bind="scheduleType" aria-label="@T("FilterScheduleAriaLabel")">
+            <option value="">@T("Schedule.All")</option><option value="once">@T("ScheduleType.Once")</option><option value="interval">@T("ScheduleType.Interval")</option><option value="cron">@T("ScheduleType.Cron")</option>
+        </select>
+    </div>
+
+    @if (items.Count == 0)
+    {
+        <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")">@if (CanManage) { <a class="button-primary" href="/triggers/new">@T("CreateTrigger")</a> }</EmptyState>
+    }
+    else if (Filtered.Count == 0)
+    {
+        <EmptyState Title="@T("NoMatchesTitle")" Message="@T("NoMatchesMessage")" />
+    }
+    else
+    {
+        <DataGrid TItem="TriggerResource" Items="Filtered">
+            <Header><tr><th>@T("Trigger")</th><th>@T("State")</th><th>@T("Schedule")</th><th>@T("Target")</th><th>@T("NextOccurrence")</th><th>@T("LastOutcome")</th><th></th></tr></Header>
+            <Row Context="trigger"><tr>
+                <td><span class="resource-name-with-scope"><strong><a href="@DetailsUrl(trigger)">@trigger.Definition.DisplayName</a></strong><ResourceScopeBadge ScopeRef="trigger.ScopeRef" Compact /></span><small class="table-secondary">@trigger.Namespace.Value/@trigger.Name</small></td>
+                <td><StatusBadge Text="@(trigger.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(trigger.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /></td>
+                <td>@TriggerUi.ScheduleLabel(trigger.Definition.Source.Schedule, Localizer)</td>
+                <td><a class="text-button" href="@FlowUrl(trigger)">@trigger.Definition.Target.Flow?.Name</a></td>
+                <td>@TriggerUi.FormatDate(trigger.Observed.NextOccurrenceAt)</td>
+                <td><StatusBadge Text="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" />@if (trigger.Observed.LastErrorCode is { } errorCode) { <small class="table-secondary">@errorCode</small> }</td>
+                <td><a class="text-button" href="@DetailsUrl(trigger)">@T("Open")</a>@if (CanManage) { <a class="text-button" href="@EditUrl(trigger)">@T("Edit")</a> }</td>
+            </tr></Row>
+        </DataGrid>
+    }
+}
+
+@code {
+    private IReadOnlyList<TriggerResource> items = [];
+    private bool loading = true;
+    private string? error;
+    private string search = "", state = "", scheduleType = "";
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    private bool CanManage => ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    private int EnabledCount => items.Count(value => value.Definition.Enabled);
+    private int AttentionCount => items.Count(value => value.Observed.LastOutcome == TriggerLastOutcome.Failed);
+    private IReadOnlyList<TriggerResource> Filtered => items
+        .Where(value => string.IsNullOrWhiteSpace(search) || value.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || value.Definition.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase) || (value.Definition.Target.Flow?.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false))
+        .Where(value => state switch { "enabled" => value.Definition.Enabled, "disabled" => !value.Definition.Enabled, "attention" => value.Observed.LastOutcome == TriggerLastOutcome.Failed, _ => true })
+        .Where(value => string.IsNullOrWhiteSpace(scheduleType) || string.Equals(value.Definition.Source.Schedule?.Type.ToString(), scheduleType, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(value => value.Observed.NextOccurrenceAt ?? DateTimeOffset.MaxValue).ThenBy(value => value.Definition.DisplayName, StringComparer.OrdinalIgnoreCase).ToArray();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+    private async Task LoadAsync() { loading = true; error = null; try { items = await Client.ListAsync(CancellationToken.None); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
+    private static string DetailsUrl(TriggerResource value) => $"/triggers/{Uri.EscapeDataString(value.Name)}";
+    private static string EditUrl(TriggerResource value) => $"{DetailsUrl(value)}/edit";
+    private static string FlowUrl(TriggerResource value) { var flow = value.Definition.Target.Flow!; return ConsoleResourceUrls.Flow(new FlowId(flow.Name, flow.Namespace ?? value.Namespace)); }
+    private static UiStatus OutcomeStatus(TriggerLastOutcome outcome) => outcome switch { TriggerLastOutcome.Submitted => UiStatus.Success, TriggerLastOutcome.Skipped => UiStatus.Warning, TriggerLastOutcome.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
+}

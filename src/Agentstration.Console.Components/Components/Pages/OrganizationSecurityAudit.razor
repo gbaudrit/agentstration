@@ -1,0 +1,54 @@
+@page "/settings/organization/security-audit"
+@using Agentstration.Security.Contracts
+@inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
+
+<PageTitle>@T("SecurityAudit") · @T("Organization") · Agentstration</PageTitle>
+<PageHeader Title="@T("SecurityAudit")" Description="@T("SecurityAudit.Description")" />
+<OrganizationSettingsNav />
+<div data-testid="console-admin-organization-security-audit">
+
+@if (loading)
+{
+    <LoadingState Message="@T("LoadingSecurityEvents")" />
+}
+else if (denied)
+{
+    <ErrorState Title="@T("PlatformAdminRequired")" Message="@T("PlatformAdminRequiredMessage")" />
+}
+else if (events.Count == 0)
+{
+    <EmptyState Title="@T("NoSecurityEvent")" Message="@T("NoSecurityEventMessage")" />
+}
+else
+{
+    <DataGrid TItem="Agentstration.Security.Contracts.SecurityAuditEvent" Items="events">
+        <Header><tr><th>@T("Time")</th><th>@T("Action")</th><th>@T("Outcome")</th><th>@T("Actor")</th><th>@T("Target")</th><th>@T("Scope")</th><th>@T("Correlation")</th></tr></Header>
+        <Row Context="entry"><tr>
+            <td>@entry.OccurredAt.ToLocalTime().ToString("g")</td>
+            <td><strong>@T($"AuditAction.{entry.Action}")</strong>@if (!string.IsNullOrWhiteSpace(entry.ReasonCode)) { <br /><small>@entry.ReasonCode</small> }</td>
+            <td><StatusBadge Text="@T($"AuditOutcome.{entry.Outcome}")" Status="@(entry.Outcome == SecurityAuditOutcome.Succeeded ? UiStatus.Success : UiStatus.Warning)" /></td>
+            <td><code>@ShortId(entry.ActorPrincipalId)</code></td>
+            <td>@if (entry.TargetPrincipalId is not null) { <span>@T("Principal") <code>@ShortId(entry.TargetPrincipalId)</code></span> } else if (entry.TargetAccountId is not null) { <span>@T("Account") <code>@ShortId(entry.TargetAccountId)</code></span> } else { <span>—</span> }</td>
+            <td>@if (entry.WorkspaceId is not null) { <span>@T("Workspace") <code>@ShortId(entry.WorkspaceId)</code></span> } else if (entry.TenantId is not null) { <span>@T("Tenant") <code>@ShortId(entry.TenantId)</code></span> } else { <span>@T("Instance")</span> }</td>
+            <td><code>@(string.IsNullOrWhiteSpace(entry.CorrelationId) ? "—" : entry.CorrelationId[..Math.Min(12, entry.CorrelationId.Length)])</code></td>
+        </tr></Row>
+    </DataGrid>
+}
+</div>
+
+@code {
+    private IReadOnlyList<Agentstration.Security.Contracts.SecurityAuditEvent> events = [];
+    private bool loading = true;
+    private bool denied;
+    private string T(string key) => Localizer[key].Value;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { events = await Client.GetSecurityAuditEventsAsync(200, default); }
+        catch (Agentstration.Web.Console.AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Forbidden) { denied = true; }
+        finally { loading = false; }
+    }
+
+    private static string ShortId(Guid? value) => value is null ? "—" : value.Value.ToString("D")[..8];
+}

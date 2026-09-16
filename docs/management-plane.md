@@ -5,20 +5,38 @@ The management plane is Agentstration's source of truth. It owns agent definitio
 Its module boundary is explicit:
 
 ```text
-Agentstration.Management.Abstractions
-  canonical resource envelope, logical keys, structured references, storage ports, lifecycle events, runtime-facing resolved specs
+Plural resource-family modules
+  Agents, Extensions, Identity, Models, Packs, Sources, Runtime, Tools and Triggers own their validation and lifecycle use cases
 
-Agentstration.Management.Core
-  validation, idempotent resource use cases, generation tracking, revision compilation, deployment orchestration
+Agentstration.*.Contracts
+  versioned contracts owned by Agents, Extensions, Identity, Models, Packs, Runtime, Secrets, Sources, Tools and Triggers
 
-Agentstration.Management.Contracts
-  versioned HTTP request and response contracts
+Agentstration.Identity.Contracts and Agentstration.Security.Contracts
+  identity, authorization, personal-access-token and provider-neutral security-audit contracts
 
-Agentstration.Management.Storage.Sqlite
+Agentstration.Sources.Contracts
+  Source and Source Registry resources, trust, discovery, refresh, network policy and provider contracts
+
+Agentstration.Packs.Contracts
+  Pack installation, authoring, composition and source-installation contracts
+
+Agentstration.Extensions.Contracts
+  Extension registration, AEP enrollment and transport-authentication contracts
+
+Agentstration.ResourceManagement.Contracts
+  generic resource declarations plus Bootstrap documents, planning results and handler ports
+
+Agentstration.Bootstrap.Contracts
+  composed Bootstrap profile/application transport contracts
+
+Agentstration.Api.Contracts
+  family-neutral HTTP collection envelopes
+
+Agentstration.ResourceManagement.Storage.Sqlite
   EF Core and SQLite implementation of the control-plane store
 ```
 
-`Agentstration.Application` does not own Management code. Both central Management projects remain independent of Microsoft Agent Framework; concrete agent materialization stays in the Runtime plane.
+`Agentstration.Application` does not own resource-family code. Family-owned contracts and resource-family modules remain independent of Microsoft Agent Framework; concrete agent materialization stays in the Runtime plane.
 
 The standalone host exposes these Minimal API routes:
 

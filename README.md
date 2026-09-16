@@ -79,6 +79,24 @@ dotnet run --project src/Agentstration.Web
 
 Open the operations Console at [http://localhost:5100](http://localhost:5100). In local Development, the default `http` and `https` launch profiles enable the `development` profile from the versioned bootstrap catalog and create the public fixture `admin / admin`, Tenant `dev`, and Workspace `default` on a fresh instance.
 
+The operations Console also has an independently hostable process shell. Keep the authoritative server running and start it from another terminal:
+
+```powershell
+dotnet run --project src/Agentstration.Console.Web --launch-profile https
+```
+
+Open [https://localhost:7190](https://localhost:7190). Its Management, Work, Flow, and Runtime origins are configured independently under `Agentstration:*Api:BaseAddress`. Private BFF calls use a dedicated instance-bound workload credential. Local login creates an opaque secure cookie backed by server-side BFF state and revalidates the Principal and selected context with the authoritative server on every request. The Console now obtains short-lived internal delegations for server-side API calls to those origins. External OIDC login still depends on #204.
+
+For a manually launched separated Console, provision a credential without displaying it:
+
+```powershell
+./scripts/security/provision-bff-workload.ps1 -OutputPath ./.agentstration/bff-workload/console-bff/primary.key
+```
+
+Configure `Agentstration:BffWorkload` on `Agentstration.Console.Web` and `Agentstration:BffWorkloadTrust` on the authoritative `Agentstration.Web` with the same workload ID (`console-bff`), credential ID, credential-file path, and target/authoritative instance ID. Add a second credential entry for overlap, move the Console to it, then set `Revoked=true` on the old server entry. Aspire and Compose provision their development credential automatically; committed configuration never contains its value.
+
+The authoritative server generates its RS256 delegation key in `Data:Directory` on first use. For a stable multi-instance deployment, configure `Agentstration:InternalDelegation:SigningKeyFile` to the same protected private-key file on every authoritative API replica. To rotate, switch to a new private-key file and list the old public-key PEM under `Agentstration:InternalDelegation:PreviousPublicKeyFiles`; retain it for at least the configured token lifetime (120 seconds by default), then remove it. The separated Console's in-memory session store is a single-replica default; a shared `IBffServerSessionStore` is required for session continuity across Console replicas. See ADR-0115 and ADR-0116.
+
 Use `--launch-profile http-NoBootstrap` or `--launch-profile https-NoBootstrap` to start Development without applying initial profiles. These launch profiles retain the catalog path and selected profiles but set `InitialBootstrapEnabled` to `false`. Published applications, Production, and runs using `--no-launch-profile` do not activate the Development profile. Without declarative bootstrap, `/bootstrap` remains available to create the first global local administrator plus the initial Tenant and Workspace interactively.
 
 When `Agentstration.AppHost` is the Visual Studio startup project, select its `https` profile for the default bootstrap or `https-NoBootstrap` to disable it for the orchestrated Console resource.

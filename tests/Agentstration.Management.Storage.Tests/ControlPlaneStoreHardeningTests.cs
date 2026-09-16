@@ -1,6 +1,7 @@
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
-using Agentstration.Management.Storage.Sqlite;
+using Agentstration.Agents;
+using Agentstration.Identity.Contracts;
+using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Data.Sqlite;
@@ -64,7 +65,7 @@ public sealed class ControlPlaneStoreHardeningTests
             await using (services)
             {
                 var exception = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
-                    services.GetRequiredService<IControlPlaneStore>().InitializeAsync(default));
+                    services.GetRequiredService<IResourceStore>().InitializeAsync(default));
                 StringAssert.Contains(exception.Message, "Delete the pre-release database and reseed");
             }
 
@@ -161,7 +162,7 @@ public sealed class ControlPlaneStoreHardeningTests
 
         Assert.AreEqual(4, stored.Select(value => value.Value.Uid).Distinct().Count());
         CollectionAssert.AreEqual(scopes, stored.Select(value => value.Value.ScopeRef!.Value).ToArray());
-        await Assert.ThrowsExactlyAsync<ControlPlaneAmbiguousResourceException>(() =>
+        await Assert.ThrowsExactlyAsync<AmbiguousResourceException>(() =>
             fixture.Store.GetAsync<ExtensionResource>(new ResourceKey("MemoryProvider", "shared"), default));
         foreach (var value in stored)
         {
@@ -171,7 +172,7 @@ public sealed class ControlPlaneStoreHardeningTests
             Assert.AreEqual(value.Value.Uid, byUid?.Value.Uid);
         }
 
-        await Assert.ThrowsExactlyAsync<ControlPlaneConcurrencyException>(() =>
+        await Assert.ThrowsExactlyAsync<ResourceConcurrencyException>(() =>
             fixture.Store.PutExactAsync(ResourceScopeRef.Tenant(tenantA), Resource("shared"), null, true, default));
         Assert.HasCount(1, await fixture.Store.ListExactAsync<ExtensionResource>(ResourceScopeRef.Tenant(tenantA), "MemoryProvider", 0, 10, default));
 
@@ -240,7 +241,7 @@ public sealed class ControlPlaneStoreHardeningTests
         await fixture.EnsureTenantAsync(tenantId);
         var stored = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, Resource("fixed"), null, true, default);
 
-        await Assert.ThrowsExactlyAsync<ControlPlaneConcurrencyException>(() => fixture.Store.PutExactAsync(
+        await Assert.ThrowsExactlyAsync<ResourceConcurrencyException>(() => fixture.Store.PutExactAsync(
             ResourceScopeRef.Tenant(tenantId),
             Resource("fixed") with { Uid = stored.Value.Uid },
             stored.ETag,
@@ -255,8 +256,8 @@ public sealed class ControlPlaneStoreHardeningTests
         var packNamespace = new ResourceNamespace("agentstration.sample-pack");
         var agent = await fixture.Store.PutAsync(new AgentResource
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Agent,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
             Metadata = new ResourceMetadata { Name = "sql-expert", Namespace = packNamespace },
             Generation = 3,
             Definition = new AgentProperties
@@ -268,8 +269,8 @@ public sealed class ControlPlaneStoreHardeningTests
         }, null, true, default);
         var revision = await fixture.Store.CreateImmutableAsync(new AgentRevision
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AgentRevision,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.AgentRevision,
             Metadata = new ResourceMetadata { Name = "sql-expert--000003", Namespace = packNamespace },
             AgentUid = agent.Value.Uid,
             AgentName = "sql-expert",
@@ -281,8 +282,8 @@ public sealed class ControlPlaneStoreHardeningTests
         }, default);
         var deployment = await fixture.Store.PutAsync(new AgentDeployment
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AgentDeployment,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.AgentDeployment,
             Metadata = new ResourceMetadata { Name = "sql-expert--g000003", Namespace = packNamespace },
             RevisionName = revision.Value.Metadata.Name,
             AgentName = "sql-expert",
@@ -296,7 +297,7 @@ public sealed class ControlPlaneStoreHardeningTests
             UpdatedAt = DateTimeOffset.UtcNow
         }, null, true, default);
 
-        var resolver = new ControlPlaneRuntimeAgentResolver(fixture.Store, fixture.Queries);
+        var resolver = new ResourceRuntimeAgentResolver(fixture.Store, fixture.Queries);
         var resolved = await resolver.ResolveAsync(new RuntimeAgentReference("sql-expert", 3) { Namespace = packNamespace }, default);
 
         Assert.AreEqual(agent.Value.Uid, resolved.AgentId);
@@ -313,8 +314,8 @@ public sealed class ControlPlaneStoreHardeningTests
 
         await fixture.Store.CreateImmutableAsync(new AgentRevision
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AgentRevision,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.AgentRevision,
             Metadata = new ResourceMetadata { Name = "sql-expert--000004", Namespace = packNamespace },
             AgentUid = agent.Value.Uid,
             AgentName = "sql-expert",
@@ -336,8 +337,8 @@ public sealed class ControlPlaneStoreHardeningTests
         var agentId = Guid.NewGuid();
         var revision = new AgentRevision
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.AgentRevision,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.AgentRevision,
             Metadata = new ResourceMetadata { Name = "sql-expert--000003" },
             AgentUid = agentId,
             AgentName = "sql-expert",
@@ -351,7 +352,7 @@ public sealed class ControlPlaneStoreHardeningTests
         var attempts = await Task.WhenAll(CreateAsync(), CreateAsync());
 
         Assert.AreEqual(1, attempts.Count(succeeded => succeeded));
-        Assert.HasCount(1, await fixture.Store.ListAsync<AgentRevision>(ResourceKinds.AgentRevision, 0, 10, default));
+        Assert.HasCount(1, await fixture.Store.ListAsync<AgentRevision>(AgentResourceKinds.AgentRevision, 0, 10, default));
 
         async Task<bool> CreateAsync()
         {
@@ -360,7 +361,7 @@ public sealed class ControlPlaneStoreHardeningTests
                 _ = await fixture.Store.CreateImmutableAsync(revision, default);
                 return true;
             }
-            catch (ControlPlaneConcurrencyException)
+            catch (ResourceConcurrencyException)
             {
                 return false;
             }
@@ -414,10 +415,10 @@ public sealed class ControlPlaneStoreHardeningTests
     private sealed class StoreFixture(
         string directory,
         ServiceProvider provider,
-        IControlPlaneStore store,
+        IResourceStore store,
         IAgentResourceQueries queries) : IAsyncDisposable
     {
-        public IControlPlaneStore Store { get; } = store;
+        public IResourceStore Store { get; } = store;
         public IAgentResourceQueries Queries { get; } = queries;
         public IResourceScopeResolver ScopeResolver => Provider.GetRequiredService<IResourceScopeResolver>();
         public ICurrentRequestContext RequestContext => Provider.GetRequiredService<ICurrentRequestContext>();
@@ -446,7 +447,7 @@ public sealed class ControlPlaneStoreHardeningTests
             if (context is not null) services.AddSingleton<ICurrentRequestContext>(context);
             services.AddSqliteControlPlane($"Data Source={Path.Combine(directory, "management.db")}");
             var provider = services.BuildServiceProvider();
-            var store = provider.GetRequiredService<IControlPlaneStore>();
+            var store = provider.GetRequiredService<IResourceStore>();
             await store.InitializeAsync(default);
             return new StoreFixture(directory, provider, store, provider.GetRequiredService<IAgentResourceQueries>());
         }

@@ -2,10 +2,13 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
-using Agentstration.Management.Core;
+using Agentstration.Agents;
+using Agentstration.Agents.Contracts;
+using Agentstration.Api.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
+using Agentstration.Models;
+using Agentstration.Models.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.AspNetCore.Hosting;
@@ -54,8 +57,8 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
         var stored = await profiles.CreateAsync(new ModelProfileResource
         {
             Metadata = new ResourceMetadata { Name = "migration-profile" },
-            Kind = ResourceKinds.ModelProfile,
-            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ModelResourceKinds.ModelProfile,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Definition = new ModelProfileProperties
             {
                 DisplayName = "Migration profile",
@@ -204,8 +207,8 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
         Assert.AreEqual(HttpStatusCode.Created, createdProfile.StatusCode);
         var agentRequest = new AgentResourceRequest
         {
-            ApiVersion = ManagementApiVersions.CoreV1,
-            Kind = ResourceKinds.Agent,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
             Metadata = new ResourceMetadata { Name = "concierge", Namespace = agentNamespace },
             Definition = new AgentProperties
             {
@@ -347,8 +350,8 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
         var profile = new ModelProfileResource
         {
             Metadata = new ResourceMetadata { Name = "canonical-profile" },
-            Kind = ResourceKinds.ModelProfile,
-            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ModelResourceKinds.ModelProfile,
+            ApiVersion = ResourceApiVersions.CoreV1,
             Definition = new ModelProfileProperties
             {
                 DisplayName = "Canonical profile",

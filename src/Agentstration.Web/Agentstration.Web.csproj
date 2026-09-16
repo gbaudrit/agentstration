@@ -1,33 +1,38 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.Api/Agentstration.Api.csproj" />
+    <ProjectReference Include="../Agentstration.Console.Client/Agentstration.Console.Client.csproj" />
+    <ProjectReference Include="../Agentstration.Console.Components/Agentstration.Console.Components.csproj" />
     <ProjectReference Include="../Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
     <ProjectReference Include="../Agentstration.Web.FlowDesigner/Agentstration.Web.FlowDesigner.csproj" />
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
     <ProjectReference Include="../Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
-    <ProjectReference Include="../Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
-    <ProjectReference Include="../Agentstration.Flow.Contracts/Agentstration.Flow.Contracts.csproj" />
-    <ProjectReference Include="../Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
-    <ProjectReference Include="../Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Application/Agentstration.Flows.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Contracts/Agentstration.Flows.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Extensions/Agentstration.Extensions.csproj" />
+    <ProjectReference Include="../Agentstration.Extensions.Aep/Agentstration.Extensions.Aep.csproj" />
+    <ProjectReference Include="../Agentstration.Identity/Agentstration.Identity.csproj" />
+    <ProjectReference Include="../Agentstration.Models.Application/Agentstration.Models.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Packs/Agentstration.Packs.csproj" />
+    <ProjectReference Include="../Agentstration.Sources/Agentstration.Sources.csproj" />
     <ProjectReference Include="../Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Contracts/Agentstration.Runtime.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
+    <ProjectReference Include="../Agentstration.Runtime.Profiles/Agentstration.Runtime.Profiles.csproj" />
     <ProjectReference Include="../Agentstration.Security.AspNetCoreIdentity/Agentstration.Security.AspNetCoreIdentity.csproj" />
     <ProjectReference Include="../Agentstration.Security.AspNetCoreIdentity.PostgreSql/Agentstration.Security.AspNetCoreIdentity.PostgreSql.csproj" />
     <ProjectReference Include="../Agentstration.Work.Contracts/Agentstration.Work.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Workplace.Components/Agentstration.Workplace.Components.csproj" />
+    <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Agentstration.Web.Tests" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
-    <PackageReference Include="ModelContextProtocol.AspNetCore" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
-    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
   </ItemGroup>
 </Project>

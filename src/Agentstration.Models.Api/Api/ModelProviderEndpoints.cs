@@ -1,0 +1,140 @@
+using Agentstration.Api.Contracts;
+using Agentstration.Models;
+using Agentstration.Models.Contracts;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
+using Agentstration.Web.Security;
+
+namespace Agentstration.Web.Api.Models;
+
+internal sealed class ListModelProvidersEndpoint : IModelManagementEndpoint
+{
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+    private static Task<IResult> HandleAsync(ModelProviderManagementService service, CancellationToken cancellationToken) =>
+        ModelsApiHttp.ExecuteAsync(async () =>
+        {
+            var providers = await service.ListAsync(cancellationToken);
+            return Results.Ok(new ValueResponse<ModelProviderResponse>(providers.Select(provider => ModelProviderMappings.Response(provider)).ToArray()));
+        });
+}
+
+internal sealed class GetModelProviderEndpoint : IModelManagementEndpoint
+{
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, HttpResponse response, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+        ModelsApiHttp.ExecuteAsync(async () =>
+        {
+            var stored = await service.GetAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken)
+                ?? throw new ModelProviderResourceNotFoundException(providerName);
+            return ModelsApiHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
+        });
+}
+
+internal sealed class CreateModelProviderEndpoint : IModelManagementEndpoint
+{
+    public static void Map(RouteGroupBuilder group) => group.MapPost("/", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+    private static Task<IResult> HandleAsync(CreateModelProviderRequest body, HttpResponse response, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+        ModelsApiHttp.ExecuteAsync(async () =>
+        {
+            var stored = await service.CreateAsync(new ModelProviderResource
+            {
+                Metadata = new ResourceMetadata { Name = body.Name, Namespace = ModelsApiHttp.Namespace(body.Namespace) },
+                Kind = ModelResourceKinds.ModelProvider,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Definition = body.Properties,
+                ScopeRef = body.ScopeRef
+            }, cancellationToken);
+            response.Headers.Location = $"/api/modelproviders/{Uri.EscapeDataString(stored.Value.Name)}?resourceNamespace={Uri.EscapeDataString(stored.Value.Namespace.Value)}";
+            return ModelsApiHttp.ResourceResult(stored, response, StatusCodes.Status201Created);
+        });
+}
+
+internal sealed class PutModelProviderEndpoint : IModelManagementEndpoint
+{
+    public static void Map(RouteGroupBuilder group) => group.MapPut("/{providerName}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, PutModelProviderRequest body, HttpRequest request, HttpResponse response, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+        ModelsApiHttp.ExecuteAsync(async () => ModelsApiHttp.ResourceResult(
+            await service.PutAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, body.Properties, ModelsApiHttp.IfMatch(request), cancellationToken),
+            response,
+            StatusCodes.Status200OK));
+}
+
+internal sealed class DeleteModelProviderEndpoint : IModelManagementEndpoint
+{
+    public static void Map(RouteGroupBuilder group) => group.MapDelete("/{providerName}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, HttpRequest request, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+        ModelsApiHttp.ExecuteAsync(async () =>
+        {
+            await service.DeleteAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, ModelsApiHttp.IfMatch(request), cancellationToken);
+            return Results.NoContent();
+        });
+}
+
+internal sealed class GetModelProviderUsagesEndpoint : IModelManagementEndpoint
+{
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}/usages", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+        ModelsApiHttp.ExecuteAsync(async () =>
+        {
+            var @namespace = ModelsApiHttp.Namespace(resourceNamespace);
+            _ = await service.GetAsync(@namespace, providerName, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(providerName);
+            var usages = await service.GetUsagesAsync(@namespace, ModelProviderManagementService.ModelProviderId(providerName), cancellationToken);
+            var values = usages.Select(value => new ModelProviderUsageResponse(value.Kind, value.Name, value.Name, value.DisplayName)).ToArray();
+            return Results.Ok(new ModelProviderUsagesResponse(values, values.Length));
+        });
+}
+
+internal sealed class TestModelProviderEndpoint : IModelManagementEndpoint
+{
+    public static void Map(RouteGroupBuilder group) => group.MapPost("/{providerName}/test", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+        ModelsApiHttp.ExecuteAsync(async () =>
+        {
+            var provider = await service.GetStatusAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken);
+            return Results.Ok(new ModelProviderStatusResponse(provider.Configuration.Name, provider.Health.Status, provider.CheckedAt, provider.Health.Details));
+        });
+}
+
+internal sealed class ListProviderModelsEndpoint : IModelManagementEndpoint
+{
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}/models", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+        ModelsApiHttp.ExecuteAsync(async () =>
+        {
+            var models = await service.ListModelsAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken);
+            return Results.Ok(new ValueResponse<AvailableModelResponse>(models.Select(model =>
+                new AvailableModelResponse(model.Name, model.DisplayName, model.Status, model.Capabilities, model.Metadata)).ToArray()));
+        });
+}
+
+internal sealed class GetModelProviderStatusEndpoint : IModelManagementEndpoint
+{
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}/status", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+        ModelsApiHttp.ExecuteAsync(async () =>
+        {
+            var provider = await service.GetStatusAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken);
+            return Results.Ok(new ModelProviderStatusResponse(provider.Configuration.Name, provider.Health.Status, provider.CheckedAt, provider.Health.Details));
+        });
+}
+
+internal static class ModelProviderMappings
+{
+    public static ModelProviderResponse Response(ModelProviderView provider, bool includeEndpoint = false) => new(
+        provider.Configuration.Uid.ToString("D"),
+        provider.Configuration.Name,
+        new ModelProviderPropertiesResponse(
+            provider.Configuration.DisplayName ?? provider.Configuration.Name,
+            provider.Configuration.AdapterType,
+            provider.Configuration.ContributionId,
+            provider.Configuration.Extension.Name,
+            (provider.Configuration.Extension.Namespace ?? provider.Configuration.Namespace).Value,
+            provider.Configuration.RegistrationSource.ToString().ToLowerInvariant(),
+            provider.Health.Status,
+            provider.Configuration.EndpointDisplayName,
+            provider.Models.Count,
+            includeEndpoint ? provider.Configuration.Endpoint : null,
+            provider.CheckedAt),
+        provider.Configuration.Namespace.Value,
+        provider.Configuration.ScopeRef);
+}

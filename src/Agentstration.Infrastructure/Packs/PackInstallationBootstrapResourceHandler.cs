@@ -1,6 +1,5 @@
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Packs;
 
 namespace Agentstration.Infrastructure.Packs;
 
@@ -22,7 +21,7 @@ public sealed class PackInstallationBootstrapResourceHandler(
     private const long MaximumArchiveBytes = 8L * 1024 * 1024;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public string Kind => BootstrapResourceKinds.PackInstallation;
+    public string Kind => PackBootstrapKinds.PackInstallation;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(

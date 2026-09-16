@@ -1,9 +1,10 @@
 using System.Text.Json;
 using Agentstration.Infrastructure.Runtime;
-using Agentstration.Management.Abstractions;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
+using Agentstration.Tools;
 
 namespace Agentstration.Runtime.Tests;
 
@@ -117,8 +118,8 @@ public sealed class ManagedToolExecutionHookTests
 
     private static ToolExecutionHookResource Hook() => new()
     {
-        ApiVersion = ManagementApiVersions.CoreV1,
-        Kind = ResourceKinds.ToolExecutionHook,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ToolResourceKinds.ToolExecutionHook,
         Metadata = new ResourceMetadata { Name = "managed-deny" },
         ScopeRef = ResourceScopeRef.Workspace(Workspace.Value),
         Generation = 1,
@@ -174,7 +175,7 @@ public sealed class ManagedToolExecutionHookTests
             invoke(context, cancellationToken);
     }
 
-    private sealed class HookResourceStore(IReadOnlyList<ToolExecutionHookResource> resources) : IControlPlaneStore
+    private sealed class HookResourceStore(IReadOnlyList<ToolExecutionHookResource> resources) : IResourceStore
     {
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException();
@@ -190,7 +191,7 @@ public sealed class ManagedToolExecutionHookTests
         public Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
-    private sealed class FailingHookResourceStore : IControlPlaneStore
+    private sealed class FailingHookResourceStore : IResourceStore
     {
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException();

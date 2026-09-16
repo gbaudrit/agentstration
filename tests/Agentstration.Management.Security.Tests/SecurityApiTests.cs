@@ -3,9 +3,14 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Extensions;
+using Agentstration.Extensions.Aep;
+using Agentstration.Identity;
+using Agentstration.Models;
+using Agentstration.Packs;
+using Agentstration.Runtime.Core;
 using Agentstration.Security.AspNetCoreIdentity;
+using Agentstration.Sources;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Microsoft.AspNetCore.Hosting;
@@ -36,6 +41,7 @@ public sealed partial class SecurityApiTests
             {
                 Func<HttpMessageHandler> handlerFactory = () => Server.CreateHandler();
                 RouteThroughTestServer<IUserPreferencesClient>(services, handlerFactory);
+                RouteThroughTestServer<IIdentityAdministrationApiClient>(services, handlerFactory);
                 RouteThroughTestServer<IManagementApiClient>(services, handlerFactory);
                 RouteThroughTestServer<IModelProvidersClient>(services, handlerFactory);
                 RouteThroughTestServer<IFlowApiClient>(services, handlerFactory);

@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using Agentstration.Management.Abstractions;
+using Agentstration.Identity.Contracts;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;

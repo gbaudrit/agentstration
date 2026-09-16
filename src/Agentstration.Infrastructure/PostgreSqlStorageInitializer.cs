@@ -46,9 +46,9 @@ internal sealed class PostgreSqlStorageInitializer(
             await using (var command = new NpgsqlCommand("CREATE SCHEMA IF NOT EXISTS management; CREATE SCHEMA IF NOT EXISTS work; CREATE SCHEMA IF NOT EXISTS flow; CREATE SCHEMA IF NOT EXISTS runtime; CREATE SCHEMA IF NOT EXISTS identity; CREATE SCHEMA IF NOT EXISTS scheduler;", connection))
                 await command.ExecuteNonQueryAsync(cancellationToken);
 
-            await MigrateFactoryAsync<Agentstration.Management.Storage.PostgreSql.ControlPlaneDbContext>(services, cancellationToken);
+            await MigrateFactoryAsync<Agentstration.ResourceManagement.Storage.PostgreSql.ResourceManagementDbContext>(services, cancellationToken);
             await MigrateFactoryAsync<Agentstration.Work.Storage.PostgreSql.WorkDbContext>(services, cancellationToken);
-            await MigrateFactoryAsync<Agentstration.Flow.Storage.PostgreSql.FlowDbContext>(services, cancellationToken);
+            await MigrateFactoryAsync<Agentstration.Flows.Storage.PostgreSql.FlowDbContext>(services, cancellationToken);
             await MigrateFactoryAsync<Agentstration.Runtime.Storage.PostgreSql.RuntimeRunDbContext>(services, cancellationToken);
             await using var scope = services.CreateAsyncScope();
             await scope.ServiceProvider.GetRequiredService<LocalIdentityDbContext>().Database.MigrateAsync(cancellationToken);

@@ -107,4 +107,4 @@ On a persistent external instance, run the workspace plan first and set `workspa
 
 Profile inputs may be an ordered array when equivalent environments use different resource names. The journey selects the first available candidate and reports the available options immediately when none match.
 
-See [Browser automation](../../docs/contributing/browser-automation.md), [ADR-0109](../../docs/decisions/0109-product-owned-browser-journeys.md), and [ADR-0110](../../docs/decisions/0110-browser-campaigns-use-dedicated-workspaces.md) for ownership, extension, and external-consumption rules.
+See [Browser automation](../../docs/contributing/browser-automation.md), [ADR-0117](../../docs/decisions/0117-product-owned-browser-journeys.md), and [ADR-0118](../../docs/decisions/0118-browser-campaigns-use-dedicated-workspaces.md) for ownership, extension, and external-consumption rules.

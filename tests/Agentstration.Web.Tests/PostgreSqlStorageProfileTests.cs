@@ -1,5 +1,5 @@
 using System.Net;
-using Agentstration.Management.Abstractions;
+using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;

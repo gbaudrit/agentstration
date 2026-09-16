@@ -1,12 +1,19 @@
 using System.Text.Json;
+using Agentstration.Agents;
 using Agentstration.Application.Work;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.Extensions;
+using Agentstration.Extensions.Aep;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Declarative;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
-using Agentstration.Management.Core;
+using Agentstration.Models;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Core;
+using Agentstration.Runtime.Profiles;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 
@@ -37,7 +44,7 @@ internal static class PackProvenance
 
 public sealed class ModelProviderPackResourceHandler(ModelProviderManagementService service) : IPackResourceHandler
 {
-    public string Kind => ResourceKinds.ModelProvider;
+    public string Kind => ModelResourceKinds.ModelProvider;
     public int InstallOrder => 10;
     public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken) { _ = Parse(resource); return Task.CompletedTask; }
     public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await service.GetAsync(@namespace, name, cancellationToken) is not null;
@@ -59,7 +66,7 @@ public sealed class ModelProviderPackResourceHandler(ModelProviderManagementServ
 
 public sealed class RuntimeProfilePackResourceHandler(RuntimeProfileManagementService service) : IPackResourceHandler
 {
-    public string Kind => ResourceKinds.RuntimeProfile;
+    public string Kind => RuntimeProfileResourceKinds.RuntimeProfile;
     public int InstallOrder => 20;
     public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken) { _ = Parse(resource); return Task.CompletedTask; }
     public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await service.GetAsync(@namespace, name, cancellationToken) is not null;
@@ -81,7 +88,7 @@ public sealed class RuntimeProfilePackResourceHandler(RuntimeProfileManagementSe
 
 public sealed class ModelProfilePackResourceHandler(ModelProfileManagementService service) : IPackResourceHandler
 {
-    public string Kind => ResourceKinds.ModelProfile;
+    public string Kind => ModelResourceKinds.ModelProfile;
     public int InstallOrder => 30;
     public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken) { _ = Parse(resource); return Task.CompletedTask; }
     public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await service.GetAsync(@namespace, name, cancellationToken) is not null;
@@ -103,7 +110,7 @@ public sealed class ModelProfilePackResourceHandler(ModelProfileManagementServic
 
 public sealed class AgentPackResourceHandler(AgentManagementService service) : IPackResourceHandler
 {
-    public string Kind => ResourceKinds.Agent;
+    public string Kind => AgentResourceKinds.Agent;
     public int InstallOrder => 40;
     public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken) { _ = Parse(resource); return Task.CompletedTask; }
     public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await service.GetAgentAsync(@namespace, name, cancellationToken) is not null;
@@ -126,7 +133,7 @@ public sealed class AgentPackResourceHandler(AgentManagementService service) : I
 
 public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinitionValidator graphValidator, TimeProvider timeProvider, ICurrentRequestContext requestContext) : IPackResourceHandler
 {
-    public string Kind => ResourceKinds.Flow;
+    public string Kind => FlowResourceKinds.Flow;
     public int InstallOrder => 50;
     public async Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken)
     {
@@ -168,7 +175,7 @@ public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinition
 
 public sealed class EntryPackResourceHandler(EntryAdministrationService service, IWorkplaceRepository repository, TimeProvider timeProvider, ICurrentRequestContext requestContext) : IPackResourceHandler
 {
-    public string Kind => ResourceKinds.Entry;
+    public string Kind => EntryResourceKinds.Entry;
     public int InstallOrder => 60;
     public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken)
     {
@@ -195,5 +202,5 @@ public sealed class EntryPackResourceHandler(EntryAdministrationService service,
     public Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken) => service.DeleteAsync(CurrentWorkspaceId(), new(resource.Name, resource.Namespace), options.RemoveDashboardReferences, options.CloseInteractions, cancellationToken);
     private static DeclarativeResourceEnvelope<DeclarativeEntryDefinition> Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<DeclarativeResourceEnvelope<DeclarativeEntryDefinition>>(resource.Manifest.GetRawText());
     private WorkspaceId CurrentWorkspaceId() => new(requestContext.Current.WorkspaceId);
-    private static EntryDraft ToDraft(WorkspaceId workspaceId, string name, ResourceNamespace @namespace, DeclarativeEntryDefinition definition, DateTimeOffset now) => new() { WorkspaceId = workspaceId, Id = new(name, @namespace), Name = name, DisplayName = definition.DisplayName ?? name, Description = definition.Description, Presentation = definition.Presentation, Binding = definition.Binding, Behavior = definition.Behavior, UpdatedAt = now };
+    private static EntryDraft ToDraft(WorkspaceId workspaceId, string name, ResourceNamespace @namespace, DeclarativeEntryDefinition definition, DateTimeOffset now) => new() { WorkspaceId = workspaceId, Id = new(name, @namespace), Name = name, DisplayName = definition.DisplayName ?? name, Description = definition.Description, Presentation = definition.Presentation, Exposure = definition.Exposure, Binding = definition.Binding, Behavior = definition.Behavior, UpdatedAt = now };
 }

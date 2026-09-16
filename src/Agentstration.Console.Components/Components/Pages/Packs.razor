@@ -1,0 +1,293 @@
+@page "/packs"
+@implements IDisposable
+@inject IPacksClient Client
+@inject IServiceProvider Services
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<PackStrings> Localizer
+
+<PageTitle>@T("Packs") · Agentstration</PageTitle>
+<PageHeader Title="@T("Packs")" Description="@T("Packs.Description")">
+    <Actions>
+        <button class="button-secondary" disabled="@loading" @onclick="LoadAsync">@T("Refresh")</button>
+        <a class="button-secondary" href="/pack-projects/new">@T("CreateFromWorkspace")</a>
+        <button class="button-primary" @onclick="OpenInstall">@T("InstallLocalPack")</button>
+    </Actions>
+</PageHeader>
+
+<div data-testid="distribution-packs">
+@if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
+}
+else if (packs is null)
+{
+    <LoadingState Message="@T("LoadingInstalledPacks")" />
+}
+else
+{
+    <section class="metric-grid pack-metrics" aria-label="@T("PackMetrics")">
+        <MetricCard Label="@T("InstalledPacks")" Value="@packs.Count.ToString()" Detail="@T("VisibleScopes")" Status="UiStatus.Info" />
+        <MetricCard Label="@T("ManagedResources")" Value="@packs.Sum(pack => pack.Definition.ManagedResources.Count).ToString()" Detail="@T("CreatedFromPacks")" Status="UiStatus.Success" />
+        <MetricCard Label="@T("RequiresAttention")" Value="@AttentionCount.ToString()" Detail="@T("FailedOrDegraded")" Status="@(AttentionCount == 0 ? UiStatus.Neutral : UiStatus.Warning)" />
+        <MetricCard Label="@T("PackProjects")" Value="@(projects?.Count.ToString() ?? "—")" Detail="@T("LocalAuthoring")" Status="UiStatus.Info" />
+    </section>
+
+    @if (packs.Count == 0)
+    {
+        <EmptyState Title="@T("NoPacksInstalled")" Message="@T("NoPacksInstalledMessage")">
+            <button class="button-primary" @onclick="OpenInstall">@T("InstallLocalPack")</button>
+        </EmptyState>
+    }
+    else
+    {
+        <DataGrid TItem="InstalledPackResource" Items="packs">
+            <Header><tr><th>@T("Pack")</th><th>@T("Purpose")</th><th>@T("Audience")</th><th>@T("Version")</th><th>@T("Status")</th><th>@T("Resources")</th><th>@T("Installed")</th><th></th></tr></Header>
+            <Row Context="pack"><tr class="@(IsSelected(pack) ? "selected-pack" : null)">
+                <td><span class="resource-name-with-scope"><strong>@DisplayName(pack)</strong><ResourceScopeBadge ScopeRef="pack.ScopeRef" Compact /></span><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></td>
+                <td><span class="pack-kind">@PurposeLabel(pack.Definition.Purpose)</span></td>
+                <td>@AudienceLabel(pack.Definition.Audience)</td>
+                <td><code>@pack.Definition.Version</code></td>
+                <td><StatusBadge Text="@StateLabel(pack.Definition.State)" Status="@StateTone(pack.Definition.State)" /></td>
+                <td>@pack.Definition.ManagedResources.Count</td>
+                <td><time datetime="@pack.Definition.InstalledAt.ToString("O")">@pack.Definition.InstalledAt.ToLocalTime().ToString("g")</time></td>
+                <td><button class="text-button" @onclick="() => SelectAsync(pack)">@T("Inspect")</button></td>
+            </tr></Row>
+        </DataGrid>
+    }
+
+    @if (selected is not null)
+    {
+        <section class="panel pack-details" aria-label="@T("SelectedPackDetails")">
+            <div class="panel-header">
+                <div><p class="eyebrow">@T("InstalledPack")</p><h2>@DisplayName(selected.Value)</h2></div>
+                <div class="pack-detail-actions"><StatusBadge Text="@StateLabel(selected.Value.Definition.State)" Status="@StateTone(selected.Value.Definition.State)" /><button class="button-secondary" @onclick="OpenFork">@T("Fork")</button><button class="button-danger" @onclick="() => confirmUninstall = true">@T("Uninstall")</button></div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(selected.Value.Definition.Description)) { <p>@selected.Value.Definition.Description</p> }
+            <dl class="resource-details pack-facts">
+                <dt>@T("Identity")</dt><dd><code>@selected.Value.Definition.Publisher/@selected.Value.Definition.PackName</code></dd>
+                <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="selected.Value.ScopeRef" /></dd>
+                <dt>@T("Namespace")</dt><dd><code>@selected.Value.Definition.Namespace</code></dd>
+                <dt>@T("Version")</dt><dd>@selected.Value.Definition.Version</dd>
+                <dt>@T("Purpose")</dt><dd><span class="pack-kind">@PurposeLabel(selected.Value.Definition.Purpose)</span></dd>
+                <dt>@T("Audience")</dt><dd>@AudienceLabel(selected.Value.Definition.Audience)</dd>
+                <dt>@T("Source")</dt><dd>@selected.Value.Definition.Source</dd>
+                <dt>@T("Installed")</dt><dd>@selected.Value.Definition.InstalledAt.ToLocalTime().ToString("F")</dd>
+            </dl>
+            @if (selected.Value.Definition.SourceProvenance is { } source)
+            {
+                <section class="pack-source-provenance">
+                    <p class="eyebrow">@T("SourceProvenance")</p>
+                    <div class="pack-source-heading">
+                        <div>
+                            <h3>@(sourceDisplayName ?? $"{source.SourcePublisher}/{source.SourceName}")</h3>
+                            @if (sourceDisplayName is not null) { <code>@source.SourcePublisher/@source.SourceName</code> }
+                        </div>
+                        @if (sourceUrl is not null) { <a class="text-button" href="@sourceUrl">@T("OpenSource") →</a> }
+                    </div>
+                    <dl class="resource-details pack-facts">
+                        <dt>@T("SourceVersion")</dt><dd>@source.SourceVersion · <code>@source.ManifestDigest</code></dd>
+                        <dt>@T("Channel")</dt><dd>@source.Channel · <code>@source.ProviderRevision</code></dd>
+                        <dt>@T("Snapshot")</dt><dd><code>@source.SnapshotUid</code> · <code>@source.SnapshotDigest</code></dd>
+                        <dt>@T("CatalogEntry")</dt><dd>@source.CatalogName/@source.EntryName · <code>@source.EntryPath</code></dd>
+                    </dl>
+                </section>
+            }
+            <h3>@T("ResourceBindings")</h3>
+            @if (selected.Value.Definition.Bindings.Count == 0) { <p class="pack-muted">@T("NoDeclaredBindings")</p> }
+            else
+            {
+                <div class="pack-binding-list">
+                    @foreach (var binding in selected.Value.Definition.Bindings)
+                    {
+                        <article>
+                            <span class="pack-kind">@BindingKindLabel(binding.TargetKind)</span>
+                            <div><strong>@binding.Name</strong><small><code>@BindingTarget(binding.Target)</code></small></div>
+                            <StatusBadge Text="@T("SecretStatus.Configured")" Status="UiStatus.Success" />
+                        </article>
+                    }
+                </div>
+            }
+            <h3>@T("ManagedResources")</h3>
+            @if (selected.Value.Definition.ManagedResources.Count == 0) { <p class="pack-muted">@T("NoManagedResources")</p> }
+            else
+            {
+                <div class="pack-resource-list">
+                    @foreach (var resource in selected.Value.Definition.ManagedResources)
+                    {
+                        <article><span class="pack-kind">@resource.Kind</span><div><strong>@resource.Name</strong><small>@resource.Path</small></div>@if (DefinitionFormUrl(resource) is { } formUrl) { <a class="text-button" href="@formUrl">@T("Form")</a> }</article>
+                    }
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(selected.Value.Definition.ErrorMessage)) { <p class="error-panel">@selected.Value.Definition.ErrorMessage</p> }
+        </section>
+    }
+
+    @if (projects is { Count: > 0 })
+    {
+        <section class="panel pack-details" aria-label="@T("PackProjects")">
+            <div class="panel-header"><div><p class="eyebrow">@T("LocalAuthoring")</p><h2>@T("PackProjects")</h2></div></div>
+            <div class="pack-resource-list">
+                @foreach (var project in projects)
+                {
+                    <article><span class="pack-kind">@T("Project")</span><div><strong>@project.Definition.DisplayName</strong><small><code>@project.Definition.Publisher/@project.Definition.PackName</code> · @project.Definition.Version · @PurposeLabel(project.Definition.Purpose) · @AudienceLabel(project.Definition.Audience)</small></div><button class="text-button" @onclick="() => OpenProject(project.Uid)">@T("Open")</button></article>
+                }
+            </div>
+        </section>
+    }
+}
+
+@if (installOpen)
+{
+    <div class="dialog-backdrop" role="presentation" @onclick="CloseInstall">
+        <section class="dialog pack-dialog" role="dialog" aria-modal="true" aria-labelledby="pack-install-title" @onclick:stopPropagation="true">
+            <div class="panel-header"><div><p class="eyebrow">@T("LocalArchive")</p><h2 id="pack-install-title">@T("InstallPack")</h2></div><button class="icon-button" @onclick="CloseInstall" aria-label="@T("Close")">×</button></div>
+            <p class="pack-muted">@T("ChoosePackArchive")</p>
+            <label class="pack-file-picker">
+                <span>@T("SelectArchive")</span>
+                <InputFile OnChange="ReadArchiveAsync" accept=".zip,application/zip" disabled="@(previewing || installing)" />
+                <small>@T("MaximumCompressedSize")</small>
+            </label>
+            @if (previewing) { <LoadingState Message="@T("ValidatingArchive")" /> }
+            @if (installError is not null) { <p class="error-panel" role="alert">@installError</p> }
+            @if (preview is not null)
+            {
+                <section class="pack-preview">
+                    <div class="panel-header"><div><strong>@(preview.Metadata.DisplayName ?? preview.Metadata.Name)</strong><small><code>@preview.Metadata.Publisher/@preview.Metadata.Name</code> · @preview.Metadata.Version · @PurposeLabel(preview.Metadata.Purpose) · @AudienceLabel(preview.Metadata.Audience)</small></div><StatusBadge Text="@PreviewStatus" Status="@(CanInstall ? UiStatus.Success : UiStatus.Warning)" /></div>
+                    @if (!string.IsNullOrWhiteSpace(preview.Metadata.Description)) { <p>@preview.Metadata.Description</p> }
+                    <ResourceScopeFormField ResourceKind="@PackKinds.InstalledPack" RequiredKind="@preview.TargetScope" @bind-Value="installScope" Disabled="true" />
+                    <div class="pack-resource-list compact">
+                        @foreach (var resource in preview.Resources)
+                        {
+                            <article><span class="pack-kind">@resource.Kind</span><div><strong>@resource.Name</strong><small>@resource.Path</small></div><StatusBadge Text="@T($"Change.{resource.Change}")" Status="@ChangeTone(resource.Change)" /></article>
+                        }
+                    </div>
+                    @if (preview.Bindings.Count > 0)
+                    {
+                        <section class="pack-bindings" aria-labelledby="pack-bindings-title">
+                            <div class="pack-bindings-heading">
+                                <div><p class="eyebrow">@T("InstallationConfiguration")</p><h3 id="pack-bindings-title">@T("ResourceBindings")</h3></div>
+                                <span>@T("BindingCount", preview.Bindings.Count)</span>
+                            </div>
+                            <p class="pack-muted">@T("ChooseBindingResources")</p>
+                            @foreach (var binding in preview.Bindings)
+                            {
+                                <article class="pack-binding-editor">
+                                    <div class="pack-binding-copy">
+                                        <span class="pack-kind">@BindingKindLabel(binding.TargetKind)</span>
+                                        <div><strong>@binding.DisplayName</strong><small><code>@binding.Name</code>@(binding.Required ? T("RequiredSuffix") : T("OptionalSuffix"))</small></div>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(binding.Description)) { <p>@binding.Description</p> }
+                                    <label>
+                                        <span>@T("WorkspaceResource")</span>
+                                        <select value="@SelectedBinding(binding.Name)" @onchange="args => BindingChanged(binding.Name, args)">
+                                            <option value="">@T("SelectBinding", BindingKindLabel(binding.TargetKind).ToLowerInvariant())</option>
+                                            @if (binding.TargetKind == PackBindingTargetKind.ModelProfile)
+                                            {
+                                                @foreach (var profile in modelProfiles)
+                                                {
+                                                    <option value="@BindingValue(profile.Name, ResourceNamespace.Parse(profile.Namespace))">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name · @profile.Properties.Provider.Name / @profile.Properties.Model.Name</option>
+                                                }
+                                            }
+                                            else if (binding.TargetKind == PackBindingTargetKind.ModelProvider)
+                                            {
+                                                @foreach (var provider in modelProviders)
+                                                {
+                                                    <option value="@BindingValue(provider.Name, ResourceNamespace.Default)">@provider.Properties.DisplayName — default/@provider.Name · @provider.Properties.ContributionId</option>
+                                                }
+                                            }
+                                            else if (binding.TargetKind == PackBindingTargetKind.ExtensionRegistration)
+                                            {
+                                                @foreach (var extension in extensionRegistrations)
+                                                {
+                                                    <option value="@BindingValue(extension.Name, extension.Namespace)">@extension.Definition.DisplayName — @extension.Namespace/@extension.Name</option>
+                                                }
+                                            }
+                                            else if (binding.TargetKind == PackBindingTargetKind.RuntimeProfile)
+                                            {
+                                                @foreach (var runtimeProfile in runtimeProfiles)
+                                                {
+                                                    <option value="@BindingValue(runtimeProfile.Name, ResourceNamespace.Parse(runtimeProfile.Namespace))">@runtimeProfile.Properties.DisplayName — @runtimeProfile.Namespace/@runtimeProfile.Name · @runtimeProfile.Properties.RuntimeType</option>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                @foreach (var secret in secrets)
+                                                {
+                                                    <option value="@BindingValue(secret.Resource.Name, secret.Resource.Namespace)">@secret.Resource.Definition.DisplayName — @secret.Resource.Namespace/@secret.Resource.Name (@T($"SecretStatus.{secret.ValueStatus}"))</option>
+                                                }
+                                            }
+                                        </select>
+                                    </label>
+                                    <small>@T("UsedBySimple", string.Join(", ", binding.UsedBy.Select(resource => $"{resource.ResourceKind}/{resource.ResourceName}")))</small>
+                                    @if (binding.Target is not null && !binding.TargetAvailable) { <p class="inline-warning">@T("PreviousResourceUnavailable")</p> }
+                                </article>
+                            }
+                        </section>
+                    }
+                    @if (preview.AlreadyInstalled)
+                    {
+                        <section class="pack-reinstall-option" aria-label="@T("PackReplacement")">
+                            <label class="studio-checkbox"><input type="checkbox" @bind="replaceExisting" /> @T("ReplaceInstalledPack")</label>
+                            <p class="pack-muted">@T("ReconcileResourcesHelp")</p>
+                            <label class="studio-checkbox"><input type="checkbox" @bind="removeDashboardReferences" /> @T("RemoveDashboardReferencesForRemovedEntries")</label>
+                        </section>
+                    }
+                </section>
+            }
+            <div class="dialog-actions"><button class="button-secondary" @onclick="CloseInstall">@T("Cancel")</button><button class="button-primary" disabled="@(!CanInstall || installing)" @onclick="InstallAsync">@(installing ? T("Installing") : T("InstallPack"))</button></div>
+        </section>
+    </div>
+}
+
+@if (forkOpen && selected is not null)
+{
+    <div class="dialog-backdrop" role="presentation" @onclick="CloseFork">
+        <section class="dialog pack-dialog" role="dialog" aria-modal="true" aria-labelledby="pack-fork-title" @onclick:stopPropagation="true">
+            <div class="panel-header"><div><p class="eyebrow">@T("EditableCopy")</p><h2 id="pack-fork-title">@T("ForkPack", DisplayName(selected.Value))</h2></div><button class="icon-button" @onclick="CloseFork" aria-label="@T("Close")">×</button></div>
+            <p class="pack-muted">@T("ForkPackHelp")</p>
+            @if (selected.Value.Definition.SourceArtifact is null)
+            {
+                <section class="pack-source-recovery" aria-labelledby="pack-source-title">
+                    <div class="pack-source-icon" aria-hidden="true">↥</div>
+                    <div>
+                        <h3 id="pack-source-title">@T("SourceArchiveRequired")</h3>
+                        <p>@T("SourceArchiveRequiredMessage")</p>
+                    </div>
+                    <label class="pack-source-picker">
+                        <span>@(sourceAttaching ? T("VerifyingArchive") : T("SelectOriginalPackZip"))</span>
+                        <InputFile OnChange="AttachSourceAsync" accept=".zip,application/zip" disabled="@sourceAttaching" />
+                    </label>
+                </section>
+                @if (forkError is not null) { <p class="error-panel" role="alert">@forkError</p> }
+                <div class="dialog-actions"><button class="button-secondary" @onclick="CloseFork">@T("Cancel")</button></div>
+            }
+            else
+            {
+                @if (forkNotice is not null) { <p class="pack-success" role="status">@forkNotice</p> }
+                <div class="form-grid pack-fork-grid">
+                    <label><span>@T("Publisher")</span><input @bind="forkPublisher" autocomplete="off" spellcheck="false" /></label>
+                    <label><span>@T("Name")</span><input @bind="forkName" autocomplete="off" spellcheck="false" /></label>
+                    <label><span>@T("Version")</span><input @bind="forkVersion" autocomplete="off" spellcheck="false" /></label>
+                    <label><span>@T("DisplayName")</span><input @bind="forkDisplayName" /></label>
+                    <label class="form-span-2"><span>@T("Description")</span><textarea rows="3" @bind="forkDescription"></textarea></label>
+                </div>
+                @if (forkError is not null) { <p class="error-panel" role="alert">@forkError</p> }
+                <div class="dialog-actions"><button class="button-secondary" @onclick="CloseFork">@T("Cancel")</button><button class="button-primary" disabled="@(!CanSubmitFork)" @onclick="ForkAsync">@(forking ? T("Creating") : T("CreatePackProject"))</button></div>
+            }
+        </section>
+    </div>
+}
+
+@if (confirmUninstall)
+{
+    <div class="dialog-backdrop" role="presentation">
+        <section class="dialog pack-dialog" role="dialog" aria-modal="true" aria-labelledby="pack-uninstall-title">
+            <h2 id="pack-uninstall-title">@T("UninstallPackQuestion")</h2>
+            <p>@T("UninstallPackMessage")</p>
+            <label class="studio-checkbox"><input type="checkbox" @bind="removeDashboardReferences" /> @T("RemovePackEntriesFromDashboards")</label>
+            <p class="pack-muted">@T("DashboardCascadeHelp")</p>
+            <div class="dialog-actions"><button class="button-secondary" @onclick="() => confirmUninstall = false">@T("Cancel")</button><button class="button-danger" @onclick="UninstallAsync">@T("Uninstall")</button></div>
+        </section>
+    </div>
+}
+</div>

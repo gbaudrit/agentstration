@@ -1,6 +1,6 @@
 using System.Text;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
+using Agentstration.Sources;
+using Agentstration.Sources.Contracts;
 
 namespace Agentstration.Tools.SourceRegistry;
 

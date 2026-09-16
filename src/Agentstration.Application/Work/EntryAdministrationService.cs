@@ -40,6 +40,8 @@ public sealed class EntryAdministrationService(
 
     public async Task<EntryDraft> SaveAsync(EntryDraft draft, CancellationToken cancellationToken)
     {
+        if (draft.WorkspaceId != context.WorkspaceId)
+            throw new WorkValidationException("entry_workspace_mismatch", "An Entry draft must be saved in the current Workspace.");
         WorkplaceValidation.Validate(draft);
         var current = await repository.GetEntryDraftAsync(draft.WorkspaceId, draft.Id, cancellationToken);
         var saved = draft with
@@ -89,6 +91,7 @@ public sealed class EntryAdministrationService(
             DisplayName = draft.DisplayName,
             Description = draft.Description,
             Presentation = draft.Presentation,
+            Exposure = draft.Exposure,
             ResolvedTarget = resolved,
             Behavior = draft.Behavior,
             Version = previous is null ? 1 : checked(previous.Version + 1),
