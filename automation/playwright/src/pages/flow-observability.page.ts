@@ -1,4 +1,4 @@
-import { type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit } from './controls.js';
 
@@ -57,9 +57,12 @@ export class FlowObservabilityPage {
   public async createAgentRun(consoleUrl: string, agentName: string, prompt: string): Promise<string> {
     requireIdentifier(agentName, 'agent');
     await this.open(consoleUrl, `/agents/${encodeURIComponent(agentName)}/run`, 'agentRunner');
-    await fillAndCommit(this.page.getByTestId(TestIds.flowObservability.agentRunPrompt), prompt);
+    await this.page.locator(`[data-testid="${TestIds.flowObservability.agentRunner}"][data-interactive="true"]`).waitFor({ state: 'visible' });
+    const promptInput = this.page.getByTestId(TestIds.flowObservability.agentRunPrompt);
+    await fillAndCommit(promptInput, prompt);
+    await expect(promptInput).toHaveValue(prompt);
     const submit = this.page.getByTestId(TestIds.flowObservability.agentRunSubmit);
-    await submit.waitFor({ state: 'visible' });
+    await expect(submit).toBeEnabled();
     await submit.click();
     const details = this.page.getByTestId(TestIds.flowObservability.agentRunDetails);
     await details.waitFor({ state: 'visible' });

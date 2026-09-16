@@ -28,7 +28,7 @@
     </Actions>
 </PageHeader>
 
-<div data-testid="distribution-sources">
+<div data-testid="distribution-sources" data-interactive="@(interactive ? "true" : "false")">
 @if (denied)
 {
     <ErrorState Title="@T("PlatformAdministratorRequired")" Message="@T("PlatformAdministratorRequiredMessage")" />
@@ -345,6 +345,8 @@ else
     private string importYaml = string.Empty;
     private ResourceScopeRef? importScope;
     private bool importing;
+    private bool interactive;
+    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
     private bool busy;
     private bool denied;
     private string? error;

@@ -25,6 +25,7 @@ export class DistributionPage {
 
   public async openFirstExtensionDetails(consoleUrl: string): Promise<void> {
     await this.open(consoleUrl, '/extensions', 'extensions');
+    await this.page.locator(`[data-testid="${TestIds.distribution.extensions}"][data-interactive="true"]`).waitFor({ state: 'visible' });
     await this.page.getByTestId(TestIds.distribution.extensionCatalogTab).click();
     const detail = this.page.locator('#extensions-panel-catalog a.text-button[href^="/extensions/"]').first();
     await detail.waitFor({ state: 'visible' });
@@ -34,6 +35,7 @@ export class DistributionPage {
 
   public async createSourceProvider(consoleUrl: string, name: string, displayName: string): Promise<void> {
     await this.open(consoleUrl, '/sourceproviders/new', 'sourceProviderDetails');
+    await this.page.locator(`[data-testid="${TestIds.distribution.sourceProviderDetails}"][data-interactive="true"]`).waitFor({ state: 'visible' });
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.providerDisplayName), displayName);
     const extension = this.page.getByTestId(TestIds.distribution.providerExtension);
     await extension.selectOption({ index: 1 });
@@ -50,6 +52,7 @@ export class DistributionPage {
 
   public async importSource(consoleUrl: string, publisher: string, name: string, yaml: string): Promise<void> {
     await this.open(consoleUrl, '/settings/sources', 'sources');
+    await this.page.locator(`[data-testid="${TestIds.distribution.sources}"][data-interactive="true"]`).waitFor({ state: 'visible' });
     await this.page.getByTestId(TestIds.distribution.sourceImportOpen).click();
     await this.page.getByTestId(TestIds.distribution.sourceImportYamlMode).click();
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.sourceImportYaml), yaml);
@@ -62,10 +65,12 @@ export class DistributionPage {
 
   public async createPackProject(consoleUrl: string, project: PackProjectDefinition): Promise<string> {
     await this.open(consoleUrl, '/pack-projects/new', 'packComposer');
+    await this.page.locator(`[data-testid="${TestIds.distribution.packComposer}"][data-interactive="true"]`).waitFor({ state: 'visible' });
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectPublisher), project.publisher);
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectName), project.name);
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectVersion), project.version);
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectDisplayName), project.displayName);
+    await expect(this.page.getByTestId(TestIds.distribution.packProjectName)).toHaveValue(project.name);
     const add = this.page.locator('[data-resource-kind="Flow"][data-resource-name="system-direct-agent-dotnet-expert"]')
       .getByTestId(TestIds.distribution.packProjectAddResource);
     await add.waitFor({ state: 'visible' });

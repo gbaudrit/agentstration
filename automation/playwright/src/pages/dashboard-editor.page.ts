@@ -9,6 +9,7 @@ export class DashboardEditorPage {
     const response = await this.page.goto(`${consoleUrl}/workspaces?${query}`, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Dashboard editor returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.editor.waitFor({ state: 'visible' });
+    await this.page.locator(`[data-testid="${TestIds.dashboardEditor.editor}"][data-interactive="true"]`).waitFor({ state: 'visible' });
     await this.entryRow(entryName, entryNamespace).waitFor({ state: 'visible' });
   }
 

@@ -30,6 +30,7 @@ public partial class Extensions
     private readonly CancellationTokenSource cancellation = new();
     private Task? initialLoad;
     private bool disposed;
+    private bool interactive;
     private IReadOnlyList<ExtensionInventoryItemResponse>? inventory;
     private IReadOnlyList<ExtensionRegistrationResource>? registrations;
     private IReadOnlyList<AepEnrollmentRequestResource>? enrollments;
@@ -106,7 +107,10 @@ public partial class Extensions
         {
             await initialLoad;
             if (!disposed)
+            {
+                interactive = true;
                 await InvokeAsync(StateHasChanged);
+            }
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {

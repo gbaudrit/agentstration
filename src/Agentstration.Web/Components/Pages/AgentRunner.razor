@@ -9,7 +9,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunnerInspectorStrings> InspectorLocalizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
-<div data-testid="flow-observability-agent-runner">
+<div data-testid="flow-observability-agent-runner" data-interactive="@(interactive ? "true" : "false")">
 <PageHeader Title="@T("Title")" Description="@T("Description")">
     <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@(agent is null || preparing)">@(preparing ? T("Reconciling") : T("ReconcileRuntime"))</button><a class="button-secondary" href="@BackUrl">@T("BackToAgent")</a></Actions>
 </PageHeader>
@@ -177,12 +177,15 @@ else
     private bool advanced;
     private bool connectionLost;
     private bool preparing;
+    private bool interactive;
     private bool IsBusy => state.Run is not null && !state.State.IsTerminal();
     private bool CanRun => readiness is { Ready: true }
         && modelResolution?.Status is not ("providerUnavailable" or "modelUnavailable" or "invalidConfiguration");
     private bool CanCancel => state.Run is not null && state.State is RuntimeRunState.Pending or RuntimeRunState.Running;
     private string BackUrl => agent is null ? "/agents" : $"/agents/{Uri.EscapeDataString(agent.Name)}";
     private string RawResponse => JsonSerializer.Serialize(new { run = state.Run, events = state.Events }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+
+    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
 
     protected override async Task OnParametersSetAsync()
     {

@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 
 export interface WorkplaceRouteContext {
@@ -46,7 +46,11 @@ export class WorkplacePage {
   }
 
   public async submitPrompt(content: string): Promise<WorkplaceConversation> {
-    await this.page.getByTestId(TestIds.workplace.promptInput).fill(content);
+    await this.page.locator(`[data-testid="${TestIds.workplace.promptForm}"][data-interactive="true"]`).waitFor({ state: 'visible' });
+    const promptInput = this.page.getByTestId(TestIds.workplace.promptInput);
+    await promptInput.fill(content);
+    await expect(promptInput).toHaveValue(content);
+    await expect(this.page.getByTestId(TestIds.workplace.promptSubmit)).toBeEnabled();
     await Promise.all([
       this.page.waitForURL(url => /\/conversations\/[0-9a-f-]{36}$/i.test(url.pathname)),
       this.page.getByTestId(TestIds.workplace.promptSubmit).click(),
@@ -59,10 +63,13 @@ export class WorkplacePage {
   }
 
   public async submitForm(fieldName: string, content: string): Promise<WorkplaceConversation> {
+    await this.page.locator(`[data-testid="${TestIds.workplace.formForm}"][data-interactive="true"]`).waitFor({ state: 'visible' });
     const field = this.page.locator(
       `[data-testid="${TestIds.workplace.formInput}"][data-field-name="${attributeValue(fieldName)}"]`,
     );
-    await field.locator('input, textarea, select').fill(content);
+    const input = field.locator('input, textarea, select');
+    await input.fill(content);
+    await expect(input).toHaveValue(content);
     await Promise.all([
       this.page.waitForURL(url => /\/conversations\/[0-9a-f-]{36}$/i.test(url.pathname)),
       this.page.getByTestId(TestIds.workplace.formSubmit).click(),

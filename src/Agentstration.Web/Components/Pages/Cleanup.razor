@@ -12,7 +12,7 @@
     <Metadata><span>@T("WorkspaceScope")</span>@if (inventory is not null) { <span>@T("AvailableCount", inventory.All.Count)</span> }</Metadata>
     <Actions><button class="button-secondary" type="button" @onclick="() => LoadAsync(true)" disabled="@(loading || deleting)">@T("Refresh")</button></Actions>
 </PageHeader>
-<div data-testid="operations-cleanup">
+<div data-testid="operations-cleanup" data-interactive="@(interactive ? "true" : "false")">
 
 @if (ContextState.IsLoading || loading && inventory is null)
 {
@@ -147,6 +147,9 @@ else if (inventory is not null)
     private bool deleting;
     private bool confirming;
     private bool acknowledged;
+    private bool interactive;
+
+    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
     private bool removeDashboardReferences;
     private bool closeInteractions;
     private bool deleteSystemManagedFlows;

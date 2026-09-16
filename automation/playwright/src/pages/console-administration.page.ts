@@ -1,4 +1,4 @@
-import { type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit } from './controls.js';
 import type { ExpectedText } from '../locales/expected-text.js';
@@ -68,9 +68,14 @@ export class ConsoleAdministrationPage {
       data: { theme: 'Dark', language },
     });
     if (!response.ok()) throw new Error(`Preference cleanup returned HTTP ${response.status()}.`);
-    await this.page.goto(`${consoleUrl}/_culture?culture=${encodeURIComponent(language)}&returnUrl=${encodeURIComponent('/settings/profile')}`, {
-      waitUntil: 'domcontentloaded',
-    });
+    const culture = await this.page.request.get(`${consoleUrl}/_culture?culture=${encodeURIComponent(language)}&returnUrl=${encodeURIComponent('/settings/profile')}`);
+    if (!culture.ok()) throw new Error(`Culture cleanup returned HTTP ${culture.status()}.`);
+    try {
+      await this.page.goto(`${consoleUrl}/settings/profile`, { waitUntil: 'domcontentloaded' });
+    } catch (error) {
+      if (!(error instanceof Error) || !/net::ERR_ABORTED|interrupted by another navigation/.test(error.message)) throw error;
+      await this.page.waitForLoadState('domcontentloaded');
+    }
     await this.page.locator(`html[lang="${language}"]`).waitFor({ state: 'attached' });
   }
 
@@ -94,10 +99,13 @@ export class ConsoleAdministrationPage {
 
   public async exerciseShellNavigation(): Promise<void> {
     await this.page.getByTestId(TestIds.console.breadcrumb).waitFor({ state: 'visible' });
+    await this.page.locator(`[data-testid="${TestIds.console.shell}"][data-preferences-ready="true"]`).waitFor({ state: 'visible' });
     const sidebarToggle = this.page.getByTestId(TestIds.console.sidebarToggle);
+    const expanded = await sidebarToggle.getAttribute('aria-expanded');
     await sidebarToggle.click();
-    await this.page.locator(`[data-testid="${TestIds.console.shell}"].sidebar-collapsed`).waitFor();
+    await expect.poll(() => sidebarToggle.getAttribute('aria-expanded')).not.toBe(expanded);
     await sidebarToggle.click();
+    await expect.poll(() => sidebarToggle.getAttribute('aria-expanded')).toBe(expanded);
     await this.page.getByTestId(TestIds.console.commandTrigger).click();
     await this.page.getByTestId(TestIds.console.commandPalette).waitFor({ state: 'visible' });
     await this.page.getByTestId(TestIds.console.commandPalette).getByRole('option').first().waitFor({ state: 'visible' });

@@ -12,7 +12,7 @@
     </Actions>
 </PageHeader>
 
-<div data-testid="distribution-pack-composer">
+<div data-testid="distribution-pack-composer" data-interactive="@(interactive ? "true" : "false")">
 @if (error is not null)
 {
     <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
@@ -204,6 +204,9 @@ else
     private bool loading = true;
     private bool creating;
     private bool reviewing;
+    private bool interactive;
+
+    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
 
     private IReadOnlyList<string> Kinds => resources.Select(item => item.Resource.Kind).Distinct(StringComparer.Ordinal).Order().ToArray();
     private IReadOnlyList<PackCompositionCatalogItem> FilteredResources => resources.Where(item =>
