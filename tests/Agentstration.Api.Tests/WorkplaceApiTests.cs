@@ -25,6 +25,211 @@ namespace Agentstration.Api.Tests;
 public sealed class WorkplaceApiTests
 {
     [TestMethod]
+    public async Task TenantHomeInvocationEntersTheExposedEntryOwningWorkspace()
+    {
+        var dataDirectory = Path.Combine(Path.GetTempPath(), "agentstration-work-api-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dataDirectory);
+        try
+        {
+            await using var factory = new WebApplicationFactory<WorkApiProgram>().WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Testing");
+                builder.UseSetting("Data:Directory", dataDirectory);
+            });
+            using var client = factory.CreateClient();
+            var current = (await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces"))!.Single();
+            var siblingId = Guid.Parse("77777777-7777-7777-7777-777777777777");
+            using (var scope = factory.Services.CreateScope())
+            {
+                var context = await scope.ServiceProvider.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+                var identities = scope.ServiceProvider.GetRequiredService<IIdentityStore>();
+                await identities.AddWorkspaceAsync(new Workspace(siblingId, context.TenantId, "sibling", "Sibling", WorkspaceStatus.Active, DateTimeOffset.UtcNow), default);
+                await identities.AddWorkspaceMembershipAsync(new WorkspaceMembership(
+                    Guid.NewGuid(),
+                    siblingId,
+                    context.PrincipalId,
+                    MembershipStatus.Active,
+                    DateTimeOffset.UtcNow), default);
+                var entries = scope.ServiceProvider.GetRequiredService<IWorkplaceRepository>();
+                await entries.UpsertEntryAsync(new EntryResource
+                {
+                    WorkspaceId = new(siblingId),
+                    Id = new("tenant-assistant"),
+                    Name = "tenant-assistant",
+                    DisplayName = "Tenant assistant",
+                    Presentation = new EntryPresentation
+                    {
+                        Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }]
+                    },
+                    Exposure = new EntryExposure
+                    {
+                        Surfaces = [EntryExposureSurface.Workplace],
+                        WorkplacePlacements = [EntryWorkplacePlacement.TenantHome]
+                    },
+                    ResolvedTarget = new("unused-for-immediate-response", "1.0.0"),
+                    Behavior = new EntryBehavior(TaskCreationMode.Never),
+                    PublishedAt = DateTimeOffset.UtcNow
+                }, default);
+            }
+
+            var discovered = await client.GetFromJsonAsync<EntryResponse[]>("/api/entries?surface=Workplace&placement=TenantHome") ?? [];
+            using var response = await client.PostAsJsonAsync(
+                $"/api/workspaces/{siblingId:D}/entries/tenant-assistant/interactions?placement=TenantHome",
+                new CreateInteractionRequest(new Dictionary<string, JsonElement>
+                {
+                    ["request"] = JsonSerializer.SerializeToElement("Hello")
+                }));
+            var submission = await response.Content.ReadFromJsonAsync<EntrySubmissionResponse>();
+
+            Assert.IsTrue(discovered.Any(value => value.Name == "tenant-assistant" && value.WorkspaceId == siblingId));
+            Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
+            Assert.AreEqual(siblingId, submission?.Interaction.WorkspaceId);
+            Assert.AreNotEqual(current.Id, submission?.Interaction.WorkspaceId);
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (Directory.Exists(dataDirectory)) Directory.Delete(dataDirectory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task EntryDiscoveryAppliesSharedSurfaceAndPlacementPolicy()
+    {
+        var dataDirectory = Path.Combine(Path.GetTempPath(), "agentstration-work-api-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dataDirectory);
+        try
+        {
+            await using var factory = new WebApplicationFactory<WorkApiProgram>().WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Testing");
+                builder.UseSetting("Data:Directory", dataDirectory);
+            });
+            using var client = factory.CreateClient();
+            var template = await client.GetFromJsonAsync<EntryDraftResponse>("/api/management/entries/universal-request");
+            Assert.IsNotNull(template);
+            var consoleOnly = template.Value with
+            {
+                Id = new EntryId("console-only"),
+                Name = "console-only",
+                Exposure = new EntryExposure
+                {
+                    Surfaces = [EntryExposureSurface.Console],
+                    WorkplacePlacements = []
+                }
+            };
+            (await client.PutAsJsonAsync("/api/management/entries/console-only", consoleOnly)).EnsureSuccessStatusCode();
+            using var publishResponse = await client.PostAsync("/api/management/entries/console-only/publish", null);
+            publishResponse.EnsureSuccessStatusCode();
+            var published = await publishResponse.Content.ReadFromJsonAsync<EntryResource>();
+            Assert.IsNotNull(published);
+
+            var workplace = await client.GetFromJsonAsync<EntryResponse[]>("/api/entries") ?? [];
+            var console = await client.GetFromJsonAsync<EntryResponse[]>("/api/entries?surface=Console") ?? [];
+            var executable = console.Single(value => value.Name == "console-only");
+            using var directWorkplaceRead = await client.GetAsync("/api/entries/console-only");
+            using var workplaceInvocation = await client.PostAsJsonAsync(
+                "/api/workspaces/default/entries/console-only/interactions",
+                new CreateInteractionRequest(new Dictionary<string, JsonElement>
+                {
+                    ["request"] = JsonSerializer.SerializeToElement("Do not run")
+                }));
+
+            Assert.IsFalse(workplace.Any(value => value.Name == "console-only"));
+            Assert.IsTrue(executable.Exposure.Surfaces.SequenceEqual([EntryExposureSurface.Console]));
+            Assert.AreEqual(true, executable.Execution?.CanInvoke);
+            Assert.AreEqual(EntryExecutionAvailability.Executable, executable.Execution?.Availability);
+            Assert.AreEqual(HttpStatusCode.NotFound, directWorkplaceRead.StatusCode);
+            Assert.AreEqual(HttpStatusCode.BadRequest, workplaceInvocation.StatusCode);
+            StringAssert.Contains(await workplaceInvocation.Content.ReadAsStringAsync(), "entry_not_exposed");
+
+            using (var scope = factory.Services.CreateScope())
+            {
+                var context = await scope.ServiceProvider.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+                var workspaceId = new WorkspaceId(context.WorkspaceId);
+                var flows = scope.ServiceProvider.GetRequiredService<FlowService>();
+                var flowId = new FlowId(published.ResolvedTarget.FlowResourceId, published.ResolvedTarget.Namespace);
+                var flow = await flows.GetAsync(workspaceId, flowId, default);
+                Assert.IsNotNull(flow);
+                await flows.UpdateAsync(workspaceId, flowId, new UpdateFlowCommand(
+                    flow.Value.Description,
+                    flow.Value.Version,
+                    false,
+                    flow.Value.Definition,
+                    flow.Value.Metadata,
+                    flow.Value.Graph,
+                    flow.Value.DisplayName), flow.ETag, default);
+
+                var entries = scope.ServiceProvider.GetRequiredService<IWorkplaceRepository>();
+                await entries.UpsertEntryAsync(published with
+                {
+                    Id = new("console-unavailable"),
+                    Name = "console-unavailable",
+                    DisplayName = "Unavailable Console Entry",
+                    ResolvedTarget = new("missing-flow", "1.0.0")
+                }, default);
+                await entries.UpsertEntryAsync(published with
+                {
+                    Id = new("console-version-unavailable"),
+                    Name = "console-version-unavailable",
+                    DisplayName = "Unavailable Console Entry version",
+                    ResolvedTarget = published.ResolvedTarget with { Version = "99.0.0" }
+                }, default);
+                await entries.UpsertEntryAsync(published with
+                {
+                    Id = new("console-immediate"),
+                    Name = "console-immediate",
+                    DisplayName = "Immediate Console Entry",
+                    ResolvedTarget = new("unused-immediate-flow", "1.0.0"),
+                    Behavior = new EntryBehavior(TaskCreationMode.Never)
+                }, default);
+                await entries.UpsertEntryDraftAsync(consoleOnly with
+                {
+                    Id = new("console-draft-only"),
+                    Name = "console-draft-only",
+                    DisplayName = "Draft-only Console Entry"
+                }, default);
+            }
+
+            console = await client.GetFromJsonAsync<EntryResponse[]>("/api/entries?surface=Console") ?? [];
+            var disabled = console.Single(value => value.Name == "console-only");
+            var unavailable = console.Single(value => value.Name == "console-unavailable");
+            var versionUnavailable = console.Single(value => value.Name == "console-version-unavailable");
+            Assert.AreEqual(false, disabled.Execution?.CanInvoke);
+            Assert.AreEqual(EntryExecutionAvailability.Disabled, disabled.Execution?.Availability);
+            Assert.AreEqual("entry_flow_disabled", disabled.Execution?.ReasonCode);
+            Assert.AreEqual(false, unavailable.Execution?.CanInvoke);
+            Assert.AreEqual(EntryExecutionAvailability.Unavailable, unavailable.Execution?.Availability);
+            Assert.AreEqual("entry_flow_unavailable", unavailable.Execution?.ReasonCode);
+            Assert.AreEqual(false, versionUnavailable.Execution?.CanInvoke);
+            Assert.AreEqual(EntryExecutionAvailability.Unavailable, versionUnavailable.Execution?.Availability);
+            Assert.AreEqual("entry_flow_version_unavailable", versionUnavailable.Execution?.ReasonCode);
+            Assert.IsFalse(console.Any(value => value.Name == "console-draft-only"));
+
+            using var disabledInvocation = await client.PostAsJsonAsync(
+                "/api/workspaces/default/entries/console-only/interactions?surface=Console",
+                new CreateInteractionRequest(new Dictionary<string, JsonElement>
+                {
+                    ["request"] = JsonSerializer.SerializeToElement("Do not run")
+                }));
+            using var immediateInvocation = await client.PostAsJsonAsync(
+                "/api/workspaces/default/entries/console-immediate/interactions?surface=Console",
+                new CreateInteractionRequest(new Dictionary<string, JsonElement>
+                {
+                    ["request"] = JsonSerializer.SerializeToElement("Respond immediately")
+                }));
+            Assert.AreEqual(HttpStatusCode.BadRequest, disabledInvocation.StatusCode);
+            StringAssert.Contains(await disabledInvocation.Content.ReadAsStringAsync(), "entry_flow_disabled");
+            Assert.AreEqual(HttpStatusCode.Created, immediateInvocation.StatusCode);
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (Directory.Exists(dataDirectory)) Directory.Delete(dataDirectory, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public async Task AgentBindingPublishesPinnedDirectAgentFlowAndDraftDoesNotAffectWorkplace()
     {
         var dataDirectory = Path.Combine(Path.GetTempPath(), "agentstration-work-api-tests", Guid.NewGuid().ToString("N"));

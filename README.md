@@ -82,10 +82,10 @@ Open the operations Console at [http://localhost:5100](http://localhost:5100). I
 The operations Console also has an independently hostable process shell. Keep the authoritative server running and start it from another terminal:
 
 ```powershell
-dotnet run --project src/Agentstration.Console.Web
+dotnet run --project src/Agentstration.Console.Web --launch-profile https
 ```
 
-Open [http://localhost:5190](http://localhost:5190). Its Management, Work, Flow, and Runtime origins are configured independently under `Agentstration:*Api:BaseAddress`. Private BFF calls use a dedicated instance-bound workload credential; interactive session resolution and delegated business tokens remain subsequent increments, so the standalone host remains the functional default for authenticated operations.
+Open [https://localhost:7190](https://localhost:7190). Its Management, Work, Flow, and Runtime origins are configured independently under `Agentstration:*Api:BaseAddress`. Private BFF calls use a dedicated instance-bound workload credential. Local login creates an opaque secure cookie backed by server-side BFF state and revalidates the Principal and selected context with the authoritative server on every request. External OIDC login and delegated business tokens remain subsequent increments, so the standalone host remains the functional default for authenticated operations.
 
 For a manually launched separated Console, provision a credential without displaying it:
 

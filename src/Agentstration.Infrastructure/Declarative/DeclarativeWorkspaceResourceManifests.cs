@@ -30,6 +30,7 @@ public sealed record DeclarativeEntryDefinition
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
     public EntryPresentation Presentation { get; init; } = null!;
+    public EntryExposure Exposure { get; init; } = new();
     public EntryBinding Binding { get; init; } = null!;
     public EntryBehavior Behavior { get; init; } = new();
     public bool Publish { get; init; } = true;

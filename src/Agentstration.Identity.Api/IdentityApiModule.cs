@@ -26,6 +26,7 @@ public static class IdentityApiModule
             .Validate(value => value.Validate(), "BFF workload trust configuration is invalid.")
             .ValidateOnStart();
         services.AddSingleton<IBffWorkloadReplayCache, BffWorkloadReplayCache>();
+        services.AddScoped<BffSessionAuthorityService>();
         services.AddHostedService<BffWorkloadTrustAuditService>();
         var options = configuration.GetSection($"{AgentstrationApiOptions.SectionName}:Authentication")
             .Get<ApiAuthenticationOptions>() ?? new();

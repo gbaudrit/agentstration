@@ -74,6 +74,25 @@ public sealed class EntryAdministrationApiClient(HttpClient httpClient, IHttpCli
 
     public async Task<IReadOnlyList<EntryResponse>> GetPublishedEntriesAsync(CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<EntryResponse[]>(httpClient, "api/entries", cancellationToken);
+    public async Task<IReadOnlyList<EntryResponse>> GetExposedEntriesAsync(EntryExposureSurface surface, EntryWorkplacePlacement? placement, CancellationToken cancellationToken)
+    {
+        var query = $"api/entries?surface={Uri.EscapeDataString(surface.ToString())}";
+        if (placement is not null) query += $"&placement={Uri.EscapeDataString(placement.Value.ToString())}";
+        return await ApiResponse.ReadAsync<EntryResponse[]>(httpClient, query, cancellationToken);
+    }
+    public async Task<EntrySubmissionResponse> SubmitConsoleEntryAsync(Guid workspaceId, ResourceNamespace @namespace, string name, CreateInteractionRequest request, CancellationToken cancellationToken)
+    {
+        var entryPath = @namespace.IsDefault
+            ? $"entries/{Uri.EscapeDataString(name)}"
+            : $"namespaces/{Uri.EscapeDataString(@namespace.Value)}/entries/{Uri.EscapeDataString(name)}";
+        using var response = await httpClient.PostAsJsonAsync(
+            $"api/workspaces/{workspaceId:D}/{entryPath}/interactions?surface={EntryExposureSurface.Console}",
+            request,
+            cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<EntrySubmissionResponse>(cancellationToken)
+            ?? throw new AgentstrationApiException("Work API returned an empty Entry submission.", Guid.NewGuid().ToString("N"));
+    }
     public async Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<WorkplaceWorkspaceResponse[]>(httpClient, "api/workplace/workspaces", cancellationToken);
     public async Task<IReadOnlyList<WorkplaceDashboardDraftResponse>> GetDashboardsAsync(string workspaceName, CancellationToken cancellationToken) =>
