@@ -1,4 +1,4 @@
-<article class="conversation-message @RoleClass" aria-label="@RoleLabel">
+<article class="conversation-message @RoleClass" aria-label="@RoleLabel" data-testid="workplace-conversation-message" data-message-role="@Message.Role.ToString().ToLowerInvariant()" data-message-id="@Message.Id">
     <div class="message-body">
         <header>
             @if (ShowRoleLabel) { <strong>@RoleLabel</strong> }

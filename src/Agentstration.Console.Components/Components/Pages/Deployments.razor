@@ -4,7 +4,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DeploymentStrings> Localizer
 
 <PageTitle>@T("Deployments") · Agentstration</PageTitle>
-<PageHeader Title="@T("AgentDeployments")" Description="@T("Deployments.Description")" />
+<PageHeader Title="@T("AgentDeployments")" Description="@T("Deployments.Description")" TestId="resource-deployments" />
 @if (items is null)
 {
     <LoadingState Message="@T("LoadingDeployments")" />

@@ -24,23 +24,23 @@ else
             <div><p class="eyebrow">@T("Workspace")</p><h1>@(workspace?.DisplayName ?? "Workplace")</h1></div>
             <RealtimeStatus Connected="RealtimeConnected" />
         </div>
-        <nav class="dashboard-navigation" aria-label="@T("Dashboards")">
+        <nav class="dashboard-navigation" aria-label="@T("Dashboards")" data-testid="workplace-dashboard-navigation">
             <div class="dashboard-links">
                 @foreach (var item in dashboards)
                 {
                     <NavLink href="@DashboardUrl(item.Name)" Match="NavLinkMatch.All"><UiIcon Name="layout-grid" /> <span>@item.DisplayName</span></NavLink>
                 }
             </div>
-            <label class="dashboard-select"><span>@T("Dashboard")</span><select value="@dashboard?.Name" @onchange="DashboardChanged">@foreach (var item in dashboards) { <option value="@item.Name">@item.DisplayName</option> }</select></label>
+            <label class="dashboard-select"><span>@T("Dashboard")</span><select value="@dashboard?.Name" @onchange="DashboardChanged" data-testid="workplace-dashboard-select">@foreach (var item in dashboards) { <option value="@item.Name">@item.DisplayName</option> }</select></label>
         </nav>
         <section class="mobile-welcome" aria-label="@T("Welcome")"><small>@T("WelcomeBack")</small><h1>@T("HelloUser", UserDisplayName)</h1><span>@T("WhatWouldYouLike")</span></section>
-        <section class="attention-summary" aria-label="@T("Workspace")">
+        <section class="attention-summary" aria-label="@T("Workspace")" data-testid="workplace-attention-summary">
             <a href="@($"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/tasks")"><strong>@tasks.Count</strong><span>@T("Activity")</span></a>
             <a href="@($"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/tasks")"><strong>@tasks.Count(value => value.Status == WorkTaskStatus.ActionRequired)</strong><span>@T("NeedYourInput")</span></a>
             <a href="@($"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/notifications")"><strong>@unread</strong><span>@T("UnreadUpdates")</span></a>
         </section>
     }
-    <div class="workplace-shell">
+    <div class="workplace-shell" data-testid="workplace-home">
         <div class="workplace-primary">
             @if (interaction is null)
             {

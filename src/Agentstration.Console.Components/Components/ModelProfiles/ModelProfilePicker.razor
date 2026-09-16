@@ -23,7 +23,7 @@
     {
         <label>
             <span>@T("ModelProfile")</span>
-            <select value="@CurrentValue" @onchange="SelectAsync" aria-label="@T("ModelProfile")">
+            <select value="@CurrentValue" @onchange="SelectAsync" aria-label="@T("ModelProfile")" data-testid="model-profile-select">
                 <option value="">@T("SelectModelProfile")</option>
                 @foreach (var profile in filtered)
                 {

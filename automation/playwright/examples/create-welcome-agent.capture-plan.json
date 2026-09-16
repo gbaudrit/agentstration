@@ -1,0 +1,45 @@
+{
+  "journey": "create-agent",
+  "input": {
+    "name": "accueil-capture",
+    "displayName": "Agent d’accueil",
+    "description": "Accueille l’utilisateur, comprend sa demande et l’oriente vers le spécialiste adapté.",
+    "instructions": "Tu es l’Agent d’accueil de l’expérience « Découvrir Agentstration ». Pour chaque nouveau message, identifie le besoin principal. N’apporte pas toi-même la réponse de fond et n’annonce pas le transfert.\n\nChoisis conseiller-solution pour la collaboration entre agents, les usages, la valeur, l’adoption, le positionnement ou une première approche.\nChoisis expert-technique pour l’architecture, l’orchestration, les Flows, les modèles locaux, Ollama, les données locales ou le déploiement.\nChoisis expert-integration pour les Tools, MCP, AEP, API, connecteurs ou systèmes externes.\n\nIdentifie le spécialiste le plus pertinent et transfère-lui la demande. Si une autre expertise est ensuite nécessaire, le spécialiste actif pourra poursuivre le handoff vers l’agent approprié. Réponds toujours en français.",
+    "modelProfile": [
+      "default:default-reasoning",
+      "default:reasoning-default"
+    ],
+    "runtimeProfile": "default:maf-builtin"
+  },
+  "locale": "fr-FR",
+  "theme": "dark",
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "captures": [
+    {
+      "checkpoint": "agent-form-empty",
+      "file": "01-agent-form-empty.png",
+      "scope": "page",
+      "fullPage": false
+    },
+    {
+      "checkpoint": "agent-identity-complete",
+      "file": "02-agent-identity-complete.png",
+      "scope": "target"
+    },
+    {
+      "checkpoint": "agent-ready-to-create",
+      "file": "03-agent-ready-to-create.png",
+      "scope": "page",
+      "fullPage": false
+    },
+    {
+      "checkpoint": "agent-created",
+      "file": "04-agent-created.png",
+      "scope": "page",
+      "fullPage": false
+    }
+  ]
+}

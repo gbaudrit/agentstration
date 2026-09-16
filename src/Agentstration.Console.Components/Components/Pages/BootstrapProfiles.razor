@@ -8,6 +8,7 @@
     <Actions><button class="button-secondary" disabled="@busy" @onclick="LoadAsync">@T("RefreshCatalog")</button></Actions>
 </PageHeader>
 
+<div data-testid="distribution-bootstrap-profiles">
 @if (denied)
 {
     <ErrorState Title="@T("PlatformAdministratorRequired")" Message="@T("PlatformAdministratorRequiredMessage")" />
@@ -188,6 +189,8 @@ else
         </section>
     </div>
 }
+
+</div>
 
 @code {
     [SupplyParameterFromQuery(Name = "sourceScope")] public string? SourceScope { get; set; }

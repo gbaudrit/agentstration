@@ -15,6 +15,7 @@ public sealed class LocalBootstrapOptions
     public string PrincipalDisplayName { get; set; } = "Development operator";
     public string ExternalIdentityIssuer { get; set; } = DevelopmentIssuer;
     public string ExternalIdentitySubject { get; set; } = DevelopmentSubject;
+    public bool GrantPlatformAdministrator { get; set; }
 }
 public sealed class CurrentRequestContext : ICurrentRequestContext, IRequestContextScopeFactory, ITriggerExecutionContext
 {

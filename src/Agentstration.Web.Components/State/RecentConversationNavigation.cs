@@ -1,6 +1,6 @@
 namespace Agentstration.Web.Components.State;
 
-public sealed record RecentConversationNavigationItem(string Title, string Url);
+public sealed record RecentConversationNavigationItem(string ConversationId, string Title, string Url);
 
 public interface IRecentConversationNavigationProvider
 {

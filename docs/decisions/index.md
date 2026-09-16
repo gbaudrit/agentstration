@@ -145,3 +145,6 @@ Use **Proposed** when implementation or repository evidence does not establish a
 113. [ADR-0113 — Entry exposure separates ownership from presentation](0113-entry-exposure-separates-ownership-from-presentation.md)
 114. [ADR-0114 — Console Entry discovery projects canonical execution readiness](0114-console-entry-discovery-projects-canonical-execution-readiness.md)
 115. [ADR-0115 — The Console BFF owns opaque server-side sessions](0115-console-bff-owns-opaque-server-sessions.md)
+116. [ADR-0116 — The Console BFF delegates short-lived API requests](0116-console-bff-delegates-short-lived-api-requests.md)
+117. [ADR-0117 — Browser journeys are product-owned reusable automation assets](0117-product-owned-browser-journeys.md)
+118. [ADR-0118 — Browser campaigns use dedicated Workspaces](0118-browser-campaigns-use-dedicated-workspaces.md)

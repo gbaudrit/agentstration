@@ -202,7 +202,7 @@ public sealed class PendingActionPanelTests
             string? dashboardName,
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<RecentConversationNavigationItem>>(
-                [new("Quarterly planning", "/w/personal/d/home/conversations/11111111-1111-1111-1111-111111111111")]);
+                [new("11111111-1111-1111-1111-111111111111", "Quarterly planning", "/w/personal/d/home/conversations/11111111-1111-1111-1111-111111111111")]);
     }
 
     private static BunitContext CreateContext()

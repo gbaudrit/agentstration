@@ -6,6 +6,7 @@
 <PageTitle>@T("SecurityAudit") · @T("Organization") · Agentstration</PageTitle>
 <PageHeader Title="@T("SecurityAudit")" Description="@T("SecurityAudit.Description")" />
 <OrganizationSettingsNav />
+<div data-testid="console-admin-organization-security-audit">
 
 @if (loading)
 {
@@ -34,6 +35,7 @@ else
         </tr></Row>
     </DataGrid>
 }
+</div>
 
 @code {
     private IReadOnlyList<Agentstration.Security.Contracts.SecurityAuditEvent> events = [];

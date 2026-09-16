@@ -223,6 +223,8 @@ dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --n
 dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 1
 ```
 
+Browser-level UX smoke tests and the reusable capture runner live under `automation/playwright`. They start isolated local Console and Workplace hosts with deterministic AI. See [Browser automation](docs/contributing/browser-automation.md) for setup and commands.
+
 Warnings are treated as errors, .NET analyzers are enabled and NuGet audit findings fail restore. The fast and integration lanes together provide complete required functional validation while remaining offline and cost-free; real-provider and performance workloads are opt-in. See the [test lane guide](docs/contributing/testing.md) for project classification and focused commands.
 
 ## Documentation

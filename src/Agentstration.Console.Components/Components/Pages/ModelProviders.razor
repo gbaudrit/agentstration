@@ -4,7 +4,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProvidersStrings> Localizer
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")">
+<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-model-providers">
     <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button><a class="button-primary" href="/modelproviders/new">@T("CreateProvider")</a></Actions>
 </PageHeader>
 

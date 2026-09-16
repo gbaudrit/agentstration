@@ -18,3 +18,7 @@ deploy/compose/.env.postgresql
 docs/site/node_modules/
 docs/site/build/
 docs/site/.docusaurus/
+automation/playwright/node_modules/
+automation/playwright/test-results/
+automation/playwright/playwright-report/
+automation/playwright/.work/

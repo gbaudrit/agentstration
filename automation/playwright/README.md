@@ -1,0 +1,110 @@
+# Agentstration browser automation
+
+This workspace owns the Playwright page objects and journeys used by product UX tests and reproducible external capture.
+
+```powershell
+npm ci
+npm run install:browsers
+npm run test:smoke
+```
+
+The smoke gate runs three Chromium projects: the desktop suite, focused responsive checks at a mobile viewport, and the independent `en-US`/`fr-FR` locale contract. Every product test also fails on unhandled page errors, actionable console errors, first-party request failures, or a visible fatal Blazor state. CI publishes the Playwright diagnostics and typed application-surface coverage report on every run.
+
+To use Playwright UI against an already-running instance:
+
+```powershell
+$env:AGENTSTRATION_CONSOLE_URL = "http://localhost:53400"
+$env:AGENTSTRATION_WORKPLACE_URL = "http://localhost:53401" # Optional for Console-only tests.
+$env:AGENTSTRATION_USERNAME = "admin"
+$env:AGENTSTRATION_PASSWORD = "admin"
+$env:AGENTSTRATION_PLAYWRIGHT_CHANNEL = "chrome"             # Optional local fallback.
+npx playwright test --ui
+```
+
+When `AGENTSTRATION_CONSOLE_URL` is present, the test fixture does not start or stop product hosts and requires the username/password pair. Journey input can explicitly override both values. Without an external URL, tests keep using dynamically allocated local ports, isolated SQLite data, and the public Development fixture `admin / admin`. An omitted Workplace URL falls back to the Console URL so Console-only journeys remain usable; set it explicitly before running a Workplace journey. External tests mutate the selected instance, so use a disposable instance or dedicated campaign Workspace.
+
+To exercise the capture contract:
+
+```powershell
+npm run capture -- --plan examples/console-home.capture-plan.json --output .work/example-capture
+```
+
+The welcome-agent plan replays the first agent created in the handoff demo:
+
+```powershell
+npm run capture -- --plan examples/create-welcome-agent.capture-plan.json --output .work/welcome-agent
+```
+
+Create and select a dedicated campaign workspace with:
+
+```powershell
+npm run capture -- --plan examples/create-campaign-workspace.capture-plan.json --output .work/campaign-workspace
+```
+
+The Workplace prompt journey reuses the same page objects and checkpoints as the end-user browser suite:
+
+```powershell
+npm run capture -- --plan examples/submit-workplace-prompt.capture-plan.json --output .work/workplace-prompt
+```
+
+The local fixture provides the deterministic `default` Workspace, `home` dashboard, and `quick-answer` Entry. For an external instance, prepare those resources explicitly or replace them in the capture plan.
+
+Offline Source import and Pack authoring reuse the distribution page object and checked-in journey inputs:
+
+```powershell
+npm run capture -- --plan examples/import-offline-source.capture-plan.json --output .work/offline-source
+npm run capture -- --plan examples/create-local-pack-project.capture-plan.json --output .work/local-pack
+```
+
+The managed fixture starts the Git and Ollama AEP extensions on loopback and performs no Registry refresh. External runs mutate the selected Workspace, so use a disposable campaign Workspace.
+
+Flow execution observability can be captured end to end from a deterministic Workplace task through its task-scoped Flow Run, global Flow Run, Agent Run, and retained event views:
+
+```powershell
+npm run capture -- --plan examples/inspect-flow-observability.capture-plan.json --output .work/flow-observability
+```
+
+The local plan uses the seeded `prepare-report` Entry. An external target must provide that Entry and a compatible published Flow in the selected Workspace.
+
+Console identity and administration can be captured across organization context, member access, profile preferences, personal access token lifecycle, and shell navigation:
+
+```powershell
+npm run capture -- --plan examples/inspect-console-administration.capture-plan.json --output .work/console-administration
+```
+
+The journey creates and immediately revokes its personal access token. Run it against a disposable instance or a dedicated campaign Workspace when targeting an external Console.
+
+The resource-administration inventory renders every management list and creation editor without mutating the target instance:
+
+```powershell
+npm run capture -- --plan examples/inspect-resource-administration.capture-plan.json --output .work/resource-administration
+```
+
+The local Ollama extension backs a fully offline create/update/delete journey for a model provider, model profile, and runtime profile:
+
+```powershell
+npm run capture -- --plan examples/exercise-model-administration.capture-plan.json --output .work/model-administration
+```
+
+The solution-discovery video Flow and Entry are captured with:
+
+```powershell
+npm run capture -- --plan examples/create-solution-discovery-flow.capture-plan.json --output .work/solution-discovery-flow --console-url https://agentstration.example.com
+npm run capture -- --plan examples/create-solution-discovery-entry.capture-plan.json --output .work/solution-discovery-entry --console-url https://agentstration.example.com
+```
+
+Run these commands against the same persistent instance and campaign Workspace. The Flow plan expects the four agent technical names declared in its `participants` input. The Entry plan expects that Flow to have been published and activated first.
+
+To run that plan against an existing Console without starting local product hosts, override its URL from the command line:
+
+```powershell
+npm run capture -- --plan examples/create-welcome-agent.capture-plan.json --output .work/welcome-agent --console-url https://agentstration.example.com
+```
+
+Command-line URLs take precedence over plan values. `--workplace-url` is optional for Console-only journeys and can be supplied when a journey also uses Workplace.
+
+On a persistent external instance, run the workspace plan first and set `workspaceName` in subsequent journey input. The target workspace must be prepared explicitly with every resource required by those journeys, such as model and runtime profiles. Local capture commands start isolated product state, so separate commands do not share a workspace.
+
+Profile inputs may be an ordered array when equivalent environments use different resource names. The journey selects the first available candidate and reports the available options immediately when none match.
+
+See [Browser automation](../../docs/contributing/browser-automation.md), [ADR-0117](../../docs/decisions/0117-product-owned-browser-journeys.md), and [ADR-0118](../../docs/decisions/0118-browser-campaigns-use-dedicated-workspaces.md) for ownership, extension, and external-consumption rules.

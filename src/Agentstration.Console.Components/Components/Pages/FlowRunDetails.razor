@@ -8,6 +8,7 @@
 @inject TimeProvider TimeProvider
 
 <PageTitle>@(run is null ? T("FlowRun") : run.Id) · Agentstration</PageTitle>
+<div data-testid="flow-observability-run-details">
 @if (notFound)
 {
     <ErrorState Title="@T("NotFoundTitle")" Message="@T("NotFoundMessage")">
@@ -166,6 +167,7 @@ else
     </main>
 }
 
+</div>
 @code {
     [Parameter] public string RunId { get; set; } = string.Empty;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];

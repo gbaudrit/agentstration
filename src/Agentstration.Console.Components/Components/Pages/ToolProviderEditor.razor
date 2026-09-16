@@ -5,7 +5,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolProviderEditorStrings> Localizer
 
 <PageTitle>@(IsNew ? T("AddProvider") : displayName) · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("AddProvider") : displayName)" Description="@T("Description")"><Actions><a class="button-secondary" href="/tools/providers">@T("Back")</a>@if (!IsNew) { <button class="button-secondary" @onclick="TestAsync" disabled="@busy">@T("TestConnection")</button><button class="button-primary" @onclick="RefreshAsync" disabled="@busy">@T("RefreshDiscovery")</button> }</Actions></PageHeader>
+<PageHeader Title="@(IsNew ? T("AddProvider") : displayName)" Description="@T("Description")" TestId="resource-tool-provider-editor"><Actions><a class="button-secondary" href="/tools/providers">@T("Back")</a>@if (!IsNew) { <button class="button-secondary" @onclick="TestAsync" disabled="@busy">@T("TestConnection")</button><button class="button-primary" @onclick="RefreshAsync" disabled="@busy">@T("RefreshDiscovery")</button> }</Actions></PageHeader>
 
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else

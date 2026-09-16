@@ -48,6 +48,7 @@ internal static class StandaloneHostCompositionExtensions
             bootstrapOptions.ExternalIdentityIssuer = configuredAuthentication.DevelopmentIssuer;
             bootstrapOptions.ExternalIdentitySubject = configuredAuthentication.DevelopmentSubject;
             bootstrapOptions.PrincipalDisplayName = configuredAuthentication.DevelopmentDisplayName;
+            bootstrapOptions.GrantPlatformAdministrator = configuredAuthentication.DevelopmentGrantPlatformAdministrator;
         }
 
         builder.Services.AddSingleton(bootstrapOptions);

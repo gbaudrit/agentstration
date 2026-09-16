@@ -193,6 +193,13 @@ At minimum, cover the relevant combination of:
 
 Prefer in-memory infrastructure for fast application tests. Use integration infrastructure only when behavior genuinely depends on HTTP, the ASP.NET Core host, SQLite, or another real boundary. Tests must not require internet access or a live LLM.
 
+### UX test scenario follow-up
+
+- For a feature or issue that adds or materially changes a Console or Workplace user journey, create a separate child issue using the Technical task form and the `test-scenario-task` label. Create it after the parent issue exists and before opening the UX implementation pull request. Link the parent and child in both issue bodies. The child must name the routes, deterministic prerequisites, user actions, and observable success and expected-failure assertions. If an existing Playwright journey already covers the changed behavior, record the evidence and an explicit `Not applicable` decision in the parent issue and UX pull request instead.
+- Mark the child as blocked by UX validation and link the UX pull request when it exists. Do not start the new reusable Playwright journey until a maintainer has explicitly validated the UX in the pull request or parent issue and the UX pull request has merged. Record that validation and the merged pull request in the child before starting work.
+- The UX pull request must still add or update tests for behavior changes, repair any existing Playwright tests affected by the change, and run the required browser smoke checks. Deferral applies only to the new reusable UX scenario, not to existing regression checks or the required offline test suites.
+- Keep the parent issue open until the child scenario is merged and its catalog surface is covered, or a maintainer records an explicit waiver with a reason. Do not use an auto-closing issue keyword for the parent in the UX-only pull request.
+
 ## Validation Commands
 
 Run from the repository root:
@@ -236,6 +243,7 @@ Use `--launch-profile http-NoBootstrap` instead when the test must preserve or e
 When creating or updating a GitHub issue, treat the forms under `.github/ISSUE_TEMPLATE/` as the canonical structure, including when using the GitHub API:
 
 - Use `bug.yml` for behavior that contradicts an existing expectation, `feature.yml` for a new user-facing or product capability, and `technical-task.yml` for architecture, refactoring, performance, testing, security, technical debt, technical documentation, or developer-experience work.
+- Use `technical-task.yml` plus `test-scenario-task` for a deferred UX test scenario child. Record the parent issue under `Dependencies` and keep the child blocked until the UX validation and merge described above.
 - Write issue titles and bodies in English. Keep titles outcome-focused and do not add type or priority prefixes such as `[Feature]`, `[Bug]`, or `[P1]`.
 - Preserve the form's section names and order. API-created issues must include the same required sections that the selected form would produce.
 - Apply the form's type label explicitly when creating an issue through the API: `bug` for bug reports, `enhancement` for feature requests, and `technical-task` for technical tasks. Use exactly one of these type labels. Add more specific area or technical labels only when they already exist and are supported by the issue content.

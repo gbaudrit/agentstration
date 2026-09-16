@@ -2,7 +2,7 @@
 @inject IAgentstrationEventStream EventStream
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Localizer
 
-<article class="panel">
+<article class="panel" data-testid="latest-run-events" aria-busy="@(loading ? "true" : "false")">
     <div class="panel-header"><h2>@T("LatestRunEvents")</h2><a href="/run-events">@T("OpenRunActivity") →</a></div>
     @if (loading)
     {

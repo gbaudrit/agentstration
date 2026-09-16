@@ -6,7 +6,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
 
 <PageTitle>@T(IsNew ? "NewDefinition" : "EditDefinition") · Agentstration</PageTitle>
-<PageHeader Title="@T(IsNew ? "NewDefinition" : "EditDefinition")" Description="@T("DefinitionEditorDescription")" />
+<PageHeader Title="@T(IsNew ? "NewDefinition" : "EditDefinition")" Description="@T("DefinitionEditorDescription")" TestId="resource-tool-definition-editor" />
 
 @if (loading) { <LoadingState Message="@T("LoadingDefinitions")" /> }
 else
