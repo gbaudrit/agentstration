@@ -1,0 +1,288 @@
+@page "/resource-plans/{Id:guid}"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject IResourcePlansApiClient Client
+@inject ConsoleContextState ContextState
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourcePlansStrings> Localizer
+
+<PageTitle>@(plan?.Value.Title ?? T("Title")) · Agentstration</PageTitle>
+<PageHeader Title="@(plan?.Value.Title ?? T("Title"))" Description="@(plan?.Value.Goal ?? T("DetailDescription"))">
+    <Actions><a class="button-secondary" href="/resource-plans">@T("BackToPlans")</a><button class="button-secondary" type="button" @onclick="LoadAsync" disabled="@busy">@T("Refresh")</button></Actions>
+</PageHeader>
+
+@if (!string.IsNullOrWhiteSpace(error)) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
+@if (!string.IsNullOrWhiteSpace(message)) { <div class="form-alert" role="status">@message</div> }
+@if (busy && plan is null) { <LoadingState Message="@T("Loading")" /> }
+else if (plan is null) { <EmptyState Title="@T("NotFound")" Message="@T("NotFoundDescription")" /> }
+else
+{
+    <section class="panel resource-plan-identity" aria-label="@T("PlanIdentity")">
+        <StatusBadge Text="@T($"Status.{plan.Value.Status}")" Status="@Tone(plan.Value.Status)" />
+        <span>@T("Revision", plan.Value.Revision)</span>
+        <span>@T("Workspace") <code>@plan.Value.Scope.WorkspaceId.Value.ToString("D")</code></span>
+        <span>@T("Updated") @plan.Value.UpdatedAt.ToLocalTime().ToString("g")</span>
+        @if (selected is not null && ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))
+        {
+            <StatusBadge Text="@T("StaleChangeSet")" Status="UiStatus.Warning" />
+        }
+    </section>
+
+    <div class="resource-plan-actions">
+        <button class="button-secondary" type="button" @onclick="MaterializeAsync" disabled="@(!CanReview || busy || !CanMaterialize)">@T("Rematerialize")</button>
+        <button class="button-secondary" type="button" @onclick="CreateChangeSetAsync" disabled="@(!CanReview || busy || materialization?.CanCreateChangeSet != true)">@T("CreateChangeSet")</button>
+        <button class="button-primary" type="button" @onclick="ValidateAsync" disabled="@(!CanReview || busy || selected is null || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))">@T("Revalidate")</button>
+    </div>
+    @if (materialization is not null)
+    {
+        <section class="panel resource-plan-materialization" aria-label="@T("Materialization")">
+            <strong>@T("Materialization")</strong><span>@T("Proposals", materialization.Proposals.Count)</span><code>@materialization.Digest</code>
+            @foreach (var diagnostic in materialization.Diagnostics)
+            {
+                <p class="resource-plan-issue"><strong>@diagnostic.Code</strong> · @diagnostic.Path · @diagnostic.Message</p>
+            }
+        </section>
+    }
+
+    <nav class="resource-plan-tabs" role="tablist" aria-label="@T("ReviewViews")">
+        @foreach (var view in Views)
+        {
+            <button type="button" role="tab" id="tab-@view" aria-controls="panel-@view" aria-selected="@(activeView == view)" class="@(activeView == view ? "active" : null)" @onclick="() => activeView = view">@T($"View.{view}")</button>
+        }
+    </nav>
+
+    <section class="panel resource-plan-view" role="tabpanel" id="panel-@activeView" aria-labelledby="tab-@activeView">
+        @if (activeView == "Overview")
+        {
+            <h2>@T("FunctionalIntent")</h2>
+            <p>@plan.Value.Goal</p>
+            @if (!string.IsNullOrWhiteSpace(plan.Value.Description)) { <p>@plan.Value.Description</p> }
+            @if (functional is not null)
+            {
+                <div class="resource-plan-overview-grid">
+                    <article><h3>@T("Solution")</h3><p>@functional.Solution.Summary</p><ul>@foreach (var outcome in functional.Solution.Outcomes) { <li>@outcome</li> }</ul></article>
+                    <article><h3>@T("Roles") <small>@functional.Roles.Count</small></h3><ul>@foreach (var role in functional.Roles) { <li><strong>@role.DisplayName</strong><span>@role.Purpose</span></li> }</ul></article>
+                    <article><h3>@T("Workflows") <small>@functional.Workflows.Count</small></h3><ul>@foreach (var workflow in functional.Workflows) { <li><strong>@workflow.DisplayName</strong><span>@workflow.Objective</span></li> }</ul></article>
+                    <article><h3>@T("Integrations") <small>@functional.Integrations.Count</small></h3><ul>@foreach (var integration in functional.Integrations) { <li><strong>@integration.DisplayName</strong><span>@integration.Purpose</span></li> }</ul></article>
+                    <article><h3>@T("Experiences") <small>@functional.Experiences.Count</small></h3><ul>@foreach (var experience in functional.Experiences) { <li><strong>@experience.DisplayName</strong><span>@experience.Purpose</span></li> }</ul></article>
+                </div>
+            }
+            <p class="muted">@T("FunctionalBoundary")</p>
+        }
+        else if (activeView == "Changes")
+        {
+            <h2>@T("Changes")</h2>
+            @if (changeSets.Count == 0) { <p>@T("NoChangeSets")</p> }
+            else
+            {
+                <label for="change-set-select">@T("ChangeSet")</label>
+                <select id="change-set-select" value="@selected?.Value.Id.Value.ToString("D")" @onchange="SelectChangeSetAsync">
+                    @foreach (var item in changeSets) { <option value="@item.Value.Id.Value.ToString("D")">@T("ChangeSetOption", item.Value.PlanRevision, item.Value.CreatedAt.ToLocalTime().ToString("g"))</option> }
+                </select>
+                @if (selected is not null)
+                {
+                    <p>@T("ChangeSetRevision", selected.Value.PlanRevision) · <code>@selected.Value.Digest</code></p>
+                    @foreach (var change in selected.Value.Changes.OrderBy(value => value.Order))
+                    {
+                        <article class="resource-plan-change">
+                            <header><div><h3>@change.LogicalId</h3><small>@change.Proposed.Kind · @change.Proposed.Metadata.Name</small></div><StatusBadge Text="@T($"Operation.{change.Operation}")" Status="@OperationTone(change.Operation)" /></header>
+                            @if (change.DependsOn.Count > 0) { <p>@T("DependsOn") @string.Join(", ", change.DependsOn)</p> }
+                            @if (change.Operation == ResourceChangeOperation.NoOp) { <p>@T("NoDifferences")</p> }
+                            else
+                            {
+                                <div class="resource-plan-table-scroll"><table><thead><tr><th>@T("Field")</th><th>@T("Current")</th><th>@T("Proposed")</th></tr></thead><tbody>
+                                @foreach (var difference in ResourcePlanReviewProjection.Differences(change))
+                                {
+                                    <tr><th scope="row"><code>@difference.Path</code></th><td><code>@(difference.Current ?? "—")</code></td><td><code>@(difference.Proposed ?? "—")</code></td></tr>
+                                }
+                                </tbody></table></div>
+                            }
+                        </article>
+                    }
+                }
+            }
+        }
+        else if (activeView == "Graph")
+        {
+            <h2>@T("Graph")</h2>
+            @if (selected is null) { <p>@T("NoChangeSets")</p> }
+            else
+            {
+                var graph = ResourcePlanReviewProjection.Graph(selected.Value);
+                <div class="resource-plan-graph-scroll"><svg viewBox="@($"0 0 {graph.Width} {graph.Height}")" role="img" aria-label="@T("GraphLabel")" style="@($"min-width:{graph.Width}px")">
+                    @foreach (var edge in graph.Edges) { <line x1="@edge.X1" y1="@edge.Y1" x2="@edge.X2" y2="@edge.Y2" class="resource-plan-edge" /> }
+                    @foreach (var node in graph.Nodes) { <g><rect x="@node.X" y="@node.Y" width="188" height="52" rx="8" class="resource-plan-node" /><text x="@(node.X + 10)" y="@(node.Y + 22)">@node.LogicalId</text><text x="@(node.X + 10)" y="@(node.Y + 40)" class="resource-plan-node-meta">@T($"Operation.{node.Operation}") · @node.Kind</text></g> }
+                </svg></div>
+                <ol class="resource-plan-graph-list">@foreach (var change in selected.Value.Changes.OrderBy(value => value.Order)) { <li><strong>@change.LogicalId</strong> · @change.Proposed.Kind @if (change.DependsOn.Count > 0) { <span>@T("DependsOn") @string.Join(", ", change.DependsOn)</span> }</li> }</ol>
+            }
+        }
+        else if (activeView == "Validation")
+        {
+            <h2>@T("Validation")</h2>
+            @if (selected is null) { <p>@T("NoChangeSets")</p> }
+            else if (latestValidation is null) { <p>@T("NotValidated")</p> }
+            else
+            {
+                <StatusBadge Text="@T($"Readiness.{latestValidation.Readiness}")" Status="@(latestValidation.Readiness == ResourceChangeSetReadiness.Ready ? UiStatus.Success : UiStatus.Danger)" />
+                @if (ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, latestValidation)) { <StatusBadge Text="@T("StaleValidation")" Status="UiStatus.Warning" /> }
+                <p>@T("ValidatedAt") @latestValidation.ValidatedAt.ToLocalTime().ToString("g")</p>
+                @if (latestValidation.Issues.Count == 0) { <p>@T("NoIssues")</p> }
+                else { <ul class="resource-plan-issues">@foreach (var issue in latestValidation.Issues) { <li><strong>@issue.Code</strong><code>@issue.Path</code><span>@issue.Message</span></li> }</ul> }
+            }
+        }
+        else
+        {
+            <h2>@T("Activity")</h2>
+            <dl class="resource-plan-origin"><dt>@T("Principal")</dt><dd><code>@plan.Value.Origin.PrincipalId</code></dd>
+                @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.WorkItemId)) { <dt>@T("Work")</dt><dd><a href="@($"/api/work/workitems/{Uri.EscapeDataString(plan.Value.Origin.WorkItemId)}")">@plan.Value.Origin.WorkItemId</a></dd> }
+                @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.FlowRunId)) { <dt>@T("FlowRun")</dt><dd><a href="@($"/flow-runs/{Uri.EscapeDataString(plan.Value.Origin.FlowRunId)}")">@plan.Value.Origin.FlowRunId</a></dd> }
+                @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.CorrelationId)) { <dt>@T("Correlation")</dt><dd><code>@plan.Value.Origin.CorrelationId</code></dd> }
+            </dl>
+            <ol class="resource-plan-timeline">@foreach (var activity in activities.OrderByDescending(value => value.CreatedAt)) { <li><strong>@T($"Activity.{activity.Type}")</strong><time datetime="@activity.CreatedAt.ToString("O")">@activity.CreatedAt.ToLocalTime().ToString("g")</time><span>@T("Revision", activity.PlanRevision)</span>@if (!string.IsNullOrWhiteSpace(activity.Detail)) { <p>@activity.Detail</p> }</li> }</ol>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private static readonly string[] Views = ["Overview", "Changes", "Graph", "Validation", "Activity"];
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly CancellationTokenSource lifetime = new();
+    private ResourcePlanSnapshot? plan;
+    private IReadOnlyList<ResourcePlanActivity> activities = [];
+    private IReadOnlyList<ResourceChangeSetSnapshot> changeSets = [];
+    private ResourceChangeSetSnapshot? selected;
+    private IReadOnlyList<ResourceChangeSetValidation> validations = [];
+    private ResourcePlanMaterialization? materialization;
+    private FunctionalResourcePlanV1? functional;
+    private string activeView = "Overview";
+    private string? error;
+    private string? message;
+    private bool busy;
+    private bool reloadRequested;
+    private int contextVersion;
+    private Guid loadedId;
+    private bool CanReview => ContextState.HasPermission("resources/write");
+    private bool CanMaterialize => plan?.Value.Status is ResourcePlanStatus.Ready or ResourcePlanStatus.Materialized or ResourcePlanStatus.Validated;
+    private ResourceChangeSetValidation? latestValidation => selected is null ? null : ResourcePlanReviewProjection.LatestValidation(selected.Value, validations);
+    private string T(string key, params object[] args) => Localizer[key, args].Value;
+
+    protected override void OnInitialized() => ContextState.Changed += OnContextChanged;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedId != Id) { loadedId = Id; plan = null; contextVersion++; }
+        await LoadAsync();
+    }
+    private void OnContextChanged() => _ = InvokeAsync(async () =>
+    {
+        contextVersion++;
+        plan = null;
+        selected = null;
+        changeSets = [];
+        validations = [];
+        materialization = null;
+        await LoadAsync();
+    });
+
+    private async Task LoadAsync()
+    {
+        if (busy) { reloadRequested = true; return; }
+        busy = true; error = null; message = null; materialization = null;
+        var version = contextVersion;
+        try
+        {
+            var loadedPlan = await Client.GetPlanAsync(Id, lifetime.Token);
+            if (loadedPlan is null)
+            {
+                if (version == contextVersion) { plan = null; activities = []; changeSets = []; selected = null; }
+                return;
+            }
+            var loadedFunctional = loadedPlan.Value.Content.Document.Deserialize<FunctionalResourcePlanV1>(JsonOptions);
+            var loadedActivities = await Client.ListActivitiesAsync(Id, lifetime.Token);
+            var page = await Client.ListChangeSetsAsync(Id, 0, 200, lifetime.Token);
+            var loadedSets = page.Items.OrderByDescending(value => value.Value.PlanRevision).ThenByDescending(value => value.Value.CreatedAt).ToArray();
+            var loadedSelected = ResourcePlanReviewProjection.LatestChangeSet(loadedPlan.Value, loadedSets);
+            IReadOnlyList<ResourceChangeSetValidation> loadedValidations = loadedSelected is null ? [] : await Client.ListValidationsAsync(loadedSelected.Value.Id.Value, lifetime.Token);
+            if (version != contextVersion) return;
+            plan = loadedPlan;
+            functional = loadedFunctional;
+            activities = loadedActivities;
+            changeSets = loadedSets;
+            selected = loadedSelected;
+            validations = loadedValidations;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
+        finally { EndBusy(); }
+    }
+
+    private async Task LoadValidationsAsync() => validations = selected is null ? [] : await Client.ListValidationsAsync(selected.Value.Id.Value, lifetime.Token);
+
+    private async Task SelectChangeSetAsync(ChangeEventArgs args)
+    {
+        if (!Guid.TryParse(args.Value?.ToString(), out var id)) return;
+        var version = contextVersion;
+        var next = changeSets.FirstOrDefault(value => value.Value.Id.Value == id);
+        try
+        {
+            IReadOnlyList<ResourceChangeSetValidation> nextValidations = next is null ? [] : await Client.ListValidationsAsync(next.Value.Id.Value, lifetime.Token);
+            if (version == contextVersion) { selected = next; validations = nextValidations; }
+        }
+        catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
+    }
+
+    private async Task MaterializeAsync()
+    {
+        if (plan is null || !CanReview || !CanMaterialize || busy) return;
+        busy = true; error = null; message = null;
+        var version = contextVersion;
+        try { var result = await Client.MaterializeAsync(Id, lifetime.Token); if (version == contextVersion) { materialization = result; message = T("Materialized", result.Proposals.Count); } }
+        catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
+        finally { EndBusy(); }
+    }
+
+    private async Task CreateChangeSetAsync()
+    {
+        if (plan is null || !CanReview || materialization?.CanCreateChangeSet != true || busy) return;
+        busy = true; error = null; message = null;
+        var version = contextVersion;
+        try
+        {
+            var created = await Client.CreateChangeSetAsync(Id, lifetime.Token);
+            if (version != contextVersion) return;
+            var page = await Client.ListChangeSetsAsync(Id, 0, 200, lifetime.Token);
+            if (version != contextVersion) return;
+            changeSets = page.Items.OrderByDescending(value => value.Value.PlanRevision).ThenByDescending(value => value.Value.CreatedAt).ToArray();
+            selected = changeSets.FirstOrDefault(value => value.Value.Id == created.Value.Id);
+            await LoadValidationsAsync();
+            if (version != contextVersion) return;
+            activeView = "Changes";
+            message = T("ChangeSetCreated");
+        }
+        catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
+        finally { EndBusy(); }
+    }
+
+    private async Task ValidateAsync()
+    {
+        if (plan is null || selected is null || !CanReview || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value) || busy) return;
+        busy = true; error = null; message = null;
+        var version = contextVersion;
+        try { _ = await Client.ValidateChangeSetAsync(selected.Value.Id.Value, lifetime.Token); if (version == contextVersion) { await LoadValidationsAsync(); if (version == contextVersion) { activeView = "Validation"; message = T("Validated"); } } }
+        catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
+        finally { EndBusy(); }
+    }
+
+    private void EndBusy()
+    {
+        busy = false;
+        if (reloadRequested && !lifetime.IsCancellationRequested)
+        {
+            reloadRequested = false;
+            _ = InvokeAsync(LoadAsync);
+        }
+    }
+
+    private static UiStatus Tone(ResourcePlanStatus status) => status switch { ResourcePlanStatus.Validated or ResourcePlanStatus.Applied => UiStatus.Success, ResourcePlanStatus.Failed or ResourcePlanStatus.Cancelled => UiStatus.Danger, ResourcePlanStatus.Ready or ResourcePlanStatus.Materialized => UiStatus.Info, _ => UiStatus.Neutral };
+    private static UiStatus OperationTone(ResourceChangeOperation operation) => operation switch { ResourceChangeOperation.Create => UiStatus.Success, ResourceChangeOperation.Update => UiStatus.Info, ResourceChangeOperation.Delete => UiStatus.Danger, _ => UiStatus.Neutral };
+    public void Dispose() { ContextState.Changed -= OnContextChanged; lifetime.Cancel(); lifetime.Dispose(); }
+}

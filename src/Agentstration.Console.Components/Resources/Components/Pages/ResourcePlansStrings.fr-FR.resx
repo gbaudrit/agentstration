@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title" xml:space="preserve"><value>Plans de ressources</value></data>
+  <data name="ListDescription" xml:space="preserve"><value>Examinez les plans fonctionnels et les changements proposés avant toute application.</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Actualiser</value></data>
+  <data name="Filters" xml:space="preserve"><value>Filtres des plans</value></data>
+  <data name="Status" xml:space="preserve"><value>Statut</value></data>
+  <data name="AllStatuses" xml:space="preserve"><value>Tous les statuts</value></data>
+  <data name="CurrentWorkspace" xml:space="preserve"><value>Espace : {0}</value></data>
+  <data name="Loading" xml:space="preserve"><value>Chargement des plans de ressources…</value></data>
+  <data name="EmptyTitle" xml:space="preserve"><value>Aucun plan de ressources</value></data>
+  <data name="EmptyDescription" xml:space="preserve"><value>Les plans créés par un Flow ou l’API dans cet espace apparaîtront ici.</value></data>
+  <data name="ListLabel" xml:space="preserve"><value>Plans de ressources</value></data>
+  <data name="Plan" xml:space="preserve"><value>Plan</value></data>
+  <data name="Scope" xml:space="preserve"><value>Espace</value></data>
+  <data name="Changes" xml:space="preserve"><value>Changements</value></data>
+  <data name="Validation" xml:space="preserve"><value>Validation</value></data>
+  <data name="Updated" xml:space="preserve"><value>Mis à jour</value></data>
+  <data name="Revision" xml:space="preserve"><value>Révision {0}</value></data>
+  <data name="Stale" xml:space="preserve"><value>Obsolète</value></data>
+  <data name="NotValidated" xml:space="preserve"><value>Non validé</value></data>
+  <data name="Page" xml:space="preserve"><value>Page {0}</value></data>
+  <data name="Previous" xml:space="preserve"><value>Précédent</value></data>
+  <data name="Next" xml:space="preserve"><value>Suivant</value></data>
+  <data name="DetailDescription" xml:space="preserve"><value>Examinez la proposition fonctionnelle et ses changements matérialisés.</value></data>
+  <data name="BackToPlans" xml:space="preserve"><value>Retour aux plans</value></data>
+  <data name="NotFound" xml:space="preserve"><value>Plan introuvable</value></data>
+  <data name="NotFoundDescription" xml:space="preserve"><value>Ce plan est indisponible dans l’espace courant.</value></data>
+  <data name="PlanIdentity" xml:space="preserve"><value>Identité du plan</value></data>
+  <data name="Workspace" xml:space="preserve"><value>Espace</value></data>
+  <data name="StaleChangeSet" xml:space="preserve"><value>ChangeSet d’une ancienne révision</value></data>
+  <data name="Rematerialize" xml:space="preserve"><value>Rematérialiser</value></data>
+  <data name="CreateChangeSet" xml:space="preserve"><value>Créer un ChangeSet</value></data>
+  <data name="Revalidate" xml:space="preserve"><value>Revalider</value></data>
+  <data name="Materialization" xml:space="preserve"><value>Matérialisation actuelle</value></data>
+  <data name="Proposals" xml:space="preserve"><value>{0} propositions</value></data>
+  <data name="ReviewViews" xml:space="preserve"><value>Vues de revue du plan</value></data>
+  <data name="FunctionalIntent" xml:space="preserve"><value>Intention fonctionnelle</value></data>
+  <data name="Solution" xml:space="preserve"><value>Solution</value></data>
+  <data name="Roles" xml:space="preserve"><value>Rôles</value></data>
+  <data name="Workflows" xml:space="preserve"><value>Workflows</value></data>
+  <data name="Integrations" xml:space="preserve"><value>Intégrations</value></data>
+  <data name="Experiences" xml:space="preserve"><value>Expériences</value></data>
+  <data name="FunctionalBoundary" xml:space="preserve"><value>L’intention fonctionnelle est distincte des ressources concrètes proposées par Agentstration.</value></data>
+  <data name="NoChangeSets" xml:space="preserve"><value>Aucun ChangeSet pour cette révision. Rematérialisez le plan pour examiner une proposition.</value></data>
+  <data name="ChangeSet" xml:space="preserve"><value>ChangeSet</value></data>
+  <data name="ChangeSetOption" xml:space="preserve"><value>Révision {0} · {1}</value></data>
+  <data name="ChangeSetRevision" xml:space="preserve"><value>Révision du plan {0}</value></data>
+  <data name="DependsOn" xml:space="preserve"><value>Dépend de :</value></data>
+  <data name="NoDifferences" xml:space="preserve"><value>Aucun champ de ressource différent.</value></data>
+  <data name="Field" xml:space="preserve"><value>Champ</value></data>
+  <data name="Current" xml:space="preserve"><value>Actuel</value></data>
+  <data name="Proposed" xml:space="preserve"><value>Proposé</value></data>
+  <data name="Graph" xml:space="preserve"><value>Graphe des dépendances</value></data>
+  <data name="GraphLabel" xml:space="preserve"><value>Graphe orienté des dépendances des ressources proposées</value></data>
+  <data name="ValidatedAt" xml:space="preserve"><value>Validé le :</value></data>
+  <data name="StaleValidation" xml:space="preserve"><value>Validation obsolète</value></data>
+  <data name="NoIssues" xml:space="preserve"><value>Aucun problème de validation.</value></data>
+  <data name="Activity" xml:space="preserve"><value>Activité et provenance</value></data>
+  <data name="Principal" xml:space="preserve"><value>Principal</value></data>
+  <data name="Work" xml:space="preserve"><value>Work d’origine</value></data>
+  <data name="OpenTasks" xml:space="preserve"><value>Ouvrir les tâches</value></data>
+  <data name="FlowRun" xml:space="preserve"><value>Flow Run</value></data>
+  <data name="Correlation" xml:space="preserve"><value>Corrélation</value></data>
+  <data name="Materialized" xml:space="preserve"><value>{0} ressources proposées matérialisées.</value></data>
+  <data name="ChangeSetCreated" xml:space="preserve"><value>ChangeSet prêt pour la revue.</value></data>
+  <data name="Validated" xml:space="preserve"><value>Validation du ChangeSet enregistrée.</value></data>
+  <data name="Status.Draft" xml:space="preserve"><value>Brouillon</value></data>
+  <data name="Status.Ready" xml:space="preserve"><value>Prêt</value></data>
+  <data name="Status.Materialized" xml:space="preserve"><value>Matérialisé</value></data>
+  <data name="Status.Validated" xml:space="preserve"><value>Validé</value></data>
+  <data name="Status.Applied" xml:space="preserve"><value>Appliqué</value></data>
+  <data name="Status.Failed" xml:space="preserve"><value>Échec</value></data>
+  <data name="Status.Archived" xml:space="preserve"><value>Archivé</value></data>
+  <data name="Status.Cancelled" xml:space="preserve"><value>Annulé</value></data>
+  <data name="Readiness.Ready" xml:space="preserve"><value>Prêt</value></data>
+  <data name="Readiness.Blocked" xml:space="preserve"><value>Bloqué</value></data>
+  <data name="View.Overview" xml:space="preserve"><value>Vue d’ensemble</value></data>
+  <data name="View.Changes" xml:space="preserve"><value>Changements</value></data>
+  <data name="View.Graph" xml:space="preserve"><value>Graphe</value></data>
+  <data name="View.Validation" xml:space="preserve"><value>Validation</value></data>
+  <data name="View.Activity" xml:space="preserve"><value>Activité</value></data>
+  <data name="Operation.Create" xml:space="preserve"><value>Création</value></data>
+  <data name="Operation.Update" xml:space="preserve"><value>Mise à jour</value></data>
+  <data name="Operation.Delete" xml:space="preserve"><value>Suppression</value></data>
+  <data name="Operation.NoOp" xml:space="preserve"><value>Sans changement</value></data>
+  <data name="Activity.Created" xml:space="preserve"><value>Création</value></data>
+  <data name="Activity.Refined" xml:space="preserve"><value>Révision</value></data>
+  <data name="Activity.StatusChanged" xml:space="preserve"><value>Changement de statut</value></data>
+  <data name="Activity.Materialized" xml:space="preserve"><value>Matérialisation</value></data>
+  <data name="Activity.Validated" xml:space="preserve"><value>Validation</value></data>
+  <data name="Activity.Applied" xml:space="preserve"><value>Application</value></data>
+  <data name="Activity.Failed" xml:space="preserve"><value>Échec</value></data>
+  <data name="Activity.Archived" xml:space="preserve"><value>Archivage</value></data>
+  <data name="Activity.Cancelled" xml:space="preserve"><value>Annulation</value></data>
+</root>

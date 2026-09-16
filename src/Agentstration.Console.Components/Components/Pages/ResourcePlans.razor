@@ -1,0 +1,165 @@
+@page "/resource-plans"
+@rendermode InteractiveServer
+@implements IDisposable
+@using System.Collections.Concurrent
+@inject IResourcePlansApiClient Client
+@inject ConsoleContextState ContextState
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourcePlansStrings> Localizer
+
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("ListDescription")">
+    <Actions><button class="button-secondary" type="button" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button></Actions>
+</PageHeader>
+
+<section class="panel resource-plan-filters" aria-label="@T("Filters")">
+    <label for="resource-plan-status">@T("Status")</label>
+    <select id="resource-plan-status" @bind="statusFilter" @bind:after="ApplyFilterAsync">
+        <option value="">@T("AllStatuses")</option>
+        @foreach (var status in Enum.GetValues<ResourcePlanStatus>())
+        {
+            <option value="@status">@T($"Status.{status}")</option>
+        }
+    </select>
+    <span>@T("CurrentWorkspace", ContextState.Current?.WorkspaceDisplayName ?? "—")</span>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="form-alert form-alert-danger" role="alert">@error</div>
+}
+@if (loading && page is null)
+{
+    <LoadingState Message="@T("Loading")" />
+}
+else if (page is not null && page.Items.Count == 0)
+{
+    <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyDescription")" />
+}
+else if (page is not null)
+{
+    <section class="panel resource-plan-list" aria-label="@T("ListLabel")">
+        <div class="resource-plan-table-scroll">
+            <table>
+                <thead><tr><th>@T("Plan")</th><th>@T("Status")</th><th>@T("Scope")</th><th>@T("Changes")</th><th>@T("Validation")</th><th>@T("Updated")</th></tr></thead>
+                <tbody>
+                @foreach (var item in page.Items)
+                {
+                    var summary = summaries.GetValueOrDefault(item.Value.Id.Value);
+                    <tr>
+                        <td><a href="@($"/resource-plans/{item.Value.Id.Value:D}")"><strong>@item.Value.Title</strong></a><small>@item.Value.Goal</small></td>
+                        <td><StatusBadge Text="@T($"Status.{item.Value.Status}")" Status="@Tone(item.Value.Status)" /><small>@T("Revision", item.Value.Revision)</small></td>
+                        <td><code>@item.Value.Scope.WorkspaceId.Value.ToString("D")</code></td>
+                        <td>@(summary?.Changes.ToString() ?? "—") @if (summary?.Stale == true) { <StatusBadge Text="@T("Stale")" Status="UiStatus.Warning" /> }</td>
+                        <td>@(summary?.Readiness is null ? T("NotValidated") : T($"Readiness.{summary.Readiness}"))</td>
+                        <td>@item.Value.UpdatedAt.ToLocalTime().ToString("g")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        <nav class="resource-plan-pagination" aria-label="@T("Pages")">
+            <span>@T("Page", skip / PageSize + 1)</span>
+            <div><button class="button-secondary" type="button" @onclick="PreviousAsync" disabled="@(loading || skip == 0)">@T("Previous")</button>
+            <button class="button-secondary" type="button" @onclick="NextAsync" disabled="@(loading || !page.HasMore)">@T("Next")</button></div>
+        </nav>
+    </section>
+}
+
+@code {
+    private const int PageSize = 30;
+    private readonly CancellationTokenSource lifetime = new();
+    private ResourcePlanPage? page;
+    private readonly Dictionary<Guid, PlanSummary> summaries = [];
+    private string statusFilter = string.Empty;
+    private string? error;
+    private bool loading;
+    private bool reloadRequested;
+    private int skip;
+    private int contextVersion;
+    private string T(string key, params object[] args) => Localizer[key, args].Value;
+    private sealed record PlanSummary(int Changes, ResourceChangeSetReadiness? Readiness, bool Stale);
+
+    protected override async Task OnInitializedAsync()
+    {
+        ContextState.Changed += OnContextChanged;
+        await LoadAsync();
+    }
+
+    private void OnContextChanged() => _ = InvokeAsync(async () =>
+    {
+        contextVersion++;
+        skip = 0;
+        page = null;
+        summaries.Clear();
+        await LoadAsync();
+    });
+
+    private async Task ApplyFilterAsync() { skip = 0; await LoadAsync(); }
+    private async Task PreviousAsync() { skip = Math.Max(0, skip - PageSize); await LoadAsync(); }
+    private async Task NextAsync() { skip += PageSize; await LoadAsync(); }
+
+    private async Task LoadAsync()
+    {
+        if (loading) { reloadRequested = true; return; }
+        loading = true;
+        error = null;
+        var version = contextVersion;
+        try
+        {
+            var status = Enum.TryParse<ResourcePlanStatus>(statusFilter, out var parsed) ? parsed : (ResourcePlanStatus?)null;
+            var loadedPage = await Client.ListPlansAsync(status, skip, PageSize, lifetime.Token);
+            if (version != contextVersion) return;
+            page = loadedPage;
+            summaries.Clear();
+            _ = LoadSummariesAsync(loadedPage, version);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
+        finally
+        {
+            loading = false;
+            if (reloadRequested && !lifetime.IsCancellationRequested)
+            {
+                reloadRequested = false;
+                _ = InvokeAsync(LoadAsync);
+            }
+        }
+    }
+
+    private async Task LoadSummariesAsync(ResourcePlanPage loadedPage, int version)
+    {
+        try
+        {
+            var loadedSummaries = new ConcurrentDictionary<Guid, PlanSummary>();
+            await Parallel.ForEachAsync(loadedPage.Items,
+                new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = lifetime.Token }, async (item, cancellationToken) =>
+            {
+                if (version != contextVersion) return;
+                var sets = await Client.ListChangeSetsAsync(item.Value.Id.Value, 0, 50, cancellationToken);
+                var latest = ResourcePlanReviewProjection.LatestChangeSet(item.Value, sets.Items);
+                if (latest is null) return;
+                var validations = await Client.ListValidationsAsync(latest.Value.Id.Value, cancellationToken);
+                var validation = ResourcePlanReviewProjection.LatestValidation(latest.Value, validations);
+                loadedSummaries[item.Value.Id.Value] = new(latest.Value.Changes.Count, validation?.Readiness,
+                    ResourcePlanReviewProjection.IsStale(item.Value, latest.Value)
+                    || validation is not null && ResourcePlanReviewProjection.IsStale(item.Value, latest.Value, validation));
+            });
+            if (version != contextVersion || !ReferenceEquals(page, loadedPage)) return;
+            summaries.Clear();
+            foreach (var summary in loadedSummaries) summaries.Add(summary.Key, summary.Value);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { if (version == contextVersion && ReferenceEquals(page, loadedPage)) { error = exception.Message; await InvokeAsync(StateHasChanged); } }
+    }
+
+    private static UiStatus Tone(ResourcePlanStatus status) => status switch
+    {
+        ResourcePlanStatus.Validated or ResourcePlanStatus.Applied => UiStatus.Success,
+        ResourcePlanStatus.Failed or ResourcePlanStatus.Cancelled => UiStatus.Danger,
+        ResourcePlanStatus.Ready or ResourcePlanStatus.Materialized => UiStatus.Info,
+        _ => UiStatus.Neutral
+    };
+
+    public void Dispose() { ContextState.Changed -= OnContextChanged; lifetime.Cancel(); lifetime.Dispose(); }
+}

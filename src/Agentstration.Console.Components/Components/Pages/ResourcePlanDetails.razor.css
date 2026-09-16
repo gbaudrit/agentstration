@@ -1,0 +1,35 @@
+.resource-plan-identity, .resource-plan-actions, .resource-plan-materialization { align-items: center; display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1rem; }
+.resource-plan-identity code, .resource-plan-materialization code { overflow-wrap: anywhere; }
+.resource-plan-actions { justify-content: flex-end; }
+.resource-plan-tabs { border-bottom: 1px solid var(--border-color, #d7dee8); display: flex; gap: .25rem; overflow-x: auto; }
+.resource-plan-tabs button { background: transparent; border: 0; border-bottom: 3px solid transparent; cursor: pointer; padding: .75rem 1rem; white-space: nowrap; }
+.resource-plan-tabs button.active { border-bottom-color: var(--accent, #2563eb); font-weight: 700; }
+.resource-plan-tabs button:focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: -3px; }
+.resource-plan-view { margin-top: 1rem; }
+.resource-plan-overview-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.resource-plan-overview-grid article { border: 1px solid var(--border-color, #d7dee8); border-radius: .6rem; padding: 1rem; }
+.resource-plan-overview-grid h3 { margin-top: 0; }
+.resource-plan-overview-grid li { margin-bottom: .5rem; }
+.resource-plan-overview-grid li span { color: var(--text-muted, #64748b); display: block; }
+.resource-plan-change { border-top: 1px solid var(--border-color, #d7dee8); padding: 1rem 0; }
+.resource-plan-change header { align-items: center; display: flex; justify-content: space-between; }
+.resource-plan-change h3 { margin: 0; }
+.resource-plan-change small { color: var(--text-muted, #64748b); }
+.resource-plan-table-scroll, .resource-plan-graph-scroll { overflow: auto; }
+.resource-plan-change table { border-collapse: collapse; min-width: 600px; width: 100%; }
+.resource-plan-change th, .resource-plan-change td { border-bottom: 1px solid var(--border-color, #d7dee8); padding: .5rem; text-align: start; vertical-align: top; }
+.resource-plan-change td { max-width: 30rem; overflow-wrap: anywhere; }
+.resource-plan-graph-scroll svg { height: auto; max-height: 80vh; width: 100%; }
+.resource-plan-edge { stroke: #64748b; stroke-width: 2; }
+.resource-plan-node { fill: #eff6ff; stroke: #2563eb; stroke-width: 1.5; }
+.resource-plan-graph-scroll text { fill: #172554; font-size: 13px; }
+.resource-plan-graph-scroll .resource-plan-node-meta { font-size: 10px; }
+.resource-plan-graph-list li { margin: .4rem 0; }
+.resource-plan-graph-list span { display: block; }
+.resource-plan-issues li { border-bottom: 1px solid var(--border-color, #d7dee8); display: grid; gap: .25rem; padding: .6rem 0; }
+.resource-plan-origin { display: grid; gap: .4rem 1rem; grid-template-columns: max-content 1fr; }
+.resource-plan-origin dd { margin: 0; overflow-wrap: anywhere; }
+.resource-plan-timeline { border-inline-start: 2px solid var(--border-color, #d7dee8); list-style: none; margin-inline-start: .5rem; padding-inline-start: 1rem; }
+.resource-plan-timeline li { margin-bottom: 1rem; }
+.resource-plan-timeline time, .resource-plan-timeline span { color: var(--text-muted, #64748b); margin-inline-start: .6rem; }
+@media (max-width: 700px) { .resource-plan-actions { justify-content: flex-start; } .resource-plan-origin { grid-template-columns: 1fr; } }
