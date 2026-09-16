@@ -62,12 +62,22 @@ public sealed class ResourcePlanReviewTests
         Assert.AreEqual(change, ResourcePlanReviewProjection.ChangeForIssue(set.Value, issue));
         Assert.AreEqual("Rédaction, Analyse", ResourcePlanReviewProjection.FormatValue("[\"Rédaction\",\"Analyse\"]"));
 
-        var flow = change with { Proposed = change.Proposed with
+        var flow = change with
         {
-            Kind = "Flow",
-            Definition = JsonSerializer.SerializeToElement(new { displayName = "Routing", version = "1.0.0", enabled = true,
-                spec = new { flowKind = "orchestration", pattern = new { strategy = "sequential" } }, publish = true, activate = true })
-        } };
+            Proposed = change.Proposed with
+            {
+                Kind = "Flow",
+                Definition = JsonSerializer.SerializeToElement(new
+                {
+                    displayName = "Routing",
+                    version = "1.0.0",
+                    enabled = true,
+                    spec = new { flowKind = "orchestration", pattern = new { strategy = "sequential" } },
+                    publish = true,
+                    activate = true
+                })
+            }
+        };
         CollectionAssert.AreEqual(new[] { "definition.spec.flowKind", "definition.spec.pattern.strategy", "definition.version" },
             ResourcePlanReviewProjection.HighlightFields(flow).Select(value => value.Path).ToArray());
     }
