@@ -15,6 +15,7 @@ public sealed record BffServerSession(
     string AuthenticationMethod,
     string Provider,
     string AuthenticationVersion,
+    string SessionId,
     DateTimeOffset CreatedAt,
     DateTimeOffset LastSeenAt,
     DateTimeOffset AbsoluteExpiresAt);
@@ -22,6 +23,7 @@ public sealed record BffServerSession(
 public interface IBffServerSessionStore : ITicketStore
 {
     Task<BffServerSession?> FindAsync(string key, CancellationToken cancellationToken = default);
+    Task<bool> IsActiveSessionAsync(string sessionId, CancellationToken cancellationToken = default);
 }
 
 public sealed class InMemoryBffSessionStore(
@@ -126,6 +128,21 @@ public sealed class InMemoryBffSessionStore(
         }
     }
 
+    public async Task<bool> IsActiveSessionAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        await storeGate.WaitAsync(cancellationToken);
+        try
+        {
+            var now = timeProvider.GetUtcNow();
+            return sessions.Values.Any(value => value.Session.SessionId == sessionId
+                && !IsExpired(value.Session, now));
+        }
+        finally
+        {
+            storeGate.Release();
+        }
+    }
+
     private static BffServerSession Session(
         AuthenticationTicket ticket,
         string key,
@@ -145,6 +162,8 @@ public sealed class InMemoryBffSessionStore(
             ticket.Principal.FindFirst(BffSessionClaims.AuthenticationMethod)?.Value ?? string.Empty,
             ticket.Principal.FindFirst(BffSessionClaims.Provider)?.Value ?? string.Empty,
             ticket.Principal.FindFirst(BffSessionClaims.AuthenticationVersion)?.Value ?? string.Empty,
+            ticket.Principal.FindFirst(BffSessionClaims.SessionId)?.Value
+                ?? throw new InvalidOperationException("A BFF session requires an opaque session identifier."),
             createdAt,
             lastSeenAt,
             absoluteExpiresAt);

@@ -1,5 +1,7 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using Agentstration.Identity.Contracts;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace Agentstration.Console.Web.Security;
 
@@ -11,9 +13,11 @@ public static class BffSessionClaims
     public const string AuthenticationMethod = "agentstration:bff:authentication_method";
     public const string Provider = "agentstration:bff:provider";
     public const string AuthenticationVersion = "agentstration:bff:authentication_version";
+    public const string SessionId = "agentstration:bff:session_id";
 
-    public static ClaimsPrincipal Create(BffSessionIdentityResponse identity)
+    public static ClaimsPrincipal Create(BffSessionIdentityResponse identity, string? sessionId = null)
     {
+        sessionId ??= WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, identity.PrincipalId.ToString("D")),
@@ -23,7 +27,8 @@ public static class BffSessionClaims
             new Claim(WorkspaceId, identity.WorkspaceId.ToString("D")),
             new Claim(AuthenticationMethod, identity.AuthenticationMethod),
             new Claim(Provider, identity.Provider),
-            new Claim(AuthenticationVersion, identity.AuthenticationVersion)
+            new Claim(AuthenticationVersion, identity.AuthenticationVersion),
+            new Claim(SessionId, sessionId)
         };
         return new ClaimsPrincipal(new ClaimsIdentity(claims, ConsoleAuthenticationDefaults.Scheme));
     }

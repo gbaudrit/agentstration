@@ -3,18 +3,32 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Security.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace Agentstration.Management.Tests;
 
 public sealed partial class SecurityApiTests
 {
+    [TestMethod]
+    public async Task DevelopmentAuthenticationDoesNotAcceptAnInvalidInternalDelegation()
+    {
+        await using var factory = Factory("Development");
+        using var client = UnredirectedClient(factory);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+        request.Headers.Authorization = new("Bearer", "agd_invalid");
+        using var response = await client.SendAsync(request);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     [TestMethod]
     public async Task RegisteredBffCredentialAuthenticatesWithoutLeakingCredentialMaterial()
     {
@@ -106,6 +120,213 @@ public sealed partial class SecurityApiTests
                 json: JsonSerializer.Serialize(new BffLocalSessionRequest("bff-session-user", "wrong-password")));
             using var invalidResponse = await client.SendAsync(invalid);
             Assert.AreEqual(HttpStatusCode.Unauthorized, invalidResponse.StatusCode);
+        }
+        finally { fixture.Dispose(); }
+    }
+
+    [TestMethod]
+    public async Task BffDelegationIsAudienceBoundAndRechecksCurrentPrincipalState()
+    {
+        var fixture = BffFixture.Create();
+        try
+        {
+            await using var factory = fixture.Factory();
+            using var client = UnredirectedClient(factory);
+            await BootstrapAsync(client, "delegated-user");
+            using var login = fixture.SignedRequest("primary", "/api/internal/bff/sessions/local",
+                method: HttpMethod.Post,
+                json: JsonSerializer.Serialize(new BffLocalSessionRequest("delegated-user", LocalPassword)));
+            using var loginResponse = await client.SendAsync(login);
+            var identity = await loginResponse.Content.ReadFromJsonAsync<BffSessionIdentityResponse>();
+            Assert.AreEqual(HttpStatusCode.OK, loginResponse.StatusCode);
+            Assert.IsNotNull(identity);
+
+            var sessionId = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+                .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+            var delegationRequest = new BffDelegationRequest(
+                identity.PrincipalId, identity.TenantId, identity.WorkspaceId, sessionId,
+                identity.AuthenticationMethod, identity.Provider, identity.AuthenticationVersion,
+                InternalDelegationAudiences.Management);
+            using var humanOnly = await client.PostAsJsonAsync("/api/internal/bff/delegations", delegationRequest);
+            Assert.AreEqual(HttpStatusCode.Unauthorized, humanOnly.StatusCode);
+            using var issue = fixture.SignedRequest("primary", "/api/internal/bff/delegations",
+                method: HttpMethod.Post,
+                json: JsonSerializer.Serialize(delegationRequest));
+            using var issuedResponse = await client.SendAsync(issue);
+            var issued = await issuedResponse.Content.ReadFromJsonAsync<BffDelegationResponse>();
+            Assert.AreEqual(HttpStatusCode.OK, issuedResponse.StatusCode);
+            Assert.IsNotNull(issued);
+            StringAssert.StartsWith(issued.AccessToken, "agd_");
+            var tokenClaims = new JsonWebTokenHandler().ReadJsonWebToken(issued.AccessToken[4..]).Claims
+                .Select(value => value.Type).ToHashSet(StringComparer.Ordinal);
+            Assert.IsFalse(tokenClaims.Contains("agentstration_provider"));
+            Assert.IsFalse(tokenClaims.Contains("agentstration_authentication_version"));
+            Assert.IsFalse(tokenClaims.Contains("email"));
+            Assert.IsFalse(tokenClaims.Contains("role"));
+            Assert.IsFalse(tokenClaims.Contains("permission"));
+            using var keyRequest = fixture.SignedRequest("primary", "/api/internal/bff/delegation-keys");
+            using var keyResponse = await client.SendAsync(keyRequest);
+            Assert.AreEqual(HttpStatusCode.OK, keyResponse.StatusCode);
+            using var keyDocument = JsonDocument.Parse(await keyResponse.Content.ReadAsStringAsync());
+            var publishedKey = keyDocument.RootElement.GetProperty("keys")[0];
+            Assert.IsTrue(publishedKey.TryGetProperty("n", out _));
+            Assert.IsTrue(publishedKey.TryGetProperty("e", out _));
+            Assert.IsFalse(publishedKey.TryGetProperty("d", out _));
+
+            using var management = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+            management.Headers.Authorization = new("Bearer", issued.AccessToken);
+            using var managementResponse = await client.SendAsync(management);
+            Assert.AreEqual(HttpStatusCode.OK, managementResponse.StatusCode);
+            using var lowerCaseScheme = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+            lowerCaseScheme.Headers.Authorization = new("bearer", issued.AccessToken);
+            using var lowerCaseResponse = await client.SendAsync(lowerCaseScheme);
+            Assert.AreEqual(HttpStatusCode.OK, lowerCaseResponse.StatusCode);
+
+            using var wrongAudience = new HttpRequestMessage(HttpMethod.Get, "/api/work/workitems");
+            wrongAudience.Headers.Authorization = new("Bearer", issued.AccessToken);
+            using var wrongAudienceResponse = await client.SendAsync(wrongAudience);
+            Assert.AreEqual(HttpStatusCode.Unauthorized, wrongAudienceResponse.StatusCode);
+
+            var audienceRoutes = new[]
+            {
+                (InternalDelegationAudiences.Management, "/api/identity/context"),
+                (InternalDelegationAudiences.Work, "/api/work/workitems"),
+                (InternalDelegationAudiences.Flow, "/api/flows"),
+                (InternalDelegationAudiences.Runtime, "/api/runtime/runs")
+            };
+            foreach (var (_, path) in audienceRoutes.Skip(2))
+            {
+                using var mismatch = new HttpRequestMessage(HttpMethod.Get, path);
+                mismatch.Headers.Authorization = new("Bearer", issued.AccessToken);
+                using var mismatchResponse = await client.SendAsync(mismatch);
+                Assert.AreEqual(HttpStatusCode.Unauthorized, mismatchResponse.StatusCode, path);
+            }
+            foreach (var (audience, path) in audienceRoutes.Skip(1))
+            {
+                using var audienceIssue = fixture.SignedRequest("primary", "/api/internal/bff/delegations",
+                    method: HttpMethod.Post,
+                    json: JsonSerializer.Serialize(new BffDelegationRequest(
+                        identity.PrincipalId, identity.TenantId, identity.WorkspaceId, sessionId,
+                        identity.AuthenticationMethod, identity.Provider, identity.AuthenticationVersion, audience)));
+                using var audienceIssueResponse = await client.SendAsync(audienceIssue);
+                Assert.AreEqual(HttpStatusCode.OK, audienceIssueResponse.StatusCode, audience);
+                var audienceToken = await audienceIssueResponse.Content.ReadFromJsonAsync<BffDelegationResponse>();
+                Assert.IsNotNull(audienceToken);
+                using var business = new HttpRequestMessage(HttpMethod.Get, path);
+                business.Headers.Authorization = new("Bearer", audienceToken.AccessToken);
+                using var businessResponse = await client.SendAsync(business);
+                Assert.AreNotEqual(HttpStatusCode.Unauthorized, businessResponse.StatusCode, audience);
+                foreach (var (otherAudience, otherPath) in audienceRoutes.Where(value => value.Item1 != audience))
+                {
+                    using var mismatch = new HttpRequestMessage(HttpMethod.Get, otherPath);
+                    mismatch.Headers.Authorization = new("Bearer", audienceToken.AccessToken);
+                    using var mismatchResponse = await client.SendAsync(mismatch);
+                    Assert.AreEqual(HttpStatusCode.Unauthorized, mismatchResponse.StatusCode,
+                        $"{audience} must not authorize {otherAudience}.");
+                }
+            }
+
+            using (var scope = factory.Services.CreateScope())
+            {
+                var store = scope.ServiceProvider.GetRequiredService<IIdentityStore>();
+                var principal = await store.GetPrincipalAsync(identity.PrincipalId, CancellationToken.None);
+                Assert.IsNotNull(principal);
+                await store.UpdatePrincipalAsync(principal with { Status = PrincipalStatus.Disabled }, CancellationToken.None);
+            }
+            using var disabled = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+            disabled.Headers.Authorization = new("Bearer", issued.AccessToken);
+            using var disabledResponse = await client.SendAsync(disabled);
+            Assert.AreEqual(HttpStatusCode.Unauthorized, disabledResponse.StatusCode);
+
+        }
+        finally { fixture.Dispose(); }
+    }
+
+    [TestMethod]
+    public async Task BffDelegationExpiresWithoutClockSkew()
+    {
+        var fixture = BffFixture.Create();
+        var time = new ManualTimeProvider(DateTimeOffset.UtcNow);
+        try
+        {
+            await using var factory = fixture.Factory(timeProvider: time);
+            using var client = UnredirectedClient(factory);
+            await BootstrapAsync(client, "delegation-expiry-user");
+            using var login = fixture.SignedRequest("primary", "/api/internal/bff/sessions/local",
+                method: HttpMethod.Post,
+                json: JsonSerializer.Serialize(new BffLocalSessionRequest("delegation-expiry-user", LocalPassword)));
+            using var loginResponse = await client.SendAsync(login);
+            var identity = await loginResponse.Content.ReadFromJsonAsync<BffSessionIdentityResponse>();
+            Assert.AreEqual(HttpStatusCode.OK, loginResponse.StatusCode);
+            Assert.IsNotNull(identity);
+            var sessionId = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+                .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+            using var issue = fixture.SignedRequest("primary", "/api/internal/bff/delegations",
+                method: HttpMethod.Post,
+                json: JsonSerializer.Serialize(new BffDelegationRequest(identity.PrincipalId, identity.TenantId,
+                    identity.WorkspaceId, sessionId, identity.AuthenticationMethod, identity.Provider,
+                    identity.AuthenticationVersion, InternalDelegationAudiences.Management)));
+            using var issuedResponse = await client.SendAsync(issue);
+            var issued = await issuedResponse.Content.ReadFromJsonAsync<BffDelegationResponse>();
+            Assert.AreEqual(HttpStatusCode.OK, issuedResponse.StatusCode);
+            Assert.IsNotNull(issued);
+            using var before = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+            before.Headers.Authorization = new("Bearer", issued.AccessToken);
+            using var beforeResponse = await client.SendAsync(before);
+            Assert.AreEqual(HttpStatusCode.OK, beforeResponse.StatusCode);
+
+            time.Advance(TimeSpan.FromSeconds(121));
+            using var after = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+            after.Headers.Authorization = new("Bearer", issued.AccessToken);
+            using var afterResponse = await client.SendAsync(after);
+            Assert.AreEqual(HttpStatusCode.Unauthorized, afterResponse.StatusCode);
+        }
+        finally { fixture.Dispose(); }
+    }
+
+    [TestMethod]
+    public async Task BffDelegationLosesAccessWhenWorkspaceMembershipIsRemoved()
+    {
+        var fixture = BffFixture.Create();
+        try
+        {
+            await using var factory = fixture.Factory();
+            using var administrator = UnredirectedClient(factory);
+            await BootstrapAsync(administrator, "delegation-owner");
+            var context = await administrator.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
+            Assert.IsNotNull(context);
+            var member = await CreateAccountAsync(administrator, context.Context.WorkspaceId,
+                "delegation-member", BuiltInIdentityRoles.Viewer);
+            using var login = fixture.SignedRequest("primary", "/api/internal/bff/sessions/local",
+                method: HttpMethod.Post,
+                json: JsonSerializer.Serialize(new BffLocalSessionRequest("delegation-member", LocalPassword)));
+            using var loginResponse = await administrator.SendAsync(login);
+            var identity = await loginResponse.Content.ReadFromJsonAsync<BffSessionIdentityResponse>();
+            Assert.AreEqual(HttpStatusCode.OK, loginResponse.StatusCode);
+            Assert.IsNotNull(identity);
+            var sessionId = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+                .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+            using var issue = fixture.SignedRequest("primary", "/api/internal/bff/delegations",
+                method: HttpMethod.Post,
+                json: JsonSerializer.Serialize(new BffDelegationRequest(identity.PrincipalId, identity.TenantId,
+                    identity.WorkspaceId, sessionId, identity.AuthenticationMethod, identity.Provider,
+                    identity.AuthenticationVersion, InternalDelegationAudiences.Management)));
+            using var issuedResponse = await administrator.SendAsync(issue);
+            var issued = await issuedResponse.Content.ReadFromJsonAsync<BffDelegationResponse>();
+            Assert.AreEqual(HttpStatusCode.OK, issuedResponse.StatusCode);
+            Assert.IsNotNull(issued);
+            using var before = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+            before.Headers.Authorization = new("Bearer", issued.AccessToken);
+            using var beforeResponse = await administrator.SendAsync(before);
+            Assert.AreEqual(HttpStatusCode.OK, beforeResponse.StatusCode);
+
+            using var removal = await administrator.DeleteAsync(
+                $"/api/identity/workspaces/{context.Context.WorkspaceId:D}/memberships/{member.PrincipalId:D}");
+            Assert.AreEqual(HttpStatusCode.NoContent, removal.StatusCode);
+            using var after = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+            after.Headers.Authorization = new("Bearer", issued.AccessToken);
+            using var afterResponse = await administrator.SendAsync(after);
+            Assert.AreEqual(HttpStatusCode.Unauthorized, afterResponse.StatusCode);
         }
         finally { fixture.Dispose(); }
     }
@@ -227,13 +448,15 @@ public sealed partial class SecurityApiTests
                 Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)), includeNext);
         }
 
-        public WebApplicationFactory<Program> Factory(bool revokePrimary = false) =>
+        public WebApplicationFactory<Program> Factory(bool revokePrimary = false, TimeProvider? timeProvider = null) =>
             SecurityApiTests.Factory("Local").WithWebHostBuilder(builder =>
             {
                 builder.UseSetting("Agentstration:BffWorkloadTrust:Enabled", "true");
                 builder.UseSetting("Agentstration:BffWorkloadTrust:InstanceId", "instance-a");
                 Credential(builder, 0, "primary", Path.Combine(Directory, "primary.key"), revokePrimary);
                 if (IncludeNext) Credential(builder, 1, "next", Path.Combine(Directory, "next.key"), false);
+                if (timeProvider is not null)
+                    builder.ConfigureTestServices(services => services.AddSingleton(timeProvider));
             });
 
         public HttpRequestMessage SignedRequest(
@@ -279,5 +502,12 @@ public sealed partial class SecurityApiTests
         }
 
         public void Dispose() => System.IO.Directory.Delete(Directory, recursive: true);
+    }
+
+    private sealed class ManualTimeProvider(DateTimeOffset initial) : TimeProvider
+    {
+        private DateTimeOffset now = initial;
+        public override DateTimeOffset GetUtcNow() => now;
+        public void Advance(TimeSpan duration) => now += duration;
     }
 }

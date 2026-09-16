@@ -27,7 +27,8 @@ public sealed class BffCookieConfiguration(
         }
 
         var request = BffSessionClaims.ValidationRequest(context.Principal);
-        if (request is null)
+        var sessionId = context.Principal.FindFirst(BffSessionClaims.SessionId)?.Value;
+        if (request is null || string.IsNullOrWhiteSpace(sessionId))
         {
             await RejectAndRevokeAsync(context);
             return;
@@ -54,12 +55,15 @@ public sealed class BffCookieConfiguration(
             return;
         }
 
-        context.ReplacePrincipal(BffSessionClaims.Create(validation.Identity));
+        context.ReplacePrincipal(BffSessionClaims.Create(validation.Identity, sessionId));
         context.ShouldRenew = true;
     }
 
     private static async Task RejectAndRevokeAsync(CookieValidatePrincipalContext context)
     {
+        if (context.Principal?.FindFirst(BffSessionClaims.SessionId)?.Value is { } sessionId)
+            context.HttpContext.RequestServices.GetRequiredService<BffDelegationTokenCache>()
+                .RevokeSession(sessionId);
         context.RejectPrincipal();
         await context.HttpContext.SignOutAsync(ConsoleAuthenticationDefaults.Scheme);
     }

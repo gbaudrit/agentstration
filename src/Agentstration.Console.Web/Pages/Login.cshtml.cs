@@ -14,6 +14,7 @@ public sealed class LoginModel(
     IBffSessionAuthorityClient authority,
     IOptions<BffSessionOptions> sessionOptions,
     TimeProvider timeProvider,
+    BffDelegationTokenCache cache,
     IStringLocalizer<AuthStrings> localizer) : PageModel
 {
     [BindProperty]
@@ -57,6 +58,8 @@ public sealed class LoginModel(
             return Page();
         }
 
+        if (User.FindFirst(BffSessionClaims.SessionId)?.Value is { } priorSessionId)
+            cache.RevokeSession(priorSessionId);
         await HttpContext.SignOutAsync(ConsoleAuthenticationDefaults.Scheme);
         var now = timeProvider.GetUtcNow();
         var absoluteExpiry = Input.RememberMe

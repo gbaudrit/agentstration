@@ -48,6 +48,22 @@ public static class BffWorkloadEndpoints
             Results.Ok(await sessions.ValidateAsync(request, cancellationToken)))
             .RequireAuthorization(AgentstrationPolicies.BffWorkload)
             .ExcludeFromDescription();
+        endpoints.MapPost("/api/internal/bff/delegations", async (
+            BffDelegationRequest request,
+            InternalDelegationService delegations,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await delegations.IssueAsync(request, cancellationToken);
+            return result is null
+                ? Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "delegation_denied")
+                : Results.Ok(result);
+        })
+            .RequireAuthorization(AgentstrationPolicies.BffWorkload)
+            .ExcludeFromDescription();
+        endpoints.MapGet("/api/internal/bff/delegation-keys", (InternalDelegationKeys keys) =>
+            Results.Ok(new { keys = keys.PublicKeys }))
+            .RequireAuthorization(AgentstrationPolicies.BffWorkload)
+            .ExcludeFromDescription();
         return endpoints;
     }
 }
