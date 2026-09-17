@@ -185,6 +185,9 @@ public sealed class AgentFrameworkRuntimeFactory(
             var mappedTools = tools.Select(tool => MapTool(tool, toolExecution, ToolContext(definition, RevisionId, null, request.ToolExecution))).ToList();
             var agent = AgentFrameworkRuntimeFactory.Observe(new ChatClientAgent(chatClient, instructions: instructions, name: AgentId, description: description, tools: mappedTools), observabilityEnabled);
             var chatOptions = AgentFrameworkChatOptionsMapper.Map(model, request.Options);
+            var streaming = ResolveStreamingMode(
+                request.Execution?.Streaming ?? request.Options?.Streaming ?? RuntimeStreamingMode.Automatic,
+                model);
             var effective = new ModelExecutionOptions(
                 chatOptions.Temperature,
                 chatOptions.MaxOutputTokens,
@@ -192,7 +195,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                 chatOptions.TopK,
                 checked((int?)chatOptions.Seed),
                 chatOptions.StopSequences?.ToArray(),
-                request.Execution?.Streaming ?? request.Options?.Streaming ?? RuntimeStreamingMode.Automatic);
+                streaming);
             ValidateCompatibility(model, effective);
             var output = new StringBuilder();
             if (effective.Streaming == RuntimeStreamingMode.Disabled)
@@ -252,6 +255,20 @@ public sealed class AgentFrameworkRuntimeFactory(
                 model.ModelName,
                 RuntimeType,
                 tools.Count > 0);
+        }
+
+        private RuntimeStreamingMode ResolveStreamingMode(RuntimeStreamingMode requested, ModelChatClientMetadata? model)
+        {
+            if (requested != RuntimeStreamingMode.Automatic
+                || model?.ProviderCapabilities is null || model.ModelCapabilities is null || model.AdapterCapabilities is null)
+                return requested;
+            var capabilities = EffectiveCapabilityResolver.Intersect(
+                model.ProviderCapabilities,
+                model.ModelCapabilities,
+                Capabilities,
+                model.AdapterCapabilities);
+            return capabilities.Streaming.Support == CapabilitySupport.Unsupported
+                ? RuntimeStreamingMode.Disabled : RuntimeStreamingMode.Enabled;
         }
 
     }

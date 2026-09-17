@@ -7,21 +7,22 @@ namespace Agentstration.Extensions.Foundry;
 
 public sealed class FoundryRequestAuthenticator
 {
-    private static readonly TokenRequestContext TokenContext = new(["https://ai.azure.com/.default"]);
+    private static readonly TokenRequestContext ProjectTokenContext = new(["https://ai.azure.com/.default"]);
+    private static readonly TokenRequestContext ResourceInferenceTokenContext = new(["https://cognitiveservices.azure.com/.default"]);
     private readonly TokenCredential? credential;
     private readonly string? apiKey;
 
-    public FoundryRequestAuthenticator(FoundryExtensionOptions options)
+    public FoundryRequestAuthenticator(FoundryExtensionOptions options, string? developmentApiKey = null, TokenCredential? tokenCredential = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         if (options.AuthenticationMode == FoundryAuthenticationMode.ApiKeyEnvironment)
         {
-            apiKey = Environment.GetEnvironmentVariable("FOUNDRY_API_KEY");
+            apiKey = Environment.GetEnvironmentVariable("FOUNDRY_API_KEY") ?? developmentApiKey;
             if (string.IsNullOrWhiteSpace(apiKey) || apiKey.Length > 8192 || apiKey.Any(char.IsWhiteSpace) || apiKey.Any(char.IsControl))
                 throw new InvalidOperationException("FOUNDRY_API_KEY must contain a bounded, single-line API key in ApiKeyEnvironment mode.");
             return;
         }
-        credential = options.AuthenticationMode switch
+        credential = tokenCredential ?? (options.AuthenticationMode switch
         {
             FoundryAuthenticationMode.ManagedIdentity => new ManagedIdentityCredential(
                 options.ManagedIdentityClientId is { Length: > 0 } clientId
@@ -30,10 +31,20 @@ public sealed class FoundryRequestAuthenticator
             FoundryAuthenticationMode.WorkloadIdentity => CreateWorkloadIdentity(),
             FoundryAuthenticationMode.Development => new AzureCliCredential(),
             _ => throw new InvalidOperationException("Unsupported Foundry authentication mode.")
-        };
+        });
     }
 
-    public async Task ApplyAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    public Task ApplyAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+        ApplyAsync(request, ProjectTokenContext, cancellationToken);
+
+    public Task ApplyInferenceAsync(HttpRequestMessage request, FoundryExtensionOptions options, CancellationToken cancellationToken) =>
+        ApplyAsync(
+            request,
+            options.InferenceEndpoint.AbsolutePath.StartsWith("/api/projects/", StringComparison.Ordinal)
+                ? ProjectTokenContext : ResourceInferenceTokenContext,
+            cancellationToken);
+
+    private async Task ApplyAsync(HttpRequestMessage request, TokenRequestContext tokenContext, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (apiKey is not null)
@@ -43,7 +54,7 @@ public sealed class FoundryRequestAuthenticator
         }
         try
         {
-            var token = await credential!.GetTokenAsync(TokenContext, cancellationToken);
+            var token = await credential!.GetTokenAsync(tokenContext, cancellationToken);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
