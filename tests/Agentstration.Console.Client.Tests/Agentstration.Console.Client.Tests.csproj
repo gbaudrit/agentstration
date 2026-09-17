@@ -5,6 +5,7 @@
     <ProjectReference Include="../../src/Agentstration.Flows/Agentstration.Flows.csproj" />
     <ProjectReference Include="../../src/Agentstration.Flows.Contracts/Agentstration.Flows.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Resources/Agentstration.Resources.csproj" />
+    <ProjectReference Include="../../src/Agentstration.ResourcePlanning.Contracts/Agentstration.ResourcePlanning.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Contracts/Agentstration.Runtime.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Work/Agentstration.Work.csproj" />

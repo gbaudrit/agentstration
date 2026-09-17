@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 
 export interface WorkspaceDefinition {
@@ -60,9 +60,7 @@ export class OrganizationWorkspacesPage {
     }
 
     await this.select(workspaceId);
-    if (await shell.getAttribute('data-workspace-name') !== name) {
-      throw new Error(`Workspace selector did not activate campaign workspace '${name}'.`);
-    }
+    await expect(shell).toHaveAttribute('data-workspace-name', name);
   }
 
   public row(name: string): Locator {

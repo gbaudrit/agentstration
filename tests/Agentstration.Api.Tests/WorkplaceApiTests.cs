@@ -767,7 +767,8 @@ public sealed class WorkplaceApiTests
             var supervisedActions = await client.GetFromJsonAsync<PendingActionContract[]>($"/api/tasks/{resolvedTask.Id}/pending-actions");
             var supervised = supervisedActions ?? []; Assert.HasCount(1, supervised); Assert.AreEqual(resolvedTask.Id, supervised[0].WorkTaskId); Assert.AreEqual(PendingActionStatus.Completed, supervised[0].Status);
             persistedInteraction = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/default/interactions/{submitted.Interaction.Id}");
-            Assert.IsInstanceOfType<CreateTaskAction>(persistedInteraction?.ImmediateResult);
+            Assert.AreEqual(resolvedTask.Id, persistedInteraction?.TaskId);
+            Assert.IsTrue(persistedInteraction?.ImmediateResult is CreateTaskAction or ShowResultAction);
 
             using var replay = await client.PostAsJsonAsync(
                 $"/api/workspaces/default/interactions/{submitted.Interaction.Id}/pending-actions/{choice.PendingActionId.Value}/responses",

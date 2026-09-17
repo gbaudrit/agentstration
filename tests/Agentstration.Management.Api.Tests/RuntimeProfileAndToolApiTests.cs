@@ -28,6 +28,33 @@ namespace Agentstration.Management.Tests;
 public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
+    public async Task PlannedAgentDeletionUsesItsExactWorkspaceScope()
+    {
+        await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        var agents = factory.Services.GetRequiredService<AgentManagementService>();
+        const string agentName = "planned-retirement-test";
+        var created = await agents.PutAgentAsync(new AgentResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
+            Metadata = new ResourceMetadata { Name = agentName },
+            Definition = new AgentProperties
+            {
+                DisplayName = "Planned retirement",
+                Instructions = "Test exact workspace deletion.",
+                ModelProfile = new ResourceReference("reasoning-default")
+            }
+        }, null, true, default);
+        var scopeRef = created.Value.ScopeRef ?? throw new AssertFailedException("Created Agent has no scope.");
+
+        await agents.DeleteAgentExactAsync(scopeRef, created.Value.Namespace, agentName, created.ETag, default);
+
+        Assert.IsNull(await agents.GetAgentExactAsync(scopeRef, created.Value.Namespace, agentName, default));
+    }
+
+    [TestMethod]
     public async Task RuntimeProfileIsPersistedAsAnIndependentManagementResource()
     {
         await using var factory = Factory();

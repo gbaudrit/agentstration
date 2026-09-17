@@ -12,6 +12,7 @@ using Agentstration.Infrastructure.Events;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Infrastructure.Notifications;
 using Agentstration.Infrastructure.Packs;
+using Agentstration.Infrastructure.ResourcePlanning;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Sources;
 using Agentstration.Infrastructure.Triggers;
@@ -21,6 +22,9 @@ using Agentstration.Packs;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Storage.PostgreSql;
 using Agentstration.ResourceManagement.Storage.Sqlite;
+using Agentstration.ResourcePlanning;
+using Agentstration.ResourcePlanning.Storage.PostgreSql;
+using Agentstration.ResourcePlanning.Storage.Sqlite;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
@@ -100,6 +104,20 @@ public static class DependencyInjection
             controlPlaneConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "control-plane.db")}";
             services.AddSqliteResourceManagement(controlPlaneConnectionString);
         }
+        if (storageProvider == AgentstrationStorageProvider.PostgreSql)
+            services.AddPostgreSqlResourcePlanning(storageOptions.ConnectionString!);
+        else
+            services.AddSqliteResourcePlanning($"Data Source={Path.Combine(dataDirectory, "resource-planning.db")};Pooling=False");
+        services.AddSingleton<IResourcePlanContentValidator, FunctionalResourcePlanValidator>();
+        services.AddSingleton<ResourcePlanService>();
+        services.AddSingleton(new ResourcePlanningMaterializationOptions());
+        services.AddSingleton<IResourcePlanningStateReader, ManagementResourcePlanningStateReader>();
+        services.AddSingleton<ResourcePlanMaterializationService>();
+        services.AddSingleton<ResourceChangeSetService>();
+        services.AddSingleton<IPlannedResourceValidator, CanonicalPlannedResourceValidator>();
+        services.AddSingleton<ResourceChangeSetValidationService>();
+        services.AddSingleton<IPlannedResourceApplier, CanonicalPlannedResourceApplier>();
+        services.AddSingleton<ResourceChangeSetApplicationService>();
         var secretPath = Path.Combine(dataDirectory, "secrets");
         services.AddSingleton(_ => new EnvironmentMasterKeyProvider(Path.Combine(secretPath, "master.key")));
         services.AddSingleton<IMasterKeyProvider>(provider => provider.GetRequiredService<EnvironmentMasterKeyProvider>());
@@ -314,6 +332,13 @@ public static class DependencyInjection
         services.AddSingleton<WorkNotificationMcpToolDefinitionProvider>();
         services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<WorkNotificationMcpToolDefinitionProvider>());
         services.AddSingleton<WorkNotificationMcpTool>();
+        AddInternalTool<ResourcePlanCreateMcpTool>(services);
+        AddInternalTool<ResourcePlanGetMcpTool>(services);
+        AddInternalTool<ResourcePlanRefineMcpTool>(services);
+        AddInternalTool<ResourcePlanSubmitMcpTool>(services);
+        AddInternalTool<ResourcePlanMaterializeMcpTool>(services);
+        AddInternalTool<ResourceChangeSetCreateMcpTool>(services);
+        AddInternalTool<ResourceChangeSetValidateMcpTool>(services);
         services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<WorkNotificationMcpTool>());
         services.AddSingleton<InternalMcpToolProjectionService>();
         services.AddSingleton(provider => new Lazy<IEnumerable<IInternalMcpToolHandler>>(
@@ -366,5 +391,12 @@ public static class DependencyInjection
         services.AddSingleton<IToolDefinitionExecutor, ToolDefinitionExecutor>();
         services.AddSingleton(provider => new Lazy<IToolDefinitionExecutor>(provider.GetRequiredService<IToolDefinitionExecutor>));
         return services;
+    }
+
+    private static void AddInternalTool<TTool>(IServiceCollection services) where TTool : class, IInternalMcpToolHandler
+    {
+        services.AddSingleton<TTool>();
+        services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<TTool>());
+        services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<TTool>());
     }
 }
