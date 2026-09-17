@@ -3,6 +3,13 @@ namespace Agentstration.ResourcePlanning.Contracts;
 public enum ResourceChangeSetApplicationStatus { Applying, Applied, PartiallyApplied, Failed }
 public enum ResourceChangeApplicationOutcome { Applied, AlreadyApplied, Skipped, Failed }
 
+public sealed record ResourceChangeSetApplicationAttempt(
+    int Number,
+    Guid RequestedByPrincipalId,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? CompletedAt,
+    ResourceChangeSetApplicationStatus? Status);
+
 public sealed record ResourceChangeApplicationOperation(
     int Order,
     string LogicalId,
@@ -30,7 +37,8 @@ public sealed record ResourceChangeSetApplication(
     DateTimeOffset StartedAt,
     DateTimeOffset UpdatedAt,
     DateTimeOffset LeaseUntil,
-    DateTimeOffset? CompletedAt);
+    DateTimeOffset? CompletedAt,
+    IReadOnlyList<ResourceChangeSetApplicationAttempt>? AttemptHistory = null);
 
 public sealed record ResourceChangeSetApplicationSnapshot(ResourceChangeSetApplication Value, string ETag);
 

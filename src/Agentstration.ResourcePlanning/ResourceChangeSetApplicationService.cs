@@ -79,9 +79,11 @@ public sealed class ResourceChangeSetApplicationService(
 
         var application = previous is null
             ? new ResourceChangeSetApplication(Guid.NewGuid(), plan.Value.Id, plan.Value.Revision, id, changeSet.Value.Digest,
-                validation.Id, scope, ResourceChangeSetApplicationStatus.Applying, [], 1, actorPrincipalId, now, now, now.Add(Lease), null)
+                validation.Id, scope, ResourceChangeSetApplicationStatus.Applying, [], 1, actorPrincipalId, now, now, now.Add(Lease), null,
+                [new ResourceChangeSetApplicationAttempt(1, actorPrincipalId, now, null, null)])
             : previous.Value with { Status = ResourceChangeSetApplicationStatus.Applying, Attempts = previous.Value.Attempts + 1,
-                UpdatedAt = now, LeaseUntil = now.Add(Lease), CompletedAt = null };
+                UpdatedAt = now, LeaseUntil = now.Add(Lease), CompletedAt = null,
+                AttemptHistory = [.. previous.Value.AttemptHistory ?? [], new ResourceChangeSetApplicationAttempt(previous.Value.Attempts + 1, actorPrincipalId, now, null, null)] };
         ResourceChangeSetApplicationSnapshot stored;
         try { stored = await repository.SaveApplicationAsync(application, previous?.ETag, cancellationToken); }
         catch (ResourcePlanConcurrencyException)
@@ -114,7 +116,9 @@ public sealed class ResourceChangeSetApplicationService(
             var status = failed ? hasApplied ? ResourceChangeSetApplicationStatus.PartiallyApplied : ResourceChangeSetApplicationStatus.Failed : ResourceChangeSetApplicationStatus.Applied;
             stored = await repository.SaveApplicationAsync(stored.Value with
             {
-                Status = status, UpdatedAt = timeProvider.GetUtcNow(), CompletedAt = timeProvider.GetUtcNow(), LeaseUntil = timeProvider.GetUtcNow()
+                Status = status, UpdatedAt = timeProvider.GetUtcNow(), CompletedAt = timeProvider.GetUtcNow(), LeaseUntil = timeProvider.GetUtcNow(),
+                AttemptHistory = stored.Value.AttemptHistory?.Select(value => value.Number == stored.Value.Attempts
+                    ? value with { CompletedAt = timeProvider.GetUtcNow(), Status = status } : value).ToArray()
             }, stored.ETag, cancellationToken);
             var setStatus = status switch
             {

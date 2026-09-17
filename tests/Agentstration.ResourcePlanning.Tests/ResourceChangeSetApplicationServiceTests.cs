@@ -48,6 +48,8 @@ public sealed class ResourceChangeSetApplicationServiceTests
         var resumed = await fixture.Applications.ApplyAsync(fixture.Scope, fixture.ChangeSet.Value.Id, fixture.Request, fixture.Actor, default);
         Assert.AreEqual(ResourceChangeSetApplicationStatus.Applied, resumed.Value.Status);
         Assert.AreEqual(2, resumed.Value.Attempts);
+        Assert.AreEqual(2, resumed.Value.AttemptHistory!.Count);
+        Assert.IsTrue(resumed.Value.AttemptHistory.All(value => value.CompletedAt is not null));
         Assert.AreEqual(3, fixture.Applier.Calls);
     }
 
