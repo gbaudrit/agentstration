@@ -329,7 +329,16 @@ else
                             {
                                 var change = selected?.Value.Changes.FirstOrDefault(value => value.LogicalId == operation.LogicalId);
                                 var resourceUrl = ResourcePlanReviewProjection.AppliedResourceUrl(change, operation);
-                                <li><span class="resource-plan-application-order">@(operation.Order + 1)</span><div class="resource-plan-application-resource"><strong>@(change is null ? operation.LogicalId : ResourcePlanReviewProjection.DisplayName(change))</strong><small>@(change is null ? operation.LogicalId : $"{ResourceKindLabel(change.Proposed.Kind)} · {operation.LogicalId}")</small>@if (!string.IsNullOrWhiteSpace(operation.ErrorMessage)) { <p class="resource-plan-application-error">@operation.ErrorMessage</p> }</div>@if (resourceUrl is not null) { <a class="resource-plan-application-open text-button" href="@resourceUrl" aria-label="@($"{T("Open")} {ResourcePlanReviewProjection.DisplayName(change!)}")">@T("Open") <span aria-hidden="true">↗</span></a> }<StatusBadge Text="@T($"Outcome.{operation.Outcome}")" Status="@ApplicationOutcomeTone(operation.Outcome)" /></li>
+                                var resourceName = change is null ? operation.LogicalId : ResourcePlanReviewProjection.DisplayName(change);
+                                <li>
+                                    <span class="resource-plan-application-order">@(operation.Order + 1)</span>
+                                    <div class="resource-plan-application-resource">
+                                        <strong>@if (resourceUrl is not null) { <a class="resource-name-link" href="@resourceUrl">@resourceName</a> } else { @resourceName }</strong>
+                                        <small>@(change is null ? operation.LogicalId : $"{ResourceKindLabel(change.Proposed.Kind)} · {operation.LogicalId}")</small>
+                                        @if (!string.IsNullOrWhiteSpace(operation.ErrorMessage)) { <p class="resource-plan-application-error">@operation.ErrorMessage</p> }
+                                    </div>
+                                    <StatusBadge Text="@T($"Outcome.{operation.Outcome}")" Status="@ApplicationOutcomeTone(operation.Outcome)" />
+                                </li>
                             }
                         </ol>
                     }

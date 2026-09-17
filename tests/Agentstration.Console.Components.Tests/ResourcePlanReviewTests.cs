@@ -214,7 +214,10 @@ public sealed class ResourcePlanReviewTests
             Assert.Contains("Ressources appliquées", rendered.Find(".resource-plan-application-summary").TextContent, StringComparison.Ordinal);
             Assert.AreEqual("1", rendered.Find(".resource-plan-application-counts strong").TextContent);
             Assert.Contains("Triage", rendered.Find(".resource-plan-application-operations").TextContent, StringComparison.Ordinal);
-            Assert.AreEqual("/agents/triage", rendered.Find(".resource-plan-application-open").GetAttribute("href"));
+            var resourceLink = rendered.Find(".resource-plan-application-resource .resource-name-link");
+            Assert.AreEqual("/agents/triage", resourceLink.GetAttribute("href"));
+            Assert.AreEqual("Triage", resourceLink.TextContent);
+            Assert.HasCount(1, rendered.FindAll(".resource-plan-application-operations li a"));
         });
         rendered.Find("#tab-Activity").Click();
         rendered.WaitForAssertion(() =>
