@@ -726,6 +726,73 @@ public sealed class AgentFrameworkRuntimeFactoryTests
     }
 
     [TestMethod]
+    public async Task NonStreamingRuntimePreservesModelUsageInDirectAndEventResults()
+    {
+        using var chatClient = new RecordingChatClient
+        {
+            ResponseFactory = (_, _, _) => new ChatResponse(new ChatMessage(ChatRole.Assistant, "Bonjour !"))
+            {
+                Usage = new UsageDetails { InputTokenCount = 20, OutputTokenCount = 5, TotalTokenCount = 25 }
+            }
+        };
+        var runtime = await new AgentFrameworkRuntimeFactory(
+            new RecordingResolver(chatClient), NullLoggerFactory.Instance, new GenAiObservabilityOptions { Enabled = false })
+            .CreateAsync(Definition(), "revision-1", new AgentRuntimeContext(new EmptyToolCatalog()), default);
+
+        var direct = await runtime.ExecuteAsync(new AgentExecutionRequest("Dis juste bonjour"), default);
+        Assert.AreEqual("Bonjour !", direct.Output);
+        Assert.AreEqual(20, direct.Usage?.InputTokens);
+        Assert.AreEqual(5, direct.Usage?.OutputTokens);
+
+        var events = new List<AgentExecutionEvent>();
+        await foreach (var item in runtime.ExecuteEventsAsync(new AgentExecutionRequest(
+            "Dis juste bonjour", Execution: new AgentExecutionOptions { Streaming = RuntimeStreamingMode.Disabled })))
+            events.Add(item);
+        var usage = events.OfType<UsageUpdated>().Single().Usage;
+        Assert.AreEqual(20, usage.InputTokens);
+        Assert.AreEqual(5, usage.OutputTokens);
+        Assert.AreEqual(usage, events.OfType<ExecutionCompleted>().Single().Result.Usage);
+    }
+
+    [TestMethod]
+    public async Task NonStreamingRuntimeLeavesUsageAbsentWhenProviderDoesNotReportIt()
+    {
+        using var chatClient = new RecordingChatClient();
+        var runtime = await new AgentFrameworkRuntimeFactory(
+            new RecordingResolver(chatClient), NullLoggerFactory.Instance, new GenAiObservabilityOptions { Enabled = false })
+            .CreateAsync(Definition(), "revision-1", new AgentRuntimeContext(new EmptyToolCatalog()), default);
+
+        var result = await runtime.ExecuteAsync(new AgentExecutionRequest("hello"), default);
+        Assert.IsNull(result.Usage);
+        var events = new List<AgentExecutionEvent>();
+        await foreach (var item in runtime.ExecuteEventsAsync(new AgentExecutionRequest(
+            "hello", Execution: new AgentExecutionOptions { Streaming = RuntimeStreamingMode.Disabled })))
+            events.Add(item);
+        Assert.IsFalse(events.OfType<UsageUpdated>().Any());
+        Assert.IsNull(events.OfType<ExecutionCompleted>().Single().Result.Usage);
+    }
+
+    [TestMethod]
+    public async Task NonStreamingRuntimeBoundsProviderTokenCounts()
+    {
+        using var chatClient = new RecordingChatClient
+        {
+            ResponseFactory = (_, _, _) => new ChatResponse(new ChatMessage(ChatRole.Assistant, "OK"))
+            {
+                Usage = new UsageDetails { InputTokenCount = long.MaxValue, OutputTokenCount = -1 }
+            }
+        };
+        var runtime = await new AgentFrameworkRuntimeFactory(
+            new RecordingResolver(chatClient), NullLoggerFactory.Instance, new GenAiObservabilityOptions { Enabled = false })
+            .CreateAsync(Definition(), "revision-1", new AgentRuntimeContext(new EmptyToolCatalog()), default);
+
+        var result = await runtime.ExecuteAsync(new AgentExecutionRequest("hello"), default);
+
+        Assert.AreEqual(int.MaxValue, result.Usage?.InputTokens);
+        Assert.IsNull(result.Usage?.OutputTokens);
+    }
+
+    [TestMethod]
     public async Task RuntimeMapsCanonicalOptionsAndNormalizesStreamingEvents()
     {
         using var schema = JsonDocument.Parse("{\"type\":\"object\"}");

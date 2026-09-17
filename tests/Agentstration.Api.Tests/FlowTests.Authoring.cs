@@ -200,6 +200,7 @@ public sealed partial class FlowTests
         Assert.AreEqual(3L, agent.AgentVersion);
         Assert.AreEqual("Deterministic", agent.Provider);
         Assert.AreEqual(12, agent.Usage!.InputTokens);
+        Assert.AreEqual(4, agent.Usage.OutputTokens);
         Assert.AreEqual("done", completed.Output!.Value.GetString());
         Assert.AreEqual(1, (await runs.ListAsync(created.Value.Id, FlowRunStatus.Succeeded, 0, 20, TestScope, default)).Items.Count);
 
