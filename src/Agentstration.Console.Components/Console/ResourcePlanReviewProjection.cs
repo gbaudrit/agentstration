@@ -67,6 +67,28 @@ public static class ResourcePlanReviewProjection
 
     public static string DisplayName(ResourceChange change) => DefinitionText(change, "displayName") ?? change.LogicalId;
 
+    public static string? AppliedResourceUrl(ResourceChange? change, ResourceChangeApplicationOperation operation)
+    {
+        if (change is null || operation.Operation == ResourceChangeOperation.Delete
+            || operation.Outcome is not (ResourceChangeApplicationOutcome.Applied or ResourceChangeApplicationOutcome.AlreadyApplied or ResourceChangeApplicationOutcome.Skipped))
+            return null;
+
+        var metadata = change.Proposed.Metadata;
+        if (string.IsNullOrWhiteSpace(metadata.Name)) return null;
+        var resourceType = change.Proposed.Kind switch
+        {
+            "Agent" => "agents",
+            "Flow" => "flows",
+            "Entry" => "entries",
+            _ => null
+        };
+        if (resourceType is null) return null;
+        var name = Uri.EscapeDataString(metadata.Name);
+        return metadata.Namespace.IsDefault
+            ? $"/{resourceType}/{name}"
+            : $"/namespaces/{Uri.EscapeDataString(metadata.Namespace.Value)}/{resourceType}/{name}";
+    }
+
     public static string? Description(ResourceChange change) => DefinitionText(change, "description");
 
     public static string? ModelProfile(ResourceChange change)

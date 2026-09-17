@@ -61,6 +61,24 @@ public sealed class ResourcePlanReviewTests
     }
 
     [TestMethod]
+    public void AppliedResourceLinksUseConsoleRoutesOnlyForExistingResources()
+    {
+        var agent = Change(0, "triage", [], "Triage");
+        var operation = new ResourceChangeApplicationOperation(0, "triage", ResourceChangeOperation.Update,
+            ResourceChangeApplicationOutcome.Applied, Guid.NewGuid(), 2, "\"updated\"", null, null, DateTimeOffset.UnixEpoch);
+        Assert.AreEqual("/agents/triage", ResourcePlanReviewProjection.AppliedResourceUrl(agent, operation));
+
+        var namespaced = new ResourceMetadata { Name = "support-flow", Namespace = ResourceNamespace.Parse("support.pack") };
+        var flow = agent with { Proposed = agent.Proposed with { Kind = "Flow", Metadata = namespaced } };
+        var entry = flow with { Proposed = flow.Proposed with { Kind = "Entry" } };
+        Assert.AreEqual("/namespaces/support.pack/flows/support-flow", ResourcePlanReviewProjection.AppliedResourceUrl(flow, operation));
+        Assert.AreEqual("/namespaces/support.pack/entries/support-flow", ResourcePlanReviewProjection.AppliedResourceUrl(entry, operation));
+        Assert.IsNull(ResourcePlanReviewProjection.AppliedResourceUrl(agent, operation with { Operation = ResourceChangeOperation.Delete }));
+        Assert.IsNull(ResourcePlanReviewProjection.AppliedResourceUrl(agent, operation with { Outcome = ResourceChangeApplicationOutcome.Failed }));
+        Assert.IsNull(ResourcePlanReviewProjection.AppliedResourceUrl(null, operation));
+    }
+
+    [TestMethod]
     public void ReviewProjectionKeepsReadableDefinitionChangesAndLocatesAffectedResource()
     {
         var change = Change(0, "triage", [], "Triage");
@@ -196,6 +214,7 @@ public sealed class ResourcePlanReviewTests
             Assert.Contains("Ressources appliquées", rendered.Find(".resource-plan-application-summary").TextContent, StringComparison.Ordinal);
             Assert.AreEqual("1", rendered.Find(".resource-plan-application-counts strong").TextContent);
             Assert.Contains("Triage", rendered.Find(".resource-plan-application-operations").TextContent, StringComparison.Ordinal);
+            Assert.AreEqual("/agents/triage", rendered.Find(".resource-plan-application-open").GetAttribute("href"));
         });
         rendered.Find("#tab-Activity").Click();
         rendered.WaitForAssertion(() =>

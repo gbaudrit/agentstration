@@ -160,6 +160,7 @@
 .resource-plan-application-resource { flex: 1; min-width: 0; }
 .resource-plan-application-resource strong, .resource-plan-application-resource small { display: block; overflow-wrap: anywhere; }
 .resource-plan-application-resource small { margin-top: .2rem; color: var(--muted); }
+.resource-plan-application-open { flex: none; align-self: center; white-space: nowrap; }
 .resource-plan-application-error { margin: .55rem 0 0; color: #ad2838; line-height: 1.45; }
 .resource-plan-issues { display: grid; gap: .8rem; margin: 1.1rem 0 0; padding: 0; list-style: none; }
 .resource-plan-issues li { display: flex; gap: .9rem; min-width: 0; padding: 1.1rem 1.2rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface); }

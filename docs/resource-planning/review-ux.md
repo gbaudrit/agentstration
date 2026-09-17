@@ -6,7 +6,7 @@ Console exposes Resource Planning at `/resource-plans` in the current Workspace.
 - **Changes** shows each ChangeSet operation and field-level Current versus Proposed differences.
 - **Graph** shows the dependency order and explicit edges between proposed resources.
 - **Validation** shows readiness and each issue's stable code and path.
-- **Application** shows the governed apply action, attempt status, and per-operation outcomes.
+- **Application** shows the governed apply action, attempt status, and per-operation outcomes. Successful Agent, Flow, and Entry operations link to the resulting resource; deleted and failed resources have no link.
 - **Activity** shows the plan history and links to originating Work and Flow Run records when recorded.
 
 The list and detail pages use the same Workspace-scoped `/api/resource-plans` endpoints as other clients. The current Workspace controls visibility. The page does not accept Tenant or Workspace IDs as request parameters. Users with `resources/read` may review; `resources/write` is required to re-materialize, create a ChangeSet, verify it, or apply it.
