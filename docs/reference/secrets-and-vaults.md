@@ -7,6 +7,8 @@ sidebar_position: 7
 
 Agentstration resources never store credentials directly. A consumer such as a Model Provider stores a reference to a `Secret`; the Secret stores a key and a reference to a `Vault`; only the Vault provider stores the value.
 
+Secrets and Vaults may belong to the instance, a tenant, or a workspace. Their ownership scope determines where they are stored. A separate `usePolicy` determines which descendants may use them. No descendant receives access by default.
+
 ```mermaid
 flowchart LR
     Consumer["Model Provider, Tool, Agent, Flow or MCP"] -->|Secret reference| Secret["Secret resource"]
@@ -53,6 +55,22 @@ If either a configured key file already exists or `AGENTSTRATION_MASTER_KEY` is 
 5. Save the Secret resource.
 6. Use **Set value** or **Replace value**. The field is cleared after saving.
 7. In a consuming resource, use the Secret selector. Only the Secret resource reference is persisted.
+
+To use a Vault owned by an ancestor scope, first add a use grant on the Vault for the Secret's scope. The Console then offers that Vault in the Secret editor. To let a descendant consumer use an ancestor Secret, add a separate grant on the Secret. A grant to a tenant can optionally include its workspaces. Grants cannot target another tenant's branch, siblings, or ancestors.
+
+An ancestor resource reference must name its exact `scopeRef`; an omitted scope means the consumer's own scope for Secret resolution. Names are never searched through parent scopes. `PUT /api/vaults/{name}` and `PUT /api/secrets/{name}` accept `usePolicy.grants` in their properties and require the current ETag. For example:
+
+```json
+{
+  "usePolicy": {
+    "grants": [
+      { "scopeRef": "/tenants/11111111-1111-1111-1111-111111111111", "includeDescendants": true }
+    ]
+  }
+}
+```
+
+This fragment shows the policy fields inside `properties`; a complete PUT also includes the resource's other required properties. Management reads expose grant metadata, never the Secret value. Removing a grant immediately prevents subsequent resolutions through that path.
 
 For example, the Display name `Clé OpenAI — Production` produces:
 
