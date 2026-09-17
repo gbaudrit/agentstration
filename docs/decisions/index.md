@@ -148,3 +148,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 116. [ADR-0116 — The Console BFF delegates short-lived API requests](0116-console-bff-delegates-short-lived-api-requests.md)
 117. [ADR-0117 — Browser journeys are product-owned reusable automation assets](0117-product-owned-browser-journeys.md)
 118. [ADR-0118 — Browser campaigns use dedicated Workspaces](0118-browser-campaigns-use-dedicated-workspaces.md)
+119. [ADR-0119 — Foundry model deployments use an isolated AEP extension](0119-foundry-model-deployments-use-an-isolated-aep-extension.md)
+120. [ADR-0120 — Foundry local Aspire discovery is explicitly opt-in](0120-foundry-local-aspire-discovery-is-explicitly-opt-in.md)
