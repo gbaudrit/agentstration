@@ -15,12 +15,12 @@
   <data name="ListLabel" xml:space="preserve"><value>Resource Plans</value></data>
   <data name="Plan" xml:space="preserve"><value>Plan</value></data>
   <data name="Scope" xml:space="preserve"><value>Workspace</value></data>
-  <data name="Changes" xml:space="preserve"><value>Changes</value></data>
-  <data name="Validation" xml:space="preserve"><value>Validation</value></data>
+  <data name="Changes" xml:space="preserve"><value>Proposed changes</value></data>
+  <data name="Validation" xml:space="preserve"><value>Verification</value></data>
   <data name="Updated" xml:space="preserve"><value>Updated</value></data>
   <data name="Revision" xml:space="preserve"><value>Revision {0}</value></data>
   <data name="Stale" xml:space="preserve"><value>Stale</value></data>
-  <data name="NotValidated" xml:space="preserve"><value>Not validated</value></data>
+  <data name="NotValidated" xml:space="preserve"><value>Proposal not checked yet</value></data>
   <data name="Page" xml:space="preserve"><value>Page {0}</value></data>
   <data name="Pages" xml:space="preserve"><value>Plan pages</value></data>
   <data name="Previous" xml:space="preserve"><value>Previous</value></data>
@@ -33,11 +33,11 @@
   <data name="PlanIdentity" xml:space="preserve"><value>Plan identity</value></data>
   <data name="Workspace" xml:space="preserve"><value>Workspace</value></data>
   <data name="StaleChangeSet" xml:space="preserve"><value>ChangeSet belongs to an earlier revision</value></data>
-  <data name="Rematerialize" xml:space="preserve"><value>Refresh preview</value></data>
-  <data name="CreateChangeSet" xml:space="preserve"><value>Create ChangeSet</value></data>
-  <data name="Revalidate" xml:space="preserve"><value>Revalidate</value></data>
+  <data name="Rematerialize" xml:space="preserve"><value>Refresh proposal</value></data>
+  <data name="CreateChangeSet" xml:space="preserve"><value>Save this proposal</value></data>
+  <data name="Revalidate" xml:space="preserve"><value>Check proposal</value></data>
   <data name="Materialization" xml:space="preserve"><value>Current materialization</value></data>
-  <data name="Proposals" xml:space="preserve"><value>{0} proposals</value></data>
+  <data name="Proposals" xml:space="preserve"><value>{0} proposed resources</value></data>
   <data name="ReviewViews" xml:space="preserve"><value>Resource Plan review views</value></data>
   <data name="FunctionalIntent" xml:space="preserve"><value>Functional intent</value></data>
   <data name="Solution" xml:space="preserve"><value>Solution</value></data>
@@ -47,8 +47,8 @@
   <data name="Experiences" xml:space="preserve"><value>Experiences</value></data>
   <data name="NothingPlanned" xml:space="preserve"><value>Nothing planned for this plan.</value></data>
   <data name="FunctionalBoundary" xml:space="preserve"><value>Functional intent is separate from the concrete Resources proposed by Agentstration.</value></data>
-  <data name="NoChangeSets" xml:space="preserve"><value>No ChangeSet exists for this plan revision. Re-materialize to review a proposal.</value></data>
-  <data name="ChangeSet" xml:space="preserve"><value>ChangeSet</value></data>
+  <data name="NoChangeSets" xml:space="preserve"><value>No proposal has been saved for this revision. Choose agent profiles to review a plan proposal.</value></data>
+  <data name="ChangeSet" xml:space="preserve"><value>Displayed proposal</value></data>
   <data name="ChangeSetOption" xml:space="preserve"><value>Revision {0} · {1}</value></data>
   <data name="ChangeSetRevision" xml:space="preserve"><value>Plan revision {0}</value></data>
   <data name="DependsOn" xml:space="preserve"><value>Depends on:</value></data>
@@ -64,9 +64,9 @@
   <data name="Operation" xml:space="preserve"><value>Change</value></data>
   <data name="ResourceName" xml:space="preserve"><value>Proposed name</value></data>
   <data name="NoDependencies" xml:space="preserve"><value>None</value></data>
-  <data name="ValidatedAt" xml:space="preserve"><value>Validated:</value></data>
-  <data name="StaleValidation" xml:space="preserve"><value>Validation is stale</value></data>
-  <data name="NoIssues" xml:space="preserve"><value>No validation issues.</value></data>
+  <data name="ValidatedAt" xml:space="preserve"><value>Checked:</value></data>
+  <data name="StaleValidation" xml:space="preserve"><value>Verification is stale</value></data>
+  <data name="NoIssues" xml:space="preserve"><value>No issues found.</value></data>
   <data name="ConcreteProposal" xml:space="preserve"><value>Materialized proposal</value></data>
   <data name="ChangesIntro" xml:space="preserve"><value>Review the resources Agentstration proposes to create or change. Expand a card’s details to compare its fields.</value></data>
   <data name="CreatedAt" xml:space="preserve"><value>Created {0}</value></data>
@@ -118,18 +118,18 @@
   <data name="Value.definition.spec.pattern.strategy.magentic" xml:space="preserve"><value>Adaptive</value></data>
   <data name="ReviewResult" xml:space="preserve"><value>Review result</value></data>
   <data name="ValidationIntro" xml:space="preserve"><value>Check what needs attention before these resources can be applied.</value></data>
-  <data name="ValidationState" xml:space="preserve"><value>ChangeSet readiness</value></data>
+  <data name="ValidationState" xml:space="preserve"><value>Verification result</value></data>
   <data name="ValidationReadyTitle" xml:space="preserve"><value>Ready for the next step</value></data>
   <data name="ValidationReadyDescription" xml:space="preserve"><value>No blocking issue was found. Review any warnings below.</value></data>
   <data name="ValidationIssueSingular" xml:space="preserve"><value>1 issue to resolve</value></data>
   <data name="ValidationIssuePlural" xml:space="preserve"><value>{0} issues to resolve</value></data>
-  <data name="ValidationBlockedDescription" xml:space="preserve"><value>Resolve the issues below, then run validation again.</value></data>
+  <data name="ValidationBlockedDescription" xml:space="preserve"><value>Resolve the issues below, then check the proposal again.</value></data>
   <data name="Severity.Error" xml:space="preserve"><value>Blocking issue</value></data>
   <data name="Severity.Warning" xml:space="preserve"><value>Warning</value></data>
   <data name="UnknownProfile" xml:space="preserve"><value>unknown</value></data>
   <data name="Issue.ModelProfile.Title" xml:space="preserve"><value>Model profile needs attention</value></data>
   <data name="Issue.ModelProfile.Description" xml:space="preserve"><value>The model profile “{0}” referenced by this resource is missing or invalid.</value></data>
-  <data name="Issue.ModelProfile.Action" xml:space="preserve"><value>Create or repair this model profile, then revalidate the ChangeSet.</value></data>
+  <data name="Issue.ModelProfile.Action" xml:space="preserve"><value>Create or repair this model profile, then check the proposal again.</value></data>
   <data name="Issue.Canonical.Title" xml:space="preserve"><value>Proposed resource is invalid</value></data>
   <data name="Issue.Canonical.Description" xml:space="preserve"><value>This resource does not satisfy the platform validation rules. Open technical details for the exact reason.</value></data>
   <data name="Issue.Conflict.Title" xml:space="preserve"><value>Resource already exists</value></data>
@@ -146,9 +146,9 @@
   <data name="OpenTasks" xml:space="preserve"><value>Open tasks</value></data>
   <data name="FlowRun" xml:space="preserve"><value>Flow Run</value></data>
   <data name="Correlation" xml:space="preserve"><value>Correlation</value></data>
-  <data name="Materialized" xml:space="preserve"><value>Materialized {0} proposed Resources.</value></data>
-  <data name="ChangeSetCreated" xml:space="preserve"><value>ChangeSet ready for review.</value></data>
-  <data name="Validated" xml:space="preserve"><value>ChangeSet validation recorded.</value></data>
+  <data name="Materialized" xml:space="preserve"><value>Proposal refreshed: {0} proposed resources.</value></data>
+  <data name="ChangeSetCreated" xml:space="preserve"><value>Proposal saved. You can now check it.</value></data>
+  <data name="Validated" xml:space="preserve"><value>Saved proposal checked.</value></data>
   <data name="Status.Draft" xml:space="preserve"><value>Draft</value></data>
   <data name="Status.Ready" xml:space="preserve"><value>Ready</value></data>
   <data name="Status.Materialized" xml:space="preserve"><value>Materialized</value></data>
@@ -160,9 +160,9 @@
   <data name="Readiness.Ready" xml:space="preserve"><value>Ready</value></data>
   <data name="Readiness.Blocked" xml:space="preserve"><value>Blocked</value></data>
   <data name="View.Overview" xml:space="preserve"><value>Overview</value></data>
-  <data name="View.Changes" xml:space="preserve"><value>Changes</value></data>
+  <data name="View.Changes" xml:space="preserve"><value>Proposed changes</value></data>
   <data name="View.Graph" xml:space="preserve"><value>Graph</value></data>
-  <data name="View.Validation" xml:space="preserve"><value>Validation</value></data>
+  <data name="View.Validation" xml:space="preserve"><value>Verification</value></data>
   <data name="View.Activity" xml:space="preserve"><value>Activity</value></data>
   <data name="Operation.Create" xml:space="preserve"><value>Create</value></data>
   <data name="Operation.Update" xml:space="preserve"><value>Update</value></data>
@@ -172,15 +172,15 @@
   <data name="Activity.Refined" xml:space="preserve"><value>Refined</value></data>
   <data name="Activity.StatusChanged" xml:space="preserve"><value>StatusChanged</value></data>
   <data name="Activity.Materialized" xml:space="preserve"><value>Materialized</value></data>
-  <data name="Activity.Validated" xml:space="preserve"><value>Validated</value></data>
+  <data name="Activity.Validated" xml:space="preserve"><value>Checked</value></data>
   <data name="Activity.Applied" xml:space="preserve"><value>Applied</value></data>
   <data name="Activity.Failed" xml:space="preserve"><value>Failed</value></data>
   <data name="Activity.Archived" xml:space="preserve"><value>Archived</value></data>
   <data name="Activity.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
   <data name="BindingsTitle" xml:space="preserve"><value>Agent bindings</value></data>
-  <data name="BindingsIntro" xml:space="preserve"><value>1. Choose a model profile and a runtime profile for each agent. Your choices are saved on this plan, even when you leave the page.</value></data>
+  <data name="BindingsIntro" xml:space="preserve"><value>Choose a model profile and a runtime profile for each agent. Your choices remain saved when you leave this page.</value></data>
   <data name="BindingsProgress" xml:space="preserve"><value>{0} of {1} agents configured</value></data>
-  <data name="BindingsSavedAutomatically" xml:space="preserve"><value>Choices saved automatically · no resources are applied.</value></data>
+  <data name="BindingsSavedAutomatically" xml:space="preserve"><value>Choices saved automatically</value></data>
   <data name="BindingsSaving" xml:space="preserve"><value>Saving choices…</value></data>
   <data name="BindingsNotSavedYet" xml:space="preserve"><value>Each choice will be saved automatically on this plan.</value></data>
   <data name="BindingsSaveFailed" xml:space="preserve"><value>Could not save the choices. Retry without leaving the page.</value></data>
@@ -188,30 +188,30 @@
   <data name="ReloadBindings" xml:space="preserve"><value>Reload profiles</value></data>
   <data name="RetrySaveBindings" xml:space="preserve"><value>Retry</value></data>
   <data name="BindingsOutdated" xml:space="preserve"><value>The plan changed since your last choices. Select profiles for this revision.</value></data>
-  <data name="ReviewChangesAction" xml:space="preserve"><value>Review proposed changes</value></data>
+  <data name="ReviewChangesAction" xml:space="preserve"><value>Review plan proposal</value></data>
   <data name="ReviewPath" xml:space="preserve"><value>Review steps</value></data>
   <data name="StepProfiles" xml:space="preserve"><value>Choose profiles</value></data>
   <data name="StepProfilesHint" xml:space="preserve"><value>Choices saved on the plan</value></data>
-  <data name="StepPreview" xml:space="preserve"><value>Review preview</value></data>
+  <data name="StepPreview" xml:space="preserve"><value>Review proposal</value></data>
   <data name="StepPreviewHint" xml:space="preserve"><value>Calculated with chosen profiles</value></data>
-  <data name="StepChangeSet" xml:space="preserve"><value>Create ChangeSet</value></data>
+  <data name="StepChangeSet" xml:space="preserve"><value>Save proposal</value></data>
   <data name="StepChangeSetHint" xml:space="preserve"><value>Recorded proposal</value></data>
-  <data name="StepValidation" xml:space="preserve"><value>Validate</value></data>
-  <data name="StepValidationHint" xml:space="preserve"><value>Checks on recorded changes</value></data>
-  <data name="SavedChangeSetOption" xml:space="preserve"><value>Saved ChangeSet · Revision {0} · {1}</value></data>
+  <data name="StepValidation" xml:space="preserve"><value>Check</value></data>
+  <data name="StepValidationHint" xml:space="preserve"><value>Checks on the saved proposal</value></data>
+  <data name="SavedChangeSetOption" xml:space="preserve"><value>Saved proposal · Revision {0} · {1}</value></data>
   <data name="ModelProfile" xml:space="preserve"><value>Model profile</value></data>
   <data name="RuntimeProfile" xml:space="preserve"><value>Runtime profile</value></data>
   <data name="SelectProfile" xml:space="preserve"><value>Select a profile</value></data>
   <data name="CreateModelProfile" xml:space="preserve"><value>Create a model profile to continue →</value></data>
   <data name="CreateRuntimeProfile" xml:space="preserve"><value>Create a runtime profile to continue →</value></data>
   <data name="ReviewedBindings" xml:space="preserve"><value>Reviewed agent profiles</value></data>
-  <data name="CurrentPreview" xml:space="preserve"><value>Current preview</value></data>
-  <data name="CurrentPreviewDescription" xml:space="preserve"><value>2. This preview uses your saved profile choices. Create a ChangeSet to pin the proposal, then validate it.</value></data>
-  <data name="CurrentPreviewBlockedDescription" xml:space="preserve"><value>Resolve the materialization issues before creating a ChangeSet.</value></data>
+  <data name="CurrentPreview" xml:space="preserve"><value>Plan proposal</value></data>
+  <data name="CurrentPreviewDescription" xml:space="preserve"><value>Calculated with the selected profiles, not yet saved. No resources have been applied.</value></data>
+  <data name="CurrentPreviewBlockedDescription" xml:space="preserve"><value>Resolve the issues below before saving this proposal.</value></data>
   <data name="PendingPreview" xml:space="preserve"><value>Profiles changed</value></data>
   <data name="PendingPreviewDescription" xml:space="preserve"><value>Finish selecting profiles to preview the corresponding changes.</value></data>
-  <data name="RecordedChangeSet" xml:space="preserve"><value>Saved ChangeSet</value></data>
-  <data name="PreviewRequiresChangeSet" xml:space="preserve"><value>Create a ChangeSet from the current preview before validating it. Saved ChangeSets remain available in the Changes tab.</value></data>
+  <data name="RecordedChangeSet" xml:space="preserve"><value>Saved proposal</value></data>
+  <data name="PreviewRequiresChangeSet" xml:space="preserve"><value>Save the plan proposal before checking it. Saved proposals remain available in the Proposed changes tab.</value></data>
   <data name="MaterializationDiagnostic.planning_binding_required" xml:space="preserve"><value>Choose both profiles for this agent.</value></data>
   <data name="MaterializationDiagnostic.planning_binding_not_found" xml:space="preserve"><value>The selected profile is not available in this workspace.</value></data>
   <data name="MaterializationDiagnostic.planning_binding_unavailable" xml:space="preserve"><value>The selected profile is not ready.</value></data>
@@ -219,5 +219,5 @@
   <data name="MaterializationDiagnostic.planning_binding_outside_scope" xml:space="preserve"><value>The selected profile is outside this workspace.</value></data>
   <data name="MaterializationDiagnostic.planning_binding_ambiguous" xml:space="preserve"><value>Choose a profile with an exact scope.</value></data>
   <data name="MaterializationDiagnostic.planning_binding_unknown_role" xml:space="preserve"><value>This binding does not match a planned agent.</value></data>
-  <data name="MaterializationDiagnostic.planning_materialization_stale" xml:space="preserve"><value>Refresh the preview before creating the ChangeSet.</value></data>
+  <data name="MaterializationDiagnostic.planning_materialization_stale" xml:space="preserve"><value>Refresh the proposal before saving it.</value></data>
 </root>

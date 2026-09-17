@@ -13,33 +13,16 @@
 </PageHeader>
 
 @if (!string.IsNullOrWhiteSpace(error)) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
-@if (!string.IsNullOrWhiteSpace(message)) { <div class="form-alert" role="status">@message</div> }
 @if (busy && plan is null) { <LoadingState Message="@T("Loading")" /> }
 else if (plan is null) { <EmptyState Title="@T("NotFound")" Message="@T("NotFoundDescription")" /> }
 else
 {
-    <div class="resource-plan-actions">
-        <button class="button-secondary" type="button" @onclick="MaterializeAsync" disabled="@(!CanReview || busy || bindingSaveFailed || !CanMaterialize || functional?.Roles.Count != CompleteBindings)">@T("Rematerialize")</button>
-        <button class="button-secondary" type="button" @onclick="CreateChangeSetAsync" disabled="@(!CanReview || busy || bindingSaveFailed || showRecordedChanges || materialization?.CanCreateChangeSet != true)">@T("CreateChangeSet")</button>
-        <button class="button-primary" type="button" @onclick="ValidateAsync" disabled="@(!CanReview || busy || !showRecordedChanges || selected is null || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))">@T("Revalidate")</button>
-    </div>
     <ol class="resource-plan-review-path" aria-label="@T("ReviewPath")">
         <li class="@(functional?.Roles.Count > 0 && CompleteBindings == functional.Roles.Count && !bindingSaveFailed ? "is-done" : null)"><span>1</span><div><strong>@T("StepProfiles")</strong><small>@T("StepProfilesHint")</small></div></li>
         <li class="@(materialization is not null || showRecordedChanges && selected is not null ? "is-done" : null)"><span>2</span><div><strong>@T("StepPreview")</strong><small>@T("StepPreviewHint")</small></div></li>
         <li class="@(showRecordedChanges && selected is not null ? "is-done" : null)"><span>3</span><div><strong>@T("StepChangeSet")</strong><small>@T("StepChangeSetHint")</small></div></li>
         <li class="@(showRecordedChanges && latestValidation is not null ? "is-done" : null)"><span>4</span><div><strong>@T("StepValidation")</strong><small>@T("StepValidationHint")</small></div></li>
     </ol>
-    @if (materialization is not null)
-    {
-        <section class="panel resource-plan-materialization" aria-label="@T("Materialization")">
-            <strong>@T("CurrentPreview")</strong><span>@T("Proposals", materialization.Proposals.Count)</span><details><summary>@T("TechnicalDetails")</summary><code>@materialization.Digest</code></details>
-            @foreach (var diagnostic in materialization.Diagnostics)
-            {
-                <p class="resource-plan-issue"><strong>@DiagnosticLabel(diagnostic)</strong> · @diagnostic.Path</p>
-            }
-        </section>
-    }
-
     <nav class="resource-plan-tabs" role="tablist" aria-label="@T("ReviewViews")">
         @foreach (var view in Views)
         {
@@ -109,7 +92,6 @@ else
                     {
                         <section class="resource-plan-bindings" aria-label="@T("BindingsTitle")">
                         <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ConcreteProposal")</p><h2>@T("BindingsTitle")</h2><p>@T("BindingsIntro")</p></div></div>
-                        <div class="resource-plan-binding-progress" role="status"><strong>@T("BindingsProgress", CompleteBindings, functional.Roles.Count)</strong><span>@T(bindingSaving ? "BindingsSaving" : bindingSaveFailed ? bindingsConflict ? "BindingsConflict" : "BindingsSaveFailed" : bindingsOutdated ? "BindingsOutdated" : bindingDraft is null ? "BindingsNotSavedYet" : "BindingsSavedAutomatically")</span>@if (bindingSaveFailed) { <button class="button-secondary" type="button" @onclick="RetryBindingsAsync" disabled="@busy">@T(bindingsConflict ? "ReloadBindings" : "RetrySaveBindings")</button> }</div>
                         @if (modelProfiles.Count == 0 || runtimeProfiles.Count == 0)
                         {
                             <p class="resource-plan-binding-empty">
@@ -141,10 +123,13 @@ else
                                 </article>
                             }
                         </div>
-                        @if (CompleteBindings == functional.Roles.Count && CanMaterialize)
-                        {
-                            <button class="button-secondary" type="button" @onclick="ShowChanges" disabled="@busy">@T("ReviewChangesAction")</button>
-                        }
+                        <footer class="resource-plan-binding-footer">
+                            <div class="resource-plan-binding-progress" role="status"><strong>@T("BindingsProgress", CompleteBindings, functional.Roles.Count)</strong><span>@T(bindingSaving ? "BindingsSaving" : bindingSaveFailed ? bindingsConflict ? "BindingsConflict" : "BindingsSaveFailed" : bindingsOutdated ? "BindingsOutdated" : bindingDraft is null ? "BindingsNotSavedYet" : "BindingsSavedAutomatically")</span>@if (bindingSaveFailed) { <button class="button-secondary" type="button" @onclick="RetryBindingsAsync" disabled="@busy">@T(bindingsConflict ? "ReloadBindings" : "RetrySaveBindings")</button> }</div>
+                            <div class="resource-plan-binding-actions">
+                                <button class="button-secondary" type="button" @onclick="MaterializeAsync" disabled="@(!CanReview || busy || bindingSaveFailed || !CanMaterialize || functional.Roles.Count != CompleteBindings)">@T("Rematerialize")</button>
+                                <button class="button-primary" type="button" @onclick="ShowChanges" disabled="@(busy || bindingSaveFailed || !CanMaterialize || functional.Roles.Count != CompleteBindings)">@T("ReviewChangesAction")</button>
+                            </div>
+                        </footer>
                         </section>
                 }
             }
@@ -165,11 +150,18 @@ else
             {
                 @if (!showRecordedChanges && materialization is not null)
                 {
-                    <div class="resource-plan-review-notice" role="status"><strong>@T("CurrentPreview")</strong><span>@T(materialization.CanCreateChangeSet ? "CurrentPreviewDescription" : "CurrentPreviewBlockedDescription")</span></div>
+                    <div class="resource-plan-review-notice" role="status">
+                        <div><strong>@T("CurrentPreview")</strong><span>@T("Proposals", materialization.Proposals.Count)</span><p>@T(materialization.CanCreateChangeSet ? "CurrentPreviewDescription" : "CurrentPreviewBlockedDescription")</p><details><summary>@T("TechnicalDetails")</summary><code>@materialization.Digest</code></details></div>
+                        <button class="button-primary" type="button" @onclick="CreateChangeSetAsync" disabled="@(!CanReview || busy || bindingSaveFailed || !materialization.CanCreateChangeSet)">@T("CreateChangeSet")</button>
+                    </div>
+                    @foreach (var diagnostic in materialization.Diagnostics)
+                    {
+                        <p class="resource-plan-issue"><strong>@DiagnosticLabel(diagnostic)</strong> · @diagnostic.Path</p>
+                    }
                 }
                 else if (selected is not null)
                 {
-                    <div class="resource-plan-change-set-meta"><span>@T("RecordedChangeSet")</span><span>@T("ChangeSetRevision", selected.Value.PlanRevision)</span><span>@T("CreatedAt", selected.Value.CreatedAt.ToLocalTime().ToString("g"))</span><details><summary>@T("TechnicalDetails")</summary><code>@selected.Value.Digest</code></details></div>
+                    <div class="resource-plan-review-notice resource-plan-recorded-notice"><div><strong>@T("RecordedChangeSet")</strong><span>@T("ChangeSetRevision", selected.Value.PlanRevision)</span><span>@T("CreatedAt", selected.Value.CreatedAt.ToLocalTime().ToString("g"))</span><details><summary>@T("TechnicalDetails")</summary><code>@selected.Value.Digest</code></details></div><button class="button-primary" type="button" @onclick="ValidateAsync" disabled="@(!CanReview || busy || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))">@T("Revalidate")</button></div>
                 }
                     <div class="resource-plan-change-summary" aria-label="@T("ChangeSummary")">
                         @foreach (var operation in Enum.GetValues<ResourceChangeOperation>())
@@ -249,7 +241,7 @@ else
         }
         else if (activeView == "Validation")
         {
-            <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ReviewResult")</p><h2>@T("Validation")</h2><p>@T("ValidationIntro")</p></div></div>
+            <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ReviewResult")</p><h2>@T("Validation")</h2><p>@T("ValidationIntro")</p></div>@if (showRecordedChanges && selected is not null) { <button class="button-secondary" type="button" @onclick="ValidateAsync" disabled="@(!CanReview || busy || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))">@T("Revalidate")</button> }</div>
             @if (!showRecordedChanges) { <p>@T("PreviewRequiresChangeSet")</p> }
             else if (selected is null) { <p>@T("NoChangeSets")</p> }
             else if (latestValidation is null) { <p>@T("NotValidated")</p> }
@@ -323,7 +315,6 @@ else
     private IReadOnlyList<ResourcePlanResolvedBinding>? DisplayedBindings => !showRecordedChanges && materialization is not null ? materialization.ResolvedBindings : selected?.Value.ResolvedBindings;
     private string activeView = "Overview";
     private string? error;
-    private string? message;
     private bool busy;
     private bool reloadRequested;
     private int contextVersion;
@@ -515,7 +506,7 @@ else
     private async Task LoadAsync()
     {
         if (busy) { reloadRequested = true; return; }
-        busy = true; error = null; message = null; materialization = null;
+        busy = true; error = null; materialization = null;
         var version = contextVersion;
         var previewOnLoad = false;
         try
@@ -599,9 +590,9 @@ else
     private async Task MaterializeAsync()
     {
         if (plan is null || !CanReview || bindingSaveFailed || !CanMaterialize || busy) return;
-        busy = true; error = null; message = null;
+        busy = true; error = null;
         var version = contextVersion;
-        try { var result = await Client.MaterializeAsync(Id, BindingRequest(), lifetime.Token); if (version == contextVersion) { materialization = result; bindingsDirty = true; showRecordedChanges = false; selectedGraphKey = null; message = T("Materialized", result.Proposals.Count); } }
+        try { var result = await Client.MaterializeAsync(Id, BindingRequest(), lifetime.Token); if (version == contextVersion) { materialization = result; bindingsDirty = true; showRecordedChanges = false; selectedGraphKey = null; } }
         catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
         finally { EndBusy(); }
     }
@@ -609,7 +600,7 @@ else
     private async Task CreateChangeSetAsync()
     {
         if (plan is null || !CanReview || bindingSaveFailed || showRecordedChanges || materialization?.CanCreateChangeSet != true || busy) return;
-        busy = true; error = null; message = null;
+        busy = true; error = null;
         var version = contextVersion;
         try
         {
@@ -626,7 +617,6 @@ else
             await LoadValidationsAsync();
             if (version != contextVersion) return;
             activeView = "Changes";
-            message = T("ChangeSetCreated");
         }
         catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
         finally { EndBusy(); }
@@ -635,9 +625,9 @@ else
     private async Task ValidateAsync()
     {
         if (plan is null || selected is null || !CanReview || !showRecordedChanges || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value) || busy) return;
-        busy = true; error = null; message = null;
+        busy = true; error = null;
         var version = contextVersion;
-        try { var result = await Client.ValidateChangeSetAsync(selected.Value.Id.Value, lifetime.Token); if (version == contextVersion) { await LoadValidationsAsync(); if (version == contextVersion) { activeView = "Validation"; message = result.Readiness == ResourceChangeSetReadiness.Ready ? T("Validated") : null; } } }
+        try { _ = await Client.ValidateChangeSetAsync(selected.Value.Id.Value, lifetime.Token); if (version == contextVersion) { await LoadValidationsAsync(); if (version == contextVersion) activeView = "Validation"; } }
         catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
         finally { EndBusy(); }
     }

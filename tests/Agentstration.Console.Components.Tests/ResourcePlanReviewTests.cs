@@ -104,9 +104,9 @@ public sealed class ResourcePlanReviewTests
             Assert.AreEqual(5, rendered.FindAll("[role=tab]").Count);
             Assert.Contains("Support design", rendered.Markup, StringComparison.Ordinal);
             Assert.Contains("ChangeSet belongs to an earlier revision", rendered.Markup, StringComparison.Ordinal);
-            Assert.IsTrue(rendered.FindAll("button").Single(value => value.TextContent.Contains("Revalidate", StringComparison.Ordinal)).HasAttribute("disabled"));
         });
         rendered.Find("#tab-Changes").Click();
+        Assert.IsTrue(rendered.FindAll("button").Single(value => value.TextContent.Contains("Check proposal", StringComparison.Ordinal)).HasAttribute("disabled"));
         Assert.Contains("definition.displayName", rendered.Markup, StringComparison.Ordinal);
         Assert.AreEqual(1, rendered.FindAll(".resource-plan-change").Count);
         Assert.Contains("Compare 1 field", rendered.Find(".resource-plan-change-diff summary").TextContent, StringComparison.Ordinal);
@@ -117,7 +117,7 @@ public sealed class ResourcePlanReviewTests
         Assert.Contains("Resource type", rendered.Find(".resource-plan-graph-details").TextContent, StringComparison.Ordinal);
         Assert.Contains("triage", rendered.Find(".resource-plan-graph-details").TextContent, StringComparison.Ordinal);
         rendered.Find("#tab-Validation").Click();
-        Assert.Contains("Validation is stale", rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains("Verification is stale", rendered.Markup, StringComparison.Ordinal);
         rendered.Find("#tab-Activity").Click();
         Assert.Contains("/flow-runs/run-1", rendered.Markup, StringComparison.Ordinal);
     }
@@ -138,11 +138,12 @@ public sealed class ResourcePlanReviewTests
         var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
         rendered.WaitForAssertion(() => Assert.Contains("Plans de ressources", context.Services.GetRequiredService<IStringLocalizer<ResourcePlansStrings>>()["Title"].Value, StringComparison.Ordinal));
         Assert.Contains("Créer un profil de modèle pour continuer", rendered.Markup, StringComparison.Ordinal);
-        rendered.FindAll("button").Single(value => value.TextContent.Contains("Revalider", StringComparison.Ordinal)).Click();
+        rendered.Find("#tab-Validation").Click();
+        rendered.FindAll("button").Single(value => value.TextContent.Contains("Vérifier la proposition", StringComparison.Ordinal)).Click();
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual(1, client.ValidationCalls);
-            Assert.Contains("Validation de la proposition enregistrée", rendered.Markup, StringComparison.Ordinal);
+            Assert.Contains("Prêt pour la suite", rendered.Find(".resource-plan-validation-summary").TextContent, StringComparison.Ordinal);
         });
     }
 
@@ -161,7 +162,8 @@ public sealed class ResourcePlanReviewTests
 
         var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
         rendered.WaitForElement("#tab-Validation");
-        rendered.FindAll("button").Single(value => value.TextContent.Contains("Revalider", StringComparison.Ordinal)).Click();
+        rendered.Find("#tab-Validation").Click();
+        rendered.FindAll("button").Single(value => value.TextContent.Contains("Vérifier la proposition", StringComparison.Ordinal)).Click();
 
         rendered.WaitForAssertion(() =>
         {
@@ -169,7 +171,7 @@ public sealed class ResourcePlanReviewTests
             Assert.Contains("profil de modèle « default/default »", rendered.Find(".resource-plan-issue-content").TextContent, StringComparison.Ordinal);
             Assert.Contains("Créez ou corrigez ce profil", rendered.Find(".resource-plan-issue-action").TextContent, StringComparison.Ordinal);
             Assert.IsFalse(rendered.Find(".resource-plan-issue-technical").HasAttribute("open"));
-            Assert.DoesNotContain("Validation de la proposition enregistrée", rendered.Markup, StringComparison.Ordinal);
+            Assert.Contains("point à corriger", rendered.Find(".resource-plan-validation-summary").TextContent, StringComparison.Ordinal);
         });
     }
 
@@ -205,20 +207,20 @@ public sealed class ResourcePlanReviewTests
         Assert.AreEqual("0", reopened.FindAll(".resource-plan-binding-card select")[0].GetAttribute("value"));
         Assert.AreEqual("0", reopened.FindAll(".resource-plan-binding-card select")[1].GetAttribute("value"));
         reopened.Find("#tab-Changes").Click();
-        Assert.Contains("Current preview", reopened.Markup, StringComparison.Ordinal);
+        Assert.Contains("Plan proposal", reopened.Markup, StringComparison.Ordinal);
         rendered.Find("#tab-Changes").Click();
-        Assert.Contains("Current preview", rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains("Plan proposal", rendered.Markup, StringComparison.Ordinal);
         Assert.Contains("model-a", rendered.Find(".resource-plan-change-highlights").TextContent, StringComparison.Ordinal);
         Assert.Contains("runtime-a", rendered.Find(".resource-plan-change-highlights").TextContent, StringComparison.Ordinal);
         rendered.Find("#tab-Graph").Click();
         Assert.AreEqual(1, rendered.FindAll(".topology-node").Count);
         rendered.Find("#tab-Changes").Click();
         rendered.Find("#change-set-select").Change(set.Value.Id.Value.ToString("D"));
-        Assert.Contains("Saved ChangeSet", rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains("Saved proposal", rendered.Markup, StringComparison.Ordinal);
         Assert.AreEqual(2, rendered.FindAll(".resource-plan-change").Count);
         rendered.Find("#change-set-select").Change("preview");
         Assert.Contains("model-a", rendered.Find(".resource-plan-change-highlights").TextContent, StringComparison.Ordinal);
-        rendered.FindAll("button").Single(value => value.TextContent.Contains("Create ChangeSet", StringComparison.Ordinal)).Click();
+        rendered.FindAll("button").Single(value => value.TextContent.Contains("Save this proposal", StringComparison.Ordinal)).Click();
         rendered.WaitForAssertion(() => Assert.AreEqual("reviewed", client.LastChangeSetRequest?.ExpectedDigest));
     }
 

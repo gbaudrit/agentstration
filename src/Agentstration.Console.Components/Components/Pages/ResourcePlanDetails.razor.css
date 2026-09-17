@@ -1,6 +1,3 @@
-.resource-plan-actions, .resource-plan-materialization { align-items: center; display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1rem; }
-.resource-plan-materialization code { overflow-wrap: anywhere; }
-.resource-plan-actions { justify-content: flex-end; }
 .resource-plan-tabs { border-bottom: 1px solid var(--border-color, #d7dee8); display: flex; gap: .25rem; overflow-x: auto; }
 .resource-plan-tabs button { background: transparent; border: 0; border-bottom: 3px solid transparent; cursor: pointer; padding: .75rem 1rem; white-space: nowrap; }
 .resource-plan-tabs button.active { border-bottom-color: var(--accent, #2563eb); font-weight: 700; }
@@ -45,9 +42,11 @@
 .resource-plan-binding-card small { margin-top: .25rem; color: var(--muted); }
 .resource-plan-binding-card label span { margin-bottom: .4rem; font-size: .8rem; font-weight: 700; }
 .resource-plan-binding-card select { width: 100%; min-width: 0; }
-.resource-plan-binding-progress { display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem 1rem; margin: 0 0 .8rem; padding: .75rem 1rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface-2); font-size: .82rem; }
+.resource-plan-binding-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; padding: 1rem 1.1rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface-2); }
+.resource-plan-binding-progress { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .65rem; min-width: 0; font-size: .82rem; }
 .resource-plan-binding-progress strong { color: var(--primary); }
 .resource-plan-binding-progress span { color: var(--muted); }
+.resource-plan-binding-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
 .resource-plan-review-path { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; margin: 0 0 1.25rem; padding: 0; list-style: none; }
 .resource-plan-review-path li { display: flex; gap: .65rem; min-width: 0; padding: .8rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface); }
 .resource-plan-review-path li > span { display: grid; place-items: center; flex: none; width: 1.65rem; height: 1.65rem; border-radius: .5rem; background: var(--surface-2); color: var(--muted); font-size: .78rem; font-weight: 800; }
@@ -63,19 +62,22 @@
 .resource-plan-reviewed-bindings span { color: var(--muted); }
 @media (max-width: 850px) { .resource-plan-binding-card { grid-template-columns: 1fr; } }
 .resource-plan-boundary span { color: var(--primary); font-size: 1rem; }
-.resource-plan-section-heading { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 1.4rem; }
+.resource-plan-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.4rem; }
 .resource-plan-section-heading .eyebrow { margin: 0 0 .4rem; color: var(--primary); font-size: .7rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .resource-plan-section-heading h2 { margin: 0; font-size: 1.4rem; }
 .resource-plan-section-heading p:last-child { margin: .4rem 0 0; color: var(--muted); line-height: 1.5; }
 .resource-plan-change-set-picker { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; margin-bottom: .75rem; }
 .resource-plan-change-set-picker label { font-weight: 700; }
 .resource-plan-change-set-picker select { max-width: 100%; }
-.resource-plan-review-notice { display: flex; flex-wrap: wrap; gap: .35rem .6rem; margin: .75rem 0 1rem; padding: .85rem 1rem; border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border)); border-radius: .65rem; background: color-mix(in srgb, var(--primary) 5%, var(--surface)); color: var(--text); font-size: .84rem; }
+.resource-plan-review-notice { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: .75rem 0 1rem; padding: 1rem 1.15rem; border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border)); border-radius: .7rem; background: color-mix(in srgb, var(--primary) 5%, var(--surface)); color: var(--text); font-size: .84rem; }
+.resource-plan-review-notice > div { min-width: 0; }
 .resource-plan-review-notice strong { color: var(--primary); }
-.resource-plan-change-set-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem 1rem; color: var(--muted); font-size: .8rem; }
-.resource-plan-change-set-meta details { position: relative; }
-.resource-plan-change-set-meta summary { color: var(--primary); cursor: pointer; }
-.resource-plan-change-set-meta code { display: block; max-width: 100%; padding: .35rem 0; overflow-wrap: anywhere; }
+.resource-plan-review-notice span { margin-inline-start: .7rem; color: var(--muted); }
+.resource-plan-review-notice p { margin: .35rem 0 0; line-height: 1.45; }
+.resource-plan-review-notice details { margin-top: .5rem; color: var(--muted); font-size: .77rem; }
+.resource-plan-review-notice summary { color: var(--primary); cursor: pointer; }
+.resource-plan-review-notice code { display: block; max-width: 100%; padding: .35rem 0; overflow-wrap: anywhere; }
+.resource-plan-review-notice > button { flex: none; }
 .resource-plan-change-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .7rem; margin: 1.4rem 0; }
 .resource-plan-change-summary > div { display: flex; align-items: baseline; gap: .65rem; min-width: 0; padding: .9rem 1rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface-2); }
 .resource-plan-change-summary strong { color: var(--primary); font-size: 1.3rem; }
@@ -152,4 +154,4 @@
 .resource-plan-timeline time, .resource-plan-timeline span { color: var(--text-muted, #64748b); margin-inline-start: .6rem; }
 @media (max-width: 1100px) { .resource-plan-overview-main { grid-template-columns: 1fr; } }
 @media (max-width: 900px) { .resource-plan-graph-layout.has-selection { grid-template-columns: 1fr; } }
-@media (max-width: 700px) { .resource-plan-actions { justify-content: flex-start; } .resource-plan-origin { grid-template-columns: 1fr; } .resource-plan-intent { padding: 1.25rem; } .resource-plan-overview-main { padding: 1rem 1.25rem; } .resource-plan-overview-details, .resource-plan-overview-secondary { grid-template-columns: 1fr; gap: .8rem; } .resource-plan-overview-secondary { padding: 0 1.25rem 1.25rem; } .resource-plan-boundary { padding: .85rem 1.25rem; } .resource-plan-change-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .resource-plan-change { padding: 1rem; } .resource-plan-change-description, .resource-plan-change-dependencies, .resource-plan-change-highlights, .resource-plan-change-empty, .resource-plan-change-diff { margin-left: 0; } .resource-plan-change-highlights { grid-template-columns: 1fr; } .resource-plan-validation-summary { padding: 1rem; } }
+@media (max-width: 700px) { .resource-plan-origin { grid-template-columns: 1fr; } .resource-plan-intent { padding: 1.25rem; } .resource-plan-overview-main { padding: 1rem 1.25rem; } .resource-plan-overview-details, .resource-plan-overview-secondary { grid-template-columns: 1fr; gap: .8rem; } .resource-plan-overview-secondary { padding: 0 1.25rem 1.25rem; } .resource-plan-bindings { padding: 1.25rem; } .resource-plan-boundary { padding: .85rem 1.25rem; } .resource-plan-binding-footer, .resource-plan-binding-actions, .resource-plan-review-notice { flex-direction: column; align-items: stretch; } .resource-plan-binding-actions > button, .resource-plan-review-notice > button { width: 100%; } .resource-plan-change-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .resource-plan-change { padding: 1rem; } .resource-plan-change-description, .resource-plan-change-dependencies, .resource-plan-change-highlights, .resource-plan-change-empty, .resource-plan-change-diff { margin-left: 0; } .resource-plan-change-highlights { grid-template-columns: 1fr; } .resource-plan-validation-summary { padding: 1rem; } }

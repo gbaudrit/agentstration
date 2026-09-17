@@ -47,8 +47,8 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   await expect(page.getByRole('tab')).toHaveCount(5, { timeout: 30_000 });
   await expect(page.getByText('Route support requests')).toBeVisible();
 
-  await expect(page.getByRole('button', { name: 'Refresh preview' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Create ChangeSet' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Refresh proposal' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Review plan proposal' })).toBeDisabled();
   const model = page.getByRole('combobox', { name: 'Triage agent · Model profile' });
   const runtime = page.getByRole('combobox', { name: 'Triage agent · Runtime profile' });
   const modelChoice = await model.locator('option', { hasText: modelName }).getAttribute('value');
@@ -63,15 +63,17 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   await expect(page.getByRole('combobox', { name: 'Triage agent · Model profile' })).toHaveValue(modelChoice);
   await expect(page.getByRole('combobox', { name: 'Triage agent · Runtime profile' })).toHaveValue('');
   await page.getByRole('combobox', { name: 'Triage agent · Runtime profile' }).selectOption(runtimeChoice);
-  await expect(page.getByRole('button', { name: 'Create ChangeSet' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Review plan proposal' })).toBeEnabled();
   await page.getByRole('link', { name: 'Back to plans' }).click();
   await page.locator('tr', { hasText: title }).getByRole('link', { name: title }).click();
   await expect(page.getByRole('combobox', { name: 'Triage agent · Model profile' })).toHaveValue(modelChoice);
   await expect(page.getByRole('combobox', { name: 'Triage agent · Runtime profile' })).toHaveValue(runtimeChoice);
-  await page.getByRole('button', { name: 'Review proposed changes' }).click();
-  await expect(page.locator('.resource-plan-review-notice')).toContainText('Current preview');
-  await page.getByRole('button', { name: 'Create ChangeSet' }).click();
-  await expect(page.locator('.form-alert[role="status"]')).toContainText('ChangeSet ready for review.');
+  await expect(page.locator('.resource-plan-binding-footer')).toContainText('Choices saved automatically');
+  await page.getByRole('button', { name: 'Review plan proposal' }).click();
+  await expect(page.locator('.resource-plan-review-notice')).toContainText('Plan proposal');
+  await expect(page.locator('.resource-plan-review-notice')).toContainText('2 proposed resources');
+  await page.locator('.resource-plan-review-notice').getByRole('button', { name: 'Save this proposal' }).click();
+  await expect(page.locator('.resource-plan-recorded-notice')).toContainText('Saved proposal');
   await expect(page.locator('.resource-plan-change')).toHaveCount(2);
   await expect(page.getByText('Create', { exact: true }).first()).toBeVisible();
   await expect(page.locator('.resource-plan-change-summary')).toContainText('2');
@@ -88,8 +90,8 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   await expect(page.locator('.topology-edge')).toHaveCount(1);
   await page.locator('.topology-node').first().click();
   await expect(page.locator('.resource-plan-graph-details')).toContainText('triage');
-  await page.getByRole('tab', { name: 'Validation' }).click();
-  await page.getByRole('button', { name: 'Revalidate' }).click();
+  await page.getByRole('tab', { name: 'Verification' }).click();
+  await page.getByRole('button', { name: 'Check proposal' }).click();
   await expect(page.locator('.resource-plan-validation-summary')).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
@@ -107,7 +109,8 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled({ timeout: 30_000 });
   await expect(page.getByText('ChangeSet belongs to an earlier revision')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole('button', { name: 'Revalidate' })).toBeDisabled();
+  await page.getByRole('tab', { name: 'Verification' }).click();
+  await expect(page.getByRole('button', { name: 'Check proposal' })).toBeDisabled();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('tab', { name: 'Graph' }).click();
