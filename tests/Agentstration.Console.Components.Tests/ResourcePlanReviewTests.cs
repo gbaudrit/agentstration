@@ -119,6 +119,10 @@ public sealed class ResourcePlanReviewTests
         rendered.Find("#tab-Validation").Click();
         Assert.Contains("Verification is stale", rendered.Markup, StringComparison.Ordinal);
         rendered.Find("#tab-Activity").Click();
+        Assert.Contains("Plan origin", rendered.Find(".resource-plan-origin-card").TextContent, StringComparison.Ordinal);
+        Assert.Contains("Event history", rendered.Find(".resource-plan-history").TextContent, StringComparison.Ordinal);
+        Assert.AreEqual(1, rendered.FindAll(".resource-plan-timeline li").Count);
+        Assert.Contains("Created", rendered.Find(".resource-plan-timeline li").TextContent, StringComparison.Ordinal);
         Assert.Contains("/flow-runs/run-1", rendered.Markup, StringComparison.Ordinal);
     }
 

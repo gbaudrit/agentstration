@@ -141,7 +141,15 @@
   <data name="Issue.Generic.Title" xml:space="preserve"><value>Review required</value></data>
   <data name="Issue.Generic.Description" xml:space="preserve"><value>This proposal needs attention. Open technical details for the exact reason.</value></data>
   <data name="Activity" xml:space="preserve"><value>Activity and provenance</value></data>
-  <data name="Principal" xml:space="preserve"><value>Principal</value></data>
+  <data name="ActivityKicker" xml:space="preserve"><value>Plan history</value></data>
+  <data name="ActivityIntro" xml:space="preserve"><value>Review where this plan came from and the actions recorded throughout its lifecycle.</value></data>
+  <data name="OriginTitle" xml:space="preserve"><value>Plan origin</value></data>
+  <data name="OriginDescription" xml:space="preserve"><value>Identifiers associated with the creation of this plan.</value></data>
+  <data name="HistoryTitle" xml:space="preserve"><value>Event history</value></data>
+  <data name="HistoryDescription" xml:space="preserve"><value>Most recent events first.</value></data>
+  <data name="HistoryCount" xml:space="preserve"><value>Events: {0}</value></data>
+  <data name="HistoryEmpty" xml:space="preserve"><value>No event has been recorded yet.</value></data>
+  <data name="Principal" xml:space="preserve"><value>Creator ID</value></data>
   <data name="Work" xml:space="preserve"><value>Originating Work</value></data>
   <data name="OpenTasks" xml:space="preserve"><value>Open tasks</value></data>
   <data name="FlowRun" xml:space="preserve"><value>Flow Run</value></data>

@@ -141,10 +141,18 @@
   <data name="Issue.Generic.Title" xml:space="preserve"><value>Revue nécessaire</value></data>
   <data name="Issue.Generic.Description" xml:space="preserve"><value>Cette proposition nécessite une intervention. Consultez les détails techniques pour connaître la cause précise.</value></data>
   <data name="Activity" xml:space="preserve"><value>Activité et provenance</value></data>
-  <data name="Principal" xml:space="preserve"><value>Principal</value></data>
-  <data name="Work" xml:space="preserve"><value>Work d’origine</value></data>
+  <data name="ActivityKicker" xml:space="preserve"><value>Suivi du plan</value></data>
+  <data name="ActivityIntro" xml:space="preserve"><value>Retrouvez l’origine du plan et les actions enregistrées au fil de son parcours.</value></data>
+  <data name="OriginTitle" xml:space="preserve"><value>Origine du plan</value></data>
+  <data name="OriginDescription" xml:space="preserve"><value>Identifiants associés à la création de ce plan.</value></data>
+  <data name="HistoryTitle" xml:space="preserve"><value>Historique des événements</value></data>
+  <data name="HistoryDescription" xml:space="preserve"><value>Les événements les plus récents apparaissent en premier.</value></data>
+  <data name="HistoryCount" xml:space="preserve"><value>Événements : {0}</value></data>
+  <data name="HistoryEmpty" xml:space="preserve"><value>Aucun événement enregistré pour le moment.</value></data>
+  <data name="Principal" xml:space="preserve"><value>Identifiant du créateur</value></data>
+  <data name="Work" xml:space="preserve"><value>Tâche d’origine</value></data>
   <data name="OpenTasks" xml:space="preserve"><value>Ouvrir les tâches</value></data>
-  <data name="FlowRun" xml:space="preserve"><value>Flow Run</value></data>
+  <data name="FlowRun" xml:space="preserve"><value>Exécution du flow</value></data>
   <data name="Correlation" xml:space="preserve"><value>Corrélation</value></data>
   <data name="Materialized" xml:space="preserve"><value>Proposition actualisée : {0} ressources proposées.</value></data>
   <data name="ChangeSetCreated" xml:space="preserve"><value>Proposition enregistrée. Vous pouvez maintenant la vérifier.</value></data>
