@@ -1,4 +1,4 @@
-<form @onsubmit="SubmitAsync" @onsubmit:preventDefault="true" aria-busy="@(Busy || submitting)">
+<form @onsubmit="SubmitAsync" @onsubmit:preventDefault="true" aria-busy="@(Busy || submitting)" data-testid="workplace-form-form" data-interactive="@(interactive ? "true" : "false")">
     <header><div><h2>@Definition.DisplayName</h2>@if (Definition.Description is not null) { <p>@Definition.Description</p> }</div></header>
     <div class="entry-fields">
         @foreach (var field in Definition.Presentation.Fields.OrderBy(value => value.Order))
@@ -6,7 +6,7 @@
             <EntryFieldRenderer Definition="field" Value="GetValue(field)" ValueChanged="value => values[field.Name] = value" Disabled="@(Disabled || Busy || submitting)" />
         }
     </div>
-    <button class="entry-submit" type="submit" disabled="@(Disabled || Busy || submitting)"><UiIcon Name="send" /> @(Busy || submitting ? Localizer["Sending"] : Localizer["Continue"])</button>
+    <button class="entry-submit" type="submit" disabled="@(Disabled || Busy || submitting)" data-testid="workplace-form-submit"><UiIcon Name="send" /> @(Busy || submitting ? Localizer["Sending"] : Localizer["Continue"])</button>
     @if (error is not null) { <p class="entry-error" role="alert">@error</p> }
 </form>
 
@@ -18,6 +18,9 @@
     private readonly Dictionary<string, JsonElement> values = new(StringComparer.Ordinal);
     private string? error;
     private bool submitting;
+    private bool interactive;
+
+    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
     private JsonElement GetValue(EntryFieldDefinition field) => values.TryGetValue(field.Name, out var value) ? value : field.DefaultValue ?? default;
     private async Task SubmitAsync()
     {

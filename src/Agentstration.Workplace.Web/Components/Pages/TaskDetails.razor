@@ -10,7 +10,7 @@
 else if (error is not null) { <ServiceUnavailableState Message="@error" /> }
 else if (task is not null)
 {
-    <div class="task-page-heading">
+    <div class="task-page-heading" data-testid="workplace-task-details" data-task-id="@task.Id" data-task-status="@task.Status">
         <div><a class="back-link" href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks")">← @T("Tasks")</a><p class="eyebrow">@T("Task")</p><h1>@task.Title</h1>@if (!string.IsNullOrWhiteSpace(task.Description)){<p>@task.Description</p>}</div>
         <div class="task-heading-status"><RealtimeStatus Connected="@(Realtime.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)" /><TaskStatusBadge Value="task.Status" /></div>
     </div>

@@ -1,0 +1,16 @@
+{
+  "journey": "submit-workplace-prompt",
+  "input": {
+    "workspaceName": "default",
+    "dashboardName": "home",
+    "entryNamespace": "default",
+    "entryName": "quick-answer",
+    "prompt": "Confirm that the Workplace browser journey is operational."
+  },
+  "captures": [
+    { "checkpoint": "workplace-home", "file": "workplace-home.png" },
+    { "checkpoint": "workplace-entry-ready", "file": "workplace-entry.png" },
+    { "checkpoint": "workplace-request-submitted", "file": "workplace-conversation.png" },
+    { "checkpoint": "workplace-response-completed", "file": "workplace-response.png" }
+  ]
+}

@@ -37,6 +37,25 @@ public sealed class ConsoleApiSessionHandlerTests
     }
 
     [TestMethod]
+    public async Task DevelopmentSessionForwardsWorkspaceWithoutApplicationCookie()
+    {
+        var workspaceId = Guid.NewGuid();
+        var terminal = new CaptureHandler();
+        using var handler = new ConsoleApiSessionHandler(
+            new HttpContextAccessor { HttpContext = AuthenticatedContext(string.Empty) },
+            new TestRequestContext(workspaceId),
+            TrustedOrigin,
+            SessionCookie)
+        { InnerHandler = terminal };
+        using var client = new HttpClient(handler);
+
+        using var response = await client.GetAsync(new Uri(TrustedOrigin, "/api/identity/context"));
+
+        Assert.IsFalse(terminal.Request!.Headers.Contains(HeaderNames.Cookie));
+        Assert.AreEqual(workspaceId.ToString("D"), terminal.Request.Headers.GetValues(PrincipalResolutionMiddleware.WorkspaceHeader).Single());
+    }
+
+    [TestMethod]
     public async Task SessionIsNeverForwardedOutsideTheConfiguredOrigin()
     {
         var httpContext = AuthenticatedContext($"{SessionCookie}=secret");

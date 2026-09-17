@@ -4,13 +4,13 @@
     ViewData["Title"] = Auth["SignOut"];
 }
 
-<header class="auth-heading">
+<header class="auth-heading" data-testid="console-admin-logout">
     <p class="eyebrow">@Auth["CurrentSession"]</p>
     <h1>@Auth["SignOutQuestion"]</h1>
     <p>@Auth["SignOutDescription"]</p>
 </header>
 
 <form method="post" class="auth-actions">
-    <button type="submit" class="primary-action">@Auth["SignOut"]</button>
+    <button type="submit" class="primary-action" data-testid="logout-submit">@Auth["SignOut"]</button>
     <a href="/" class="secondary-action">@Auth["Cancel"]</a>
 </form>

@@ -7,6 +7,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<TasksStrings> Localizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
+<div data-testid="flow-observability-tasks">
 <PageHeader Title="@T("Tasks")" Description="@T("Description")">
     <Actions><RealtimeStatus State="Realtime.State" /><button class="button-secondary" type="button" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button></Actions>
 </PageHeader>
@@ -36,6 +37,7 @@ else
     }
 }
 
+</div>
 @code {
     [SupplyParameterFromQuery(Name="workspaceId")] public string? WorkspaceId { get; set; }
     [SupplyParameterFromQuery(Name="status")] public string? Status { get; set; }

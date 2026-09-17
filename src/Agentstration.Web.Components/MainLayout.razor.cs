@@ -82,6 +82,7 @@ public partial class MainLayout
     private bool commandPaletteOpen;
     private bool focusCommandInput;
     private bool searchingResources;
+    private bool themeReady;
     private int selectedCommandIndex;
     private IReadOnlyList<CommandItem> resourceCommands = [];
     private CancellationTokenSource? resourceSearchCancellation;
@@ -134,6 +135,8 @@ public partial class MainLayout
             contextModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/context-selector.js");
             themeModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/theme-preferences.js");
             Preferences.SetSystemTheme(await themeModule.InvokeAsync<bool>("prefersDarkTheme"));
+            themeReady = true;
+            StateHasChanged();
             selfReference = DotNetObjectReference.Create(this);
             commandRegistration = await commandModule.InvokeAsync<IJSObjectReference>("registerCommandPalette", selfReference);
             if (CultureNavigation.NavigateToPreferredCulture(NavigationManager, Preferences.Language)) return;

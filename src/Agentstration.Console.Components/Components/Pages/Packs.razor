@@ -14,6 +14,7 @@
     </Actions>
 </PageHeader>
 
+<div data-testid="distribution-packs">
 @if (error is not null)
 {
     <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
@@ -289,3 +290,4 @@ else
         </section>
     </div>
 }
+</div>

@@ -1,0 +1,14 @@
+{
+  "journey": "create-pack-project",
+  "input": {
+    "publisher": "playwright",
+    "name": "local-coverage",
+    "version": "1.0.0",
+    "displayName": "Playwright local coverage"
+  },
+  "captures": [
+    { "checkpoint": "pack-project-composer", "file": "pack-project-composer.png" },
+    { "checkpoint": "pack-project-created", "file": "pack-project-created.png" },
+    { "checkpoint": "pack-project-built", "file": "pack-project-built.png" }
+  ]
+}

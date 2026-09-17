@@ -8,6 +8,7 @@
 
 <PageTitle>@(project?.Value.Definition.DisplayName ?? T("PackProject")) · Agentstration</PageTitle>
 
+<div data-testid="distribution-pack-project-details" data-project-id="@ProjectId">
 @if (error is not null)
 {
     <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
@@ -22,7 +23,7 @@ else
         <Actions>
             <button class="button-secondary" @onclick="BackToPacks">@T("BackToPacks")</button>
             <button class="button-secondary" disabled="@(busy || !dirty)" @onclick="SaveAsync">@T("Save")</button>
-            <button class="button-primary" disabled="@busy" @onclick="BuildAsync">@(building ? T("Building") : T("BuildPack"))</button>
+            <button class="button-primary" disabled="@busy" @onclick="BuildAsync" data-testid="pack-project-build">@(building ? T("Building") : T("BuildPack"))</button>
         </Actions>
     </PageHeader>
 
@@ -76,7 +77,7 @@ else
                     }
                 </div>
               }
-            @if (message is not null) { <p class="@(hasError ? "error-panel" : "studio-message")" role="status">@message</p> }
+            @if (message is not null) { <p class="@(hasError ? "error-panel" : "studio-message")" role="status" data-testid="pack-project-status" data-state="@(hasError ? "error" : "success")">@message</p> }
         </div>
 
         <aside class="panel studio-install">
@@ -216,6 +217,8 @@ else
         }
     </section>
 }
+
+</div>
 
 @code {
     [Parameter] public Guid ProjectId { get; set; }

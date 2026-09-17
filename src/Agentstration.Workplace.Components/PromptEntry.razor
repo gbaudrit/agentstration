@@ -1,4 +1,4 @@
-<form class="prompt-entry" @onsubmit="SubmitAsync" @onsubmit:preventDefault="true" aria-busy="@(Busy || submitting)">
+<form class="prompt-entry" @onsubmit="SubmitAsync" @onsubmit:preventDefault="true" aria-busy="@(Busy || submitting)" data-testid="workplace-prompt-form" data-interactive="@(interactive ? "true" : "false")">
     <div class="entry-heading">
         <div>
             <h2>@Definition.DisplayName</h2>
@@ -7,8 +7,8 @@
     </div>
     <div class="prompt-composer">
         <span class="composer-core" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /></span>
-        <textarea @bind="request" @bind:event="oninput" @onkeydown="HandleKeyDown" placeholder="@Definition.Presentation.Placeholder" aria-label="@Definition.DisplayName" aria-describedby="prompt-help prompt-error" disabled="@(Disabled || Busy || submitting)"></textarea>
-        <button class="prompt-submit" type="submit" aria-label="@Localizer["SendRequest"]" disabled="@(Disabled || Busy || submitting || string.IsNullOrWhiteSpace(request))">
+        <textarea @bind="request" @bind:event="oninput" @onkeydown="HandleKeyDown" placeholder="@Definition.Presentation.Placeholder" aria-label="@Definition.DisplayName" aria-describedby="prompt-help prompt-error" disabled="@(Disabled || Busy || submitting)" data-testid="workplace-prompt-input"></textarea>
+        <button class="prompt-submit" type="submit" aria-label="@Localizer["SendRequest"]" disabled="@(Disabled || Busy || submitting || string.IsNullOrWhiteSpace(request))" data-testid="workplace-prompt-submit">
             <UiIcon Name="send" /><span>@(Busy || submitting ? Localizer["Sending"] : Localizer["SendRequest"])</span>
         </button>
     </div>
@@ -35,6 +35,9 @@
     private string request = string.Empty;
     private string? error;
     private bool submitting;
+    private bool interactive;
+
+    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
 
     private async Task HandleKeyDown(KeyboardEventArgs args)
     {

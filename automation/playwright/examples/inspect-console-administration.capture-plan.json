@@ -1,0 +1,13 @@
+{
+  "journey": "inspect-console-administration",
+  "input": {
+    "tokenName": "playwright-console-administration"
+  },
+  "checkpoints": [
+    "console-admin-organization",
+    "console-admin-member",
+    "console-admin-preferences",
+    "console-admin-token",
+    "console-admin-navigation"
+  ]
+}

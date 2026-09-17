@@ -1,0 +1,45 @@
+{
+  "journey": "create-handoff-flow",
+  "input": {
+    "workspaceName": "capture-handoff",
+    "name": "solution-discovery",
+    "displayName": "Découvrir Agentstration",
+    "description": "Une équipe de spécialistes se transmet la conversation selon les sujets abordés par l’utilisateur.",
+    "version": "0.1.3",
+    "enabled": true,
+    "participants": [
+      "accueil",
+      "conseiller-solution",
+      "expert-technique",
+      "expert-integration"
+    ],
+    "initialParticipant": "accueil",
+    "routes": [
+      { "from": "accueil", "to": "conseiller-solution" },
+      { "from": "accueil", "to": "expert-technique" },
+      { "from": "accueil", "to": "expert-integration" },
+      { "from": "conseiller-solution", "to": "expert-technique" },
+      { "from": "conseiller-solution", "to": "expert-integration" },
+      { "from": "conseiller-solution", "to": "accueil" },
+      { "from": "expert-technique", "to": "conseiller-solution" },
+      { "from": "expert-technique", "to": "expert-integration" },
+      { "from": "expert-technique", "to": "accueil" },
+      { "from": "expert-integration", "to": "conseiller-solution" },
+      { "from": "expert-integration", "to": "expert-technique" },
+      { "from": "expert-integration", "to": "accueil" }
+    ],
+    "autonomous": true,
+    "maximumTurnsPerParticipant": 4,
+    "terminationPhrase": "[[HANDOFF_COMPLETE]]"
+  },
+  "locale": "fr-FR",
+  "theme": "dark",
+  "viewport": { "width": 1920, "height": 1080 },
+  "captures": [
+    { "checkpoint": "flow-identity-complete", "file": "01-flow-identity-complete.png", "scope": "target" },
+    { "checkpoint": "flow-participants-complete", "file": "02-flow-participants-complete.png", "scope": "target" },
+    { "checkpoint": "flow-strategy-complete", "file": "03-flow-strategy-complete.png", "scope": "target" },
+    { "checkpoint": "flow-created", "file": "04-flow-created.png", "scope": "page", "fullPage": false },
+    { "checkpoint": "flow-published", "file": "05-flow-published.png", "scope": "page", "fullPage": false }
+  ]
+}

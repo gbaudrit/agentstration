@@ -6,7 +6,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DeploymentStrings> DeploymentLocalizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
-<PageHeader Eyebrow="@T("Eyebrow")" Title="@T("Agents")" Description="@T("Description")">
+<PageHeader Eyebrow="@T("Eyebrow")" Title="@T("Agents")" Description="@T("Description")" TestId="resource-agents">
     <Metadata><span>@F("AgentCount", Filtered.Count)</span><span>@F("DeployedCount", DeployedCount)</span><span>@F("AttentionCount", FailedCount)</span></Metadata>
     <Actions><a class="button-primary" href="/agents/new">@T("CreateAgent")</a></Actions>
 </PageHeader>

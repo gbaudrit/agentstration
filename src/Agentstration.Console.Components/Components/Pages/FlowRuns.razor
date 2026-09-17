@@ -3,10 +3,12 @@
 @inject IFlowApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowRunsStrings> Localizer
 <PageTitle>@T("Title") · Agentstration</PageTitle>
+<div data-testid="flow-observability-runs">
 <PageHeader Title="@T("Title")" Description="@T("Description")"><Actions><a class="button-secondary" href="/flows">@T("Definitions")</a></Actions></PageHeader>
 <nav class="section-tabs"><a href="/flows">@T("Definitions")</a><a class="active" href="/flow-runs">@T("Runs")</a><a href="/flows#deployments">@T("Deployments")</a></nav>
 <div class="filter-bar"><SearchBox @bind-Value="search" Placeholder="@T("SearchPlaceholder")" /><select @bind="status"><option value="">@T("AllStatuses")</option>@foreach(var value in Enum.GetValues<FlowRunStatus>()){<option value="@value">@StatusLabel(value)</option>}</select><select @bind="trigger"><option value="">@T("AllTriggers")</option>@foreach(var value in Enum.GetValues<FlowRunTrigger>()){<option value="@value">@TriggerLabel(value)</option>}</select><input @bind="version" placeholder="@T("Version")" /><input @bind="deployment" placeholder="@T("Deployment")" /></div>
 @if(runs is null){<LoadingState Message="@T("Loading")"/>}else if(Filtered.Count==0){<EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"/>}else{<RunGrid Runs="Filtered" />}
+</div>
 @code {
     private readonly CancellationTokenSource cancellation=new(); private IReadOnlyList<FlowRun>? runs; private string search="",status="",trigger="",version="",deployment="";
     private string T(string key, params object[] arguments) => Localizer[key, arguments];

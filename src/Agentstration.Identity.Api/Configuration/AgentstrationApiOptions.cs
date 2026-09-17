@@ -24,6 +24,7 @@ public sealed class ApiAuthenticationOptions
     public string DevelopmentIssuer { get; set; } = "https://agentstration.local/development";
     public string DevelopmentSubject { get; set; } = "development-operator";
     public string DevelopmentDisplayName { get; set; } = "Development operator";
+    public bool DevelopmentGrantPlatformAdministrator { get; set; }
 
     public static bool SupportsLocalAccounts(string mode) =>
         string.Equals(mode, Local, StringComparison.OrdinalIgnoreCase)

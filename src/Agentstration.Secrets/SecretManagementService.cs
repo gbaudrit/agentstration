@@ -22,6 +22,8 @@ public sealed class SecretManagementService(
     IResourceStore store,
     IResourceReferenceResolver references,
     IResourceScopeOperations scopeOperations,
+    IRequestContextScopeFactory requestContexts,
+    DescendantResourceUseAuthorizer useAuthorizer,
     IEnumerable<ISecretVaultProvider> providers) : ISecretResolver
 {
     public Task<IReadOnlyList<StoredResource<VaultResource>>> ListVaultsAsync(CancellationToken cancellationToken) => store.ListAllAsync<VaultResource>(SecretResourceKinds.Vault, cancellationToken);
@@ -35,10 +37,13 @@ public sealed class SecretManagementService(
         await ViewAsync((await GetVaultExactAsync(scopeRef, name, cancellationToken))?.Value ?? throw new VaultResourceNotFoundException(name), cancellationToken);
     public async Task<StoredResource<VaultResource>> CreateVaultAsync(VaultResource resource, CancellationToken cancellationToken)
     {
-        ValidateVault(resource);
         var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(SecretResourceKinds.Vault);
-        return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite,
-            token => store.PutExactAsync(scopeRef, resource with { ScopeRef = scopeRef, Generation = 1, Status = Succeeded() }, null, true, token), cancellationToken);
+        return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
+        {
+            ValidateVault(resource);
+            await useAuthorizer.ValidateAsync(scopeRef, resource.Definition.UsePolicy, token);
+            return await store.PutExactAsync(scopeRef, resource with { ScopeRef = scopeRef, Generation = 1, Status = Succeeded() }, null, true, token);
+        }, cancellationToken);
     }
     public async Task<StoredResource<VaultResource>> PutVaultAsync(string name, VaultProperties definition, string? etag, CancellationToken cancellationToken)
     {
@@ -52,10 +57,13 @@ public sealed class SecretManagementService(
     }
     private async Task<StoredResource<VaultResource>> PutVaultAsync(StoredResource<VaultResource> existing, VaultProperties definition, string? etag, CancellationToken cancellationToken)
     {
-        ValidateVault(existing.Value with { Definition = definition });
         var scopeRef = RequireScope(existing.Value);
-        return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite,
-            token => store.PutExactAsync(scopeRef, existing.Value with { Definition = definition, Generation = checked(existing.Value.Generation + 1), Status = Succeeded() }, etag, false, token), cancellationToken);
+        return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
+        {
+            ValidateVault(existing.Value with { Definition = definition });
+            await useAuthorizer.ValidateAsync(scopeRef, definition.UsePolicy, token);
+            return await store.PutExactAsync(scopeRef, existing.Value with { Definition = definition, Generation = checked(existing.Value.Generation + 1), Status = Succeeded() }, etag, false, token);
+        }, cancellationToken);
     }
     public async Task DeleteVaultAsync(string name, string? etag, CancellationToken cancellationToken)
     {
@@ -71,11 +79,17 @@ public sealed class SecretManagementService(
     {
         var name = existing.Value.Name;
         var scopeRef = RequireScope(existing.Value);
-        if ((await store.ListAllAsync<SecretResource>(SecretResourceKinds.Secret, cancellationToken)).Any(value =>
-                value.Value.ScopeRef == scopeRef && value.Value.Definition.Vault.Name == name)) throw new VaultInUseException(name);
         await scopeOperations.WriteAsync(SecretResourceKinds.Vault, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
-            await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, ResourceNamespace.Default, SecretResourceKinds.Vault, name), etag, token);
+            using (requestContexts.PushSystem())
+            {
+                if ((await store.ListAllAsync<SecretResource>(SecretResourceKinds.Secret, token)).Any(value =>
+                        (value.Value.Definition.Vault.ScopeRef ?? value.Value.ScopeRef) == scopeRef
+                        && value.Value.Definition.Vault.Name == name
+                        && (value.Value.Definition.Vault.Namespace ?? value.Value.Namespace) == existing.Value.Namespace))
+                    throw new VaultInUseException(name);
+            }
+            await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, existing.Value.Namespace, SecretResourceKinds.Vault, name), etag, token);
             return true;
         }, cancellationToken);
     }
@@ -191,12 +205,15 @@ public sealed class SecretManagementService(
     {
         var name = secret.Name;
         var scopeRef = RequireScope(secret);
-        if ((await GetSecretUsagesAsync(scopeRef, name, cancellationToken)).Count > 0)
-            throw new SecretManagementException($"Secret '{name}' is referenced by a managed resource.");
-        await DeleteValueAsync(secret, cancellationToken);
         await scopeOperations.WriteAsync(SecretResourceKinds.Secret, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
-            await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, ResourceNamespace.Default, SecretResourceKinds.Secret, name), etag, token);
+            using (requestContexts.PushSystem())
+            {
+                if ((await GetSecretUsagesAsync(scopeRef, name, token)).Count > 0)
+                    throw new SecretManagementException($"Secret '{name}' is referenced by a managed resource.");
+            }
+            await DeleteValueAsync(secret, token);
+            await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, secret.Namespace, SecretResourceKinds.Secret, name), etag, token);
             return true;
         }, cancellationToken);
     }
@@ -245,13 +262,16 @@ public sealed class SecretManagementService(
     {
         if (reference.Address.Kind != SecretResourceKinds.Secret)
             throw new SecretManagementException("The referenced resource must be a Secret.");
-        var secret = (await references.ResolveAsync<SecretResource>(
-            new ResourceReference(reference.Address.Name, reference.ScopeRef, reference.Address.Namespace),
-            resolution.Consumer.Namespace,
-            SecretResourceKinds.Secret,
-            resolution.ConsumerScopeRef,
-            cancellationToken))?.Value;
+        // An omitted scope retains the legacy same-scope reference, without searching ancestors.
+        var secretScope = reference.ScopeRef ?? resolution.ConsumerScopeRef;
+        if (!await useAuthorizer.IsSameOrDescendantAsync(secretScope, resolution.ConsumerScopeRef, cancellationToken))
+            throw new SecretAccessDeniedException(reference.Address);
+        var secret = (await store.GetExactAsync<SecretResource>(ScopedResourceAddress.Create(
+            secretScope, reference.Address.Namespace, SecretResourceKinds.Secret, reference.Address.Name), cancellationToken))?.Value;
         if (secret is null) return null;
+        if (!await useAuthorizer.CanUseAsync(RequireScope(secret), resolution.ConsumerScopeRef,
+                secret.Definition.UsePolicy, cancellationToken))
+            throw new SecretAccessDeniedException(reference.Address);
         var (provider, context) = await ProviderAsync(secret, cancellationToken);
         var value = await provider.GetAsync(context, secret.Definition.Key, cancellationToken);
         return value is null ? null : new ResolvedSecret(secret.Address, context.Vault, value);
@@ -272,13 +292,16 @@ public sealed class SecretManagementService(
     {
         var address = secret.Definition.Vault.Resolve(secret.Namespace, SecretResourceKinds.Vault);
         var secretScopeRef = RequireScope(secret);
-        if (secret.Definition.Vault.ScopeRef is { } requestedVaultScope && requestedVaultScope != secretScopeRef)
-            throw new SecretManagementException("A Secret and its Vault must belong to the exact same scope.");
+        var vaultScopeRef = secret.Definition.Vault.ScopeRef ?? secretScopeRef;
+        if (!await useAuthorizer.IsSameOrDescendantAsync(vaultScopeRef, secretScopeRef, cancellationToken))
+            throw new SecretAccessDeniedException(secret.Address);
         var vault = (await store.GetExactAsync<VaultResource>(
-            ScopedResourceAddress.Create(secretScopeRef, address.Namespace, address.Kind, address.Name),
+            ScopedResourceAddress.Create(vaultScopeRef, address.Namespace, address.Kind, address.Name),
             cancellationToken))?.Value ?? throw new VaultResourceNotFoundException(address.Name);
+        if (!await useAuthorizer.CanUseAsync(vaultScopeRef, secretScopeRef, vault.Definition.UsePolicy, cancellationToken))
+            throw new SecretAccessDeniedException(secret.Address);
         var provider = providers.SingleOrDefault(value => string.Equals(value.ProviderType, vault.Definition.ProviderType, StringComparison.OrdinalIgnoreCase)) ?? throw new SecretVaultUnavailableException(vault.Definition.ProviderType);
-        return (provider, new(secretScopeRef, vault.Address, vault.Definition.ProviderOptions));
+        return (provider, new(vaultScopeRef, vault.Address, vault.Definition.ProviderOptions));
     }
 
     private static ResourceScopeRef RequireScope(Resource resource)
@@ -296,12 +319,14 @@ public sealed class SecretManagementService(
         if (resource.Kind != SecretResourceKinds.Secret || resource.ApiVersion != ResourceApiVersions.CoreV1) throw new SecretManagementException("Invalid Secret resource envelope.");
         ArgumentException.ThrowIfNullOrWhiteSpace(resource.Metadata.Name); ArgumentException.ThrowIfNullOrWhiteSpace(resource.Definition.DisplayName); ArgumentException.ThrowIfNullOrWhiteSpace(resource.Definition.Key);
         var scopeRef = RequireScope(resource);
-        if (resource.Definition.Vault.ScopeRef is { } requestedVaultScope && requestedVaultScope != scopeRef)
-            throw new SecretManagementException("A Secret and its Vault must belong to the exact same scope.");
+        await useAuthorizer.ValidateAsync(scopeRef, resource.Definition.UsePolicy, cancellationToken);
         var @namespace = resource.Definition.Vault.Namespace ?? resource.Namespace;
-        _ = await store.GetExactAsync<VaultResource>(
-            ScopedResourceAddress.Create(scopeRef, @namespace, SecretResourceKinds.Vault, resource.Definition.Vault.Name),
-            cancellationToken) ?? throw new VaultResourceNotFoundException(resource.Definition.Vault.Name);
+        var vaultScope = resource.Definition.Vault.ScopeRef ?? scopeRef;
+        var vault = (await store.GetExactAsync<VaultResource>(ScopedResourceAddress.Create(vaultScope, @namespace,
+            SecretResourceKinds.Vault, resource.Definition.Vault.Name), cancellationToken))?.Value
+            ?? throw new VaultResourceNotFoundException(resource.Definition.Vault.Name);
+        if (!await useAuthorizer.CanUseAsync(vaultScope, scopeRef, vault.Definition.UsePolicy, cancellationToken))
+            throw new SecretManagementException("The Secret's scope has no use grant for its Vault.");
     }
 
     private static ResourceStatus Succeeded() => new() { ProvisioningState = ProvisioningState.Succeeded };

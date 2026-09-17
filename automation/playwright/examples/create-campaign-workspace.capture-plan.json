@@ -1,0 +1,37 @@
+{
+  "journey": "create-workspace",
+  "input": {
+    "name": "capture-handoff",
+    "displayName": "Handoff capture campaign"
+  },
+  "locale": "en-US",
+  "theme": "dark",
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "captures": [
+    {
+      "checkpoint": "workspace-form-empty",
+      "file": "01-workspace-form-empty.png",
+      "scope": "page",
+      "fullPage": false
+    },
+    {
+      "checkpoint": "workspace-identity-complete",
+      "file": "02-workspace-identity-complete.png",
+      "scope": "target"
+    },
+    {
+      "checkpoint": "workspace-created",
+      "file": "03-workspace-created.png",
+      "scope": "target"
+    },
+    {
+      "checkpoint": "workspace-selected",
+      "file": "04-workspace-selected.png",
+      "scope": "page",
+      "fullPage": false
+    }
+  ]
+}
