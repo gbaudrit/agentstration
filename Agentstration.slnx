@@ -37,6 +37,7 @@
     <Project Path="src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
     <Project Path="src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
     <Project Path="src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
+    <Project Path="src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj" />
     <Project Path="src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
     <Project Path="src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
   </Folder>

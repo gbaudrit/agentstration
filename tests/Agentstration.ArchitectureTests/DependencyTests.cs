@@ -52,6 +52,29 @@ namespace Agentstration.ArchitectureTests;
 public sealed class DependencyTests
 {
     [TestMethod]
+    public void FoundryDependenciesStayInsideTheAutonomousExtension()
+    {
+        var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
+        var foundryProject = Path.Combine(sourceRoot, "Agentstration.Extensions.Foundry", "Agentstration.Extensions.Foundry.csproj");
+        Assert.IsTrue(File.Exists(foundryProject));
+        Assert.Contains("<PackageReference Include=\"Azure.Identity\"", File.ReadAllText(foundryProject));
+
+        var violations = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !string.Equals(path, foundryProject, StringComparison.OrdinalIgnoreCase))
+            .Where(path =>
+            {
+                var project = File.ReadAllText(path);
+                return project.Contains("Agentstration.Extensions.Foundry", StringComparison.Ordinal)
+                    || project.Contains("<PackageReference Include=\"Azure.Identity\"", StringComparison.Ordinal)
+                    || project.Contains("<PackageReference Include=\"Azure.AI.", StringComparison.Ordinal);
+            })
+            .Select(path => Path.GetRelativePath(sourceRoot, path))
+            .ToArray();
+
+        Assert.IsEmpty(violations, $"Foundry dependencies must not enter product modules: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
     public void ConsoleClientDoesNotReferenceAuthoritativeServerImplementations()
     {
         var references = typeof(IManagementApiClient).Assembly.GetReferencedAssemblies()

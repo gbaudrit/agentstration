@@ -1,5 +1,45 @@
 # Foundry integration
 
-Microsoft Foundry is optional and is not referenced by the domain, application, storage, local runtime, or Web host.
+Microsoft Foundry is an optional AEP model-provider extension, not an Agent hosting mode. Agentstration remains authoritative for Agents, revisions, deployments and desired state. `AgentHostingMode.FoundryHosted` remains unsupported. See [ADR-0119](decisions/0119-foundry-model-deployments-use-an-isolated-aep-extension.md) and [FR-185](https://github.com/gbaudrit/agentstration/issues/185).
 
-A future `Agentstration.Runtime.Foundry` adapter may implement a hosting provisioner and persist a generic `ExternalBinding`. Agentstration resource identifiers, versions, revisions, desired state, and audit history remain authoritative. Foundry identifiers are external binding data only.
+## Implementation sequence and gates
+
+| Increment | Outcome | Gate |
+| --- | --- | --- |
+| [FR-445](https://github.com/gbaudrit/agentstration/issues/445) | Isolated AEP host, explicit identity, health and bounded project deployment discovery | Offline tests, .NET 10 build, no Azure in central projects |
+| [FR-446](https://github.com/gbaudrit/agentstration/issues/446) | Non-streaming OpenAI/v1 chat through the ordinary Model Profile and durable Runtime path | Offline AEP, Runtime and Flow tests; verify inference route and Entra audience |
+| [FR-450](https://github.com/gbaudrit/agentstration/issues/450) | Streaming and governed tool-call round trip | Cancellation, stream bounds, tool-governance tests |
+| [FR-448](https://github.com/gbaudrit/agentstration/issues/448) | Deployment-specific structured output and reasoning | Explicit unsupported options fail before inference |
+| [FR-449](https://github.com/gbaudrit/agentstration/issues/449) | Complete egress, retries, error mapping and safe observability | Adversarial offline tests before orchestrated/remote preview |
+| [FR-451](https://github.com/gbaudrit/agentstration/issues/451) | Opt-in AppHost/Compose/bootstrap and localized Console workflow | Default offline startup and both functional test lanes pass; optional live suite |
+| [FR-452](https://github.com/gbaudrit/agentstration/issues/452) | Consumer-level Agentstration Secret Binding through [FR-439](https://github.com/gbaudrit/agentstration/issues/439) | Scope/isolation and credential-rotation tests; environment key stops being the managed path |
+
+FR-433 adds explicit descendant grants for higher-scope Secrets. It is not required for a same-tenant Model Provider and Secret binding. Foundry-hosted Agents, model deployment administration and non-chat media APIs are outside this integration.
+
+## FR-445 configuration for an initial local test
+
+`Agentstration.Extensions.Foundry` is an autonomous process and is not started by the default Agentstration profile. Configure it explicitly with the project data-plane endpoint, an OpenAI/v1 inference base URL for later increments, and one authentication mode:
+
+| Setting | Meaning |
+| --- | --- |
+| `Foundry:ProjectEndpoint` | HTTPS project endpoint ending in `/api/projects/{project-name}` |
+| `Foundry:InferenceEndpoint` | HTTPS resource `/openai/v1` or project `/api/projects/{project-name}/openai/v1` base URL |
+| `Foundry:AuthenticationMode` | Required: `ApiKeyEnvironment`, `ManagedIdentity`, `WorkloadIdentity`, or `Development` |
+| `Foundry:ManagedIdentityClientId` | Optional user-assigned client ID, only in `ManagedIdentity` mode |
+| `FOUNDRY_API_KEY` | Temporary environment-only key, required only in `ApiKeyEnvironment` mode; never commit or place in appsettings |
+| `Foundry:AllowedPrivateHosts` | Optional comma-separated list of configured endpoint DNS hosts allowed to resolve to private addresses; link-local remains blocked |
+| `Foundry:MaximumDiscoveryPages`, `Foundry:MaximumDiscoveredModels`, `Foundry:MaximumDiscoveryResponseBytes`, `Foundry:RequestTimeoutSeconds` | Bounded discovery and timeout overrides |
+
+`Development` uses Azure CLI identity explicitly; `ManagedIdentity` and `WorkloadIdentity` do not fall back to developer identities. Workload mode requires `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and an existing `AZURE_FEDERATED_TOKEN_FILE`. Entra discovery requests use the `https://ai.azure.com/.default` scope. The inference scope will be checked with the selected endpoint route in FR-446. The temporary environment key is read at process startup, so rotate it by restarting this extension; FR-452 will replace this with late-bound Agentstration Secret access.
+
+The extension currently publishes AEP identity, provider health and model listing only. Chat/streaming capability is reported as unavailable until FR-446/FR-450. Discovery calls `GET {projectEndpoint}/deployments?api-version=v1&deploymentType=ModelDeployment`, follows only same-origin, same-path bounded continuations, and lists deployments only when their metadata affirmatively reports chat capability. Publisher, model and version are exposed as bounded safe metadata; unknown model features are not advertised.
+
+No Azure account, key or live model is needed for the default test suite. The optional live test requires a pre-existing project with read access and never creates, updates or deletes Foundry resources. Do not enable AEP payload capture or log raw provider responses when using real credentials.
+
+## Release stages
+
+1. **Local developer preview:** explicit standalone extension against a test or existing Foundry project; no default bootstrap changes.
+2. **Secure orchestrated preview:** only after FR-449 and the opt-in topology/Console work of FR-451. AEP enrollment, scope and transport prerequisites #174, #175, #178, #179 and #180 are already delivered.
+3. **Manual remote extension:** only after the same security gate plus pairing prerequisites #176 and #177. Managed API-key use awaits FR-439/FR-452; the environment mode remains a documented temporary deployment mechanism.
+
+References: [Foundry project v1 REST API](https://learn.microsoft.com/en-us/rest/api/microsoft-foundry/aiproject), [OpenAI-compatible chat v1 API](https://learn.microsoft.com/en-us/azure/foundry/openai/latest).
