@@ -39,10 +39,27 @@ Initial registered names are:
 - `aep.source-provider`
 - `aep.tools`
 - `aep.configuration`
+- `aep.secret-requirements`
 
 Unknown names are preserved. Each capability evolves through its own version and may declare an endpoint and metadata. The manifest is the only input an Inspector needs to decide which explorers to display.
 
 The model-provider capability currently uses `/aep/model-providers`. AEP tool contributions may map to MCP servers; MCP remains authoritative for tool schema and invocation.
+
+### Secret requirements
+
+An extension may declare logical Secret requirements in the discovery manifest. When the list is nonempty, it advertises `aep.secret-requirements` version `1.0`. This capability has no separate endpoint: `secretRequirements` in the manifest is the complete declaration. Extensions with no requirements omit both the capability and the list.
+
+```json
+{
+  "capabilities": { "aep.secret-requirements": { "version": "1.0" } },
+  "secretRequirements": [
+    { "id": "credential", "required": true, "description": "API credential" },
+    { "id": "proxy-auth", "required": false }
+  ]
+}
+```
+
+Each identifier is a stable extension-contract name: 1–64 characters, beginning with a lowercase ASCII letter, then lowercase letters, digits, `.`, `_` or `-`. Duplicate or invalid identifiers are rejected. `required` distinguishes a need that must be bound before use from an optional one; this declaration does not create a binding or authorize Secret access. A requirement has no Secret name, `SecretReference`, Vault, scope or value. Consumer bindings and runtime access belong to later protocol capabilities.
 
 ### Source providers
 

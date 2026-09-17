@@ -47,6 +47,8 @@ The Inspector provides:
 
 Extensions can publish immutable option-set versions and explicit directed migrations through `aep.configuration`. Consumers pin the option-set id, version, and schema digest; a newer preferred version does not silently reinterpret existing values. Migration requests validate every step before returning a new envelope. Secret annotations and schema-driven editing in the standalone Inspector remain future work.
 
+Extensions can also declare logical requirements through `AepExtensionOptions.SecretRequirements`. Discovery publishes them under the versioned `aep.secret-requirements` capability. These declarations contain identifiers and required/optional metadata only; consumer binding and runtime access are separate work.
+
 The `SourceProviderExtension` sample demonstrates the native `aep.source-provider` Resolve/Materialize lifecycle entirely offline. Source Provider configuration uses the versioned `source-channel` option scope, and materialization is bounded by archive size, entry count, expanded size, timeout, exact revision, and SHA-256 integrity checks. AEP does not interpret Source catalogs or expose acquisition as an MCP tool.
 
 ## Authenticate AEP traffic
