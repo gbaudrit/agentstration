@@ -1,0 +1,96 @@
+.tool-capability,
+.tool-contract {
+    margin-bottom: 16px;
+}
+
+.tool-capability p {
+    margin: 0;
+    max-width: 82ch;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}
+
+.tool-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    gap: 12px;
+}
+
+.tool-field {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+}
+
+.tool-field-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.tool-field-heading code {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.tool-field-required,
+.tool-field-optional {
+    padding: 3px 7px;
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 650;
+}
+
+.tool-field-required {
+    color: var(--primary);
+    background: var(--primary-soft);
+}
+
+.tool-field-optional {
+    color: var(--muted);
+    background: var(--surface);
+}
+
+.tool-field p {
+    margin: 8px 0 0;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.tool-field-type,
+.tool-contract-note {
+    color: var(--muted);
+}
+
+.tool-field-constraints {
+    margin: 10px 0 0;
+    padding-left: 18px;
+    color: var(--muted);
+    font-size: .8rem;
+    overflow-wrap: anywhere;
+}
+
+.tool-raw-schema {
+    margin-top: 16px;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+}
+
+.tool-raw-schema summary {
+    width: fit-content;
+    color: var(--primary);
+    cursor: pointer;
+}
+
+.tool-raw-schema pre {
+    max-height: 420px;
+    overflow: auto;
+    padding: 14px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    font-size: .78rem;
+}
