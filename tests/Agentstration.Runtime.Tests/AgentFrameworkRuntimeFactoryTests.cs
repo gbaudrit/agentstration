@@ -770,6 +770,31 @@ public sealed class AgentFrameworkRuntimeFactoryTests
     }
 
     [TestMethod]
+    public async Task AutomaticStreamingUsesNonStreamingChatWhenTheSelectedProviderCannotStream()
+    {
+        using var chatClient = new RecordingChatClient
+        {
+            Metadata = new ModelChatClientMetadata(
+                "foundry-profile", "foundry-deployment", "microsoft-foundry", "foundry", "Phi-4-reasoning",
+                ProviderCapabilities: new AgentRuntimeCapabilities(),
+                ModelCapabilities: new AgentRuntimeCapabilities(),
+                AdapterCapabilities: new AgentRuntimeCapabilities())
+        };
+        var runtime = await new AgentFrameworkRuntimeFactory(
+            new RecordingResolver(chatClient), NullLoggerFactory.Instance, new GenAiObservabilityOptions { Enabled = false })
+            .CreateAsync(Definition(), "revision-1", new AgentRuntimeContext(new EmptyToolCatalog()), default);
+        var events = new List<AgentExecutionEvent>();
+
+        await foreach (var item in runtime.ExecuteEventsAsync(new AgentExecutionRequest("hello"))) events.Add(item);
+
+        Assert.AreEqual(0, chatClient.StreamingCalls);
+        Assert.AreEqual(1, chatClient.Calls.Count);
+        Assert.AreEqual("Phi-4-reasoning", chatClient.Options?.ModelId);
+        Assert.AreEqual("OK", events.OfType<ExecutionCompleted>().Single().Result.Output);
+        Assert.AreEqual(RuntimeStreamingMode.Disabled, events.OfType<ExecutionCompleted>().Single().Result.EffectiveOptions?.Streaming);
+    }
+
+    [TestMethod]
     public async Task MafTelemetryIsEmittedWithoutPromptContent()
     {
         const string secretPrompt = "secret-customer-prompt";

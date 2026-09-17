@@ -15,7 +15,7 @@ public sealed class FoundryAepModelProvider(
         "microsoft-foundry",
         "Microsoft Foundry",
         new AepModelProviderCapabilities(
-            Chat: false,
+            Chat: true,
             Streaming: false,
             Tools: false,
             Thinking: false,
@@ -24,7 +24,7 @@ public sealed class FoundryAepModelProvider(
             ModelDiscovery: true));
 
     public Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken) =>
-        throw new AepServerException("not_implemented", "Foundry chat is not available in this extension increment.", 501);
+        FoundryChatCompletion.ExecuteAsync(httpClient, options, authenticator, request, cancellationToken);
 
     public async IAsyncEnumerable<AepChatUpdate> ChatStreamingAsync(
         AepChatRequest request,
@@ -182,6 +182,7 @@ public sealed class FoundryAepModelProvider(
             if (!string.Equals(capability.Name, "chat", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(capability.Name, "chatCompletion", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(capability.Name, "chatCompletions", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(capability.Name, "chat_completion", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(capability.Name, "chat_completions", StringComparison.OrdinalIgnoreCase)) continue;
             if (capability.Value.ValueKind == JsonValueKind.True
                 || capability.Value.ValueKind == JsonValueKind.String && string.Equals(capability.Value.GetString(), "true", StringComparison.OrdinalIgnoreCase))
