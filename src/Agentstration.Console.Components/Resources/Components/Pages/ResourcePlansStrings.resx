@@ -33,7 +33,7 @@
   <data name="PlanIdentity" xml:space="preserve"><value>Plan identity</value></data>
   <data name="Workspace" xml:space="preserve"><value>Workspace</value></data>
   <data name="StaleChangeSet" xml:space="preserve"><value>ChangeSet belongs to an earlier revision</value></data>
-  <data name="Rematerialize" xml:space="preserve"><value>Re-materialize</value></data>
+  <data name="Rematerialize" xml:space="preserve"><value>Refresh preview</value></data>
   <data name="CreateChangeSet" xml:space="preserve"><value>Create ChangeSet</value></data>
   <data name="Revalidate" xml:space="preserve"><value>Revalidate</value></data>
   <data name="Materialization" xml:space="preserve"><value>Current materialization</value></data>
@@ -178,7 +178,27 @@
   <data name="Activity.Archived" xml:space="preserve"><value>Archived</value></data>
   <data name="Activity.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
   <data name="BindingsTitle" xml:space="preserve"><value>Agent bindings</value></data>
-  <data name="BindingsIntro" xml:space="preserve"><value>Choose the model and runtime profiles for each planned agent before materializing.</value></data>
+  <data name="BindingsIntro" xml:space="preserve"><value>1. Choose a model profile and a runtime profile for each agent. Your choices are saved on this plan, even when you leave the page.</value></data>
+  <data name="BindingsProgress" xml:space="preserve"><value>{0} of {1} agents configured</value></data>
+  <data name="BindingsSavedAutomatically" xml:space="preserve"><value>Choices saved automatically · no resources are applied.</value></data>
+  <data name="BindingsSaving" xml:space="preserve"><value>Saving choices…</value></data>
+  <data name="BindingsNotSavedYet" xml:space="preserve"><value>Each choice will be saved automatically on this plan.</value></data>
+  <data name="BindingsSaveFailed" xml:space="preserve"><value>Could not save the choices. Retry without leaving the page.</value></data>
+  <data name="BindingsConflict" xml:space="preserve"><value>The plan or its choices changed elsewhere. Reload the profiles before continuing.</value></data>
+  <data name="ReloadBindings" xml:space="preserve"><value>Reload profiles</value></data>
+  <data name="RetrySaveBindings" xml:space="preserve"><value>Retry</value></data>
+  <data name="BindingsOutdated" xml:space="preserve"><value>The plan changed since your last choices. Select profiles for this revision.</value></data>
+  <data name="ReviewChangesAction" xml:space="preserve"><value>Review proposed changes</value></data>
+  <data name="ReviewPath" xml:space="preserve"><value>Review steps</value></data>
+  <data name="StepProfiles" xml:space="preserve"><value>Choose profiles</value></data>
+  <data name="StepProfilesHint" xml:space="preserve"><value>Choices saved on the plan</value></data>
+  <data name="StepPreview" xml:space="preserve"><value>Review preview</value></data>
+  <data name="StepPreviewHint" xml:space="preserve"><value>Calculated with chosen profiles</value></data>
+  <data name="StepChangeSet" xml:space="preserve"><value>Create ChangeSet</value></data>
+  <data name="StepChangeSetHint" xml:space="preserve"><value>Recorded proposal</value></data>
+  <data name="StepValidation" xml:space="preserve"><value>Validate</value></data>
+  <data name="StepValidationHint" xml:space="preserve"><value>Checks on recorded changes</value></data>
+  <data name="SavedChangeSetOption" xml:space="preserve"><value>Saved ChangeSet · Revision {0} · {1}</value></data>
   <data name="ModelProfile" xml:space="preserve"><value>Model profile</value></data>
   <data name="RuntimeProfile" xml:space="preserve"><value>Runtime profile</value></data>
   <data name="SelectProfile" xml:space="preserve"><value>Select a profile</value></data>
@@ -186,7 +206,7 @@
   <data name="CreateRuntimeProfile" xml:space="preserve"><value>Create a runtime profile to continue →</value></data>
   <data name="ReviewedBindings" xml:space="preserve"><value>Reviewed agent profiles</value></data>
   <data name="CurrentPreview" xml:space="preserve"><value>Current preview</value></data>
-  <data name="CurrentPreviewDescription" xml:space="preserve"><value>These changes use the selected profiles. Create the ChangeSet to save and validate them.</value></data>
+  <data name="CurrentPreviewDescription" xml:space="preserve"><value>2. This preview uses your saved profile choices. Create a ChangeSet to pin the proposal, then validate it.</value></data>
   <data name="CurrentPreviewBlockedDescription" xml:space="preserve"><value>Resolve the materialization issues before creating a ChangeSet.</value></data>
   <data name="PendingPreview" xml:space="preserve"><value>Profiles changed</value></data>
   <data name="PendingPreviewDescription" xml:space="preserve"><value>Finish selecting profiles to preview the corresponding changes.</value></data>

@@ -9,6 +9,8 @@ public interface IResourcePlansApiClient
     Task<ResourcePlanPage> ListPlansAsync(ResourcePlanStatus? status, int skip, int take, CancellationToken cancellationToken);
     Task<ResourcePlanSnapshot?> GetPlanAsync(Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(Guid id, CancellationToken cancellationToken);
+    Task<ResourcePlanBindingDraftSnapshot?> GetBindingsAsync(Guid id, CancellationToken cancellationToken);
+    Task<ResourcePlanBindingDraftSnapshot> SaveBindingsAsync(Guid id, SaveResourcePlanBindingsRequest request, string? expectedETag, CancellationToken cancellationToken);
     Task<ResourcePlanMaterialization> MaterializeAsync(Guid id, ResourcePlanMaterializationRequest request, CancellationToken cancellationToken);
     Task<ResourceChangeSetPage> ListChangeSetsAsync(Guid planId, int skip, int take, CancellationToken cancellationToken);
     Task<ResourceChangeSetSnapshot> CreateChangeSetAsync(Guid planId, ResourcePlanMaterializationRequest request, CancellationToken cancellationToken);
@@ -36,6 +38,21 @@ public sealed class ResourcePlansApiClient(HttpClient httpClient) : IResourcePla
 
     public Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(Guid id, CancellationToken cancellationToken) =>
         ReadListAsync<ResourcePlanActivity>($"{BasePath}/{id:D}/activities", cancellationToken);
+
+    public async Task<ResourcePlanBindingDraftSnapshot?> GetBindingsAsync(Guid id, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync($"{BasePath}/{id:D}/bindings", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        return await ReadSnapshotAsync<ResourcePlanBindingDraft, ResourcePlanBindingDraftSnapshot>(response, (value, etag) => new(value, etag), cancellationToken);
+    }
+
+    public async Task<ResourcePlanBindingDraftSnapshot> SaveBindingsAsync(Guid id, SaveResourcePlanBindingsRequest request, string? expectedETag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Put, $"{BasePath}/{id:D}/bindings") { Content = JsonContent.Create(request) };
+        if (expectedETag is not null) message.Headers.TryAddWithoutValidation("If-Match", expectedETag);
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        return await ReadSnapshotAsync<ResourcePlanBindingDraft, ResourcePlanBindingDraftSnapshot>(response, (value, etag) => new(value, etag), cancellationToken);
+    }
 
     public Task<ResourcePlanMaterialization> MaterializeAsync(Guid id, ResourcePlanMaterializationRequest request, CancellationToken cancellationToken) =>
         PostAsync<ResourcePlanMaterialization>($"{BasePath}/{id:D}/materializations", request, cancellationToken);

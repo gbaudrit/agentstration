@@ -7,6 +7,21 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   await page.locator('button[type="submit"]').click();
   await expect(page).toHaveURL(/\/$/);
 
+  const suffix = Date.now().toString(36);
+  const extensionName = `review-extension-${suffix}`;
+  const providerName = `review-provider-${suffix}`;
+  const modelName = `review-model-${suffix}`;
+  const runtimeName = `review-runtime-${suffix}`;
+  for (const [path, data] of [
+    ['/api/extensionregistrations', { name: extensionName, properties: { displayName: 'Review fixture extension', endpoint: `http://127.0.0.1:5199/health/${suffix}` } }],
+    ['/api/modelproviders', { name: providerName, properties: { displayName: 'Review fixture provider', extension: { name: extensionName }, contributionId: 'ollama' } }],
+    ['/api/modelprofiles', { name: modelName, properties: { displayName: 'Review fixture model', provider: { name: providerName }, model: { name: 'fixture-model' } } }],
+    ['/api/runtimeprofiles', { name: runtimeName, properties: { displayName: 'Review fixture runtime', runtimeType: 'microsoft-agent-framework' } }],
+  ]) {
+    const response = await page.request.post(path, { data });
+    expect(response.status(), await response.text()).toBe(201);
+  }
+
   const title = `Playwright review ${Date.now()}`;
   const content = {
     solution: { summary: 'Route support requests', outcomes: ['Requests are triaged'] },
@@ -29,20 +44,34 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   const row = page.locator('tr', { hasText: title });
   await expect(row).toBeVisible({ timeout: 30_000 });
   await row.getByRole('link', { name: title }).click();
-  await expect(page.getByRole('tab')).toHaveCount(5);
+  await expect(page.getByRole('tab')).toHaveCount(5, { timeout: 30_000 });
   await expect(page.getByText('Route support requests')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Re-materialize' }).click();
-  await expect(page.locator('.resource-plan-materialization')).toContainText('Choose both profiles for this agent.');
+  await expect(page.getByRole('button', { name: 'Refresh preview' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Create ChangeSet' })).toBeDisabled();
   const model = page.getByRole('combobox', { name: 'Triage agent · Model profile' });
   const runtime = page.getByRole('combobox', { name: 'Triage agent · Runtime profile' });
-  if (await model.locator('option:not([value=""]):not([disabled])').count() === 0 || await runtime.locator('option:not([value=""])').count() === 0) return;
-  await model.selectOption(await model.locator('option:not([value=""]):not([disabled])').first().getAttribute('value'));
-  await runtime.selectOption(await runtime.locator('option:not([value=""])').first().getAttribute('value'));
-  await page.getByRole('button', { name: 'Re-materialize' }).click();
+  const modelChoice = await model.locator('option', { hasText: modelName }).getAttribute('value');
+  const runtimeChoice = await runtime.locator('option', { hasText: runtimeName }).getAttribute('value');
+  await model.selectOption(modelChoice);
+  await expect(page.locator('.resource-plan-binding-progress')).toContainText('Choices saved automatically');
+  const partialDraft = await page.request.get(`/api/resource-plans/${plan.id.value}/bindings`);
+  expect(partialDraft.ok(), await partialDraft.text()).toBeTruthy();
+  expect((await partialDraft.json()).bindings[0].modelProfile.name).toBe(modelName);
+  await page.getByRole('link', { name: 'Back to plans' }).click();
+  await page.locator('tr', { hasText: title }).getByRole('link', { name: title }).click();
+  await expect(page.getByRole('combobox', { name: 'Triage agent · Model profile' })).toHaveValue(modelChoice);
+  await expect(page.getByRole('combobox', { name: 'Triage agent · Runtime profile' })).toHaveValue('');
+  await page.getByRole('combobox', { name: 'Triage agent · Runtime profile' }).selectOption(runtimeChoice);
   await expect(page.getByRole('button', { name: 'Create ChangeSet' })).toBeEnabled();
+  await page.getByRole('link', { name: 'Back to plans' }).click();
+  await page.locator('tr', { hasText: title }).getByRole('link', { name: title }).click();
+  await expect(page.getByRole('combobox', { name: 'Triage agent · Model profile' })).toHaveValue(modelChoice);
+  await expect(page.getByRole('combobox', { name: 'Triage agent · Runtime profile' })).toHaveValue(runtimeChoice);
+  await page.getByRole('button', { name: 'Review proposed changes' }).click();
+  await expect(page.locator('.resource-plan-review-notice')).toContainText('Current preview');
   await page.getByRole('button', { name: 'Create ChangeSet' }).click();
+  await expect(page.locator('.form-alert[role="status"]')).toContainText('ChangeSet ready for review.');
   await expect(page.locator('.resource-plan-change')).toHaveCount(2);
   await expect(page.getByText('Create', { exact: true }).first()).toBeVisible();
   await expect(page.locator('.resource-plan-change-summary')).toContainText('2');
@@ -75,8 +104,9 @@ test('review a Resource Plan from intent through changes, graph, validation, act
     data: { title, goal: 'Improve support routing again', content: { schemaVersion: 'resource-planning.agentstration.io/v1', document: content } },
   });
   expect(refined.ok()).toBeTruthy();
-  await page.getByRole('button', { name: 'Refresh' }).click();
-  await expect(page.getByText('ChangeSet belongs to an earlier revision')).toBeVisible();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled({ timeout: 30_000 });
+  await expect(page.getByText('ChangeSet belongs to an earlier revision')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: 'Revalidate' })).toBeDisabled();
 
   await page.setViewportSize({ width: 390, height: 844 });

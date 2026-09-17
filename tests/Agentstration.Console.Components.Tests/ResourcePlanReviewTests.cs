@@ -189,6 +189,10 @@ public sealed class ResourcePlanReviewTests
         var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
         rendered.WaitForElement(".resource-plan-binding-card");
         rendered.FindAll(".resource-plan-binding-card select")[0].Change("0");
+        var partiallyReopened = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
+        partiallyReopened.WaitForAssertion(() => Assert.Contains("0 of 1 agents configured", partiallyReopened.Markup, StringComparison.Ordinal));
+        Assert.AreEqual("0", partiallyReopened.FindAll(".resource-plan-binding-card select")[0].GetAttribute("value"));
+        Assert.AreEqual("", partiallyReopened.FindAll(".resource-plan-binding-card select")[1].GetAttribute("value"));
         rendered.FindAll(".resource-plan-binding-card select")[1].Change("0");
         rendered.WaitForAssertion(() => Assert.IsTrue(client.LastMaterializationRequest?.Bindings.Count == 1));
         var binding = client.LastMaterializationRequest!.Bindings.Single();
@@ -196,6 +200,12 @@ public sealed class ResourcePlanReviewTests
         Assert.AreEqual("model-a", binding.ModelProfile.Name);
         Assert.AreEqual("runtime-a", binding.RuntimeProfile.Name);
         Assert.AreEqual(ResourceScopeRef.Workspace(Scope.WorkspaceId.Value), binding.ModelProfile.ScopeRef);
+        var reopened = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
+        reopened.WaitForAssertion(() => Assert.Contains("1 of 1 agents configured", reopened.Markup, StringComparison.Ordinal));
+        Assert.AreEqual("0", reopened.FindAll(".resource-plan-binding-card select")[0].GetAttribute("value"));
+        Assert.AreEqual("0", reopened.FindAll(".resource-plan-binding-card select")[1].GetAttribute("value"));
+        reopened.Find("#tab-Changes").Click();
+        Assert.Contains("Current preview", reopened.Markup, StringComparison.Ordinal);
         rendered.Find("#tab-Changes").Click();
         Assert.Contains("Current preview", rendered.Markup, StringComparison.Ordinal);
         Assert.Contains("model-a", rendered.Find(".resource-plan-change-highlights").TextContent, StringComparison.Ordinal);
@@ -268,12 +278,20 @@ public sealed class ResourcePlanReviewTests
     private sealed class FakeClient(ResourceChangeSetSnapshot set, bool blockOnValidate = false, bool supportMaterialization = false) : IResourcePlansApiClient
     {
         private IReadOnlyList<ResourceChangeSetValidation> validations = [Validation(set.Value, "old-digest")];
+        private ResourcePlanBindingDraftSnapshot? savedBindings;
         public int ValidationCalls { get; private set; }
         public ResourcePlanMaterializationRequest? LastMaterializationRequest { get; private set; }
         public ResourcePlanMaterializationRequest? LastChangeSetRequest { get; private set; }
         public Task<ResourcePlanPage> ListPlansAsync(ResourcePlanStatus? status, int skip, int take, CancellationToken cancellationToken) => Task.FromResult(new ResourcePlanPage([new(Plan, "\"plan\"")], false));
         public Task<ResourcePlanSnapshot?> GetPlanAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<ResourcePlanSnapshot?>(id == Plan.Id.Value ? new(Plan, "\"plan\"") : null);
         public Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResourcePlanActivity>>([new(Guid.NewGuid(), Plan.Id, Scope, 1, ResourcePlanActivityType.Created, Guid.NewGuid(), null, DateTimeOffset.UnixEpoch)]);
+        public Task<ResourcePlanBindingDraftSnapshot?> GetBindingsAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(savedBindings);
+        public Task<ResourcePlanBindingDraftSnapshot> SaveBindingsAsync(Guid id, SaveResourcePlanBindingsRequest request, string? expectedETag, CancellationToken cancellationToken)
+        {
+            if (savedBindings?.ETag != expectedETag) throw new InvalidOperationException("stale bindings");
+            savedBindings = new(new(Plan.Id, Scope, request.PlanRevision, request.Bindings, DateTimeOffset.UnixEpoch), "\"saved\"");
+            return Task.FromResult(savedBindings);
+        }
         public Task<ResourcePlanMaterialization> MaterializeAsync(Guid id, ResourcePlanMaterializationRequest request, CancellationToken cancellationToken)
         {
             if (!supportMaterialization) throw new NotSupportedException();

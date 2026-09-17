@@ -10,6 +10,7 @@ public sealed class ResourcePlanningDbContext(DbContextOptions<ResourcePlanningD
 {
     internal DbSet<ResourcePlanDocument> Plans => Set<ResourcePlanDocument>();
     internal DbSet<ResourcePlanActivityDocument> Activities => Set<ResourcePlanActivityDocument>();
+    internal DbSet<ResourcePlanBindingDraftDocument> BindingDrafts => Set<ResourcePlanBindingDraftDocument>();
     internal DbSet<ResourceChangeSetDocument> ChangeSets => Set<ResourceChangeSetDocument>();
     internal DbSet<ResourceChangeSetValidationDocument> Validations => Set<ResourceChangeSetValidationDocument>();
 
@@ -30,6 +31,12 @@ public sealed class ResourcePlanningDbContext(DbContextOptions<ResourcePlanningD
         activity.Property(value => value.Payload).IsRequired();
         activity.Property(value => value.CreatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         activity.HasIndex(value => new { value.TenantId, value.WorkspaceId, value.PlanId, value.CreatedAt, value.Id });
+
+        var bindings = modelBuilder.Entity<ResourcePlanBindingDraftDocument>();
+        bindings.ToTable("ResourcePlanBindingDrafts");
+        bindings.HasKey(value => new { value.WorkspaceId, value.PlanId });
+        bindings.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
+        bindings.Property(value => value.Payload).IsRequired();
 
         var changeSet = modelBuilder.Entity<ResourceChangeSetDocument>();
         changeSet.ToTable("ResourceChangeSets");
@@ -72,6 +79,15 @@ internal sealed class ResourcePlanActivityDocument
     public long PlanRevision { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public required string Payload { get; set; }
+}
+
+internal sealed class ResourcePlanBindingDraftDocument
+{
+    public Guid TenantId { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public Guid PlanId { get; set; }
+    public required string Payload { get; set; }
+    public required string ETag { get; set; }
 }
 
 internal sealed class ResourceChangeSetDocument
@@ -179,6 +195,38 @@ public sealed class PostgreSqlResourcePlanRepository(
                 value.TenantId == scope.TenantId && value.WorkspaceId == scope.WorkspaceId.Value && value.PlanId == id.Value)
             .OrderBy(value => value.CreatedAt).ThenBy(value => value.Id).Select(value => value.Payload).ToArrayAsync(cancellationToken);
         return payloads.Select(Deserialize<ResourcePlanActivity>).ToArray();
+    }
+
+    public async Task<ResourcePlanBindingDraftSnapshot?> GetBindingsAsync(ResourcePlanScope scope, ResourcePlanId id, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var value = await context.BindingDrafts.AsNoTracking().SingleOrDefaultAsync(item =>
+            item.TenantId == scope.TenantId && item.WorkspaceId == scope.WorkspaceId.Value && item.PlanId == id.Value, cancellationToken);
+        return value is null ? null : new(Deserialize<ResourcePlanBindingDraft>(value.Payload), value.ETag);
+    }
+
+    public async Task<ResourcePlanBindingDraftSnapshot> SaveBindingsAsync(ResourcePlanBindingDraft draft, string? expectedETag, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var value = await context.BindingDrafts.SingleOrDefaultAsync(item =>
+            item.TenantId == draft.Scope.TenantId && item.WorkspaceId == draft.Scope.WorkspaceId.Value && item.PlanId == draft.PlanId.Value, cancellationToken);
+        if (value?.ETag != expectedETag) throw new ResourcePlanConcurrencyException("Profile selections changed. Reload the plan before editing them.");
+        if (value is null)
+        {
+            value = new()
+            {
+                TenantId = draft.Scope.TenantId,
+                WorkspaceId = draft.Scope.WorkspaceId.Value,
+                PlanId = draft.PlanId.Value,
+                Payload = string.Empty,
+                ETag = NewETag()
+            };
+            context.BindingDrafts.Add(value);
+        }
+        else value.ETag = NewETag();
+        value.Payload = JsonSerializer.Serialize(draft, JsonOptions);
+        await SaveCreateAsync(context, cancellationToken);
+        return new(draft, value.ETag);
     }
 
     public async Task<ResourceChangeSetSnapshot> CreateAsync(ResourceChangeSet changeSet, CancellationToken cancellationToken)

@@ -22,6 +22,8 @@ public static class ResourcePlanningApiModule
         plans.MapPut("/{id:guid}", RefineAsync).Produces<ResourcePlan>().WithSummary("Refine a Resource Plan").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         plans.MapPost("/{id:guid}/status", ChangeStatusAsync).Produces<ResourcePlan>().WithSummary("Change Resource Plan status").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         plans.MapGet("/{id:guid}/activities", ListActivitiesAsync).Produces<ResourcePlanActivity[]>().WithSummary("List Resource Plan activities").RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapGet("/{id:guid}/bindings", GetBindingsAsync).Produces<ResourcePlanBindingDraft>().WithSummary("Get saved profile selections").RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapPut("/{id:guid}/bindings", SaveBindingsAsync).Produces<ResourcePlanBindingDraft>().WithSummary("Save profile selections for the current plan revision").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         plans.MapPost("/validate-content", ValidateContent).Produces<PlanningValidationResult>().WithSummary("Validate functional planning content").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         plans.MapPost("/{id:guid}/materializations", MaterializeAsync).Produces<ResourcePlanMaterialization>().WithSummary("Materialize a Resource Plan").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         plans.MapPost("/{id:guid}/change-sets", CreateChangeSetAsync).Produces<ResourceChangeSet>(StatusCodes.Status201Created).WithSummary("Create a Resource ChangeSet").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
@@ -104,6 +106,25 @@ public static class ResourcePlanningApiModule
         ICurrentRequestContext context,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
             Results.Ok(await service.ListActivitiesAsync(Scope(RequireWorkspace(context)), new(id), cancellationToken)));
+
+    private static Task<IResult> GetBindingsAsync(Guid id, HttpResponse response, ResourcePlanService service,
+        ICurrentRequestContext context, CancellationToken cancellationToken) => ExecuteAsync(async () =>
+    {
+        var draft = await service.GetBindingsAsync(Scope(RequireWorkspace(context)), new(id), cancellationToken);
+        if (draft is null) return Results.NotFound(Problem("resource_plan_bindings_not_found", "No profile selections have been saved.", StatusCodes.Status404NotFound));
+        response.Headers.ETag = draft.ETag;
+        return Results.Ok(draft.Value);
+    });
+
+    private static Task<IResult> SaveBindingsAsync(Guid id, SaveResourcePlanBindingsRequest request,
+        HttpRequest httpRequest, HttpResponse response, ResourcePlanService service,
+        ICurrentRequestContext context, CancellationToken cancellationToken) => ExecuteAsync(async () =>
+    {
+        var draft = await service.SaveBindingsAsync(Scope(RequireWorkspace(context)), new(id), request,
+            httpRequest.Headers.IfMatch.ToString() is { Length: > 0 } etag ? etag : null, cancellationToken);
+        response.Headers.ETag = draft.ETag;
+        return Results.Ok(draft.Value);
+    });
 
     private static RequestContext RequireWorkspace(ICurrentRequestContext context) =>
         context.IsInitialized ? context.Current : throw new UnauthorizedAccessException("A Workspace request context is required.");

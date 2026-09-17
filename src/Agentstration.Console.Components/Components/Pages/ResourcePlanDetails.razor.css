@@ -45,6 +45,18 @@
 .resource-plan-binding-card small { margin-top: .25rem; color: var(--muted); }
 .resource-plan-binding-card label span { margin-bottom: .4rem; font-size: .8rem; font-weight: 700; }
 .resource-plan-binding-card select { width: 100%; min-width: 0; }
+.resource-plan-binding-progress { display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem 1rem; margin: 0 0 .8rem; padding: .75rem 1rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface-2); font-size: .82rem; }
+.resource-plan-binding-progress strong { color: var(--primary); }
+.resource-plan-binding-progress span { color: var(--muted); }
+.resource-plan-review-path { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; margin: 0 0 1.25rem; padding: 0; list-style: none; }
+.resource-plan-review-path li { display: flex; gap: .65rem; min-width: 0; padding: .8rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface); }
+.resource-plan-review-path li > span { display: grid; place-items: center; flex: none; width: 1.65rem; height: 1.65rem; border-radius: .5rem; background: var(--surface-2); color: var(--muted); font-size: .78rem; font-weight: 800; }
+.resource-plan-review-path li.is-done > span { background: var(--primary-soft); color: var(--primary); }
+.resource-plan-review-path strong, .resource-plan-review-path small { display: block; }
+.resource-plan-review-path strong { font-size: .78rem; }
+.resource-plan-review-path small { margin-top: .2rem; color: var(--muted); font-size: .7rem; line-height: 1.35; }
+@media (max-width: 850px) { .resource-plan-review-path { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 500px) { .resource-plan-review-path { grid-template-columns: 1fr; } }
 .resource-plan-reviewed-bindings { margin: 1rem 0 1.4rem; padding: 1rem 1.2rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface-2); }
 .resource-plan-reviewed-bindings h3 { margin: 0 0 .6rem; font-size: .9rem; }
 .resource-plan-reviewed-bindings p { display: flex; flex-wrap: wrap; gap: .35rem .75rem; margin: .35rem 0; font-size: .8rem; }

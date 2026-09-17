@@ -54,6 +54,47 @@ public sealed class ResourcePlanServiceTests
     }
 
     [TestMethod]
+    public async Task ProfileSelectionsSurviveRepositoryReloadAndRespectScopeRevisionAndETag()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ResourcePlanningDbContext>().UseSqlite(connection).Options;
+        var repository = new SqliteResourcePlanRepository(new TestDbContextFactory(options));
+        var service = new ResourcePlanService(repository, TimeProvider.System, new FunctionalResourcePlanValidator());
+        await service.InitializeAsync(default);
+        await using (var drop = connection.CreateCommand())
+        {
+            drop.CommandText = "DROP TABLE ResourcePlanBindingDrafts";
+            await drop.ExecuteNonQueryAsync();
+        }
+        await service.InitializeAsync(default); // Existing local databases acquire the new table.
+        var content = FunctionalResourcePlanSerializer.Serialize(new FunctionalResourcePlanV1
+        {
+            Solution = new("Triage requests", ["A qualified request"]),
+            Roles = [new("triage", "Triage", "Qualify", ["Classify"], ["Text analysis"])]
+        });
+        var created = await service.CreateAsync(Scope, new("Support", "Triage requests", null, content), Actor, default);
+        var selected = new ResourcePlanAgentBindingSelection("triage", new("model-a"), null);
+        var saved = await service.SaveBindingsAsync(Scope, created.Value.Id, new(created.Value.Revision, [selected]), null, default);
+        var reopened = new ResourcePlanService(new SqliteResourcePlanRepository(new TestDbContextFactory(options)), TimeProvider.System, new FunctionalResourcePlanValidator());
+        Assert.AreEqual("model-a", (await reopened.GetBindingsAsync(Scope, created.Value.Id, default))!.Value.Bindings.Single().ModelProfile!.Name);
+        await Assert.ThrowsAsync<ResourcePlanNotFoundException>(() => reopened.GetBindingsAsync(
+            Scope with { WorkspaceId = new WorkspaceId(Guid.NewGuid()) }, created.Value.Id, default));
+        await Assert.ThrowsAsync<ResourcePlanConcurrencyException>(() => reopened.SaveBindingsAsync(Scope, created.Value.Id,
+            new(created.Value.Revision, [selected]), null, default));
+        await Assert.ThrowsAsync<ArgumentException>(() => reopened.SaveBindingsAsync(Scope, created.Value.Id,
+            new(created.Value.Revision, [selected, selected]), saved.ETag, default));
+        var updated = await reopened.SaveBindingsAsync(Scope, created.Value.Id,
+            new(created.Value.Revision, [selected with { RuntimeProfile = new("runtime-a") }]), saved.ETag, default);
+        Assert.AreEqual("runtime-a", updated.Value.Bindings.Single().RuntimeProfile!.Name);
+        var refined = await service.RefineAsync(Scope, created.Value.Id,
+            new("Support", "Triage requests", null, content), created.ETag, Actor, default);
+        await Assert.ThrowsAsync<ResourcePlanConcurrencyException>(() => reopened.SaveBindingsAsync(Scope, created.Value.Id,
+            new(created.Value.Revision, [selected]), updated.ETag, default));
+        Assert.AreEqual(2, refined.Value.Revision);
+    }
+
+    [TestMethod]
     public async Task AppliedPlanCanOnlyBeArchived()
     {
         var repository = new MemoryRepository();
@@ -83,6 +124,7 @@ public sealed class ResourcePlanServiceTests
     {
         private readonly Dictionary<ResourcePlanId, ResourcePlanSnapshot> plans = [];
         private readonly List<ResourcePlanActivity> activities = [];
+        private ResourcePlanBindingDraftSnapshot? bindings;
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<ResourcePlanSnapshot> CreateAsync(ResourcePlan plan, CancellationToken cancellationToken) { var value = new ResourcePlanSnapshot(plan, ETag()); plans.Add(plan.Id, value); return Task.FromResult(value); }
         public Task<ResourcePlanSnapshot?> GetAsync(ResourcePlanScope scope, ResourcePlanId id, CancellationToken cancellationToken) => Task.FromResult(plans.TryGetValue(id, out var value) && value.Value.Scope == scope ? value : null);
@@ -90,6 +132,13 @@ public sealed class ResourcePlanServiceTests
         public Task<ResourcePlanSnapshot> UpdateAsync(ResourcePlan plan, string expectedETag, CancellationToken cancellationToken) { if (!plans.TryGetValue(plan.Id, out var current)) throw new ResourcePlanNotFoundException(plan.Id); if (current.ETag != expectedETag) throw new ResourcePlanConcurrencyException("stale"); var value = new ResourcePlanSnapshot(plan, ETag()); plans[plan.Id] = value; return Task.FromResult(value); }
         public Task AddActivityAsync(ResourcePlanActivity activity, CancellationToken cancellationToken) { activities.Add(activity); return Task.CompletedTask; }
         public Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(ResourcePlanScope scope, ResourcePlanId id, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResourcePlanActivity>>(activities.Where(value => value.Scope == scope && value.PlanId == id).ToArray());
+        public Task<ResourcePlanBindingDraftSnapshot?> GetBindingsAsync(ResourcePlanScope scope, ResourcePlanId id, CancellationToken cancellationToken) => Task.FromResult(bindings?.Value.Scope == scope && bindings.Value.PlanId == id ? bindings : null);
+        public Task<ResourcePlanBindingDraftSnapshot> SaveBindingsAsync(ResourcePlanBindingDraft draft, string? expectedETag, CancellationToken cancellationToken)
+        {
+            if (bindings?.ETag != expectedETag) throw new ResourcePlanConcurrencyException("stale");
+            bindings = new(draft, ETag());
+            return Task.FromResult(bindings);
+        }
         private static string ETag() => $"\"{Guid.NewGuid():N}\"";
     }
 }

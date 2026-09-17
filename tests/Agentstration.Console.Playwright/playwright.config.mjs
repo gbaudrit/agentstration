@@ -1,4 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const dataDirectory = join(tmpdir(), 'agentstration-console-playwright', String(process.pid));
 
 export default defineConfig({
   testDir: '.',
@@ -17,6 +21,11 @@ export default defineConfig({
     timeout: 180_000,
     reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === '1',
     env: {
+      Data__Directory: dataDirectory,
+      Data__ControlPlanePath: join(dataDirectory, 'control-plane.db'),
+      Data__WorkPlanePath: join(dataDirectory, 'work-plane.db'),
+      Data__FlowPath: join(dataDirectory, 'flow-plane.db'),
+      Logging__EventLog__LogLevel__Default: 'None',
       AI__Provider: 'Deterministic',
       Agentstration__ManagementApi__BaseAddress: 'http://localhost:5199/',
       Agentstration__RuntimeApi__BaseAddress: 'http://localhost:5199/',

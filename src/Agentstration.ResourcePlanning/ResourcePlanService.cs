@@ -9,6 +9,7 @@ public sealed class ResourcePlanService(
     TimeProvider timeProvider,
     IResourcePlanContentValidator contentValidator)
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     public Task InitializeAsync(CancellationToken cancellationToken) => repository.InitializeAsync(cancellationToken);
 
     public async Task<ResourcePlanSnapshot> CreateAsync(
@@ -113,6 +114,30 @@ public sealed class ResourcePlanService(
 
     public Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(ResourcePlanScope scope, ResourcePlanId id, CancellationToken cancellationToken) =>
         repository.ListActivitiesAsync(scope, id, cancellationToken);
+
+    public async Task<ResourcePlanBindingDraftSnapshot?> GetBindingsAsync(ResourcePlanScope scope, ResourcePlanId id, CancellationToken cancellationToken)
+    {
+        _ = await RequireAsync(scope, id, cancellationToken);
+        return await repository.GetBindingsAsync(scope, id, cancellationToken);
+    }
+
+    public async Task<ResourcePlanBindingDraftSnapshot> SaveBindingsAsync(ResourcePlanScope scope, ResourcePlanId id,
+        SaveResourcePlanBindingsRequest request, string? expectedETag, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var plan = await RequireAsync(scope, id, cancellationToken);
+        if (plan.Value.Revision != request.PlanRevision)
+            throw new ResourcePlanConcurrencyException("The Resource Plan changed. Reload it before selecting profiles.");
+        if (plan.Value.Status is ResourcePlanStatus.Applied or ResourcePlanStatus.Archived or ResourcePlanStatus.Cancelled)
+            throw new ResourcePlanLifecycleException("resource_plan_bindings_closed", "This Resource Plan no longer accepts profile selections.");
+        var roles = plan.Value.Content.Document.Deserialize<FunctionalResourcePlanV1>(JsonOptions)?.Roles
+            .Select(value => value.LogicalId).ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
+        if (request.Bindings is null || request.Bindings.Count > roles.Count || request.Bindings.Any(value => !roles.Contains(value.LogicalId))
+            || request.Bindings.Select(value => value.LogicalId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != request.Bindings.Count)
+            throw new ArgumentException("Profile selections must refer to distinct roles in the current plan.", nameof(request));
+        var draft = new ResourcePlanBindingDraft(id, scope, plan.Value.Revision, request.Bindings.ToArray(), timeProvider.GetUtcNow());
+        return await repository.SaveBindingsAsync(draft, expectedETag, cancellationToken);
+    }
 
     private async Task<ResourcePlanSnapshot> RequireAsync(ResourcePlanScope scope, ResourcePlanId id, CancellationToken cancellationToken) =>
         await GetAsync(scope, id, cancellationToken) ?? throw new ResourcePlanNotFoundException(id);

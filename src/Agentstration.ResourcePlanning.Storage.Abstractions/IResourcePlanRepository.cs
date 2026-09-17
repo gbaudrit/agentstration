@@ -11,6 +11,8 @@ public interface IResourcePlanRepository
     Task<ResourcePlanSnapshot> UpdateAsync(ResourcePlan plan, string expectedETag, CancellationToken cancellationToken);
     Task AddActivityAsync(ResourcePlanActivity activity, CancellationToken cancellationToken);
     Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(ResourcePlanScope scope, ResourcePlanId id, CancellationToken cancellationToken);
+    Task<ResourcePlanBindingDraftSnapshot?> GetBindingsAsync(ResourcePlanScope scope, ResourcePlanId id, CancellationToken cancellationToken);
+    Task<ResourcePlanBindingDraftSnapshot> SaveBindingsAsync(ResourcePlanBindingDraft draft, string? expectedETag, CancellationToken cancellationToken);
 }
 
 public interface IResourceChangeSetRepository

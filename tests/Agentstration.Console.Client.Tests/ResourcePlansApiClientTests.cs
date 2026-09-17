@@ -40,6 +40,30 @@ public sealed class ResourcePlansApiClientTests
         Assert.IsFalse(requests.Any(value => value.Contains("workspace", StringComparison.OrdinalIgnoreCase) || value.Contains("tenant", StringComparison.OrdinalIgnoreCase)));
     }
 
+    [TestMethod]
+    public async Task ClientReadsAndUpdatesSavedBindingsWithETag()
+    {
+        var id = Guid.NewGuid();
+        var scope = new ResourcePlanScope(Guid.NewGuid(), new Agentstration.Resources.WorkspaceId(Guid.NewGuid()));
+        var draft = new ResourcePlanBindingDraft(new(id), scope, 2,
+            [new("triage", new("model-a"), new("runtime-a"))], DateTimeOffset.UnixEpoch);
+        string? sentETag = null;
+        using var http = new HttpClient(new Handler(request =>
+        {
+            Assert.AreEqual($"/api/resource-plans/{id:D}/bindings", request.RequestUri!.AbsolutePath);
+            if (request.Method == HttpMethod.Put) sentETag = request.Headers.IfMatch.ToString();
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(draft) };
+            response.Headers.ETag = new System.Net.Http.Headers.EntityTagHeaderValue("\"draft-a\"");
+            return response;
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new ResourcePlansApiClient(http);
+        Assert.AreEqual("model-a", (await client.GetBindingsAsync(id, default))!.Value.Bindings.Single().ModelProfile!.Name);
+        var saved = await client.SaveBindingsAsync(id, new(2, draft.Bindings), "\"draft-a\"", default);
+        Assert.AreEqual("\"draft-a\"", sentETag);
+        Assert.AreEqual("runtime-a", saved.Value.Bindings.Single().RuntimeProfile!.Name);
+    }
+
     private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => Task.FromResult(respond(request));

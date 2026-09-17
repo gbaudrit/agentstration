@@ -33,7 +33,7 @@
   <data name="PlanIdentity" xml:space="preserve"><value>Identité du plan</value></data>
   <data name="Workspace" xml:space="preserve"><value>Espace</value></data>
   <data name="StaleChangeSet" xml:space="preserve"><value>Jeu de changements d’une ancienne révision</value></data>
-  <data name="Rematerialize" xml:space="preserve"><value>Rematérialiser</value></data>
+  <data name="Rematerialize" xml:space="preserve"><value>Actualiser l’aperçu</value></data>
   <data name="CreateChangeSet" xml:space="preserve"><value>Créer un jeu de changements</value></data>
   <data name="Revalidate" xml:space="preserve"><value>Revalider</value></data>
   <data name="Materialization" xml:space="preserve"><value>Matérialisation actuelle</value></data>
@@ -178,7 +178,27 @@
   <data name="Activity.Archived" xml:space="preserve"><value>Archivage</value></data>
   <data name="Activity.Cancelled" xml:space="preserve"><value>Annulation</value></data>
   <data name="BindingsTitle" xml:space="preserve"><value>Profils des agents</value></data>
-  <data name="BindingsIntro" xml:space="preserve"><value>Choisissez les profils de modèle et d’exécution de chaque agent avant la matérialisation.</value></data>
+  <data name="BindingsIntro" xml:space="preserve"><value>1. Choisissez un profil de modèle et un profil d’exécution par agent. Vos choix sont enregistrés sur ce plan, même si vous quittez la page.</value></data>
+  <data name="BindingsProgress" xml:space="preserve"><value>{0} agent(s) sur {1} configuré(s)</value></data>
+  <data name="BindingsSavedAutomatically" xml:space="preserve"><value>Choix enregistrés automatiquement · aucune ressource n’est appliquée.</value></data>
+  <data name="BindingsSaving" xml:space="preserve"><value>Enregistrement des choix…</value></data>
+  <data name="BindingsNotSavedYet" xml:space="preserve"><value>Chaque choix sera enregistré automatiquement sur ce plan.</value></data>
+  <data name="BindingsSaveFailed" xml:space="preserve"><value>Enregistrement impossible. Réessayez sans quitter la page.</value></data>
+  <data name="BindingsConflict" xml:space="preserve"><value>Les choix ou le plan ont changé ailleurs. Rechargez les profils avant de continuer.</value></data>
+  <data name="ReloadBindings" xml:space="preserve"><value>Recharger les profils</value></data>
+  <data name="RetrySaveBindings" xml:space="preserve"><value>Réessayer</value></data>
+  <data name="BindingsOutdated" xml:space="preserve"><value>Le plan a changé depuis vos derniers choix. Sélectionnez les profils pour cette révision.</value></data>
+  <data name="ReviewChangesAction" xml:space="preserve"><value>Voir l’aperçu des changements</value></data>
+  <data name="ReviewPath" xml:space="preserve"><value>Étapes de la revue</value></data>
+  <data name="StepProfiles" xml:space="preserve"><value>Choisir les profils</value></data>
+  <data name="StepProfilesHint" xml:space="preserve"><value>Choix conservés sur le plan</value></data>
+  <data name="StepPreview" xml:space="preserve"><value>Examiner l’aperçu</value></data>
+  <data name="StepPreviewHint" xml:space="preserve"><value>Calculé avec les profils choisis</value></data>
+  <data name="StepChangeSet" xml:space="preserve"><value>Créer le jeu</value></data>
+  <data name="StepChangeSetHint" xml:space="preserve"><value>Proposition enregistrée</value></data>
+  <data name="StepValidation" xml:space="preserve"><value>Valider</value></data>
+  <data name="StepValidationHint" xml:space="preserve"><value>Contrôles sur le jeu enregistré</value></data>
+  <data name="SavedChangeSetOption" xml:space="preserve"><value>Jeu enregistré · Révision {0} · {1}</value></data>
   <data name="ModelProfile" xml:space="preserve"><value>Profil de modèle</value></data>
   <data name="RuntimeProfile" xml:space="preserve"><value>Profil d’exécution</value></data>
   <data name="SelectProfile" xml:space="preserve"><value>Choisir un profil</value></data>
@@ -186,7 +206,7 @@
   <data name="CreateRuntimeProfile" xml:space="preserve"><value>Créer un profil d’exécution pour continuer →</value></data>
   <data name="ReviewedBindings" xml:space="preserve"><value>Profils des agents examinés</value></data>
   <data name="CurrentPreview" xml:space="preserve"><value>Aperçu actuel</value></data>
-  <data name="CurrentPreviewDescription" xml:space="preserve"><value>Ces changements utilisent les profils sélectionnés. Créez le ChangeSet pour les enregistrer et les valider.</value></data>
+  <data name="CurrentPreviewDescription" xml:space="preserve"><value>2. Cet aperçu utilise vos profils enregistrés. Pour figer cette proposition, créez un jeu de changements ; vous pourrez ensuite le valider.</value></data>
   <data name="CurrentPreviewBlockedDescription" xml:space="preserve"><value>Corrigez les problèmes de matérialisation avant de créer un ChangeSet.</value></data>
   <data name="PendingPreview" xml:space="preserve"><value>Profils modifiés</value></data>
   <data name="PendingPreviewDescription" xml:space="preserve"><value>Terminez le choix des profils pour afficher les changements correspondants.</value></data>
