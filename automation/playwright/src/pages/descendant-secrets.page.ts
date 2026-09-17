@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 
 export type SecretResourceScope = 'tenant' | 'workspace';
@@ -46,9 +46,11 @@ export class DescendantSecretsPage {
   }
 
   public async createSecret(name: string, displayName: string, vaultName: string, vaultScopeRef: string): Promise<void> {
-    await this.page.getByTestId(TestIds.secretGrants.secretDisplayName).fill(displayName);
-    await this.page.getByTestId(TestIds.secretGrants.secretName).fill(name);
-    await this.page.getByTestId(TestIds.secretGrants.secretVaultKey).fill(name);
+    const displayNameInput = this.page.getByTestId(TestIds.secretGrants.secretDisplayName);
+    await displayNameInput.fill(displayName);
+    await displayNameInput.press('Tab');
+    await expect(this.page.getByTestId(TestIds.secretGrants.secretName)).toHaveValue(name);
+    await expect(this.page.getByTestId(TestIds.secretGrants.secretVaultKey)).toHaveValue(name);
     const option = await this.vaultOption(vaultName, vaultScopeRef);
     if (!option) throw new Error(`Vault '${vaultName}' at '${vaultScopeRef}' is not offered to this Secret.`);
     await this.page.getByTestId(TestIds.secretGrants.secretVault).selectOption(option);
