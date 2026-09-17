@@ -8,7 +8,7 @@ Prevented — 2026-09-17
 
 - Issue: [#458](https://github.com/gbaudrit/agentstration/issues/458)
 - Introducing change: commit `34f4213f` in [PR #274](https://github.com/gbaudrit/agentstration/pull/274)
-- Corrective pull request: Pending (branch `codex/458-tool-contract`)
+- Corrective pull request: [#465](https://github.com/gbaudrit/agentstration/pull/465)
 - Related ADRs: [ADR-0107](../decisions/0107-notification-channels-are-delivery-flows.md)
 
 ## Defect
