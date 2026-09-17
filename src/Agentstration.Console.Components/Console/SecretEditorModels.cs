@@ -1,7 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using Agentstration.Resources;
+using Agentstration.ResourceManagement;
 using Agentstration.Secrets;
 
 namespace Agentstration.Web.Console;
@@ -11,8 +13,10 @@ public sealed class VaultEditorModel
     [Required, RegularExpression("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")] public string Name { get; set; } = string.Empty;
     [Required] public string DisplayName { get; set; } = string.Empty;
     [Required] public string ProviderType { get; set; } = "local";
-    public VaultProperties Properties() => new() { DisplayName = DisplayName.Trim(), ProviderType = ProviderType.Trim().ToLowerInvariant() };
-    public static VaultEditorModel From(VaultResource value) => new() { Name = value.Name, DisplayName = value.Definition.DisplayName, ProviderType = value.Definition.ProviderType };
+    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; set; } = new Dictionary<string, JsonElement>();
+    public List<DescendantUseGrant> UseGrants { get; set; } = [];
+    public VaultProperties Properties() => new() { DisplayName = DisplayName.Trim(), ProviderType = ProviderType.Trim().ToLowerInvariant(), ProviderOptions = ProviderOptions, UsePolicy = new() { Grants = UseGrants.ToArray() } };
+    public static VaultEditorModel From(VaultResource value) => new() { Name = value.Name, DisplayName = value.Definition.DisplayName, ProviderType = value.Definition.ProviderType, ProviderOptions = value.Definition.ProviderOptions, UseGrants = value.Definition.UsePolicy.Grants.ToList() };
 }
 
 public sealed class SecretEditorModel
@@ -21,9 +25,12 @@ public sealed class SecretEditorModel
     [Required] public string DisplayName { get; set; } = string.Empty;
     public string? Description { get; set; }
     [Required] public string VaultName { get; set; } = string.Empty;
+    public ResourceScopeRef? VaultScopeRef { get; set; }
+    public ResourceNamespace? VaultNamespace { get; set; }
     [Required] public string Key { get; set; } = string.Empty;
-    public SecretProperties Properties(ResourceScopeRef? vaultScopeRef = null) => new() { DisplayName = DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(), Vault = new ResourceReference(VaultName, vaultScopeRef), Key = Key.Trim(), SecretType = SecretType.Opaque };
-    public static SecretEditorModel From(SecretResource value) => new() { Name = value.Name, DisplayName = value.Definition.DisplayName, Description = value.Definition.Description, VaultName = value.Definition.Vault.Name, Key = value.Definition.Key };
+    public List<DescendantUseGrant> UseGrants { get; set; } = [];
+    public SecretProperties Properties(ResourceScopeRef? defaultVaultScopeRef = null) => new() { DisplayName = DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(), Vault = new ResourceReference(VaultName, VaultScopeRef ?? defaultVaultScopeRef, VaultNamespace), Key = Key.Trim(), SecretType = SecretType.Opaque, UsePolicy = new() { Grants = UseGrants.ToArray() } };
+    public static SecretEditorModel From(SecretResource value) => new() { Name = value.Name, DisplayName = value.Definition.DisplayName, Description = value.Definition.Description, VaultName = value.Definition.Vault.Name, VaultScopeRef = value.Definition.Vault.ScopeRef ?? value.ScopeRef, VaultNamespace = value.Definition.Vault.Namespace, Key = value.Definition.Key, UseGrants = value.Definition.UsePolicy.Grants.ToList() };
 
     public static string IdentifierFromDisplayName(string? value)
     {

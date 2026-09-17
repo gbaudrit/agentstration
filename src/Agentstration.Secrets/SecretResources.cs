@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Resources;
+using Agentstration.ResourceManagement;
 
 namespace Agentstration.Secrets;
 
@@ -17,6 +18,7 @@ public sealed record VaultProperties
     public required string DisplayName { get; init; }
     public required string ProviderType { get; init; }
     public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+    public DescendantUsePolicy UsePolicy { get; init; } = new();
 }
 
 public sealed record VaultResource : Resource
@@ -31,6 +33,7 @@ public sealed record SecretProperties
     public required ResourceReference Vault { get; init; }
     public required string Key { get; init; }
     public SecretType SecretType { get; init; } = SecretType.Opaque;
+    public DescendantUsePolicy UsePolicy { get; init; } = new();
 }
 
 public sealed record SecretResource : Resource

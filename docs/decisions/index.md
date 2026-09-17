@@ -148,3 +148,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 116. [ADR-0116 — The Console BFF delegates short-lived API requests](0116-console-bff-delegates-short-lived-api-requests.md)
 117. [ADR-0117 — Browser journeys are product-owned reusable automation assets](0117-product-owned-browser-journeys.md)
 118. [ADR-0118 — Browser campaigns use dedicated Workspaces](0118-browser-campaigns-use-dedicated-workspaces.md)
+119. [ADR-0119 — Descendant use grants govern Secrets and Vaults](0119-descendant-use-grants-for-secrets-and-vaults.md)

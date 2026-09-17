@@ -23,6 +23,7 @@ public sealed class SecretLocalizationTests
 
             Assert.AreEqual("Créer un coffre", strings["CreateVault"].Value);
             Assert.AreEqual("Coffre indisponible", strings["Status.VaultUnavailable"].Value);
+            Assert.AreEqual("Accès des périmètres descendants", strings["DescendantAccess"].Value);
             Assert.AreEqual("Supprimer le secret « api-key » et sa valeur stockée ?", strings["DeleteSecretMessage", "api-key"].Value);
         }
         finally
