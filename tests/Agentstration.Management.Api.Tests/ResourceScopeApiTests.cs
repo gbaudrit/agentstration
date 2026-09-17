@@ -102,6 +102,9 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         grantRequest.Headers.IfMatch.ParseAdd(tenantVaultRead.Headers.ETag!.ToString());
         using var grantResponse = await client.SendAsync(grantRequest);
         Assert.AreEqual(HttpStatusCode.OK, grantResponse.StatusCode);
+        using var savedVaultResponse = await client.GetAsync($"/api/vaults/tenant-vault?scopeRef={Uri.EscapeDataString(tenant.ScopeRef.Value)}");
+        var savedVault = await savedVaultResponse.Content.ReadFromJsonAsync<VaultResponse>();
+        Assert.AreEqual(workspace.ScopeRef, savedVault?.Resource.Definition.UsePolicy.Grants.Single().ScopeRef);
 
         using var allowed = await client.PostAsJsonAsync("/api/secrets",
             new CreateSecretRequest("granted-workspace-secret", new SecretProperties
@@ -184,6 +187,9 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         grantRequest.Headers.IfMatch.ParseAdd(secretRead.Headers.ETag!.ToString());
         using var granted = await client.SendAsync(grantRequest);
         Assert.AreEqual(HttpStatusCode.OK, granted.StatusCode);
+        using var savedSecretResponse = await client.GetAsync($"/api/secrets/resolution-secret?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        var savedSecret = await savedSecretResponse.Content.ReadFromJsonAsync<SecretResponse>();
+        Assert.AreEqual(workspace, savedSecret?.Resource.Definition.UsePolicy.Grants.Single().ScopeRef);
 
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
         using (var resolved = await resolver.ResolveAsync(new SecretReference(address, tenant), context))
