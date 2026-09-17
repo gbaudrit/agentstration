@@ -182,7 +182,16 @@
   <data name="ModelProfile" xml:space="preserve"><value>Profil de modèle</value></data>
   <data name="RuntimeProfile" xml:space="preserve"><value>Profil d’exécution</value></data>
   <data name="SelectProfile" xml:space="preserve"><value>Choisir un profil</value></data>
+  <data name="CreateModelProfile" xml:space="preserve"><value>Créer un profil de modèle pour continuer →</value></data>
+  <data name="CreateRuntimeProfile" xml:space="preserve"><value>Créer un profil d’exécution pour continuer →</value></data>
   <data name="ReviewedBindings" xml:space="preserve"><value>Profils des agents examinés</value></data>
+  <data name="CurrentPreview" xml:space="preserve"><value>Aperçu actuel</value></data>
+  <data name="CurrentPreviewDescription" xml:space="preserve"><value>Ces changements utilisent les profils sélectionnés. Créez le ChangeSet pour les enregistrer et les valider.</value></data>
+  <data name="CurrentPreviewBlockedDescription" xml:space="preserve"><value>Corrigez les problèmes de matérialisation avant de créer un ChangeSet.</value></data>
+  <data name="PendingPreview" xml:space="preserve"><value>Profils modifiés</value></data>
+  <data name="PendingPreviewDescription" xml:space="preserve"><value>Terminez le choix des profils pour afficher les changements correspondants.</value></data>
+  <data name="RecordedChangeSet" xml:space="preserve"><value>ChangeSet enregistré</value></data>
+  <data name="PreviewRequiresChangeSet" xml:space="preserve"><value>Créez un ChangeSet à partir de l’aperçu actuel avant de le valider. Les ChangeSets enregistrés restent accessibles dans l’onglet Changements.</value></data>
   <data name="MaterializationDiagnostic.planning_binding_required" xml:space="preserve"><value>Choisissez les deux profils de cet agent.</value></data>
   <data name="MaterializationDiagnostic.planning_binding_not_found" xml:space="preserve"><value>Le profil choisi n’est pas disponible dans cet espace.</value></data>
   <data name="MaterializationDiagnostic.planning_binding_unavailable" xml:space="preserve"><value>Le profil choisi n’est pas prêt.</value></data>

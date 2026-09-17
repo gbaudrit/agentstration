@@ -137,6 +137,7 @@ public sealed class ResourcePlanReviewTests
 
         var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
         rendered.WaitForAssertion(() => Assert.Contains("Plans de ressources", context.Services.GetRequiredService<IStringLocalizer<ResourcePlansStrings>>()["Title"].Value, StringComparison.Ordinal));
+        Assert.Contains("Créer un profil de modèle pour continuer", rendered.Markup, StringComparison.Ordinal);
         rendered.FindAll("button").Single(value => value.TextContent.Contains("Revalider", StringComparison.Ordinal)).Click();
         rendered.WaitForAssertion(() =>
         {
@@ -176,7 +177,7 @@ public sealed class ResourcePlanReviewTests
     public void DetailPassesSelectedProfilesAndReviewedDigestToChangeSet()
     {
         using var culture = new TestCultureScope("en-US");
-        var set = ChangeSet(Plan.Revision, [Change(0, "triage", [], "Triage")]);
+        var set = ChangeSet(Plan.Revision, [Change(0, "triage", [], "Triage"), Change(1, "workflow", ["triage"], "Workflow")]);
         var client = new FakeClient(set, supportMaterialization: true);
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -189,13 +190,24 @@ public sealed class ResourcePlanReviewTests
         rendered.WaitForElement(".resource-plan-binding-card");
         rendered.FindAll(".resource-plan-binding-card select")[0].Change("0");
         rendered.FindAll(".resource-plan-binding-card select")[1].Change("0");
-        rendered.FindAll("button").Single(value => value.TextContent.Contains("Re-materialize", StringComparison.Ordinal)).Click();
         rendered.WaitForAssertion(() => Assert.IsTrue(client.LastMaterializationRequest?.Bindings.Count == 1));
         var binding = client.LastMaterializationRequest!.Bindings.Single();
         Assert.AreEqual("triage", binding.LogicalId);
         Assert.AreEqual("model-a", binding.ModelProfile.Name);
         Assert.AreEqual("runtime-a", binding.RuntimeProfile.Name);
         Assert.AreEqual(ResourceScopeRef.Workspace(Scope.WorkspaceId.Value), binding.ModelProfile.ScopeRef);
+        rendered.Find("#tab-Changes").Click();
+        Assert.Contains("Current preview", rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains("model-a", rendered.Find(".resource-plan-change-highlights").TextContent, StringComparison.Ordinal);
+        Assert.Contains("runtime-a", rendered.Find(".resource-plan-change-highlights").TextContent, StringComparison.Ordinal);
+        rendered.Find("#tab-Graph").Click();
+        Assert.AreEqual(1, rendered.FindAll(".topology-node").Count);
+        rendered.Find("#tab-Changes").Click();
+        rendered.Find("#change-set-select").Change(set.Value.Id.Value.ToString("D"));
+        Assert.Contains("Saved ChangeSet", rendered.Markup, StringComparison.Ordinal);
+        Assert.AreEqual(2, rendered.FindAll(".resource-plan-change").Count);
+        rendered.Find("#change-set-select").Change("preview");
+        Assert.Contains("model-a", rendered.Find(".resource-plan-change-highlights").TextContent, StringComparison.Ordinal);
         rendered.FindAll("button").Single(value => value.TextContent.Contains("Create ChangeSet", StringComparison.Ordinal)).Click();
         rendered.WaitForAssertion(() => Assert.AreEqual("reviewed", client.LastChangeSetRequest?.ExpectedDigest));
     }
@@ -266,7 +278,19 @@ public sealed class ResourcePlanReviewTests
         {
             if (!supportMaterialization) throw new NotSupportedException();
             LastMaterializationRequest = request;
-            return Task.FromResult(new ResourcePlanMaterialization(Plan.Id, Plan.Revision, ResourcePlanningContractVersions.V1, "1.1.0", Scope, [], [], "reviewed"));
+            var binding = request.Bindings.Single();
+            var resource = new PlannedResourceDocument("agentstration.io/v1", "Agent", ResourceScopeRef.Workspace(Scope.WorkspaceId.Value),
+                new ResourceMetadata { Name = binding.LogicalId }, JsonSerializer.SerializeToElement(new
+                {
+                    displayName = "Triage",
+                    modelProfile = new { name = binding.ModelProfile.Name, @namespace = "default" },
+                    runtimeProfile = new { name = binding.RuntimeProfile.Name, @namespace = "default" }
+                }));
+            ResourcePlanResolvedBinding[] evidence = [
+                new(binding.LogicalId, "modelProfile", binding.ModelProfile, Guid.NewGuid(), 1, "model", "model-digest"),
+                new(binding.LogicalId, "runtimeProfile", binding.RuntimeProfile, Guid.NewGuid(), 1, "runtime", "runtime-digest")];
+            return Task.FromResult(new ResourcePlanMaterialization(Plan.Id, Plan.Revision, ResourcePlanningContractVersions.V1, "1.1.0", Scope,
+                [new(binding.LogicalId, resource, ResourcePlanProposedOperation.Create, null, [], "proposed")], [], "reviewed", evidence));
         }
         public Task<ResourceChangeSetPage> ListChangeSetsAsync(Guid planId, int skip, int take, CancellationToken cancellationToken) => Task.FromResult(new ResourceChangeSetPage([set], false));
         public Task<ResourceChangeSetSnapshot> CreateChangeSetAsync(Guid planId, ResourcePlanMaterializationRequest request, CancellationToken cancellationToken)

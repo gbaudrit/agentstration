@@ -38,6 +38,8 @@
 .resource-plan-boundary { display: flex; align-items: baseline; gap: .6rem; margin: 0; padding: .95rem 2rem; border-top: 1px solid var(--border); color: var(--muted); font-size: .78rem; line-height: 1.5; }
 .resource-plan-bindings { padding: 1.5rem 2rem; border-top: 1px solid var(--border); }
 .resource-plan-binding-list { display: grid; gap: .8rem; }
+.resource-plan-binding-empty { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin: 0 0 1rem; }
+.resource-plan-binding-empty a { color: var(--primary); font-size: .85rem; font-weight: 700; }
 .resource-plan-binding-card { display: grid; grid-template-columns: minmax(10rem, 1fr) repeat(2, minmax(0, 1.4fr)); align-items: end; gap: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface-2); }
 .resource-plan-binding-card strong, .resource-plan-binding-card small, .resource-plan-binding-card label span { display: block; }
 .resource-plan-binding-card small { margin-top: .25rem; color: var(--muted); }
@@ -56,6 +58,8 @@
 .resource-plan-change-set-picker { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; margin-bottom: .75rem; }
 .resource-plan-change-set-picker label { font-weight: 700; }
 .resource-plan-change-set-picker select { max-width: 100%; }
+.resource-plan-review-notice { display: flex; flex-wrap: wrap; gap: .35rem .6rem; margin: .75rem 0 1rem; padding: .85rem 1rem; border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border)); border-radius: .65rem; background: color-mix(in srgb, var(--primary) 5%, var(--surface)); color: var(--text); font-size: .84rem; }
+.resource-plan-review-notice strong { color: var(--primary); }
 .resource-plan-change-set-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem 1rem; color: var(--muted); font-size: .8rem; }
 .resource-plan-change-set-meta details { position: relative; }
 .resource-plan-change-set-meta summary { color: var(--primary); cursor: pointer; }

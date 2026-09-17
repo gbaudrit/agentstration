@@ -21,7 +21,7 @@ else
     <div class="resource-plan-actions">
         <button class="button-secondary" type="button" @onclick="MaterializeAsync" disabled="@(!CanReview || busy || !CanMaterialize)">@T("Rematerialize")</button>
         <button class="button-secondary" type="button" @onclick="CreateChangeSetAsync" disabled="@(!CanReview || busy || materialization?.CanCreateChangeSet != true)">@T("CreateChangeSet")</button>
-        <button class="button-primary" type="button" @onclick="ValidateAsync" disabled="@(!CanReview || busy || selected is null || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))">@T("Revalidate")</button>
+        <button class="button-primary" type="button" @onclick="ValidateAsync" disabled="@(!CanReview || busy || !showRecordedChanges || selected is null || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))">@T("Revalidate")</button>
     </div>
     @if (materialization is not null)
     {
@@ -42,7 +42,7 @@ else
     </nav>
 
     <section class="panel resource-plan-view @(activeView == "Overview" ? "resource-plan-overview" : null)" role="tabpanel" id="panel-@activeView" aria-labelledby="tab-@activeView">
-        @if (activeView != "Overview" && selected is not null && ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))
+        @if (activeView != "Overview" && showRecordedChanges && selected is not null && ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))
         {
             <div class="resource-plan-stale-notice"><StatusBadge Text="@T("StaleChangeSet")" Status="UiStatus.Warning" /></div>
         }
@@ -103,12 +103,19 @@ else
                 {
                     <section class="resource-plan-bindings" aria-label="@T("BindingsTitle")">
                         <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ConcreteProposal")</p><h2>@T("BindingsTitle")</h2><p>@T("BindingsIntro")</p></div></div>
+                        @if (modelProfiles.Count == 0 || runtimeProfiles.Count == 0)
+                        {
+                            <p class="resource-plan-binding-empty">
+                                @if (modelProfiles.Count == 0) { <a href="/modelprofiles">@T("CreateModelProfile")</a> }
+                                @if (runtimeProfiles.Count == 0) { <a href="/runtimeprofiles">@T("CreateRuntimeProfile")</a> }
+                            </p>
+                        }
                         <div class="resource-plan-binding-list">
                             @foreach (var role in functional.Roles)
                             {
                                 <article class="resource-plan-binding-card">
                                     <div><strong>@role.DisplayName</strong><small>@role.LogicalId</small></div>
-                                    <label><span>@T("ModelProfile")</span><select aria-label="@($"{role.DisplayName} · {T("ModelProfile")}")" value="@SelectedModelIndex(role.LogicalId)" @onchange="args => SelectModel(role.LogicalId, args)" disabled="@busy">
+                                    <label><span>@T("ModelProfile")</span><select aria-label="@($"{role.DisplayName} · {T("ModelProfile")}")" value="@SelectedModelIndex(role.LogicalId)" @onchange="args => SelectModelAsync(role.LogicalId, args)" disabled="@busy">
                                         <option value="">@T("SelectProfile")</option>
                                         @for (var index = 0; index < modelProfiles.Count; index++)
                                         {
@@ -116,7 +123,7 @@ else
                                             <option value="@index" disabled="@IsInvalidModel(profile)">@profile.Properties.DisplayName · @profile.Namespace/@profile.Name</option>
                                         }
                                     </select></label>
-                                    <label><span>@T("RuntimeProfile")</span><select aria-label="@($"{role.DisplayName} · {T("RuntimeProfile")}")" value="@SelectedRuntimeIndex(role.LogicalId)" @onchange="args => SelectRuntime(role.LogicalId, args)" disabled="@busy">
+                                    <label><span>@T("RuntimeProfile")</span><select aria-label="@($"{role.DisplayName} · {T("RuntimeProfile")}")" value="@SelectedRuntimeIndex(role.LogicalId)" @onchange="args => SelectRuntimeAsync(role.LogicalId, args)" disabled="@busy">
                                         <option value="">@T("SelectProfile")</option>
                                         @for (var index = 0; index < runtimeProfiles.Count; index++)
                                         {
@@ -135,23 +142,32 @@ else
         else if (activeView == "Changes")
         {
             <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ConcreteProposal")</p><h2>@T("Changes")</h2><p>@T("ChangesIntro")</p></div></div>
-            @if (changeSets.Count == 0) { <p>@T("NoChangeSets")</p> }
-            else
+            @if (changeSets.Count > 0 || materialization is not null || bindingsDirty)
             {
-                <div class="resource-plan-change-set-picker"><label for="change-set-select">@T("ChangeSet")</label><select id="change-set-select" value="@selected?.Value.Id.Value.ToString("D")" @onchange="SelectChangeSetAsync">
+                <div class="resource-plan-change-set-picker"><label for="change-set-select">@T("ChangeSet")</label><select id="change-set-select" value="@ReviewSelectionValue" @onchange="SelectChangeSetAsync">
+                    @if (materialization is not null) { <option value="preview">@T("CurrentPreview")</option> }
+                    @if (bindingsDirty && materialization is null) { <option value="pending">@T("PendingPreview")</option> }
                     @foreach (var item in changeSets) { <option value="@item.Value.Id.Value.ToString("D")">@T("ChangeSetOption", item.Value.PlanRevision, item.Value.CreatedAt.ToLocalTime().ToString("g"))</option> }
                 </select></div>
-                @if (selected is not null)
+            }
+            @if (DisplayedChanges is { } displayedChanges)
+            {
+                @if (!showRecordedChanges && materialization is not null)
                 {
-                    <div class="resource-plan-change-set-meta"><span>@T("ChangeSetRevision", selected.Value.PlanRevision)</span><span>@T("CreatedAt", selected.Value.CreatedAt.ToLocalTime().ToString("g"))</span><details><summary>@T("TechnicalDetails")</summary><code>@selected.Value.Digest</code></details></div>
+                    <div class="resource-plan-review-notice" role="status"><strong>@T("CurrentPreview")</strong><span>@T(materialization.CanCreateChangeSet ? "CurrentPreviewDescription" : "CurrentPreviewBlockedDescription")</span></div>
+                }
+                else if (selected is not null)
+                {
+                    <div class="resource-plan-change-set-meta"><span>@T("RecordedChangeSet")</span><span>@T("ChangeSetRevision", selected.Value.PlanRevision)</span><span>@T("CreatedAt", selected.Value.CreatedAt.ToLocalTime().ToString("g"))</span><details><summary>@T("TechnicalDetails")</summary><code>@selected.Value.Digest</code></details></div>
+                }
                     <div class="resource-plan-change-summary" aria-label="@T("ChangeSummary")">
                         @foreach (var operation in Enum.GetValues<ResourceChangeOperation>())
                         {
-                            var count = selected.Value.Changes.Count(value => value.Operation == operation);
+                            var count = displayedChanges.Count(value => value.Operation == operation);
                             <div><strong>@count</strong><span>@OperationCountLabel(operation, count)</span></div>
                         }
                     </div>
-                    @if (selected.Value.ResolvedBindings is { Count: > 0 } reviewedBindings)
+                    @if (DisplayedBindings is { Count: > 0 } reviewedBindings)
                     {
                         <div class="resource-plan-reviewed-bindings">
                             <h3>@T("ReviewedBindings")</h3>
@@ -161,7 +177,7 @@ else
                             }
                         </div>
                     }
-                    @foreach (var change in selected.Value.Changes.OrderBy(value => value.Order))
+                    @foreach (var change in displayedChanges.OrderBy(value => value.Order))
                     {
                         var reviewFields = ResourcePlanReviewProjection.ReviewFields(change);
                         <article class="resource-plan-change">
@@ -189,15 +205,16 @@ else
                         </article>
                     }
                 }
-            }
+            else if (bindingsDirty) { <div class="resource-plan-review-notice" role="status">@T("PendingPreviewDescription")</div> }
+            else { <p>@T("NoChangeSets")</p> }
         }
         else if (activeView == "Graph")
         {
             <h2>@T("Graph")</h2>
-            @if (selected is null) { <p>@T("NoChangeSets")</p> }
+            @if (DisplayedChanges is not { } graphChanges) { <p>@T(bindingsDirty ? "PendingPreviewDescription" : "NoChangeSets")</p> }
             else
             {
-                var graph = ResourcePlanReviewProjection.Graph(selected.Value);
+                var graph = ResourcePlanReviewProjection.Graph(graphChanges);
                 <div class="resource-plan-graph-layout @(SelectedGraphChange is not null ? "has-selection" : null)">
                     <div class="resource-plan-graph-canvas">
                         <FlowTopologyViewer Graph="@GraphTopology(graph)" SelectedKey="selectedGraphKey" SelectedKeyChanged="SelectGraphNode" InitiallyFit="true" ShowStateLegend="false" />
@@ -216,13 +233,14 @@ else
                         </aside>
                     }
                 </div>
-                <ol class="sr-only">@foreach (var graphChange in selected.Value.Changes.OrderBy(value => value.Order)) { <li>@graphChange.LogicalId · @graphChange.Proposed.Kind @if (graphChange.DependsOn.Count > 0) { <span>@T("DependsOn") @string.Join(", ", graphChange.DependsOn)</span> }</li> }</ol>
+                <ol class="sr-only">@foreach (var graphChange in graphChanges.OrderBy(value => value.Order)) { <li>@graphChange.LogicalId · @graphChange.Proposed.Kind @if (graphChange.DependsOn.Count > 0) { <span>@T("DependsOn") @string.Join(", ", graphChange.DependsOn)</span> }</li> }</ol>
             }
         }
         else if (activeView == "Validation")
         {
             <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ReviewResult")</p><h2>@T("Validation")</h2><p>@T("ValidationIntro")</p></div></div>
-            @if (selected is null) { <p>@T("NoChangeSets")</p> }
+            @if (!showRecordedChanges) { <p>@T("PreviewRequiresChangeSet")</p> }
+            else if (selected is null) { <p>@T("NoChangeSets")</p> }
             else if (latestValidation is null) { <p>@T("NotValidated")</p> }
             else
             {
@@ -247,7 +265,7 @@ else
                         </div></li>
                     }
                     </ol>
-                }
+            }
             }
         }
         else
@@ -280,6 +298,12 @@ else
     private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
     private readonly Dictionary<string, ResourceReference> modelBindings = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ResourceReference> runtimeBindings = new(StringComparer.OrdinalIgnoreCase);
+    private bool bindingsDirty;
+    private bool showRecordedChanges = true;
+    private string ReviewSelectionValue => showRecordedChanges ? selected?.Value.Id.Value.ToString("D") ?? string.Empty : materialization is null ? "pending" : "preview";
+    private IReadOnlyList<ResourceChange>? DisplayedChanges => !showRecordedChanges && materialization is not null ? MaterializedChanges(materialization)
+        : showRecordedChanges ? selected?.Value.Changes : null;
+    private IReadOnlyList<ResourcePlanResolvedBinding>? DisplayedBindings => !showRecordedChanges && materialization is not null ? materialization.ResolvedBindings : selected?.Value.ResolvedBindings;
     private string activeView = "Overview";
     private string? error;
     private string? message;
@@ -294,9 +318,9 @@ else
     {
         get
         {
-            if (selected is null || selectedGraphKey is null || !selectedGraphKey.StartsWith("resource:", StringComparison.Ordinal)
+            if (DisplayedChanges is not { } displayedChanges || selectedGraphKey is null || !selectedGraphKey.StartsWith("resource:", StringComparison.Ordinal)
                 || !int.TryParse(selectedGraphKey.AsSpan("resource:".Length), out var index)) return null;
-            return selected.Value.Changes.OrderBy(value => value.Order).ElementAtOrDefault(index);
+            return displayedChanges.OrderBy(value => value.Order).ElementAtOrDefault(index);
         }
     }
     private string T(string key, params object[] args) => Localizer[key, args].Value;
@@ -315,7 +339,7 @@ else
     private string SelectedRuntimeIndex(string role) => runtimeBindings.TryGetValue(role, out var reference)
         ? runtimeProfiles.Select((profile, index) => (profile, index)).Where(item => Reference(item.profile.Name, item.profile.Namespace, item.profile.ScopeRef) == reference).Select(item => item.index.ToString(System.Globalization.CultureInfo.InvariantCulture)).FirstOrDefault() ?? string.Empty
         : string.Empty;
-    private void SelectModel(string role, ChangeEventArgs args)
+    private async Task SelectModelAsync(string role, ChangeEventArgs args)
     {
         if (int.TryParse(args.Value?.ToString(), out var index) && index >= 0 && index < modelProfiles.Count && !IsInvalidModel(modelProfiles[index]))
         {
@@ -323,9 +347,9 @@ else
             modelBindings[role] = Reference(profile.Name, profile.Namespace, profile.ScopeRef);
         }
         else modelBindings.Remove(role);
-        materialization = null;
+        await BindingChangedAsync();
     }
-    private void SelectRuntime(string role, ChangeEventArgs args)
+    private async Task SelectRuntimeAsync(string role, ChangeEventArgs args)
     {
         if (int.TryParse(args.Value?.ToString(), out var index) && index >= 0 && index < runtimeProfiles.Count)
         {
@@ -333,8 +357,25 @@ else
             runtimeBindings[role] = Reference(profile.Name, profile.Namespace, profile.ScopeRef);
         }
         else runtimeBindings.Remove(role);
-        materialization = null;
+        await BindingChangedAsync();
     }
+    private async Task BindingChangedAsync()
+    {
+        materialization = null;
+        bindingsDirty = true;
+        showRecordedChanges = false;
+        selectedGraphKey = null;
+        if (functional?.Roles.All(role => modelBindings.ContainsKey(role.LogicalId) && runtimeBindings.ContainsKey(role.LogicalId)) == true)
+            await MaterializeAsync();
+    }
+    private static IReadOnlyList<ResourceChange> MaterializedChanges(ResourcePlanMaterialization preview) => preview.Proposals.Select((proposal, order) => new ResourceChange(
+        order, proposal.LogicalId, proposal.Operation switch
+        {
+            ResourcePlanProposedOperation.Create => ResourceChangeOperation.Create,
+            ResourcePlanProposedOperation.Update => ResourceChangeOperation.Update,
+            ResourcePlanProposedOperation.NoOp => ResourceChangeOperation.NoOp,
+            _ => throw new ArgumentOutOfRangeException(nameof(proposal))
+        }, proposal.Resource, proposal.Current, proposal.DependsOn, proposal.ProposedDigest)).ToArray();
     private ResourcePlanMaterializationRequest BindingRequest() => new(functional?.Roles
         .Where(role => modelBindings.ContainsKey(role.LogicalId) && runtimeBindings.ContainsKey(role.LogicalId))
         .Select(role => new ResourcePlanAgentBinding(role.LogicalId, modelBindings[role.LogicalId], runtimeBindings[role.LogicalId])).ToArray() ?? []);
@@ -405,7 +446,7 @@ else
     protected override void OnInitialized() => ContextState.Changed += OnContextChanged;
     protected override async Task OnParametersSetAsync()
     {
-        if (loadedId != Id) { loadedId = Id; plan = null; modelBindings.Clear(); runtimeBindings.Clear(); contextVersion++; }
+        if (loadedId != Id) { loadedId = Id; plan = null; modelBindings.Clear(); runtimeBindings.Clear(); bindingsDirty = false; showRecordedChanges = true; contextVersion++; }
         await LoadAsync();
     }
     private void OnContextChanged() => _ = InvokeAsync(async () =>
@@ -419,6 +460,8 @@ else
         materialization = null;
         modelBindings.Clear();
         runtimeBindings.Clear();
+        bindingsDirty = false;
+        showRecordedChanges = true;
         await LoadAsync();
     });
 
@@ -463,13 +506,14 @@ else
 
     private async Task SelectChangeSetAsync(ChangeEventArgs args)
     {
+        if (args.Value?.ToString() is "preview" or "pending") { showRecordedChanges = false; selectedGraphKey = null; return; }
         if (!Guid.TryParse(args.Value?.ToString(), out var id)) return;
         var version = contextVersion;
         var next = changeSets.FirstOrDefault(value => value.Value.Id.Value == id);
         try
         {
             IReadOnlyList<ResourceChangeSetValidation> nextValidations = next is null ? [] : await Client.ListValidationsAsync(next.Value.Id.Value, lifetime.Token);
-            if (version == contextVersion) { selected = next; selectedGraphKey = null; validations = nextValidations; }
+            if (version == contextVersion) { selected = next; showRecordedChanges = true; selectedGraphKey = null; validations = nextValidations; }
         }
         catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
     }
@@ -479,7 +523,7 @@ else
         if (plan is null || !CanReview || !CanMaterialize || busy) return;
         busy = true; error = null; message = null;
         var version = contextVersion;
-        try { var result = await Client.MaterializeAsync(Id, BindingRequest(), lifetime.Token); if (version == contextVersion) { materialization = result; message = T("Materialized", result.Proposals.Count); } }
+        try { var result = await Client.MaterializeAsync(Id, BindingRequest(), lifetime.Token); if (version == contextVersion) { materialization = result; bindingsDirty = true; showRecordedChanges = false; selectedGraphKey = null; message = T("Materialized", result.Proposals.Count); } }
         catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
         finally { EndBusy(); }
     }
@@ -497,6 +541,9 @@ else
             if (version != contextVersion) return;
             changeSets = page.Items.OrderByDescending(value => value.Value.PlanRevision).ThenByDescending(value => value.Value.CreatedAt).ToArray();
             selected = changeSets.FirstOrDefault(value => value.Value.Id == created.Value.Id);
+            materialization = null;
+            bindingsDirty = false;
+            showRecordedChanges = true;
             selectedGraphKey = null;
             await LoadValidationsAsync();
             if (version != contextVersion) return;
@@ -509,7 +556,7 @@ else
 
     private async Task ValidateAsync()
     {
-        if (plan is null || selected is null || !CanReview || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value) || busy) return;
+        if (plan is null || selected is null || !CanReview || !showRecordedChanges || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value) || busy) return;
         busy = true; error = null; message = null;
         var version = contextVersion;
         try { var result = await Client.ValidateChangeSetAsync(selected.Value.Id.Value, lifetime.Token); if (version == contextVersion) { await LoadValidationsAsync(); if (version == contextVersion) { activeView = "Validation"; message = result.Readiness == ResourceChangeSetReadiness.Ready ? T("Validated") : null; } } }

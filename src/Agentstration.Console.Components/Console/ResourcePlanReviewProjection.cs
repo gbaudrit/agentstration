@@ -102,9 +102,11 @@ public static class ResourcePlanReviewProjection
         catch (JsonException) { return value; }
     }
 
-    public static ResourcePlanGraph Graph(ResourceChangeSet changeSet)
+    public static ResourcePlanGraph Graph(ResourceChangeSet changeSet) => Graph(changeSet.Changes);
+
+    public static ResourcePlanGraph Graph(IReadOnlyList<ResourceChange> source)
     {
-        var changes = changeSet.Changes.OrderBy(value => value.Order).ToArray();
+        var changes = source.OrderBy(value => value.Order).ToArray();
         var depths = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var change in changes)
         {
