@@ -44,6 +44,8 @@ public sealed class ConsoleHostTests
         var html = await login.Content.ReadAsStringAsync();
         var script = await client.GetStringAsync("/_content/Agentstration.Console.Components/app.js");
         var styles = await client.GetStringAsync("/_content/Agentstration.Console.Components/app.css");
+        var toolDetailsStyles = await client.GetStringAsync("/_content/Agentstration.Console.Components/tool-details.css");
+        var isolatedStyles = await client.GetStringAsync("/Agentstration.Console.Web.styles.css");
 
         Assert.AreEqual(HttpStatusCode.Redirect, response.StatusCode);
         Assert.AreEqual("/login", response.Headers.Location?.AbsolutePath);
@@ -52,6 +54,8 @@ public sealed class ConsoleHostTests
         StringAssert.Contains(html, "__RequestVerificationToken");
         StringAssert.Contains(script, "agentstrationEnrollment");
         StringAssert.Contains(styles, ".task-summary-grid");
+        StringAssert.Contains(toolDetailsStyles, ".tool-field-heading");
+        StringAssert.Contains(isolatedStyles, "Agentstration.Console.Components");
     }
 
     [TestMethod]
@@ -166,6 +170,9 @@ public sealed class ConsoleHostTests
         using var authenticated = await client.GetAsync("/");
         Assert.AreEqual(HttpStatusCode.OK, authenticated.StatusCode);
         Assert.IsTrue(authority.Validations > 0);
+        var authenticatedHtml = await authenticated.Content.ReadAsStringAsync();
+        StringAssert.Contains(authenticatedHtml, "tool-details.css?v=20260918-1");
+        StringAssert.Contains(authenticatedHtml, "Agentstration.Console.Web.styles.css");
 
         var logoutHtml = await client.GetStringAsync("/logout");
         using var logout = await client.PostAsync("/logout", Form(Token(logoutHtml)));
