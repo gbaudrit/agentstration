@@ -8,6 +8,8 @@ using Agentstration.ResourcePlanning.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
+using Agentstration.Tools;
+using Agentstration.Tools.Contracts;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -69,6 +71,7 @@ public sealed class ResourcePlanReviewTests
         CollectionAssert.AreEqual(new[] { "definition.displayName" }, ResourcePlanReviewProjection.ReviewFields(change).Select(value => value.Path).ToArray());
         Assert.AreEqual(change, ResourcePlanReviewProjection.ChangeForIssue(set.Value, issue));
         Assert.AreEqual("Rédaction, Analyse", ResourcePlanReviewProjection.FormatValue("[\"Rédaction\",\"Analyse\"]"));
+        Assert.AreEqual("default/ticketing", ResourcePlanReviewProjection.FormatValue("[{\"name\":\"ticketing\",\"namespace\":\"default\"}]"));
 
         var flow = change with
         {
@@ -248,7 +251,7 @@ public sealed class ResourcePlanReviewTests
         rendered.WaitForElement(".resource-plan-binding-card");
         rendered.FindAll(".resource-plan-binding-card select")[0].Change("0");
         var partiallyReopened = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
-        partiallyReopened.WaitForAssertion(() => Assert.Contains("0 of 1 agents configured", partiallyReopened.Markup, StringComparison.Ordinal));
+        partiallyReopened.WaitForAssertion(() => Assert.Contains("0 of 1 bindings configured", partiallyReopened.Markup, StringComparison.Ordinal));
         Assert.AreEqual("0", partiallyReopened.FindAll(".resource-plan-binding-card select")[0].GetAttribute("value"));
         Assert.AreEqual("", partiallyReopened.FindAll(".resource-plan-binding-card select")[1].GetAttribute("value"));
         rendered.FindAll(".resource-plan-binding-card select")[1].Change("0");
@@ -259,7 +262,7 @@ public sealed class ResourcePlanReviewTests
         Assert.AreEqual("runtime-a", binding.RuntimeProfile.Name);
         Assert.AreEqual(ResourceScopeRef.Workspace(Scope.WorkspaceId.Value), binding.ModelProfile.ScopeRef);
         var reopened = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
-        reopened.WaitForAssertion(() => Assert.Contains("1 of 1 agents configured", reopened.Markup, StringComparison.Ordinal));
+        reopened.WaitForAssertion(() => Assert.Contains("1 of 1 bindings configured", reopened.Markup, StringComparison.Ordinal));
         Assert.AreEqual("0", reopened.FindAll(".resource-plan-binding-card select")[0].GetAttribute("value"));
         Assert.AreEqual("0", reopened.FindAll(".resource-plan-binding-card select")[1].GetAttribute("value"));
         reopened.Find("#tab-Changes").Click();
@@ -306,6 +309,7 @@ public sealed class ResourcePlanReviewTests
     {
         context.Services.AddSingleton<IModelProfilesClient>(new EmptyModelProfilesClient(withProfiles));
         context.Services.AddSingleton<IRuntimeProfilesClient>(new EmptyRuntimeProfilesClient(withProfiles));
+        context.Services.AddSingleton<IToolsClient>(new EmptyToolsClient());
         context.Services.AddSingleton<IIdentityAdministrationApiClient>(new IdentityAdministrationApiClient(
             new HttpClient(new IdentityHandler()) { BaseAddress = new Uri("http://localhost/") }));
     }
@@ -327,6 +331,20 @@ public sealed class ResourcePlanReviewTests
                 Content = JsonContent.Create(new OrganizationAdministrationResponse(tenant, [], members))
             });
         }
+    }
+
+    private sealed class EmptyToolsClient : IToolsClient
+    {
+        public Task<IReadOnlyList<ToolResource>> GetToolsAsync(string? provider = null, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<ToolResource>>([]);
+        public Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolProviderResource>> CreateProviderAsync(CreateToolProviderRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolProviderResource>> UpdateProviderAsync(string name, PutToolProviderRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ToolConnectionTestResponse> TestAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ToolDiscoveryDiffResponse> RefreshAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolResource>> GetToolAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(string name, bool enabled, string? etag, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class EmptyModelProfilesClient(bool withProfiles) : IModelProfilesClient
@@ -374,7 +392,7 @@ public sealed class ResourcePlanReviewTests
         public Task<ResourcePlanBindingDraftSnapshot> SaveBindingsAsync(Guid id, SaveResourcePlanBindingsRequest request, string? expectedETag, CancellationToken cancellationToken)
         {
             if (savedBindings?.ETag != expectedETag) throw new InvalidOperationException("stale bindings");
-            savedBindings = new(new(Plan.Id, Scope, request.PlanRevision, request.Bindings, DateTimeOffset.UnixEpoch), "\"saved\"");
+            savedBindings = new(new(Plan.Id, Scope, request.PlanRevision, request.Bindings, DateTimeOffset.UnixEpoch, request.IntegrationBindings), "\"saved\"");
             return Task.FromResult(savedBindings);
         }
         public Task<ResourcePlanMaterialization> MaterializeAsync(Guid id, ResourcePlanMaterializationRequest request, CancellationToken cancellationToken)

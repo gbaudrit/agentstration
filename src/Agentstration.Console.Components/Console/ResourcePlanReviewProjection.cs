@@ -34,7 +34,8 @@ public static class ResourcePlanReviewProjection
         var current = new Dictionary<string, string>(StringComparer.Ordinal);
         var proposed = new Dictionary<string, string>(StringComparer.Ordinal);
         if (change.Current is not null) Flatten(change.Current.Document, string.Empty, current);
-        Flatten(JsonSerializer.SerializeToElement(change.Proposed, JsonOptions), string.Empty, proposed);
+        if (change.Operation != ResourceChangeOperation.Delete)
+            Flatten(JsonSerializer.SerializeToElement(change.Proposed, JsonOptions), string.Empty, proposed);
         return current.Keys.Union(proposed.Keys, StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .Where(path => !current.TryGetValue(path, out var before) || !proposed.TryGetValue(path, out var after) || before != after)
@@ -52,9 +53,10 @@ public static class ResourcePlanReviewProjection
 
     public static IReadOnlyList<ResourcePlanFieldDifference> HighlightFields(ResourceChange change)
     {
+        if (change.Operation == ResourceChangeOperation.Delete) return [];
         string[] paths = change.Proposed.Kind switch
         {
-            "Agent" => ["definition.modelProfile.name", "definition.runtimeProfile.name", "definition.behaviors"],
+            "Agent" => ["definition.modelProfile.name", "definition.runtimeProfile.name", "definition.tools", "definition.behaviors"],
             "Flow" => ["definition.spec.flowKind", "definition.spec.pattern.strategy", "definition.version"],
             "Entry" => ["definition.presentation.kind", "definition.binding.resourceId", "definition.behavior.allowConversation"],
             _ => []
@@ -96,8 +98,13 @@ public static class ResourcePlanReviewProjection
             using var json = JsonDocument.Parse(value);
             if (json.RootElement.ValueKind != JsonValueKind.Array) return value;
             var items = json.RootElement.EnumerateArray().ToArray();
-            return items.Length == 0 ? "—" : items.All(item => item.ValueKind == JsonValueKind.String)
-                ? string.Join(", ", items.Select(item => item.GetString())) : value;
+            if (items.Length == 0) return "—";
+            if (items.All(item => item.ValueKind == JsonValueKind.String))
+                return string.Join(", ", items.Select(item => item.GetString()));
+            if (items.All(item => item.ValueKind == JsonValueKind.Object && item.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String))
+                return string.Join(", ", items.Select(item => item.TryGetProperty("namespace", out var ns) && ns.ValueKind == JsonValueKind.String
+                    ? $"{ns.GetString()}/{item.GetProperty("name").GetString()}" : item.GetProperty("name").GetString()));
+            return value;
         }
         catch (JsonException) { return value; }
     }
@@ -145,8 +152,10 @@ public static class ResourcePlanReviewProjection
     }
 
     private static string? DefinitionText(ResourceChange change, string property) =>
-        change.Proposed.Definition.ValueKind == JsonValueKind.Object
-        && change.Proposed.Definition.TryGetProperty(property, out var value)
+        (change.Operation == ResourceChangeOperation.Delete && change.Current is not null
+            && change.Current.Document.TryGetProperty("definition", out var currentDefinition)
+            ? currentDefinition : change.Proposed.Definition) is { ValueKind: JsonValueKind.Object } definition
+        && definition.TryGetProperty(property, out var value)
         && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
     private static bool IsEmpty(string? value) => string.IsNullOrWhiteSpace(value) || value is "[]" or "{}";
@@ -157,6 +166,7 @@ public static class ResourcePlanReviewProjection
         "definition.description" => 1,
         "definition.modelProfile.name" => 2,
         "definition.runtimeProfile.name" => 3,
+        "definition.tools" => 4,
         "definition.spec.flowKind" or "definition.presentation.kind" => 4,
         "definition.spec.pattern.strategy" or "definition.binding.resourceId" => 5,
         "definition.instructions" => 6,

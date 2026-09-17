@@ -142,12 +142,17 @@ public sealed class ResourcePlanService(
             throw new ResourcePlanConcurrencyException("The Resource Plan changed. Reload it before selecting profiles.");
         if (plan.Value.Status is ResourcePlanStatus.Applied or ResourcePlanStatus.Archived or ResourcePlanStatus.Cancelled)
             throw new ResourcePlanLifecycleException("resource_plan_bindings_closed", "This Resource Plan no longer accepts profile selections.");
-        var roles = plan.Value.Content.Document.Deserialize<FunctionalResourcePlanV1>(JsonOptions)?.Roles
-            .Select(value => value.LogicalId).ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
+        var functional = plan.Value.Content.Document.Deserialize<FunctionalResourcePlanV1>(JsonOptions);
+        var roles = functional?.Roles.Select(value => value.LogicalId).ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
+        var integrations = functional?.Integrations.Select(value => value.LogicalId).ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
         if (request.Bindings is null || request.Bindings.Count > roles.Count || request.Bindings.Any(value => !roles.Contains(value.LogicalId))
             || request.Bindings.Select(value => value.LogicalId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != request.Bindings.Count)
             throw new ArgumentException("Profile selections must refer to distinct roles in the current plan.", nameof(request));
-        var draft = new ResourcePlanBindingDraft(id, scope, plan.Value.Revision, request.Bindings.ToArray(), timeProvider.GetUtcNow());
+        var toolBindings = request.IntegrationBindings ?? [];
+        if (toolBindings.Count > integrations.Count || toolBindings.Any(value => value is null || !integrations.Contains(value.LogicalId) || value.Tool is null || string.IsNullOrWhiteSpace(value.Tool.Name))
+            || toolBindings.Select(value => value.LogicalId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != toolBindings.Count)
+            throw new ArgumentException("Tool selections must refer to distinct integrations in the current plan.", nameof(request));
+        var draft = new ResourcePlanBindingDraft(id, scope, plan.Value.Revision, request.Bindings.ToArray(), timeProvider.GetUtcNow(), toolBindings.ToArray());
         return await repository.SaveBindingsAsync(draft, expectedETag, cancellationToken);
     }
 

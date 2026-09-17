@@ -6,6 +6,8 @@ using Agentstration.ResourceManagement;
 using Agentstration.ResourcePlanning.Contracts;
 using Agentstration.ResourcePlanning.Storage.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Tools;
 using Agentstration.Work;
 
 namespace Agentstration.ResourcePlanning;
@@ -39,6 +41,25 @@ public sealed class ResourceChangeSetValidationService(
             else
                 issues.AddRange(await validator.ValidateAsync(change, scope, cancellationToken));
             await ValidateCurrentStateAsync(change, issues, cancellationToken);
+        }
+        foreach (var binding in snapshot.Value.ResolvedBindings ?? [])
+        {
+            var kind = binding.Field switch
+            {
+                "modelProfile" => ModelResourceKinds.ModelProfile,
+                "runtimeProfile" => RuntimeProfileResourceKinds.RuntimeProfile,
+                "tool" => ToolResourceKinds.Tool,
+                _ => null
+            };
+            if (kind is null)
+            {
+                issues.Add(Error("resource_change_binding_invalid", $"bindings[{binding.LogicalId}]", "The proposal contains an unknown binding type."));
+                continue;
+            }
+            var current = await stateReader.ResolveBindingAsync(scope, kind, binding.Reference, cancellationToken);
+            if (current is null || current.Digest != binding.Digest || current.ETag != binding.ETag)
+                issues.Add(Error("resource_change_binding_stale", $"bindings[{binding.LogicalId}].{binding.Field}",
+                    "A selected profile or Tool changed. Refresh the proposal before verification."));
         }
         var readiness = issues.Any(value => value.Severity == ResourceChangeSetValidationSeverity.Error) ? ResourceChangeSetReadiness.Blocked : ResourceChangeSetReadiness.Ready;
         var validation = new ResourceChangeSetValidation(Guid.NewGuid(), id, snapshot.Value.Digest, snapshot.Value.PlanId, snapshot.Value.PlanRevision, scope, readiness, issues, actorPrincipalId, timeProvider.GetUtcNow());
@@ -105,6 +126,7 @@ public sealed class CanonicalPlannedResourceValidator(AgentManagementService age
     {
         try
         {
+            if (change.Operation == ResourceChangeOperation.Delete) return [];
             if (change.Proposed.Kind == AgentResourceKinds.Agent)
             {
                 var definition = change.Proposed.Definition.Deserialize<AgentProperties>(JsonOptions) ?? throw new JsonException("Agent definition is empty.");

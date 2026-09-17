@@ -5,6 +5,7 @@
 @inject IIdentityAdministrationApiClient IdentityClient
 @inject IModelProfilesClient ModelProfilesClient
 @inject IRuntimeProfilesClient RuntimeProfilesClient
+@inject IToolsClient ToolsClient
 @inject ConsoleContextState ContextState
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ResourcePlansStrings> Localizer
 
@@ -19,7 +20,7 @@ else if (plan is null) { <EmptyState Title="@T("NotFound")" Message="@T("NotFoun
 else
 {
     <ol class="resource-plan-review-path" aria-label="@T("ReviewPath")">
-        <li class="@(functional?.Roles.Count > 0 && CompleteBindings == functional.Roles.Count && !bindingSaveFailed ? "is-done" : null)"><span>1</span><div><strong>@T("StepProfiles")</strong><small>@T("StepProfilesHint")</small></div></li>
+        <li class="@(BindingsComplete && !bindingSaveFailed ? "is-done" : null)"><span>1</span><div><strong>@T("StepProfiles")</strong><small>@T("StepProfilesHint")</small></div></li>
         <li class="@(materialization is not null || showRecordedChanges && selected is not null ? "is-done" : null)"><span>2</span><div><strong>@T("StepPreview")</strong><small>@T("StepPreviewHint")</small></div></li>
         <li class="@(showRecordedChanges && selected is not null ? "is-done" : null)"><span>3</span><div><strong>@T("StepChangeSet")</strong><small>@T("StepChangeSetHint")</small></div></li>
         <li class="@(showRecordedChanges && latestValidation is not null ? "is-done" : null)"><span>4</span><div><strong>@T("StepValidation")</strong><small>@T("StepValidationHint")</small></div></li>
@@ -89,12 +90,19 @@ else
                         @if (functional.Experiences.Count == 0) { <p class="resource-plan-empty">@T("NothingPlanned")</p> }
                         else { <ul>@foreach (var experience in functional.Experiences) { <li><strong>@experience.DisplayName</strong><span>@experience.Purpose</span></li> }</ul> }
                     </article>
+                    @if (functional.Retirements is { Count: > 0 } retirements)
+                    {
+                        <article class="resource-plan-secondary-card">
+                            <h3>@T("Retirements") <span class="resource-plan-count">@retirements.Count</span></h3>
+                            <ul>@foreach (var retirement in retirements) { <li><strong>@T($"Retirement.{retirement.Element}") · @retirement.LogicalId</strong><span>@retirement.Reason</span></li> }</ul>
+                        </article>
+                    }
                 </div>
-                    @if (functional.Roles.Count > 0)
+                    @if (functional.Roles.Count > 0 || functional.Integrations.Count > 0 || functional.Retirements?.Count > 0)
                     {
                         <section class="resource-plan-bindings" aria-label="@T("BindingsTitle")">
                         <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ConcreteProposal")</p><h2>@T("BindingsTitle")</h2><p>@T("BindingsIntro")</p></div></div>
-                        @if (modelProfiles.Count == 0 || runtimeProfiles.Count == 0)
+                        @if (functional.Roles.Count > 0 && (modelProfiles.Count == 0 || runtimeProfiles.Count == 0))
                         {
                             <p class="resource-plan-binding-empty">
                                 @if (modelProfiles.Count == 0) { <a href="/modelprofiles">@T("CreateModelProfile")</a> }
@@ -125,11 +133,33 @@ else
                                 </article>
                             }
                         </div>
+                        @if (functional.Integrations.Count > 0)
+                        {
+                            <h3>@T("ToolBindingsTitle")</h3>
+                            <p>@T("ToolBindingsIntro")</p>
+                            @if (tools.Count == 0) { <p class="resource-plan-binding-empty"><a href="/tools">@T("ManageTools")</a></p> }
+                            <div class="resource-plan-binding-list">
+                                @foreach (var integration in functional.Integrations)
+                                {
+                                    <article class="resource-plan-binding-card">
+                                        <div><strong>@integration.DisplayName</strong><small>@integration.Purpose</small></div>
+                                        <label><span>@T("ToolBinding")</span><select aria-label="@($"{integration.DisplayName} · {T("ToolBinding")}")" value="@SelectedToolIndex(integration.LogicalId)" @onchange="args => SelectToolAsync(integration.LogicalId, args)" disabled="@(busy || !CanReview)">
+                                            <option value="">@T("SelectTool")</option>
+                                            @for (var index = 0; index < tools.Count; index++)
+                                            {
+                                                var tool = tools[index];
+                                                <option value="@index" disabled="@(!UsableTool(tool))">@tool.Definition.DisplayName · @tool.Metadata.Namespace/@tool.Metadata.Name</option>
+                                            }
+                                        </select></label>
+                                    </article>
+                                }
+                            </div>
+                        }
                         <footer class="resource-plan-binding-footer">
-                            <div class="resource-plan-binding-progress" role="status"><strong>@T("BindingsProgress", CompleteBindings, functional.Roles.Count)</strong><span>@T(bindingSaving ? "BindingsSaving" : bindingSaveFailed ? bindingsConflict ? "BindingsConflict" : "BindingsSaveFailed" : bindingsOutdated ? "BindingsOutdated" : bindingDraft is null ? "BindingsNotSavedYet" : "BindingsSavedAutomatically")</span>@if (bindingSaveFailed) { <button class="button-secondary" type="button" @onclick="RetryBindingsAsync" disabled="@busy">@T(bindingsConflict ? "ReloadBindings" : "RetrySaveBindings")</button> }</div>
+                            <div class="resource-plan-binding-progress" role="status"><strong>@(functional.Roles.Count + functional.Integrations.Count == 0 ? T("NoBindingsRequired") : T("BindingsProgress", CompleteBindings + CompleteToolBindings, functional.Roles.Count + functional.Integrations.Count))</strong><span>@T(bindingSaving ? "BindingsSaving" : bindingSaveFailed ? bindingsConflict ? "BindingsConflict" : "BindingsSaveFailed" : bindingsOutdated ? "BindingsOutdated" : bindingDraft is null ? "BindingsNotSavedYet" : "BindingsSavedAutomatically")</span>@if (bindingSaveFailed) { <button class="button-secondary" type="button" @onclick="RetryBindingsAsync" disabled="@busy">@T(bindingsConflict ? "ReloadBindings" : "RetrySaveBindings")</button> }</div>
                             <div class="resource-plan-binding-actions">
-                                <button class="button-secondary" type="button" @onclick="MaterializeAsync" disabled="@(!CanReview || busy || bindingSaveFailed || !CanMaterialize || functional.Roles.Count != CompleteBindings)">@T("Rematerialize")</button>
-                                <button class="button-primary" type="button" @onclick="ShowChanges" disabled="@(busy || bindingSaveFailed || !CanMaterialize || functional.Roles.Count != CompleteBindings)">@T("ReviewChangesAction")</button>
+                                <button class="button-secondary" type="button" @onclick="MaterializeAsync" disabled="@(!CanReview || busy || bindingSaveFailed || !CanMaterialize || !BindingsComplete)">@T("Rematerialize")</button>
+                                <button class="button-primary" type="button" @onclick="ShowChanges" disabled="@(busy || bindingSaveFailed || !CanMaterialize || !BindingsComplete)">@T("ReviewChangesAction")</button>
                             </div>
                         </footer>
                         </section>
@@ -178,7 +208,7 @@ else
                             <h3>@T("ReviewedBindings")</h3>
                             @foreach (var binding in reviewedBindings.OrderBy(value => value.LogicalId, StringComparer.Ordinal).ThenBy(value => value.Field, StringComparer.Ordinal))
                             {
-                                <p><strong>@binding.LogicalId</strong><span>@T(binding.Field == "modelProfile" ? "ModelProfile" : "RuntimeProfile")</span><code>@(binding.Reference.Namespace ?? ResourceNamespace.Default)/@binding.Reference.Name</code></p>
+                                <p><strong>@binding.LogicalId</strong><span>@T(binding.Field switch { "modelProfile" => "ModelProfile", "runtimeProfile" => "RuntimeProfile", "tool" => "ToolBinding", _ => "BindingsTitle" })</span><code>@(binding.Reference.Namespace ?? ResourceNamespace.Default)/@binding.Reference.Name</code></p>
                             }
                         </div>
                     }
@@ -362,14 +392,18 @@ else
     private FunctionalResourcePlanV1? functional;
     private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
     private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
+    private IReadOnlyList<ToolResource> tools = [];
     private readonly Dictionary<string, ResourceReference> modelBindings = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ResourceReference> runtimeBindings = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ResourceReference> toolBindings = new(StringComparer.OrdinalIgnoreCase);
     private ResourcePlanBindingDraftSnapshot? bindingDraft;
     private bool bindingSaveFailed;
     private bool bindingSaving;
     private bool bindingsConflict;
     private bool bindingsOutdated;
     private int CompleteBindings => functional?.Roles.Count(role => modelBindings.ContainsKey(role.LogicalId) && runtimeBindings.ContainsKey(role.LogicalId)) ?? 0;
+    private int CompleteToolBindings => functional?.Integrations.Count(value => toolBindings.ContainsKey(value.LogicalId)) ?? 0;
+    private bool BindingsComplete => functional is not null && CompleteBindings == functional.Roles.Count && CompleteToolBindings == functional.Integrations.Count;
     private bool bindingsDirty;
     private bool showRecordedChanges = true;
     private string ReviewSelectionValue => showRecordedChanges ? selected?.Value.Id.Value.ToString("D") ?? string.Empty : materialization is null ? "pending" : "preview";
@@ -405,6 +439,7 @@ else
         return localized.ResourceNotFound ? diagnostic.Message : localized.Value;
     }
     private static bool IsInvalidModel(ModelProfileSummaryResponse profile) => ModelManagementUi.IsInvalid(profile);
+    private static bool UsableTool(ToolResource tool) => tool.Definition.Enabled && tool.Definition.Discovery?.Available == true;
     private static bool IsVisible(ResourceScopeRef? scopeRef, ResourcePlanScope scope) => scopeRef is { } candidate
         && (candidate == ResourceScopeRef.Instance || candidate == ResourceScopeRef.Tenant(scope.TenantId) || candidate == ResourceScopeRef.Workspace(scope.WorkspaceId.Value));
     private static ResourceReference Reference(string name, string @namespace, ResourceScopeRef? scope) => new(name, scope, ResourceNamespace.Parse(@namespace));
@@ -413,6 +448,9 @@ else
         : string.Empty;
     private string SelectedRuntimeIndex(string role) => runtimeBindings.TryGetValue(role, out var reference)
         ? runtimeProfiles.Select((profile, index) => (profile, index)).Where(item => Reference(item.profile.Name, item.profile.Namespace, item.profile.ScopeRef) == reference).Select(item => item.index.ToString(System.Globalization.CultureInfo.InvariantCulture)).FirstOrDefault() ?? string.Empty
+        : string.Empty;
+    private string SelectedToolIndex(string integration) => toolBindings.TryGetValue(integration, out var reference)
+        ? tools.Select((tool, index) => (tool, index)).Where(item => Reference(item.tool.Metadata.Name, item.tool.Metadata.Namespace.Value, item.tool.ScopeRef) == reference).Select(item => item.index.ToString(System.Globalization.CultureInfo.InvariantCulture)).FirstOrDefault() ?? string.Empty
         : string.Empty;
     private async Task SelectModelAsync(string role, ChangeEventArgs args)
     {
@@ -434,6 +472,16 @@ else
         else runtimeBindings.Remove(role);
         await BindingChangedAsync();
     }
+    private async Task SelectToolAsync(string integration, ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var index) && index >= 0 && index < tools.Count && UsableTool(tools[index]))
+        {
+            var tool = tools[index];
+            toolBindings[integration] = Reference(tool.Metadata.Name, tool.Metadata.Namespace.Value, tool.ScopeRef);
+        }
+        else toolBindings.Remove(integration);
+        await BindingChangedAsync();
+    }
     private async Task BindingChangedAsync()
     {
         materialization = null;
@@ -449,7 +497,9 @@ else
             var saved = await Client.SaveBindingsAsync(Id, new(plan.Value.Revision, functional?.Roles
                 .Where(role => modelBindings.ContainsKey(role.LogicalId) || runtimeBindings.ContainsKey(role.LogicalId))
                 .Select(role => new ResourcePlanAgentBindingSelection(role.LogicalId,
-                    modelBindings.GetValueOrDefault(role.LogicalId), runtimeBindings.GetValueOrDefault(role.LogicalId))).ToArray() ?? []), bindingDraft?.ETag, lifetime.Token);
+                    modelBindings.GetValueOrDefault(role.LogicalId), runtimeBindings.GetValueOrDefault(role.LogicalId))).ToArray() ?? [],
+                functional?.Integrations.Where(value => toolBindings.ContainsKey(value.LogicalId))
+                    .Select(value => new ResourcePlanIntegrationBinding(value.LogicalId, toolBindings[value.LogicalId])).ToArray() ?? []), bindingDraft?.ETag, lifetime.Token);
             if (version == contextVersion) { bindingDraft = saved; bindingSaveFailed = false; bindingsConflict = false; bindingsOutdated = false; error = null; }
         }
         catch (Exception exception)
@@ -462,7 +512,7 @@ else
             }
         }
         finally { if (version == contextVersion) bindingSaving = false; EndBusy(); }
-        if (version == contextVersion && !bindingSaveFailed && CompleteBindings == functional?.Roles.Count && CanMaterialize)
+        if (version == contextVersion && !bindingSaveFailed && BindingsComplete && CanMaterialize)
             await MaterializeAsync();
     }
     private Task RetryBindingsAsync() => bindingsConflict ? LoadAsync() : BindingChangedAsync();
@@ -471,17 +521,22 @@ else
         {
             ResourcePlanProposedOperation.Create => ResourceChangeOperation.Create,
             ResourcePlanProposedOperation.Update => ResourceChangeOperation.Update,
+            ResourcePlanProposedOperation.Delete => ResourceChangeOperation.Delete,
             ResourcePlanProposedOperation.NoOp => ResourceChangeOperation.NoOp,
             _ => throw new ArgumentOutOfRangeException(nameof(proposal))
         }, proposal.Resource, proposal.Current, proposal.DependsOn, proposal.ProposedDigest)).ToArray();
     private ResourcePlanMaterializationRequest BindingRequest() => new(functional?.Roles
         .Where(role => modelBindings.ContainsKey(role.LogicalId) && runtimeBindings.ContainsKey(role.LogicalId))
-        .Select(role => new ResourcePlanAgentBinding(role.LogicalId, modelBindings[role.LogicalId], runtimeBindings[role.LogicalId])).ToArray() ?? []);
+        .Select(role => new ResourcePlanAgentBinding(role.LogicalId, modelBindings[role.LogicalId], runtimeBindings[role.LogicalId])).ToArray() ?? [], null,
+        functional?.Integrations.Where(value => toolBindings.ContainsKey(value.LogicalId))
+            .Select(value => new ResourcePlanIntegrationBinding(value.LogicalId, toolBindings[value.LogicalId])).ToArray() ?? []);
     private bool MatchesSavedChangeSet(ResourceChangeSetSnapshot? changeSet) => changeSet?.Value.ResolvedBindings is { } resolved
         && functional?.Roles.All(role => modelBindings.TryGetValue(role.LogicalId, out var model)
             && runtimeBindings.TryGetValue(role.LogicalId, out var runtime)
             && resolved.Any(value => value.LogicalId.Equals(role.LogicalId, StringComparison.OrdinalIgnoreCase) && value.Field == "modelProfile" && value.Reference == model)
-            && resolved.Any(value => value.LogicalId.Equals(role.LogicalId, StringComparison.OrdinalIgnoreCase) && value.Field == "runtimeProfile" && value.Reference == runtime)) == true;
+            && resolved.Any(value => value.LogicalId.Equals(role.LogicalId, StringComparison.OrdinalIgnoreCase) && value.Field == "runtimeProfile" && value.Reference == runtime)) == true
+        && functional.Integrations.All(integration => toolBindings.TryGetValue(integration.LogicalId, out var tool)
+            && resolved.Any(value => value.LogicalId.Equals(integration.LogicalId, StringComparison.OrdinalIgnoreCase) && value.Field == "tool" && value.Reference == tool));
     private string OperationCountLabel(ResourceChangeOperation operation, int count) => T($"Operation{(count == 1 ? string.Empty : "Plural")}.{operation}");
     private string DisplayValue(string path, string? value)
     {
@@ -516,6 +571,7 @@ else
         "resource_change_canonical_invalid" => T("Issue.Canonical.Title"),
         "resource_change_create_conflict" => T("Issue.Conflict.Title"),
         "resource_change_current_missing" or "resource_change_stale" => T("Issue.Stale.Title"),
+        "resource_change_binding_stale" => T("Issue.BindingStale.Title"),
         "resource_change_dependency_missing" or "resource_change_dependency_order_invalid" => T("Issue.Dependency.Title"),
         _ => T("Issue.Generic.Title")
     };
@@ -525,6 +581,7 @@ else
         "resource_change_canonical_invalid" => T("Issue.Canonical.Description"),
         "resource_change_create_conflict" => T("Issue.Conflict.Description"),
         "resource_change_current_missing" or "resource_change_stale" => T("Issue.Stale.Description"),
+        "resource_change_binding_stale" => T("Issue.BindingStale.Description"),
         "resource_change_dependency_missing" or "resource_change_dependency_order_invalid" => T("Issue.Dependency.Description"),
         _ => T("Issue.Generic.Description")
     };
@@ -550,7 +607,7 @@ else
     protected override void OnInitialized() => ContextState.Changed += OnContextChanged;
     protected override async Task OnParametersSetAsync()
     {
-        if (loadedId != Id) { loadedId = Id; plan = null; principalNames = new Dictionary<Guid, string>(); modelBindings.Clear(); runtimeBindings.Clear(); bindingDraft = null; bindingsDirty = false; showRecordedChanges = true; contextVersion++; }
+        if (loadedId != Id) { loadedId = Id; plan = null; principalNames = new Dictionary<Guid, string>(); modelBindings.Clear(); runtimeBindings.Clear(); toolBindings.Clear(); bindingDraft = null; bindingsDirty = false; showRecordedChanges = true; contextVersion++; }
         await LoadAsync();
     }
     private void OnContextChanged() => _ = InvokeAsync(async () =>
@@ -565,6 +622,7 @@ else
         materialization = null;
         modelBindings.Clear();
         runtimeBindings.Clear();
+        toolBindings.Clear();
         bindingDraft = null;
         bindingsDirty = false;
         showRecordedChanges = true;
@@ -609,6 +667,8 @@ else
             var loadedFunctional = loadedPlan.Value.Content.Document.Deserialize<FunctionalResourcePlanV1>(JsonOptions);
             var loadedModelProfiles = await ModelProfilesClient.GetModelProfilesAsync(null, null, null, lifetime.Token);
             var loadedRuntimeProfiles = await RuntimeProfilesClient.GetRuntimeProfilesAsync(lifetime.Token);
+            IReadOnlyList<ToolResource> loadedTools = loadedFunctional?.Integrations.Count > 0
+                ? await ToolsClient.GetToolsAsync(cancellationToken: lifetime.Token) : [];
             var loadedActivities = await Client.ListActivitiesAsync(Id, lifetime.Token);
             var loadedPrincipalNames = await LoadPrincipalNamesAsync(loadedPlan.Value, loadedActivities, lifetime.Token);
             var page = await Client.ListChangeSetsAsync(Id, 0, 200, lifetime.Token);
@@ -622,6 +682,7 @@ else
             functional = loadedFunctional;
             modelProfiles = loadedModelProfiles.Where(profile => IsVisible(profile.ScopeRef, loadedPlan.Value.Scope)).ToArray();
             runtimeProfiles = loadedRuntimeProfiles.Where(profile => IsVisible(profile.ScopeRef, loadedPlan.Value.Scope)).ToArray();
+            tools = loadedTools.Where(tool => IsVisible(tool.ScopeRef, loadedPlan.Value.Scope)).ToArray();
             activities = loadedActivities;
             principalNames = loadedPrincipalNames;
             changeSets = loadedSets;
@@ -635,6 +696,7 @@ else
             bindingsOutdated = loadedDraft is not null && loadedDraft.Value.PlanRevision != loadedPlan.Value.Revision;
             modelBindings.Clear();
             runtimeBindings.Clear();
+            toolBindings.Clear();
             if (loadedDraft?.Value.PlanRevision == loadedPlan.Value.Revision)
             {
                 foreach (var binding in loadedDraft.Value.Bindings.Where(binding => loadedFunctional?.Roles.Any(role => role.LogicalId.Equals(binding.LogicalId, StringComparison.OrdinalIgnoreCase)) == true))
@@ -642,6 +704,9 @@ else
                     if (binding.ModelProfile is { } model) modelBindings[binding.LogicalId] = model;
                     if (binding.RuntimeProfile is { } runtime) runtimeBindings[binding.LogicalId] = runtime;
                 }
+                foreach (var binding in loadedDraft.Value.IntegrationBindings ?? [])
+                    if (loadedFunctional?.Integrations.Any(value => value.LogicalId.Equals(binding.LogicalId, StringComparison.OrdinalIgnoreCase)) == true)
+                        toolBindings[binding.LogicalId] = binding.Tool;
             }
             else if (loadedSelected?.Value.PlanRevision == loadedPlan.Value.Revision && loadedSelected.Value.ResolvedBindings is { } resolved)
             {
@@ -652,11 +717,15 @@ else
                     if (model is not null) modelBindings[role.LogicalId] = model.Reference;
                     if (runtime is not null) runtimeBindings[role.LogicalId] = runtime.Reference;
                 }
+                foreach (var integration in loadedFunctional?.Integrations ?? [])
+                {
+                    var tool = resolved.FirstOrDefault(value => value.LogicalId.Equals(integration.LogicalId, StringComparison.OrdinalIgnoreCase) && value.Field == "tool");
+                    if (tool is not null) toolBindings[integration.LogicalId] = tool.Reference;
+                }
             }
             bindingsDirty = loadedDraft?.Value.PlanRevision == loadedPlan.Value.Revision && !MatchesSavedChangeSet(loadedSelected);
             showRecordedChanges = !bindingsDirty;
-            previewOnLoad = bindingsDirty && CanReview && CanMaterialize && loadedFunctional?.Roles.Count > 0
-                && loadedFunctional.Roles.All(role => modelBindings.ContainsKey(role.LogicalId) && runtimeBindings.ContainsKey(role.LogicalId));
+            previewOnLoad = bindingsDirty && CanReview && CanMaterialize && BindingsComplete;
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception exception) { if (version == contextVersion) error = exception.Message; }

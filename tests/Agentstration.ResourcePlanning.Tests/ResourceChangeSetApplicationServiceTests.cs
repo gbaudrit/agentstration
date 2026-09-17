@@ -108,6 +108,20 @@ public sealed class ResourceChangeSetApplicationServiceTests
         Assert.IsNull(await fixture.Applications.GetAsync(otherScope, fixture.ChangeSet.Value.Id, default));
     }
 
+    [TestMethod]
+    public async Task ToolChangedAfterVerificationBlocksApplication()
+    {
+        var fixture = await Fixture.CreateAsync(includeTool: true);
+        await using var connection = fixture.Connection;
+        fixture.State.ToolChanged = true;
+
+        var result = await fixture.Applications.ApplyAsync(fixture.Scope, fixture.ChangeSet.Value.Id, fixture.Request, fixture.Actor, default);
+
+        Assert.AreEqual(ResourceChangeSetApplicationStatus.Failed, result.Value.Status);
+        Assert.AreEqual("resource_change_binding_stale", result.Value.Operations[0].ErrorCode);
+        Assert.AreEqual(0, fixture.Applier.Calls);
+    }
+
     private sealed class Fixture
     {
         public required SqliteConnection Connection { get; init; }
@@ -120,7 +134,7 @@ public sealed class ResourceChangeSetApplicationServiceTests
         public required MutableStateReader State { get; init; }
         public required ResourceChangeSetApplicationService Applications { get; init; }
 
-        public static async Task<Fixture> CreateAsync(bool includeFlow = false)
+        public static async Task<Fixture> CreateAsync(bool includeFlow = false, bool includeTool = false)
         {
             var scope = new ResourcePlanScope(Guid.NewGuid(), WorkspaceId.New());
             var actor = Guid.NewGuid();
@@ -136,7 +150,9 @@ public sealed class ResourceChangeSetApplicationServiceTests
                     Solution = new("Support", ["Answer requests"]),
                     Roles = [new("triage", "Triage", "Classify", ["Classify"], ["Text analysis"]),
                         new("resolution", "Resolution", "Answer", ["Answer"], ["Text generation"])],
-                    Workflows = includeFlow ? [new("support", "Support", "Resolve", ["triage", "resolution"], PlanningCollaborationStyle.Ordered)] : []
+                    Workflows = includeFlow ? [new("support", "Support", "Resolve", ["triage", "resolution"], PlanningCollaborationStyle.Ordered)] : [],
+                    Integrations = includeTool ? [new("ticketing", "Ticketing", "Create tickets", ["Ticket creation"])] : [],
+                    Dependencies = includeTool ? [new("triage", "ticketing", "Uses")] : []
                 })), actor, default);
             var ready = await plans.ChangeStatusAsync(scope, created.Value.Id, new(ResourcePlanStatus.Ready), created.ETag, actor, default);
             var state = new MutableStateReader();
@@ -144,7 +160,8 @@ public sealed class ResourceChangeSetApplicationServiceTests
             var changeSets = new ResourceChangeSetService(materializer, repository, TimeProvider.System);
             var bindings = new ResourcePlanMaterializationRequest([
                 new("triage", new("model-a"), new("runtime-a")),
-                new("resolution", new("model-a"), new("runtime-a"))]);
+                new("resolution", new("model-a"), new("runtime-a"))], null,
+                includeTool ? [new("ticketing", new("tool-a"))] : []);
             var set = await changeSets.CreateAsync(scope, ready.Value.Id, actor, bindings, default);
             var validation = await new ResourceChangeSetValidationService(changeSets, repository, state, [new AcceptingValidator()], TimeProvider.System)
                 .ValidateAsync(scope, set.Value.Id, actor, default);
@@ -163,10 +180,14 @@ public sealed class ResourceChangeSetApplicationServiceTests
     {
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
         private readonly Dictionary<string, CurrentResourceEvidence> values = [];
+        public bool ToolChanged { get; set; }
         public Task<CurrentResourceEvidence?> GetAsync(PlannedResourceDocument resource, CancellationToken cancellationToken) =>
             Task.FromResult(values.GetValueOrDefault(resource.Metadata.Name));
         public Task<CurrentResourceEvidence?> ResolveBindingAsync(ResourcePlanScope scope, string kind, ResourceReference reference, CancellationToken cancellationToken) =>
-            Task.FromResult<CurrentResourceEvidence?>(new(Guid.Empty, 1, "\"profile\"", JsonSerializer.SerializeToElement(new { kind, reference.Name }), $"{kind}:{reference.Name}"));
+            Task.FromResult<CurrentResourceEvidence?>(new(Guid.Empty, 1, "\"profile\"", JsonSerializer.SerializeToElement(new
+            {
+                kind, reference.Name, definition = new { enabled = true, discovery = new { available = true } }
+            }), $"{kind}:{reference.Name}{(ToolChanged && kind == "Tool" ? ":changed" : string.Empty)}"));
         public void Apply(ResourceChange change) => values[change.Proposed.Metadata.Name] = new(Guid.NewGuid(), 1, "\"applied\"", change.Proposed.Definition, change.ProposedDigest);
         public void ApplyDraft(ResourceChange change)
         {

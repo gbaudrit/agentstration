@@ -40,13 +40,18 @@ public sealed class ResourceChangeSetValidationServiceTests
         Assert.AreEqual(ready.Value.Revision, result.PlanRevision);
         Assert.AreEqual(ResourceChangeSetStatus.Validated, (await changeSets.GetAsync(scope, changeSet.Value.Id, default)).Value.Status);
         Assert.AreEqual(1, (await service.ListAsync(scope, changeSet.Value.Id, default)).Count);
+        state.BindingChanged = true;
+        var stale = await service.ValidateAsync(scope, changeSet.Value.Id, actor, default);
+        Assert.AreEqual(ResourceChangeSetReadiness.Blocked, stale.Readiness);
+        Assert.IsTrue(stale.Issues.Any(value => value.Code == "resource_change_binding_stale"));
     }
 
     private sealed class EmptyStateReader : IResourcePlanningStateReader
     {
+        public bool BindingChanged { get; set; }
         public Task<CurrentResourceEvidence?> GetAsync(PlannedResourceDocument resource, CancellationToken cancellationToken) => Task.FromResult<CurrentResourceEvidence?>(null);
         public Task<CurrentResourceEvidence?> ResolveBindingAsync(ResourcePlanScope scope, string kind, ResourceReference reference, CancellationToken cancellationToken) =>
-            Task.FromResult<CurrentResourceEvidence?>(new(Guid.Empty, 1, "\"profile\"", System.Text.Json.JsonSerializer.SerializeToElement(new { kind, reference.Name }), $"{kind}:{reference.Name}"));
+            Task.FromResult<CurrentResourceEvidence?>(new(Guid.Empty, 1, "\"profile\"", System.Text.Json.JsonSerializer.SerializeToElement(new { kind, reference.Name }), $"{kind}:{reference.Name}{(BindingChanged ? ":changed" : string.Empty)}"));
     }
 
     private sealed class AcceptingValidator : IPlannedResourceValidator

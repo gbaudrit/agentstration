@@ -44,11 +44,45 @@ public sealed class ResourceChangeSetServiceTests
         Assert.IsTrue(stale.Diagnostics.Any(value => value.Code == "planning_materialization_stale"));
     }
 
+    [TestMethod]
+    public async Task PersistsAnExplicitRetirementAsDelete()
+    {
+        var scope = new ResourcePlanScope(Guid.NewGuid(), WorkspaceId.New());
+        var actor = Guid.NewGuid();
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var repository = new SqliteResourcePlanRepository(new Factory(new DbContextOptionsBuilder<ResourcePlanningDbContext>().UseSqlite(connection).Options));
+        var validator = new FunctionalResourcePlanValidator();
+        var plans = new ResourcePlanService(repository, TimeProvider.System, validator);
+        await plans.InitializeAsync(default);
+        var created = await plans.CreateAsync(scope, new("Retire", "Remove the old assistant", null,
+            FunctionalResourcePlanSerializer.Serialize(new()
+            {
+                Solution = new("Retire a role", ["Remove it safely"]),
+                Retirements = [new("old-assistant", PlanningElementKind.Role, "No longer needed")]
+            })), actor, default);
+        var ready = await plans.ChangeStatusAsync(scope, created.Value.Id, new(ResourcePlanStatus.Ready), created.ETag, actor, default);
+        var current = new CurrentResourceEvidence(Guid.NewGuid(), 2, "\"existing\"",
+            System.Text.Json.JsonSerializer.SerializeToElement(new { definition = new { displayName = "Old assistant" } }), "existing-digest");
+        var materializer = new ResourcePlanMaterializationService(plans, validator, new ExistingStateReader(current), new());
+        var changeSet = await new ResourceChangeSetService(materializer, repository, TimeProvider.System)
+            .CreateAsync(scope, ready.Value.Id, actor, default);
+
+        Assert.AreEqual(ResourceChangeOperation.Delete, changeSet.Value.Changes.Single().Operation);
+        Assert.AreEqual(current.ETag, changeSet.Value.Changes.Single().Current?.ETag);
+    }
+
     private sealed class EmptyStateReader : IResourcePlanningStateReader
     {
         public Task<CurrentResourceEvidence?> GetAsync(PlannedResourceDocument resource, CancellationToken cancellationToken) => Task.FromResult<CurrentResourceEvidence?>(null);
         public Task<CurrentResourceEvidence?> ResolveBindingAsync(ResourcePlanScope scope, string kind, ResourceReference reference, CancellationToken cancellationToken) =>
             Task.FromResult<CurrentResourceEvidence?>(new(Guid.Empty, 1, "\"profile\"", System.Text.Json.JsonSerializer.SerializeToElement(new { kind, reference.Name }), $"{kind}:{reference.Name}"));
+    }
+
+    private sealed class ExistingStateReader(CurrentResourceEvidence current) : IResourcePlanningStateReader
+    {
+        public Task<CurrentResourceEvidence?> GetAsync(PlannedResourceDocument resource, CancellationToken cancellationToken) => Task.FromResult<CurrentResourceEvidence?>(current);
+        public Task<CurrentResourceEvidence?> ResolveBindingAsync(ResourcePlanScope scope, string kind, ResourceReference reference, CancellationToken cancellationToken) => Task.FromResult<CurrentResourceEvidence?>(null);
     }
 
     private sealed class Factory(DbContextOptions<ResourcePlanningDbContext> options) : IDbContextFactory<ResourcePlanningDbContext>

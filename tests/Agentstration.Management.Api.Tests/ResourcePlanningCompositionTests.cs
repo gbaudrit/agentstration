@@ -30,6 +30,9 @@ public sealed class ResourcePlanningCompositionTests
         }, calls.Select(value => value.Flow.ResourceId).ToArray());
         Assert.IsTrue(tools.All(value => value.StartsWith("agentstration.resource-planning.", StringComparison.Ordinal)));
         Assert.IsFalse(tools.Any(value => value.EndsWith(".apply", StringComparison.Ordinal)));
+        Assert.IsFalse(tools.Any(value => value.EndsWith("change-set.create", StringComparison.Ordinal)));
+        Assert.IsFalse(tools.Any(value => value.EndsWith("change-set.validate", StringComparison.Ordinal)));
+        Assert.IsTrue(parent.Definition.Graph.Transitions.Any(value => value.FromStep == "materialize-plan" && value.ToStep == "output"));
         Assert.IsTrue(parent.Definition.Graph.Steps.OfType<ConditionFlowStepDefinition>().Any(value => value.Name == "ready"));
     }
 

@@ -81,28 +81,16 @@ definition:
         argumentsMapping: { planId: "${steps.create-plan.output.plan.id.value}", expectedETag: "${steps.create-plan.output.etag}" }
       - type: tool
         name: materialize-plan
-        displayName: Materialize deterministic proposal
+        displayName: Identify the profile and Tool choices required for review
         tool: { resourceId: agentstration.resource-planning.plan.materialize }
         argumentsMapping: { planId: "${steps.create-plan.output.plan.id.value}" }
-      - type: tool
-        name: create-change-set
-        displayName: Create review boundary
-        tool: { resourceId: agentstration.resource-planning.change-set.create }
-        argumentsMapping: { planId: "${steps.create-plan.output.plan.id.value}" }
-      - type: tool
-        name: validate-change-set
-        displayName: Validate proposed changes
-        tool: { resourceId: agentstration.resource-planning.change-set.validate }
-        argumentsMapping: { changeSetId: "${steps.create-change-set.output.changeSet.id.value}" }
       - type: output
         name: output
-        displayName: Validated planning result
+        displayName: Plan ready for binding selection and review
         outputMapping:
-          status: "${steps.validate-change-set.output.readiness}"
+          status: ready-for-review
           plan: "${steps.submit-plan.output.plan}"
           materialization: "${steps.materialize-plan.output}"
-          changeSet: "${steps.create-change-set.output.changeSet}"
-          validation: "${steps.validate-change-set.output}"
     transitions:
       - { id: input-to-intent, fromStep: input, event: completed, toStep: analyze-intent }
       - { id: intent-to-capabilities, fromStep: analyze-intent, event: completed, toStep: design-capabilities }
@@ -115,9 +103,7 @@ definition:
       - { id: ready-to-create, fromStep: ready, event: "true", toStep: create-plan }
       - { id: create-to-submit, fromStep: create-plan, event: completed, toStep: submit-plan }
       - { id: submit-to-materialize, fromStep: submit-plan, event: completed, toStep: materialize-plan }
-      - { id: materialize-to-change-set, fromStep: materialize-plan, event: completed, toStep: create-change-set }
-      - { id: change-set-to-validation, fromStep: create-change-set, event: completed, toStep: validate-change-set }
-      - { id: validation-to-output, fromStep: validate-change-set, event: completed, toStep: output }
+      - { id: materialize-to-output, fromStep: materialize-plan, event: completed, toStep: output }
     outputSchema:
       type: object
       additionalProperties: true

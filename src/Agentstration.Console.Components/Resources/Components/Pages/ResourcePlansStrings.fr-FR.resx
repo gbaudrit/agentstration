@@ -45,6 +45,10 @@
   <data name="Workflows" xml:space="preserve"><value>Workflows</value></data>
   <data name="Integrations" xml:space="preserve"><value>Intégrations</value></data>
   <data name="Experiences" xml:space="preserve"><value>Expériences</value></data>
+  <data name="Retirements" xml:space="preserve"><value>Retraits prévus</value></data>
+  <data name="Retirement.Role" xml:space="preserve"><value>Rôle</value></data>
+  <data name="Retirement.Workflow" xml:space="preserve"><value>Workflow</value></data>
+  <data name="Retirement.Experience" xml:space="preserve"><value>Expérience</value></data>
   <data name="NothingPlanned" xml:space="preserve"><value>Aucun élément prévu pour ce plan.</value></data>
   <data name="FunctionalBoundary" xml:space="preserve"><value>L’intention fonctionnelle est distincte des ressources concrètes proposées par Agentstration.</value></data>
   <data name="NoChangeSets" xml:space="preserve"><value>Aucune proposition enregistrée pour cette révision. Choisissez les profils des agents pour examiner une proposition de plan.</value></data>
@@ -187,9 +191,9 @@
   <data name="Activity.Failed" xml:space="preserve"><value>Échec</value></data>
   <data name="Activity.Archived" xml:space="preserve"><value>Archivage</value></data>
   <data name="Activity.Cancelled" xml:space="preserve"><value>Annulation</value></data>
-  <data name="BindingsTitle" xml:space="preserve"><value>Profils des agents</value></data>
-  <data name="BindingsIntro" xml:space="preserve"><value>Choisissez un profil de modèle et un profil d’exécution par agent. Vos choix sont conservés même si vous quittez cette page.</value></data>
-  <data name="BindingsProgress" xml:space="preserve"><value>{0} agent(s) sur {1} configuré(s)</value></data>
+  <data name="BindingsTitle" xml:space="preserve"><value>Liaisons du plan</value></data>
+  <data name="BindingsIntro" xml:space="preserve"><value>Choisissez les profils des agents et les Tools des intégrations. Vos choix sont conservés même si vous quittez cette page.</value></data>
+  <data name="BindingsProgress" xml:space="preserve"><value>{0} liaison(s) sur {1} configurée(s)</value></data>
   <data name="BindingsSavedAutomatically" xml:space="preserve"><value>Choix enregistrés automatiquement</value></data>
   <data name="BindingsSaving" xml:space="preserve"><value>Enregistrement des choix…</value></data>
   <data name="BindingsNotSavedYet" xml:space="preserve"><value>Chaque choix sera enregistré automatiquement sur ce plan.</value></data>
@@ -200,7 +204,7 @@
   <data name="BindingsOutdated" xml:space="preserve"><value>Le plan a changé depuis vos derniers choix. Sélectionnez les profils pour cette révision.</value></data>
   <data name="ReviewChangesAction" xml:space="preserve"><value>Examiner la proposition de plan</value></data>
   <data name="ReviewPath" xml:space="preserve"><value>Étapes de la revue</value></data>
-  <data name="StepProfiles" xml:space="preserve"><value>Choisir les profils</value></data>
+  <data name="StepProfiles" xml:space="preserve"><value>Choisir les liaisons</value></data>
   <data name="StepProfilesHint" xml:space="preserve"><value>Choix conservés sur le plan</value></data>
   <data name="StepPreview" xml:space="preserve"><value>Examiner la proposition</value></data>
   <data name="StepPreviewHint" xml:space="preserve"><value>Calculé avec les profils choisis</value></data>
@@ -268,4 +272,20 @@
   <data name="Outcome.AlreadyApplied" xml:space="preserve"><value>Déjà appliqué</value></data>
   <data name="Outcome.Skipped" xml:space="preserve"><value>Sans changement</value></data>
   <data name="Outcome.Failed" xml:space="preserve"><value>Échec</value></data>
+  <data name="ToolBindingsTitle" xml:space="preserve"><value>Tools liés aux intégrations</value></data>
+  <data name="NoBindingsRequired" xml:space="preserve"><value>Aucune liaison à choisir pour ce plan.</value></data>
+  <data name="ToolBindingsIntro" xml:space="preserve"><value>Choisissez un Tool existant pour chaque intégration. Les agents qui en dépendent pourront l’utiliser.</value></data>
+  <data name="ToolBinding" xml:space="preserve"><value>Tool</value></data>
+  <data name="SelectTool" xml:space="preserve"><value>Choisir un Tool</value></data>
+  <data name="ManageTools" xml:space="preserve"><value>Créer ou configurer un Tool</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_unknown_integration" xml:space="preserve"><value>Ce Tool ne correspond à aucune intégration du plan.</value></data>
+  <data name="MaterializationDiagnostic.planning_integration_agent_required" xml:space="preserve"><value>Reliez cette intégration à au moins un agent du plan par une dépendance.</value></data>
+  <data name="MaterializationDiagnostic.planning_tool_binding_required" xml:space="preserve"><value>Choisissez un Tool existant pour cette intégration.</value></data>
+  <data name="MaterializationDiagnostic.planning_tool_binding_not_found" xml:space="preserve"><value>Le Tool choisi n’est pas visible dans cet espace.</value></data>
+  <data name="MaterializationDiagnostic.planning_tool_binding_unavailable" xml:space="preserve"><value>Le Tool choisi est désactivé ou indisponible.</value></data>
+  <data name="MaterializationDiagnostic.planning_tool_binding_outside_scope" xml:space="preserve"><value>Le Tool choisi est hors des espaces accessibles.</value></data>
+  <data name="MaterializationDiagnostic.planning_tool_binding_ambiguous" xml:space="preserve"><value>Choisissez un Tool avec un espace précis.</value></data>
+  <data name="MaterializationDiagnostic.planning_resource_name_collision" xml:space="preserve"><value>Deux éléments du plan ciblent le même nom de ressource.</value></data>
+  <data name="Issue.BindingStale.Title" xml:space="preserve"><value>Liaison à actualiser</value></data>
+  <data name="Issue.BindingStale.Description" xml:space="preserve"><value>Un profil ou un Tool choisi a changé. Actualisez la proposition, puis relancez la vérification.</value></data>
 </root>

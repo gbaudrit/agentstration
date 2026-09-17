@@ -16,6 +16,7 @@ public sealed record FunctionalResourcePlanV1
     public IReadOnlyList<PlanningWorkflowIntent> Workflows { get; init; } = [];
     public IReadOnlyList<PlanningIntegrationIntent> Integrations { get; init; } = [];
     public IReadOnlyList<PlanningExperienceIntent> Experiences { get; init; } = [];
+    public IReadOnlyList<PlanningRetirementIntent> Retirements { get; init; } = [];
     public IReadOnlyList<PlanningLogicalDependency> Dependencies { get; init; } = [];
     public PlanningRuntimeConstraints Runtime { get; init; } = new();
 }
@@ -79,6 +80,11 @@ public sealed record PlanningExperienceIntent(
     string Workflow,
     IReadOnlyList<string> Audiences,
     PlanningInteractionStyle Interaction = PlanningInteractionStyle.Conversation);
+
+[JsonConverter(typeof(JsonStringEnumConverter<PlanningElementKind>))]
+public enum PlanningElementKind { Role, Workflow, Experience }
+
+public sealed record PlanningRetirementIntent(string LogicalId, PlanningElementKind Element, string Reason);
 
 [JsonConverter(typeof(JsonStringEnumConverter<PlanningInteractionStyle>))]
 public enum PlanningInteractionStyle

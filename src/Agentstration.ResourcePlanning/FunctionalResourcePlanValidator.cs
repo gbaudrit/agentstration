@@ -63,6 +63,13 @@ public sealed class FunctionalResourcePlanValidator : IResourcePlanContentValida
             Required(experience.Purpose, $"{path}.purpose", 2000, issues);
             RequireValues(experience.Audiences, $"{path}.audiences", issues);
         }
+        foreach (var (retirement, index) in (plan.Retirements ?? []).Select((value, index) => (value, index)))
+        {
+            var path = $"retirements[{index}]";
+            Identity(retirement.LogicalId, $"{path}.logicalId", identities, issues);
+            if (!Enum.IsDefined(retirement.Element)) issues.Add(Error("planning_retirement_element_invalid", $"{path}.element", "Retire a role, workflow, or experience."));
+            Required(retirement.Reason, $"{path}.reason", 2000, issues);
+        }
         ValidateReferences(plan, identities, issues);
         if (plan.Runtime is null)
             issues.Add(Error("planning_runtime_required", "runtime", "Runtime constraints are required."));

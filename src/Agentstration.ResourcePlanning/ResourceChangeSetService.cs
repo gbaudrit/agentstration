@@ -30,6 +30,7 @@ public sealed class ResourceChangeSetService(
             {
                 ResourcePlanProposedOperation.Create => ResourceChangeOperation.Create,
                 ResourcePlanProposedOperation.Update => ResourceChangeOperation.Update,
+                ResourcePlanProposedOperation.Delete => ResourceChangeOperation.Delete,
                 ResourcePlanProposedOperation.NoOp => ResourceChangeOperation.NoOp,
                 _ => throw new ArgumentOutOfRangeException(nameof(proposal))
             },

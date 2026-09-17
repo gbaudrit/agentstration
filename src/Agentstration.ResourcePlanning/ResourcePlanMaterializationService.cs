@@ -11,6 +11,7 @@ using Agentstration.ResourcePlanning.Contracts;
 using Agentstration.ResourcePlanning.Storage.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Tools;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 
@@ -18,7 +19,7 @@ namespace Agentstration.ResourcePlanning;
 
 public sealed record ResourcePlanningMaterializationOptions
 {
-    public string MaterializerVersion { get; init; } = "1.1.0";
+    public string MaterializerVersion { get; init; } = "1.2.0";
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
 }
 
@@ -75,13 +76,42 @@ public sealed class ResourcePlanMaterializationService(
             var runtime = await CheckBindingAsync(scope, role.LogicalId, "runtimeProfile", RuntimeProfileResourceKinds.RuntimeProfile, binding.RuntimeProfile, diagnostics, bindingEvidence, cancellationToken);
             if (model is not null && runtime is not null) resolvedBindings.Add(role.LogicalId, new(role.LogicalId, model, runtime));
         }
-        var candidates = CreateCandidates(snapshot.Value, functional, resolvedBindings, diagnostics);
+        var integrationSelections = request.IntegrationBindings ?? [];
+        if (integrationSelections.Any(value => value is null || string.IsNullOrWhiteSpace(value.LogicalId))
+            || integrationSelections.Select(value => value.LogicalId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != integrationSelections.Count)
+            throw new ArgumentException("Integration bindings require distinct logical IDs.", nameof(request));
+        var selectedTools = new Dictionary<string, ResourceReference>(StringComparer.OrdinalIgnoreCase);
+        foreach (var selection in integrationSelections)
+            if (!functional.Integrations.Any(value => value.LogicalId.Equals(selection.LogicalId, StringComparison.OrdinalIgnoreCase)))
+                diagnostics.Add(new("planning_binding_unknown_integration", $"integrationBindings[{selection.LogicalId}]", "The Tool binding does not match a planned integration."));
+        foreach (var integration in functional.Integrations)
+        {
+            var selection = integrationSelections.FirstOrDefault(value => value.LogicalId.Equals(integration.LogicalId, StringComparison.OrdinalIgnoreCase));
+            var consumers = functional.Roles.Where(role => functional.Dependencies.Any(dependency =>
+                dependency.From.Equals(role.LogicalId, StringComparison.OrdinalIgnoreCase)
+                && dependency.To.Equals(integration.LogicalId, StringComparison.OrdinalIgnoreCase))).ToArray();
+            if (consumers.Length == 0)
+                diagnostics.Add(new("planning_integration_agent_required", $"integrations[{integration.LogicalId}]", "Connect this integration to at least one planned role with a dependency."));
+            var tool = await CheckBindingAsync(scope, integration.LogicalId, "tool", ToolResourceKinds.Tool, selection?.Tool,
+                diagnostics, bindingEvidence, cancellationToken);
+            if (tool is not null) selectedTools.Add(integration.LogicalId, tool);
+        }
+        var candidates = CreateCandidates(snapshot.Value, functional, resolvedBindings, selectedTools, diagnostics);
+        foreach (var collision in candidates.GroupBy(value => (value.Resource.Kind, value.Resource.Metadata.Namespace, value.Resource.Metadata.Name))
+            .Where(value => value.Count() > 1))
+            diagnostics.Add(new("planning_resource_name_collision", "logicalId",
+                $"The logical IDs {string.Join(", ", collision.Select(value => value.LogicalId))} resolve to the same resource name '{collision.Key.Name}'."));
         var proposals = new List<MaterializedResourceProposal>(candidates.Count);
         foreach (var candidate in candidates)
         {
             var current = await stateReader.GetAsync(candidate.Resource, cancellationToken);
+            if (candidate.IsRetirement && current is null)
+            {
+                diagnostics.Add(new("planning_retirement_target_missing", $"retirements[{candidate.LogicalId}]", "The resource to retire does not exist in this Workspace."));
+                continue;
+            }
             var proposedDigest = Digest(candidate.Resource);
-            var operation = current is null
+            var operation = candidate.IsRetirement ? ResourcePlanProposedOperation.Delete : current is null
                 ? ResourcePlanProposedOperation.Create
                 : string.Equals(current.Digest, proposedDigest, StringComparison.Ordinal)
                     ? ResourcePlanProposedOperation.NoOp
@@ -96,7 +126,8 @@ public sealed class ResourcePlanMaterializationService(
             contractVersion = snapshot.Value.Content.SchemaVersion,
             materializerVersion = options.MaterializerVersion,
             bindings = bindingEvidence.OrderBy(value => value.LogicalId, StringComparer.Ordinal).ThenBy(value => value.Field, StringComparer.Ordinal),
-            proposals = ordered.Select(value => new { value.LogicalId, value.Operation, value.ProposedDigest, value.DependsOn }),
+            proposals = ordered.Select(value => new { value.LogicalId, value.Operation, value.ProposedDigest, value.DependsOn,
+                Current = value.Current is null ? null : new { value.Current.Uid, value.Current.Revision, value.Current.ETag, value.Current.Digest } }),
             diagnostics
         });
         return new(planId, snapshot.Value.Revision, snapshot.Value.Content.SchemaVersion, options.MaterializerVersion, scope, ordered, diagnostics, digest, bindingEvidence);
@@ -108,7 +139,8 @@ public sealed class ResourcePlanMaterializationService(
         var path = $"bindings[{logicalId}].{field}";
         if (reference is null || string.IsNullOrWhiteSpace(reference.Name))
         {
-            diagnostics.Add(new("planning_binding_required", path, $"Select a {field} for this role."));
+            diagnostics.Add(new(kind == ToolResourceKinds.Tool ? "planning_tool_binding_required" : "planning_binding_required", path,
+                kind == ToolResourceKinds.Tool ? "Select an existing Tool for this integration." : $"Select a {field} for this role."));
             return null;
         }
         try
@@ -117,13 +149,22 @@ public sealed class ResourcePlanMaterializationService(
             var resolved = await stateReader.ResolveBindingAsync(scope, kind, requested, cancellationToken);
             if (resolved is null)
             {
-                diagnostics.Add(new("planning_binding_not_found", path, $"The selected {field} '{reference.Name}' is not visible in this Workspace."));
+                diagnostics.Add(new(kind == ToolResourceKinds.Tool ? "planning_tool_binding_not_found" : "planning_binding_not_found", path,
+                    $"The selected {field} '{reference.Name}' is not visible in this Workspace."));
                 return null;
             }
             if (resolved.Document.TryGetProperty("status", out var statusValue)
                 && statusValue.Deserialize<ResourceStatus>(JsonOptions)?.ProvisioningState != ProvisioningState.Succeeded)
             {
                 diagnostics.Add(new("planning_binding_unavailable", path, $"The selected {field} '{reference.Name}' is not provisioned successfully."));
+                return null;
+            }
+            if (kind == ToolResourceKinds.Tool && (!resolved.Document.TryGetProperty("definition", out var definition)
+                || !definition.TryGetProperty("enabled", out var enabled) || enabled.ValueKind != JsonValueKind.True
+                || !definition.TryGetProperty("discovery", out var discovery) || discovery.ValueKind != JsonValueKind.Object
+                || !discovery.TryGetProperty("available", out var available) || available.ValueKind != JsonValueKind.True))
+            {
+                diagnostics.Add(new("planning_tool_binding_unavailable", path, $"The selected Tool '{reference.Name}' is unavailable."));
                 return null;
             }
             var exactScope = resolved.Document.TryGetProperty("scopeRef", out var scopeValue)
@@ -134,12 +175,14 @@ public sealed class ResourcePlanMaterializationService(
         }
         catch (ResourceReferenceOutsideScopeException)
         {
-            diagnostics.Add(new("planning_binding_outside_scope", path, "The selected profile is outside this Workspace's visible scopes."));
+            diagnostics.Add(new(kind == ToolResourceKinds.Tool ? "planning_tool_binding_outside_scope" : "planning_binding_outside_scope", path,
+                "The selected resource is outside this Workspace's visible scopes."));
             return null;
         }
         catch (ResourceReferenceAmbiguousException)
         {
-            diagnostics.Add(new("planning_binding_ambiguous", path, "The selected profile is ambiguous; choose its exact scope."));
+            diagnostics.Add(new(kind == ToolResourceKinds.Tool ? "planning_tool_binding_ambiguous" : "planning_binding_ambiguous", path,
+                "The selected resource is ambiguous; choose its exact scope."));
             return null;
         }
         catch (ModelProfileValidationException exception)
@@ -149,17 +192,21 @@ public sealed class ResourcePlanMaterializationService(
         }
     }
 
-    private List<Candidate> CreateCandidates(ResourcePlan plan, FunctionalResourcePlanV1 functional, IReadOnlyDictionary<string, ResourcePlanAgentBinding> bindings, List<ResourcePlanMaterializationDiagnostic> diagnostics)
+    private List<Candidate> CreateCandidates(ResourcePlan plan, FunctionalResourcePlanV1 functional, IReadOnlyDictionary<string, ResourcePlanAgentBinding> bindings,
+        IReadOnlyDictionary<string, ResourceReference> toolBindings, List<ResourcePlanMaterializationDiagnostic> diagnostics)
     {
         var result = new List<Candidate>();
         var scopeRef = ResourceScopeRef.Workspace(plan.Scope.WorkspaceId.Value);
-        var names = functional.Roles.Concat<object>(functional.Workflows).Concat(functional.Integrations).Concat(functional.Experiences)
+        var retirements = functional.Retirements ?? [];
+        var integrationIds = functional.Integrations.Select(value => value.LogicalId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var names = functional.Roles.Concat<object>(functional.Workflows).Concat(functional.Integrations).Concat(functional.Experiences).Concat(retirements)
             .Select(value => value switch
             {
                 PlanningRoleIntent item => item.LogicalId,
                 PlanningWorkflowIntent item => item.LogicalId,
                 PlanningIntegrationIntent item => item.LogicalId,
                 PlanningExperienceIntent item => item.LogicalId,
+                PlanningRetirementIntent item => item.LogicalId,
                 _ => throw new UnreachableException()
             }).ToDictionary(value => value, StableName, StringComparer.OrdinalIgnoreCase);
 
@@ -173,9 +220,12 @@ public sealed class ResourcePlanMaterializationService(
                 Instructions = BuildInstructions(role),
                 ModelProfile = binding.ModelProfile,
                 RuntimeProfile = binding.RuntimeProfile,
+                Tools = functional.Dependencies.Where(value => value.From.Equals(role.LogicalId, StringComparison.OrdinalIgnoreCase)
+                    && toolBindings.ContainsKey(value.To)).Select(value => toolBindings[value.To]).Distinct().ToArray(),
                 Behaviors = role.Capabilities.ToArray()
             };
-            result.Add(new(role.LogicalId, Document(AgentResourceKinds.Agent, names[role.LogicalId], scopeRef, definition), Dependencies(functional, role.LogicalId)));
+            result.Add(new(role.LogicalId, Document(AgentResourceKinds.Agent, names[role.LogicalId], scopeRef, definition),
+                Dependencies(functional, role.LogicalId).Where(value => !integrationIds.Contains(value)).ToArray()));
         }
 
         foreach (var workflow in functional.Workflows)
@@ -188,11 +238,8 @@ public sealed class ResourcePlanMaterializationService(
             }
             var spec = CreateFlowDefinition(workflow, participants);
             var definition = new MaterializedFlowDefinition(workflow.DisplayName, workflow.Objective, "1.0.0", true, spec, true, true);
-            result.Add(new(workflow.LogicalId, Document(FlowResourceKinds.Flow, names[workflow.LogicalId], scopeRef, definition), workflow.Participants.Concat(Dependencies(functional, workflow.LogicalId)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()));
+            result.Add(new(workflow.LogicalId, Document(FlowResourceKinds.Flow, names[workflow.LogicalId], scopeRef, definition), workflow.Participants.Concat(Dependencies(functional, workflow.LogicalId).Where(value => !integrationIds.Contains(value))).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()));
         }
-
-        foreach (var integration in functional.Integrations)
-            diagnostics.Add(new("planning_integration_binding_required", $"integrations[{integration.LogicalId}]", $"Integration '{integration.DisplayName}' requires an operator-selected Tool/provider binding before it can be materialized.", ResourcePlanMaterializationSeverity.Warning));
 
         foreach (var experience in functional.Experiences)
         {
@@ -203,7 +250,23 @@ public sealed class ResourcePlanMaterializationService(
                 new EntryBinding(EntryBindingKind.Flow, names[experience.Workflow], options.Namespace),
                 new EntryBehavior(AllowConversation: experience.Interaction == PlanningInteractionStyle.Conversation),
                 true);
-            result.Add(new(experience.LogicalId, Document(EntryResourceKinds.Entry, names[experience.LogicalId], scopeRef, definition), [experience.Workflow, .. Dependencies(functional, experience.LogicalId)]));
+            result.Add(new(experience.LogicalId, Document(EntryResourceKinds.Entry, names[experience.LogicalId], scopeRef, definition), [experience.Workflow, .. Dependencies(functional, experience.LogicalId).Where(value => !integrationIds.Contains(value))]));
+        }
+        var retirementIds = retirements.Select(value => value.LogicalId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var retirement in retirements)
+        {
+            var kind = retirement.Element switch
+            {
+                PlanningElementKind.Role => AgentResourceKinds.Agent,
+                PlanningElementKind.Workflow => FlowResourceKinds.Flow,
+                PlanningElementKind.Experience => EntryResourceKinds.Entry,
+                _ => throw new UnreachableException()
+            };
+            // A dependent resource must be removed before its prerequisite.
+            var dependsOn = functional.Dependencies.Where(value =>
+                string.Equals(value.To, retirement.LogicalId, StringComparison.OrdinalIgnoreCase) && retirementIds.Contains(value.From))
+                .Select(value => value.From).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            result.Add(new(retirement.LogicalId, Document<object?>(kind, names[retirement.LogicalId], scopeRef, null), dependsOn, true));
         }
         return result;
     }
@@ -281,7 +344,7 @@ public sealed class ResourcePlanMaterializationService(
         return $"sha256:{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(json)))}";
     }
 
-    private sealed record Candidate(string LogicalId, PlannedResourceDocument Resource, IReadOnlyList<string> DependsOn);
+    private sealed record Candidate(string LogicalId, PlannedResourceDocument Resource, IReadOnlyList<string> DependsOn, bool IsRetirement = false);
     private sealed record MaterializedFlowDefinition(string DisplayName, string Description, string Version, bool Enabled, FlowDefinition Spec, bool Publish, bool Activate);
     private sealed record MaterializedEntryDefinition(string DisplayName, string Description, EntryPresentation Presentation, EntryBinding Binding, EntryBehavior Behavior, bool Publish);
 }
@@ -307,6 +370,11 @@ public sealed class ManagementResourcePlanningStateReader(
         if (kind == RuntimeProfileResourceKinds.RuntimeProfile)
         {
             var stored = await references.ResolveAsync<RuntimeProfileResource>(reference, ResourceNamespace.Default, kind, consumer, cancellationToken);
+            return stored is null ? null : new(stored.Value.Uid, stored.Value.Generation, stored.ETag, JsonSerializer.SerializeToElement(stored.Value, JsonOptions), ResourcePlanMaterializationService.Digest(stored.Value));
+        }
+        if (kind == ToolResourceKinds.Tool)
+        {
+            var stored = await references.ResolveAsync<ToolResource>(reference, ResourceNamespace.Default, kind, consumer, cancellationToken);
             return stored is null ? null : new(stored.Value.Uid, stored.Value.Generation, stored.ETag, JsonSerializer.SerializeToElement(stored.Value, JsonOptions), ResourcePlanMaterializationService.Digest(stored.Value));
         }
         throw new ArgumentException("Unsupported binding kind.", nameof(kind));

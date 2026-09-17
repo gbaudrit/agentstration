@@ -71,19 +71,24 @@ public sealed class ResourcePlanServiceTests
         var content = FunctionalResourcePlanSerializer.Serialize(new FunctionalResourcePlanV1
         {
             Solution = new("Triage requests", ["A qualified request"]),
-            Roles = [new("triage", "Triage", "Qualify", ["Classify"], ["Text analysis"])]
+            Roles = [new("triage", "Triage", "Qualify", ["Classify"], ["Text analysis"])],
+            Integrations = [new("ticketing", "Ticketing", "Create tickets", ["Ticket creation"])]
         });
         var created = await service.CreateAsync(Scope, new("Support", "Triage requests", null, content), Actor, default);
         var selected = new ResourcePlanAgentBindingSelection("triage", new("model-a"), null);
-        var saved = await service.SaveBindingsAsync(Scope, created.Value.Id, new(created.Value.Revision, [selected]), null, default);
+        var saved = await service.SaveBindingsAsync(Scope, created.Value.Id,
+            new(created.Value.Revision, [selected], [new("ticketing", new("tool-a"))]), null, default);
         var reopened = new ResourcePlanService(new SqliteResourcePlanRepository(new TestDbContextFactory(options)), TimeProvider.System, new FunctionalResourcePlanValidator());
         Assert.AreEqual("model-a", (await reopened.GetBindingsAsync(Scope, created.Value.Id, default))!.Value.Bindings.Single().ModelProfile!.Name);
+        Assert.AreEqual("tool-a", (await reopened.GetBindingsAsync(Scope, created.Value.Id, default))!.Value.IntegrationBindings!.Single().Tool.Name);
         await Assert.ThrowsAsync<ResourcePlanNotFoundException>(() => reopened.GetBindingsAsync(
             Scope with { WorkspaceId = new WorkspaceId(Guid.NewGuid()) }, created.Value.Id, default));
         await Assert.ThrowsAsync<ResourcePlanConcurrencyException>(() => reopened.SaveBindingsAsync(Scope, created.Value.Id,
             new(created.Value.Revision, [selected]), null, default));
         await Assert.ThrowsAsync<ArgumentException>(() => reopened.SaveBindingsAsync(Scope, created.Value.Id,
             new(created.Value.Revision, [selected, selected]), saved.ETag, default));
+        await Assert.ThrowsAsync<ArgumentException>(() => reopened.SaveBindingsAsync(Scope, created.Value.Id,
+            new(created.Value.Revision, [selected], [new("unknown", new("tool-a"))]), saved.ETag, default));
         var updated = await reopened.SaveBindingsAsync(Scope, created.Value.Id,
             new(created.Value.Revision, [selected with { RuntimeProfile = new("runtime-a") }]), saved.ETag, default);
         Assert.AreEqual("runtime-a", updated.Value.Bindings.Single().RuntimeProfile!.Name);

@@ -5,6 +5,7 @@ using Agentstration.ResourcePlanning.Contracts;
 using Agentstration.ResourcePlanning.Storage.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Tools;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
@@ -148,7 +149,7 @@ public sealed class ResourceChangeSetApplicationService(
                 if (!application.Operations.Any(value => value.LogicalId.Equals(dependency, StringComparison.OrdinalIgnoreCase) && value.Outcome is
                     ResourceChangeApplicationOutcome.Applied or ResourceChangeApplicationOutcome.AlreadyApplied or ResourceChangeApplicationOutcome.Skipped))
                     throw new ResourceChangeSetApplicationException("resource_change_dependency_unapplied", $"Dependency '{dependency}' has not been applied.");
-            if (change.Proposed.Kind == "Agent") await CheckBindingsAsync(scope, changeSet, change.LogicalId, cancellationToken);
+            await CheckBindingsAsync(scope, changeSet, cancellationToken);
             var current = await stateReader.GetAsync(change.Proposed, cancellationToken);
             var retry = application.Attempts > 1;
             if (retry && ((change.Operation == ResourceChangeOperation.Delete && current is null) ||
@@ -204,14 +205,20 @@ public sealed class ResourceChangeSetApplicationService(
         return current.Digest == ResourcePlanMaterializationService.Digest(intermediate);
     }
 
-    private async Task CheckBindingsAsync(ResourcePlanScope scope, ResourceChangeSet changeSet, string logicalId, CancellationToken cancellationToken)
+    private async Task CheckBindingsAsync(ResourcePlanScope scope, ResourceChangeSet changeSet, CancellationToken cancellationToken)
     {
-        foreach (var binding in changeSet.ResolvedBindings?.Where(value => value.LogicalId.Equals(logicalId, StringComparison.OrdinalIgnoreCase)) ?? [])
+        foreach (var binding in changeSet.ResolvedBindings ?? [])
         {
-            var kind = binding.Field == "modelProfile" ? ModelResourceKinds.ModelProfile : RuntimeProfileResourceKinds.RuntimeProfile;
+            var kind = binding.Field switch
+            {
+                "modelProfile" => ModelResourceKinds.ModelProfile,
+                "runtimeProfile" => RuntimeProfileResourceKinds.RuntimeProfile,
+                "tool" => ToolResourceKinds.Tool,
+                _ => throw new ResourceChangeSetApplicationException("resource_change_binding_invalid", "An unknown binding type was recorded.")
+            };
             var current = await stateReader.ResolveBindingAsync(scope, kind, binding.Reference, cancellationToken);
             if (current is null || current.Digest != binding.Digest || current.ETag != binding.ETag)
-                throw new ResourceChangeSetApplicationException("resource_change_binding_stale", "An agent profile changed since the proposal was verified.");
+                throw new ResourceChangeSetApplicationException("resource_change_binding_stale", "A selected profile or Tool changed since the proposal was verified.");
         }
     }
 }

@@ -27,7 +27,7 @@ public sealed class CanonicalPlannedResourceApplier(
         {
             if (change.Operation == ResourceChangeOperation.Delete)
             {
-                await agents.DeleteAgentAsync(resource.Metadata.Namespace, resource.Metadata.Name, change.Current?.ETag, cancellationToken);
+                await agents.DeleteAgentExactAsync(resource.ScopeRef, resource.Metadata.Namespace, resource.Metadata.Name, change.Current?.ETag, cancellationToken);
                 return;
             }
             var definition = resource.Definition.Deserialize<AgentProperties>(JsonOptions) ?? throw new JsonException("Agent definition is empty.");
