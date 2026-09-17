@@ -1,13 +1,17 @@
 using System.Net;
 using System.Text;
+using Azure.Core;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
+using Agentstration.Aep.Client;
+using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Extensions.Foundry;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.AI;
 
 namespace Agentstration.ModelProviders.Tests;
 
@@ -58,6 +62,26 @@ public sealed class FoundryProviderTests
     }
 
     [TestMethod]
+    public async Task EntraUsesTheProjectOrResourceAudienceForTheSelectedInferenceRoute()
+    {
+        var credential = new RecordingCredential();
+        var options = Options() with { AuthenticationMode = FoundryAuthenticationMode.Development };
+        var authenticator = new FoundryRequestAuthenticator(options, tokenCredential: credential);
+        using var discovery = new HttpRequestMessage(HttpMethod.Get, options.DeploymentsEndpoint());
+        await authenticator.ApplyAsync(discovery, default);
+        Assert.AreEqual("https://ai.azure.com/.default", credential.LastScope);
+
+        using var resourceInference = new HttpRequestMessage(HttpMethod.Post, new Uri("https://foundry.example/openai/v1/chat/completions"));
+        await authenticator.ApplyInferenceAsync(resourceInference, options, default);
+        Assert.AreEqual("https://cognitiveservices.azure.com/.default", credential.LastScope);
+
+        var projectOptions = options with { InferenceEndpoint = new Uri("https://foundry.example/api/projects/demo/openai/v1") };
+        using var projectInference = new HttpRequestMessage(HttpMethod.Post, new Uri("https://foundry.example/api/projects/demo/openai/v1/chat/completions"));
+        await authenticator.ApplyInferenceAsync(projectInference, projectOptions, default);
+        Assert.AreEqual("https://ai.azure.com/.default", credential.LastScope);
+    }
+
+    [TestMethod]
     public async Task DiscoveryFiltersUnknownCapabilitiesAndKeepsAuthenticationOnEachRequest()
     {
         var seen = new List<Uri>();
@@ -91,10 +115,26 @@ public sealed class FoundryProviderTests
             CollectionAssert.AreEqual(new[] { "chat" }, models[0].Capabilities!.ToArray());
             Assert.AreEqual("chat-b", models[1].Id);
             Assert.AreEqual(2, seen.Count);
-            Assert.IsFalse(provider.Descriptor.Capabilities.Chat);
+            Assert.IsTrue(provider.Descriptor.Capabilities.Chat);
             Assert.IsTrue(provider.Descriptor.Capabilities.ModelDiscovery);
         }
         finally { Environment.SetEnvironmentVariable("FOUNDRY_API_KEY", previous); }
+    }
+
+    [TestMethod]
+    public async Task DiscoveryAcceptsFoundryChatCompletionCapability()
+    {
+        await WithEnvironmentKeyAsync(async authenticator =>
+        {
+            using var client = Client((_, _) => Task.FromResult(Json(HttpStatusCode.OK, """
+                {"value":[{"name":"Phi-4-reasoning","type":"ModelDeployment","modelName":"Phi-4-reasoning","modelVersion":"1","modelPublisher":"Microsoft","capabilities":{"chat_completion":"true"},"sku":{"name":"GlobalStandard","capacity":20}}]}
+                """)));
+            var models = await new FoundryAepModelProvider(client, Options(), authenticator).ListModelsAsync();
+
+            Assert.HasCount(1, models);
+            Assert.AreEqual("Phi-4-reasoning", models[0].Id);
+            CollectionAssert.AreEqual(new[] { "chat" }, models[0].Capabilities!.ToArray());
+        });
     }
 
     [TestMethod]
@@ -233,9 +273,13 @@ public sealed class FoundryProviderTests
                 {
                     services.RemoveAll<FoundryAepModelProvider>();
                     services.AddSingleton(new FoundryAepModelProvider(
-                        Client((_, _) => Task.FromResult(Json(HttpStatusCode.OK, """
-                            {"value":[{"type":"ModelDeployment","name":"chat-a","capabilities":{"chat":true}}]}
-                            """))),
+                        Client((request, _) => Task.FromResult(request.Method == HttpMethod.Post
+                            ? Json(HttpStatusCode.OK, """
+                                {"choices":[{"index":0,"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}]}
+                                """)
+                            : Json(HttpStatusCode.OK, """
+                                {"value":[{"type":"ModelDeployment","name":"chat-a","capabilities":{"chat":true}}]}
+                                """))),
                         Options(),
                         new FoundryRequestAuthenticator(Options())));
                 }));
@@ -243,10 +287,13 @@ public sealed class FoundryProviderTests
             var manifest = await client.GetStringAsync(AepProtocol.DiscoveryPath);
             var models = await client.GetStringAsync($"{AepProtocol.ModelProvidersPath}/microsoft-foundry/models");
             var health = await client.GetStringAsync($"{AepProtocol.ModelProvidersPath}/microsoft-foundry/health");
+            using var chatClient = new AepChatClient(new AepClient(client).CreateModelProvider("microsoft-foundry"), "chat-a");
+            var chat = await chatClient.GetResponseAsync([new ChatMessage(ChatRole.User, "ping")]);
 
             StringAssert.Contains(manifest, "microsoft-foundry");
             StringAssert.Contains(models, "chat-a");
             StringAssert.Contains(health, "available");
+            Assert.AreEqual("pong", chat.Text);
         }
         finally
         {
@@ -291,5 +338,19 @@ public sealed class FoundryProviderTests
     private sealed class StubHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handle) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => handle(request, cancellationToken);
+    }
+
+    private sealed class RecordingCredential : TokenCredential
+    {
+        public string? LastScope { get; private set; }
+
+        public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
+        {
+            LastScope = requestContext.Scopes.Single();
+            return new AccessToken("test-token", DateTimeOffset.MaxValue);
+        }
+
+        public override ValueTask<AccessToken> GetTokenAsync(TokenRequestContext requestContext, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(GetToken(requestContext, cancellationToken));
     }
 }
