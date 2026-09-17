@@ -72,6 +72,8 @@ An ancestor resource reference must name its exact `scopeRef`; an omitted scope 
 
 This fragment shows the policy fields inside `properties`; a complete PUT also includes the resource's other required properties. Management reads expose grant metadata, never the Secret value. Removing a grant immediately prevents subsequent resolutions through that path.
 
+Existing workspace Secrets and Vaults retain their workspace ownership and same-scope references. Definitions written before `usePolicy` was introduced deserialize with an empty grant list, so descendant use remains denied until an administrator adds a grant. The policy is stored in the resource JSON payload; adding it requires no SQLite or PostgreSQL table migration. Resources with the same name at different scopes remain distinct, including their Local Vault encrypted values. Back up the master key and encrypted payloads together when moving an existing installation; neither belongs in a resource export.
+
 For example, the Display name `Clé OpenAI — Production` produces:
 
 ```text
@@ -84,6 +86,8 @@ Vault key: cle-openai-production
 While creating the Secret, changing **Display name** updates both generated identifiers. Changing **Name** manually also updates **Vault key** until the Vault key itself is edited. After a field is customized manually, the Console preserves that customization. Existing Secret names are immutable when editing their metadata.
 
 Secret values are write-only in the Management Plane. Resource reads, lists, YAML exports, Console state, and usage references contain only metadata and status such as `Configured` or `Missing`. There is deliberately no reveal action and no `GET` value endpoint.
+
+The Pack Composer represents a workspace Secret as an installation binding to a Secret selected at installation time. It does not copy the Secret or its value into the Pack; Vaults cannot be selected for Pack export. Bootstrap account credentials are supplied from configuration, separately from managed Secrets. Backups or snapshots of Management resource metadata do not include Local Vault payload files or the master-key file; restore those protected files separately when values must survive a move.
 
 The value operations are:
 

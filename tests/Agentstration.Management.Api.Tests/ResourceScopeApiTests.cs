@@ -161,6 +161,20 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             }, tenant));
         Assert.AreEqual(HttpStatusCode.Created, secretResponse.StatusCode);
 
+        const string secretValue = "private-value-must-not-appear-in-management";
+        using var setValue = await client.PutAsJsonAsync(
+            $"/api/secrets/resolution-secret/value?scopeRef={Uri.EscapeDataString(tenant.Value)}",
+            new SetSecretValueRequest(secretValue));
+        Assert.AreEqual(HttpStatusCode.NoContent, setValue.StatusCode);
+        using var valueRead = await client.GetAsync($"/api/secrets/resolution-secret?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        using var valueList = await client.GetAsync("/api/secrets");
+        using var valueUsages = await client.GetAsync($"/api/secrets/resolution-secret/usages?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        Assert.AreEqual(HttpStatusCode.OK, valueRead.StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, valueList.StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, valueUsages.StatusCode);
+        foreach (var response in new[] { valueRead, valueList, valueUsages })
+            Assert.IsFalse((await response.Content.ReadAsStringAsync()).Contains(secretValue, StringComparison.Ordinal));
+
         var resolver = factory.Services.GetRequiredService<ISecretResolver>();
         var context = new SecretResolutionContext(workspace,
             ResourceAddress.Create(ResourceNamespace.Default, "ModelProvider", "consumer"));

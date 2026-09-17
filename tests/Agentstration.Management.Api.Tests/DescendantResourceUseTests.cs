@@ -1,5 +1,7 @@
+using System.Text.Json;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Secrets;
 
 namespace Agentstration.Management.Tests;
 
@@ -40,6 +42,22 @@ public sealed class DescendantResourceUseTests
         await authorizer.ValidateAsync(ResourceScopeRef.Instance, grant, default);
         Assert.IsTrue(await authorizer.CanUseAsync(ResourceScopeRef.Instance, WorkspaceA, grant, default));
         Assert.IsFalse(await authorizer.CanUseAsync(ResourceScopeRef.Instance, WorkspaceB, grant, default));
+    }
+
+    [TestMethod]
+    public async Task LegacyDefinitionsWithoutUsePolicyRemainReadableAndDenyDescendants()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var vault = JsonSerializer.Deserialize<VaultProperties>("""{"displayName":"Local","providerType":"local"}""", options);
+        var secret = JsonSerializer.Deserialize<SecretProperties>("""{"displayName":"Legacy","vault":{"name":"local"},"key":"legacy"}""", options);
+
+        Assert.IsNotNull(vault);
+        Assert.IsNotNull(secret);
+        var authorizer = new DescendantResourceUseAuthorizer(new Scopes());
+        Assert.IsTrue(await authorizer.CanUseAsync(TenantA, TenantA, vault.UsePolicy, default));
+        Assert.IsFalse(await authorizer.CanUseAsync(TenantA, WorkspaceA, vault.UsePolicy, default));
+        Assert.IsTrue(await authorizer.CanUseAsync(TenantA, TenantA, secret.UsePolicy, default));
+        Assert.IsFalse(await authorizer.CanUseAsync(TenantA, WorkspaceA, secret.UsePolicy, default));
     }
 
     [TestMethod]
