@@ -3,13 +3,13 @@
 
 @if (OwnerScopeRef is { } owner && (Grants.Count > 0 || Candidates(owner).Count > 0))
 {
-    <section class="panel form-section descendant-grants">
+    <section class="panel form-section descendant-grants" data-testid="descendant-grants">
         <div class="panel-header"><div><p class="eyebrow">@T("Scope")</p><h2>@T("DescendantAccess")</h2></div></div>
         <p>@T("DescendantAccessHelp")</p>
         <div class="grant-list">
             @foreach (var grant in Grants)
             {
-                <div class="grant-row" @key="grant.ScopeRef">
+                <div class="grant-row" data-testid="descendant-grant-row" data-scope-ref="@grant.ScopeRef.Value" @key="grant.ScopeRef">
                     <div class="grant-target">
                         <span class="grant-field-label">@T("TargetScope")</span>
                         <span class="grant-target-identity" title="@grant.ScopeRef.Value"><ResourceScopeBadge ScopeRef="grant.ScopeRef" /><strong>@ScopeName(grant.ScopeRef)</strong></span>
@@ -19,7 +19,7 @@
                         {
                             <label class="grant-checkbox"><input type="checkbox" checked="@grant.IncludeDescendants" @onchange="args => SetIncludeDescendants(grant.ScopeRef, args.Value is true)" /><span>@T("IncludeDescendants")</span></label>
                         }
-                        <button type="button" class="button-secondary grant-remove" @onclick="() => Remove(grant.ScopeRef)">@T("RemoveGrant")</button>
+                        <button type="button" class="button-secondary grant-remove" data-testid="descendant-grant-remove" @onclick="() => Remove(grant.ScopeRef)">@T("RemoveGrant")</button>
                     </div>
                 </div>
             }
@@ -27,8 +27,8 @@
         @if (Candidates(owner).Any(value => Grants.All(grant => grant.ScopeRef != value.ScopeRef)))
         {
             <div class="grant-add">
-                <label><span class="grant-field-label">@T("TargetScope")</span><select @bind="selectedScope" @onchange:stopPropagation="true"><option value="">@T("SelectScope")</option>@foreach (var target in Candidates(owner).Where(value => Grants.All(grant => grant.ScopeRef != value.ScopeRef))) { <option value="@target.ScopeRef.Value">@ScopeLabel(target)</option> }</select></label>
-                <button type="button" class="button-secondary grant-add-button" disabled="@string.IsNullOrWhiteSpace(selectedScope)" @onclick="Add">@T("AddGrant")</button>
+                <label><span class="grant-field-label">@T("TargetScope")</span><select data-testid="descendant-grant-target" @bind="selectedScope" @onchange:stopPropagation="true"><option value="">@T("SelectScope")</option>@foreach (var target in Candidates(owner).Where(value => Grants.All(grant => grant.ScopeRef != value.ScopeRef))) { <option value="@target.ScopeRef.Value">@ScopeLabel(target)</option> }</select></label>
+                <button type="button" class="button-secondary grant-add-button" data-testid="descendant-grant-add" disabled="@string.IsNullOrWhiteSpace(selectedScope)" @onclick="Add">@T("AddGrant")</button>
             </div>
         }
     </section>

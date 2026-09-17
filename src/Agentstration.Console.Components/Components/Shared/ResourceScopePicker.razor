@@ -3,7 +3,7 @@
 
 <label>
     <span>@Localizer["ResourceScope.Label"] <HelpTooltip Text="@Localizer["ResourceScope.Help"]" /></span>
-    <select value="@(Value?.Value ?? string.Empty)" @onchange="ChangeAsync" disabled="@Disabled">
+    <select data-testid="resource-scope-picker" value="@(Value?.Value ?? string.Empty)" @onchange="ChangeAsync" disabled="@Disabled">
         @foreach (var target in Targets)
         {
             <option value="@target.ScopeRef.Value" disabled="@(!target.CanWrite)">@Label(target)</option>
