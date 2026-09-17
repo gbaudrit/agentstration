@@ -57,15 +57,18 @@ public sealed class DependencyTests
     {
         var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
         var foundryProject = Path.Combine(sourceRoot, "Agentstration.Extensions.Foundry", "Agentstration.Extensions.Foundry.csproj");
+        var appHostProject = Path.Combine(sourceRoot, "Agentstration.AppHost", "Agentstration.AppHost.csproj");
         Assert.IsTrue(File.Exists(foundryProject));
         Assert.Contains("<PackageReference Include=\"Azure.Identity\"", File.ReadAllText(foundryProject));
+        Assert.Contains("../Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj", File.ReadAllText(appHostProject));
 
         var violations = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
             .Where(path => !string.Equals(path, foundryProject, StringComparison.OrdinalIgnoreCase))
             .Where(path =>
             {
                 var project = File.ReadAllText(path);
-                return project.Contains("Agentstration.Extensions.Foundry", StringComparison.Ordinal)
+                return (!string.Equals(path, appHostProject, StringComparison.OrdinalIgnoreCase)
+                        && project.Contains("Agentstration.Extensions.Foundry", StringComparison.Ordinal))
                     || project.Contains("<PackageReference Include=\"Azure.Identity\"", StringComparison.Ordinal)
                     || project.Contains("<PackageReference Include=\"Azure.AI.", StringComparison.Ordinal);
             })
@@ -73,6 +76,18 @@ public sealed class DependencyTests
             .ToArray();
 
         Assert.IsEmpty(violations, $"Foundry dependencies must not enter product modules: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
+    public void AspireFoundryRegistrationIsOptInAndKeepsItsApiKeySecret()
+    {
+        var appHost = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Agentstration.AppHost", "Program.cs"));
+
+        Assert.Contains("Foundry:Enabled", appHost, StringComparison.Ordinal);
+        Assert.Contains("if (foundryEnabled)", appHost, StringComparison.Ordinal);
+        Assert.Contains("AddParameterFromConfiguration(\"foundry-api-key\", \"FOUNDRY_API_KEY\", secret: true)", appHost, StringComparison.Ordinal);
+        Assert.Contains("developmentExtensions.Add(new DevelopmentAepExtension(", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("WithEnvironment(\"FOUNDRY_API_KEY\", builder.Configuration", appHost, StringComparison.Ordinal);
     }
 
     [TestMethod]
