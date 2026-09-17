@@ -142,8 +142,9 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task SecretResolutionUsesExactScopeAndRequiresItsOwnGrant()
     {
+        var vaultProvider = new TestVaultProvider();
         await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
-            services.AddSingleton<ISecretVaultProvider>(new TestVaultProvider())));
+            services.AddSingleton<ISecretVaultProvider>(vaultProvider)));
         using var client = factory.CreateClient();
         var targets = (await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
             $"/api/resource-scopes/targets?kind={SecretResourceKinds.Secret}"))!;
@@ -176,11 +177,15 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             Assert.IsFalse((await response.Content.ReadAsStringAsync()).Contains(secretValue, StringComparison.Ordinal));
 
         var resolver = factory.Services.GetRequiredService<ISecretResolver>();
+        var authorizer = factory.Services.GetRequiredService<ISecretAccessAuthorizer>();
         var context = new SecretResolutionContext(workspace,
             ResourceAddress.Create(ResourceNamespace.Default, "ModelProvider", "consumer"));
         var address = ResourceAddress.Create(ResourceNamespace.Default, SecretResourceKinds.Secret, "resolution-secret");
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
         {
+            await Assert.ThrowsAsync<SecretAccessDeniedException>(async () =>
+                await authorizer.GetAuthorizedStatusAsync(new SecretReference(address, tenant), context));
+            Assert.AreEqual(SecretValueStatus.Missing, await authorizer.GetAuthorizedStatusAsync(new SecretReference(address), context));
             await Assert.ThrowsAsync<SecretAccessDeniedException>(async () =>
                 await resolver.ResolveAsync(new SecretReference(address, tenant), context));
             Assert.IsNull(await resolver.ResolveAsync(new SecretReference(address), context));
@@ -205,9 +210,29 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         var savedSecret = await savedSecretResponse.Content.ReadFromJsonAsync<SecretResponse>();
         Assert.AreEqual(workspace, savedSecret?.Resource.Definition.UsePolicy.Grants.Single().ScopeRef);
 
+        var capabilities = factory.Services.GetRequiredService<ISecretCapabilityService>();
+        var capabilityContext = new SecretCapabilityContext(
+            ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default, "ExtensionRegistration", "test-extension"),
+            "test.extension",
+            ScopedResourceAddress.Create(workspace, ResourceNamespace.Default, "ModelProvider", "consumer"),
+            "credential",
+            Guid.NewGuid().ToString("N"));
+        SecretCapabilityHandle capability;
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            var readsBeforeIssuance = vaultProvider.GetCalls;
+            capability = await capabilities.IssueAsync(
+                capabilityContext,
+                new SecretBinding("credential", new SecretReference(address, tenant)),
+                ["credential"],
+                CancellationToken.None);
+            Assert.AreEqual(readsBeforeIssuance, vaultProvider.GetCalls);
+        }
+
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
         using (var resolved = await resolver.ResolveAsync(new SecretReference(address, tenant), context))
         {
+            Assert.AreEqual(SecretValueStatus.Configured, await authorizer.GetAuthorizedStatusAsync(new SecretReference(address, tenant), context));
             Assert.IsNotNull(resolved);
             Assert.AreEqual("[REDACTED]", resolved.ToString());
         }
@@ -226,15 +251,28 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         using var revoked = await client.SendAsync(revokeRequest);
         Assert.AreEqual(HttpStatusCode.OK, revoked.StatusCode);
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            await Assert.ThrowsAsync<SecretAccessDeniedException>(async () =>
+                await authorizer.GetAuthorizedStatusAsync(new SecretReference(address, tenant), context));
             await Assert.ThrowsAsync<SecretAccessDeniedException>(async () =>
                 await resolver.ResolveAsync(new SecretReference(address, tenant), context));
+            var denied = await Assert.ThrowsExactlyAsync<SecretCapabilityException>(() =>
+                capabilities.RedeemAsync(capability.RevealForTransport(), capabilityContext));
+            Assert.AreEqual("access_denied", denied.Code);
+        }
     }
 
     private sealed class TestVaultProvider : ISecretVaultProvider
     {
+        private int getCalls;
+        public int GetCalls => Volatile.Read(ref getCalls);
         public string ProviderType => "test";
         public Task<SecretValueStatus> GetStatusAsync(SecretVaultContext context, string key, CancellationToken cancellationToken = default) => Task.FromResult(SecretValueStatus.Configured);
-        public Task<SecretValue?> GetAsync(SecretVaultContext context, string key, CancellationToken cancellationToken = default) => Task.FromResult<SecretValue?>(new([1, 2, 3]));
+        public Task<SecretValue?> GetAsync(SecretVaultContext context, string key, CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref getCalls);
+            return Task.FromResult<SecretValue?>(new([1, 2, 3]));
+        }
         public Task SetAsync(SecretVaultContext context, string key, SecretValue value, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task DeleteAsync(SecretVaultContext context, string key, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

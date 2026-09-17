@@ -309,6 +309,8 @@ The normal Web, Aspire, and provider-specific Compose compositions use the manag
 
 AEP Secret requirements are declared by an extension, while `SecretBinding` values belong to each consuming Model Profile or local Source binding selection. Each binding retains the logical requirement id and an explicit scoped `SecretReference`; no Secret value is part of the resource. Source versions and their published manifests remain portable because their concrete bindings live in `SourceConfiguration`. Configuration validation rejects unknown or duplicate bindings, and readiness checks require every declared mandatory binding. A binding expresses configuration intent only: subsequent runtime access must still pass through `ISecretResolver` and its scope policy.
 
+The in-process `ISecretCapabilityService` issues a random, single-use handle for one declared requirement after `ISecretAccessAuthorizer` checks the scoped Secret and Vault without reading the value. The handle is bound to the extension registration and identity, consumer, requirement and execution id; it expires after one minute or when its execution lifetime ends. Runtime stores only a SHA-256 digest of the handle with the binding reference and context, never a Secret value. Redemption consumes the handle atomically and calls `ISecretResolver` at that point, so deletion or revoked access fails closed. Expired handles are pruned periodically and execution cleanup can revoke them explicitly. AEP transport and extension access to this handle remain separate protocol work.
+
 ### AEP tool contribution and MCP flow
 
 ```text
