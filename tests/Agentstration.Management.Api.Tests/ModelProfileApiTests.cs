@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Agentstration.Aep.Abstractions;
 using Agentstration.Agents;
 using Agentstration.Agents.Contracts;
 using Agentstration.Api.Contracts;
@@ -10,6 +11,7 @@ using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -21,6 +23,59 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class ModelProfileApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task ProfileSecretBindingsPersistPerConsumerAndRejectUnknownRequirements()
+    {
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IExtensionInspector>();
+            services.AddSingleton<IExtensionInspector>(new ConfiguredEndpointInspector([new AepSecretRequirement("credential", true)]));
+        }));
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var profiles = factory.Services.GetRequiredService<ModelProfileManagementService>();
+        var scope = ResourceScopeRef.Instance;
+
+        async Task<ModelProfileResource> CreateAsync(string name, string secretName)
+        {
+            var stored = await profiles.CreateAsync(new ModelProfileResource
+            {
+                Metadata = new ResourceMetadata { Name = name },
+                Kind = ModelResourceKinds.ModelProfile,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Definition = new ModelProfileProperties
+                {
+                    DisplayName = name,
+                    Provider = new ResourceReference("ollama-local"),
+                    Model = new ModelSelection { Name = "test-model" },
+                    SecretBindings = [new("credential", new(new(ResourceNamespace.Default, "Secret", secretName), scope))]
+                }
+            }, default);
+            return stored.Value;
+        }
+
+        await CreateAsync("bound-profile-a", "company-a");
+        await CreateAsync("bound-profile-b", "company-b");
+        using var client = factory.CreateClient();
+        var first = await client.GetFromJsonAsync<ModelProfileResource>("/api/modelprofiles/bound-profile-a");
+        var second = await client.GetFromJsonAsync<ModelProfileResource>("/api/modelprofiles/bound-profile-b");
+        Assert.IsNotNull(first);
+        Assert.IsNotNull(second);
+        Assert.AreEqual("company-a", first.Definition.SecretBindings.Single().Secret.Address.Name);
+        Assert.AreEqual("company-b", second.Definition.SecretBindings.Single().Secret.Address.Name);
+        Assert.AreEqual(scope, first.Definition.SecretBindings.Single().Secret.ScopeRef);
+
+        var invalid = first with
+        {
+            Metadata = new ResourceMetadata { Name = "bound-profile-invalid" },
+            Definition = first.Definition with
+            {
+                SecretBindings = [new SecretBinding("unknown", new(new(ResourceNamespace.Default, "Secret", "company-a"), scope))]
+            }
+        };
+        await Assert.ThrowsExactlyAsync<ModelProfileValidationException>(async () => await profiles.CreateAsync(invalid, default));
+    }
+
     [TestMethod]
     public async Task ManagedHostCompositionUsesPersistedModelProfileResolver()
     {

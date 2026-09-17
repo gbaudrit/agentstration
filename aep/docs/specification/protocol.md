@@ -59,7 +59,7 @@ An extension may declare logical Secret requirements in the discovery manifest. 
 }
 ```
 
-Each identifier is a stable extension-contract name: 1–64 characters, beginning with a lowercase ASCII letter, then lowercase letters, digits, `.`, `_` or `-`. Duplicate or invalid identifiers are rejected. `required` distinguishes a need that must be bound before use from an optional one; this declaration does not create a binding or authorize Secret access. A requirement has no Secret name, `SecretReference`, Vault, scope or value. Consumer bindings and runtime access belong to later protocol capabilities.
+Each identifier is a stable extension-contract name: 1–64 characters, beginning with a lowercase ASCII letter, then lowercase letters, digits, `.`, `_` or `-`. Duplicate or invalid identifiers are rejected. `required` distinguishes a need that must be bound before use from an optional one; this declaration does not create a binding or authorize Secret access. A requirement has no Secret name, `SecretReference`, Vault, scope or value. Agentstration stores consumer bindings outside the AEP discovery manifest; runtime Secret access belongs to a later protocol capability.
 
 ### Source providers
 

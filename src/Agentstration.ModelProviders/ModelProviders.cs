@@ -2,6 +2,7 @@ using System.Text.Json;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Models;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.AI;
 
@@ -34,6 +35,7 @@ public sealed record ModelDeploymentConfiguration
     public ResourceNamespace ProviderNamespace { get; init; } = ResourceNamespace.Default;
     public required string ModelName { get; init; }
     public IReadOnlyDictionary<string, VersionedExtensionOptions> ProviderOptions { get; init; } = new Dictionary<string, VersionedExtensionOptions>();
+    public IReadOnlyList<SecretBinding> SecretBindings { get; init; } = [];
 }
 
 public sealed record ModelProfileConfiguration

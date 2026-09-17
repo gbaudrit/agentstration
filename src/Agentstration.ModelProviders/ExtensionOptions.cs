@@ -55,7 +55,8 @@ public sealed record ExtensionInspection(
     ExtensionIdentity? Extension,
     IReadOnlyList<ExtensionContribution> Contributions,
     IReadOnlyList<ExtensionOptionSet> OptionSets,
-    string? Details = null);
+    string? Details = null,
+    IReadOnlyList<AepSecretRequirement>? SecretRequirements = null);
 
 public interface IExtensionInspector
 {

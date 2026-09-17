@@ -73,6 +73,9 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients, ISecretReso
         RequireEnabled(provider);
         var client = CreateClient(provider);
         var manifest = await client.DiscoverAsync(cancellationToken);
+        var bindingIssues = ExtensionSecretBindingValidator.Validate(deployment.SecretBindings, manifest.SecretRequirements, requireAll: true);
+        if (bindingIssues.Count > 0)
+            throw new ModelProviderConfigurationException(bindingIssues[0].Message);
         var contribution = manifest.Contributions.ModelProviders.SingleOrDefault(
             value => string.Equals(value.Id, provider.ContributionId, StringComparison.OrdinalIgnoreCase))
             ?? throw new ModelProviderConfigurationException($"The AEP extension does not contribute model provider '{provider.ContributionId}'.");
@@ -150,7 +153,8 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients, ISecretReso
                     .Concat((manifest.Contributions.SourceProviders ?? [])
                         .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.SourceProvider, value.Id)))
                     .ToArray(),
-                catalog.OptionSets.Select(Map).ToArray());
+                catalog.OptionSets.Select(Map).ToArray(),
+                SecretRequirements: manifest.SecretRequirements);
         }
         catch (AepProtocolException exception)
         {
