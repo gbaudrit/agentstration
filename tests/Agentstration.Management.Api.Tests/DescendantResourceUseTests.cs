@@ -45,11 +45,11 @@ public sealed class DescendantResourceUseTests
     }
 
     [TestMethod]
-    public async Task LegacyDefinitionsWithoutUsePolicyRemainReadableAndDenyDescendants()
+    public async Task DefinitionsWithoutExplicitUsePolicyDenyDescendants()
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         var vault = JsonSerializer.Deserialize<VaultProperties>("""{"displayName":"Local","providerType":"local"}""", options);
-        var secret = JsonSerializer.Deserialize<SecretProperties>("""{"displayName":"Legacy","vault":{"name":"local"},"key":"legacy"}""", options);
+        var secret = JsonSerializer.Deserialize<SecretProperties>("""{"displayName":"Default policy","vault":{"name":"local"},"key":"default-policy"}""", options);
 
         Assert.IsNotNull(vault);
         Assert.IsNotNull(secret);

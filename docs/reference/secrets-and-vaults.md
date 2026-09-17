@@ -72,7 +72,7 @@ An ancestor resource reference must name its exact `scopeRef`; an omitted scope 
 
 This fragment shows the policy fields inside `properties`; a complete PUT also includes the resource's other required properties. Management reads expose grant metadata, never the Secret value. Removing a grant immediately prevents subsequent resolutions through that path.
 
-Existing workspace Secrets and Vaults retain their workspace ownership and same-scope references. Definitions written before `usePolicy` was introduced deserialize with an empty grant list, so descendant use remains denied until an administrator adds a grant. The policy is stored in the resource JSON payload; adding it requires no SQLite or PostgreSQL table migration. Resources with the same name at different scopes remain distinct, including their Local Vault encrypted values. Back up the master key and encrypted payloads together when moving an existing installation; neither belongs in a resource export.
+Workspace Secrets and Vaults use same-scope references without descendant grants. When `usePolicy` is omitted, the grant list is empty and descendant use is denied. Resources with the same name at different scopes remain distinct, including their Local Vault encrypted values. The master key and encrypted payloads are stored separately from resource metadata; neither belongs in a resource export.
 
 For example, the Display name `Clé OpenAI — Production` produces:
 
