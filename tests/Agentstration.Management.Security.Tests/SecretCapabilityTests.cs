@@ -30,6 +30,26 @@ public sealed class SecretCapabilityTests
     }
 
     [TestMethod]
+    public async Task ProtocolRedemptionMatchesExtensionRequirementAndExecution()
+    {
+        var resolver = new FakeResolver();
+        using var capabilities = new SecretCapabilityService(new FakeAccessAuthorizer(), resolver, new ManualTimeProvider());
+        var context = Context();
+        var wrong = await capabilities.IssueAsync(context, Binding(), ["credential"], CancellationToken.None);
+        await AssertCodeAsync("context_mismatch", () => capabilities.RedeemAsync(
+            wrong.RevealForTransport(), "other.extension", context.RequirementId, context.ExecutionId));
+        Assert.AreEqual(0, resolver.Calls);
+
+        var correct = await capabilities.IssueAsync(context, Binding(), ["credential"], CancellationToken.None);
+        using var secret = await capabilities.RedeemAsync(correct.RevealForTransport(),
+            context.ExtensionId, context.RequirementId, context.ExecutionId);
+        Assert.AreEqual(1, resolver.Calls);
+        Assert.AreEqual("test-value", Encoding.UTF8.GetString(secret.Value.AccessValue().Span));
+        await AssertCodeAsync("capability_invalid", () => capabilities.RedeemAsync(correct.RevealForTransport(),
+            context.ExtensionId, context.RequirementId, context.ExecutionId));
+    }
+
+    [TestMethod]
     public async Task ContextMismatchConsumesTheCapabilityWithoutResolving()
     {
         var resolver = new FakeResolver();

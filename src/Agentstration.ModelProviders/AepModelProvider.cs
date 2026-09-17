@@ -1,14 +1,21 @@
 using Agentstration.Aep.Client;
+using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Models;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Secrets.Abstractions;
+using Agentstration.Resources;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
 
 namespace Agentstration.ModelProviders;
 
-public sealed class AepModelProvider(IHttpClientFactory httpClients, ISecretResolver? secrets = null) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator
+public sealed class AepModelProvider(
+    IHttpClientFactory httpClients,
+    ISecretResolver? secrets = null,
+    ISecretCapabilityService? capabilities = null,
+    IConfiguration? configuration = null) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator
 {
     public const string AdapterType = "aep";
     public string ProviderType => AdapterType;
@@ -25,7 +32,61 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients, ISecretReso
         return new AepChatClient(
             CreateClient(provider).CreateModelProvider(provider.ContributionId),
             deployment.ModelName,
-            nativeOptions is null ? null : Map(nativeOptions));
+            nativeOptions is null ? null : Map(nativeOptions),
+            deployment.SecretBindings.Count == 0 ? null : token => IssueSecretAccessAsync(provider, deployment, token));
+    }
+
+    private async Task<AepSecretAccessLease> IssueSecretAccessAsync(
+        ModelProviderConfiguration provider,
+        ModelDeploymentConfiguration deployment,
+        CancellationToken cancellationToken)
+    {
+        if (capabilities is null || configuration is null
+            || deployment.ScopeRef is not { } consumerScope || consumerScope == default
+            || provider.ExtensionScopeRef is not { } extensionScope || extensionScope == default
+            || string.IsNullOrWhiteSpace(provider.ExpectedExtensionId))
+            throw new ModelProviderConfigurationException("AEP Secret access requires scoped resources, a pinned extension identity and the host capability service.");
+        var publicBaseUrl = configuration["Agentstration:Aep:SecretAccess:PublicBaseUrl"];
+        if (!Uri.TryCreate(publicBaseUrl, UriKind.Absolute, out var baseUri)
+            || baseUri.Scheme != Uri.UriSchemeHttps && !(baseUri.Scheme == Uri.UriSchemeHttp && baseUri.IsLoopback))
+            throw new ModelProviderConfigurationException("AEP Secret access requires a HTTPS or loopback host PublicBaseUrl.");
+
+        var manifest = await CreateClient(provider).DiscoverAsync(cancellationToken);
+        if (!manifest.Capabilities.TryGetValue(AepCapabilityNames.SecretAccess, out var feature)
+            || feature.Version != AepProtocol.SecretAccessVersion)
+            throw new ModelProviderConfigurationException("The AEP extension does not support Secret access version 1.0.");
+        var issues = ExtensionSecretBindingValidator.Validate(deployment.SecretBindings, manifest.SecretRequirements, requireAll: true);
+        if (issues.Count > 0)
+            throw new ModelProviderConfigurationException(issues[0].Message);
+
+        var extensionAddress = provider.Extension.Resolve(provider.Namespace, ExtensionKinds.ExtensionRegistration);
+        var extension = new ScopedResourceAddress(extensionScope, extensionAddress.Namespace, extensionAddress.Kind, extensionAddress.Name);
+        var consumer = new ScopedResourceAddress(consumerScope, provider.Namespace, ModelResourceKinds.ModelProfile, deployment.Name);
+        var executionId = Guid.NewGuid().ToString("N");
+        var endpoint = new Uri(baseUri, AepProtocol.SecretAccessPath);
+        var declared = manifest.SecretRequirements?.Select(value => value.Id).ToArray() ?? [];
+        var handles = new List<SecretCapabilityHandle>();
+        var grants = new List<AepSecretAccessGrant>();
+        try
+        {
+            foreach (var binding in deployment.SecretBindings)
+            {
+                var context = new SecretCapabilityContext(extension, manifest.Extension.Id, consumer, binding.RequirementId, executionId);
+                var handle = await capabilities.IssueAsync(context, binding, declared, cancellationToken, cancellationToken);
+                handles.Add(handle);
+                grants.Add(new AepSecretAccessGrant(AepProtocol.SecretAccessVersion, endpoint, manifest.Extension.Id,
+                    binding.RequirementId, executionId, handle.RevealForTransport()));
+            }
+            return new AepSecretAccessLease(grants, () =>
+            {
+                foreach (var handle in handles) capabilities.Revoke(handle);
+            });
+        }
+        catch
+        {
+            foreach (var handle in handles) capabilities.Revoke(handle);
+            throw;
+        }
     }
 
     public void Validate(IReadOnlyDictionary<string, System.Text.Json.JsonElement> providerOptions)
@@ -73,6 +134,10 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients, ISecretReso
         RequireEnabled(provider);
         var client = CreateClient(provider);
         var manifest = await client.DiscoverAsync(cancellationToken);
+        if (deployment.SecretBindings.Count > 0
+            && (!manifest.Capabilities.TryGetValue(AepCapabilityNames.SecretAccess, out var secretAccess)
+                || secretAccess.Version != AepProtocol.SecretAccessVersion))
+            throw new ModelProviderConfigurationException("The AEP extension does not support Secret access version 1.0.");
         var bindingIssues = ExtensionSecretBindingValidator.Validate(deployment.SecretBindings, manifest.SecretRequirements, requireAll: true);
         if (bindingIssues.Count > 0)
             throw new ModelProviderConfigurationException(bindingIssues[0].Message);

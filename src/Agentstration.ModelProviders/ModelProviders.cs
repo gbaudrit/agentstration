@@ -31,6 +31,7 @@ public sealed record ModelProviderConfiguration
 public sealed record ModelDeploymentConfiguration
 {
     public required string Name { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
     public required string ProviderName { get; init; }
     public ResourceNamespace ProviderNamespace { get; init; } = ResourceNamespace.Default;
     public required string ModelName { get; init; }

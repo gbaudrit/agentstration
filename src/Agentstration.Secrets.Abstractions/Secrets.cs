@@ -71,6 +71,13 @@ public interface ISecretCapabilityService
         SecretCapabilityContext context,
         CancellationToken cancellationToken = default);
 
+    Task<ResolvedSecret> RedeemAsync(
+        string token,
+        string extensionId,
+        string requirementId,
+        string executionId,
+        CancellationToken cancellationToken = default);
+
     void Revoke(SecretCapabilityHandle handle);
     void RevokeExecution(SecretCapabilityContext context);
     int PruneExpired();

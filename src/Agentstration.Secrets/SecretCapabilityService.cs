@@ -116,6 +116,24 @@ public sealed class SecretCapabilityService : ISecretCapabilityService, IDisposa
         string token,
         SecretCapabilityContext context,
         CancellationToken cancellationToken = default)
+        => await RedeemCoreAsync(token, candidate => candidate == context, cancellationToken);
+
+    public async Task<ResolvedSecret> RedeemAsync(
+        string token,
+        string extensionId,
+        string requirementId,
+        string executionId,
+        CancellationToken cancellationToken = default)
+        => await RedeemCoreAsync(token,
+            candidate => string.Equals(candidate.ExtensionId, extensionId, StringComparison.Ordinal)
+                && string.Equals(candidate.RequirementId, requirementId, StringComparison.Ordinal)
+                && string.Equals(candidate.ExecutionId, executionId, StringComparison.Ordinal),
+            cancellationToken);
+
+    private async Task<ResolvedSecret> RedeemCoreAsync(
+        string token,
+        Func<SecretCapabilityContext, bool> matches,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(token) || token.Length > 256 || !entries.TryRemove(Hash(token), out var entry))
@@ -124,7 +142,7 @@ public sealed class SecretCapabilityService : ISecretCapabilityService, IDisposa
             throw Failure("capability_expired", "The Secret capability has expired.");
         if (entry.LifetimeToken.IsCancellationRequested)
             throw Failure("context_terminated", "The execution context has ended.");
-        if (context != entry.Context)
+        if (!matches(entry.Context))
             throw Failure("context_mismatch", "The Secret capability does not belong to this context.");
 
         try

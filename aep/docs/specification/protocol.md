@@ -40,6 +40,7 @@ Initial registered names are:
 - `aep.tools`
 - `aep.configuration`
 - `aep.secret-requirements`
+- `aep.secret-access`
 
 Unknown names are preserved. Each capability evolves through its own version and may declare an endpoint and metadata. The manifest is the only input an Inspector needs to decide which explorers to display.
 
@@ -59,7 +60,13 @@ An extension may declare logical Secret requirements in the discovery manifest. 
 }
 ```
 
-Each identifier is a stable extension-contract name: 1–64 characters, beginning with a lowercase ASCII letter, then lowercase letters, digits, `.`, `_` or `-`. Duplicate or invalid identifiers are rejected. `required` distinguishes a need that must be bound before use from an optional one; this declaration does not create a binding or authorize Secret access. A requirement has no Secret name, `SecretReference`, Vault, scope or value. Agentstration stores consumer bindings outside the AEP discovery manifest; runtime Secret access belongs to a later protocol capability.
+Each identifier is a stable extension-contract name: 1–64 characters, beginning with a lowercase ASCII letter, then lowercase letters, digits, `.`, `_` or `-`. Duplicate or invalid identifiers are rejected. `required` distinguishes a need that must be bound before use from an optional one; this declaration does not create a binding or authorize Secret access. A requirement has no Secret name, `SecretReference`, Vault, scope or value. Agentstration stores consumer bindings outside the AEP discovery manifest.
+
+### Bound Secret access
+
+An extension that supports bound runtime Secret access advertises `aep.secret-access` version `1.0` in its manifest capabilities. The extension SDK exposes `AepSecretAccessClient`. The host sends `secretAccess` grants in each `AepChatRequest` only for explicitly bound requirements. Each grant supplies `version`, `endpoint`, `extensionId`, `requirementId`, `executionId`, and an opaque `secretCapability`; it never supplies a Secret or Vault name. The extension selects the grant by its logical `requirementId` and calls `AepSecretAccessClient.RedeemAsync(grant)` during that operation. The SDK posts the grant identity and capability to the host endpoint. The host replies with `version` and `secretValueBase64`; the SDK returns a byte array that the extension should clear after use.
+
+The host callback URL must use HTTPS, except for loopback HTTP. The host limits values to 65,536 bytes, consumes each capability once, and revokes unused capabilities at the end of the call. Errors use AEP's `AepErrorResponse` envelope and value-free codes such as `capability_invalid`, `capability_expired`, `context_mismatch`, `access_denied`, `secret_unavailable`, `vault_unavailable`, `secret_value_invalid`, and `secret_access_version_unsupported`. Callback grants are independent of `IAepAccessTokenProvider` and `StaticBearer` host-to-extension authentication. Extensions without Secret requirements need no protocol change; if a bound extension does not advertise `aep.secret-access` version `1.0`, invocation fails closed.
 
 ### Source providers
 

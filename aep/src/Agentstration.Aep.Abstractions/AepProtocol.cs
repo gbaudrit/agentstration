@@ -16,6 +16,8 @@ public static class AepProtocol
     public const string ConfigurationPath = "/aep/configuration";
     public const string ConfigurationMigrationPath = "/aep/configuration/migrate";
     public const string SecretRequirementsCapabilityVersion = "1.0";
+    public const string SecretAccessVersion = "1.0";
+    public const string SecretAccessPath = "/api/aep/secrets/redeem";
 
     public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();
 
@@ -35,6 +37,7 @@ public static class AepCapabilityNames
     public const string Tools = "aep.tools";
     public const string Configuration = "aep.configuration";
     public const string SecretRequirements = "aep.secret-requirements";
+    public const string SecretAccess = "aep.secret-access";
 }
 
 public sealed record AepExtensionIdentity(string Id, string Name, string Version, string? Description = null);
@@ -235,6 +238,32 @@ public sealed record AepManifest(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepSecretRequirement>? SecretRequirements = null);
 
 public sealed record AepSecretRequirement(string Id, [property: JsonRequired] bool Required, string? Description = null);
+
+public sealed record AepSecretAccessGrant(
+    string Version,
+    Uri Endpoint,
+    string ExtensionId,
+    string RequirementId,
+    string ExecutionId,
+    string SecretCapability)
+{
+    public override string ToString() => "[REDACTED]";
+}
+
+public sealed record AepSecretAccessRequest(
+    string Version,
+    string ExtensionId,
+    string RequirementId,
+    string ExecutionId,
+    string SecretCapability)
+{
+    public override string ToString() => "[REDACTED]";
+}
+
+public sealed record AepSecretAccessResponse(string Version, string SecretValueBase64)
+{
+    public override string ToString() => "[REDACTED]";
+}
 
 public sealed record AepHealth(string Status, string? Details = null);
 
@@ -446,7 +475,8 @@ public sealed record AepChatRequest(
     IReadOnlyList<AepMessage> Messages,
     AepModelOptions? Options = null,
     IReadOnlyList<AepToolDefinition>? Tools = null,
-    IReadOnlyDictionary<string, JsonElement>? Metadata = null);
+    IReadOnlyDictionary<string, JsonElement>? Metadata = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepSecretAccessGrant>? SecretAccess = null);
 
 public sealed record AepUsage(long? InputTokens = null, long? OutputTokens = null, long? TotalTokens = null);
 
