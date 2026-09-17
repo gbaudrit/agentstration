@@ -47,7 +47,7 @@
 .resource-plan-binding-progress strong { color: var(--primary); }
 .resource-plan-binding-progress span { color: var(--muted); }
 .resource-plan-binding-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
-.resource-plan-review-path { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; margin: 0 0 1.25rem; padding: 0; list-style: none; }
+.resource-plan-review-path { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .6rem; margin: 0 0 1.25rem; padding: 0; list-style: none; }
 .resource-plan-review-path li { display: flex; gap: .65rem; min-width: 0; padding: .8rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface); }
 .resource-plan-review-path li > span { display: grid; place-items: center; flex: none; width: 1.65rem; height: 1.65rem; border-radius: .5rem; background: var(--surface-2); color: var(--muted); font-size: .78rem; font-weight: 800; }
 .resource-plan-review-path li.is-done > span { background: var(--primary-soft); color: var(--primary); }
@@ -131,6 +131,14 @@
 .resource-plan-validation-summary h3 + p { margin: .4rem 0 0; color: var(--muted); line-height: 1.5; }
 .resource-plan-validation-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem .9rem; margin-top: 1rem; color: var(--muted); font-size: .78rem; }
 .resource-plan-validation-empty { margin: 1rem 0 0; color: var(--muted); }
+.resource-plan-application-action { display: flex; align-items: center; justify-content: space-between; gap: 1.2rem; margin-top: 1.2rem; padding: 1.2rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface-2); }
+.resource-plan-application-action p { margin: .4rem 0 0; color: var(--muted); line-height: 1.45; }
+.resource-plan-application-action button { flex: none; }
+.resource-plan-application-result { margin-top: 1.2rem; padding: 1.2rem; border: 1px solid var(--border); border-radius: .75rem; }
+.resource-plan-application-result h3 { margin: 0 0 .6rem; }
+.resource-plan-application-result ol { margin-bottom: 0; padding-left: 1.4rem; }
+.resource-plan-application-result li { margin-top: .45rem; }
+.resource-plan-application-result li p { margin: .2rem 0 0; color: #ad2838; }
 .resource-plan-issues { display: grid; gap: .8rem; margin: 1.1rem 0 0; padding: 0; list-style: none; }
 .resource-plan-issues li { display: flex; gap: .9rem; min-width: 0; padding: 1.1rem 1.2rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface); }
 .resource-plan-issue-symbol { display: grid; place-items: center; flex: none; width: 1.7rem; height: 1.7rem; border-radius: 50%; background: color-mix(in srgb, #b42333 12%, var(--surface)); color: #ad2838; font-size: .9rem; font-weight: 800; }

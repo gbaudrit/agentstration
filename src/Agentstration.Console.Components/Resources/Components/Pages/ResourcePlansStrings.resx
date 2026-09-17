@@ -220,4 +220,20 @@
   <data name="MaterializationDiagnostic.planning_binding_ambiguous" xml:space="preserve"><value>Choose a profile with an exact scope.</value></data>
   <data name="MaterializationDiagnostic.planning_binding_unknown_role" xml:space="preserve"><value>This binding does not match a planned agent.</value></data>
   <data name="MaterializationDiagnostic.planning_materialization_stale" xml:space="preserve"><value>Refresh the proposal before saving it.</value></data>
+  <data name="StepApplication" xml:space="preserve"><value>Apply</value></data>
+  <data name="StepApplicationHint" xml:space="preserve"><value>Create or update resources</value></data>
+  <data name="ApplyTitle" xml:space="preserve"><value>Apply the verified proposal</value></data>
+  <data name="ApplyDescription" xml:space="preserve"><value>Resources are processed in dependency order. Application stops on failure; successful operations remain recorded.</value></data>
+  <data name="ApplyProposal" xml:space="preserve"><value>Apply proposal</value></data>
+  <data name="RetryApply" xml:space="preserve"><value>Resume application</value></data>
+  <data name="ApplicationResult" xml:space="preserve"><value>Application result</value></data>
+  <data name="ApplicationAttempts" xml:space="preserve"><value>Attempts: {0}</value></data>
+  <data name="Application.Applying" xml:space="preserve"><value>Applying</value></data>
+  <data name="Application.Applied" xml:space="preserve"><value>Applied</value></data>
+  <data name="Application.PartiallyApplied" xml:space="preserve"><value>Partially applied</value></data>
+  <data name="Application.Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="Outcome.Applied" xml:space="preserve"><value>Applied</value></data>
+  <data name="Outcome.AlreadyApplied" xml:space="preserve"><value>Already applied</value></data>
+  <data name="Outcome.Skipped" xml:space="preserve"><value>Unchanged</value></data>
+  <data name="Outcome.Failed" xml:space="preserve"><value>Failed</value></data>
 </root>

@@ -148,6 +148,34 @@ public sealed class ResourcePlanReviewTests
     }
 
     [TestMethod]
+    public void ReadyVerificationCanApplyThePinnedProposal()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        var set = ChangeSet(Plan.Revision, [Change(0, "triage", [], "Triage")]);
+        var client = new FakeClient(set);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IResourcePlansApiClient>(client);
+        RegisterProfiles(context);
+        context.Services.AddSingleton(new ConsoleContextState(new FakeContextProvider()));
+        context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default).GetAwaiter().GetResult();
+
+        var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
+        rendered.WaitForAssertion(() => Assert.Contains("Support design", rendered.Markup, StringComparison.Ordinal));
+        rendered.Find("#tab-Validation").Click();
+        rendered.FindAll("button").Single(value => value.TextContent.Contains("Vérifier la proposition", StringComparison.Ordinal)).Click();
+        rendered.WaitForAssertion(() => Assert.Contains("Appliquer la proposition", rendered.Markup, StringComparison.Ordinal));
+        rendered.FindAll("button").Single(value => value.TextContent.Contains("Appliquer la proposition", StringComparison.Ordinal)).Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsNotNull(client.LastApplyRequest);
+            Assert.AreEqual(set.Value.Digest, client.LastApplyRequest.ChangeSetDigest);
+            Assert.Contains("Résultat de l’application", rendered.Markup, StringComparison.Ordinal);
+        });
+    }
+
+    [TestMethod]
     public void DetailShowsBlockedModelProfileIssueAfterRevalidation()
     {
         using var culture = new TestCultureScope("fr-FR");
@@ -280,10 +308,12 @@ public sealed class ResourcePlanReviewTests
     private sealed class FakeClient(ResourceChangeSetSnapshot set, bool blockOnValidate = false, bool supportMaterialization = false) : IResourcePlansApiClient
     {
         private IReadOnlyList<ResourceChangeSetValidation> validations = [Validation(set.Value, "old-digest")];
+        private ResourceChangeSetApplicationSnapshot? application;
         private ResourcePlanBindingDraftSnapshot? savedBindings;
         public int ValidationCalls { get; private set; }
         public ResourcePlanMaterializationRequest? LastMaterializationRequest { get; private set; }
         public ResourcePlanMaterializationRequest? LastChangeSetRequest { get; private set; }
+        public ApplyResourceChangeSetRequest? LastApplyRequest { get; private set; }
         public Task<ResourcePlanPage> ListPlansAsync(ResourcePlanStatus? status, int skip, int take, CancellationToken cancellationToken) => Task.FromResult(new ResourcePlanPage([new(Plan, "\"plan\"")], false));
         public Task<ResourcePlanSnapshot?> GetPlanAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<ResourcePlanSnapshot?>(id == Plan.Id.Value ? new(Plan, "\"plan\"") : null);
         public Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResourcePlanActivity>>([new(Guid.NewGuid(), Plan.Id, Scope, 1, ResourcePlanActivityType.Created, Guid.NewGuid(), null, DateTimeOffset.UnixEpoch)]);
@@ -331,6 +361,15 @@ public sealed class ResourcePlanReviewTests
             };
             validations = [.. validations, result];
             return Task.FromResult(result);
+        }
+        public Task<ResourceChangeSetApplicationSnapshot?> GetApplicationAsync(Guid changeSetId, CancellationToken cancellationToken) => Task.FromResult(application);
+        public Task<ResourceChangeSetApplicationSnapshot> ApplyChangeSetAsync(Guid changeSetId, ApplyResourceChangeSetRequest request, CancellationToken cancellationToken)
+        {
+            LastApplyRequest = request;
+            var now = DateTimeOffset.UtcNow;
+            application = new(new(Guid.NewGuid(), request.PlanId, request.PlanRevision, new(changeSetId), request.ChangeSetDigest,
+                request.ValidationId, Scope, ResourceChangeSetApplicationStatus.Applied, [], 1, Guid.NewGuid(), now, now, now, now), "\"application\"");
+            return Task.FromResult(application);
         }
     }
 

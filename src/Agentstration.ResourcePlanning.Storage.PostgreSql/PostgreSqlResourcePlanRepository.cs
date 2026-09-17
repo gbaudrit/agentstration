@@ -13,6 +13,7 @@ public sealed class ResourcePlanningDbContext(DbContextOptions<ResourcePlanningD
     internal DbSet<ResourcePlanBindingDraftDocument> BindingDrafts => Set<ResourcePlanBindingDraftDocument>();
     internal DbSet<ResourceChangeSetDocument> ChangeSets => Set<ResourceChangeSetDocument>();
     internal DbSet<ResourceChangeSetValidationDocument> Validations => Set<ResourceChangeSetValidationDocument>();
+    internal DbSet<ResourceChangeSetApplicationDocument> Applications => Set<ResourceChangeSetApplicationDocument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,6 +56,12 @@ public sealed class ResourcePlanningDbContext(DbContextOptions<ResourcePlanningD
         validation.Property(value => value.Payload).IsRequired();
         validation.Property(value => value.ValidatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         validation.HasIndex(value => new { value.TenantId, value.WorkspaceId, value.ChangeSetId, value.ValidatedAt, value.Id });
+
+        var application = modelBuilder.Entity<ResourceChangeSetApplicationDocument>();
+        application.ToTable("ResourceChangeSetApplications");
+        application.HasKey(value => new { value.WorkspaceId, value.ChangeSetId });
+        application.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
+        application.Property(value => value.Payload).IsRequired();
     }
 }
 
@@ -113,6 +120,15 @@ internal sealed class ResourceChangeSetValidationDocument
     public required string ChangeSetDigest { get; set; }
     public DateTimeOffset ValidatedAt { get; set; }
     public required string Payload { get; set; }
+}
+
+internal sealed class ResourceChangeSetApplicationDocument
+{
+    public Guid TenantId { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public Guid ChangeSetId { get; set; }
+    public required string Payload { get; set; }
+    public required string ETag { get; set; }
 }
 
 public sealed class PostgreSqlResourcePlanRepository(
@@ -296,6 +312,32 @@ public sealed class PostgreSqlResourcePlanRepository(
         var payloads = await context.Validations.AsNoTracking().Where(value => value.TenantId == scope.TenantId && value.WorkspaceId == scope.WorkspaceId.Value && value.ChangeSetId == id.Value)
             .OrderBy(value => value.ValidatedAt).ThenBy(value => value.Id).Select(value => value.Payload).ToArrayAsync(cancellationToken);
         return payloads.Select(Deserialize<ResourceChangeSetValidation>).ToArray();
+    }
+
+    public async Task<ResourceChangeSetApplicationSnapshot?> GetApplicationAsync(ResourcePlanScope scope, ResourceChangeSetId id, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Applications.AsNoTracking().SingleOrDefaultAsync(value =>
+            value.TenantId == scope.TenantId && value.WorkspaceId == scope.WorkspaceId.Value && value.ChangeSetId == id.Value, cancellationToken);
+        return document is null ? null : new(Deserialize<ResourceChangeSetApplication>(document.Payload), document.ETag);
+    }
+
+    public async Task<ResourceChangeSetApplicationSnapshot> SaveApplicationAsync(ResourceChangeSetApplication application, string? expectedETag, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Applications.SingleOrDefaultAsync(value => value.TenantId == application.Scope.TenantId &&
+            value.WorkspaceId == application.Scope.WorkspaceId.Value && value.ChangeSetId == application.ChangeSetId.Value, cancellationToken);
+        if (document?.ETag != expectedETag) throw new ResourcePlanConcurrencyException("The Resource ChangeSet application changed concurrently.");
+        if (document is null)
+        {
+            document = new() { TenantId = application.Scope.TenantId, WorkspaceId = application.Scope.WorkspaceId.Value,
+                ChangeSetId = application.ChangeSetId.Value, Payload = string.Empty, ETag = NewETag() };
+            context.Applications.Add(document);
+        }
+        else document.ETag = NewETag();
+        document.Payload = JsonSerializer.Serialize(application, JsonOptions);
+        await SaveCreateAsync(context, cancellationToken);
+        return new(application, document.ETag);
     }
 
     private static ResourcePlanDocument ToDocument(ResourcePlan plan) => new()

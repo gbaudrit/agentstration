@@ -72,6 +72,7 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         entryDraft.Property(value => value.Id).HasMaxLength(768);
         entryDraft.Property(value => value.WorkspaceId).HasMaxLength(36);
         entryDraft.Property(value => value.Name).HasMaxLength(128);
+        entryDraft.Property(value => value.Payload).IsConcurrencyToken();
         entryDraft.HasIndex(value => new { value.WorkspaceId, value.Name });
 
         var interaction = modelBuilder.Entity<InteractionDocument>();

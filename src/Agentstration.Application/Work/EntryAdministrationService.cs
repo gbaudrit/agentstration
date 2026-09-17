@@ -38,19 +38,27 @@ public sealed class EntryAdministrationService(
         await repository.GetEntryDraftAsync(workspaceId, id, cancellationToken)
         ?? throw new KeyNotFoundException($"Entry draft '{id}' was not found.");
 
-    public async Task<EntryDraft> SaveAsync(EntryDraft draft, CancellationToken cancellationToken)
+    public Task<EntryDraft> SaveAsync(EntryDraft draft, CancellationToken cancellationToken) => SaveAsync(draft, null, enforceRevision: false, cancellationToken);
+
+    public Task<EntryDraft> SaveIfRevisionAsync(EntryDraft draft, long? expectedRevision, CancellationToken cancellationToken) =>
+        SaveAsync(draft, expectedRevision, enforceRevision: true, cancellationToken);
+
+    private async Task<EntryDraft> SaveAsync(EntryDraft draft, long? expectedRevision, bool enforceRevision, CancellationToken cancellationToken)
     {
         if (draft.WorkspaceId != context.WorkspaceId)
             throw new WorkValidationException("entry_workspace_mismatch", "An Entry draft must be saved in the current Workspace.");
         WorkplaceValidation.Validate(draft);
         var current = await repository.GetEntryDraftAsync(draft.WorkspaceId, draft.Id, cancellationToken);
+        if (enforceRevision && current?.Revision != expectedRevision)
+            throw new WorkValidationException("entry_revision_conflict", "The Entry changed since the proposal was verified.");
         var saved = draft with
         {
             Revision = current is null ? 1 : checked(current.Revision + 1),
             UpdatedAt = timeProvider.GetUtcNow(),
             PublishedBinding = current?.PublishedBinding
         };
-        await repository.UpsertEntryDraftAsync(saved, cancellationToken);
+        if (enforceRevision) await repository.UpsertEntryDraftAsync(saved, expectedRevision, cancellationToken);
+        else await repository.UpsertEntryDraftAsync(saved, cancellationToken);
         return saved;
     }
 
@@ -75,12 +83,24 @@ public sealed class EntryAdministrationService(
 
     public Task<EntryValidationResult> ValidateAsync(EntryId id, CancellationToken cancellationToken) => ValidateAsync(context.WorkspaceId, id, cancellationToken);
 
-    public async Task<EntryResource> PublishAsync(WorkspaceId workspaceId, EntryId id, CancellationToken cancellationToken)
+    public Task<EntryResource> PublishAsync(WorkspaceId workspaceId, EntryId id, CancellationToken cancellationToken) =>
+        PublishAsync(workspaceId, id, reuseEquivalent: false, cancellationToken);
+
+    public async Task<EntryResource> PublishAsync(WorkspaceId workspaceId, EntryId id, bool reuseEquivalent, CancellationToken cancellationToken)
     {
         var draft = await GetAsync(workspaceId, id, cancellationToken);
         WorkplaceValidation.Validate(draft);
         var resolved = await targetResolver.ResolveAsync(draft, cancellationToken);
         var previous = await repository.GetEntryAsync(workspaceId, id, cancellationToken);
+        if (reuseEquivalent && previous is not null && previous.ResolvedTarget == resolved &&
+            previous.DisplayName == draft.DisplayName && previous.Description == draft.Description &&
+            System.Text.Json.JsonSerializer.Serialize(previous.Exposure) == System.Text.Json.JsonSerializer.Serialize(draft.Exposure) &&
+            System.Text.Json.JsonSerializer.Serialize(previous.Presentation) == System.Text.Json.JsonSerializer.Serialize(draft.Presentation) &&
+            System.Text.Json.JsonSerializer.Serialize(previous.Behavior) == System.Text.Json.JsonSerializer.Serialize(draft.Behavior))
+        {
+            await repository.UpsertEntryDraftAsync(draft with { PublishedBinding = draft.Binding }, cancellationToken);
+            return previous;
+        }
         var published = new EntryResource
         {
             WorkspaceId = draft.WorkspaceId,

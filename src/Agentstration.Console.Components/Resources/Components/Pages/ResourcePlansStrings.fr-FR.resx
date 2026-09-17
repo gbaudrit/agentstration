@@ -220,4 +220,20 @@
   <data name="MaterializationDiagnostic.planning_binding_ambiguous" xml:space="preserve"><value>Choisissez un profil avec un périmètre précis.</value></data>
   <data name="MaterializationDiagnostic.planning_binding_unknown_role" xml:space="preserve"><value>Ce binding ne correspond à aucun agent prévu.</value></data>
   <data name="MaterializationDiagnostic.planning_materialization_stale" xml:space="preserve"><value>Actualisez la proposition avant de l’enregistrer.</value></data>
+  <data name="StepApplication" xml:space="preserve"><value>Appliquer</value></data>
+  <data name="StepApplicationHint" xml:space="preserve"><value>Ressources créées ou mises à jour</value></data>
+  <data name="ApplyTitle" xml:space="preserve"><value>Appliquer la proposition vérifiée</value></data>
+  <data name="ApplyDescription" xml:space="preserve"><value>Les ressources seront traitées dans l’ordre des dépendances. En cas d’échec, l’application s’arrête et les opérations réussies restent enregistrées.</value></data>
+  <data name="ApplyProposal" xml:space="preserve"><value>Appliquer la proposition</value></data>
+  <data name="RetryApply" xml:space="preserve"><value>Reprendre l’application</value></data>
+  <data name="ApplicationResult" xml:space="preserve"><value>Résultat de l’application</value></data>
+  <data name="ApplicationAttempts" xml:space="preserve"><value>Tentatives : {0}</value></data>
+  <data name="Application.Applying" xml:space="preserve"><value>En cours</value></data>
+  <data name="Application.Applied" xml:space="preserve"><value>Appliqué</value></data>
+  <data name="Application.PartiallyApplied" xml:space="preserve"><value>Partiellement appliqué</value></data>
+  <data name="Application.Failed" xml:space="preserve"><value>Échec</value></data>
+  <data name="Outcome.Applied" xml:space="preserve"><value>Appliqué</value></data>
+  <data name="Outcome.AlreadyApplied" xml:space="preserve"><value>Déjà appliqué</value></data>
+  <data name="Outcome.Skipped" xml:space="preserve"><value>Sans changement</value></data>
+  <data name="Outcome.Failed" xml:space="preserve"><value>Échec</value></data>
 </root>

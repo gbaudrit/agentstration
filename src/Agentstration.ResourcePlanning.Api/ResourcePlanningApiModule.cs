@@ -31,6 +31,8 @@ public static class ResourcePlanningApiModule
         plans.MapGet("/change-sets/{id:guid}", GetChangeSetAsync).Produces<ResourceChangeSet>().WithSummary("Get a Resource ChangeSet").RequireAuthorization(AgentstrationPolicies.CanReadResources);
         plans.MapPost("/change-sets/{id:guid}/validations", ValidateChangeSetAsync).Produces<ResourceChangeSetValidation>().WithSummary("Validate a Resource ChangeSet").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         plans.MapGet("/change-sets/{id:guid}/validations", ListChangeSetValidationsAsync).Produces<ResourceChangeSetValidation[]>().WithSummary("List Resource ChangeSet validations").RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapGet("/change-sets/{id:guid}/application", GetApplicationAsync).Produces<ResourceChangeSetApplication>().WithSummary("Get Resource ChangeSet application and operation outcomes").RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        plans.MapPost("/change-sets/{id:guid}/application", ApplyChangeSetAsync).Produces<ResourceChangeSetApplication>().WithSummary("Apply a verified Resource ChangeSet").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         return endpoints;
     }
 
@@ -140,6 +142,7 @@ public static class ResourcePlanningApiModule
         catch (ResourcePlanLifecycleException exception) { return Results.UnprocessableEntity(Problem(exception.Code, exception.Message, StatusCodes.Status422UnprocessableEntity)); }
         catch (ResourcePlanValidationException exception) { return Results.UnprocessableEntity(new { title = "resource_plan_content_invalid", detail = exception.Message, status = StatusCodes.Status422UnprocessableEntity, errors = exception.Issues }); }
         catch (ResourcePlanMaterializationException exception) { return Results.UnprocessableEntity(new { title = "resource_plan_materialization_failed", detail = exception.Message, status = StatusCodes.Status422UnprocessableEntity, errors = exception.Diagnostics }); }
+        catch (ResourceChangeSetApplicationException exception) { return Results.Conflict(Problem(exception.Code, exception.Message, StatusCodes.Status409Conflict)); }
         catch (ArgumentException exception) { return Results.BadRequest(Problem("resource_plan_invalid", exception.Message, StatusCodes.Status400BadRequest)); }
     }
 
@@ -188,4 +191,22 @@ public static class ResourcePlanningApiModule
 
     private static Task<IResult> ListChangeSetValidationsAsync(Guid id, ResourceChangeSetValidationService service, ICurrentRequestContext context, CancellationToken cancellationToken) => ExecuteAsync(async () =>
         Results.Ok(await service.ListAsync(Scope(RequireWorkspace(context)), new(id), cancellationToken)));
+
+    private static Task<IResult> GetApplicationAsync(Guid id, HttpResponse response, ResourceChangeSetApplicationService service,
+        ICurrentRequestContext context, CancellationToken cancellationToken) => ExecuteAsync(async () =>
+    {
+        var application = await service.GetAsync(Scope(RequireWorkspace(context)), new(id), cancellationToken);
+        if (application is null) return Results.NotFound(Problem("resource_change_set_application_not_found", "This proposal has not been applied.", StatusCodes.Status404NotFound));
+        response.Headers.ETag = application.ETag;
+        return Results.Ok(application.Value);
+    });
+
+    private static Task<IResult> ApplyChangeSetAsync(Guid id, ApplyResourceChangeSetRequest request, HttpResponse response,
+        ResourceChangeSetApplicationService service, ICurrentRequestContext context, CancellationToken cancellationToken) => ExecuteAsync(async () =>
+    {
+        var current = RequireWorkspace(context);
+        var application = await service.ApplyAsync(Scope(current), new(id), request, current.PrincipalId, cancellationToken);
+        response.Headers.ETag = application.ETag;
+        return Results.Ok(application.Value);
+    });
 }
