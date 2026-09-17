@@ -119,4 +119,11 @@ public interface IInternalMcpToolHandler : IInternalMcpToolDefinitionProvider
 public static class AgentstrationInternalTools
 {
     public const string NotificationCreate = "work.notification.create";
+    public const string ResourcePlanCreate = "resource-planning.plan.create";
+    public const string ResourcePlanGet = "resource-planning.plan.get";
+    public const string ResourcePlanRefine = "resource-planning.plan.refine";
+    public const string ResourcePlanSubmit = "resource-planning.plan.submit";
+    public const string ResourcePlanMaterialize = "resource-planning.plan.materialize";
+    public const string ResourceChangeSetCreate = "resource-planning.change-set.create";
+    public const string ResourceChangeSetValidate = "resource-planning.change-set.validate";
 }

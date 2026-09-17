@@ -42,6 +42,7 @@ src/
   Agentstration.Packs/            Pack authoring, installation and composition
   Agentstration.Sources/          Source and source-registry use cases
   Agentstration.ResourceManagement.Storage.Sqlite/
+  Agentstration.ResourcePlanning*/ Resource Plan contracts, lifecycle, API and relational storage
   ../aep/                            autonomous future AEP repository subtree
   Agentstration.Extensions.Ollama/   autonomous AEP-to-Ollama service
   Agentstration.Extensions.LlamaCpp/ autonomous AEP-to-llama.cpp service
@@ -126,7 +127,8 @@ Management abstractions and kind constants are owned by their resource families;
 |---|---|---|
 | Management plane | canonical declarative agent and model-profile resources, typed references, desired state, generations, provisioning status, lifecycle events, deterministic revisions, deployments, ETag API | operations, policies, connections, identities, manifest import |
 | Pack distribution | local ZIP importer, retained source artifacts, Pack Projects, workspace-resource Composer with dependency closure, deterministic builds, direct current-Workspace installation, logical Model Profile/Model Provider/Runtime Profile/Secret bindings retained by Pack identity, coordinated six-kind lifecycle, differential updates, provenance, compensation, and modification-safe uninstall | broader contained-resource authoring, fully scoped cross-Workspace install, dependency resolution, three-way merge, signatures, Gallery, and publisher verification |
-| Control storage | SQLite by default or optional PostgreSQL in six module-owned schemas, with optimistic concurrency and versioned migrations | richer relational projections and supported export/import |
+| Control storage | SQLite by default or optional PostgreSQL in seven module-owned schemas, with optimistic concurrency and versioned migrations | richer relational projections and supported export/import |
+| Resource Planning | durable Workspace-scoped Resource Plans, deterministic materialization with explicit per-Agent Model and Runtime Profile bindings, reviewable ChangeSets, validation, governed application through canonical services, planning Tools, specialist Flows, and Console review UX | an official installable Pack |
 | Runtime plane | durable Run resources and events, SSE observation, cancellation/retry, MAF `ChatClientAgent`, in-process/shared-host provisioning, registry, reconciliation | provider-native token/tool streaming, sessions, dedicated hosts, containers, remote and Foundry adapters |
 | Model providers | SQLite-backed extension registrations and provider bindings with ETag CRUD and usage protection, explicit configuration/Aspire refresh, dynamic AEP health/model discovery, persisted logical profiles, and provider-neutral `IChatClient` resolution | additional AEP extensions, cached discovery |
 | Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API | durable dispatch, retry/recovery, requester authorization, artifact storage |

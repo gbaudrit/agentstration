@@ -20,6 +20,7 @@ public interface IWorkplaceRepository
     Task<EntryResource?> GetEntryAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken);
     Task DeleteEntryAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken);
     Task UpsertEntryDraftAsync(EntryDraft draft, CancellationToken cancellationToken);
+    Task UpsertEntryDraftAsync(EntryDraft draft, long? expectedRevision, CancellationToken cancellationToken);
     Task<IReadOnlyList<EntryDraft>> ListEntryDraftsAsync(WorkspaceId workspaceId, CancellationToken cancellationToken);
     Task<EntryDraft?> GetEntryDraftAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken);
     Task DeleteEntryDraftAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken);

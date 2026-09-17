@@ -20,11 +20,6 @@ public sealed record ModelProfileResolution(
     EffectiveCapabilities? EffectiveCapabilities = null,
     IReadOnlyList<ExecutionCapabilityIssue>? Incompatibilities = null);
 
-public sealed class ModelProfileValidationException(string code, string message, IReadOnlyDictionary<string, string[]>? errors = null) : Exception(message)
-{
-    public string Code { get; } = code;
-    public IReadOnlyDictionary<string, string[]> Errors { get; } = errors ?? new Dictionary<string, string[]>();
-}
 public sealed class ModelProfileInUseException(string profileName, IReadOnlyList<ModelProfileUsage> usages) : Exception($"The model profile '{profileName}' is used by {usages.Count} agent(s).")
 {
     public string ProfileName { get; } = profileName;

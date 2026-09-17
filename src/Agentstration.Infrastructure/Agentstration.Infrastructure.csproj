@@ -7,6 +7,9 @@
     <ProjectReference Include="../Agentstration.Flows.Storage.PostgreSql/Agentstration.Flows.Storage.PostgreSql.csproj" />
     <ProjectReference Include="../Agentstration.ResourceManagement.Storage.Sqlite/Agentstration.ResourceManagement.Storage.Sqlite.csproj" />
     <ProjectReference Include="../Agentstration.ResourceManagement.Storage.PostgreSql/Agentstration.ResourceManagement.Storage.PostgreSql.csproj" />
+    <ProjectReference Include="../Agentstration.ResourcePlanning/Agentstration.ResourcePlanning.csproj" />
+    <ProjectReference Include="../Agentstration.ResourcePlanning.Storage.Sqlite/Agentstration.ResourcePlanning.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../Agentstration.ResourcePlanning.Storage.PostgreSql/Agentstration.ResourcePlanning.Storage.PostgreSql.csproj" />
     <ProjectReference Include="../Agentstration.Extensions/Agentstration.Extensions.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.Aep/Agentstration.Extensions.Aep.csproj" />
