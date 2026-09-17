@@ -330,8 +330,14 @@ public sealed class PostgreSqlResourcePlanRepository(
         if (document?.ETag != expectedETag) throw new ResourcePlanConcurrencyException("The Resource ChangeSet application changed concurrently.");
         if (document is null)
         {
-            document = new() { TenantId = application.Scope.TenantId, WorkspaceId = application.Scope.WorkspaceId.Value,
-                ChangeSetId = application.ChangeSetId.Value, Payload = string.Empty, ETag = NewETag() };
+            document = new()
+            {
+                TenantId = application.Scope.TenantId,
+                WorkspaceId = application.Scope.WorkspaceId.Value,
+                ChangeSetId = application.ChangeSetId.Value,
+                Payload = string.Empty,
+                ETag = NewETag()
+            };
             context.Applications.Add(document);
         }
         else document.ETag = NewETag();

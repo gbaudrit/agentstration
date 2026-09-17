@@ -126,8 +126,14 @@ public sealed class ResourcePlanMaterializationService(
             contractVersion = snapshot.Value.Content.SchemaVersion,
             materializerVersion = options.MaterializerVersion,
             bindings = bindingEvidence.OrderBy(value => value.LogicalId, StringComparer.Ordinal).ThenBy(value => value.Field, StringComparer.Ordinal),
-            proposals = ordered.Select(value => new { value.LogicalId, value.Operation, value.ProposedDigest, value.DependsOn,
-                Current = value.Current is null ? null : new { value.Current.Uid, value.Current.Revision, value.Current.ETag, value.Current.Digest } }),
+            proposals = ordered.Select(value => new
+            {
+                value.LogicalId,
+                value.Operation,
+                value.ProposedDigest,
+                value.DependsOn,
+                Current = value.Current is null ? null : new { value.Current.Uid, value.Current.Revision, value.Current.ETag, value.Current.Digest }
+            }),
             diagnostics
         });
         return new(planId, snapshot.Value.Revision, snapshot.Value.Content.SchemaVersion, options.MaterializerVersion, scope, ordered, diagnostics, digest, bindingEvidence);

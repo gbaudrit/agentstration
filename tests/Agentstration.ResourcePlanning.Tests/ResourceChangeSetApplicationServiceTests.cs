@@ -1,7 +1,7 @@
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourcePlanning.Contracts;
 using Agentstration.ResourcePlanning.Storage.Sqlite;
@@ -168,8 +168,14 @@ public sealed class ResourceChangeSetApplicationServiceTests
             var applier = new RecordingApplier(state);
             return new()
             {
-                Connection = connection, Scope = scope, Actor = actor, Plans = plans, ChangeSet = set, State = state,
-                Request = new(ready.Value.Id, ready.Value.Revision, set.Value.Digest, validation.Id), Applier = applier,
+                Connection = connection,
+                Scope = scope,
+                Actor = actor,
+                Plans = plans,
+                ChangeSet = set,
+                State = state,
+                Request = new(ready.Value.Id, ready.Value.Revision, set.Value.Digest, validation.Id),
+                Applier = applier,
                 Applications = new(plans, changeSets, repository, state, new AllowingScopes(), [new AcceptingValidator()], [applier], TimeProvider.System,
                     NullLogger<ResourceChangeSetApplicationService>.Instance)
             };
@@ -186,7 +192,9 @@ public sealed class ResourceChangeSetApplicationServiceTests
         public Task<CurrentResourceEvidence?> ResolveBindingAsync(ResourcePlanScope scope, string kind, ResourceReference reference, CancellationToken cancellationToken) =>
             Task.FromResult<CurrentResourceEvidence?>(new(Guid.Empty, 1, "\"profile\"", JsonSerializer.SerializeToElement(new
             {
-                kind, reference.Name, definition = new { enabled = true, discovery = new { available = true } }
+                kind,
+                reference.Name,
+                definition = new { enabled = true, discovery = new { available = true } }
             }), $"{kind}:{reference.Name}{(ToolChanged && kind == "Tool" ? ":changed" : string.Empty)}"));
         public void Apply(ResourceChange change) => values[change.Proposed.Metadata.Name] = new(Guid.NewGuid(), 1, "\"applied\"", change.Proposed.Definition, change.ProposedDigest);
         public void ApplyDraft(ResourceChange change)

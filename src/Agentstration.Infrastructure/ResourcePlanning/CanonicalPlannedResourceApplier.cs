@@ -33,8 +33,11 @@ public sealed class CanonicalPlannedResourceApplier(
             var definition = resource.Definition.Deserialize<AgentProperties>(JsonOptions) ?? throw new JsonException("Agent definition is empty.");
             await agents.PutAgentAsync(new AgentResource
             {
-                ApiVersion = resource.ApiVersion, Kind = resource.Kind, ScopeRef = resource.ScopeRef,
-                Metadata = resource.Metadata, Definition = definition
+                ApiVersion = resource.ApiVersion,
+                Kind = resource.Kind,
+                ScopeRef = resource.ScopeRef,
+                Metadata = resource.Metadata,
+                Definition = definition
             }, change.Current?.ETag, change.Operation == ResourceChangeOperation.Create, cancellationToken);
             return;
         }
@@ -80,7 +83,9 @@ public sealed class CanonicalPlannedResourceApplier(
             var definition = resource.Definition;
             var draft = new EntryDraft
             {
-                WorkspaceId = workspaceId, Id = id, Name = resource.Metadata.Name,
+                WorkspaceId = workspaceId,
+                Id = id,
+                Name = resource.Metadata.Name,
                 DisplayName = definition.GetProperty("displayName").GetString() ?? resource.Metadata.Name,
                 Description = definition.GetProperty("description").GetString(),
                 Presentation = definition.GetProperty("presentation").Deserialize<EntryPresentation>(JsonOptions) ?? throw new JsonException("Entry presentation is empty."),
