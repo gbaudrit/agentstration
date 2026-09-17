@@ -15,6 +15,54 @@ export class FlowObservabilityPage {
     await this.page.getByTestId(TestIds.flowObservability[marker]).waitFor({ state: 'visible' });
   }
 
+  public async exerciseDraftDefinitionAndSplit(consoleUrl: string, checkInvalidYaml: boolean): Promise<void> {
+    const flowName = `definition-editor-smoke-${Date.now()}`;
+    const created = await this.page.request.post(`${consoleUrl}/api/flows/drafts`, {
+      data: { name: flowName, displayName: 'Definition editor smoke', template: 'Empty' },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    await this.open(consoleUrl, `/flows/${flowName}/designer`, 'designer');
+
+    const shell = this.page.locator('.flow-editor-shell.definition');
+    await expect(async () => {
+      await this.page.getByRole('button', { name: 'Definition', exact: true }).click();
+      await expect(shell).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
+    const source = shell.locator('.source-editor');
+    const lines = source.locator('.view-lines');
+    await expect(lines).toContainText('entryStep');
+    await expect(lines).not.toContainText('sourceText');
+    await expect(source.locator('.error-panel')).toHaveCount(0);
+    await expect(shell.locator('.flow-canvas-wrap')).toHaveCount(0);
+    const shellWidth = (await shell.boundingBox())?.width ?? 0;
+    const sourceWidth = (await source.boundingBox())?.width ?? 0;
+    expect(sourceWidth).toBeGreaterThan(shellWidth * 0.9);
+
+    await source.getByRole('textbox', { name: 'Editor content' }).focus();
+    await this.page.keyboard.press('ControlOrMeta+End');
+    await this.page.keyboard.insertText('\n# definition-editor-smoke');
+    await expect(lines).toContainText('definition-editor-smoke');
+    await source.getByRole('button', { name: 'Apply and save' }).click();
+    await expect(source.locator('.error-panel')).toHaveCount(0);
+
+    await this.page.getByRole('button', { name: 'Split', exact: true }).click();
+    const split = this.page.locator('.flow-editor-shell.split');
+    await expect(split).toBeVisible();
+    await expect(split.locator('.flow-canvas-wrap')).toBeVisible();
+    await expect(split.locator('.flow-node')).toHaveCount(2);
+    await expect(split.locator('.source-editor')).toBeVisible();
+
+    if (!checkInvalidYaml) return;
+    await split.getByRole('textbox', { name: 'Editor content' }).focus();
+    await this.page.keyboard.press('ControlOrMeta+A');
+    await this.page.keyboard.insertText('entryStep: [');
+    await expect(split.locator('.view-lines')).toContainText('entryStep: [');
+    await split.getByRole('button', { name: 'Apply and save' }).click();
+    await expect(split.locator('.source-editor .error-panel')).toBeVisible();
+    await expect(split.locator('.view-lines')).toContainText('entryStep: [');
+    await expect(split.locator('.flow-node')).toHaveCount(2);
+  }
+
   public async openTask(consoleUrl: string, taskId: string): Promise<void> {
     requireIdentifier(taskId, 'task');
     await this.open(consoleUrl, `/tasks/${encodeURIComponent(taskId)}`, 'taskDetails');

@@ -8,7 +8,7 @@ public sealed class FlowDesignerResourceProvider(IManagementApiClient client, IF
     public async Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(CancellationToken cancellationToken)
     {
         var agents = await client.GetAgentsAsync(cancellationToken);
-        return agents.Select(agent => new FlowDesignerAgent(agent.Name, agent.Name)).ToArray();
+        return agents.Select(agent => new FlowDesignerAgent(agent.Id, agent.Name) { Namespace = agent.Namespace }).ToArray();
     }
 
     public async Task<IReadOnlyList<FlowDesignerFlow>> GetFlowsAsync(CancellationToken cancellationToken)

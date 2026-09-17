@@ -86,12 +86,21 @@ public sealed class FlowService(
         var stored = await repository.GetAsync(workspaceId, id, cancellationToken) ?? throw new FlowNotFoundException(id);
         if (!string.Equals(stored.Value.Version, version, StringComparison.Ordinal))
             throw new FlowValidationException("flow_version_mismatch", "The requested version must match the current Flow definition version.");
+        if (await repository.GetVersionAsync(workspaceId, id, version, cancellationToken) is not null)
+            throw new FlowValidationException("flow_version_already_published", $"Flow version '{version}' has already been published. Choose a new version.");
         var published = new FlowVersion(workspaceId, id, version, stored.Value.Description, stored.Value.Definition, stored.Value.Metadata, timeProvider.GetUtcNow(), stored.Value.Graph,
             stored.Value.Graph is null ? null : FlowDefinitionHash.Compute(stored.Value.Graph), releaseNotes);
         FlowValidator.ValidateVersion(published);
         if (activate)
             foreach (var guard in activationGuards ?? []) await guard.ValidateActivationAsync(workspaceId, published, cancellationToken);
-        var created = await repository.CreateVersionAsync(published, cancellationToken);
+        StoredFlowVersion created;
+        try { created = await repository.CreateVersionAsync(published, cancellationToken); }
+        catch (FlowConcurrencyException)
+        {
+            if (await repository.GetVersionAsync(workspaceId, id, version, cancellationToken) is not null)
+                throw new FlowValidationException("flow_version_already_published", $"Flow version '{version}' has already been published. Choose a new version.");
+            throw;
+        }
         if (activate)
         {
             var activated = stored.Value with { ActiveVersion = version, Enabled = true, UpdatedAt = timeProvider.GetUtcNow() };

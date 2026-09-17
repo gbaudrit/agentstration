@@ -21,6 +21,12 @@ public sealed record FlowDesignerLoadResult(FlowDesignerResource Resource, strin
         response.ETag);
 }
 
+public sealed class FlowDesignerVersionAlreadyPublishedException(string version, Exception innerException)
+    : Exception($"Flow version '{version}' is already published.", innerException)
+{
+    public string Version { get; } = version;
+}
+
 public interface IFlowDesignerBackend
 {
     Task<FlowDesignerLoadResult> LoadAsync(FlowDesignerTarget target, CancellationToken cancellationToken);

@@ -39,13 +39,88 @@ public sealed class FlowDetailsDesignerTests
             rendered.FindAll("nav.section-tabs button").Select(button => button.TextContent.Trim()).ToArray());
         rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
 
-        var link = rendered.Find("a.button-primary");
+        var link = rendered.Find(".page-header .flow-header-designer");
         Assert.AreEqual("/namespaces/pack.sample/flows/sample/designer", link.GetAttribute("href"));
+        Assert.AreEqual(strings["ViewInFlowDesigner"].Value, link.TextContent.Trim());
+        Assert.HasCount(0, rendered.FindAll(".flow-definition-heading a"));
+        StringAssert.Contains(rendered.Find(".flow-definition-heading").TextContent, strings["DefinitionIdentityTitle"].Value);
+        Assert.HasCount(0, rendered.FindAll(".flow-definition-sheet .topology-shell"));
+        Assert.IsTrue(rendered.Find("[data-testid='flow-definition-display-name']").HasAttribute("disabled"));
+        Assert.IsTrue(rendered.Find("[data-testid='flow-definition-name']").HasAttribute("readonly"));
+        Assert.IsTrue(rendered.Find("[data-testid='flow-definition-namespace']").HasAttribute("readonly"));
+        Assert.AreEqual("pack.sample", rendered.Find("[data-testid='flow-definition-namespace']").GetAttribute("value"));
+        Assert.HasCount(0, rendered.FindAll(".flow-definition-form button[type=submit]"));
+        Assert.AreEqual(0, client.DraftLoadCount);
         Assert.AreEqual(new ResourceNamespace("pack.sample"), client.RequestedNamespace);
         rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.YAML"].Value).Click();
         var yaml = rendered.Find("[data-testid='flow-yaml-viewer'] textarea");
         Assert.IsTrue(yaml.HasAttribute("readonly"));
         Assert.IsTrue(yaml.TextContent.Contains("entryStep: input", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void WorkspaceDefinitionSavesDraftMetadataWithoutChangingGraphOrTags()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FlowClientStub();
+        context.Services.AddSingleton<IFlowApiClient>(client);
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
+
+        var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
+        Assert.AreEqual("/flows/sample/designer", rendered.Find(".page-header .flow-header-designer").GetAttribute("href"));
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
+
+        Assert.HasCount(0, rendered.FindAll(".flow-definition-sheet .topology-shell"));
+        Assert.AreEqual("Draft Flow", rendered.Find("[data-testid='flow-definition-display-name']").GetAttribute("value"));
+        Assert.IsTrue(rendered.Find("[data-testid='flow-definition-name']").HasAttribute("readonly"));
+        Assert.IsTrue(rendered.Find("[data-testid='flow-definition-namespace']").HasAttribute("readonly"));
+        rendered.Find("[data-testid='flow-definition-display-name']").Input("Reviewed Flow");
+        rendered.Find("[data-testid='flow-definition-description']").Input("Coordinates reviewers.");
+        rendered.Find("[data-testid='flow-definition-form']").Submit();
+
+        rendered.WaitForAssertion(() => Assert.AreEqual("Reviewed Flow", client.LastDraftUpdate?.DisplayName));
+        Assert.AreEqual("Coordinates reviewers.", client.LastDraftUpdate?.Description);
+        Assert.AreSame(client.OriginalGraph, client.LastDraftUpdate?.Definition);
+        Assert.AreEqual("platform", client.LastDraftUpdate?.Tags?["owner"]);
+        Assert.AreEqual("\"etag-1\"", client.LastDraftETag);
+        StringAssert.Contains(rendered.Find("[role=status]").TextContent, strings["DefinitionSaved"].Value);
+    }
+
+    [TestMethod]
+    public void WorkspaceDefinitionRejectsEmptyDisplayNameWithoutSaving()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FlowClientStub();
+        context.Services.AddSingleton<IFlowApiClient>(client);
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
+
+        var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
+        rendered.Find("[data-testid='flow-definition-display-name']").Input("   ");
+        rendered.Find("[data-testid='flow-definition-form']").Submit();
+
+        Assert.IsNull(client.LastDraftUpdate);
+        StringAssert.Contains(rendered.Find("[role=alert]").TextContent, strings["DefinitionDisplayNameRequired"].Value);
+    }
+
+    [TestMethod]
+    public void WorkspaceDefinitionReportsConcurrentDraftChange()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FlowClientStub { SimulateDraftConflict = true };
+        context.Services.AddSingleton<IFlowApiClient>(client);
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
+
+        var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
+        rendered.Find("[data-testid='flow-definition-display-name']").Input("Changed elsewhere");
+        rendered.Find("[data-testid='flow-definition-form']").Submit();
+
+        StringAssert.Contains(rendered.Find("[role=alert]").TextContent, strings["DefinitionSaveConflict"].Value);
+        Assert.HasCount(0, rendered.FindAll("[role=status]"));
     }
 
     [TestMethod]
@@ -168,6 +243,7 @@ public sealed class FlowDetailsDesignerTests
         private readonly FlowDefinition definition;
         private readonly FlowRun? run;
         private readonly FlowRunCausalityPageResponse? causality;
+        private FlowDraftResponse? storedDraft;
         public FlowClientStub(bool orchestration = false, FlowRun? run = null, FlowRunCausalityPageResponse? causality = null)
         {
             definition = orchestration
@@ -177,6 +253,11 @@ public sealed class FlowDetailsDesignerTests
             this.causality = causality;
         }
         public ResourceNamespace RequestedNamespace { get; private set; }
+        public FlowGraphDefinition OriginalGraph => Graph;
+        public UpdateFlowDraftRequest? LastDraftUpdate { get; private set; }
+        public string? LastDraftETag { get; private set; }
+        public int DraftLoadCount { get; private set; }
+        public bool SimulateDraftConflict { get; init; }
 
         public Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken)
         {
@@ -210,8 +291,40 @@ public sealed class FlowDetailsDesignerTests
         public Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public async IAsyncEnumerable<FlowRun> ObserveFlowRunAsync(string runId, [EnumeratorCancellation] CancellationToken cancellationToken) { await Task.CompletedTask; yield break; }
         public Task<FlowDraftResponse> CreateDraftAsync(CreateFlowDraftRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<FlowDraftResponse> GetDraftAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<FlowDraftResponse> SaveDraftAsync(string flowId, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<FlowDraftResponse> GetDraftAsync(string flowId, CancellationToken cancellationToken)
+        {
+            DraftLoadCount++;
+            storedDraft ??= new(new FlowDraft
+            {
+                WorkspaceId = new WorkspaceId(Guid.NewGuid()),
+                Id = $"{flowId}-draft",
+                FlowId = new FlowId(flowId),
+                DisplayName = "Draft Flow",
+                Description = "Existing description",
+                Tags = new Dictionary<string, string> { ["owner"] = "platform" },
+                Definition = Graph,
+                CreatedAt = Now,
+                UpdatedAt = Now
+            }, "\"etag-1\"");
+            return Task.FromResult(storedDraft);
+        }
+        public Task<FlowDraftResponse> SaveDraftAsync(string flowId, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken)
+        {
+            LastDraftUpdate = request;
+            LastDraftETag = etag;
+            if (SimulateDraftConflict)
+                throw new AgentstrationApiException("Draft changed", "draft-conflict", System.Net.HttpStatusCode.PreconditionFailed, "flow_concurrency_conflict");
+            var current = storedDraft ?? throw new InvalidOperationException("The draft was not loaded.");
+            storedDraft = new(current.Value with
+            {
+                DisplayName = request.DisplayName,
+                Description = request.Description,
+                Tags = request.Tags ?? new Dictionary<string, string>(),
+                Definition = request.Definition,
+                Revision = current.Value.Revision + 1
+            }, "\"etag-2\"");
+            return Task.FromResult(storedDraft);
+        }
         public Task<FlowValidationResponse> ValidateDraftAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowSourceResponse> GetDraftSourceAsync(string flowId, string format, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowDraftResponse> ReplaceDraftSourceAsync(string flowId, ReplaceFlowSourceRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();

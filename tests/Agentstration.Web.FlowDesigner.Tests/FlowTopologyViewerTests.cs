@@ -21,8 +21,11 @@ public sealed class FlowTopologyViewerTests
             "graph",
             "Read-only topology");
         var rendered = context.Render<FlowTopologyViewer>(parameters => parameters
-            .Add(component => component.Graph, graph));
+            .Add(component => component.Graph, graph)
+            .Add(component => component.Title, "Flow topology"));
 
+        Assert.AreEqual("Flow topology", rendered.Find(".topology-description").TextContent);
+        Assert.AreEqual("Flow topology", rendered.Find("svg").GetAttribute("aria-label"));
         Assert.AreEqual("100%", rendered.Find(".topology-zoom-controls span").TextContent.Trim());
         rendered.Find($"button[aria-label='{strings["ZoomIn"].Value}']").Click();
         Assert.AreEqual("115%", rendered.Find(".topology-zoom-controls span").TextContent.Trim());

@@ -29,6 +29,133 @@
     min-height: 0;
 }
 
+.flow-definition-sheet {
+    display: grid;
+    gap: 18px;
+}
+
+.flow-definition-heading .eyebrow {
+    margin: 0 0 6px;
+}
+
+.flow-definition-heading h2 {
+    margin: 0;
+    font-size: 1.15rem;
+}
+
+.flow-definition-heading p:not(.eyebrow) {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: .78rem;
+    line-height: 1.5;
+}
+
+.flow-header-designer {
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.flow-header-designer ::deep .ui-icon {
+    width: 17px;
+    height: 17px;
+}
+
+.flow-definition-form {
+    width: 100%;
+    padding: 24px;
+}
+
+.flow-definition-form .panel-header {
+    align-items: flex-start;
+    margin-bottom: 22px;
+}
+
+.flow-definition-form .panel-header h3 {
+    margin: 0;
+    font-size: .96rem;
+}
+
+.flow-definition-form .panel-header p {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: .75rem;
+    line-height: 1.45;
+}
+
+.flow-definition-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 20px;
+}
+
+.flow-definition-fields label {
+    display: grid;
+    align-content: start;
+    gap: 7px;
+    min-width: 0;
+    color: var(--text);
+    font-size: .76rem;
+    font-weight: 650;
+}
+
+.flow-definition-fields input,
+.flow-definition-fields textarea {
+    width: 100%;
+    min-height: var(--field-height);
+    padding: 10px 12px;
+    border: 1px solid var(--field-border);
+    border-radius: var(--field-radius);
+    background: var(--field-background);
+    color: var(--text);
+    font: inherit;
+    font-weight: 400;
+    box-shadow: var(--field-shadow);
+}
+
+.flow-definition-fields textarea {
+    min-height: 112px;
+    resize: vertical;
+}
+
+.flow-definition-fields input:focus-visible,
+.flow-definition-fields textarea:focus-visible {
+    outline: 0;
+    border-color: var(--primary);
+    box-shadow: var(--field-focus-ring), var(--field-shadow);
+}
+
+.flow-definition-fields input:read-only,
+.flow-definition-fields input:disabled,
+.flow-definition-fields textarea:disabled {
+    background: var(--surface-2);
+    color: var(--muted);
+    box-shadow: none;
+    opacity: 1;
+}
+
+.flow-definition-fields small {
+    color: var(--muted);
+    font-size: .68rem;
+    font-weight: 400;
+}
+
+.flow-definition-description {
+    grid-column: 1 / -1;
+}
+
+.flow-definition-form .form-actions {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+}
+
+.flow-definition-success {
+    margin: 18px 0 0;
+    color: var(--color-success);
+    font-size: .76rem;
+    font-weight: 650;
+}
+
 @media (max-width: 720px) {
     .flow-overview-preview {
         padding: 18px;
@@ -36,5 +163,13 @@
 
     .flow-overview-preview ::deep .topology-shell {
         height: 540px;
+    }
+
+    .flow-definition-form {
+        padding: 18px;
+    }
+
+    .flow-definition-fields {
+        grid-template-columns: 1fr;
     }
 }

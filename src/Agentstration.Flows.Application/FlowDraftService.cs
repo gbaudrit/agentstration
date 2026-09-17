@@ -70,6 +70,8 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
     public async Task<StoredFlowVersion> PublishAsync(WorkspaceId workspaceId, FlowId flowId, string version, string? releaseNotes, bool activate, CancellationToken cancellationToken)
     {
         var draft = await RequiredAsync(workspaceId, flowId, cancellationToken);
+        if (await repository.GetVersionAsync(workspaceId, flowId, version, cancellationToken) is not null)
+            throw new FlowValidationException("flow_version_already_published", $"Flow version '{version}' has already been published. Choose a new version.");
         var validation = await validator.ValidateAsync(draft.Value.Definition, new FlowValidationContext(true, workspaceId, flowId), cancellationToken);
         if (!validation.IsValid) throw new FlowValidationException("flow_validation_failed", "The Flow Draft contains validation errors and cannot be published.");
         var definition = await repository.GetAsync(workspaceId, flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);

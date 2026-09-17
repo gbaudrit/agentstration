@@ -74,10 +74,14 @@ public sealed class FlowDesignerBackend(IFlowApiClient client) : IFlowDesignerBa
         return client.ValidateDraftAsync(target.ResourceId, cancellationToken);
     }
 
-    public Task<FlowVersionResponse> PublishAsync(FlowDesignerTarget target, PublishFlowDraftRequest request, CancellationToken cancellationToken)
+    public async Task<FlowVersionResponse> PublishAsync(FlowDesignerTarget target, PublishFlowDraftRequest request, CancellationToken cancellationToken)
     {
         EnsureWorkspace(target);
-        return client.PublishDraftAsync(target.ResourceId, request, cancellationToken);
+        try { return await client.PublishDraftAsync(target.ResourceId, request, cancellationToken); }
+        catch (AgentstrationApiException exception) when (exception.ProblemTitle == "flow_version_already_published")
+        {
+            throw new FlowDesignerVersionAlreadyPublishedException(request.Version, exception);
+        }
     }
 
     public Task<FlowRun> RunDraftAsync(FlowDesignerTarget target, CreateFlowRunRequest request, CancellationToken cancellationToken)

@@ -11,18 +11,18 @@
 else
 {
     <PageHeader Title="@flow.Name" Description="@(flow.Description ?? T("DefaultDescription"))">
-        <Actions><StatusBadge Text="@StatusLabel" Status="@PlatformDashboardService.ToStatus(Status)" /></Actions>
+        <Status><StatusBadge Text="@StatusLabel" Status="@PlatformDashboardService.ToStatus(Status)" /></Status>
+        <Actions>@if (!IsOrchestration) { <a class="button-primary flow-header-designer" href="@EditorUrl" data-enhance-nav="false"><UiIcon Name="workflow" />@EditorLabel</a> }</Actions>
     </PageHeader>
     <nav class="section-tabs" aria-label="@T("DetailsAriaLabel")">
-        @foreach (var tab in AvailableTabs) { <button class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@TabLabel(tab)</button> }
+        @foreach (var tab in AvailableTabs) { <button class="@(activeTab == tab ? "active" : null)" @onclick="() => SelectTabAsync(tab)">@TabLabel(tab)</button> }
     </nav>
     @if (activeTab == "Overview")
     {
         <section class="metric-grid flow-metrics"><MetricCard Label="@T("CurrentVersion")" Value="@flow.Version" Detail="@(flow.ActiveVersion is null ? T("NotPublished") : T("ActiveVersion", flow.ActiveVersion))" Status="UiStatus.Info" /><MetricCard Label="@T("Status")" Value="@StatusLabel" Detail="@T("ImmutableVersions")" Status="@(flow.ActiveVersion is null ? UiStatus.Warning : UiStatus.Success)" /><MetricCard Label="@(IsOrchestration ? T("Participants") : T("Steps"))" Value="@TopologyNodeCount.ToString()" Detail="@(IsOrchestration ? StrategyLabel(Orchestration!.Strategy) : Topology.Layout)" Status="UiStatus.Neutral" /><MetricCard Label="@T("RecentRuns")" Value="@runs.Count.ToString()" Detail="@SucceededRunCount(runs.Count(x => x.Status == FlowRunStatus.Succeeded))" Status="UiStatus.Success" /></section>
-        <article class="panel definition-grid"><div><span class="field-label">@T("DisplayName")</span><strong>@(flow.DisplayName ?? flow.Name)</strong></div><div><span class="field-label">@T("ResourceName")</span><code>@flow.Id</code></div><div><span class="field-label">@T("Namespace")</span><code>@FlowResourceNamespace.Value</code></div><div><span class="field-label">@T("Kind")</span><strong>@flow.Definition.Kind</strong></div>@if(IsOrchestration){<div><span class="field-label">@T("Strategy")</span><strong>@StrategyLabel(Orchestration!.Strategy)</strong></div><div><span class="field-label">@T("Participants")</span><strong>@string.Join(", ", Orchestration.Participants.Select(x => x.Id))</strong></div>}<div><span class="field-label">@T("ExecutionProfile")</span><strong>local</strong></div><div><span class="field-label">@T("LastPublication")</span><strong>@(versions.FirstOrDefault()?.PublishedAt.LocalDateTime.ToString("g") ?? "—")</strong></div></article>
         <section class="panel flow-overview-preview">
             <div class="panel-header"><div><h2>@T("ExecutionPreview")</h2><p>@T("ExecutionPreviewHelp")</p></div>@if (IsOrchestration) { <StatusBadge Text="@StrategyLabel(Orchestration!.Strategy)" Status="UiStatus.Info" /> }</div>
-            <FlowTopologyViewer Graph="Topology" InitiallyFit="true" />
+            <FlowTopologyViewer Graph="PreviewTopology" Title="@T("FlowTopology")" InitiallyFit="true" />
         </section>
         @if (!FlowResourceNamespace.IsDefault)
         {
@@ -42,21 +42,40 @@ else
         }
         else
         {
-            <div class="toolbar"><a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@EditorLabel</a></div>
-            <section class="designer-layout">
-                <FlowTopologyViewer Graph="Topology" SelectedKey="selectedNode" SelectedKeyChanged="SelectNode" />
-                <article class="panel inspector">
-                    <div class="panel-header"><h2>@T("StepProperties")</h2></div>
-                    @if (SelectedTopologyNode is null)
-                    {
-                        <p class="muted">@T("SelectNode")</p>
-                    }
-                    else
-                    {
-                        <dl class="details-list"><dt>@T("Name")</dt><dd>@SelectedTopologyNode.Label</dd><dt>@T("Type")</dt><dd>@SelectedTopologyNode.Type</dd>@if(SelectedTopologyNode.Subtitle is not null){<dt>@T("RoleOrTarget")</dt><dd>@SelectedTopologyNode.Subtitle</dd>}@if(SelectedTopologyNode.IsInitial){<dt>@T("Entry")</dt><dd>@T("InitialParticipant")</dd>}</dl>
-                        <p class="muted">@T("OpenEditorHelp")</p>
-                    }
-                </article>
+            <section class="flow-definition-sheet">
+                <div class="flow-definition-heading">
+                    <div>
+                        <p class="eyebrow">@T("DefinitionIdentityEyebrow")</p>
+                        <h2>@T("DefinitionIdentityTitle")</h2>
+                        <p>@T("DefinitionIdentityHelp")</p>
+                    </div>
+                </div>
+                @if (definitionLoading)
+                {
+                    <LoadingState />
+                }
+                else
+                {
+                    <form class="panel flow-definition-form" @onsubmit="SaveDefinitionAsync" @onsubmit:preventDefault="true" data-testid="flow-definition-form">
+                        <div class="panel-header">
+                            <div><h3>@T("DefinitionIdentitySection")</h3><p>@T(FlowResourceNamespace.IsDefault ? "DefinitionDraftHelp" : "DefinitionPublishedHelp")</p></div>
+                            <StatusBadge Text="@T(FlowResourceNamespace.IsDefault ? "Status.Draft" : "ReadOnly")" Status="UiStatus.Neutral" />
+                        </div>
+                        <div class="flow-definition-fields">
+                            <label><span>@T("DisplayName")</span><input value="@definitionDisplayName" @oninput="args => definitionDisplayName = args.Value?.ToString() ?? string.Empty" disabled="@(!CanEditDefinition)" maxlength="200" data-testid="flow-definition-display-name" /></label>
+                            <label><span>@T("ResourceName")</span><input value="@flow.Id" readonly data-testid="flow-definition-name" /><small>@T("DefinitionIdentityFixedHelp")</small></label>
+                            <label><span>@T("Namespace")</span><input value="@FlowResourceNamespace.Value" readonly data-testid="flow-definition-namespace" /><small>@T("DefinitionIdentityFixedHelp")</small></label>
+                            <label><span>@T("Kind")</span><input value="@flow.Definition.Kind" readonly /></label>
+                            <label class="flow-definition-description"><span>@T("Description")</span><textarea rows="4" @bind="definitionDescription" @bind:event="oninput" disabled="@(!CanEditDefinition)" data-testid="flow-definition-description"></textarea></label>
+                        </div>
+                        @if (definitionError is not null) { <p class="error-panel" role="alert">@definitionError</p> }
+                        @if (definitionSaved && !DefinitionDirty) { <p class="flow-definition-success" role="status">@T("DefinitionSaved")</p> }
+                        @if (FlowResourceNamespace.IsDefault)
+                        {
+                            <div class="form-actions"><button class="button-primary" type="submit" disabled="@(!CanEditDefinition || definitionSaving || !DefinitionDirty)">@(definitionSaving ? T("Saving") : T("SaveDefinition"))</button></div>
+                        }
+                    </form>
+                }
             </section>
         }
     }
@@ -94,7 +113,12 @@ else
     private static readonly string[] Tabs = ["Overview", "Definition", "Runs", "Deployments", "YAML"];
     private readonly CancellationTokenSource cancellation = new();
     private FlowResponse? flow; private IReadOnlyList<FlowVersionResponse> versions=[]; private IReadOnlyList<FlowRun> runs=[];
-    private string activeTab="Overview", inputJson="{\n  \"prompt\": \"How can I optimize this SQL query?\"\n}", deployment="local", runVersion=""; private string? selectedNode,error; private bool showRun,submitting;
+    private string activeTab="Overview", inputJson="{\n  \"prompt\": \"How can I optimize this SQL query?\"\n}", deployment="local", runVersion=""; private string? error; private bool showRun,submitting;
+    private FlowDraftResponse? definitionDraft;
+    private string definitionDisplayName = string.Empty;
+    private string definitionDescription = string.Empty;
+    private string? definitionError;
+    private bool definitionLoaded, definitionLoading, definitionSaving, definitionSaved;
     private string Status => flow?.ActiveVersion is not null ? "Published" : "Draft";
     private string StatusLabel => T($"Status.{Status}");
     private ResourceNamespace FlowResourceNamespace => string.IsNullOrWhiteSpace(FlowNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(FlowNamespace);
@@ -116,10 +140,107 @@ else
         ? FlowResourceNamespace.IsDefault ? T("OpenOrchestrationEditor") : T("ViewOrchestration")
         : FlowResourceNamespace.IsDefault ? T("OpenFlowDesigner") : T("ViewInFlowDesigner");
     private FlowTopologyGraph Topology => flow is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.Project(flow.Definition, flow.Graph);
-    private FlowTopologyNode? SelectedTopologyNode => Topology.FindBySelection(selectedNode);
+    private FlowTopologyGraph PreviewTopology => flow is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.ProjectPreview(flow.Definition, flow.Graph);
     private int TopologyNodeCount => Topology.Nodes.Count(node => node.Type is not "input" and not "output" and not "conversation" and not "manager");
-    protected override async Task OnParametersSetAsync(){flow=await Client.GetFlowAsync(FlowResourceNamespace,FlowId,cancellation.Token);versions=await Client.GetFlowVersionsAsync(FlowResourceNamespace,FlowId,cancellation.Token);runs=await Client.GetFlowRunsAsync(FlowResourceNamespace,FlowId,cancellation.Token);runVersion=flow.ActiveVersion ?? versions.FirstOrDefault()?.Version ?? "";if(string.Equals(View,"definition",StringComparison.OrdinalIgnoreCase))activeTab="Definition";else if(string.Equals(View,"yaml",StringComparison.OrdinalIgnoreCase))activeTab="YAML";}
-    private void SelectNode(string name)=>selectedNode=name;
+    private bool CanEditDefinition => FlowResourceNamespace.IsDefault && definitionDraft is not null;
+    private bool DefinitionDirty => definitionDraft is not null &&
+        (!string.Equals(definitionDisplayName.Trim(), definitionDraft.Value.DisplayName, StringComparison.Ordinal) ||
+         !string.Equals(NormalizedDescription, NormalizeDescription(definitionDraft.Value.Description), StringComparison.Ordinal));
+    private string? NormalizedDescription => NormalizeDescription(definitionDescription);
+    private static string? NormalizeDescription(string? description) => string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        definitionLoaded = false;
+        definitionDraft = null;
+        definitionError = null;
+        definitionSaved = false;
+        flow = await Client.GetFlowAsync(FlowResourceNamespace, FlowId, cancellation.Token);
+        versions = await Client.GetFlowVersionsAsync(FlowResourceNamespace, FlowId, cancellation.Token);
+        runs = await Client.GetFlowRunsAsync(FlowResourceNamespace, FlowId, cancellation.Token);
+        runVersion = flow.ActiveVersion ?? versions.FirstOrDefault()?.Version ?? "";
+        if (string.Equals(View, "definition", StringComparison.OrdinalIgnoreCase)) activeTab = "Definition";
+        else if (string.Equals(View, "yaml", StringComparison.OrdinalIgnoreCase)) activeTab = "YAML";
+        if (activeTab == "Definition" && !IsOrchestration) await LoadDefinitionAsync();
+    }
+
+    private async Task SelectTabAsync(string tab)
+    {
+        activeTab = tab;
+        if (tab == "Definition" && !IsOrchestration) await LoadDefinitionAsync();
+    }
+
+    private async Task LoadDefinitionAsync()
+    {
+        if (definitionLoaded || definitionLoading || flow is null) return;
+        definitionLoading = true;
+        definitionError = null;
+        try
+        {
+            if (FlowResourceNamespace.IsDefault)
+            {
+                definitionDraft = await Client.GetDraftAsync(FlowId, cancellation.Token);
+                definitionDisplayName = definitionDraft.Value.DisplayName;
+                definitionDescription = definitionDraft.Value.Description ?? string.Empty;
+            }
+            else
+            {
+                definitionDisplayName = flow.DisplayName ?? flow.Name;
+                definitionDescription = flow.Description ?? string.Empty;
+            }
+            definitionLoaded = true;
+        }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            definitionDisplayName = flow.DisplayName ?? flow.Name;
+            definitionDescription = flow.Description ?? string.Empty;
+            definitionError = T("DefinitionDraftUnavailable");
+            definitionLoaded = true;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            definitionDisplayName = flow.DisplayName ?? flow.Name;
+            definitionDescription = flow.Description ?? string.Empty;
+            definitionError = exception.Message;
+            definitionLoaded = true;
+        }
+        finally { definitionLoading = false; }
+    }
+
+    private async Task SaveDefinitionAsync()
+    {
+        if (!CanEditDefinition || definitionSaving || !DefinitionDirty) return;
+        var displayName = definitionDisplayName.Trim();
+        if (displayName.Length == 0)
+        {
+            definitionError = T("DefinitionDisplayNameRequired");
+            return;
+        }
+
+        definitionSaving = true;
+        definitionError = null;
+        definitionSaved = false;
+        try
+        {
+            var current = definitionDraft!;
+            var saved = await Client.SaveDraftAsync(FlowId,
+                new UpdateFlowDraftRequest(displayName, NormalizedDescription, current.Value.Tags, current.Value.Definition),
+                current.ETag, cancellation.Token);
+            definitionDraft = saved;
+            definitionDisplayName = saved.Value.DisplayName;
+            definitionDescription = saved.Value.Description ?? string.Empty;
+            definitionSaved = true;
+        }
+        catch (AgentstrationApiException exception) when (exception.StatusCode is System.Net.HttpStatusCode.Conflict or System.Net.HttpStatusCode.PreconditionFailed)
+        {
+            definitionError = T("DefinitionSaveConflict");
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            definitionError = exception.Message;
+        }
+        finally { definitionSaving = false; }
+    }
     private void OpenRun(){activeTab="Runs";showRun=true;error=null;if(flow?.Metadata.TryGetValue("agentstration.io/sample-input",out var sampleInput)==true)inputJson=sampleInput;}
     private async Task SubmitRunAsync(){try{submitting=true;error=null;using var document=JsonDocument.Parse(inputJson);var run=await Client.CreateFlowRunAsync(FlowResourceNamespace,FlowId,new CreateFlowRunRequest(document.RootElement.Clone(),runVersion,deployment,FlowRunTrigger.Manual),cancellation.Token);Navigation.NavigateTo($"/flow-runs/{run.Id}");}catch(Exception exception){error=exception.Message;}finally{submitting=false;}}
     public void Dispose(){cancellation.Cancel();cancellation.Dispose();}
