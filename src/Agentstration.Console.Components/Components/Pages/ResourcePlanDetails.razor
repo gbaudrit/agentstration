@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @implements IDisposable
 @inject IResourcePlansApiClient Client
+@inject IIdentityAdministrationApiClient IdentityClient
 @inject IModelProfilesClient ModelProfilesClient
 @inject IRuntimeProfilesClient RuntimeProfilesClient
 @inject ConsoleContextState ContextState
@@ -319,8 +320,8 @@ else
                 <section class="resource-plan-origin-card" aria-label="@T("OriginTitle")">
                     <div class="resource-plan-activity-card-heading"><span class="resource-plan-origin-symbol" aria-hidden="true">◎</span><div><h3>@T("OriginTitle")</h3><p>@T("OriginDescription")</p></div></div>
                     <dl class="resource-plan-origin">
-                        <div><dt>@T("Principal")</dt><dd><code>@plan.Value.Origin.PrincipalId</code></dd></div>
-                        @if (activities.Where(value => value.Type == ResourcePlanActivityType.Applied).OrderByDescending(value => value.CreatedAt).FirstOrDefault() is { } appliedActivity) { <div><dt>@T("AppliedBy")</dt><dd><code>@appliedActivity.ActorPrincipalId</code></dd></div> }
+                        <div><dt>@T("Principal")</dt><dd>@if (PrincipalDisplayName(plan.Value.Origin.PrincipalId) is { } creatorName) { <strong>@creatorName</strong> }<code>@plan.Value.Origin.PrincipalId</code></dd></div>
+                        @if (activities.Where(value => value.Type == ResourcePlanActivityType.Applied).OrderByDescending(value => value.CreatedAt).FirstOrDefault() is { } appliedActivity) { <div><dt>@T("AppliedBy")</dt><dd>@if (PrincipalDisplayName(appliedActivity.ActorPrincipalId) is { } appliedByName) { <strong>@appliedByName</strong> }<code>@appliedActivity.ActorPrincipalId</code></dd></div> }
                         @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.WorkItemId)) { <div><dt>@T("Work")</dt><dd><a href="@($"/api/work/workitems/{Uri.EscapeDataString(plan.Value.Origin.WorkItemId)}")">@plan.Value.Origin.WorkItemId</a></dd></div> }
                         @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.FlowRunId)) { <div><dt>@T("FlowRun")</dt><dd><a href="@($"/flow-runs/{Uri.EscapeDataString(plan.Value.Origin.FlowRunId)}")">@plan.Value.Origin.FlowRunId</a></dd></div> }
                         @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.CorrelationId)) { <div><dt>@T("Correlation")</dt><dd><code>@plan.Value.Origin.CorrelationId</code></dd></div> }
@@ -351,6 +352,7 @@ else
     private readonly CancellationTokenSource lifetime = new();
     private ResourcePlanSnapshot? plan;
     private IReadOnlyList<ResourcePlanActivity> activities = [];
+    private IReadOnlyDictionary<Guid, string> principalNames = new Dictionary<Guid, string>();
     private IReadOnlyList<ResourceChangeSetSnapshot> changeSets = [];
     private ResourceChangeSetSnapshot? selected;
     private string? selectedGraphKey;
@@ -396,6 +398,7 @@ else
         }
     }
     private string T(string key, params object[] args) => Localizer[key, args].Value;
+    private string? PrincipalDisplayName(Guid id) => principalNames.TryGetValue(id, out var name) && !string.IsNullOrWhiteSpace(name) ? name : null;
     private string DiagnosticLabel(ResourcePlanMaterializationDiagnostic diagnostic)
     {
         var localized = Localizer[$"MaterializationDiagnostic.{diagnostic.Code}"];
@@ -547,13 +550,14 @@ else
     protected override void OnInitialized() => ContextState.Changed += OnContextChanged;
     protected override async Task OnParametersSetAsync()
     {
-        if (loadedId != Id) { loadedId = Id; plan = null; modelBindings.Clear(); runtimeBindings.Clear(); bindingDraft = null; bindingsDirty = false; showRecordedChanges = true; contextVersion++; }
+        if (loadedId != Id) { loadedId = Id; plan = null; principalNames = new Dictionary<Guid, string>(); modelBindings.Clear(); runtimeBindings.Clear(); bindingDraft = null; bindingsDirty = false; showRecordedChanges = true; contextVersion++; }
         await LoadAsync();
     }
     private void OnContextChanged() => _ = InvokeAsync(async () =>
     {
         contextVersion++;
         plan = null;
+        principalNames = new Dictionary<Guid, string>();
         selected = null;
         selectedGraphKey = null;
         changeSets = [];
@@ -567,6 +571,27 @@ else
         await LoadAsync();
     });
 
+    private async Task<IReadOnlyDictionary<Guid, string>> LoadPrincipalNamesAsync(ResourcePlan loadedPlan, IReadOnlyList<ResourcePlanActivity> loadedActivities, CancellationToken cancellationToken)
+    {
+        var relevantIds = loadedActivities.Where(value => value.Type == ResourcePlanActivityType.Applied)
+            .Select(value => value.ActorPrincipalId).Append(loadedPlan.Origin.PrincipalId).ToHashSet();
+        var names = new Dictionary<Guid, string>();
+        if (ContextState.Current is { } current && relevantIds.Contains(current.UserId) && !string.IsNullOrWhiteSpace(current.UserDisplayName))
+            names[current.UserId] = current.UserDisplayName;
+        if (!ContextState.HasPermission("authorization/read")) return names;
+
+        try
+        {
+            var organization = await IdentityClient.GetOrganizationAsync(cancellationToken);
+            foreach (var member in organization.Members.Where(value => relevantIds.Contains(value.Principal.Id) && !string.IsNullOrWhiteSpace(value.Principal.DisplayName)))
+                names[member.Principal.Id] = member.Principal.DisplayName;
+        }
+        catch (AgentstrationApiException) { }
+        catch (HttpRequestException) { }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+        return names;
+    }
+
     private async Task LoadAsync()
     {
         if (busy) { reloadRequested = true; return; }
@@ -578,13 +603,14 @@ else
             var loadedPlan = await Client.GetPlanAsync(Id, lifetime.Token);
             if (loadedPlan is null)
             {
-                if (version == contextVersion) { plan = null; activities = []; changeSets = []; selected = null; selectedGraphKey = null; }
+                if (version == contextVersion) { plan = null; activities = []; principalNames = new Dictionary<Guid, string>(); changeSets = []; selected = null; selectedGraphKey = null; }
                 return;
             }
             var loadedFunctional = loadedPlan.Value.Content.Document.Deserialize<FunctionalResourcePlanV1>(JsonOptions);
             var loadedModelProfiles = await ModelProfilesClient.GetModelProfilesAsync(null, null, null, lifetime.Token);
             var loadedRuntimeProfiles = await RuntimeProfilesClient.GetRuntimeProfilesAsync(lifetime.Token);
             var loadedActivities = await Client.ListActivitiesAsync(Id, lifetime.Token);
+            var loadedPrincipalNames = await LoadPrincipalNamesAsync(loadedPlan.Value, loadedActivities, lifetime.Token);
             var page = await Client.ListChangeSetsAsync(Id, 0, 200, lifetime.Token);
             var loadedSets = page.Items.OrderByDescending(value => value.Value.PlanRevision).ThenByDescending(value => value.Value.CreatedAt).ToArray();
             var loadedSelected = ResourcePlanReviewProjection.LatestChangeSet(loadedPlan.Value, loadedSets);
@@ -597,6 +623,7 @@ else
             modelProfiles = loadedModelProfiles.Where(profile => IsVisible(profile.ScopeRef, loadedPlan.Value.Scope)).ToArray();
             runtimeProfiles = loadedRuntimeProfiles.Where(profile => IsVisible(profile.ScopeRef, loadedPlan.Value.Scope)).ToArray();
             activities = loadedActivities;
+            principalNames = loadedPrincipalNames;
             changeSets = loadedSets;
             selected = loadedSelected;
             selectedGraphKey = null;

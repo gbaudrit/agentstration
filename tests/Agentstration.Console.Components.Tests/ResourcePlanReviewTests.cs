@@ -1,4 +1,7 @@
+using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
+using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.ResourcePlanning.Contracts;
@@ -19,6 +22,7 @@ namespace Agentstration.Web.Tests;
 public sealed class ResourcePlanReviewTests
 {
     private static readonly ResourcePlanScope Scope = new(Guid.NewGuid(), WorkspaceId.New());
+    private static readonly Guid AppliedPrincipalId = Guid.NewGuid();
     private static readonly ResourcePlan Plan = new(new(Guid.NewGuid()), Scope, "Support design", "Coordinate support", null,
         new(ResourcePlanningContractVersions.V1, JsonSerializer.SerializeToElement(new
         {
@@ -120,6 +124,8 @@ public sealed class ResourcePlanReviewTests
         Assert.Contains("Verification is stale", rendered.Markup, StringComparison.Ordinal);
         rendered.Find("#tab-Activity").Click();
         Assert.Contains("Plan origin", rendered.Find(".resource-plan-origin-card").TextContent, StringComparison.Ordinal);
+        Assert.Contains(Plan.Origin.PrincipalId.ToString("D"), rendered.Find(".resource-plan-origin").TextContent, StringComparison.Ordinal);
+        Assert.IsFalse(rendered.Find(".resource-plan-origin").TextContent.Contains("Plan creator", StringComparison.Ordinal));
         Assert.Contains("Event history", rendered.Find(".resource-plan-history").TextContent, StringComparison.Ordinal);
         Assert.AreEqual(1, rendered.FindAll(".resource-plan-timeline li").Count);
         Assert.Contains("Created", rendered.Find(".resource-plan-timeline li").TextContent, StringComparison.Ordinal);
@@ -161,12 +167,13 @@ public sealed class ResourcePlanReviewTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourcePlansApiClient>(client);
         RegisterProfiles(context);
-        context.Services.AddSingleton(new ConsoleContextState(new FakeContextProvider()));
+        context.Services.AddSingleton(new ConsoleContextState(new FakeContextProvider(identityRead: true)));
         context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default).GetAwaiter().GetResult();
 
         var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
         rendered.WaitForAssertion(() => Assert.Contains("Support design", rendered.Markup, StringComparison.Ordinal));
         rendered.Find("#tab-Activity").Click();
+        Assert.Contains("Plan creator", rendered.Find(".resource-plan-origin").TextContent, StringComparison.Ordinal);
         Assert.IsFalse(rendered.Find(".resource-plan-origin").TextContent.Contains("Appliqué par", StringComparison.Ordinal));
         rendered.Find("#tab-Application").Click();
         Assert.Contains("Vérifiez d’abord la proposition", rendered.Find(".resource-plan-application-pending").TextContent, StringComparison.Ordinal);
@@ -191,6 +198,7 @@ public sealed class ResourcePlanReviewTests
         rendered.WaitForAssertion(() =>
         {
             Assert.Contains("Appliqué par", rendered.Find(".resource-plan-origin").TextContent, StringComparison.Ordinal);
+            Assert.Contains("Aline Martin", rendered.Find(".resource-plan-origin").TextContent, StringComparison.Ordinal);
             Assert.Contains(client.AppliedPrincipalId.ToString("D"), rendered.Find(".resource-plan-origin").TextContent, StringComparison.Ordinal);
         });
     }
@@ -298,6 +306,27 @@ public sealed class ResourcePlanReviewTests
     {
         context.Services.AddSingleton<IModelProfilesClient>(new EmptyModelProfilesClient(withProfiles));
         context.Services.AddSingleton<IRuntimeProfilesClient>(new EmptyRuntimeProfilesClient(withProfiles));
+        context.Services.AddSingleton<IIdentityAdministrationApiClient>(new IdentityAdministrationApiClient(
+            new HttpClient(new IdentityHandler()) { BaseAddress = new Uri("http://localhost/") }));
+    }
+
+    private sealed class IdentityHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var tenant = new Tenant(Scope.TenantId, "test", "Test", TenantStatus.Active, DateTimeOffset.UnixEpoch);
+            var members = new OrganizationMemberResponse[]
+            {
+                new(new Principal(Plan.Origin.PrincipalId, PrincipalKind.Human, "Plan creator", null, PrincipalStatus.Active, DateTimeOffset.UnixEpoch),
+                    new TenantMembership(Guid.NewGuid(), Scope.TenantId, Plan.Origin.PrincipalId, MembershipStatus.Active, DateTimeOffset.UnixEpoch), [], []),
+                new(new Principal(AppliedPrincipalId, PrincipalKind.Human, "Aline Martin", null, PrincipalStatus.Active, DateTimeOffset.UnixEpoch),
+                    new TenantMembership(Guid.NewGuid(), Scope.TenantId, AppliedPrincipalId, MembershipStatus.Active, DateTimeOffset.UnixEpoch), [], [])
+            };
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new OrganizationAdministrationResponse(tenant, [], members))
+            });
+        }
     }
 
     private sealed class EmptyModelProfilesClient(bool withProfiles) : IModelProfilesClient
@@ -330,7 +359,7 @@ public sealed class ResourcePlanReviewTests
         private IReadOnlyList<ResourceChangeSetValidation> validations = [Validation(set.Value, "old-digest")];
         private ResourceChangeSetApplicationSnapshot? application;
         private ResourcePlanBindingDraftSnapshot? savedBindings;
-        public Guid AppliedPrincipalId { get; } = Guid.NewGuid();
+        public Guid AppliedPrincipalId => ResourcePlanReviewTests.AppliedPrincipalId;
         public int ValidationCalls { get; private set; }
         public ResourcePlanMaterializationRequest? LastMaterializationRequest { get; private set; }
         public ResourcePlanMaterializationRequest? LastChangeSetRequest { get; private set; }
@@ -399,10 +428,10 @@ public sealed class ResourcePlanReviewTests
         }
     }
 
-    private sealed class FakeContextProvider : IConsoleContextProvider
+    private sealed class FakeContextProvider(bool identityRead = false) : IConsoleContextProvider
     {
         public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(new ConsoleContextSnapshot(
             Guid.NewGuid(), "Reviewer", Scope.TenantId, "tenant", "Tenant", Scope.WorkspaceId.Value, "workspace", "Workspace",
-            new HashSet<string>(["resources/read", "resources/write"], StringComparer.Ordinal), []));
+            new HashSet<string>(identityRead ? ["resources/read", "resources/write", "authorization/read"] : ["resources/read", "resources/write"], StringComparer.Ordinal), []));
     }
 }

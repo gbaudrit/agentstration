@@ -149,7 +149,7 @@
   <data name="HistoryDescription" xml:space="preserve"><value>Most recent events first.</value></data>
   <data name="HistoryCount" xml:space="preserve"><value>Events: {0}</value></data>
   <data name="HistoryEmpty" xml:space="preserve"><value>No event has been recorded yet.</value></data>
-  <data name="Principal" xml:space="preserve"><value>Creator ID</value></data>
+  <data name="Principal" xml:space="preserve"><value>Created by</value></data>
   <data name="AppliedBy" xml:space="preserve"><value>Applied by</value></data>
   <data name="Work" xml:space="preserve"><value>Originating Work</value></data>
   <data name="OpenTasks" xml:space="preserve"><value>Open tasks</value></data>
