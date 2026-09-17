@@ -170,7 +170,7 @@ public sealed class AgentFrameworkRuntimeFactory(
             var chatOptions = AgentFrameworkChatOptionsMapper.Map(model, request.Options);
             var runOptions = new ChatClientAgentRunOptions(chatOptions);
             var response = await agent.RunAsync(request.Input, options: runOptions, cancellationToken: cancellationToken);
-            return new AgentExecutionResult(response.Text, request.SessionId, model?.ContributionId, model?.ModelName, effective);
+            return new AgentExecutionResult(response.Text, request.SessionId, model?.ContributionId, model?.ModelName, effective, MapUsage(response.Usage));
         }
 
         public async IAsyncEnumerable<AgentExecutionEvent> ExecuteEventsAsync(
@@ -205,7 +205,9 @@ public sealed class AgentFrameworkRuntimeFactory(
                     options: new ChatClientAgentRunOptions(chatOptions),
                     cancellationToken: cancellationToken);
                 if (!string.IsNullOrEmpty(response.Text)) yield return new ContentDelta(response.Text);
-                yield return new ExecutionCompleted(new AgentExecutionResult(response.Text, request.SessionId, model?.ContributionId, model?.ModelName, effective));
+                var usage = MapUsage(response.Usage);
+                if (usage is not null) yield return new UsageUpdated(usage);
+                yield return new ExecutionCompleted(new AgentExecutionResult(response.Text, request.SessionId, model?.ContributionId, model?.ModelName, effective, usage));
                 yield break;
             }
             await using var updates = agent.RunStreamingAsync(
@@ -236,6 +238,20 @@ public sealed class AgentFrameworkRuntimeFactory(
                 yield return new ContentDelta(update.Text);
             }
             yield return new ExecutionCompleted(new AgentExecutionResult(output.ToString(), request.SessionId, model?.ContributionId, model?.ModelName, effective));
+        }
+
+        private static AgentExecutionUsage? MapUsage(UsageDetails? usage)
+        {
+            if (usage is null) return null;
+            var inputTokens = ToTokenCount(usage.InputTokenCount);
+            var outputTokens = ToTokenCount(usage.OutputTokenCount);
+            return inputTokens is null && outputTokens is null ? null : new(inputTokens, outputTokens);
+        }
+
+        private static int? ToTokenCount(long? count)
+        {
+            if (count is null || count < 0) return null;
+            return (int)Math.Min(count.Value, int.MaxValue);
         }
 
         private void ValidateCompatibility(ModelChatClientMetadata? model, ModelExecutionOptions execution)
