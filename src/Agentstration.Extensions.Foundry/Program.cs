@@ -4,7 +4,9 @@ using Agentstration.Extensions.Foundry;
 var builder = WebApplication.CreateBuilder(args);
 var foundry = FoundryExtensionOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(foundry);
-builder.Services.AddSingleton(new FoundryRequestAuthenticator(foundry));
+builder.Services.AddSingleton(new FoundryRequestAuthenticator(
+    foundry,
+    builder.Environment.IsDevelopment() ? builder.Configuration["FOUNDRY_API_KEY"] : null));
 builder.Services.AddHttpClient<FoundryAepModelProvider>(client => client.Timeout = Timeout.InfiniteTimeSpan)
     .ConfigurePrimaryHttpMessageHandler(() => FoundrySecureTransport.Create(foundry));
 builder.Services.AddAgentstrationAep(options =>

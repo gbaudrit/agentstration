@@ -37,6 +37,27 @@ public sealed class FoundryProviderTests
     }
 
     [TestMethod]
+    public async Task DevelopmentUserSecretIsAnOptionalFallbackToTheEnvironmentKey()
+    {
+        var previous = Environment.GetEnvironmentVariable("FOUNDRY_API_KEY");
+        try
+        {
+            Environment.SetEnvironmentVariable("FOUNDRY_API_KEY", null);
+            var authenticator = new FoundryRequestAuthenticator(Options(), "development-secret");
+            using var request = new HttpRequestMessage(HttpMethod.Get, Options().DeploymentsEndpoint());
+            await authenticator.ApplyAsync(request, CancellationToken.None);
+            Assert.AreEqual("development-secret", request.Headers.GetValues("api-key").Single());
+
+            Environment.SetEnvironmentVariable("FOUNDRY_API_KEY", "environment-key");
+            authenticator = new FoundryRequestAuthenticator(Options(), "development-secret");
+            using var overrideRequest = new HttpRequestMessage(HttpMethod.Get, Options().DeploymentsEndpoint());
+            await authenticator.ApplyAsync(overrideRequest, CancellationToken.None);
+            Assert.AreEqual("environment-key", overrideRequest.Headers.GetValues("api-key").Single());
+        }
+        finally { Environment.SetEnvironmentVariable("FOUNDRY_API_KEY", previous); }
+    }
+
+    [TestMethod]
     public async Task DiscoveryFiltersUnknownCapabilitiesAndKeepsAuthenticationOnEachRequest()
     {
         var seen = new List<Uri>();

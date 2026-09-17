@@ -11,12 +11,12 @@ public sealed class FoundryRequestAuthenticator
     private readonly TokenCredential? credential;
     private readonly string? apiKey;
 
-    public FoundryRequestAuthenticator(FoundryExtensionOptions options)
+    public FoundryRequestAuthenticator(FoundryExtensionOptions options, string? developmentApiKey = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         if (options.AuthenticationMode == FoundryAuthenticationMode.ApiKeyEnvironment)
         {
-            apiKey = Environment.GetEnvironmentVariable("FOUNDRY_API_KEY");
+            apiKey = Environment.GetEnvironmentVariable("FOUNDRY_API_KEY") ?? developmentApiKey;
             if (string.IsNullOrWhiteSpace(apiKey) || apiKey.Length > 8192 || apiKey.Any(char.IsWhiteSpace) || apiKey.Any(char.IsControl))
                 throw new InvalidOperationException("FOUNDRY_API_KEY must contain a bounded, single-line API key in ApiKeyEnvironment mode.");
             return;

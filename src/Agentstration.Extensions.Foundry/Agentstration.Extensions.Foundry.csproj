@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <UserSecretsId>e6af7b9b-18a6-4d80-a24d-df021cd54a7a</UserSecretsId>
+  </PropertyGroup>
   <ItemGroup Condition="'$(UseLocalAepProjects)' == 'true'">
     <ProjectReference Include="../../aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
     <ProjectReference Include="../../aep/src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
