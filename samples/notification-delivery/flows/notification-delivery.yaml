@@ -17,10 +17,11 @@ definition:
     inputSchema:
       type: object
       properties:
-        deliveryKey: { type: string }
-        title: { type: string }
-        message: { type: string }
-        actionUrl: { type: string }
+        deliveryKey: { type: string, maxLength: 256, pattern: '\S', description: 'Stable idempotency key for one logical notification in this Workspace; reuse it on retries.' }
+        title: { type: string, maxLength: 200, pattern: '\S', description: 'Short user-visible notification heading.' }
+        message: { type: string, maxLength: 4000, pattern: '\S', description: 'User-visible notification body.' }
+        actionUrl: { type: string, maxLength: 2048, pattern: '^/(?!/)[^\\]*$', description: 'Optional local absolute Agentstration path; external URLs and backslashes are not supported.' }
+      additionalProperties: false
       required: [deliveryKey, title, message]
     outputSchema:
       type: object
