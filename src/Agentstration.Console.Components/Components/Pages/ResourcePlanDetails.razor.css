@@ -158,7 +158,7 @@
 .resource-plan-application-operations li { display: flex; align-items: flex-start; gap: .8rem; min-width: 0; padding: .95rem 1rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface); }
 .resource-plan-application-order { display: grid; place-items: center; flex: none; width: 1.8rem; height: 1.8rem; border-radius: .5rem; background: var(--primary-soft); color: var(--primary); font-size: .75rem; font-weight: 800; }
 .resource-plan-application-resource { flex: 1; min-width: 0; }
-.resource-plan-application-resource strong, .resource-plan-application-resource small { display: block; overflow-wrap: anywhere; }
+.resource-plan-application-resource .resource-name-link, .resource-plan-application-resource strong, .resource-plan-application-resource small { display: block; overflow-wrap: anywhere; }
 .resource-plan-application-resource small { margin-top: .2rem; color: var(--muted); }
 .resource-plan-application-error { margin: .55rem 0 0; color: #ad2838; line-height: 1.45; }
 .resource-plan-issues { display: grid; gap: .8rem; margin: 1.1rem 0 0; padding: 0; list-style: none; }

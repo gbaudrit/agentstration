@@ -333,7 +333,7 @@ else
                                 <li>
                                     <span class="resource-plan-application-order">@(operation.Order + 1)</span>
                                     <div class="resource-plan-application-resource">
-                                        <strong>@if (resourceUrl is not null) { <a class="resource-name-link" href="@resourceUrl">@resourceName</a> } else { @resourceName }</strong>
+                                        @if (resourceUrl is not null) { <a class="resource-name-link" href="@resourceUrl">@resourceName</a> } else { <strong>@resourceName</strong> }
                                         <small>@(change is null ? operation.LogicalId : $"{ResourceKindLabel(change.Proposed.Kind)} · {operation.LogicalId}")</small>
                                         @if (!string.IsNullOrWhiteSpace(operation.ErrorMessage)) { <p class="resource-plan-application-error">@operation.ErrorMessage</p> }
                                     </div>
