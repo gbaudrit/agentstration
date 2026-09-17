@@ -270,19 +270,46 @@ else
                     }
                     </ol>
             }
-                @if (latestValidation.Readiness == ResourceChangeSetReadiness.Ready && !ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, latestValidation) && application?.Value.Status != ResourceChangeSetApplicationStatus.Applied)
+                @if (latestValidation.Readiness == ResourceChangeSetReadiness.Ready && !ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, latestValidation))
                 {
-                    <div class="resource-plan-application-action"><div><strong>@T("ApplyTitle")</strong><p>@T("ApplyDescription")</p></div><button class="button-primary" type="button" @onclick="ApplyAsync" disabled="@(!CanApply || busy || application?.Value.Status == ResourceChangeSetApplicationStatus.Applying)">@T(application?.Value.Status is ResourceChangeSetApplicationStatus.Failed or ResourceChangeSetApplicationStatus.PartiallyApplied ? "RetryApply" : "ApplyProposal")</button></div>
+                    <div class="resource-plan-validation-next"><div><strong>@T("ValidationNextTitle")</strong><p>@T("ValidationNextDescription")</p></div><button class="button-secondary" type="button" @onclick="ShowApplication">@T("OpenApplication")</button></div>
                 }
-                @if (application is not null)
-                {
-                    <section class="resource-plan-application-result" aria-label="@T("ApplicationResult")">
-                        <h3>@T("ApplicationResult")</h3>
-                        <StatusBadge Text="@T($"Application.{application.Value.Status}")" Status="@(application.Value.Status == ResourceChangeSetApplicationStatus.Applied ? UiStatus.Success : application.Value.Status == ResourceChangeSetApplicationStatus.Applying ? UiStatus.Warning : UiStatus.Danger)" />
-                        <p>@T("ApplicationAttempts", application.Value.Attempts)</p>
-                        <ol>@foreach (var operation in application.Value.Operations.OrderBy(value => value.Order)) { <li><strong>@operation.LogicalId</strong> · @T($"Outcome.{operation.Outcome}") @if (operation.ErrorMessage is not null) { <p>@operation.ErrorMessage</p> }</li> }</ol>
-                    </section>
-                }
+            }
+        }
+        else if (activeView == "Application")
+        {
+            <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ApplicationKicker")</p><h2>@T("View.Application")</h2><p>@T("ApplicationIntro")</p></div></div>
+            @if (application is not null)
+            {
+                <div class="resource-plan-application-summary @(application.Value.Status == ResourceChangeSetApplicationStatus.Applied ? "is-applied" : application.Value.Status == ResourceChangeSetApplicationStatus.Applying ? "is-applying" : "is-failed")" role="status">
+                    <span class="resource-plan-application-symbol" aria-hidden="true">@(application.Value.Status == ResourceChangeSetApplicationStatus.Applied ? "✓" : application.Value.Status == ResourceChangeSetApplicationStatus.Applying ? "…" : "!")</span>
+                    <div><p class="resource-plan-validation-kicker">@T("ApplicationResult")</p><h3>@T($"ApplicationSummary.{application.Value.Status}")</h3><p>@T($"ApplicationDescription.{application.Value.Status}")</p>
+                        <div class="resource-plan-validation-meta"><StatusBadge Text="@T($"Application.{application.Value.Status}")" Status="@(application.Value.Status == ResourceChangeSetApplicationStatus.Applied ? UiStatus.Success : application.Value.Status == ResourceChangeSetApplicationStatus.Applying ? UiStatus.Warning : UiStatus.Danger)" /><span>@T("ApplicationAttempts", application.Value.Attempts)</span>@if (application.Value.CompletedAt is { } completedAt) { <span>@T("ApplicationCompletedAt") <time datetime="@completedAt.ToString("O")">@completedAt.ToLocalTime().ToString("g")</time></span> }</div>
+                    </div>
+                </div>
+                <div class="resource-plan-application-counts" aria-label="@T("ApplicationProgress")"><div><strong>@application.Value.Operations.Count(value => value.Outcome is ResourceChangeApplicationOutcome.Applied or ResourceChangeApplicationOutcome.AlreadyApplied)</strong><span>@T("ApplicationAppliedCount")</span></div><div><strong>@application.Value.Operations.Count(value => value.Outcome == ResourceChangeApplicationOutcome.Skipped)</strong><span>@T("ApplicationSkippedCount")</span></div><div><strong>@application.Value.Operations.Count(value => value.Outcome == ResourceChangeApplicationOutcome.Failed)</strong><span>@T("ApplicationFailedCount")</span></div></div>
+                <section class="resource-plan-application-operations" aria-label="@T("ApplicationOperations")">
+                    <h3>@T("ApplicationOperations")</h3>
+                    @if (application.Value.Operations.Count == 0) { <p class="resource-plan-validation-empty">@T("ApplicationNoOperations")</p> }
+                    else
+                    {
+                        <ol>
+                            @foreach (var operation in application.Value.Operations.OrderBy(value => value.Order))
+                            {
+                                var change = selected?.Value.Changes.FirstOrDefault(value => value.LogicalId == operation.LogicalId);
+                                <li><span class="resource-plan-application-order">@(operation.Order + 1)</span><div class="resource-plan-application-resource"><strong>@(change is null ? operation.LogicalId : ResourcePlanReviewProjection.DisplayName(change))</strong><small>@(change is null ? operation.LogicalId : $"{ResourceKindLabel(change.Proposed.Kind)} · {operation.LogicalId}")</small>@if (!string.IsNullOrWhiteSpace(operation.ErrorMessage)) { <p class="resource-plan-application-error">@operation.ErrorMessage</p> }</div><StatusBadge Text="@T($"Outcome.{operation.Outcome}")" Status="@ApplicationOutcomeTone(operation.Outcome)" /></li>
+                            }
+                        </ol>
+                    }
+                </section>
+            }
+            else if (!showRecordedChanges || selected is null || latestValidation is null || latestValidation.Readiness != ResourceChangeSetReadiness.Ready || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, latestValidation))
+            {
+                <div class="resource-plan-application-pending"><span class="resource-plan-application-symbol" aria-hidden="true">3</span><div><h3>@T("ApplicationPendingTitle")</h3><p>@T("ApplicationPendingDescription")</p></div><button class="button-secondary" type="button" @onclick="ShowValidation">@T("View.Validation")</button></div>
+            }
+            @if (showRecordedChanges && selected is not null && latestValidation is { Readiness: ResourceChangeSetReadiness.Ready } readyValidation && !ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, readyValidation) && application?.Value.Status is not (ResourceChangeSetApplicationStatus.Applied or ResourceChangeSetApplicationStatus.Applying))
+            {
+                <div class="resource-plan-application-action"><div><strong>@T("ApplyTitle")</strong><p>@T("ApplyDescription")</p></div><button class="button-primary" type="button" @onclick="ApplyAsync" disabled="@(!CanApply || busy)">@T(application?.Value.Status is ResourceChangeSetApplicationStatus.Failed or ResourceChangeSetApplicationStatus.PartiallyApplied ? "RetryApply" : "ApplyProposal")</button></div>
             }
         }
         else
@@ -300,7 +327,7 @@ else
 
 @code {
     [Parameter] public Guid Id { get; set; }
-    private static readonly string[] Views = ["Overview", "Changes", "Graph", "Validation", "Activity"];
+    private static readonly string[] Views = ["Overview", "Changes", "Graph", "Validation", "Application", "Activity"];
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly CancellationTokenSource lifetime = new();
     private ResourcePlanSnapshot? plan;
@@ -329,6 +356,8 @@ else
         : showRecordedChanges ? selected?.Value.Changes : null;
     private IReadOnlyList<ResourcePlanResolvedBinding>? DisplayedBindings => !showRecordedChanges && materialization is not null ? materialization.ResolvedBindings : selected?.Value.ResolvedBindings;
     private string activeView = "Overview";
+    private void ShowValidation() => activeView = "Validation";
+    private void ShowApplication() => activeView = "Application";
     private string? error;
     private bool busy;
     private bool reloadRequested;
@@ -654,6 +683,7 @@ else
     private async Task ApplyAsync()
     {
         if (plan is null || selected is null || latestValidation is null || latestValidation.Readiness != ResourceChangeSetReadiness.Ready ||
+            application?.Value.Status is ResourceChangeSetApplicationStatus.Applied or ResourceChangeSetApplicationStatus.Applying ||
             !CanApply || !showRecordedChanges || busy || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, latestValidation)) return;
         busy = true; error = null;
         var version = contextVersion;
@@ -661,7 +691,7 @@ else
         {
             var applied = await Client.ApplyChangeSetAsync(selected.Value.Id.Value,
                 new(plan.Value.Id, plan.Value.Revision, selected.Value.Digest, latestValidation.Id), lifetime.Token);
-            if (version == contextVersion) { application = applied; await LoadAsync(); }
+            if (version == contextVersion) { application = applied; activeView = "Application"; await LoadAsync(); }
         }
         catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
         finally { EndBusy(); }
@@ -679,5 +709,6 @@ else
 
     private static UiStatus Tone(ResourcePlanStatus status) => status switch { ResourcePlanStatus.Validated or ResourcePlanStatus.Applied => UiStatus.Success, ResourcePlanStatus.Failed or ResourcePlanStatus.Cancelled => UiStatus.Danger, ResourcePlanStatus.Ready or ResourcePlanStatus.Materialized => UiStatus.Info, _ => UiStatus.Neutral };
     private static UiStatus OperationTone(ResourceChangeOperation operation) => operation switch { ResourceChangeOperation.Create => UiStatus.Success, ResourceChangeOperation.Update => UiStatus.Info, ResourceChangeOperation.Delete => UiStatus.Danger, _ => UiStatus.Neutral };
+    private static UiStatus ApplicationOutcomeTone(ResourceChangeApplicationOutcome outcome) => outcome switch { ResourceChangeApplicationOutcome.Applied or ResourceChangeApplicationOutcome.AlreadyApplied => UiStatus.Success, ResourceChangeApplicationOutcome.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
     public void Dispose() { ContextState.Changed -= OnContextChanged; lifetime.Cancel(); lifetime.Dispose(); }
 }

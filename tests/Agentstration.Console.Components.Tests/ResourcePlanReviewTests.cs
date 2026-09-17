@@ -87,7 +87,7 @@ public sealed class ResourcePlanReviewTests
     }
 
     [TestMethod]
-    public void DetailRendersFiveViewsAndKeepsStaleReviewReadOnly()
+    public void DetailRendersSixViewsAndKeepsStaleReviewReadOnly()
     {
         using var culture = new TestCultureScope("en-US");
         var set = ChangeSet(1, [Change(0, "triage", [], "Triage")]);
@@ -101,7 +101,7 @@ public sealed class ResourcePlanReviewTests
         var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
         rendered.WaitForAssertion(() =>
         {
-            Assert.AreEqual(5, rendered.FindAll("[role=tab]").Count);
+            Assert.AreEqual(6, rendered.FindAll("[role=tab]").Count);
             Assert.Contains("Support design", rendered.Markup, StringComparison.Ordinal);
             Assert.Contains("ChangeSet belongs to an earlier revision", rendered.Markup, StringComparison.Ordinal);
         });
@@ -162,16 +162,24 @@ public sealed class ResourcePlanReviewTests
 
         var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
         rendered.WaitForAssertion(() => Assert.Contains("Support design", rendered.Markup, StringComparison.Ordinal));
+        rendered.Find("#tab-Application").Click();
+        Assert.Contains("Vérifiez d’abord la proposition", rendered.Find(".resource-plan-application-pending").TextContent, StringComparison.Ordinal);
         rendered.Find("#tab-Validation").Click();
         rendered.FindAll("button").Single(value => value.TextContent.Contains("Vérifier la proposition", StringComparison.Ordinal)).Click();
-        rendered.WaitForAssertion(() => Assert.Contains("Appliquer la proposition", rendered.Markup, StringComparison.Ordinal));
+        rendered.WaitForAssertion(() => Assert.Contains("Prêt pour la suite", rendered.Find(".resource-plan-validation-summary").TextContent, StringComparison.Ordinal));
+        Assert.IsEmpty(rendered.FindAll(".resource-plan-application-summary"));
+        rendered.FindAll("button").Single(value => value.TextContent.Contains("Voir l’application", StringComparison.Ordinal)).Click();
+        Assert.Contains("Appliquer la proposition", rendered.Markup, StringComparison.Ordinal);
         rendered.FindAll("button").Single(value => value.TextContent.Contains("Appliquer la proposition", StringComparison.Ordinal)).Click();
 
         rendered.WaitForAssertion(() =>
         {
             Assert.IsNotNull(client.LastApplyRequest);
             Assert.AreEqual(set.Value.Digest, client.LastApplyRequest.ChangeSetDigest);
-            Assert.Contains("Résultat de l’application", rendered.Markup, StringComparison.Ordinal);
+            Assert.IsTrue(rendered.Find("#tab-Application").ClassList.Contains("active"));
+            Assert.Contains("Ressources appliquées", rendered.Find(".resource-plan-application-summary").TextContent, StringComparison.Ordinal);
+            Assert.AreEqual("1", rendered.Find(".resource-plan-application-counts strong").TextContent);
+            Assert.Contains("Triage", rendered.Find(".resource-plan-application-operations").TextContent, StringComparison.Ordinal);
         });
     }
 
@@ -368,7 +376,9 @@ public sealed class ResourcePlanReviewTests
             LastApplyRequest = request;
             var now = DateTimeOffset.UtcNow;
             application = new(new(Guid.NewGuid(), request.PlanId, request.PlanRevision, new(changeSetId), request.ChangeSetDigest,
-                request.ValidationId, Scope, ResourceChangeSetApplicationStatus.Applied, [], 1, Guid.NewGuid(), now, now, now, now), "\"application\"");
+                request.ValidationId, Scope, ResourceChangeSetApplicationStatus.Applied,
+                [new ResourceChangeApplicationOperation(0, "triage", ResourceChangeOperation.Update, ResourceChangeApplicationOutcome.Applied, Guid.NewGuid(), 2, "\"updated\"", null, null, now)],
+                1, Guid.NewGuid(), now, now, now, now), "\"application\"");
             return Task.FromResult(application);
         }
     }

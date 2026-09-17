@@ -131,14 +131,36 @@
 .resource-plan-validation-summary h3 + p { margin: .4rem 0 0; color: var(--muted); line-height: 1.5; }
 .resource-plan-validation-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem .9rem; margin-top: 1rem; color: var(--muted); font-size: .78rem; }
 .resource-plan-validation-empty { margin: 1rem 0 0; color: var(--muted); }
+.resource-plan-validation-next { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.25rem; padding: 1.1rem 1.2rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface-2); }
+.resource-plan-validation-next p { margin: .35rem 0 0; color: var(--muted); line-height: 1.45; }
+.resource-plan-validation-next button { flex: none; }
 .resource-plan-application-action { display: flex; align-items: center; justify-content: space-between; gap: 1.2rem; margin-top: 1.2rem; padding: 1.2rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface-2); }
 .resource-plan-application-action p { margin: .4rem 0 0; color: var(--muted); line-height: 1.45; }
 .resource-plan-application-action button { flex: none; }
-.resource-plan-application-result { margin-top: 1.2rem; padding: 1.2rem; border: 1px solid var(--border); border-radius: .75rem; }
-.resource-plan-application-result h3 { margin: 0 0 .6rem; }
-.resource-plan-application-result ol { margin-bottom: 0; padding-left: 1.4rem; }
-.resource-plan-application-result li { margin-top: .45rem; }
-.resource-plan-application-result li p { margin: .2rem 0 0; color: #ad2838; }
+.resource-plan-application-summary, .resource-plan-application-pending { display: flex; align-items: flex-start; gap: 1rem; padding: 1.4rem 1.5rem; border: 1px solid var(--border); border-radius: .8rem; background: var(--surface-2); }
+.resource-plan-application-summary.is-applied { border-color: color-mix(in srgb, #17865b 26%, var(--border)); background: color-mix(in srgb, #17865b 5%, var(--surface)); }
+.resource-plan-application-summary.is-failed { border-color: color-mix(in srgb, #b42333 26%, var(--border)); background: color-mix(in srgb, #b42333 5%, var(--surface)); }
+.resource-plan-application-summary.is-applying { border-color: color-mix(in srgb, var(--primary) 26%, var(--border)); background: color-mix(in srgb, var(--primary) 5%, var(--surface)); }
+.resource-plan-application-symbol { display: grid; place-items: center; flex: none; width: 2.35rem; height: 2.35rem; border-radius: .7rem; background: color-mix(in srgb, currentColor 11%, var(--surface)); color: var(--primary); font-size: 1.3rem; font-weight: 800; }
+.is-applied .resource-plan-application-symbol { color: #17865b; }
+.is-failed .resource-plan-application-symbol { color: #ad2838; }
+.resource-plan-application-summary h3, .resource-plan-application-pending h3 { margin: 0; font-size: 1.15rem; }
+.resource-plan-application-summary h3 + p, .resource-plan-application-pending p { margin: .4rem 0 0; color: var(--muted); line-height: 1.5; }
+.resource-plan-application-pending { align-items: center; }
+.resource-plan-application-pending > div { flex: 1; }
+.resource-plan-application-pending button { flex: none; }
+.resource-plan-application-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .7rem; margin: 1.1rem 0 1.4rem; }
+.resource-plan-application-counts > div { display: flex; align-items: baseline; gap: .65rem; padding: .9rem 1rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface-2); }
+.resource-plan-application-counts strong { color: var(--primary); font-size: 1.3rem; }
+.resource-plan-application-counts span { color: var(--muted); font-size: .82rem; }
+.resource-plan-application-operations h3 { margin: 0 0 .75rem; font-size: 1rem; }
+.resource-plan-application-operations ol { display: grid; gap: .65rem; margin: 0; padding: 0; list-style: none; }
+.resource-plan-application-operations li { display: flex; align-items: flex-start; gap: .8rem; min-width: 0; padding: .95rem 1rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface); }
+.resource-plan-application-order { display: grid; place-items: center; flex: none; width: 1.8rem; height: 1.8rem; border-radius: .5rem; background: var(--primary-soft); color: var(--primary); font-size: .75rem; font-weight: 800; }
+.resource-plan-application-resource { flex: 1; min-width: 0; }
+.resource-plan-application-resource strong, .resource-plan-application-resource small { display: block; overflow-wrap: anywhere; }
+.resource-plan-application-resource small { margin-top: .2rem; color: var(--muted); }
+.resource-plan-application-error { margin: .55rem 0 0; color: #ad2838; line-height: 1.45; }
 .resource-plan-issues { display: grid; gap: .8rem; margin: 1.1rem 0 0; padding: 0; list-style: none; }
 .resource-plan-issues li { display: flex; gap: .9rem; min-width: 0; padding: 1.1rem 1.2rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface); }
 .resource-plan-issue-symbol { display: grid; place-items: center; flex: none; width: 1.7rem; height: 1.7rem; border-radius: 50%; background: color-mix(in srgb, #b42333 12%, var(--surface)); color: #ad2838; font-size: .9rem; font-weight: 800; }
@@ -163,3 +185,5 @@
 @media (max-width: 1100px) { .resource-plan-overview-main { grid-template-columns: 1fr; } }
 @media (max-width: 900px) { .resource-plan-graph-layout.has-selection { grid-template-columns: 1fr; } }
 @media (max-width: 700px) { .resource-plan-origin { grid-template-columns: 1fr; } .resource-plan-intent { padding: 1.25rem; } .resource-plan-overview-main { padding: 1rem 1.25rem; } .resource-plan-overview-details, .resource-plan-overview-secondary { grid-template-columns: 1fr; gap: .8rem; } .resource-plan-overview-secondary { padding: 0 1.25rem 1.25rem; } .resource-plan-bindings { padding: 1.25rem; } .resource-plan-boundary { padding: .85rem 1.25rem; } .resource-plan-binding-footer, .resource-plan-binding-actions, .resource-plan-review-notice { flex-direction: column; align-items: stretch; } .resource-plan-binding-actions > button, .resource-plan-review-notice > button { width: 100%; } .resource-plan-change-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .resource-plan-change { padding: 1rem; } .resource-plan-change-description, .resource-plan-change-dependencies, .resource-plan-change-highlights, .resource-plan-change-empty, .resource-plan-change-diff { margin-left: 0; } .resource-plan-change-highlights { grid-template-columns: 1fr; } .resource-plan-validation-summary { padding: 1rem; } }
+@media (max-width: 700px) { .resource-plan-application-summary, .resource-plan-application-pending { padding: 1rem; } .resource-plan-application-pending { flex-wrap: wrap; } .resource-plan-application-pending button { width: 100%; } .resource-plan-application-counts { grid-template-columns: 1fr; } .resource-plan-application-operations li { flex-wrap: wrap; } }
+@media (max-width: 700px) { .resource-plan-validation-next { flex-direction: column; align-items: stretch; } }

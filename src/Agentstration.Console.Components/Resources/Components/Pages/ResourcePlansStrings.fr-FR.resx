@@ -163,6 +163,7 @@
   <data name="View.Changes" xml:space="preserve"><value>Proposition de changements</value></data>
   <data name="View.Graph" xml:space="preserve"><value>Graphe</value></data>
   <data name="View.Validation" xml:space="preserve"><value>Vérification</value></data>
+  <data name="View.Application" xml:space="preserve"><value>Application</value></data>
   <data name="View.Activity" xml:space="preserve"><value>Activité</value></data>
   <data name="Operation.Create" xml:space="preserve"><value>Création</value></data>
   <data name="Operation.Update" xml:space="preserve"><value>Mise à jour</value></data>
@@ -227,6 +228,28 @@
   <data name="ApplyProposal" xml:space="preserve"><value>Appliquer la proposition</value></data>
   <data name="RetryApply" xml:space="preserve"><value>Reprendre l’application</value></data>
   <data name="ApplicationResult" xml:space="preserve"><value>Résultat de l’application</value></data>
+  <data name="ApplicationKicker" xml:space="preserve"><value>Déploiement des ressources</value></data>
+  <data name="ValidationNextTitle" xml:space="preserve"><value>Prêt pour l’application</value></data>
+  <data name="ValidationNextDescription" xml:space="preserve"><value>Consultez l’étape Application pour appliquer et suivre les ressources vérifiées.</value></data>
+  <data name="OpenApplication" xml:space="preserve"><value>Voir l’application</value></data>
+  <data name="ApplicationIntro" xml:space="preserve"><value>Suivez les ressources appliquées et repérez les opérations qui demandent une intervention.</value></data>
+  <data name="ApplicationPendingTitle" xml:space="preserve"><value>Vérifiez d’abord la proposition</value></data>
+  <data name="ApplicationPendingDescription" xml:space="preserve"><value>Enregistrez et vérifiez une proposition avant d’appliquer ses ressources.</value></data>
+  <data name="ApplicationProgress" xml:space="preserve"><value>Progression de l’application</value></data>
+  <data name="ApplicationAppliedCount" xml:space="preserve"><value>Appliquées</value></data>
+  <data name="ApplicationSkippedCount" xml:space="preserve"><value>Sans changement</value></data>
+  <data name="ApplicationFailedCount" xml:space="preserve"><value>En échec</value></data>
+  <data name="ApplicationOperations" xml:space="preserve"><value>Ressources traitées</value></data>
+  <data name="ApplicationNoOperations" xml:space="preserve"><value>Aucune ressource traitée pour le moment.</value></data>
+  <data name="ApplicationCompletedAt" xml:space="preserve"><value>Terminé le</value></data>
+  <data name="ApplicationSummary.Applying" xml:space="preserve"><value>Application en cours</value></data>
+  <data name="ApplicationSummary.Applied" xml:space="preserve"><value>Ressources appliquées</value></data>
+  <data name="ApplicationSummary.PartiallyApplied" xml:space="preserve"><value>Application à compléter</value></data>
+  <data name="ApplicationSummary.Failed" xml:space="preserve"><value>Échec de l’application</value></data>
+  <data name="ApplicationDescription.Applying" xml:space="preserve"><value>Les ressources sont traitées dans l’ordre des dépendances.</value></data>
+  <data name="ApplicationDescription.Applied" xml:space="preserve"><value>Toutes les opérations prévues sont terminées. Consultez chaque ressource ci-dessous.</value></data>
+  <data name="ApplicationDescription.PartiallyApplied" xml:space="preserve"><value>Certaines ressources sont appliquées. Examinez l’opération en échec avant de reprendre.</value></data>
+  <data name="ApplicationDescription.Failed" xml:space="preserve"><value>Aucune opération n’a abouti. Examinez l’erreur avant de reprendre.</value></data>
   <data name="ApplicationAttempts" xml:space="preserve"><value>Tentatives : {0}</value></data>
   <data name="Application.Applying" xml:space="preserve"><value>En cours</value></data>
   <data name="Application.Applied" xml:space="preserve"><value>Appliqué</value></data>
