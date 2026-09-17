@@ -116,6 +116,8 @@ public static class DependencyInjection
         services.AddSingleton<ResourceChangeSetService>();
         services.AddSingleton<IPlannedResourceValidator, CanonicalPlannedResourceValidator>();
         services.AddSingleton<ResourceChangeSetValidationService>();
+        services.AddSingleton<IPlannedResourceApplier, CanonicalPlannedResourceApplier>();
+        services.AddSingleton<ResourceChangeSetApplicationService>();
         var secretPath = Path.Combine(dataDirectory, "secrets");
         services.AddSingleton(_ => new EnvironmentMasterKeyProvider(Path.Combine(secretPath, "master.key")));
         services.AddSingleton<IMasterKeyProvider>(provider => provider.GetRequiredService<EnvironmentMasterKeyProvider>());

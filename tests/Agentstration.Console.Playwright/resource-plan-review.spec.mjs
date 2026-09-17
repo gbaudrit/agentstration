@@ -44,7 +44,8 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   const row = page.locator('tr', { hasText: title });
   await expect(row).toBeVisible({ timeout: 30_000 });
   await row.getByRole('link', { name: title }).click();
-  await expect(page.getByRole('tab')).toHaveCount(5, { timeout: 30_000 });
+  await expect(page.getByRole('tab')).toHaveCount(6, { timeout: 30_000 });
+  await expect(page.getByRole('tab', { name: 'Application' })).toBeVisible();
   await expect(page.getByText('Route support requests')).toBeVisible();
 
   await expect(page.getByRole('button', { name: 'Refresh proposal' })).toBeDisabled();

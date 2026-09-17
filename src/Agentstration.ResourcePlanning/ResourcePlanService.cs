@@ -115,6 +115,18 @@ public sealed class ResourcePlanService(
     public Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(ResourcePlanScope scope, ResourcePlanId id, CancellationToken cancellationToken) =>
         repository.ListActivitiesAsync(scope, id, cancellationToken);
 
+    public async Task<ResourcePlanSnapshot> MarkAppliedAsync(ResourcePlanScope scope, ResourcePlanId id, Guid actorPrincipalId, CancellationToken cancellationToken)
+    {
+        ValidateActor(actorPrincipalId);
+        var current = await RequireAsync(scope, id, cancellationToken);
+        if (current.Value.Status == ResourcePlanStatus.Applied) return current;
+        var now = timeProvider.GetUtcNow();
+        var next = current.Value with { Status = ResourcePlanStatus.Applied, UpdatedAt = now };
+        var stored = await repository.UpdateAsync(next, current.ETag, cancellationToken);
+        await repository.AddActivityAsync(Activity(next, ResourcePlanActivityType.Applied, actorPrincipalId, null, now), cancellationToken);
+        return stored;
+    }
+
     public async Task<ResourcePlanBindingDraftSnapshot?> GetBindingsAsync(ResourcePlanScope scope, ResourcePlanId id, CancellationToken cancellationToken)
     {
         _ = await RequireAsync(scope, id, cancellationToken);

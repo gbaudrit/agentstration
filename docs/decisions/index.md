@@ -5,6 +5,7 @@
 ADRs record durable architectural choices and their consequences. Existing decisions are numbered in chronological order and remain in Git when superseded.
 
 The Resource Planning integration adds [ADR-0117 — Resource Plans are reviewed proposals](0117-resource-plans-are-reviewed-proposals.md).
+Governed application follows [ADR-0120 — Resource ChangeSet application is durable and ordered](0120-resource-change-set-application-is-durable-and-ordered.md).
 
 ## Format
 

@@ -27,6 +27,8 @@ public sealed class ResourceChangeSetValidationService(
     {
         if (actorPrincipalId == Guid.Empty) throw new ArgumentException("An actor Principal is required.", nameof(actorPrincipalId));
         var snapshot = await changeSets.GetAsync(scope, id, cancellationToken);
+        if (snapshot.Value.Status is ResourceChangeSetStatus.Applying or ResourceChangeSetStatus.Applied or ResourceChangeSetStatus.PartiallyApplied or ResourceChangeSetStatus.Failed)
+            throw new ResourceChangeSetApplicationException("resource_change_set_application_started", "A proposal cannot be verified again after application has started.");
         var issues = new List<ResourceChangeSetValidationIssue>();
         ValidateStructure(snapshot.Value, issues);
         foreach (var change in snapshot.Value.Changes)

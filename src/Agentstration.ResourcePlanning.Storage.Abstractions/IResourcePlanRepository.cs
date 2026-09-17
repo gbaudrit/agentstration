@@ -24,6 +24,8 @@ public interface IResourceChangeSetRepository
     Task<ResourceChangeSetSnapshot> UpdateAsync(ResourceChangeSet changeSet, string expectedETag, CancellationToken cancellationToken);
     Task AddValidationAsync(ResourceChangeSetValidation validation, CancellationToken cancellationToken);
     Task<IReadOnlyList<ResourceChangeSetValidation>> ListValidationsAsync(ResourcePlanScope scope, ResourceChangeSetId id, CancellationToken cancellationToken);
+    Task<ResourceChangeSetApplicationSnapshot?> GetApplicationAsync(ResourcePlanScope scope, ResourceChangeSetId id, CancellationToken cancellationToken);
+    Task<ResourceChangeSetApplicationSnapshot> SaveApplicationAsync(ResourceChangeSetApplication application, string? expectedETag, CancellationToken cancellationToken);
 }
 
 public sealed class ResourcePlanConcurrencyException(string message) : Exception(message);

@@ -141,7 +141,16 @@
   <data name="Issue.Generic.Title" xml:space="preserve"><value>Review required</value></data>
   <data name="Issue.Generic.Description" xml:space="preserve"><value>This proposal needs attention. Open technical details for the exact reason.</value></data>
   <data name="Activity" xml:space="preserve"><value>Activity and provenance</value></data>
-  <data name="Principal" xml:space="preserve"><value>Principal</value></data>
+  <data name="ActivityKicker" xml:space="preserve"><value>Plan history</value></data>
+  <data name="ActivityIntro" xml:space="preserve"><value>Review where this plan came from and the actions recorded throughout its lifecycle.</value></data>
+  <data name="OriginTitle" xml:space="preserve"><value>Plan origin</value></data>
+  <data name="OriginDescription" xml:space="preserve"><value>Identifiers associated with the creation of this plan.</value></data>
+  <data name="HistoryTitle" xml:space="preserve"><value>Event history</value></data>
+  <data name="HistoryDescription" xml:space="preserve"><value>Most recent events first.</value></data>
+  <data name="HistoryCount" xml:space="preserve"><value>Events: {0}</value></data>
+  <data name="HistoryEmpty" xml:space="preserve"><value>No event has been recorded yet.</value></data>
+  <data name="Principal" xml:space="preserve"><value>Created by</value></data>
+  <data name="AppliedBy" xml:space="preserve"><value>Applied by</value></data>
   <data name="Work" xml:space="preserve"><value>Originating Work</value></data>
   <data name="OpenTasks" xml:space="preserve"><value>Open tasks</value></data>
   <data name="FlowRun" xml:space="preserve"><value>Flow Run</value></data>
@@ -163,6 +172,7 @@
   <data name="View.Changes" xml:space="preserve"><value>Proposed changes</value></data>
   <data name="View.Graph" xml:space="preserve"><value>Graph</value></data>
   <data name="View.Validation" xml:space="preserve"><value>Verification</value></data>
+  <data name="View.Application" xml:space="preserve"><value>Application</value></data>
   <data name="View.Activity" xml:space="preserve"><value>Activity</value></data>
   <data name="Operation.Create" xml:space="preserve"><value>Create</value></data>
   <data name="Operation.Update" xml:space="preserve"><value>Update</value></data>
@@ -220,4 +230,42 @@
   <data name="MaterializationDiagnostic.planning_binding_ambiguous" xml:space="preserve"><value>Choose a profile with an exact scope.</value></data>
   <data name="MaterializationDiagnostic.planning_binding_unknown_role" xml:space="preserve"><value>This binding does not match a planned agent.</value></data>
   <data name="MaterializationDiagnostic.planning_materialization_stale" xml:space="preserve"><value>Refresh the proposal before saving it.</value></data>
+  <data name="StepApplication" xml:space="preserve"><value>Apply</value></data>
+  <data name="StepApplicationHint" xml:space="preserve"><value>Create or update resources</value></data>
+  <data name="ApplyTitle" xml:space="preserve"><value>Apply the verified proposal</value></data>
+  <data name="ApplyDescription" xml:space="preserve"><value>Resources are processed in dependency order. Application stops on failure; successful operations remain recorded.</value></data>
+  <data name="ApplyProposal" xml:space="preserve"><value>Apply proposal</value></data>
+  <data name="RetryApply" xml:space="preserve"><value>Resume application</value></data>
+  <data name="ApplicationResult" xml:space="preserve"><value>Application result</value></data>
+  <data name="ApplicationKicker" xml:space="preserve"><value>Resource deployment</value></data>
+  <data name="ValidationNextTitle" xml:space="preserve"><value>Ready for application</value></data>
+  <data name="ValidationNextDescription" xml:space="preserve"><value>Review the application step to apply and track the verified resources.</value></data>
+  <data name="OpenApplication" xml:space="preserve"><value>View application</value></data>
+  <data name="ApplicationIntro" xml:space="preserve"><value>Track which resources were applied and review any operation that needs attention.</value></data>
+  <data name="ApplicationPendingTitle" xml:space="preserve"><value>Verify the proposal first</value></data>
+  <data name="ApplicationPendingDescription" xml:space="preserve"><value>Save and verify a proposal before applying its resources.</value></data>
+  <data name="ApplicationProgress" xml:space="preserve"><value>Application progress</value></data>
+  <data name="ApplicationAppliedCount" xml:space="preserve"><value>Applied</value></data>
+  <data name="ApplicationSkippedCount" xml:space="preserve"><value>Unchanged</value></data>
+  <data name="ApplicationFailedCount" xml:space="preserve"><value>Failed</value></data>
+  <data name="ApplicationOperations" xml:space="preserve"><value>Resources processed</value></data>
+  <data name="ApplicationNoOperations" xml:space="preserve"><value>No resource has been processed yet.</value></data>
+  <data name="ApplicationCompletedAt" xml:space="preserve"><value>Completed</value></data>
+  <data name="ApplicationSummary.Applying" xml:space="preserve"><value>Application in progress</value></data>
+  <data name="ApplicationSummary.Applied" xml:space="preserve"><value>Resources applied</value></data>
+  <data name="ApplicationSummary.PartiallyApplied" xml:space="preserve"><value>Application needs attention</value></data>
+  <data name="ApplicationSummary.Failed" xml:space="preserve"><value>Application failed</value></data>
+  <data name="ApplicationDescription.Applying" xml:space="preserve"><value>The resources are being processed in dependency order.</value></data>
+  <data name="ApplicationDescription.Applied" xml:space="preserve"><value>All planned operations completed. Review each resource below.</value></data>
+  <data name="ApplicationDescription.PartiallyApplied" xml:space="preserve"><value>Some resources were applied. Review the failed operation before resuming.</value></data>
+  <data name="ApplicationDescription.Failed" xml:space="preserve"><value>No operation completed successfully. Review the error before resuming.</value></data>
+  <data name="ApplicationAttempts" xml:space="preserve"><value>Attempts: {0}</value></data>
+  <data name="Application.Applying" xml:space="preserve"><value>Applying</value></data>
+  <data name="Application.Applied" xml:space="preserve"><value>Applied</value></data>
+  <data name="Application.PartiallyApplied" xml:space="preserve"><value>Partially applied</value></data>
+  <data name="Application.Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="Outcome.Applied" xml:space="preserve"><value>Applied</value></data>
+  <data name="Outcome.AlreadyApplied" xml:space="preserve"><value>Already applied</value></data>
+  <data name="Outcome.Skipped" xml:space="preserve"><value>Unchanged</value></data>
+  <data name="Outcome.Failed" xml:space="preserve"><value>Failed</value></data>
 </root>

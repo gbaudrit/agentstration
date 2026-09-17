@@ -323,7 +323,8 @@ public sealed class ManagementResourcePlanningStateReader(
         {
             var current = await flows.GetAsync(new WorkspaceId(resource.ScopeRef.TargetId!.Value), new FlowId(resource.Metadata.Name, resource.Metadata.Namespace), cancellationToken);
             if (current is null) return null;
-            var definition = new { displayName = current.Value.DisplayName ?? current.Value.Name, description = current.Value.Description ?? string.Empty, version = current.Value.Version, enabled = current.Value.Enabled, spec = current.Value.Definition, publish = current.Value.ActiveVersion is not null, activate = current.Value.ActiveVersion is not null };
+            var published = await flows.GetVersionAsync(new WorkspaceId(resource.ScopeRef.TargetId!.Value), new FlowId(resource.Metadata.Name, resource.Metadata.Namespace), current.Value.Version, cancellationToken);
+            var definition = new { displayName = current.Value.DisplayName ?? current.Value.Name, description = current.Value.Description ?? string.Empty, version = current.Value.Version, enabled = current.Value.Enabled, spec = current.Value.Definition, publish = published is not null, activate = current.Value.ActiveVersion == current.Value.Version };
             return Evidence(null, 0, current.ETag, resource with { Definition = JsonSerializer.SerializeToElement(definition, JsonOptions) });
         }
         if (resource.Kind == EntryResourceKinds.Entry)
@@ -331,7 +332,7 @@ public sealed class ManagementResourcePlanningStateReader(
             var workspaceId = new WorkspaceId(resource.ScopeRef.TargetId!.Value);
             var current = await workplace.GetEntryDraftAsync(workspaceId, new EntryId(resource.Metadata.Name, resource.Metadata.Namespace), cancellationToken);
             if (current is null) return null;
-            var definition = new { displayName = current.DisplayName, description = current.Description ?? string.Empty, presentation = current.Presentation, binding = current.Binding, behavior = current.Behavior, publish = current.PublishedBinding is not null };
+            var definition = new { displayName = current.DisplayName, description = current.Description ?? string.Empty, presentation = current.Presentation, binding = current.Binding, behavior = current.Behavior, publish = current.PublishedBinding == current.Binding };
             return Evidence(null, current.Revision, current.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture), resource with { Definition = JsonSerializer.SerializeToElement(definition, JsonOptions) });
         }
         return null;

@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @implements IDisposable
 @inject IResourcePlansApiClient Client
+@inject IIdentityAdministrationApiClient IdentityClient
 @inject IModelProfilesClient ModelProfilesClient
 @inject IRuntimeProfilesClient RuntimeProfilesClient
 @inject ConsoleContextState ContextState
@@ -22,6 +23,7 @@ else
         <li class="@(materialization is not null || showRecordedChanges && selected is not null ? "is-done" : null)"><span>2</span><div><strong>@T("StepPreview")</strong><small>@T("StepPreviewHint")</small></div></li>
         <li class="@(showRecordedChanges && selected is not null ? "is-done" : null)"><span>3</span><div><strong>@T("StepChangeSet")</strong><small>@T("StepChangeSetHint")</small></div></li>
         <li class="@(showRecordedChanges && latestValidation is not null ? "is-done" : null)"><span>4</span><div><strong>@T("StepValidation")</strong><small>@T("StepValidationHint")</small></div></li>
+        <li class="@(application?.Value.Status == ResourceChangeSetApplicationStatus.Applied ? "is-done" : null)"><span>5</span><div><strong>@T("StepApplication")</strong><small>@T("StepApplicationHint")</small></div></li>
     </ol>
     <nav class="resource-plan-tabs" role="tablist" aria-label="@T("ReviewViews")">
         @foreach (var view in Views)
@@ -161,7 +163,7 @@ else
                 }
                 else if (selected is not null)
                 {
-                    <div class="resource-plan-review-notice resource-plan-recorded-notice"><div><strong>@T("RecordedChangeSet")</strong><span>@T("ChangeSetRevision", selected.Value.PlanRevision)</span><span>@T("CreatedAt", selected.Value.CreatedAt.ToLocalTime().ToString("g"))</span><details><summary>@T("TechnicalDetails")</summary><code>@selected.Value.Digest</code></details></div><button class="button-primary" type="button" @onclick="ValidateAsync" disabled="@(!CanReview || busy || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))">@T("Revalidate")</button></div>
+                    <div class="resource-plan-review-notice resource-plan-recorded-notice"><div><strong>@T("RecordedChangeSet")</strong><span>@T("ChangeSetRevision", selected.Value.PlanRevision)</span><span>@T("CreatedAt", selected.Value.CreatedAt.ToLocalTime().ToString("g"))</span><details><summary>@T("TechnicalDetails")</summary><code>@selected.Value.Digest</code></details></div>@if (application is null) { <button class="button-primary" type="button" @onclick="ValidateAsync" disabled="@(!CanReview || busy || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))">@T("Revalidate")</button> }</div>
                 }
                     <div class="resource-plan-change-summary" aria-label="@T("ChangeSummary")">
                         @foreach (var operation in Enum.GetValues<ResourceChangeOperation>())
@@ -241,7 +243,7 @@ else
         }
         else if (activeView == "Validation")
         {
-            <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ReviewResult")</p><h2>@T("Validation")</h2><p>@T("ValidationIntro")</p></div>@if (showRecordedChanges && selected is not null) { <button class="button-secondary" type="button" @onclick="ValidateAsync" disabled="@(!CanReview || busy || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))">@T("Revalidate")</button> }</div>
+            <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ReviewResult")</p><h2>@T("Validation")</h2><p>@T("ValidationIntro")</p></div>@if (showRecordedChanges && selected is not null && application is null) { <button class="button-secondary" type="button" @onclick="ValidateAsync" disabled="@(!CanReview || busy || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))">@T("Revalidate")</button> }</div>
             @if (!showRecordedChanges) { <p>@T("PreviewRequiresChangeSet")</p> }
             else if (selected is null) { <p>@T("NoChangeSets")</p> }
             else if (latestValidation is null) { <p>@T("NotValidated")</p> }
@@ -269,32 +271,93 @@ else
                     }
                     </ol>
             }
+                @if (latestValidation.Readiness == ResourceChangeSetReadiness.Ready && !ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, latestValidation))
+                {
+                    <div class="resource-plan-validation-next"><div><strong>@T("ValidationNextTitle")</strong><p>@T("ValidationNextDescription")</p></div><button class="button-secondary" type="button" @onclick="ShowApplication">@T("OpenApplication")</button></div>
+                }
+            }
+        }
+        else if (activeView == "Application")
+        {
+            <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ApplicationKicker")</p><h2>@T("View.Application")</h2><p>@T("ApplicationIntro")</p></div></div>
+            @if (application is not null)
+            {
+                <div class="resource-plan-application-summary @(application.Value.Status == ResourceChangeSetApplicationStatus.Applied ? "is-applied" : application.Value.Status == ResourceChangeSetApplicationStatus.Applying ? "is-applying" : "is-failed")" role="status">
+                    <span class="resource-plan-application-symbol" aria-hidden="true">@(application.Value.Status == ResourceChangeSetApplicationStatus.Applied ? "✓" : application.Value.Status == ResourceChangeSetApplicationStatus.Applying ? "…" : "!")</span>
+                    <div><p class="resource-plan-validation-kicker">@T("ApplicationResult")</p><h3>@T($"ApplicationSummary.{application.Value.Status}")</h3><p>@T($"ApplicationDescription.{application.Value.Status}")</p>
+                        <div class="resource-plan-validation-meta"><StatusBadge Text="@T($"Application.{application.Value.Status}")" Status="@(application.Value.Status == ResourceChangeSetApplicationStatus.Applied ? UiStatus.Success : application.Value.Status == ResourceChangeSetApplicationStatus.Applying ? UiStatus.Warning : UiStatus.Danger)" /><span>@T("ApplicationAttempts", application.Value.Attempts)</span>@if (application.Value.CompletedAt is { } completedAt) { <span>@T("ApplicationCompletedAt") <time datetime="@completedAt.ToString("O")">@completedAt.ToLocalTime().ToString("g")</time></span> }</div>
+                    </div>
+                </div>
+                <div class="resource-plan-application-counts" aria-label="@T("ApplicationProgress")"><div><strong>@application.Value.Operations.Count(value => value.Outcome is ResourceChangeApplicationOutcome.Applied or ResourceChangeApplicationOutcome.AlreadyApplied)</strong><span>@T("ApplicationAppliedCount")</span></div><div><strong>@application.Value.Operations.Count(value => value.Outcome == ResourceChangeApplicationOutcome.Skipped)</strong><span>@T("ApplicationSkippedCount")</span></div><div><strong>@application.Value.Operations.Count(value => value.Outcome == ResourceChangeApplicationOutcome.Failed)</strong><span>@T("ApplicationFailedCount")</span></div></div>
+                <section class="resource-plan-application-operations" aria-label="@T("ApplicationOperations")">
+                    <h3>@T("ApplicationOperations")</h3>
+                    @if (application.Value.Operations.Count == 0) { <p class="resource-plan-validation-empty">@T("ApplicationNoOperations")</p> }
+                    else
+                    {
+                        <ol>
+                            @foreach (var operation in application.Value.Operations.OrderBy(value => value.Order))
+                            {
+                                var change = selected?.Value.Changes.FirstOrDefault(value => value.LogicalId == operation.LogicalId);
+                                <li><span class="resource-plan-application-order">@(operation.Order + 1)</span><div class="resource-plan-application-resource"><strong>@(change is null ? operation.LogicalId : ResourcePlanReviewProjection.DisplayName(change))</strong><small>@(change is null ? operation.LogicalId : $"{ResourceKindLabel(change.Proposed.Kind)} · {operation.LogicalId}")</small>@if (!string.IsNullOrWhiteSpace(operation.ErrorMessage)) { <p class="resource-plan-application-error">@operation.ErrorMessage</p> }</div><StatusBadge Text="@T($"Outcome.{operation.Outcome}")" Status="@ApplicationOutcomeTone(operation.Outcome)" /></li>
+                            }
+                        </ol>
+                    }
+                </section>
+            }
+            else if (!showRecordedChanges || selected is null || latestValidation is null || latestValidation.Readiness != ResourceChangeSetReadiness.Ready || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, latestValidation))
+            {
+                <div class="resource-plan-application-pending"><span class="resource-plan-application-symbol" aria-hidden="true">3</span><div><h3>@T("ApplicationPendingTitle")</h3><p>@T("ApplicationPendingDescription")</p></div><button class="button-secondary" type="button" @onclick="ShowValidation">@T("View.Validation")</button></div>
+            }
+            @if (showRecordedChanges && selected is not null && latestValidation is { Readiness: ResourceChangeSetReadiness.Ready } readyValidation && !ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, readyValidation) && application?.Value.Status is not (ResourceChangeSetApplicationStatus.Applied or ResourceChangeSetApplicationStatus.Applying))
+            {
+                <div class="resource-plan-application-action"><div><strong>@T("ApplyTitle")</strong><p>@T("ApplyDescription")</p></div><button class="button-primary" type="button" @onclick="ApplyAsync" disabled="@(!CanApply || busy)">@T(application?.Value.Status is ResourceChangeSetApplicationStatus.Failed or ResourceChangeSetApplicationStatus.PartiallyApplied ? "RetryApply" : "ApplyProposal")</button></div>
             }
         }
         else
         {
-            <h2>@T("Activity")</h2>
-            <dl class="resource-plan-origin"><dt>@T("Principal")</dt><dd><code>@plan.Value.Origin.PrincipalId</code></dd>
-                @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.WorkItemId)) { <dt>@T("Work")</dt><dd><a href="@($"/api/work/workitems/{Uri.EscapeDataString(plan.Value.Origin.WorkItemId)}")">@plan.Value.Origin.WorkItemId</a></dd> }
-                @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.FlowRunId)) { <dt>@T("FlowRun")</dt><dd><a href="@($"/flow-runs/{Uri.EscapeDataString(plan.Value.Origin.FlowRunId)}")">@plan.Value.Origin.FlowRunId</a></dd> }
-                @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.CorrelationId)) { <dt>@T("Correlation")</dt><dd><code>@plan.Value.Origin.CorrelationId</code></dd> }
-            </dl>
-            <ol class="resource-plan-timeline">@foreach (var activity in activities.OrderByDescending(value => value.CreatedAt)) { <li><strong>@T($"Activity.{activity.Type}")</strong><time datetime="@activity.CreatedAt.ToString("O")">@activity.CreatedAt.ToLocalTime().ToString("g")</time><span>@T("Revision", activity.PlanRevision)</span>@if (!string.IsNullOrWhiteSpace(activity.Detail)) { <p>@activity.Detail</p> }</li> }</ol>
+            <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ActivityKicker")</p><h2>@T("Activity")</h2><p>@T("ActivityIntro")</p></div></div>
+            <div class="resource-plan-activity-layout">
+                <section class="resource-plan-origin-card" aria-label="@T("OriginTitle")">
+                    <div class="resource-plan-activity-card-heading"><span class="resource-plan-origin-symbol" aria-hidden="true">◎</span><div><h3>@T("OriginTitle")</h3><p>@T("OriginDescription")</p></div></div>
+                    <dl class="resource-plan-origin">
+                        <div><dt>@T("Principal")</dt><dd>@if (PrincipalDisplayName(plan.Value.Origin.PrincipalId) is { } creatorName) { <strong>@creatorName</strong> }<code>@plan.Value.Origin.PrincipalId</code></dd></div>
+                        @if (activities.Where(value => value.Type == ResourcePlanActivityType.Applied).OrderByDescending(value => value.CreatedAt).FirstOrDefault() is { } appliedActivity) { <div><dt>@T("AppliedBy")</dt><dd>@if (PrincipalDisplayName(appliedActivity.ActorPrincipalId) is { } appliedByName) { <strong>@appliedByName</strong> }<code>@appliedActivity.ActorPrincipalId</code></dd></div> }
+                        @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.WorkItemId)) { <div><dt>@T("Work")</dt><dd><a href="@($"/api/work/workitems/{Uri.EscapeDataString(plan.Value.Origin.WorkItemId)}")">@plan.Value.Origin.WorkItemId</a></dd></div> }
+                        @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.FlowRunId)) { <div><dt>@T("FlowRun")</dt><dd><a href="@($"/flow-runs/{Uri.EscapeDataString(plan.Value.Origin.FlowRunId)}")">@plan.Value.Origin.FlowRunId</a></dd></div> }
+                        @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.CorrelationId)) { <div><dt>@T("Correlation")</dt><dd><code>@plan.Value.Origin.CorrelationId</code></dd></div> }
+                    </dl>
+                </section>
+                <section class="resource-plan-history" aria-label="@T("HistoryTitle")">
+                    <div class="resource-plan-history-heading"><div><h3>@T("HistoryTitle")</h3><p>@T("HistoryDescription")</p></div><span class="resource-plan-history-count">@T("HistoryCount", activities.Count)</span></div>
+                    @if (activities.Count == 0) { <p class="resource-plan-history-empty">@T("HistoryEmpty")</p> }
+                    else
+                    {
+                        <ol class="resource-plan-timeline">
+                            @foreach (var activity in activities.OrderByDescending(value => value.CreatedAt))
+                            {
+                                <li class="@ActivityToneClass(activity.Type)"><span class="resource-plan-timeline-marker" aria-hidden="true"></span><article><div class="resource-plan-timeline-heading"><strong>@T($"Activity.{activity.Type}")</strong><span>@T("Revision", activity.PlanRevision)</span></div><time datetime="@activity.CreatedAt.ToString("O")">@activity.CreatedAt.ToLocalTime().ToString("g")</time>@if (!string.IsNullOrWhiteSpace(activity.Detail)) { <p>@activity.Detail</p> }</article></li>
+                            }
+                        </ol>
+                    }
+                </section>
+            </div>
         }
     </section>
 }
 
 @code {
     [Parameter] public Guid Id { get; set; }
-    private static readonly string[] Views = ["Overview", "Changes", "Graph", "Validation", "Activity"];
+    private static readonly string[] Views = ["Overview", "Changes", "Graph", "Validation", "Application", "Activity"];
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly CancellationTokenSource lifetime = new();
     private ResourcePlanSnapshot? plan;
     private IReadOnlyList<ResourcePlanActivity> activities = [];
+    private IReadOnlyDictionary<Guid, string> principalNames = new Dictionary<Guid, string>();
     private IReadOnlyList<ResourceChangeSetSnapshot> changeSets = [];
     private ResourceChangeSetSnapshot? selected;
     private string? selectedGraphKey;
     private IReadOnlyList<ResourceChangeSetValidation> validations = [];
+    private ResourceChangeSetApplicationSnapshot? application;
     private ResourcePlanMaterialization? materialization;
     private FunctionalResourcePlanV1? functional;
     private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
@@ -314,12 +377,15 @@ else
         : showRecordedChanges ? selected?.Value.Changes : null;
     private IReadOnlyList<ResourcePlanResolvedBinding>? DisplayedBindings => !showRecordedChanges && materialization is not null ? materialization.ResolvedBindings : selected?.Value.ResolvedBindings;
     private string activeView = "Overview";
+    private void ShowValidation() => activeView = "Validation";
+    private void ShowApplication() => activeView = "Application";
     private string? error;
     private bool busy;
     private bool reloadRequested;
     private int contextVersion;
     private Guid loadedId;
-    private bool CanReview => ContextState.HasPermission("resources/write");
+    private bool CanReview => ContextState.HasPermission("resources/write") && application is null && plan?.Value.Status is not (ResourcePlanStatus.Applied or ResourcePlanStatus.Archived or ResourcePlanStatus.Cancelled);
+    private bool CanApply => ContextState.HasPermission("resources/write") && plan?.Value.Status is not (ResourcePlanStatus.Archived or ResourcePlanStatus.Cancelled);
     private bool CanMaterialize => plan?.Value.Status is ResourcePlanStatus.Ready or ResourcePlanStatus.Materialized or ResourcePlanStatus.Validated;
     private ResourceChangeSetValidation? latestValidation => selected is null ? null : ResourcePlanReviewProjection.LatestValidation(selected.Value, validations);
     private ResourceChange? SelectedGraphChange
@@ -332,6 +398,7 @@ else
         }
     }
     private string T(string key, params object[] args) => Localizer[key, args].Value;
+    private string? PrincipalDisplayName(Guid id) => principalNames.TryGetValue(id, out var name) && !string.IsNullOrWhiteSpace(name) ? name : null;
     private string DiagnosticLabel(ResourcePlanMaterializationDiagnostic diagnostic)
     {
         var localized = Localizer[$"MaterializationDiagnostic.{diagnostic.Code}"];
@@ -483,13 +550,14 @@ else
     protected override void OnInitialized() => ContextState.Changed += OnContextChanged;
     protected override async Task OnParametersSetAsync()
     {
-        if (loadedId != Id) { loadedId = Id; plan = null; modelBindings.Clear(); runtimeBindings.Clear(); bindingDraft = null; bindingsDirty = false; showRecordedChanges = true; contextVersion++; }
+        if (loadedId != Id) { loadedId = Id; plan = null; principalNames = new Dictionary<Guid, string>(); modelBindings.Clear(); runtimeBindings.Clear(); bindingDraft = null; bindingsDirty = false; showRecordedChanges = true; contextVersion++; }
         await LoadAsync();
     }
     private void OnContextChanged() => _ = InvokeAsync(async () =>
     {
         contextVersion++;
         plan = null;
+        principalNames = new Dictionary<Guid, string>();
         selected = null;
         selectedGraphKey = null;
         changeSets = [];
@@ -503,6 +571,27 @@ else
         await LoadAsync();
     });
 
+    private async Task<IReadOnlyDictionary<Guid, string>> LoadPrincipalNamesAsync(ResourcePlan loadedPlan, IReadOnlyList<ResourcePlanActivity> loadedActivities, CancellationToken cancellationToken)
+    {
+        var relevantIds = loadedActivities.Where(value => value.Type == ResourcePlanActivityType.Applied)
+            .Select(value => value.ActorPrincipalId).Append(loadedPlan.Origin.PrincipalId).ToHashSet();
+        var names = new Dictionary<Guid, string>();
+        if (ContextState.Current is { } current && relevantIds.Contains(current.UserId) && !string.IsNullOrWhiteSpace(current.UserDisplayName))
+            names[current.UserId] = current.UserDisplayName;
+        if (!ContextState.HasPermission("authorization/read")) return names;
+
+        try
+        {
+            var organization = await IdentityClient.GetOrganizationAsync(cancellationToken);
+            foreach (var member in organization.Members.Where(value => relevantIds.Contains(value.Principal.Id) && !string.IsNullOrWhiteSpace(value.Principal.DisplayName)))
+                names[member.Principal.Id] = member.Principal.DisplayName;
+        }
+        catch (AgentstrationApiException) { }
+        catch (HttpRequestException) { }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+        return names;
+    }
+
     private async Task LoadAsync()
     {
         if (busy) { reloadRequested = true; return; }
@@ -514,28 +603,32 @@ else
             var loadedPlan = await Client.GetPlanAsync(Id, lifetime.Token);
             if (loadedPlan is null)
             {
-                if (version == contextVersion) { plan = null; activities = []; changeSets = []; selected = null; selectedGraphKey = null; }
+                if (version == contextVersion) { plan = null; activities = []; principalNames = new Dictionary<Guid, string>(); changeSets = []; selected = null; selectedGraphKey = null; }
                 return;
             }
             var loadedFunctional = loadedPlan.Value.Content.Document.Deserialize<FunctionalResourcePlanV1>(JsonOptions);
             var loadedModelProfiles = await ModelProfilesClient.GetModelProfilesAsync(null, null, null, lifetime.Token);
             var loadedRuntimeProfiles = await RuntimeProfilesClient.GetRuntimeProfilesAsync(lifetime.Token);
             var loadedActivities = await Client.ListActivitiesAsync(Id, lifetime.Token);
+            var loadedPrincipalNames = await LoadPrincipalNamesAsync(loadedPlan.Value, loadedActivities, lifetime.Token);
             var page = await Client.ListChangeSetsAsync(Id, 0, 200, lifetime.Token);
             var loadedSets = page.Items.OrderByDescending(value => value.Value.PlanRevision).ThenByDescending(value => value.Value.CreatedAt).ToArray();
             var loadedSelected = ResourcePlanReviewProjection.LatestChangeSet(loadedPlan.Value, loadedSets);
             var loadedDraft = await Client.GetBindingsAsync(Id, lifetime.Token);
             IReadOnlyList<ResourceChangeSetValidation> loadedValidations = loadedSelected is null ? [] : await Client.ListValidationsAsync(loadedSelected.Value.Id.Value, lifetime.Token);
+            var loadedApplication = loadedSelected is null ? null : await Client.GetApplicationAsync(loadedSelected.Value.Id.Value, lifetime.Token);
             if (version != contextVersion) return;
             plan = loadedPlan;
             functional = loadedFunctional;
             modelProfiles = loadedModelProfiles.Where(profile => IsVisible(profile.ScopeRef, loadedPlan.Value.Scope)).ToArray();
             runtimeProfiles = loadedRuntimeProfiles.Where(profile => IsVisible(profile.ScopeRef, loadedPlan.Value.Scope)).ToArray();
             activities = loadedActivities;
+            principalNames = loadedPrincipalNames;
             changeSets = loadedSets;
             selected = loadedSelected;
             selectedGraphKey = null;
             validations = loadedValidations;
+            application = loadedApplication;
             bindingDraft = loadedDraft;
             bindingSaveFailed = false;
             bindingsConflict = false;
@@ -582,7 +675,8 @@ else
         try
         {
             IReadOnlyList<ResourceChangeSetValidation> nextValidations = next is null ? [] : await Client.ListValidationsAsync(next.Value.Id.Value, lifetime.Token);
-            if (version == contextVersion) { selected = next; showRecordedChanges = true; selectedGraphKey = null; validations = nextValidations; }
+            var nextApplication = next is null ? null : await Client.GetApplicationAsync(next.Value.Id.Value, lifetime.Token);
+            if (version == contextVersion) { selected = next; showRecordedChanges = true; selectedGraphKey = null; validations = nextValidations; application = nextApplication; }
         }
         catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
     }
@@ -632,6 +726,23 @@ else
         finally { EndBusy(); }
     }
 
+    private async Task ApplyAsync()
+    {
+        if (plan is null || selected is null || latestValidation is null || latestValidation.Readiness != ResourceChangeSetReadiness.Ready ||
+            application?.Value.Status is ResourceChangeSetApplicationStatus.Applied or ResourceChangeSetApplicationStatus.Applying ||
+            !CanApply || !showRecordedChanges || busy || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, latestValidation)) return;
+        busy = true; error = null;
+        var version = contextVersion;
+        try
+        {
+            var applied = await Client.ApplyChangeSetAsync(selected.Value.Id.Value,
+                new(plan.Value.Id, plan.Value.Revision, selected.Value.Digest, latestValidation.Id), lifetime.Token);
+            if (version == contextVersion) { application = applied; activeView = "Application"; await LoadAsync(); }
+        }
+        catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
+        finally { EndBusy(); }
+    }
+
     private void EndBusy()
     {
         busy = false;
@@ -644,5 +755,7 @@ else
 
     private static UiStatus Tone(ResourcePlanStatus status) => status switch { ResourcePlanStatus.Validated or ResourcePlanStatus.Applied => UiStatus.Success, ResourcePlanStatus.Failed or ResourcePlanStatus.Cancelled => UiStatus.Danger, ResourcePlanStatus.Ready or ResourcePlanStatus.Materialized => UiStatus.Info, _ => UiStatus.Neutral };
     private static UiStatus OperationTone(ResourceChangeOperation operation) => operation switch { ResourceChangeOperation.Create => UiStatus.Success, ResourceChangeOperation.Update => UiStatus.Info, ResourceChangeOperation.Delete => UiStatus.Danger, _ => UiStatus.Neutral };
+    private static UiStatus ApplicationOutcomeTone(ResourceChangeApplicationOutcome outcome) => outcome switch { ResourceChangeApplicationOutcome.Applied or ResourceChangeApplicationOutcome.AlreadyApplied => UiStatus.Success, ResourceChangeApplicationOutcome.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
+    private static string ActivityToneClass(ResourcePlanActivityType type) => type switch { ResourcePlanActivityType.Applied => "is-success", ResourcePlanActivityType.Failed or ResourcePlanActivityType.Cancelled => "is-danger", ResourcePlanActivityType.StatusChanged or ResourcePlanActivityType.Validated or ResourcePlanActivityType.Materialized => "is-info", _ => "is-neutral" };
     public void Dispose() { ContextState.Changed -= OnContextChanged; lifetime.Cancel(); lifetime.Dispose(); }
 }

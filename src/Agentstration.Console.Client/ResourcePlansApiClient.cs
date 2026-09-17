@@ -16,6 +16,8 @@ public interface IResourcePlansApiClient
     Task<ResourceChangeSetSnapshot> CreateChangeSetAsync(Guid planId, ResourcePlanMaterializationRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<ResourceChangeSetValidation>> ListValidationsAsync(Guid changeSetId, CancellationToken cancellationToken);
     Task<ResourceChangeSetValidation> ValidateChangeSetAsync(Guid changeSetId, CancellationToken cancellationToken);
+    Task<ResourceChangeSetApplicationSnapshot?> GetApplicationAsync(Guid changeSetId, CancellationToken cancellationToken);
+    Task<ResourceChangeSetApplicationSnapshot> ApplyChangeSetAsync(Guid changeSetId, ApplyResourceChangeSetRequest request, CancellationToken cancellationToken);
 }
 
 public sealed class ResourcePlansApiClient(HttpClient httpClient) : IResourcePlansApiClient
@@ -72,6 +74,19 @@ public sealed class ResourcePlansApiClient(HttpClient httpClient) : IResourcePla
 
     public Task<ResourceChangeSetValidation> ValidateChangeSetAsync(Guid changeSetId, CancellationToken cancellationToken) =>
         PostAsync<ResourceChangeSetValidation>($"{BasePath}/change-sets/{changeSetId:D}/validations", cancellationToken);
+
+    public async Task<ResourceChangeSetApplicationSnapshot?> GetApplicationAsync(Guid changeSetId, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync($"{BasePath}/change-sets/{changeSetId:D}/application", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        return await ReadSnapshotAsync<ResourceChangeSetApplication, ResourceChangeSetApplicationSnapshot>(response, (value, etag) => new(value, etag), cancellationToken);
+    }
+
+    public async Task<ResourceChangeSetApplicationSnapshot> ApplyChangeSetAsync(Guid changeSetId, ApplyResourceChangeSetRequest request, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync($"{BasePath}/change-sets/{changeSetId:D}/application", request, cancellationToken);
+        return await ReadSnapshotAsync<ResourceChangeSetApplication, ResourceChangeSetApplicationSnapshot>(response, (value, etag) => new(value, etag), cancellationToken);
+    }
 
     private async Task<IReadOnlyList<T>> ReadListAsync<T>(string path, CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<T[]>(httpClient, path, cancellationToken);
