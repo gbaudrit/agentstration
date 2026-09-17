@@ -69,6 +69,35 @@ public sealed class LocalSecretVaultTests
     }
 
     [TestMethod]
+    public async Task SameVaultAndKeyInDifferentScopesKeepSeparateEncryptedValues()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-secret-{Guid.NewGuid():N}");
+        try
+        {
+            var provider = new LocalSecretVaultProvider(directory, new FixedKey(RandomNumberGenerator.GetBytes(32)));
+            var vault = ResourceAddress.Create(ResourceNamespace.Default, "Vault", "shared");
+            var tenant = new SecretVaultContext(ResourceScopeRef.Tenant(Guid.NewGuid()), vault, new Dictionary<string, JsonElement>());
+            var workspace = new SecretVaultContext(ResourceScopeRef.Workspace(Guid.NewGuid()), vault, new Dictionary<string, JsonElement>());
+            using var tenantValue = new SecretValue(Encoding.UTF8.GetBytes("tenant-value"));
+            using var workspaceValue = new SecretValue(Encoding.UTF8.GetBytes("workspace-value"));
+
+            await provider.SetAsync(tenant, "shared-key", tenantValue);
+            await provider.SetAsync(workspace, "shared-key", workspaceValue);
+
+            Assert.HasCount(2, Directory.GetFiles(directory, "*.secret"));
+            using var tenantRead = await provider.GetAsync(tenant, "shared-key");
+            using var workspaceRead = await provider.GetAsync(workspace, "shared-key");
+            Assert.AreEqual("tenant-value", Encoding.UTF8.GetString(tenantRead!.AccessValue().Span));
+            Assert.AreEqual("workspace-value", Encoding.UTF8.GetString(workspaceRead!.AccessValue().Span));
+
+            await provider.DeleteAsync(tenant, "shared-key");
+            Assert.AreEqual(SecretValueStatus.Missing, await provider.GetStatusAsync(tenant, "shared-key"));
+            Assert.AreEqual(SecretValueStatus.Configured, await provider.GetStatusAsync(workspace, "shared-key"));
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+
+    [TestMethod]
     public async Task RejectsWrongKeyAndTamperedCiphertext()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"agentstration-secret-{Guid.NewGuid():N}");
