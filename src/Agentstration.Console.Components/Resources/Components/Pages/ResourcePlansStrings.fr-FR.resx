@@ -150,6 +150,7 @@
   <data name="HistoryCount" xml:space="preserve"><value>Événements : {0}</value></data>
   <data name="HistoryEmpty" xml:space="preserve"><value>Aucun événement enregistré pour le moment.</value></data>
   <data name="Principal" xml:space="preserve"><value>Identifiant du créateur</value></data>
+  <data name="AppliedBy" xml:space="preserve"><value>Appliqué par</value></data>
   <data name="Work" xml:space="preserve"><value>Tâche d’origine</value></data>
   <data name="OpenTasks" xml:space="preserve"><value>Ouvrir les tâches</value></data>
   <data name="FlowRun" xml:space="preserve"><value>Exécution du flow</value></data>

@@ -320,6 +320,7 @@ else
                     <div class="resource-plan-activity-card-heading"><span class="resource-plan-origin-symbol" aria-hidden="true">◎</span><div><h3>@T("OriginTitle")</h3><p>@T("OriginDescription")</p></div></div>
                     <dl class="resource-plan-origin">
                         <div><dt>@T("Principal")</dt><dd><code>@plan.Value.Origin.PrincipalId</code></dd></div>
+                        @if (activities.Where(value => value.Type == ResourcePlanActivityType.Applied).OrderByDescending(value => value.CreatedAt).FirstOrDefault() is { } appliedActivity) { <div><dt>@T("AppliedBy")</dt><dd><code>@appliedActivity.ActorPrincipalId</code></dd></div> }
                         @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.WorkItemId)) { <div><dt>@T("Work")</dt><dd><a href="@($"/api/work/workitems/{Uri.EscapeDataString(plan.Value.Origin.WorkItemId)}")">@plan.Value.Origin.WorkItemId</a></dd></div> }
                         @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.FlowRunId)) { <div><dt>@T("FlowRun")</dt><dd><a href="@($"/flow-runs/{Uri.EscapeDataString(plan.Value.Origin.FlowRunId)}")">@plan.Value.Origin.FlowRunId</a></dd></div> }
                         @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.CorrelationId)) { <div><dt>@T("Correlation")</dt><dd><code>@plan.Value.Origin.CorrelationId</code></dd></div> }

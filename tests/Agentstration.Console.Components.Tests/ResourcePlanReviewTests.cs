@@ -166,6 +166,8 @@ public sealed class ResourcePlanReviewTests
 
         var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
         rendered.WaitForAssertion(() => Assert.Contains("Support design", rendered.Markup, StringComparison.Ordinal));
+        rendered.Find("#tab-Activity").Click();
+        Assert.IsFalse(rendered.Find(".resource-plan-origin").TextContent.Contains("Appliqué par", StringComparison.Ordinal));
         rendered.Find("#tab-Application").Click();
         Assert.Contains("Vérifiez d’abord la proposition", rendered.Find(".resource-plan-application-pending").TextContent, StringComparison.Ordinal);
         rendered.Find("#tab-Validation").Click();
@@ -184,6 +186,12 @@ public sealed class ResourcePlanReviewTests
             Assert.Contains("Ressources appliquées", rendered.Find(".resource-plan-application-summary").TextContent, StringComparison.Ordinal);
             Assert.AreEqual("1", rendered.Find(".resource-plan-application-counts strong").TextContent);
             Assert.Contains("Triage", rendered.Find(".resource-plan-application-operations").TextContent, StringComparison.Ordinal);
+        });
+        rendered.Find("#tab-Activity").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.Contains("Appliqué par", rendered.Find(".resource-plan-origin").TextContent, StringComparison.Ordinal);
+            Assert.Contains(client.AppliedPrincipalId.ToString("D"), rendered.Find(".resource-plan-origin").TextContent, StringComparison.Ordinal);
         });
     }
 
@@ -322,13 +330,17 @@ public sealed class ResourcePlanReviewTests
         private IReadOnlyList<ResourceChangeSetValidation> validations = [Validation(set.Value, "old-digest")];
         private ResourceChangeSetApplicationSnapshot? application;
         private ResourcePlanBindingDraftSnapshot? savedBindings;
+        public Guid AppliedPrincipalId { get; } = Guid.NewGuid();
         public int ValidationCalls { get; private set; }
         public ResourcePlanMaterializationRequest? LastMaterializationRequest { get; private set; }
         public ResourcePlanMaterializationRequest? LastChangeSetRequest { get; private set; }
         public ApplyResourceChangeSetRequest? LastApplyRequest { get; private set; }
         public Task<ResourcePlanPage> ListPlansAsync(ResourcePlanStatus? status, int skip, int take, CancellationToken cancellationToken) => Task.FromResult(new ResourcePlanPage([new(Plan, "\"plan\"")], false));
         public Task<ResourcePlanSnapshot?> GetPlanAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<ResourcePlanSnapshot?>(id == Plan.Id.Value ? new(Plan, "\"plan\"") : null);
-        public Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResourcePlanActivity>>([new(Guid.NewGuid(), Plan.Id, Scope, 1, ResourcePlanActivityType.Created, Guid.NewGuid(), null, DateTimeOffset.UnixEpoch)]);
+        public Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResourcePlanActivity>>(application is null
+            ? [new(Guid.NewGuid(), Plan.Id, Scope, 1, ResourcePlanActivityType.Created, Plan.Origin.PrincipalId, null, DateTimeOffset.UnixEpoch)]
+            : [new(Guid.NewGuid(), Plan.Id, Scope, 1, ResourcePlanActivityType.Created, Plan.Origin.PrincipalId, null, DateTimeOffset.UnixEpoch),
+                new(Guid.NewGuid(), Plan.Id, Scope, Plan.Revision, ResourcePlanActivityType.Applied, AppliedPrincipalId, null, DateTimeOffset.UnixEpoch.AddMinutes(1))]);
         public Task<ResourcePlanBindingDraftSnapshot?> GetBindingsAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(savedBindings);
         public Task<ResourcePlanBindingDraftSnapshot> SaveBindingsAsync(Guid id, SaveResourcePlanBindingsRequest request, string? expectedETag, CancellationToken cancellationToken)
         {
@@ -382,7 +394,7 @@ public sealed class ResourcePlanReviewTests
             application = new(new(Guid.NewGuid(), request.PlanId, request.PlanRevision, new(changeSetId), request.ChangeSetDigest,
                 request.ValidationId, Scope, ResourceChangeSetApplicationStatus.Applied,
                 [new ResourceChangeApplicationOperation(0, "triage", ResourceChangeOperation.Update, ResourceChangeApplicationOutcome.Applied, Guid.NewGuid(), 2, "\"updated\"", null, null, now)],
-                1, Guid.NewGuid(), now, now, now, now), "\"application\"");
+                1, AppliedPrincipalId, now, now, now, now), "\"application\"");
             return Task.FromResult(application);
         }
     }
