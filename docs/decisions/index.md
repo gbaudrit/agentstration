@@ -155,3 +155,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 121. [ADR-0121 — AEP Secret access uses one-use capabilities](0121-aep-secret-access-capabilities.md)
 122. [ADR-0122 — AEP contributions declare protected Value Requirements](0122-aep-value-requirements-and-bound-values.md)
 123. [ADR-0123 — AEP Value Requirements may constrain invariant allowed values](0123-aep-value-requirements-constrain-allowed-values.md)
+126. [ADR-0126 — Foundry model deployments use an isolated AEP extension](0126-foundry-model-deployments-use-an-isolated-aep-extension.md)
+127. [ADR-0127 — Foundry local Aspire discovery is explicitly opt-in](0127-foundry-local-aspire-discovery-is-explicitly-opt-in.md)
