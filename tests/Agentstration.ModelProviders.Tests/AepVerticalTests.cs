@@ -243,6 +243,9 @@ public sealed class AepVerticalTests
 
         Assert.AreEqual("pong", response.Text);
         Assert.AreEqual("pong", string.Concat(updates.Select(value => value.Text)));
+        var usage = updates.SelectMany(value => value.Contents).OfType<UsageContent>().Single().Details;
+        Assert.AreEqual(2L, usage.InputTokenCount);
+        Assert.AreEqual(3L, usage.OutputTokenCount);
         await Assert.ThrowsAsync<OperationCanceledException>(() => adapter.GetResponseAsync([new ChatMessage(ChatRole.User, "ping")], cancellationToken: cancellation.Token));
     }
 
@@ -791,6 +794,7 @@ public sealed class AepVerticalTests
             Record(request.BoundValues);
             yield return new([AepContent.FromText("po")], AepRole.Assistant, request.Model);
             await Task.Yield();
+            yield return new([], Usage: new AepUsage(2, 3, 5));
             yield return new([AepContent.FromText("ng")], FinishReason: AepFinishReason.Stop);
         }
         public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>

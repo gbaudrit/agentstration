@@ -46,7 +46,15 @@ public sealed class AepChatClient(
         var request = MapRequest(messages, options) with { BoundValues = lease?.Values };
         await foreach (var update in provider.ChatStreamingAsync(request, cancellationToken).WithCancellation(cancellationToken))
         {
-            var mapped = new ChatResponseUpdate(MapRole(update.Role), MapContents(update.Contents))
+            var contents = MapContents(update.Contents);
+            if (update.Usage is { } usage)
+                contents.Add(new UsageContent(new UsageDetails
+                {
+                    InputTokenCount = usage.InputTokens,
+                    OutputTokenCount = usage.OutputTokens,
+                    TotalTokenCount = usage.TotalTokens
+                }));
+            var mapped = new ChatResponseUpdate(MapRole(update.Role), contents)
             {
                 ModelId = update.Model ?? model,
                 FinishReason = MapFinishReason(update.FinishReason)

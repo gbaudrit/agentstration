@@ -9,7 +9,7 @@ namespace Agentstration.Extensions.Foundry;
 
 internal static class FoundryChatCompletion
 {
-    private const int MaximumRequestBytes = 1024 * 1024;
+    internal const int MaximumRequestBytes = 1024 * 1024;
     private const int MaximumResponseBytes = 2 * 1024 * 1024;
     private const int MaximumErrorBytes = 8192;
 
@@ -48,7 +48,7 @@ internal static class FoundryChatCompletion
             {
                 throw new AepServerException("invalid_response", "Foundry chat returned invalid JSON.", innerException: exception);
             }
-            using (document) return ParseResponse(document.RootElement, chat.Model);
+            using (document) return ParseResponse(document.RootElement, chat.Model, chat.Tools);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -60,12 +60,20 @@ internal static class FoundryChatCompletion
         }
     }
 
-    private static JsonObject BuildRequest(AepChatRequest chat)
+    internal static JsonObject BuildRequest(AepChatRequest chat, bool streaming = false)
     {
         if (chat is null || string.IsNullOrWhiteSpace(chat.Model) || chat.Model.Length > 256
             || chat.Messages is null || chat.Messages.Count is < 1 or > 64)
             throw Invalid("A bounded deployment name and 1 to 64 messages are required.");
-        if (chat.Tools is { Count: > 0 }) throw Unsupported("Tool definitions are not supported by Foundry chat yet.");
+        if (chat.Tools is { Count: > 0 } declaredTools)
+        {
+            if (declaredTools.Count > 16) throw Invalid("Foundry chat accepts at most 16 tools.");
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var tool in declaredTools)
+                if (string.IsNullOrWhiteSpace(tool.Name) || tool.Name.Length > 128 || !names.Add(tool.Name)
+                    || tool.Description is { Length: > 1024 } || tool.Parameters.ValueKind != JsonValueKind.Object)
+                    throw Invalid("Foundry chat tool definition is invalid.");
+        }
         if (chat.Metadata is { Count: > 0 }) throw Unsupported("Chat metadata is not supported by Foundry chat yet.");
 
         var messages = new JsonArray();
@@ -96,13 +104,36 @@ internal static class FoundryChatCompletion
                 AepRole.Assistant => "assistant",
                 _ => throw Unsupported("The AEP message role is not supported by Foundry chat.")
             };
-            if (message.Contents.Any(content => content is null || content.Kind != AepContentKind.Text || content.Text is null))
-                throw Unsupported("Foundry non-streaming chat currently supports text messages only.");
+            if (message.Contents.Any(content => content is null || (content.Kind != AepContentKind.Text && content.Kind != AepContentKind.ToolCall)))
+                throw Unsupported("Foundry chat supports text and assistant tool calls only.");
+            if (message.Role != AepRole.Assistant && message.Contents.Any(content => content.Kind == AepContentKind.ToolCall))
+                throw Unsupported("Only assistant messages can contain tool calls.");
+            if (message.Contents.Any(content => content.Kind == AepContentKind.Text && content.Text is null))
+                throw Invalid("Foundry chat text content is invalid.");
             var mapped = new JsonObject
             {
                 ["role"] = role,
-                ["content"] = string.Concat(message.Contents.Select(content => content.Text))
+                ["content"] = string.Concat(message.Contents.Where(content => content.Kind == AepContentKind.Text).Select(content => content.Text))
             };
+            if (message.Contents.Any(content => content.Kind == AepContentKind.ToolCall))
+            {
+                var calls = new JsonArray();
+                foreach (var content in message.Contents.Where(content => content.Kind == AepContentKind.ToolCall))
+                {
+                    var call = content.ToolCall;
+                    if (call is null || string.IsNullOrWhiteSpace(call.Id) || call.Id.Length > 128
+                        || string.IsNullOrWhiteSpace(call.Name) || call.Name.Length > 128
+                        || call.Arguments.ValueKind != JsonValueKind.Object)
+                        throw Invalid("Foundry chat tool call is invalid.");
+                    calls.Add(new JsonObject
+                    {
+                        ["id"] = call.Id,
+                        ["type"] = "function",
+                        ["function"] = new JsonObject { ["name"] = call.Name, ["arguments"] = call.Arguments.GetRawText() }
+                    });
+                }
+                mapped["tool_calls"] = calls;
+            }
             if (message.AuthorName is not null)
             {
                 if (string.IsNullOrWhiteSpace(message.AuthorName) || message.AuthorName.Length > 64)
@@ -112,7 +143,24 @@ internal static class FoundryChatCompletion
             messages.Add(mapped);
         }
 
-        var body = new JsonObject { ["model"] = chat.Model, ["messages"] = messages, ["stream"] = false };
+        var body = new JsonObject { ["model"] = chat.Model, ["messages"] = messages, ["stream"] = streaming };
+        if (chat.Tools is { Count: > 0 } definitions)
+        {
+            var tools = new JsonArray();
+            foreach (var tool in definitions)
+                tools.Add(new JsonObject
+                {
+                    ["type"] = "function",
+                    ["function"] = new JsonObject
+                    {
+                        ["name"] = tool.Name,
+                        ["description"] = tool.Description,
+                        ["parameters"] = JsonNode.Parse(tool.Parameters.GetRawText())
+                    }
+                });
+            body["tools"] = tools;
+        }
+        if (streaming) body["stream_options"] = new JsonObject { ["include_usage"] = true };
         ApplyOptions(body, chat.Options);
         return body;
     }
@@ -153,7 +201,7 @@ internal static class FoundryChatCompletion
         }
     }
 
-    private static AepChatResponse ParseResponse(JsonElement root, string deployment)
+    private static AepChatResponse ParseResponse(JsonElement root, string deployment, IReadOnlyList<AepToolDefinition>? declaredTools)
     {
         if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("choices", out var choices)
             || choices.ValueKind != JsonValueKind.Array || choices.GetArrayLength() != 1)
@@ -167,13 +215,47 @@ internal static class FoundryChatCompletion
             "stop" => AepFinishReason.Stop,
             "length" => AepFinishReason.Length,
             "content_filter" => throw new AepServerException("content_filtered", "Foundry filtered the chat completion."),
-            "tool_calls" or "function_call" => throw UnsupportedResponse("Foundry returned tool calls before tool support is enabled."),
+            "tool_calls" => AepFinishReason.ToolCalls,
             _ => throw InvalidResponse("Foundry chat returned an unsupported finish reason.")
         };
-        if (!message.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.String)
+        var contents = new List<AepContent>();
+        if (message.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String)
+            contents.Add(AepContent.FromText(content.GetString()!));
+        else if (finish != AepFinishReason.ToolCalls)
             throw InvalidResponse("Foundry chat returned non-text assistant content.");
-        if (message.TryGetProperty("tool_calls", out var calls) && calls.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined))
-            throw UnsupportedResponse("Foundry returned tool calls before tool support is enabled.");
+        if (message.TryGetProperty("tool_calls", out var calls) && calls.ValueKind != JsonValueKind.Null)
+        {
+            if (finish != AepFinishReason.ToolCalls || calls.ValueKind != JsonValueKind.Array || calls.GetArrayLength() is < 1 or > 16)
+                throw InvalidResponse("Foundry chat returned invalid tool calls.");
+            var seenIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var call in calls.EnumerateArray())
+            {
+                if (call.ValueKind != JsonValueKind.Object || GetString(call, "type") != "function"
+                    || GetString(call, "id") is not { Length: > 0 and <= 128 } id
+                    || !call.TryGetProperty("function", out var function) || function.ValueKind != JsonValueKind.Object
+                    || GetString(function, "name") is not { Length: > 0 and <= 128 } name
+                    || GetString(function, "arguments") is not { Length: <= 65536 } arguments)
+                    throw InvalidResponse("Foundry chat returned an invalid tool call.");
+                if (!seenIds.Add(id) || declaredTools is null || !declaredTools.Any(tool => tool.Name == name))
+                    throw InvalidResponse("Foundry chat returned an undeclared or duplicate tool call.");
+                JsonDocument argumentsDocument;
+                try { argumentsDocument = JsonDocument.Parse(arguments, new JsonDocumentOptions { MaxDepth = 32 }); }
+                catch (JsonException exception)
+                { throw new AepServerException("invalid_response", "Foundry chat returned invalid tool arguments.", innerException: exception); }
+                using (argumentsDocument)
+                {
+                    if (argumentsDocument.RootElement.ValueKind != JsonValueKind.Object)
+                        throw InvalidResponse("Foundry chat returned non-object tool arguments.");
+                    contents.Add(new AepContent
+                    {
+                        Kind = AepContentKind.ToolCall,
+                        ToolCall = new AepToolCall(id, name, argumentsDocument.RootElement.Clone())
+                    });
+                }
+            }
+        }
+        else if (finish == AepFinishReason.ToolCalls)
+            throw InvalidResponse("Foundry chat returned no tool calls.");
         AepUsage? usage = null;
         if (root.TryGetProperty("usage", out var rawUsage) && rawUsage.ValueKind != JsonValueKind.Null)
         {
@@ -184,13 +266,13 @@ internal static class FoundryChatCompletion
                 ReadUsage(rawUsage, "total_tokens"));
         }
         return new AepChatResponse(
-            [new AepMessage(AepRole.Assistant, [AepContent.FromText(content.GetString()!)])],
+            [new AepMessage(AepRole.Assistant, contents)],
             deployment,
             finish,
             usage);
     }
 
-    private static long? ReadUsage(JsonElement usage, string property)
+    internal static long? ReadUsage(JsonElement usage, string property)
     {
         if (!usage.TryGetProperty(property, out var value) || value.ValueKind == JsonValueKind.Null) return null;
         if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt64(out var count) || count < 0)
@@ -198,7 +280,7 @@ internal static class FoundryChatCompletion
         return count;
     }
 
-    private static async Task<AepServerException> FailureAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    internal static async Task<AepServerException> FailureAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         if ((int)response.StatusCode is >= 300 and < 400)
             return new AepServerException("provider_redirect_denied", "Foundry redirected a credential-bearing chat request.");
@@ -250,6 +332,5 @@ internal static class FoundryChatCompletion
 
     private static AepServerException Invalid(string message) => new("invalid_request", message, 400);
     private static AepServerException Unsupported(string message) => new("unsupported_option", message, 400);
-    private static AepServerException InvalidResponse(string message) => new("invalid_response", message);
-    private static AepServerException UnsupportedResponse(string message) => new("unsupported_response", message);
+    internal static AepServerException InvalidResponse(string message) => new("invalid_response", message);
 }
