@@ -30,12 +30,62 @@ public sealed class ResolvedSecret(ResourceAddress secret, ResourceAddress vault
 }
 
 public sealed record SecretReference(ResourceAddress Address, ResourceScopeRef? ScopeRef = null);
+public sealed record SecretBinding(string RequirementId, SecretReference Secret);
 public sealed record SecretResolutionContext(ResourceScopeRef ConsumerScopeRef, ResourceAddress Consumer);
 public sealed record SecretVaultContext(ResourceScopeRef ScopeRef, ResourceAddress Vault, IReadOnlyDictionary<string, JsonElement> Options);
 
 public interface ISecretResolver
 {
     Task<ResolvedSecret?> ResolveAsync(SecretReference secret, SecretResolutionContext context, CancellationToken cancellationToken = default);
+}
+
+public interface ISecretAccessAuthorizer
+{
+    Task<SecretValueStatus> GetAuthorizedStatusAsync(SecretReference secret, SecretResolutionContext context, CancellationToken cancellationToken = default);
+}
+
+public sealed record SecretCapabilityContext(
+    ScopedResourceAddress ExtensionRegistration,
+    string ExtensionId,
+    ScopedResourceAddress Consumer,
+    string RequirementId,
+    string ExecutionId);
+
+public sealed class SecretCapabilityHandle(string value)
+{
+    public string RevealForTransport() => value;
+    public override string ToString() => "[REDACTED]";
+}
+
+public interface ISecretCapabilityService
+{
+    Task<SecretCapabilityHandle> IssueAsync(
+        SecretCapabilityContext context,
+        SecretBinding binding,
+        IReadOnlyCollection<string> declaredRequirements,
+        CancellationToken lifetimeToken,
+        CancellationToken cancellationToken = default);
+
+    Task<ResolvedSecret> RedeemAsync(
+        string token,
+        SecretCapabilityContext context,
+        CancellationToken cancellationToken = default);
+
+    Task<ResolvedSecret> RedeemAsync(
+        string token,
+        string extensionId,
+        string requirementId,
+        string executionId,
+        CancellationToken cancellationToken = default);
+
+    void Revoke(SecretCapabilityHandle handle);
+    void RevokeExecution(SecretCapabilityContext context);
+    int PruneExpired();
+}
+
+public sealed class SecretCapabilityException(string code, string message) : Exception(message)
+{
+    public string Code { get; } = code;
 }
 
 public interface ISecretVaultProvider

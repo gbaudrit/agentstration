@@ -9,14 +9,17 @@ namespace Agentstration.Aep.MicrosoftExtensionsAI;
 public sealed class AepChatClient(
     AepModelProviderClient provider,
     string model,
-    AepVersionedOptions? nativeOptions = null) : IChatClient
+    AepVersionedOptions? nativeOptions = null,
+    Func<CancellationToken, Task<AepSecretAccessLease>>? secretAccess = null) : IChatClient
 {
     public async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        var response = await provider.ChatAsync(MapRequest(messages, options), cancellationToken);
+        using var lease = secretAccess is null ? null : await secretAccess(cancellationToken);
+        var request = MapRequest(messages, options) with { SecretAccess = lease?.Grants };
+        var response = await provider.ChatAsync(request, cancellationToken);
         var result = new ChatResponse(response.Messages.Select(MapMessage).ToList())
         {
             ModelId = response.Model ?? model,
@@ -39,7 +42,9 @@ public sealed class AepChatClient(
         ChatOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await foreach (var update in provider.ChatStreamingAsync(MapRequest(messages, options), cancellationToken).WithCancellation(cancellationToken))
+        using var lease = secretAccess is null ? null : await secretAccess(cancellationToken);
+        var request = MapRequest(messages, options) with { SecretAccess = lease?.Grants };
+        await foreach (var update in provider.ChatStreamingAsync(request, cancellationToken).WithCancellation(cancellationToken))
         {
             var mapped = new ChatResponseUpdate(MapRole(update.Role), MapContents(update.Contents))
             {
@@ -175,4 +180,10 @@ public sealed class AepChatClient(
         AepFinishReason.ContentFilter => ChatFinishReason.ContentFilter,
         _ => null
     };
+}
+
+public sealed class AepSecretAccessLease(IReadOnlyList<AepSecretAccessGrant> grants, Action revoke) : IDisposable
+{
+    public IReadOnlyList<AepSecretAccessGrant> Grants { get; } = grants;
+    public void Dispose() => revoke();
 }

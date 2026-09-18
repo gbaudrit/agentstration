@@ -37,7 +37,81 @@ public sealed class AepConformanceTests
         Assert.AreEqual(AepProtocol.Version, manifest.ProtocolVersion);
         Assert.AreEqual("sample.hello", manifest.Extension.Id);
         Assert.AreEqual("1.0", capabilities[AepCapabilityNames.Health].Version);
+        Assert.IsNull(manifest.SecretRequirements);
+        Assert.IsFalse(capabilities.ContainsKey(AepCapabilityNames.SecretRequirements));
+        Assert.IsFalse((await httpClient.GetStringAsync(AepProtocol.DiscoveryPath)).Contains("secretRequirements", StringComparison.Ordinal));
         Assert.AreEqual("available", health.Status);
+    }
+
+    [TestMethod]
+    public async Task SecretRequirementsRoundTripThroughVersionedDiscovery()
+    {
+        await using var factory = new WebApplicationFactory<global::Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+                services.Configure<AepExtensionOptions>(options =>
+                {
+                    options.SecretRequirements.Add(new("credential", true, "API credential for this extension."));
+                    options.SecretRequirements.Add(new("proxy-auth", false));
+                })));
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+
+        var manifest = await client.GetManifestAsync();
+        var validation = await new AepValidator().ValidateAsync(client);
+        var json = await httpClient.GetStringAsync(AepProtocol.DiscoveryPath);
+
+        Assert.IsTrue(validation.IsValid);
+        Assert.AreEqual(AepProtocol.SecretRequirementsCapabilityVersion,
+            manifest.Capabilities[AepCapabilityNames.SecretRequirements].Version);
+        Assert.IsNotNull(manifest.SecretRequirements);
+        Assert.HasCount(2, manifest.SecretRequirements);
+        Assert.AreEqual(new AepSecretRequirement("credential", true, "API credential for this extension."), manifest.SecretRequirements[0]);
+        Assert.AreEqual(new AepSecretRequirement("proxy-auth", false), manifest.SecretRequirements[1]);
+        StringAssert.Contains(json, "\"secretRequirements\"");
+        Assert.IsFalse(json.Contains("secretReference", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(json.Contains("scopeRef", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(json.Contains("vault", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public void SecretRequirementsRejectInvalidAndDuplicateIdentifiers()
+    {
+        var manifest = new AepManifest(
+            AepProtocol.Version,
+            new("sample", "Sample", "1.0.0"),
+            new Dictionary<string, AepCapabilityDescriptor>
+            {
+                [AepCapabilityNames.SecretRequirements] = new(AepProtocol.SecretRequirementsCapabilityVersion)
+            },
+            new([]),
+            SecretRequirements: [new("credential", true), new("proxy-auth", false)]);
+        Assert.IsEmpty(AepDescriptorValidator.Validate(manifest));
+
+        var invalid = manifest with { SecretRequirements = [new("credential", true), new("credential", false), new("../key", true)] };
+        var errors = AepDescriptorValidator.Validate(invalid);
+        Assert.IsTrue(errors.Any(value => value.Contains("duplicated", StringComparison.Ordinal)));
+        Assert.IsTrue(errors.Any(value => value.Contains("../key", StringComparison.Ordinal)));
+        Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
+        {
+            SecretRequirements = [new("Credential", true), new(new string('a', 65), false)]
+        }).Count >= 2);
+        Assert.ThrowsExactly<JsonException>(() => JsonSerializer.Deserialize<AepSecretRequirement>(
+            """{"id":"credential"}""", AepProtocol.JsonOptions));
+        Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
+        {
+            Capabilities = new Dictionary<string, AepCapabilityDescriptor>()
+        }).Any(value => value.Contains("capability", StringComparison.Ordinal)));
+        Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
+        {
+            SecretRequirements = []
+        }).Any(value => value.Contains("at least one", StringComparison.Ordinal)));
+        Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
+        {
+            Capabilities = new Dictionary<string, AepCapabilityDescriptor>
+            {
+                [AepCapabilityNames.SecretRequirements] = new("2.0")
+            }
+        }).Any(value => value.Contains("not supported", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -504,7 +578,7 @@ public sealed class AepConformanceTests
         var sink = new MemoryTraceSink();
         using var handler = new AepTracingHandler(sink) { InnerHandler = new StaticHandler() };
         using var client = new HttpClient(handler);
-        using var request = new HttpRequestMessage(HttpMethod.Post, "http://extension/test") { Content = new StringContent("{\"apiKey\":\"secret-value\"}", Encoding.UTF8, "application/json") };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "http://extension/test?secretCapability=query-handle") { Content = new StringContent("{\"apiKey\":\"secret-value\",\"secretAccess\":[{\"secretCapability\":\"body-handle\"}]}", Encoding.UTF8, "application/json") };
         request.Headers.Authorization = new("Bearer", "secret-token");
 
         using var response = await client.SendAsync(request);
@@ -513,6 +587,66 @@ public sealed class AepConformanceTests
         Assert.AreEqual("***", sink.Trace!.RequestHeaders["Authorization"]);
         StringAssert.Contains(sink.Trace.RequestBody, "\"apiKey\":\"***\"");
         Assert.IsFalse(sink.Trace.RequestBody!.Contains("secret-value", StringComparison.Ordinal));
+        Assert.IsFalse(sink.Trace.RequestBody.Contains("body-handle", StringComparison.Ordinal));
+        Assert.IsFalse(sink.Trace.Url!.ToString().Contains("query-handle", StringComparison.Ordinal));
+        Assert.IsFalse(sink.Trace.ResponseBody!.Contains("response-secret", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task TracingOmitsMalformedBodiesInsteadOfRetainingTheirContents()
+    {
+        var sink = new MemoryTraceSink();
+        using var handler = new AepTracingHandler(sink) { InnerHandler = new StaticHandler() };
+        using var client = new HttpClient(handler);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "http://extension/test")
+        {
+            Content = new StringContent("{\"secretCapability\":\"handle-in-invalid-json", Encoding.UTF8, "application/json")
+        };
+
+        using var response = await client.SendAsync(request);
+
+        Assert.AreEqual("[payload omitted: invalid JSON]", sink.Trace?.RequestBody);
+        Assert.IsFalse(sink.Trace!.RequestBody!.Contains("handle-in-invalid-json", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task SecretAccessSdkRejectsUnknownErrorCodesAndInvalidEncoding()
+    {
+        var grant = new AepSecretAccessGrant(AepProtocol.SecretAccessVersion,
+            new Uri("http://localhost/api/aep/secrets/redeem"), "extension.test", "credential", "run-1", "opaque-handle");
+        using var deniedHttp = new HttpClient(new SecretAccessResponseHandler(HttpStatusCode.Forbidden,
+            "{\"error\":{\"code\":\"private-secret\",\"message\":\"private-value\"}}"));
+        var denied = await Assert.ThrowsExactlyAsync<AepProtocolException>(() =>
+            new AepSecretAccessClient(deniedHttp).RedeemAsync(grant));
+        Assert.AreEqual("secret_access_failed", denied.Code);
+        Assert.IsFalse(denied.Message.Contains("private-value", StringComparison.Ordinal));
+        Assert.IsFalse(denied.Message.Contains("private-secret", StringComparison.Ordinal));
+
+        using var invalidHttp = new HttpClient(new SecretAccessResponseHandler(HttpStatusCode.OK,
+            "{\"version\":\"1.0\",\"secretValueBase64\":\"not-base64\"}"));
+        var invalid = await Assert.ThrowsExactlyAsync<AepProtocolException>(() =>
+            new AepSecretAccessClient(invalidHttp).RedeemAsync(grant));
+        Assert.AreEqual("secret_value_invalid", invalid.Code);
+        Assert.IsFalse(invalid.Message.Contains("not-base64", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task InspectorRetainsOnlyRedactedSecretAccessTrace()
+    {
+        await using var inspector = new InspectorSession(NullLoggerFactory.Instance);
+        using var handler = new AepTracingHandler(inspector) { InnerHandler = new StaticHandler() };
+        using var client = new HttpClient(handler);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "http://extension/chat?secretCapability=query-handle")
+        {
+            Content = new StringContent("{\"secretAccess\":[{\"secretCapability\":\"body-handle\"}]}", Encoding.UTF8, "application/json")
+        };
+
+        using var response = await client.SendAsync(request);
+
+        var trace = inspector.Traces.Single();
+        Assert.IsFalse(trace.Url!.ToString().Contains("query-handle", StringComparison.Ordinal));
+        Assert.IsFalse(trace.RequestBody!.Contains("body-handle", StringComparison.Ordinal));
+        Assert.IsFalse(trace.ResponseBody!.Contains("response-secret", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -836,6 +970,15 @@ public sealed class AepConformanceTests
         {
             Content = new StringContent(JsonSerializer.Serialize(new { token = "response-secret" }), Encoding.UTF8, "application/json")
         });
+    }
+
+    private sealed class SecretAccessResponseHandler(HttpStatusCode status, string body) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(status)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            });
     }
 
     private sealed class CapturingAuthorizationHandler : HttpMessageHandler

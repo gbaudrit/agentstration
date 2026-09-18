@@ -128,6 +128,8 @@ public static class DependencyInjection
         services.AddSingleton<DescendantResourceUseAuthorizer>();
         services.AddSingleton<SecretManagementService>();
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
+        services.AddSingleton<ISecretAccessAuthorizer>(provider => provider.GetRequiredService<SecretManagementService>());
+        services.AddSingleton<ISecretCapabilityService, SecretCapabilityService>();
         services.AddSingleton<IPrincipalResolver, ExternalIdentityPrincipalResolver>();
         services.AddSingleton<IInitialPrincipalProvisioner, InitialPrincipalProvisioner>();
         services.AddSingleton<IInitialTopologyProvisioner, InitialTopologyProvisioner>();
