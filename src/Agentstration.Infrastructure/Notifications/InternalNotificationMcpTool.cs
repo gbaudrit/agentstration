@@ -12,16 +12,16 @@ public sealed class WorkNotificationMcpToolDefinitionProvider : IInternalMcpTool
     public InternalMcpToolDefinition Definition { get; } = new(
         AgentstrationInternalTools.NotificationCreate,
         "Create in-product notification",
-        "Creates one durable notification in the current Agentstration Workspace.",
+        "Creates a durable in-product notification for the current Workspace. Use it to notify the user about a relevant event or result. A stable delivery key prevents duplicate notifications on retries. Optional actions can target only local Agentstration paths, not external URLs.",
         JsonSerializer.SerializeToElement(new
         {
             type = "object",
             properties = new
             {
-                deliveryKey = new { type = "string", maxLength = 256 },
-                title = new { type = "string", maxLength = 200 },
-                message = new { type = "string", maxLength = 4000 },
-                actionUrl = new { type = "string", maxLength = 2048 }
+                deliveryKey = new { type = "string", maxLength = 256, pattern = @"\S", description = "Stable idempotency key for one logical notification in this Workspace. Reuse the same key when retrying that notification." },
+                title = new { type = "string", maxLength = 200, pattern = @"\S", description = "Short user-visible notification heading." },
+                message = new { type = "string", maxLength = 4000, pattern = @"\S", description = "User-visible notification body." },
+                actionUrl = new { type = "string", maxLength = 2048, pattern = @"^/(?!/)[^\\]*$", description = "Optional local absolute Agentstration path beginning with one slash. External URLs and backslashes are not supported." }
             },
             required = new[] { "deliveryKey", "title", "message" },
             additionalProperties = false
@@ -113,7 +113,28 @@ public sealed class InternalMcpToolProjectionService(
             var name = AgentstrationToolProvider.ToolResourceName(definition.Name);
             var key = new ResourceKey(ToolResourceKinds.Tool, name, @namespace);
             var existing = await store.GetAsync<ToolResource>(key, cancellationToken);
-            if (existing is not null) continue;
+            if (existing is not null)
+            {
+                if (existing.Value.Definition.ExternalId != definition.Name
+                    || existing.Value.Definition.Provider?.Name != AgentstrationToolProvider.Name
+                    || existing.Value.ScopeRef != workspaceScope)
+                    throw new ToolResourceValidationException($"The reserved internal Tool identity '{name}' is already in use.");
+                if (existing.Value.Definition.Description != definition.Description
+                    || !ToolDefinitionService.SameSchema(existing.Value.Definition.Schema?.Input, definition.InputSchema)
+                    || !ToolDefinitionService.SameSchema(existing.Value.Definition.Schema?.Output, definition.OutputSchema))
+                {
+                    await store.PutAsync(existing.Value with
+                    {
+                        Generation = checked(existing.Value.Generation + 1),
+                        Definition = existing.Value.Definition with
+                        {
+                            Description = definition.Description,
+                            Schema = new ToolSchema { Input = definition.InputSchema.Clone(), Output = definition.OutputSchema?.Clone() }
+                        }
+                    }, existing.ETag, false, cancellationToken);
+                }
+                continue;
+            }
             await store.PutAsync(new ToolResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,

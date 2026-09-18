@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Flows;
@@ -27,6 +28,49 @@ namespace Agentstration.Management.Tests;
 public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
+    public async Task InternalNotificationContractExposesEffectiveArgumentConstraints()
+    {
+        var definition = new WorkNotificationMcpToolDefinitionProvider().Definition;
+        StringAssert.Contains(definition.Description!, "notify the user");
+        StringAssert.Contains(definition.Description!, "retries");
+        StringAssert.Contains(definition.Description!, "local Agentstration paths");
+        var schema = definition.InputSchema;
+        Assert.IsFalse(schema.GetProperty("additionalProperties").GetBoolean());
+        CollectionAssert.AreEquivalent(new[] { "deliveryKey", "title", "message" },
+            schema.GetProperty("required").EnumerateArray().Select(value => value.GetString()).ToArray());
+        var properties = schema.GetProperty("properties");
+        foreach (var (name, maximum) in new[] { ("deliveryKey", 256), ("title", 200), ("message", 4000) })
+        {
+            var property = properties.GetProperty(name);
+            Assert.AreEqual(maximum, property.GetProperty("maxLength").GetInt32());
+            Assert.IsTrue(Regex.IsMatch("value", property.GetProperty("pattern").GetString()!));
+            Assert.IsFalse(Regex.IsMatch(" \t ", property.GetProperty("pattern").GetString()!));
+            Assert.IsFalse(string.IsNullOrWhiteSpace(property.GetProperty("description").GetString()));
+        }
+        StringAssert.Contains(properties.GetProperty("deliveryKey").GetProperty("description").GetString()!, "idempotency");
+        var action = properties.GetProperty("actionUrl");
+        Assert.AreEqual(2048, action.GetProperty("maxLength").GetInt32());
+        StringAssert.Contains(action.GetProperty("description").GetString()!, "local absolute");
+        var pattern = action.GetProperty("pattern").GetString()!;
+        Assert.IsTrue(Regex.IsMatch("/workplace/notifications", pattern));
+        foreach (var invalid in new[] { "", "relative/path", "https://example.com", "//example.com", "/path\\segment" })
+            Assert.IsFalse(Regex.IsMatch(invalid, pattern), invalid);
+
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var handler = factory.Services.GetRequiredService<IInternalMcpToolHandler>();
+        foreach (var invalid in new[] { "", "relative/path", "https://example.com", "//example.com", "/path\\segment" })
+        {
+            var failure = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(async () => await handler.ExecuteAsync(new(
+                context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId, "contract-call", null,
+                JsonSerializer.SerializeToElement(new { deliveryKey = "key", title = "Title", message = "Message", actionUrl = invalid }),
+                ToolDefinitionCallerKind.Agent), default));
+            Assert.AreEqual("notification_action_url_invalid", failure.Code);
+        }
+    }
+
+    [TestMethod]
     public void NotificationDeliverySamplesUseOnlyGenericFlowAndToolSteps()
     {
         var sampleRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "samples", "notification-delivery"));
@@ -41,6 +85,9 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         Assert.IsInstanceOfType<FlowCallStepDefinition>(parent.Definition.Graph!.Steps.Single(value => value.Name == "deliver"));
         Assert.AreEqual("notification-delivery", definition.Definition.Flow.Name);
         Assert.IsTrue(definition.Definition.Flow.UseActiveVersion);
+        Assert.IsTrue(ToolDefinitionService.SameSchema(definition.Definition.InputSchema, delivery.Definition.Graph.InputSchema));
+        StringAssert.Contains(definition.Definition.Description!, "retries");
+        Assert.IsTrue(definition.Definition.InputSchema.GetProperty("properties").GetProperty("actionUrl").TryGetProperty("pattern", out _));
     }
 
     [TestMethod]
@@ -57,6 +104,8 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             ownsHttpClient: false);
         await using var mcp = await McpClient.CreateAsync(transport, loggerFactory: NullLoggerFactory.Instance);
         var tool = (await mcp.ListToolsAsync()).Single(value => value.Name == AgentstrationInternalTools.NotificationCreate);
+        StringAssert.Contains(tool.Description!, "notify the user");
+        Assert.IsTrue(tool.JsonSchema.GetProperty("properties").GetProperty("actionUrl").TryGetProperty("pattern", out _));
         var arguments = new AIFunctionArguments(new Dictionary<string, object?>
         {
             ["deliveryKey"] = "daily-news-2026-09-10",
@@ -86,6 +135,9 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             new(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.NotificationCreate)), default);
         Assert.IsNotNull(projected);
         Assert.AreEqual(AgentstrationInternalTools.NotificationCreate, projected.Value.Definition.ExternalId);
+        Assert.AreEqual(tool.Description, projected.Value.Definition.Description);
+        Assert.AreEqual(tool.JsonSchema.GetProperty("properties").GetProperty("actionUrl").GetProperty("pattern").GetString(),
+            projected.Value.Definition.Schema!.Input.GetProperty("properties").GetProperty("actionUrl").GetProperty("pattern").GetString());
         var reserved = await Assert.ThrowsAsync<ToolDefinitionValidationException>(async () => await factory.Services
             .GetRequiredService<ToolDefinitionService>()
             .PutAsync(NotificationToolDefinition(
@@ -94,6 +146,38 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
                 ResourceScopeRef.Workspace(context.WorkspaceId),
                 NotificationSchemas()), null, true, default));
         Assert.AreEqual("tool_definition_name_reserved", reserved.Code);
+    }
+
+    [TestMethod]
+    public async Task InternalNotificationProjectionRefreshesContractWithoutEnablingDisabledTool()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var projection = factory.Services.GetRequiredService<InternalMcpToolProjectionService>();
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        var key = new ResourceKey(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.NotificationCreate));
+        await projection.EnsureAsync(scope, ResourceNamespace.Default, default);
+        var original = (await store.GetAsync<ToolResource>(key, default))!;
+        var stale = await store.PutAsync(original.Value with
+        {
+            Generation = original.Value.Generation + 1,
+            Definition = original.Value.Definition with
+            {
+                Enabled = false,
+                Description = "Old description",
+                Schema = new ToolSchema { Input = JsonSerializer.SerializeToElement(new { type = "object" }) }
+            }
+        }, original.ETag, false, default);
+
+        await projection.EnsureAsync(scope, ResourceNamespace.Default, default);
+
+        var refreshed = (await store.GetAsync<ToolResource>(key, default))!;
+        Assert.IsFalse(refreshed.Value.Definition.Enabled);
+        Assert.AreEqual(stale.Value.Generation + 1, refreshed.Value.Generation);
+        Assert.AreEqual(new WorkNotificationMcpToolDefinitionProvider().Definition.Description, refreshed.Value.Definition.Description);
+        Assert.IsTrue(refreshed.Value.Definition.Schema!.Input.GetProperty("properties").GetProperty("actionUrl").TryGetProperty("pattern", out _));
     }
 
     [TestMethod]
