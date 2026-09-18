@@ -14,8 +14,8 @@ public sealed class GenAiHttpPayloadCaptureHandlerTests
     [TestMethod]
     public async Task CaptureLogsRedactedJsonAndPreservesTransportBodies()
     {
-        const string requestJson = "{\"model\":\"qwen3\",\"messages\":[{\"content\":\"inspect this prompt\"}],\"api_key\":\"request-secret\"}";
-        const string responseJson = "{\"message\":{\"content\":\"answer\"},\"access_token\":\"response-secret\"}";
+        const string requestJson = "{\"model\":\"qwen3\",\"messages\":[{\"content\":\"inspect this prompt\"}],\"api_key\":\"request-secret\",\"secretAccess\":[{\"secretCapability\":\"secret-handle\"}]}";
+        const string responseJson = "{\"message\":{\"content\":\"answer\"},\"access_token\":\"response-secret\",\"secretValueBase64\":\"secret-value\"}";
         var logger = new RecordingLogger();
         var stopped = new ConcurrentQueue<Activity>();
         using var listener = new ActivityListener
@@ -62,12 +62,16 @@ public sealed class GenAiHttpPayloadCaptureHandlerTests
         StringAssert.Contains(logs, "***REDACTED***");
         Assert.IsFalse(logs.Contains("request-secret", StringComparison.Ordinal));
         Assert.IsFalse(logs.Contains("response-secret", StringComparison.Ordinal));
+        Assert.IsFalse(logs.Contains("secret-handle", StringComparison.Ordinal));
+        Assert.IsFalse(logs.Contains("secret-value", StringComparison.Ordinal));
         Assert.IsFalse(logs.Contains("query-secret", StringComparison.Ordinal));
         Assert.HasCount(1, stopped);
         var traceData = string.Join(' ', stopped.Single().Events.SelectMany(item => item.Tags).Select(tag => $"{tag.Key}={tag.Value}"));
         StringAssert.Contains(traceData, "inspect this prompt");
         Assert.IsFalse(traceData.Contains("request-secret", StringComparison.Ordinal));
         Assert.IsFalse(traceData.Contains("response-secret", StringComparison.Ordinal));
+        Assert.IsFalse(traceData.Contains("secret-handle", StringComparison.Ordinal));
+        Assert.IsFalse(traceData.Contains("secret-value", StringComparison.Ordinal));
     }
 
     [TestMethod]

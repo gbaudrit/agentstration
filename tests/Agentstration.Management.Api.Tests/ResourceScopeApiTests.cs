@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using Agentstration.Aep.Abstractions;
+using Agentstration.Aep.Client;
 using Agentstration.Agents;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
@@ -236,6 +238,43 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             Assert.IsNotNull(resolved);
             Assert.AreEqual("[REDACTED]", resolved.ToString());
         }
+
+        var identities = factory.Services.GetRequiredService<IIdentityStore>();
+        var now = factory.Services.GetRequiredService<TimeProvider>().GetUtcNow();
+        var siblingId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        var foreignWorkspaceId = Guid.NewGuid();
+        await identities.AddWorkspaceAsync(new Workspace(siblingId, tenant.TargetId!.Value,
+            "sibling", "Sibling", WorkspaceStatus.Active, now), default);
+        await identities.AddTenantAsync(new Tenant(otherTenantId, "other-tenant", "Other tenant", TenantStatus.Active, now), default);
+        await identities.AddWorkspaceAsync(new Workspace(foreignWorkspaceId, otherTenantId,
+            "foreign", "Foreign", WorkspaceStatus.Active, now), default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            foreach (var scope in new[] { ResourceScopeRef.Workspace(siblingId), ResourceScopeRef.Workspace(foreignWorkspaceId) })
+            {
+                var deniedContext = capabilityContext with
+                {
+                    Consumer = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, "ModelProvider", "consumer")
+                };
+                var denied = await Assert.ThrowsExactlyAsync<SecretCapabilityException>(() => capabilities.IssueAsync(
+                    deniedContext, new SecretBinding("credential", new SecretReference(address, tenant)),
+                    ["credential"], CancellationToken.None));
+                Assert.AreEqual("access_denied", denied.Code);
+            }
+        }
+
+        SecretCapabilityHandle apiHandle;
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+            apiHandle = await capabilities.IssueAsync(capabilityContext,
+                new SecretBinding("credential", new SecretReference(address, tenant)),
+                ["credential"], CancellationToken.None);
+        var grant = new AepSecretAccessGrant(AepProtocol.SecretAccessVersion,
+            new Uri(client.BaseAddress!, AepProtocol.SecretAccessPath), capabilityContext.ExtensionId,
+            capabilityContext.RequirementId, capabilityContext.ExecutionId, apiHandle.RevealForTransport());
+        var bytes = await new AepSecretAccessClient(client).RedeemAsync(grant);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, bytes);
+        System.Security.Cryptography.CryptographicOperations.ZeroMemory(bytes);
 
         using var revokeRequest = new HttpRequestMessage(HttpMethod.Put,
             $"/api/secrets/resolution-secret?scopeRef={Uri.EscapeDataString(tenant.Value)}")
