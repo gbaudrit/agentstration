@@ -17,18 +17,51 @@ public sealed class FoundryAepModelProvider(
             Chat: true,
             Streaming: true,
             Tools: true,
-            Thinking: false,
-            StructuredOutput: false,
+            Thinking: true,
+            StructuredOutput: true,
             Vision: false,
             ModelDiscovery: true));
 
-    public Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken) =>
-        FoundryChatCompletion.ExecuteAsync(httpClient, options, authenticator, request, cancellationToken);
+    public async Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken)
+    {
+        _ = FoundryChatCompletion.BuildRequest(request);
+        await ValidateAdvancedCapabilitiesAsync(request, cancellationToken);
+        return await FoundryChatCompletion.ExecuteAsync(httpClient, options, authenticator, request, cancellationToken);
+    }
 
     public IAsyncEnumerable<AepChatUpdate> ChatStreamingAsync(
         AepChatRequest request,
         CancellationToken cancellationToken) =>
-        FoundryChatStream.ExecuteAsync(httpClient, options, authenticator, request, cancellationToken);
+        ChatStreamingValidatedAsync(request, cancellationToken);
+
+    private async IAsyncEnumerable<AepChatUpdate> ChatStreamingValidatedAsync(
+        AepChatRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        _ = FoundryChatCompletion.BuildRequest(request, streaming: true);
+        await ValidateAdvancedCapabilitiesAsync(request, cancellationToken);
+        await foreach (var update in FoundryChatStream.ExecuteAsync(httpClient, options, authenticator, request, cancellationToken))
+            yield return update;
+    }
+
+    private async Task ValidateAdvancedCapabilitiesAsync(AepChatRequest request, CancellationToken cancellationToken)
+    {
+        var format = FoundryChatCompletion.RequestedFormat(request.Options);
+        var effort = FoundryChatCompletion.RequestedReasoningEffort(request.Options);
+        if ((format is null or "text") && effort is null) return;
+        var model = (await ListModelsAsync(cancellationToken)).SingleOrDefault(value => value.Id == request.Model);
+        if (model is null) throw new AepServerException("model_unavailable", "The Foundry deployment is not available.", 400);
+        if (format is "json_object" or "json_schema"
+            && !model.Metadata!.ContainsKey(format == "json_object" ? "jsonObject" : "jsonSchema"))
+            throw new AepServerException("unsupported_option", "The Foundry deployment does not advertise the requested output format.", 400);
+        if (effort is not null)
+        {
+            if (!model.Capabilities!.Contains("reasoning", StringComparer.Ordinal)
+                || effort != "default" && (model.Metadata is null
+                    || !model.Metadata.TryGetValue("reasoningEfforts", out var efforts)
+                    || !efforts.Split(',', StringSplitOptions.RemoveEmptyEntries).Contains(effort, StringComparer.Ordinal)))
+                throw new AepServerException("unsupported_option", "The Foundry deployment does not advertise the requested reasoning effort.", 400);
+        }
+    }
 
     public async Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default)
     {
@@ -104,6 +137,14 @@ public sealed class FoundryAepModelProvider(
                         var capabilities = new List<string> { "chat", "streaming" };
                         if (HasTrueCapability(item, "toolCalling", "tool_calls", "functionCalling"))
                             capabilities.Add("tools");
+                        if (HasTrueCapability(item, "jsonObject", "json_object")) metadata["jsonObject"] = "true";
+                        if (HasTrueCapability(item, "jsonSchema", "json_schema")) metadata["jsonSchema"] = "true";
+                        if (metadata.ContainsKey("jsonObject") || metadata.ContainsKey("jsonSchema")) capabilities.Add("structuredOutput");
+                        if (HasTrueCapability(item, "reasoning"))
+                        {
+                            capabilities.Add("reasoning");
+                            AddReasoningEfforts(item, metadata);
+                        }
                         models.Add(name, new AepModelDescriptor(name, name, capabilities, metadata));
                     }
                     if (!root.TryGetProperty("nextLink", out var nextLink) || nextLink.ValueKind == JsonValueKind.Null)
@@ -185,6 +226,17 @@ public sealed class FoundryAepModelProvider(
                 return true;
         }
         return false;
+    }
+
+    private static void AddReasoningEfforts(JsonElement item, IDictionary<string, string> metadata)
+    {
+        if (!item.TryGetProperty("capabilities", out var capabilities)
+            || !capabilities.TryGetProperty("reasoningEfforts", out var efforts)
+            || efforts.ValueKind != JsonValueKind.Array || efforts.GetArrayLength() > 8) return;
+        var allowed = new HashSet<string>(["none", "minimal", "low", "medium", "high"], StringComparer.Ordinal);
+        var values = efforts.EnumerateArray().Where(value => value.ValueKind == JsonValueKind.String)
+            .Select(value => value.GetString()!).Where(allowed.Contains).Distinct(StringComparer.Ordinal).ToArray();
+        if (values.Length > 0) metadata["reasoningEfforts"] = string.Join(',', values);
     }
 
     private static string? GetString(JsonElement item, string property) =>

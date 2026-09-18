@@ -874,6 +874,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         Assert.AreEqual(0.8f, chatClient.Options?.TopP);
         Assert.AreEqual(20, chatClient.Options?.TopK);
         Assert.IsNotNull(chatClient.Options?.ResponseFormat);
+        Assert.AreEqual(true, chatClient.Options?.AdditionalProperties?["json_schema_strict"]);
         Assert.AreEqual("medium", chatClient.Options?.AdditionalProperties?["reasoning_effort"]);
     }
 
