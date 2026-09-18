@@ -7,7 +7,7 @@ namespace Agentstration.Aep.Abstractions;
 
 public static class AepProtocol
 {
-    public const string Version = "2026-08-01";
+    public const string Version = "2026-09-18";
     public const string DiscoveryPath = "/.well-known/aep";
     public const string LegacyDiscoveryPath = "/.well-known/agentstration";
     public const string HealthPath = "/aep/health";
@@ -15,7 +15,8 @@ public static class AepProtocol
     public const string SourceProvidersPath = "/aep/source-providers";
     public const string ConfigurationPath = "/aep/configuration";
     public const string ConfigurationMigrationPath = "/aep/configuration/migrate";
-    public const string SecretRequirementsCapabilityVersion = "1.0";
+    public const string ValueRequirementsCapabilityVersion = "1.0";
+    public const string BoundValuesCapabilityVersion = "1.0";
     public const string SecretAccessVersion = "1.0";
     public const string SecretAccessPath = "/api/aep/secrets/redeem";
 
@@ -36,7 +37,8 @@ public static class AepCapabilityNames
     public const string SourceProvider = "aep.source-provider";
     public const string Tools = "aep.tools";
     public const string Configuration = "aep.configuration";
-    public const string SecretRequirements = "aep.secret-requirements";
+    public const string ValueRequirements = "aep.value-requirements";
+    public const string BoundValues = "aep.bound-values";
     public const string SecretAccess = "aep.secret-access";
 }
 
@@ -235,9 +237,119 @@ public sealed record AepManifest(
     IReadOnlyDictionary<string, AepCapabilityDescriptor> Capabilities,
     AepContributions Contributions,
     AepMcpDescriptor? Mcp = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepSecretRequirement>? SecretRequirements = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepValueRequirement>? ValueRequirements = null);
 
-public sealed record AepSecretRequirement(string Id, [property: JsonRequired] bool Required, string? Description = null);
+public enum AepValueProtection { Standard, Secured }
+public enum AepValueType { String, Integer, Number, Boolean }
+
+public sealed record AepValueRequirement(
+    string ContributionKind,
+    string ContributionId,
+    string Id,
+    [property: JsonRequired] bool Required,
+    AepValueType Type = AepValueType.String,
+    AepValueProtection Protection = AepValueProtection.Standard,
+    string? Format = null,
+    string? Description = null);
+
+public enum AepBoundValueKind { Inline, SecretGrant }
+
+public sealed record AepBoundValue(
+    string RequirementId,
+    AepBoundValueKind Kind,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? InlineValue = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AepSecretAccessGrant? SecretGrant = null)
+{
+    public static AepBoundValue Inline(string requirementId, JsonElement value) =>
+        new(requirementId, AepBoundValueKind.Inline, value.Clone());
+
+    public static AepBoundValue Secured(string requirementId, AepSecretAccessGrant grant) =>
+        new(requirementId, AepBoundValueKind.SecretGrant, SecretGrant: grant);
+
+    public override string ToString() => "[REDACTED]";
+}
+
+public sealed record AepBoundValuesRequest(
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepBoundValue>? BoundValues = null);
+
+public sealed record AepBoundValueValidationIssue(string Code, string RequirementId);
+
+public static class AepBoundValueValidator
+{
+    public const int MaximumBoundValues = 64;
+    public const int MaximumInlineValueBytes = 65_536;
+
+    public static IReadOnlyList<AepBoundValueValidationIssue> Validate(
+        IReadOnlyList<AepBoundValue>? values,
+        IReadOnlyList<AepValueRequirement>? requirements,
+        string contributionKind,
+        string contributionId,
+        bool requireAll)
+    {
+        var issues = new List<AepBoundValueValidationIssue>();
+        var applicable = (requirements ?? [])
+            .Where(value => string.Equals(value.ContributionKind, contributionKind, StringComparison.Ordinal)
+                && string.Equals(value.ContributionId, contributionId, StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(value => value.Id, StringComparer.Ordinal);
+        var supplied = values ?? [];
+        if (supplied.Count > MaximumBoundValues)
+            issues.Add(new("bound_values_too_many", string.Empty));
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var value in supplied.Take(MaximumBoundValues))
+        {
+            if (value is null || string.IsNullOrWhiteSpace(value.RequirementId))
+            {
+                issues.Add(new("bound_value_invalid", string.Empty));
+                continue;
+            }
+            if (!seen.Add(value.RequirementId))
+                issues.Add(new("bound_value_duplicate", value.RequirementId));
+            if (!applicable.TryGetValue(value.RequirementId, out var requirement))
+            {
+                issues.Add(new("bound_value_unknown", value.RequirementId));
+                continue;
+            }
+            var validVariant = value.Kind switch
+            {
+                AepBoundValueKind.Inline => value.InlineValue is not null && value.SecretGrant is null,
+                AepBoundValueKind.SecretGrant => value.InlineValue is null && value.SecretGrant is not null,
+                _ => false
+            };
+            if (!validVariant)
+            {
+                issues.Add(new("bound_value_variant_invalid", value.RequirementId));
+                continue;
+            }
+            if (value.Kind == AepBoundValueKind.Inline)
+            {
+                if (requirement.Protection == AepValueProtection.Secured)
+                    issues.Add(new("bound_value_protection_invalid", value.RequirementId));
+                else if (JsonSerializer.SerializeToUtf8Bytes(value.InlineValue!.Value, AepProtocol.JsonOptions).Length > MaximumInlineValueBytes)
+                    issues.Add(new("bound_value_too_large", value.RequirementId));
+                else if (!MatchesType(value.InlineValue.Value, requirement.Type))
+                    issues.Add(new("bound_value_type_invalid", value.RequirementId));
+            }
+            else if (!string.Equals(value.SecretGrant!.Version, AepProtocol.SecretAccessVersion, StringComparison.Ordinal)
+                || !string.Equals(value.SecretGrant.RequirementId, value.RequirementId, StringComparison.Ordinal))
+                issues.Add(new("bound_value_grant_invalid", value.RequirementId));
+        }
+        if (requireAll)
+        {
+            foreach (var requirement in applicable.Values.Where(value => value.Required && !seen.Contains(value.Id)))
+                issues.Add(new("bound_value_required", requirement.Id));
+        }
+        return issues;
+    }
+
+    private static bool MatchesType(JsonElement value, AepValueType type) => type switch
+    {
+        AepValueType.String => value.ValueKind == JsonValueKind.String,
+        AepValueType.Integer => value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out _),
+        AepValueType.Number => value.ValueKind == JsonValueKind.Number,
+        AepValueType.Boolean => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
+        _ => false
+    };
+}
 
 public sealed record AepSecretAccessGrant(
     string Version,
@@ -326,7 +438,7 @@ public sealed record AepToolContribution(
 
 public static class AepDescriptorValidator
 {
-    private static readonly SearchValues<char> SecretRequirementIdCharacters =
+    private static readonly SearchValues<char> ValueRequirementIdCharacters =
         SearchValues.Create("abcdefghijklmnopqrstuvwxyz0123456789._-");
 
     public static IReadOnlyList<string> Validate(AepManifest descriptor)
@@ -357,28 +469,37 @@ public static class AepDescriptorValidator
             else if (!sourceProviders.Add(provider.Id)) errors.Add($"Source provider contribution '{provider.Id}' is duplicated.");
             if (string.IsNullOrWhiteSpace(provider.DisplayName)) errors.Add($"Source provider contribution '{provider.Id}' displayName is required.");
         }
-        var requirements = descriptor.SecretRequirements ?? [];
-        var hasCapability = descriptor.Capabilities.TryGetValue(AepCapabilityNames.SecretRequirements, out var secretCapability);
+        var requirements = descriptor.ValueRequirements ?? [];
+        var hasCapability = descriptor.Capabilities.TryGetValue(AepCapabilityNames.ValueRequirements, out var valueCapability);
         if (requirements.Count > 0 && !hasCapability)
-            errors.Add("Secret requirements need the aep.secret-requirements capability.");
-        if (hasCapability && !string.Equals(secretCapability!.Version, AepProtocol.SecretRequirementsCapabilityVersion, StringComparison.Ordinal))
-            errors.Add($"Secret requirements capability version '{secretCapability.Version}' is not supported.");
+            errors.Add("Value requirements need the aep.value-requirements capability.");
+        if (hasCapability && !string.Equals(valueCapability!.Version, AepProtocol.ValueRequirementsCapabilityVersion, StringComparison.Ordinal))
+            errors.Add($"Value requirements capability version '{valueCapability.Version}' is not supported.");
         if (hasCapability && requirements.Count == 0)
-            errors.Add("The aep.secret-requirements capability needs at least one secret requirement.");
+            errors.Add("The aep.value-requirements capability needs at least one value requirement.");
+        if (requirements.Count > 0
+            && (!descriptor.Capabilities.TryGetValue(AepCapabilityNames.BoundValues, out var boundValuesCapability)
+                || !string.Equals(boundValuesCapability.Version, AepProtocol.BoundValuesCapabilityVersion, StringComparison.Ordinal)))
+            errors.Add("Value requirements need the aep.bound-values capability version 1.0.");
         var requirementIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var requirement in requirements)
         {
             if (requirement is null)
             {
-                errors.Add("A secret requirement cannot be null.");
+                errors.Add("A value requirement cannot be null.");
                 continue;
             }
-            if (!IsValidSecretRequirementId(requirement.Id))
-                errors.Add($"Secret requirement id '{requirement.Id}' must start with a lowercase ASCII letter and contain only lowercase letters, digits, '.', '_' or '-' (maximum 64 characters).");
-            else if (!requirementIds.Add(requirement.Id))
-                errors.Add($"Secret requirement '{requirement.Id}' is duplicated.");
+            var contributionKey = $"{requirement.ContributionKind}\n{requirement.ContributionId}\n{requirement.Id}";
+            if (!IsKnownContribution(descriptor.Contributions, requirement.ContributionKind, requirement.ContributionId))
+                errors.Add($"Value requirement '{requirement.Id}' targets unknown contribution '{requirement.ContributionKind}/{requirement.ContributionId}'.");
+            if (!IsValidValueRequirementId(requirement.Id))
+                errors.Add($"Value requirement id '{requirement.Id}' must start with a lowercase ASCII letter and contain only lowercase letters, digits, '.', '_' or '-' (maximum 64 characters).");
+            else if (!requirementIds.Add(contributionKey))
+                errors.Add($"Value requirement '{requirement.Id}' is duplicated for contribution '{requirement.ContributionKind}/{requirement.ContributionId}'.");
+            if (requirement.Format is { Length: > 64 } || requirement.Format?.Any(char.IsControl) == true)
+                errors.Add($"Value requirement '{requirement.Id}' format must contain at most 64 printable characters.");
             if (requirement.Description is { Length: > 256 } || requirement.Description?.Any(char.IsControl) == true)
-                errors.Add($"Secret requirement '{requirement.Id}' description must contain at most 256 printable characters.");
+                errors.Add($"Value requirement '{requirement.Id}' description must contain at most 256 printable characters.");
         }
         return errors;
     }
@@ -404,10 +525,18 @@ public static class AepDescriptorValidator
         return !uri.IsAbsoluteUri || uri.Scheme is "http" or "https";
     }
 
-    private static bool IsValidSecretRequirementId(string? id) =>
+    private static bool IsKnownContribution(AepContributions contributions, string kind, string id) =>
+        string.Equals(kind, AepContributionKinds.ModelProvider, StringComparison.Ordinal)
+            && contributions.ModelProviders.Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
+        || string.Equals(kind, AepContributionKinds.SourceProvider, StringComparison.Ordinal)
+            && (contributions.SourceProviders ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
+        || string.Equals(kind, AepContributionKinds.Tool, StringComparison.Ordinal)
+            && (contributions.Tools ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsValidValueRequirementId(string? id) =>
         id is { Length: >= 1 and <= 64 }
         && id[0] is >= 'a' and <= 'z'
-        && id.AsSpan(1).IndexOfAnyExcept(SecretRequirementIdCharacters) < 0;
+        && id.AsSpan(1).IndexOfAnyExcept(ValueRequirementIdCharacters) < 0;
 }
 
 public sealed record AepModelProviderDescriptor(
@@ -476,7 +605,7 @@ public sealed record AepChatRequest(
     AepModelOptions? Options = null,
     IReadOnlyList<AepToolDefinition>? Tools = null,
     IReadOnlyDictionary<string, JsonElement>? Metadata = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepSecretAccessGrant>? SecretAccess = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepBoundValue>? BoundValues = null);
 
 public sealed record AepUsage(long? InputTokens = null, long? OutputTokens = null, long? TotalTokens = null);
 

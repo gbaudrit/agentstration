@@ -11,10 +11,10 @@ namespace Agentstration.ModelProviders.Tests;
 [TestClass]
 public sealed class ExtensionSecretBindingTests
 {
-    private static readonly AepSecretRequirement[] Requirements =
+    private static readonly AepValueRequirement[] Requirements =
     [
-        new("credential", true),
-        new("proxy-auth", false)
+        new(AepContributionKinds.ModelProvider, "test", "credential", true, Protection: AepValueProtection.Secured),
+        new(AepContributionKinds.ModelProvider, "test", "proxy-auth", false)
     ];
 
     [TestMethod]
@@ -25,8 +25,8 @@ public sealed class ExtensionSecretBindingTests
         var first = new SecretBinding("credential", Reference("company-a", firstScope));
         var second = new SecretBinding("credential", Reference("company-b", secondScope));
 
-        Assert.IsEmpty(ExtensionSecretBindingValidator.Validate([first], Requirements, requireAll: true));
-        Assert.IsEmpty(ExtensionSecretBindingValidator.Validate([second], Requirements, requireAll: true));
+        Assert.IsEmpty(Validate([first], requireAll: true));
+        Assert.IsEmpty(Validate([second], requireAll: true));
 
         var profile = new ModelProfileProperties
         {
@@ -58,18 +58,27 @@ public sealed class ExtensionSecretBindingTests
     {
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
         var valid = new SecretBinding("credential", Reference("company-a", scope));
-        var issues = ExtensionSecretBindingValidator.Validate(
+        var issues = Validate(
             [valid, valid, new("other", Reference("company-b", scope)), new("proxy-auth", new(new(ResourceNamespace.Default, "Secret", "proxy")))],
-            Requirements,
             requireAll: true);
 
         Assert.IsTrue(issues.Any(value => value.Code == "secret_binding_duplicate"));
         Assert.IsTrue(issues.Any(value => value.Code == "secret_binding_unknown"));
         Assert.IsTrue(issues.Any(value => value.Code == "secret_binding_reference_invalid"));
-        Assert.IsTrue(ExtensionSecretBindingValidator.Validate([], Requirements, requireAll: true)
+        Assert.IsTrue(Validate([], requireAll: true)
             .Any(value => value.Code == "secret_binding_required"));
-        Assert.IsEmpty(ExtensionSecretBindingValidator.Validate([], Requirements, requireAll: false));
+        Assert.IsEmpty(Validate([], requireAll: false));
     }
+
+    private static IReadOnlyList<ExtensionSecretBindingIssue> Validate(
+        IReadOnlyList<SecretBinding> bindings,
+        bool requireAll) =>
+        ExtensionSecretBindingValidator.Validate(
+            bindings,
+            Requirements,
+            AepContributionKinds.ModelProvider,
+            "test",
+            requireAll);
 
     private static SecretReference Reference(string name, ResourceScopeRef scope) =>
         new(new(ResourceNamespace.Default, "Secret", name), scope);

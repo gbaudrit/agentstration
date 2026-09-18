@@ -10,15 +10,15 @@ public sealed class AepChatClient(
     AepModelProviderClient provider,
     string model,
     AepVersionedOptions? nativeOptions = null,
-    Func<CancellationToken, Task<AepSecretAccessLease>>? secretAccess = null) : IChatClient
+    Func<CancellationToken, Task<AepBoundValuesLease>>? boundValues = null) : IChatClient
 {
     public async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        using var lease = secretAccess is null ? null : await secretAccess(cancellationToken);
-        var request = MapRequest(messages, options) with { SecretAccess = lease?.Grants };
+        using var lease = boundValues is null ? null : await boundValues(cancellationToken);
+        var request = MapRequest(messages, options) with { BoundValues = lease?.Values };
         var response = await provider.ChatAsync(request, cancellationToken);
         var result = new ChatResponse(response.Messages.Select(MapMessage).ToList())
         {
@@ -42,8 +42,8 @@ public sealed class AepChatClient(
         ChatOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        using var lease = secretAccess is null ? null : await secretAccess(cancellationToken);
-        var request = MapRequest(messages, options) with { SecretAccess = lease?.Grants };
+        using var lease = boundValues is null ? null : await boundValues(cancellationToken);
+        var request = MapRequest(messages, options) with { BoundValues = lease?.Values };
         await foreach (var update in provider.ChatStreamingAsync(request, cancellationToken).WithCancellation(cancellationToken))
         {
             var mapped = new ChatResponseUpdate(MapRole(update.Role), MapContents(update.Contents))
@@ -182,8 +182,8 @@ public sealed class AepChatClient(
     };
 }
 
-public sealed class AepSecretAccessLease(IReadOnlyList<AepSecretAccessGrant> grants, Action revoke) : IDisposable
+public sealed class AepBoundValuesLease(IReadOnlyList<AepBoundValue> values, Action revoke) : IDisposable
 {
-    public IReadOnlyList<AepSecretAccessGrant> Grants { get; } = grants;
+    public IReadOnlyList<AepBoundValue> Values { get; } = values;
     public void Dispose() => revoke();
 }
