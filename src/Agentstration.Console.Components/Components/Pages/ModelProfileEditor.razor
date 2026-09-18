@@ -147,6 +147,7 @@ else
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
     [SupplyParameterFromQuery(Name = "provider")] public string? SuggestedProvider { get; set; }
     [SupplyParameterFromQuery(Name = "providerNamespace")] public string? SuggestedProviderNamespace { get; set; }
+    [SupplyParameterFromQuery(Name = "model")] public string? SuggestedModel { get; set; }
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string AgentCount(int count) => T(count == 1 ? "AgentCount.One" : "AgentCount.Many", count);
     private readonly CancellationTokenSource cancellation = new();
@@ -182,7 +183,8 @@ else
                 {
                     Namespace = SelectedNamespace.Value,
                     ProviderName = SuggestedProvider ?? string.Empty,
-                    ProviderNamespace = SuggestedProviderNamespace ?? SelectedNamespace.Value
+                    ProviderNamespace = SuggestedProviderNamespace ?? SelectedNamespace.Value,
+                    ModelName = SuggestedModel ?? string.Empty
                 };
             }
             else

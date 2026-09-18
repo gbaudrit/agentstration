@@ -7,6 +7,7 @@ TestResults/
 artifacts/
 .models/
 deploy/compose/.env.postgresql
+deploy/compose/.env.foundry
 .agentstration*/
 *.user
 *.suo

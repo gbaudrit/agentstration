@@ -43,6 +43,8 @@
   <data name="NoModelsDiscovered"><value>Aucun modèle découvert</value></data>
   <data name="NoModelsMessage"><value>Testez le point de terminaison et vérifiez qu’un modèle est disponible chez le fournisseur.</value></data>
   <data name="Model"><value>Modèle</value></data>
+  <data name="Actions"><value>Actions</value></data>
+  <data name="CreateProfileForModel"><value>Créer un profil</value></data>
   <data name="Status"><value>État</value></data>
   <data name="Capabilities"><value>Capacités</value></data>
   <data name="Parameters"><value>Paramètres</value></data>
