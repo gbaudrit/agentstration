@@ -16,7 +16,7 @@ internal static class FoundryChatStream
 
     public static async IAsyncEnumerable<AepChatUpdate> ExecuteAsync(
         HttpClient client, FoundryExtensionOptions options, FoundryRequestAuthenticator authenticator,
-        AepChatRequest chat, [EnumeratorCancellation] CancellationToken cancellationToken)
+        AepChatRequest chat, FoundryDiagnostics diagnostics, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var body = FoundryChatCompletion.BuildRequest(chat, streaming: true);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(body, AepProtocol.JsonOptions);
@@ -41,11 +41,20 @@ internal static class FoundryChatStream
         { throw new AepServerException("provider_unavailable", "Foundry chat stream is unavailable.", innerException: exception); }
         using (response)
         {
+            diagnostics.SetStatus(response.StatusCode);
             if (!response.IsSuccessStatusCode) throw await FoundryChatCompletion.FailureAsync(response, timeout.Token);
             if (!string.Equals(response.Content.Headers.ContentType?.MediaType, "text/event-stream", StringComparison.OrdinalIgnoreCase))
                 throw FoundryChatCompletion.InvalidResponse("Foundry chat returned a non-streaming response.");
             var state = new StreamState(chat.Model, chat.Tools);
-            await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
+            Stream stream;
+            try { stream = await response.Content.ReadAsStreamAsync(timeout.Token); }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            { throw new AepServerException("provider_timeout", "Foundry chat stream timed out."); }
+            catch (IOException exception)
+            { throw new AepServerException("provider_unavailable", "Foundry chat stream was interrupted.", innerException: exception); }
+            catch (HttpRequestException exception)
+            { throw new AepServerException("provider_unavailable", "Foundry chat stream was interrupted.", innerException: exception); }
+            await using (stream)
             await foreach (var data in ReadEventsAsync(stream, timeout.Token))
             {
                 if (data == "[DONE]")
@@ -80,6 +89,8 @@ internal static class FoundryChatStream
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             { throw new AepServerException("provider_timeout", "Foundry chat stream timed out."); }
             catch (IOException exception)
+            { throw new AepServerException("provider_unavailable", "Foundry chat stream was interrupted.", innerException: exception); }
+            catch (HttpRequestException exception)
             { throw new AepServerException("provider_unavailable", "Foundry chat stream was interrupted.", innerException: exception); }
             if (read == 0) break;
             total += read;

@@ -2,14 +2,18 @@ using System.Net;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Agentstration.Extensions.Foundry;
 
 public sealed class FoundryAepModelProvider(
     HttpClient httpClient,
     FoundryExtensionOptions options,
-    FoundryRequestAuthenticator authenticator) : IAepModelProvider
+    FoundryRequestAuthenticator authenticator,
+    ILogger<FoundryAepModelProvider>? logger = null) : IAepModelProvider
 {
+    private readonly ILogger diagnosticsLogger = logger ?? NullLogger<FoundryAepModelProvider>.Instance;
     public AepModelProviderDescriptor Descriptor { get; } = new(
         "microsoft-foundry",
         "Microsoft Foundry",
@@ -24,9 +28,18 @@ public sealed class FoundryAepModelProvider(
 
     public async Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken)
     {
-        _ = FoundryChatCompletion.BuildRequest(request);
-        await ValidateAdvancedCapabilitiesAsync(request, cancellationToken);
-        return await FoundryChatCompletion.ExecuteAsync(httpClient, options, authenticator, request, cancellationToken);
+        using var diagnostics = new FoundryDiagnostics(diagnosticsLogger, "chat", request?.Model);
+        try
+        {
+            _ = FoundryChatCompletion.BuildRequest(request!);
+            await ValidateAdvancedCapabilitiesAsync(request!, cancellationToken);
+            var response = await FoundryChatCompletion.ExecuteAsync(httpClient, options, authenticator, request!, diagnostics, cancellationToken);
+            diagnostics.SetUsage(response.Usage);
+            diagnostics.Complete("success");
+            return response;
+        }
+        catch (AepServerException exception) { diagnostics.Complete(exception.Code); throw; }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { diagnostics.Complete("cancelled"); throw; }
     }
 
     public IAsyncEnumerable<AepChatUpdate> ChatStreamingAsync(
@@ -37,10 +50,25 @@ public sealed class FoundryAepModelProvider(
     private async IAsyncEnumerable<AepChatUpdate> ChatStreamingValidatedAsync(
         AepChatRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        _ = FoundryChatCompletion.BuildRequest(request, streaming: true);
-        await ValidateAdvancedCapabilitiesAsync(request, cancellationToken);
-        await foreach (var update in FoundryChatStream.ExecuteAsync(httpClient, options, authenticator, request, cancellationToken))
+        using var diagnostics = new FoundryDiagnostics(diagnosticsLogger, "chat_stream", request?.Model);
+        _ = FoundryChatCompletion.BuildRequest(request!, streaming: true);
+        await ValidateAdvancedCapabilitiesAsync(request!, cancellationToken);
+        await using var updates = FoundryChatStream.ExecuteAsync(httpClient, options, authenticator, request!, diagnostics, cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+        while (true)
+        {
+            AepChatUpdate update;
+            try
+            {
+                if (!await updates.MoveNextAsync()) break;
+                update = updates.Current;
+            }
+            catch (AepServerException exception) { diagnostics.Complete(exception.Code); throw; }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { diagnostics.Complete("cancelled"); throw; }
+            diagnostics.SetUsage(update.Usage);
             yield return update;
+        }
+        diagnostics.Complete("success");
     }
 
     private async Task ValidateAdvancedCapabilitiesAsync(AepChatRequest request, CancellationToken cancellationToken)
@@ -65,6 +93,19 @@ public sealed class FoundryAepModelProvider(
 
     public async Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default)
     {
+        using var diagnostics = new FoundryDiagnostics(diagnosticsLogger, "discovery", null);
+        try
+        {
+            var result = await ListModelsCoreAsync(diagnostics, cancellationToken);
+            diagnostics.Complete("success");
+            return result;
+        }
+        catch (AepServerException exception) { diagnostics.Complete(exception.Code); throw; }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { diagnostics.Complete("cancelled"); throw; }
+    }
+
+    private async Task<IReadOnlyList<AepModelDescriptor>> ListModelsCoreAsync(FoundryDiagnostics diagnostics, CancellationToken cancellationToken)
+    {
         var models = new Dictionary<string, AepModelDescriptor>(StringComparer.Ordinal);
         var current = options.DeploymentsEndpoint();
         var visited = new HashSet<string>(StringComparer.Ordinal);
@@ -76,14 +117,12 @@ public sealed class FoundryAepModelProvider(
             if (!visited.Add(current.AbsoluteUri))
                 throw new AepServerException("discovery_invalid", "Foundry deployment pagination contains a cycle.");
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, current);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(options.RequestTimeout);
             HttpResponseMessage response;
             try
             {
-                await authenticator.ApplyAsync(request, timeout.Token);
-                response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+                response = await SendDiscoveryPageAsync(current, diagnostics, timeout.Token);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -95,6 +134,7 @@ public sealed class FoundryAepModelProvider(
             }
             using (response)
             {
+                diagnostics.SetStatus(response.StatusCode);
                 EnsureSuccess(response);
                 if (!string.Equals(response.Content.Headers.ContentType?.MediaType, "application/json", StringComparison.OrdinalIgnoreCase))
                     throw new AepServerException("discovery_invalid", "Foundry deployment discovery requires a JSON response.");
@@ -107,6 +147,10 @@ public sealed class FoundryAepModelProvider(
                 catch (HttpRequestException exception)
                 {
                     throw new AepServerException("provider_unavailable", "Foundry deployment discovery is unavailable.", innerException: exception);
+                }
+                catch (IOException exception)
+                {
+                    throw new AepServerException("provider_unavailable", "Foundry deployment discovery was interrupted.", innerException: exception);
                 }
                 JsonDocument document;
                 try { document = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 32 }); }
@@ -155,6 +199,36 @@ public sealed class FoundryAepModelProvider(
                     current = next;
                 }
             }
+        }
+    }
+
+    private async Task<HttpResponseMessage> SendDiscoveryPageAsync(Uri endpoint, FoundryDiagnostics diagnostics, CancellationToken cancellationToken)
+    {
+        // Discovery is a read-only request. A chat POST, including a stream, is never replayed.
+        for (var attempt = 0; ; attempt++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
+            await authenticator.ApplyAsync(request, cancellationToken);
+            HttpResponseMessage response;
+            try
+            {
+                response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            }
+            catch (HttpRequestException) when (attempt == 0)
+            {
+                diagnostics.Retried();
+                await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
+                continue;
+            }
+            if (attempt > 0 || response.StatusCode is not (HttpStatusCode.TooManyRequests
+                or HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout))
+                return response;
+            var delay = response.Headers.RetryAfter?.Delta;
+            diagnostics.SetStatus(response.StatusCode);
+            diagnostics.Retried();
+            response.Dispose();
+            await Task.Delay(delay is { } retryAfter && retryAfter >= TimeSpan.Zero && retryAfter <= TimeSpan.FromMilliseconds(500)
+                ? retryAfter : TimeSpan.FromMilliseconds(100), cancellationToken);
         }
     }
 
@@ -207,6 +281,7 @@ public sealed class FoundryAepModelProvider(
             HttpStatusCode.Forbidden => "authorization_failed",
             HttpStatusCode.TooManyRequests => "rate_limited",
             HttpStatusCode.NotFound => "project_unavailable",
+            HttpStatusCode.RequestTimeout or HttpStatusCode.GatewayTimeout => "provider_timeout",
             _ => "provider_unavailable"
         };
         throw new AepServerException(code, $"Foundry deployment discovery returned HTTP {(int)response.StatusCode}.");
