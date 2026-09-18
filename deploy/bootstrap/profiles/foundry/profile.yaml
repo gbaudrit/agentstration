@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: foundry
+definition:
+  displayName: Microsoft Foundry model provider
+  description: Binds the optional Foundry extension for one tenant. Select a discovered deployment in a Model Profile afterward.
+  targetScope: tenant

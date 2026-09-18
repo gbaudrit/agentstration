@@ -1,0 +1,9 @@
+apiVersion: agentstration.io/v1
+kind: ModelProvider
+metadata:
+  name: foundry
+definition:
+  displayName: Microsoft Foundry
+  extension:
+    name: foundry-extension
+  contributionId: microsoft-foundry

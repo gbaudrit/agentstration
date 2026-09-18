@@ -43,6 +43,8 @@
   <data name="NoModelsDiscovered"><value>No models discovered</value></data>
   <data name="NoModelsMessage"><value>Test the endpoint and verify that the provider has a model available.</value></data>
   <data name="Model"><value>Model</value></data>
+  <data name="Actions"><value>Actions</value></data>
+  <data name="CreateProfileForModel"><value>Create profile</value></data>
   <data name="Status"><value>Status</value></data>
   <data name="Capabilities"><value>Capabilities</value></data>
   <data name="Parameters"><value>Parameters</value></data>

@@ -33,6 +33,10 @@ public sealed class ModelProviderNavigationTests
             Assert.AreEqual(
                 "/modelprofiles/new?namespace=shared.models&provider=ollama%2Flocal&providerNamespace=shared.models",
                 link.GetAttribute("href"));
+            var discoveredModelLink = rendered.Find("[data-testid='create-profile-for-model']");
+            Assert.AreEqual(
+                "/modelprofiles/new?namespace=shared.models&provider=ollama%2Flocal&providerNamespace=shared.models&model=qwen3",
+                discoveredModelLink.GetAttribute("href"));
         });
     }
 
@@ -54,6 +58,25 @@ public sealed class ModelProviderNavigationTests
             var provider = rendered.FindAll("select").Single(element =>
                 element.QuerySelector("option[value='shared.models:ollama/local']") is not null);
             Assert.AreEqual("shared.models:ollama/local", provider.GetAttribute("value"));
+        });
+    }
+
+    [TestMethod]
+    public void NewModelProfilePreselectsDiscoveredDeployment()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = CreateContext(out var providers);
+        context.Services.AddSingleton<IModelProfilesClient>(new StubModelProfilesClient());
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelprofiles/new?namespace=shared.models&provider=ollama%2Flocal&providerNamespace=shared.models&model=qwen3");
+
+        var rendered = context.Render<ModelProfileEditor>();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("ollama/local", providers.RequestedModelProvider);
+            Assert.AreEqual("qwen3", rendered.Find("[data-testid='model-profile-model']").GetAttribute("value"));
+            Assert.IsTrue(rendered.Find("[data-testid='model-profile-model']").TextContent.Contains("Qwen 3", StringComparison.Ordinal));
         });
     }
 
