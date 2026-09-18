@@ -37,6 +37,7 @@ public sealed class AepExtensionOptions
     public IList<AepMcpServerDescriptor> McpServers { get; } = [];
     public IList<AepToolContribution> Tools { get; } = [];
     public IList<AepOptionSetDescriptor> OptionSets { get; } = [];
+    public IList<AepSecretRequirement> SecretRequirements { get; } = [];
     public AepSourceMaterializationLimits SourceMaterializationLimits { get; set; } = new(
         MaxArchiveBytes: 64 * 1024 * 1024,
         MaxEntries: 10_000,
@@ -190,12 +191,15 @@ public static class AepServerExtensions
         if (sources.Length > 0) capabilities[AepCapabilityNames.SourceProvider] = new("1.0", AepProtocol.SourceProvidersPath);
         if (options.Tools.Count > 0) capabilities[AepCapabilityNames.Tools] = new("1.0");
         if (options.OptionSets.Count > 0) capabilities[AepCapabilityNames.Configuration] = new("1.0", AepProtocol.ConfigurationPath);
+        if (options.SecretRequirements.Count > 0)
+            capabilities[AepCapabilityNames.SecretRequirements] = new(AepProtocol.SecretRequirementsCapabilityVersion);
         var descriptor = new AepManifest(
             AepProtocol.Version,
             options.Extension,
             capabilities,
             new AepContributions(modelProviders, options.Tools.ToArray(), sources),
-            options.McpServers.Count == 0 ? null : new AepMcpDescriptor(options.McpServers.ToArray()));
+            options.McpServers.Count == 0 ? null : new AepMcpDescriptor(options.McpServers.ToArray()),
+            options.SecretRequirements.Count == 0 ? null : options.SecretRequirements.ToArray());
         var errors = AepDescriptorValidator.Validate(descriptor);
         if (errors.Count > 0) throw new InvalidOperationException($"The AEP extension descriptor is invalid: {string.Join(" ", errors)}");
         return descriptor;

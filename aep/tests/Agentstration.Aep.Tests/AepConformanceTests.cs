@@ -37,7 +37,81 @@ public sealed class AepConformanceTests
         Assert.AreEqual(AepProtocol.Version, manifest.ProtocolVersion);
         Assert.AreEqual("sample.hello", manifest.Extension.Id);
         Assert.AreEqual("1.0", capabilities[AepCapabilityNames.Health].Version);
+        Assert.IsNull(manifest.SecretRequirements);
+        Assert.IsFalse(capabilities.ContainsKey(AepCapabilityNames.SecretRequirements));
+        Assert.IsFalse((await httpClient.GetStringAsync(AepProtocol.DiscoveryPath)).Contains("secretRequirements", StringComparison.Ordinal));
         Assert.AreEqual("available", health.Status);
+    }
+
+    [TestMethod]
+    public async Task SecretRequirementsRoundTripThroughVersionedDiscovery()
+    {
+        await using var factory = new WebApplicationFactory<global::Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+                services.Configure<AepExtensionOptions>(options =>
+                {
+                    options.SecretRequirements.Add(new("credential", true, "API credential for this extension."));
+                    options.SecretRequirements.Add(new("proxy-auth", false));
+                })));
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+
+        var manifest = await client.GetManifestAsync();
+        var validation = await new AepValidator().ValidateAsync(client);
+        var json = await httpClient.GetStringAsync(AepProtocol.DiscoveryPath);
+
+        Assert.IsTrue(validation.IsValid);
+        Assert.AreEqual(AepProtocol.SecretRequirementsCapabilityVersion,
+            manifest.Capabilities[AepCapabilityNames.SecretRequirements].Version);
+        Assert.IsNotNull(manifest.SecretRequirements);
+        Assert.HasCount(2, manifest.SecretRequirements);
+        Assert.AreEqual(new AepSecretRequirement("credential", true, "API credential for this extension."), manifest.SecretRequirements[0]);
+        Assert.AreEqual(new AepSecretRequirement("proxy-auth", false), manifest.SecretRequirements[1]);
+        StringAssert.Contains(json, "\"secretRequirements\"");
+        Assert.IsFalse(json.Contains("secretReference", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(json.Contains("scopeRef", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(json.Contains("vault", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public void SecretRequirementsRejectInvalidAndDuplicateIdentifiers()
+    {
+        var manifest = new AepManifest(
+            AepProtocol.Version,
+            new("sample", "Sample", "1.0.0"),
+            new Dictionary<string, AepCapabilityDescriptor>
+            {
+                [AepCapabilityNames.SecretRequirements] = new(AepProtocol.SecretRequirementsCapabilityVersion)
+            },
+            new([]),
+            SecretRequirements: [new("credential", true), new("proxy-auth", false)]);
+        Assert.IsEmpty(AepDescriptorValidator.Validate(manifest));
+
+        var invalid = manifest with { SecretRequirements = [new("credential", true), new("credential", false), new("../key", true)] };
+        var errors = AepDescriptorValidator.Validate(invalid);
+        Assert.IsTrue(errors.Any(value => value.Contains("duplicated", StringComparison.Ordinal)));
+        Assert.IsTrue(errors.Any(value => value.Contains("../key", StringComparison.Ordinal)));
+        Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
+        {
+            SecretRequirements = [new("Credential", true), new(new string('a', 65), false)]
+        }).Count >= 2);
+        Assert.ThrowsExactly<JsonException>(() => JsonSerializer.Deserialize<AepSecretRequirement>(
+            """{"id":"credential"}""", AepProtocol.JsonOptions));
+        Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
+        {
+            Capabilities = new Dictionary<string, AepCapabilityDescriptor>()
+        }).Any(value => value.Contains("capability", StringComparison.Ordinal)));
+        Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
+        {
+            SecretRequirements = []
+        }).Any(value => value.Contains("at least one", StringComparison.Ordinal)));
+        Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
+        {
+            Capabilities = new Dictionary<string, AepCapabilityDescriptor>
+            {
+                [AepCapabilityNames.SecretRequirements] = new("2.0")
+            }
+        }).Any(value => value.Contains("not supported", StringComparison.Ordinal)));
     }
 
     [TestMethod]
