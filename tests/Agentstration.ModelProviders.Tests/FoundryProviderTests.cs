@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using Azure.Core;
 using Agentstration.Aep.Abstractions;
@@ -12,6 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.ModelProviders.Tests;
 
@@ -77,8 +79,25 @@ public sealed class FoundryProviderTests
 
         var projectOptions = options with { InferenceEndpoint = new Uri("https://foundry.example/api/projects/demo/openai/v1") };
         using var projectInference = new HttpRequestMessage(HttpMethod.Post, new Uri("https://foundry.example/api/projects/demo/openai/v1/chat/completions"));
-        await authenticator.ApplyInferenceAsync(projectInference, projectOptions, default);
+        await new FoundryRequestAuthenticator(projectOptions, tokenCredential: credential).ApplyInferenceAsync(projectInference, projectOptions, default);
         Assert.AreEqual("https://ai.azure.com/.default", credential.LastScope);
+    }
+
+    [TestMethod]
+    public async Task AuthenticationRejectsUnconfiguredTargetsBeforeAcquiringCredentials()
+    {
+        var options = Options() with { AuthenticationMode = FoundryAuthenticationMode.Development };
+        var credential = new RecordingCredential();
+        var authenticator = new FoundryRequestAuthenticator(options, tokenCredential: credential);
+        using var foreign = new HttpRequestMessage(HttpMethod.Get, "https://attacker.example/api/projects/demo/deployments");
+        Assert.AreEqual("provider_target_invalid", (await Assert.ThrowsAsync<AepServerException>(
+            () => authenticator.ApplyAsync(foreign, default))).Code);
+        using var wrongPath = new HttpRequestMessage(HttpMethod.Post, "https://foundry.example/openai/v1/other");
+        Assert.AreEqual("provider_target_invalid", (await Assert.ThrowsAsync<AepServerException>(
+            () => authenticator.ApplyInferenceAsync(wrongPath, options, default))).Code);
+        Assert.IsNull(credential.LastScope);
+        Assert.IsNull(foreign.Headers.Authorization);
+        Assert.IsNull(wrongPath.Headers.Authorization);
     }
 
     [TestMethod]
@@ -267,15 +286,90 @@ public sealed class FoundryProviderTests
     }
 
     [TestMethod]
+    public async Task DiscoveryRetriesOneTransientPageButNeverReplaysAuthenticationFailure()
+    {
+        await WithEnvironmentKeyAsync(async authenticator =>
+        {
+            var calls = 0;
+            var logger = new RecordingLogger();
+            using var client = Client((_, _) => Task.FromResult(++calls == 1
+                ? Json(HttpStatusCode.ServiceUnavailable, "sensitive-provider-body")
+                : Json(HttpStatusCode.OK, """{"value":[]}""")));
+            var models = await new FoundryAepModelProvider(client, Options(), authenticator, logger).ListModelsAsync();
+            Assert.IsEmpty(models);
+            Assert.AreEqual(2, calls);
+            StringAssert.Contains(logger.Messages.Single(), "retries 1");
+            StringAssert.Contains(logger.Messages.Single(), "HTTP 200");
+            Assert.IsFalse(logger.Messages.Single().Contains("sensitive-provider-body", StringComparison.Ordinal));
+        });
+        await WithEnvironmentKeyAsync(async authenticator =>
+        {
+            var calls = 0;
+            using var client = Client((_, _) => { calls++; return Task.FromResult(Json(HttpStatusCode.Unauthorized, "secret")); });
+            var exception = await Assert.ThrowsAsync<AepServerException>(() =>
+                new FoundryAepModelProvider(client, Options(), authenticator).ListModelsAsync());
+            Assert.AreEqual("authentication_failed", exception.Code);
+            Assert.AreEqual(1, calls);
+        });
+    }
+
+    [TestMethod]
+    public async Task InterruptedDiscoveryBodyReturnsStableSafeFailure()
+    {
+        await WithEnvironmentKeyAsync(async authenticator =>
+        {
+            using var client = Client((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StreamContent(new InterruptedBody())
+                {
+                    Headers = { ContentType = new MediaTypeHeaderValue("application/json") }
+                }
+            }));
+            var exception = await Assert.ThrowsAsync<AepServerException>(() =>
+                new FoundryAepModelProvider(client, Options(), authenticator).ListModelsAsync());
+            Assert.AreEqual("provider_unavailable", exception.Code);
+            Assert.IsFalse(exception.Message.Contains("sensitive-provider-body", StringComparison.Ordinal));
+        });
+    }
+
+    [TestMethod]
+    public async Task ChatDiagnosticsContainUsageButNoPromptOrProviderBody()
+    {
+        await WithEnvironmentKeyAsync(async authenticator =>
+        {
+            var logger = new RecordingLogger();
+            using var client = Client((_, _) => Task.FromResult(Json(HttpStatusCode.OK, """
+                {"choices":[{"message":{"role":"assistant","content":"sensitive-provider-body"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":3,"total_tokens":5}}
+                """)));
+            var provider = new FoundryAepModelProvider(client, Options(), authenticator, logger);
+            var request = new AepChatRequest("deployment", [new AepMessage(AepRole.User, [AepContent.FromText("sensitive-prompt")])]);
+            _ = await provider.ChatAsync(request, default);
+            var message = logger.Messages.Single();
+            StringAssert.Contains(message, "deployment");
+            StringAssert.Contains(message, "input tokens 2");
+            StringAssert.Contains(message, "output tokens 3");
+            Assert.IsFalse(message.Contains("sensitive-prompt", StringComparison.Ordinal));
+            Assert.IsFalse(message.Contains("sensitive-provider-body", StringComparison.Ordinal));
+        });
+    }
+
+    [TestMethod]
     public void NetworkPolicyRejectsMetadataAndRequiresExplicitPrivateHost()
     {
         var options = Options();
+        using var transport = (SocketsHttpHandler)FoundrySecureTransport.Create(options);
+        Assert.IsFalse(transport.AllowAutoRedirect);
+        Assert.IsFalse(transport.UseProxy);
         Assert.IsFalse(FoundrySecureTransport.IsAddressAllowed(IPAddress.Parse("169.254.169.254"), "foundry.example", options));
+        Assert.IsFalse(FoundrySecureTransport.IsAddressAllowed(IPAddress.Parse("0.1.2.3"), "foundry.example", options));
         Assert.IsFalse(FoundrySecureTransport.IsAddressAllowed(IPAddress.Parse("10.0.0.5"), "foundry.example", options));
+        Assert.IsFalse(FoundrySecureTransport.IsAddressAllowed(IPAddress.Parse("100.64.0.1"), "foundry.example", options));
         Assert.IsTrue(FoundrySecureTransport.IsAddressAllowed(IPAddress.Parse("20.1.2.3"), "foundry.example", options));
         options = options with { AllowedPrivateHosts = new HashSet<string>(["foundry.example"], StringComparer.OrdinalIgnoreCase) };
         Assert.IsTrue(FoundrySecureTransport.IsAddressAllowed(IPAddress.Parse("10.0.0.5"), "foundry.example", options));
+        Assert.IsTrue(FoundrySecureTransport.IsAddressAllowed(IPAddress.Parse("100.64.0.1"), "foundry.example", options));
         Assert.IsFalse(FoundrySecureTransport.IsAddressAllowed(IPAddress.Parse("169.254.169.254"), "foundry.example", options));
+        Assert.IsFalse(FoundrySecureTransport.IsAddressAllowed(IPAddress.Parse("::ffff:169.254.169.254"), "foundry.example", options));
     }
 
     [TestMethod]
@@ -376,5 +470,20 @@ public sealed class FoundryProviderTests
 
         public override ValueTask<AccessToken> GetTokenAsync(TokenRequestContext requestContext, CancellationToken cancellationToken) =>
             ValueTask.FromResult(GetToken(requestContext, cancellationToken));
+    }
+
+    private sealed class RecordingLogger : ILogger<FoundryAepModelProvider>
+    {
+        public List<string> Messages { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Messages.Add(formatter(state, exception));
+    }
+
+    private sealed class InterruptedBody : MemoryStream
+    {
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            ValueTask.FromException<int>(new IOException("sensitive-provider-body"));
     }
 }
