@@ -487,13 +487,13 @@ else
         FlowStepDefinition step = type switch
         {
             "input" => new InputFlowStepDefinition { Name = name, DisplayName = "Input" },
-            "agent" => new AgentFlowStepDefinition { Name = name, DisplayName = defaultAgent?.DisplayName ?? T("Step.agent"), Agent = defaultAgent is null ? new(UnconfiguredAgent) : AgentReference(defaultAgent) },
-            "flow" => new FlowCallStepDefinition { Name = name, DisplayName = "Flow", Flow = DefaultFlowReference(), InputMapping = JsonSerializer.SerializeToElement(new { }) },
+            "agent" => new AgentFlowStepDefinition { Name = name, DisplayName = defaultAgent?.DisplayName ?? T("Step.agent"), Agent = defaultAgent is null ? new(UnconfiguredAgent) : AgentReference(defaultAgent), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
+            "flow" => new FlowCallStepDefinition { Name = name, DisplayName = "Flow", Flow = DefaultFlowReference(), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             "tool" => new ToolFlowStepDefinition { Name = name, DisplayName = T("Step.tool"), Tool = DefaultToolReference(), ArgumentsMapping = JsonSerializer.SerializeToElement(new { }) },
             "router" => new RouterFlowStepDefinition { Name = name, DisplayName = "Router" },
             "condition" => new ConditionFlowStepDefinition { Name = name, DisplayName = "Condition", Left = "${input.prompt}", Right = "" },
             "transform" => new TransformFlowStepDefinition { Name = name, DisplayName = "Transform", Mapping = JsonSerializer.SerializeToElement(new { }) },
-            "output" => new OutputFlowStepDefinition { Name = name, DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${input}") },
+            "output" => new OutputFlowStepDefinition { Name = name, DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             _ => new FailureFlowStepDefinition { Name = name, DisplayName = "Failure" }
         };
         if (step is FlowCallStepDefinition flowCall) await LoadFlowVersionsAsync(flowCall.Flow);

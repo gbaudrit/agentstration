@@ -55,7 +55,9 @@ public sealed partial class FlowRunService
                     break;
                 case AgentFlowStepDefinition agent:
                     var agentId = await ResolveStringAsync(agent.Agent.ResourceId, context, runToken) ?? throw new FlowValidationException("agent_reference_unresolved", $"Agent reference for step '{step.Name}' could not be resolved.");
-                    var resolvedInput = agent.InputMapping is null ? stored.Value.Input.Clone() : await ResolveJsonAsync(agent.InputMapping.Value, context, runToken);
+                    var resolvedInput = agent.InputMapping is null
+                        ? transitionOutput?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
+                        : await ResolveJsonAsync(agent.InputMapping.Value, context, runToken);
                     try
                     {
                         agentResult = await agents.ExecuteAsync(new FlowTargetReference(FlowTargetKind.Agent, agentId, Namespace: agent.Agent.Namespace ?? stored.Value.FlowId.Namespace), resolvedInput, stored.Value.CorrelationId!, runToken);
@@ -103,7 +105,7 @@ public sealed partial class FlowRunService
                     break;
                 case FlowCallStepDefinition flowCall:
                     var callInput = flowCall.InputMapping is null
-                        ? stored.Value.Input.Clone()
+                        ? transitionOutput?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
                         : await ResolveJsonAsync(flowCall.InputMapping.Value, context, runToken);
                     var stepRun = stored.Value.Steps.Single(item => item.StepName == step.Name);
                     var childRunId = stepRun.ChildFlowRunId ?? ChildFlowRunId(stored.Value, step.Name, stepRun.Attempt);
@@ -139,7 +141,9 @@ public sealed partial class FlowRunService
                     }
                     break;
                 case OutputFlowStepDefinition terminal:
-                    output = terminal.OutputMapping is null ? outputs.Values.LastOrDefault(value => value is not null)?.Clone() : await ResolveJsonAsync(terminal.OutputMapping.Value, context, runToken);
+                    output = terminal.OutputMapping is null
+                        ? transitionOutput?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
+                        : await ResolveJsonAsync(terminal.OutputMapping.Value, context, runToken);
                     finalOutput = output; eventName = "completed"; break;
                 case FailureFlowStepDefinition failure:
                     throw new FlowValidationException(failure.Code, failure.Message);
