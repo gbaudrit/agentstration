@@ -71,7 +71,8 @@ internal static class FoundryChatCompletion
             var names = new HashSet<string>(StringComparer.Ordinal);
             foreach (var tool in declaredTools)
                 if (string.IsNullOrWhiteSpace(tool.Name) || tool.Name.Length > 128 || !names.Add(tool.Name)
-                    || tool.Description is { Length: > 1024 } || tool.Parameters.ValueKind != JsonValueKind.Object)
+                    || tool.Description is { Length: > 1024 } || tool.Parameters.ValueKind != JsonValueKind.Object
+                    || tool.Parameters.GetRawText().Length > 65536)
                     throw Invalid("Foundry chat tool definition is invalid.");
         }
         if (chat.Metadata is { Count: > 0 }) throw Unsupported("Chat metadata is not supported by Foundry chat yet.");
@@ -157,15 +158,13 @@ internal static class FoundryChatCompletion
     private static void ApplyOptions(JsonObject body, AepModelOptions? options)
     {
         if (options is null) return;
-        if (options.TopK is not null || options.NativeOptions is not null || options.AdditionalOptions is { Count: > 0 })
-            throw Unsupported("TopK, native options, and additional options are not supported by Foundry chat yet.");
-        if (options.ResponseFormat is { } responseFormat
-            && (responseFormat.ValueKind != JsonValueKind.Object
-                || responseFormat.EnumerateObject().Count() != 1
-                || !responseFormat.TryGetProperty("type", out var formatType)
-                || formatType.ValueKind != JsonValueKind.String
-                || formatType.GetString() != "text"))
-            throw Unsupported("Structured output is not supported by Foundry chat yet.");
+        if (options.TopK is not null || options.NativeOptions is not null)
+            throw Unsupported("TopK and native options are not supported by Foundry chat.");
+        var format = RequestedFormat(options);
+        if (format is "json_object" or "json_schema")
+            body["response_format"] = JsonNode.Parse(options.ResponseFormat!.Value.GetRawText());
+        var effort = RequestedReasoningEffort(options);
+        if (effort is not null and not "default") body["reasoning_effort"] = effort;
         if (options.Temperature is { } temperature)
         {
             if (temperature is < 0 or > 2 || !float.IsFinite(temperature)) throw Invalid("Temperature must be between 0 and 2.");
@@ -188,6 +187,57 @@ internal static class FoundryChatCompletion
                 throw Invalid("StopSequences requires 1 to 4 bounded non-empty strings.");
             body["stop"] = new JsonArray(stop.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray());
         }
+    }
+
+    internal static string? RequestedFormat(AepModelOptions? options)
+    {
+        if (options?.ResponseFormat is not { } value) return null;
+        if (value.ValueKind != JsonValueKind.Object || !value.TryGetProperty("type", out var type)
+            || type.ValueKind != JsonValueKind.String) throw Unsupported("The response format is invalid.");
+        var format = type.GetString();
+        if (format is "text" or "json_object")
+        {
+            if (value.EnumerateObject().Count() != 1) throw Unsupported("The response format has unsupported fields.");
+            return format;
+        }
+        if (format != "json_schema" || value.EnumerateObject().Count() != 2
+            || !value.TryGetProperty("json_schema", out var definition) || definition.ValueKind != JsonValueKind.Object
+            || definition.EnumerateObject().Count() is < 2 or > 3
+            || !definition.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String
+            || name.GetString() is not { Length: > 0 and <= 64 }
+            || !definition.TryGetProperty("schema", out var schema) || schema.ValueKind != JsonValueKind.Object
+            || schema.GetRawText().Length > 65536)
+            throw Unsupported("The JSON schema response format is invalid or exceeds its limit.");
+        if (definition.TryGetProperty("strict", out var strict) && strict.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+            throw Unsupported("The JSON schema strict flag is invalid.");
+        if (definition.EnumerateObject().Any(property => property.Name is not ("name" or "schema" or "strict")))
+            throw Unsupported("The JSON schema response format has unsupported fields.");
+        try { using var _ = JsonDocument.Parse(schema.GetRawText(), new JsonDocumentOptions { MaxDepth = 32 }); }
+        catch (JsonException) { throw Unsupported("The JSON schema exceeds the supported depth."); }
+        return format;
+    }
+
+    internal static string? RequestedReasoningEffort(AepModelOptions? options)
+    {
+        if (options?.AdditionalOptions is not { Count: > 0 } additional) return null;
+        if (additional.Count > 2 || additional.Keys.Any(key => key is not ("reasoning_enabled" or "reasoning_effort")))
+            throw Unsupported("The additional options are not supported by Foundry chat.");
+        bool? enabled = null;
+        if (additional.TryGetValue("reasoning_enabled", out var flag))
+        {
+            if (flag.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+                throw Unsupported("The reasoning flag is invalid.");
+            enabled = flag.GetBoolean();
+        }
+        string? effort = null;
+        if (additional.TryGetValue("reasoning_effort", out var value))
+        {
+            if (value.ValueKind != JsonValueKind.String || value.GetString() is not ("minimal" or "low" or "medium" or "high"))
+                throw Unsupported("The reasoning effort is invalid.");
+            effort = value.GetString();
+        }
+        if (enabled == false && effort is not null) throw Unsupported("Disabled reasoning cannot specify an effort.");
+        return enabled == false ? "none" : effort ?? (enabled == true ? "default" : null);
     }
 
     private static AepChatResponse ParseResponse(JsonElement root, string deployment, IReadOnlyList<AepToolDefinition>? declaredTools)

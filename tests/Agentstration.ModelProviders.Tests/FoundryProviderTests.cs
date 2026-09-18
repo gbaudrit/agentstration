@@ -139,6 +139,29 @@ public sealed class FoundryProviderTests
     }
 
     [TestMethod]
+    public async Task DiscoveryAdvertisesOnlyAffirmativeAdvancedCapabilitiesPerDeployment()
+    {
+        await WithEnvironmentKeyAsync(async authenticator =>
+        {
+            using var client = Client((_, _) => Task.FromResult(Json(HttpStatusCode.OK, """
+                {"value":[
+                  {"type":"ModelDeployment","name":"advanced","capabilities":{"chat":true,"jsonObject":true,"jsonSchema":"true","reasoning":true,"reasoningEfforts":["low","high","invalid"]}},
+                  {"type":"ModelDeployment","name":"unknown","modelName":"reasoning-model","capabilities":{"chat":true,"jsonObject":"maybe","reasoning":false}}
+                ]}
+                """)));
+            var provider = new FoundryAepModelProvider(client, Options(), authenticator);
+            var models = await provider.ListModelsAsync();
+            CollectionAssert.Contains(models[0].Capabilities!.ToArray(), "structuredOutput");
+            CollectionAssert.Contains(models[0].Capabilities!.ToArray(), "reasoning");
+            Assert.AreEqual("low,high", models[0].Metadata!["reasoningEfforts"]);
+            CollectionAssert.DoesNotContain(models[1].Capabilities!.ToArray(), "structuredOutput");
+            CollectionAssert.DoesNotContain(models[1].Capabilities!.ToArray(), "reasoning");
+            Assert.IsTrue(provider.Descriptor.Capabilities.StructuredOutput);
+            Assert.IsTrue(provider.Descriptor.Capabilities.Thinking);
+        });
+    }
+
+    [TestMethod]
     public async Task PaginationCannotForwardCredentialToAnotherOriginOrPath()
     {
         var calls = 0;
