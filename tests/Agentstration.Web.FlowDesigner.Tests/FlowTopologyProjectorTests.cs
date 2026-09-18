@@ -8,6 +8,43 @@ namespace Agentstration.Web.FlowDesigner.Tests;
 public sealed class FlowTopologyProjectorTests
 {
     [TestMethod]
+    public void PreviewArrangesOverlappingDesignerNodesWithoutChangingSavedPositions()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new AgentFlowStepDefinition { Name = "agent", Agent = new("welcome-agent") },
+                new OutputFlowStepDefinition { Name = "output" }
+            ],
+            Transitions =
+            [
+                new("input-agent", "input", "completed", "agent"),
+                new("agent-output", "agent", "completed", "output")
+            ],
+            Designer = new FlowDesignerMetadata
+            {
+                NodePositions = new Dictionary<string, FlowNodePosition>
+                {
+                    ["input"] = new(0, 0),
+                    ["agent"] = new(0, 0),
+                    ["output"] = new(0, 0)
+                }
+            }
+        };
+
+        var preview = FlowTopologyProjector.ProjectPreview(WorkflowDefinition(), graph);
+
+        Assert.IsTrue(preview.FindBySelection("input")!.X < preview.FindBySelection("agent")!.X);
+        Assert.IsTrue(preview.FindBySelection("agent")!.X < preview.FindBySelection("output")!.X);
+        Assert.HasCount(2, preview.Edges);
+        Assert.AreEqual(new FlowNodePosition(0, 0), graph.Designer.NodePositions["agent"]);
+        Assert.AreEqual(0d, FlowTopologyProjector.Project(WorkflowDefinition(), graph).FindBySelection("agent")!.X);
+    }
+
+    [TestMethod]
     public void WorkflowProjectionPreservesBranchesPositionsAndConditions()
     {
         var graph = new FlowGraphDefinition

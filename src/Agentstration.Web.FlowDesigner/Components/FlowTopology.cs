@@ -1,4 +1,5 @@
 using Agentstration.Flows;
+using Agentstration.Web.FlowDesigner.State;
 
 namespace Agentstration.Web.FlowDesigner.Components;
 
@@ -62,6 +63,21 @@ public static class FlowTopologyProjector
 
     public static FlowTopologyGraph Project(FlowDefinition definition, FlowGraphDefinition? graph = null) =>
         ProjectCore(definition, graph, null, []);
+
+    public static FlowTopologyGraph ProjectPreview(FlowDefinition definition, FlowGraphDefinition? graph = null)
+    {
+        if (graph is null) return Project(definition);
+
+        var vertical = string.Equals(graph.Designer.PreferredLayout, "Vertical", StringComparison.OrdinalIgnoreCase);
+        var arranged = graph with
+        {
+            Designer = graph.Designer with
+            {
+                NodePositions = FlowGraphAutoLayout.Arrange(graph, vertical)
+            }
+        };
+        return ProjectWorkflowGraph(arranged, null) with { Layout = vertical ? "vertical" : "horizontal" };
+    }
 
     public static FlowTopologyGraph Project(FlowRun run, IReadOnlyList<FlowRunEvent>? events = null) =>
         ProjectCore(run.DefinitionSnapshot.Definition, run.DefinitionSnapshot.Graph, run, events ?? []);

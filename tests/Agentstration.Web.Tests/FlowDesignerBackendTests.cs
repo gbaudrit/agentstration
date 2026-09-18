@@ -115,6 +115,28 @@ public sealed class FlowDesignerBackendTests
         StringAssert.Contains(exception.Message, "legacy Flow version without a Graph");
     }
 
+    [TestMethod]
+    public async Task MapsDuplicatePublishVersionToDesignerConflict()
+    {
+        using var httpClient = new HttpClient(new StubHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.Conflict)
+            {
+                Content = JsonContent.Create(new
+                {
+                    title = "flow_version_already_published",
+                    detail = "Flow version '1.0.0' has already been published.",
+                    status = 409
+                })
+            }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var backend = new FlowDesignerBackend(new FlowApiClient(httpClient));
+
+        var conflict = await Assert.ThrowsAsync<FlowDesignerVersionAlreadyPublishedException>(() =>
+            backend.PublishAsync(new(ResourceNamespace.Default, "sample"), new("1.0.0"), default));
+
+        Assert.AreEqual("1.0.0", conflict.Version);
+    }
+
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

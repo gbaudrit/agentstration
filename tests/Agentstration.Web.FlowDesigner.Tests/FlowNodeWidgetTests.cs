@@ -21,6 +21,7 @@ public sealed class FlowNodeWidgetTests
         var rendered = context.Render<FlowNodeWidget>(parameters => parameters.Add(component => component.Node, node));
 
         Assert.IsNotNull(rendered.Find(".flow-node.router"));
+        StringAssert.Contains(rendered.Find(".flow-node-icon use").GetAttribute("href")!, "#tabler-route");
         StringAssert.Contains(rendered.Markup, "Choose agent");
         StringAssert.Contains(rendered.Markup, "3 routes");
     }

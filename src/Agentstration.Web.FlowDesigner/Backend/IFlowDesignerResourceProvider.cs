@@ -3,7 +3,10 @@ using Agentstration.Resources;
 
 namespace Agentstration.Web.FlowDesigner.Backend;
 
-public sealed record FlowDesignerAgent(string Name, string DisplayName);
+public sealed record FlowDesignerAgent(string Name, string DisplayName)
+{
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+}
 public sealed record FlowDesignerFlow(string Name, string DisplayName, ResourceNamespace Namespace, string? ActiveVersion);
 public sealed record FlowDesignerFlowVersion(string Version, JsonElement? InputSchema, JsonElement? OutputSchema);
 public sealed record FlowDesignerTool(

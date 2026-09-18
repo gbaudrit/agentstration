@@ -9,7 +9,7 @@ public sealed class FlowDesignerResourceProvider(
     IToolsClient toolsClient) : IFlowDesignerResourceProvider
 {
     public async Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(CancellationToken cancellationToken) =>
-        (await client.GetAgentsAsync(cancellationToken)).Select(agent => new FlowDesignerAgent(agent.Name, agent.Name)).ToArray();
+        (await client.GetAgentsAsync(cancellationToken)).Select(agent => new FlowDesignerAgent(agent.Id, agent.Name) { Namespace = agent.Namespace }).ToArray();
 
     public async Task<IReadOnlyList<FlowDesignerFlow>> GetFlowsAsync(CancellationToken cancellationToken) =>
         (await flowClient.GetFlowsAsync(cancellationToken))

@@ -13,15 +13,24 @@
   <data name="Mode.Designer"><value>Designer</value></data><data name="Mode.Definition"><value>Définition</value></data><data name="Mode.Split"><value>Vue partagée</value></data>
   <data name="Undo"><value>Annuler</value></data><data name="Redo"><value>Rétablir</value></data>
   <data name="Validate"><value>Valider</value></data><data name="RunDraft"><value>Exécuter le brouillon</value></data>
-  <data name="Save"><value>Enregistrer</value></data><data name="Version"><value>Version</value></data><data name="PublishVersion"><value>Version à publier</value></data><data name="Publish"><value>Publier</value></data>
+  <data name="Save"><value>Enregistrer</value></data><data name="Version"><value>Version</value></data><data name="PublishVersion"><value>Version à publier</value></data><data name="Publish"><value>Publier</value></data><data name="Publishing"><value>Publication…</value></data>
+  <data name="ActionFailed"><value>Action impossible</value></data><data name="DismissError"><value>Fermer le message d’erreur</value></data>
+  <data name="PublishVersionExists"><value>La version {0} est déjà publiée. Choisissez une autre version.</value></data><data name="InvalidSourceBeforePublish"><value>Corrigez les erreurs de la définition YAML avant de publier.</value></data>
   <data name="Steps"><value>Étapes</value></data>
+  <data name="ViewControls"><value>Vue</value></data>
   <data name="Step.input"><value>Entrée</value></data><data name="Step.agent"><value>Agent</value></data><data name="Step.router"><value>Routeur</value></data><data name="Step.condition"><value>Condition</value></data><data name="Step.transform"><value>Transformation</value></data><data name="Step.output"><value>Sortie</value></data><data name="Step.failure"><value>Échec</value></data>
   <data name="Step.flow"><value>Flow</value></data>
   <data name="Step.tool"><value>Tool</value></data>
   <data name="HorizontalLayout"><value>Disposition horizontale</value></data><data name="VerticalLayout"><value>Disposition verticale</value></data><data name="Center"><value>Centrer</value></data>
   <data name="Inspector"><value>Inspecteur</value></data><data name="SelectStep"><value>Sélectionnez une étape pour la modifier.</value></data>
   <data name="DisplayName"><value>Nom d’affichage</value></data><data name="TechnicalName"><value>Nom technique</value></data><data name="Type"><value>Type</value></data>
+  <data name="StepDetails"><value>Étape</value></data><data name="StepDisplayName"><value>Nom affiché de l’étape</value></data><data name="StepId"><value>ID de l’étape</value></data>
+  <data name="CalledResource"><value>Ressource appelée</value></data><data name="CalledAgent"><value>Agent</value></data><data name="AgentId"><value>ID de l’agent</value></data><data name="FlowId"><value>ID du Flow</value></data>
+  <data name="ToolId"><value>ID du Tool</value></data><data name="CurrentToolUnavailable"><value>Tool actuel absent de la liste disponible</value></data>
+  <data name="SearchTools"><value>Rechercher un Tool</value></data><data name="NoMatchingTools"><value>Aucun Tool correspondant</value></data>
   <data name="Agent"><value>Agent</value></data><data name="RouterOutput"><value>Sortie du routeur</value></data>
+  <data name="OpenAgent"><value>Ouvrir l’agent</value></data><data name="OpenAgentInNewTab"><value>Ouvrir l’agent dans un nouvel onglet</value></data>
+  <data name="OpenFlow"><value>Ouvrir le Flow</value></data><data name="OpenFlowInNewTab"><value>Ouvrir le Flow dans un nouvel onglet</value></data>
   <data name="CalledFlow"><value>Flow appelé</value></data><data name="VersionStrategy"><value>Stratégie de version</value></data>
   <data name="VersionStrategy.Active"><value>Version active</value></data><data name="VersionStrategy.Exact"><value>Version exacte</value></data>
   <data name="ExactVersion"><value>Version exacte</value></data><data name="InputMapping"><value>Mappage d’entrée</value></data><data name="PassIncomingTransitionOutput"><value>Transmettre la sortie de la transition entrante</value></data><data name="PassIncomingTransitionOutputHelp"><value>Le Flow enfant reçoit la sortie complète portée par la transition empruntée vers cette étape.</value></data><data name="AvailableOutput"><value>Propriétés de sortie disponibles</value></data>
@@ -41,8 +50,8 @@
   <data name="SaveState.Saving"><value>Enregistrement…</value></data><data name="SaveState.UnsavedChanges"><value>Modifications non enregistrées</value></data><data name="SaveState.SaveFailed"><value>Échec de l’enregistrement</value></data><data name="SaveState.Saved"><value>Enregistré</value></data>
   <data name="FlowDiagram"><value>Diagramme du Flow</value></data><data name="DiagramZoomControls"><value>Contrôles de zoom du diagramme</value></data>
   <data name="ZoomOut"><value>Dézoomer</value></data><data name="ZoomIn"><value>Zoomer</value></data><data name="Fit"><value>Ajuster</value></data>
-  <data name="YamlDefinition"><value>Définition YAML</value></data><data name="ApplyValidYaml"><value>Appliquer le YAML valide</value></data>
-  <data name="InvalidSourceHelp"><value>La source invalide est conservée ; le canevas continue d’afficher la dernière définition valide.</value></data>
+  <data name="YamlDefinition"><value>Définition du Flow (YAML)</value></data><data name="ApplyAndSaveYaml"><value>Appliquer et enregistrer</value></data><data name="ApplyingYaml"><value>Application et enregistrement…</value></data>
+  <data name="SourceEditorHelp"><value>Appliquez pour actualiser le graphe et enregistrer le brouillon. En cas d’erreur, le texte est conservé et le graphe reste inchangé.</value></data>
   <data name="Declared"><value>Déclaré</value></data><data name="Observed"><value>Observé</value></data><data name="NotSelected"><value>Non sélectionné</value></data>
   <data name="TopologyZoomControls"><value>Contrôles de zoom de la topologie</value></data><data name="NoTopology"><value>Aucune topologie n’est disponible pour ce Flow.</value></data>
   <data name="TurnCount.One"><value>{0} tour</value></data><data name="TurnCount.Many"><value>{0} tours</value></data><data name="InitialParticipant"><value>participant initial</value></data>
