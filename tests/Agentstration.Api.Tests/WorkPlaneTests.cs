@@ -633,6 +633,22 @@ public sealed class WorkPlaneTests
     }
 
     [TestMethod]
+    public async Task SqliteEntryDraftConditionalWriteRejectsStaleRevision()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var draft = Entry(new EntryId("planned"));
+
+        await fixture.Workplace.UpsertEntryDraftAsync(draft, expectedRevision: null, default);
+        await Assert.ThrowsExactlyAsync<WorkValidationException>(() =>
+            fixture.Workplace.UpsertEntryDraftAsync(draft, expectedRevision: null, default));
+
+        await fixture.Workplace.UpsertEntryDraftAsync(draft with { Revision = 2, DisplayName = "Updated" }, expectedRevision: 1, default);
+        await Assert.ThrowsExactlyAsync<WorkValidationException>(() =>
+            fixture.Workplace.UpsertEntryDraftAsync(draft with { Revision = 3 }, expectedRevision: 1, default));
+        Assert.AreEqual("Updated", (await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, draft.Id, default))?.DisplayName);
+    }
+
+    [TestMethod]
     public async Task EntryRemovalCanExplicitlyDetachDashboardsAndCloseButRetainInteractions()
     {
         await using var fixture = await WorkFixture.CreateAsync();

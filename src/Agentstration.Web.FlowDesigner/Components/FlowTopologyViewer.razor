@@ -5,7 +5,10 @@
     <div class="topology-toolbar">
         <span class="topology-description">@Graph.Description</span>
         <div class="topology-toolbar-actions">
-            <span class="topology-legend"><i class="declared"></i>@Localizer["Declared"] <i class="observed"></i>@Localizer["Observed"] <i class="inactive"></i>@Localizer["NotSelected"]</span>
+            @if (ShowStateLegend)
+            {
+                <span class="topology-legend"><i class="declared"></i>@Localizer["Declared"] <i class="observed"></i>@Localizer["Observed"] <i class="inactive"></i>@Localizer["NotSelected"]</span>
+            }
             @if (ReplayInProgress && ReplayElapsed is not null)
             {
                 <output class="replay-counter" aria-label="@Localizer["ReplayElapsedCounter"]">@FormatReplayElapsed(ReplayElapsed.Value)</output>
@@ -120,6 +123,7 @@
     [Parameter] public TimeSpan? ReplayElapsed { get; set; }
     [Parameter] public EventCallback ReplayRequested { get; set; }
     [Parameter] public bool InitiallyFit { get; set; }
+    [Parameter] public bool ShowStateLegend { get; set; } = true;
     private bool fitInitialized;
 
     private string DeclaredMarker => $"{markerPrefix}-declared";

@@ -1,4 +1,4 @@
-# ADR-0120 — AEP Secret access uses one-use capabilities
+# ADR-0121 — AEP Secret access uses one-use capabilities
 
 Status: Accepted
 

@@ -1,0 +1,6 @@
+<Project Sdk="MSTest.Sdk/4.3.3">
+  <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.ResourcePlanning/Agentstration.ResourcePlanning.csproj" />
+    <ProjectReference Include="../../src/Agentstration.ResourcePlanning.Storage.Sqlite/Agentstration.ResourcePlanning.Storage.Sqlite.csproj" />
+  </ItemGroup>
+</Project>
