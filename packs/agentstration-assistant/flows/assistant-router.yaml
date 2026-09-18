@@ -1,0 +1,86 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: assistant-router
+definition:
+  displayName: Agentstration Assistant router
+  description: Routes one stable Assistant Entry to independently replaceable child capabilities.
+  version: 1.0.0
+  enabled: true
+  spec:
+    flowKind: routing
+    strategy: deterministic
+    destinations:
+      - { kind: agent, id: assistant-router }
+    fallback: { kind: agent, id: assistant-fallback }
+  graph:
+    entryStep: input
+    inputSchema:
+      type: object
+      properties:
+        prompt: { type: string, minLength: 1, maxLength: 16000 }
+      required: [prompt]
+      additionalProperties: false
+    steps:
+      - { type: input, name: input, displayName: Request }
+      - type: router
+        name: route
+        displayName: Select capability
+        strategy: Rules
+        selectionInstructions: Select help, diagnostics, or resource-planning only when the intent is explicit; otherwise use fallback.
+        candidates:
+          - route: help
+            agent: { resourceId: assistant-router }
+            description: Product concepts, configuration guidance, and documentation.
+            examples: [help, documentation, docs, explain, aide, documentation, expliquer]
+          - route: diagnostics
+            agent: { resourceId: assistant-router }
+            description: Evidence-backed troubleshooting of the current installation or execution.
+            examples: [diagnostic, troubleshoot, failure, error, health, panne, erreur, pourquoi]
+          - route: resource-planning
+            agent: { resourceId: assistant-router }
+            description: Design Agents, Flows, Entries, integrations, and governed resource changes.
+            examples: [resource plan, design agents, create flow, architecture, plan de ressources, créer un flow]
+        fallback: { resourceId: assistant-fallback }
+      - type: flow
+        name: help
+        displayName: Help and documentation
+        flow: { resourceId: assistant-help, versionStrategy: active }
+        inputMapping: "${input}"
+      - type: flow
+        name: diagnostics
+        displayName: Diagnostics
+        flow: { resourceId: assistant-diagnostics, versionStrategy: active }
+        inputMapping: "${input}"
+      - type: flow
+        name: resource-planning
+        displayName: Resource planning
+        flow: { resourceId: resource-planning, versionStrategy: active }
+        inputMapping: { goal: "${input.prompt}" }
+      - type: flow
+        name: fallback
+        displayName: Clarification
+        flow: { resourceId: assistant-fallback, versionStrategy: active }
+        inputMapping: "${input}"
+      - { type: output, name: output, displayName: Assistant response }
+      - { type: failure, name: failure, displayName: Capability failure, code: ASSISTANT_CAPABILITY_FAILED, message: The selected Assistant capability could not complete. }
+    transitions:
+      - { id: input-to-route, fromStep: input, event: completed, toStep: route }
+      - { id: route-to-help, fromStep: route, event: selected, toStep: help, condition: "${steps.route.output.selectedRoute == 'help'}", priority: 10 }
+      - { id: route-to-diagnostics, fromStep: route, event: selected, toStep: diagnostics, condition: "${steps.route.output.selectedRoute == 'diagnostics'}", priority: 20 }
+      - { id: route-to-planning, fromStep: route, event: selected, toStep: resource-planning, condition: "${steps.route.output.selectedRoute == 'resource-planning'}", priority: 30 }
+      - { id: route-to-fallback, fromStep: route, event: selected, toStep: fallback, condition: "${steps.route.output.selectedRoute == 'fallback'}", priority: 40 }
+      - { id: route-failed, fromStep: route, event: failed, toStep: failure }
+      - { id: help-completed, fromStep: help, event: completed, toStep: output }
+      - { id: help-failed, fromStep: help, event: failed, toStep: failure }
+      - { id: diagnostics-completed, fromStep: diagnostics, event: completed, toStep: output }
+      - { id: diagnostics-failed, fromStep: diagnostics, event: failed, toStep: failure }
+      - { id: planning-completed, fromStep: resource-planning, event: completed, toStep: output }
+      - { id: planning-failed, fromStep: resource-planning, event: failed, toStep: failure }
+      - { id: fallback-completed, fromStep: fallback, event: completed, toStep: output }
+      - { id: fallback-failed, fromStep: fallback, event: failed, toStep: failure }
+    outputSchema:
+      type: object
+      additionalProperties: true
+  publish: true
+  activate: true

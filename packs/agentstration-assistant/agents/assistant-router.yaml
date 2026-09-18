@@ -1,0 +1,21 @@
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: assistant-router
+  tags:
+    agentstration.io/capability: assistant-routing
+definition:
+  displayName: Agentstration Assistant router
+  description: Classifies Assistant requests without owning capability-specific behavior.
+  handler: prompt-agent
+  instructions: |
+    Classify the request into exactly one presentation-neutral capability: help, diagnostics, resource-planning, or fallback.
+    Help explains Agentstration and its documentation. Diagnostics investigates observed installation or execution behavior. Resource planning designs a governed functional Resource Plan. Fallback asks one concise clarification question when intent is ambiguous.
+    Never answer the request, mutate resources, or emit Agentstration Resource manifests. Return only the selected capability and a short reason.
+  modelProfile: { binding: assistant-model }
+  runtimeProfile: { binding: assistant-runtime }
+  tools: []
+  behaviors: [assistant-routing, clarification-first]
+  middleware: []
+  contextProviders: []
+  settings: {}
