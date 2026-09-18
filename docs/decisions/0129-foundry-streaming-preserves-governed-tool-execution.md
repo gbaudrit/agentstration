@@ -1,10 +1,10 @@
-# ADR-0122: Foundry streaming preserves governed Tool execution
+# ADR-0129: Foundry streaming preserves governed Tool execution
 
 Status: Accepted — 2026-09-18
 
 ## Context
 
-ADR-0121 established bounded non-streaming Foundry chat through AEP. FR-450 adds streaming and Tool calls while preserving the Agentstration Tool execution and approval boundary of ADR-0055.
+ADR-0128 established bounded non-streaming Foundry chat through AEP. FR-450 adds streaming and Tool calls while preserving the Agentstration Tool execution and approval boundary of ADR-0055.
 
 ## Decision
 

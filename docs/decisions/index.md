@@ -4,6 +4,9 @@
 
 ADRs record durable architectural choices and their consequences. Existing decisions are numbered in chronological order and remain in Git when superseded.
 
+The Resource Planning integration adds [ADR-0117 — Resource Plans are reviewed proposals](0117-resource-plans-are-reviewed-proposals.md).
+Governed application follows [ADR-0120 — Resource ChangeSet application is durable and ordered](0120-resource-change-set-application-is-durable-and-ordered.md).
+
 ## Format
 
 ```markdown
@@ -148,10 +151,12 @@ Use **Proposed** when implementation or repository evidence does not establish a
 116. [ADR-0116 — The Console BFF delegates short-lived API requests](0116-console-bff-delegates-short-lived-api-requests.md)
 117. [ADR-0117 — Browser journeys are product-owned reusable automation assets](0117-product-owned-browser-journeys.md)
 118. [ADR-0118 — Browser campaigns use dedicated Workspaces](0118-browser-campaigns-use-dedicated-workspaces.md)
-119. [ADR-0119 — Foundry model deployments use an isolated AEP extension](0119-foundry-model-deployments-use-an-isolated-aep-extension.md)
-120. [ADR-0120 — Foundry local Aspire discovery is explicitly opt-in](0120-foundry-local-aspire-discovery-is-explicitly-opt-in.md)
-121. [ADR-0121 — Foundry non-streaming chat uses the existing AEP runtime path](0121-foundry-chat-uses-the-existing-aep-runtime-path.md)
-122. [ADR-0122 — Foundry streaming preserves governed Tool execution](0122-foundry-streaming-preserves-governed-tool-execution.md)
-123. [ADR-0123 — Foundry advanced options follow deployment capabilities](0123-foundry-advanced-options-follow-deployment-capabilities.md)
-124. [ADR-0124 — Foundry egress and diagnostics are bounded](0124-foundry-egress-and-diagnostics-are-bounded.md)
-125. [ADR-0125 — Foundry operator workflow reuses model resources](0125-foundry-operator-workflow-reuses-model-resources.md)
+119. [ADR-0119 — Descendant use grants govern Secrets and Vaults](0119-descendant-use-grants-for-secrets-and-vaults.md)
+121. [ADR-0121 — AEP Secret access uses one-use capabilities](0121-aep-secret-access-capabilities.md)
+126. [ADR-0126 — Foundry model deployments use an isolated AEP extension](0126-foundry-model-deployments-use-an-isolated-aep-extension.md)
+127. [ADR-0127 — Foundry local Aspire discovery is explicitly opt-in](0127-foundry-local-aspire-discovery-is-explicitly-opt-in.md)
+128. [ADR-0128 — Foundry non-streaming chat uses the existing AEP runtime path](0128-foundry-chat-uses-the-existing-aep-runtime-path.md)
+129. [ADR-0129 — Foundry streaming preserves governed Tool execution](0129-foundry-streaming-preserves-governed-tool-execution.md)
+130. [ADR-0130 — Foundry advanced options follow deployment capabilities](0130-foundry-advanced-options-follow-deployment-capabilities.md)
+131. [ADR-0131 — Foundry egress and diagnostics are bounded](0131-foundry-egress-and-diagnostics-are-bounded.md)
+132. [ADR-0132 — Foundry operator workflow reuses model resources](0132-foundry-operator-workflow-reuses-model-resources.md)

@@ -1,0 +1,70 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SecretStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> ScopeLocalizer
+
+@if (OwnerScopeRef is { } owner && (Grants.Count > 0 || Candidates(owner).Count > 0))
+{
+    <section class="panel form-section descendant-grants" data-testid="descendant-grants">
+        <div class="panel-header"><div><p class="eyebrow">@T("Scope")</p><h2>@T("DescendantAccess")</h2></div></div>
+        <p>@T("DescendantAccessHelp")</p>
+        <div class="grant-list">
+            @foreach (var grant in Grants)
+            {
+                <div class="grant-row" data-testid="descendant-grant-row" data-scope-ref="@grant.ScopeRef.Value" @key="grant.ScopeRef">
+                    <div class="grant-target">
+                        <span class="grant-field-label">@T("TargetScope")</span>
+                        <span class="grant-target-identity" title="@grant.ScopeRef.Value"><ResourceScopeBadge ScopeRef="grant.ScopeRef" /><strong>@ScopeName(grant.ScopeRef)</strong></span>
+                    </div>
+                    <div class="grant-controls">
+                        @if (grant.ScopeRef.Kind == ResourceScopeKind.Tenant)
+                        {
+                            <label class="grant-checkbox"><input type="checkbox" checked="@grant.IncludeDescendants" @onchange="args => SetIncludeDescendants(grant.ScopeRef, args.Value is true)" /><span>@T("IncludeDescendants")</span></label>
+                        }
+                        <button type="button" class="button-secondary grant-remove" data-testid="descendant-grant-remove" @onclick="() => Remove(grant.ScopeRef)">@T("RemoveGrant")</button>
+                    </div>
+                </div>
+            }
+        </div>
+        @if (Candidates(owner).Any(value => Grants.All(grant => grant.ScopeRef != value.ScopeRef)))
+        {
+            <div class="grant-add">
+                <label><span class="grant-field-label">@T("TargetScope")</span><select data-testid="descendant-grant-target" @bind="selectedScope" @onchange:stopPropagation="true"><option value="">@T("SelectScope")</option>@foreach (var target in Candidates(owner).Where(value => Grants.All(grant => grant.ScopeRef != value.ScopeRef))) { <option value="@target.ScopeRef.Value">@ScopeLabel(target)</option> }</select></label>
+                <button type="button" class="button-secondary grant-add-button" data-testid="descendant-grant-add" disabled="@string.IsNullOrWhiteSpace(selectedScope)" @onclick="Add">@T("AddGrant")</button>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public ResourceScopeRef? OwnerScopeRef { get; set; }
+    [Parameter] public IReadOnlyList<ResourceScopeTargetResponse> Targets { get; set; } = [];
+    [Parameter] public List<DescendantUseGrant> Grants { get; set; } = [];
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private string selectedScope = string.Empty;
+    private string T(string key) => Localizer[key].Value;
+    private string ScopeLabel(ResourceScopeTargetResponse target) =>
+        $"{ScopeLocalizer[$"ResourceScope.{target.Kind}"].Value} · {target.DisplayName}";
+    private string ScopeName(ResourceScopeRef scope) =>
+        Targets.FirstOrDefault(target => target.ScopeRef == scope)?.DisplayName ?? scope.Value;
+    private IReadOnlyList<ResourceScopeTargetResponse> Candidates(ResourceScopeRef owner) =>
+        Targets.Where(value => value.Kind > owner.Kind && value.ScopeRef != owner).ToArray();
+    private async Task Add()
+    {
+        if (!ResourceScopeRef.TryParse(selectedScope, out var scope) || Grants.Any(value => value.ScopeRef == scope)) return;
+        Grants.Add(new(scope));
+        selectedScope = string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+    private async Task Remove(ResourceScopeRef scope)
+    {
+        if (Grants.RemoveAll(value => value.ScopeRef == scope) > 0) await OnChanged.InvokeAsync();
+    }
+    private async Task SetIncludeDescendants(ResourceScopeRef scope, bool includeDescendants)
+    {
+        var index = Grants.FindIndex(value => value.ScopeRef == scope);
+        if (index >= 0 && Grants[index].IncludeDescendants != includeDescendants)
+        {
+            Grants[index] = Grants[index] with { IncludeDescendants = includeDescendants };
+            await OnChanged.InvokeAsync();
+        }
+    }
+}

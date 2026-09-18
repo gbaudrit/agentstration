@@ -1,0 +1,840 @@
+@page "/resource-plans/{Id:guid}"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject IResourcePlansApiClient Client
+@inject IIdentityAdministrationApiClient IdentityClient
+@inject IModelProfilesClient ModelProfilesClient
+@inject IRuntimeProfilesClient RuntimeProfilesClient
+@inject IToolsClient ToolsClient
+@inject ConsoleContextState ContextState
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourcePlansStrings> Localizer
+
+<PageTitle>@(plan?.Value.Title ?? T("Title")) · Agentstration</PageTitle>
+<PageHeader Title="@(plan?.Value.Title ?? T("Title"))" Description="@(plan?.Value.Goal ?? T("DetailDescription"))">
+    <Actions><a class="button-secondary" href="/resource-plans">@T("BackToPlans")</a><button class="button-secondary" type="button" @onclick="LoadAsync" disabled="@busy">@T("Refresh")</button></Actions>
+</PageHeader>
+
+@if (!string.IsNullOrWhiteSpace(error)) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
+@if (busy && plan is null) { <LoadingState Message="@T("Loading")" /> }
+else if (plan is null) { <EmptyState Title="@T("NotFound")" Message="@T("NotFoundDescription")" /> }
+else
+{
+    <ol class="resource-plan-review-path" aria-label="@T("ReviewPath")">
+        <li class="@(BindingsComplete && !bindingSaveFailed ? "is-done" : null)"><span>1</span><div><strong>@T("StepProfiles")</strong><small>@T("StepProfilesHint")</small></div></li>
+        <li class="@(materialization is not null || showRecordedChanges && selected is not null ? "is-done" : null)"><span>2</span><div><strong>@T("StepPreview")</strong><small>@T("StepPreviewHint")</small></div></li>
+        <li class="@(showRecordedChanges && selected is not null ? "is-done" : null)"><span>3</span><div><strong>@T("StepChangeSet")</strong><small>@T("StepChangeSetHint")</small></div></li>
+        <li class="@(showRecordedChanges && latestValidation is not null ? "is-done" : null)"><span>4</span><div><strong>@T("StepValidation")</strong><small>@T("StepValidationHint")</small></div></li>
+        <li class="@(application?.Value.Status == ResourceChangeSetApplicationStatus.Applied ? "is-done" : null)"><span>5</span><div><strong>@T("StepApplication")</strong><small>@T("StepApplicationHint")</small></div></li>
+    </ol>
+    <nav class="resource-plan-tabs" role="tablist" aria-label="@T("ReviewViews")">
+        @foreach (var view in Views)
+        {
+            <button type="button" role="tab" id="tab-@view" aria-controls="panel-@view" aria-selected="@(activeView == view)" class="@(activeView == view ? "active" : null)" @onclick="() => activeView = view">@T($"View.{view}")</button>
+        }
+    </nav>
+
+    <section class="panel resource-plan-view @(activeView == "Overview" ? "resource-plan-overview" : null)" role="tabpanel" id="panel-@activeView" aria-labelledby="tab-@activeView">
+        @if (activeView != "Overview" && showRecordedChanges && selected is not null && ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))
+        {
+            <div class="resource-plan-stale-notice"><StatusBadge Text="@T("StaleChangeSet")" Status="UiStatus.Warning" /></div>
+        }
+        @if (activeView == "Overview")
+        {
+            <header class="resource-plan-intent">
+                <h2>@T("FunctionalIntent")</h2>
+                <p class="resource-plan-goal">@plan.Value.Goal</p>
+                @if (!string.IsNullOrWhiteSpace(plan.Value.Description)) { <p class="resource-plan-description">@plan.Value.Description</p> }
+                <div class="resource-plan-overview-meta" aria-label="@T("PlanIdentity")">
+                    <StatusBadge Text="@T($"Status.{plan.Value.Status}")" Status="@Tone(plan.Value.Status)" />
+                    <span>@T("Revision", plan.Value.Revision)</span>
+                    <span>@T("Workspace") <code>@plan.Value.Scope.WorkspaceId.Value.ToString("D")</code></span>
+                    <span>@T("Updated") <time datetime="@plan.Value.UpdatedAt.ToString("O")">@plan.Value.UpdatedAt.ToLocalTime().ToString("g")</time></span>
+                    @if (selected is not null && ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))
+                    {
+                        <StatusBadge Text="@T("StaleChangeSet")" Status="UiStatus.Warning" />
+                    }
+                </div>
+            </header>
+            @if (functional is not null)
+            {
+                <div class="resource-plan-overview-main">
+                    <article class="resource-plan-solution">
+                        <h3>@T("Solution")</h3>
+                        <p>@functional.Solution.Summary</p>
+                        @if (functional.Solution.Outcomes.Count > 0)
+                        {
+                            <ul class="resource-plan-outcomes">@foreach (var outcome in functional.Solution.Outcomes) { <li>@outcome</li> }</ul>
+                        }
+                    </article>
+                    <div class="resource-plan-overview-details">
+                        <article class="resource-plan-detail-card">
+                            <h3>@T("Roles") <span class="resource-plan-count">@functional.Roles.Count</span></h3>
+                            @if (functional.Roles.Count == 0) { <p class="resource-plan-empty">@T("NothingPlanned")</p> }
+                            else { <ol>@foreach (var role in functional.Roles) { <li><strong>@role.DisplayName</strong><span>@role.Purpose</span></li> }</ol> }
+                        </article>
+                        <article class="resource-plan-detail-card">
+                            <h3>@T("Workflows") <span class="resource-plan-count">@functional.Workflows.Count</span></h3>
+                            @if (functional.Workflows.Count == 0) { <p class="resource-plan-empty">@T("NothingPlanned")</p> }
+                            else { <ol>@foreach (var workflow in functional.Workflows) { <li><strong>@workflow.DisplayName</strong><span>@workflow.Objective</span></li> }</ol> }
+                        </article>
+                    </div>
+                </div>
+                <div class="resource-plan-overview-secondary">
+                    <article class="resource-plan-secondary-card">
+                        <h3>@T("Integrations") <span class="resource-plan-count">@functional.Integrations.Count</span></h3>
+                        @if (functional.Integrations.Count == 0) { <p class="resource-plan-empty">@T("NothingPlanned")</p> }
+                        else { <ul>@foreach (var integration in functional.Integrations) { <li><strong>@integration.DisplayName</strong><span>@integration.Purpose</span></li> }</ul> }
+                    </article>
+                    <article class="resource-plan-secondary-card">
+                        <h3>@T("Experiences") <span class="resource-plan-count">@functional.Experiences.Count</span></h3>
+                        @if (functional.Experiences.Count == 0) { <p class="resource-plan-empty">@T("NothingPlanned")</p> }
+                        else { <ul>@foreach (var experience in functional.Experiences) { <li><strong>@experience.DisplayName</strong><span>@experience.Purpose</span></li> }</ul> }
+                    </article>
+                    @if (functional.Retirements is { Count: > 0 } retirements)
+                    {
+                        <article class="resource-plan-secondary-card">
+                            <h3>@T("Retirements") <span class="resource-plan-count">@retirements.Count</span></h3>
+                            <ul>@foreach (var retirement in retirements) { <li><strong>@T($"Retirement.{retirement.Element}") · @retirement.LogicalId</strong><span>@retirement.Reason</span></li> }</ul>
+                        </article>
+                    }
+                </div>
+                    @if (functional.Roles.Count > 0 || functional.Integrations.Count > 0 || functional.Retirements?.Count > 0)
+                    {
+                        <section class="resource-plan-bindings" aria-label="@T("BindingsTitle")">
+                        <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ConcreteProposal")</p><h2>@T("BindingsTitle")</h2><p>@T("BindingsIntro")</p></div></div>
+                        @if (functional.Roles.Count > 0 && (modelProfiles.Count == 0 || runtimeProfiles.Count == 0))
+                        {
+                            <p class="resource-plan-binding-empty">
+                                @if (modelProfiles.Count == 0) { <a href="/modelprofiles">@T("CreateModelProfile")</a> }
+                                @if (runtimeProfiles.Count == 0) { <a href="/runtimeprofiles">@T("CreateRuntimeProfile")</a> }
+                            </p>
+                        }
+                        <div class="resource-plan-binding-list">
+                            @foreach (var role in functional.Roles)
+                            {
+                                <article class="resource-plan-binding-card">
+                                    <div><strong>@role.DisplayName</strong><small>@role.LogicalId</small></div>
+                                    <label><span>@T("ModelProfile")</span><select aria-label="@($"{role.DisplayName} · {T("ModelProfile")}")" value="@SelectedModelIndex(role.LogicalId)" @onchange="args => SelectModelAsync(role.LogicalId, args)" disabled="@(busy || !CanReview)">
+                                        <option value="">@T("SelectProfile")</option>
+                                        @for (var index = 0; index < modelProfiles.Count; index++)
+                                        {
+                                            var profile = modelProfiles[index];
+                                            <option value="@index" disabled="@IsInvalidModel(profile)">@profile.Properties.DisplayName · @profile.Namespace/@profile.Name</option>
+                                        }
+                                    </select></label>
+                                    <label><span>@T("RuntimeProfile")</span><select aria-label="@($"{role.DisplayName} · {T("RuntimeProfile")}")" value="@SelectedRuntimeIndex(role.LogicalId)" @onchange="args => SelectRuntimeAsync(role.LogicalId, args)" disabled="@(busy || !CanReview)">
+                                        <option value="">@T("SelectProfile")</option>
+                                        @for (var index = 0; index < runtimeProfiles.Count; index++)
+                                        {
+                                            var profile = runtimeProfiles[index];
+                                            <option value="@index">@profile.Properties.DisplayName · @profile.Namespace/@profile.Name</option>
+                                        }
+                                    </select></label>
+                                </article>
+                            }
+                        </div>
+                        @if (functional.Integrations.Count > 0)
+                        {
+                            <h3>@T("ToolBindingsTitle")</h3>
+                            <p>@T("ToolBindingsIntro")</p>
+                            @if (tools.Count == 0) { <p class="resource-plan-binding-empty"><a href="/tools">@T("ManageTools")</a></p> }
+                            <div class="resource-plan-binding-list">
+                                @foreach (var integration in functional.Integrations)
+                                {
+                                    <article class="resource-plan-binding-card">
+                                        <div><strong>@integration.DisplayName</strong><small>@integration.Purpose</small></div>
+                                        <label><span>@T("ToolBinding")</span><select aria-label="@($"{integration.DisplayName} · {T("ToolBinding")}")" value="@SelectedToolIndex(integration.LogicalId)" @onchange="args => SelectToolAsync(integration.LogicalId, args)" disabled="@(busy || !CanReview)">
+                                            <option value="">@T("SelectTool")</option>
+                                            @for (var index = 0; index < tools.Count; index++)
+                                            {
+                                                var tool = tools[index];
+                                                <option value="@index" disabled="@(!UsableTool(tool))">@tool.Definition.DisplayName · @tool.Metadata.Namespace/@tool.Metadata.Name</option>
+                                            }
+                                        </select></label>
+                                    </article>
+                                }
+                            </div>
+                        }
+                        <footer class="resource-plan-binding-footer">
+                            <div class="resource-plan-binding-progress" role="status"><strong>@(functional.Roles.Count + functional.Integrations.Count == 0 ? T("NoBindingsRequired") : T("BindingsProgress", CompleteBindings + CompleteToolBindings, functional.Roles.Count + functional.Integrations.Count))</strong><span>@T(bindingSaving ? "BindingsSaving" : bindingSaveFailed ? bindingsConflict ? "BindingsConflict" : "BindingsSaveFailed" : bindingsOutdated ? "BindingsOutdated" : bindingDraft is null ? "BindingsNotSavedYet" : "BindingsSavedAutomatically")</span>@if (bindingSaveFailed) { <button class="button-secondary" type="button" @onclick="RetryBindingsAsync" disabled="@busy">@T(bindingsConflict ? "ReloadBindings" : "RetrySaveBindings")</button> }</div>
+                            <div class="resource-plan-binding-actions">
+                                <button class="button-secondary" type="button" @onclick="MaterializeAsync" disabled="@(!CanReview || busy || bindingSaveFailed || !CanMaterialize || !BindingsComplete)">@T("Rematerialize")</button>
+                                <button class="button-primary" type="button" @onclick="ShowChanges" disabled="@(busy || bindingSaveFailed || !CanMaterialize || !BindingsComplete)">@T("ReviewChangesAction")</button>
+                            </div>
+                        </footer>
+                        </section>
+                }
+            }
+            <p class="resource-plan-boundary"><span aria-hidden="true">ⓘ</span>@T("FunctionalBoundary")</p>
+        }
+        else if (activeView == "Changes")
+        {
+            <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ConcreteProposal")</p><h2>@T("Changes")</h2><p>@T("ChangesIntro")</p></div></div>
+            @if (changeSets.Count > 0 || materialization is not null || bindingsDirty)
+            {
+                <div class="resource-plan-change-set-picker"><label for="change-set-select">@T("ChangeSet")</label><select id="change-set-select" value="@ReviewSelectionValue" @onchange="SelectChangeSetAsync">
+                    @if (materialization is not null) { <option value="preview">@T("CurrentPreview")</option> }
+                    @if (bindingsDirty && materialization is null) { <option value="pending">@T("PendingPreview")</option> }
+                    @foreach (var item in changeSets) { <option value="@item.Value.Id.Value.ToString("D")">@T("SavedChangeSetOption", item.Value.PlanRevision, item.Value.CreatedAt.ToLocalTime().ToString("g"))</option> }
+                </select></div>
+            }
+            @if (DisplayedChanges is { } displayedChanges)
+            {
+                @if (!showRecordedChanges && materialization is not null)
+                {
+                    <div class="resource-plan-review-notice" role="status">
+                        <div><strong>@T("CurrentPreview")</strong><span>@T("Proposals", materialization.Proposals.Count)</span><p>@T(materialization.CanCreateChangeSet ? "CurrentPreviewDescription" : "CurrentPreviewBlockedDescription")</p><details><summary>@T("TechnicalDetails")</summary><code>@materialization.Digest</code></details></div>
+                        <button class="button-primary" type="button" @onclick="CreateChangeSetAsync" disabled="@(!CanReview || busy || bindingSaveFailed || !materialization.CanCreateChangeSet)">@T("CreateChangeSet")</button>
+                    </div>
+                    @foreach (var diagnostic in materialization.Diagnostics)
+                    {
+                        <p class="resource-plan-issue"><strong>@DiagnosticLabel(diagnostic)</strong> · @diagnostic.Path</p>
+                    }
+                }
+                else if (selected is not null)
+                {
+                    <div class="resource-plan-review-notice resource-plan-recorded-notice"><div><strong>@T("RecordedChangeSet")</strong><span>@T("ChangeSetRevision", selected.Value.PlanRevision)</span><span>@T("CreatedAt", selected.Value.CreatedAt.ToLocalTime().ToString("g"))</span><details><summary>@T("TechnicalDetails")</summary><code>@selected.Value.Digest</code></details></div>@if (application is null) { <button class="button-primary" type="button" @onclick="ValidateAsync" disabled="@(!CanReview || busy || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))">@T("Revalidate")</button> }</div>
+                }
+                    <div class="resource-plan-change-summary" aria-label="@T("ChangeSummary")">
+                        @foreach (var operation in Enum.GetValues<ResourceChangeOperation>())
+                        {
+                            var count = displayedChanges.Count(value => value.Operation == operation);
+                            <div><strong>@count</strong><span>@OperationCountLabel(operation, count)</span></div>
+                        }
+                    </div>
+                    @if (DisplayedBindings is { Count: > 0 } reviewedBindings)
+                    {
+                        <div class="resource-plan-reviewed-bindings">
+                            <h3>@T("ReviewedBindings")</h3>
+                            @foreach (var binding in reviewedBindings.OrderBy(value => value.LogicalId, StringComparer.Ordinal).ThenBy(value => value.Field, StringComparer.Ordinal))
+                            {
+                                <p><strong>@binding.LogicalId</strong><span>@T(binding.Field switch { "modelProfile" => "ModelProfile", "runtimeProfile" => "RuntimeProfile", "tool" => "ToolBinding", _ => "BindingsTitle" })</span><code>@(binding.Reference.Namespace ?? ResourceNamespace.Default)/@binding.Reference.Name</code></p>
+                            }
+                        </div>
+                    }
+                    @foreach (var change in displayedChanges.OrderBy(value => value.Order))
+                    {
+                        var reviewFields = ResourcePlanReviewProjection.ReviewFields(change);
+                        <article class="resource-plan-change">
+                            <header><div class="resource-plan-change-identity"><span class="resource-plan-change-number">@(change.Order + 1)</span><div><p class="resource-plan-change-kind">@ResourceKindLabel(change.Proposed.Kind)</p><h3>@ResourcePlanReviewProjection.DisplayName(change)</h3><small>@change.Proposed.Metadata.Namespace/@change.Proposed.Metadata.Name</small></div></div><StatusBadge Text="@T($"Operation.{change.Operation}")" Status="@OperationTone(change.Operation)" /></header>
+                            @if (ResourcePlanReviewProjection.Description(change) is { Length: > 0 } description) { <p class="resource-plan-change-description">@description</p> }
+                            @if (change.DependsOn.Count > 0) { <p class="resource-plan-change-dependencies"><strong>@T("DependsOn")</strong> @string.Join(", ", change.DependsOn)</p> }
+                            @if (change.Operation == ResourceChangeOperation.NoOp) { <p class="resource-plan-change-empty">@T("NoDifferences")</p> }
+                            else
+                            {
+                                <div class="resource-plan-change-highlights">
+                                    @foreach (var difference in ResourcePlanReviewProjection.HighlightFields(change))
+                                    {
+                                        <div><span>@FieldLabel(difference.Path)</span><strong>@DisplayValue(difference.Path, difference.Proposed)</strong></div>
+                                    }
+                                </div>
+                                <details class="resource-plan-change-diff"><summary>@(reviewFields.Count == 1 ? T("ShowField") : T("ShowFields", reviewFields.Count))</summary>
+                                    <div class="resource-plan-table-scroll"><table><thead><tr><th>@T("Field")</th><th>@T("Current")</th><th>@T("Proposed")</th></tr></thead><tbody>
+                                    @foreach (var difference in reviewFields)
+                                    {
+                                        <tr><th scope="row"><strong>@FieldLabel(difference.Path)</strong><code>@difference.Path</code></th><td><span class="resource-plan-diff-value">@DisplayValue(difference.Path, difference.Current)</span></td><td><span class="resource-plan-diff-value">@DisplayValue(difference.Path, difference.Proposed)</span></td></tr>
+                                    }
+                                    </tbody></table></div>
+                                </details>
+                            }
+                        </article>
+                    }
+                }
+            else if (bindingsDirty) { <div class="resource-plan-review-notice" role="status">@T("PendingPreviewDescription")</div> }
+            else { <p>@T("NoChangeSets")</p> }
+        }
+        else if (activeView == "Graph")
+        {
+            <h2>@T("Graph")</h2>
+            @if (DisplayedChanges is not { } graphChanges) { <p>@T(bindingsDirty ? "PendingPreviewDescription" : "NoChangeSets")</p> }
+            else
+            {
+                var graph = ResourcePlanReviewProjection.Graph(graphChanges);
+                <div class="resource-plan-graph-layout @(SelectedGraphChange is not null ? "has-selection" : null)">
+                    <div class="resource-plan-graph-canvas">
+                        <FlowTopologyViewer Graph="@GraphTopology(graph)" SelectedKey="selectedGraphKey" SelectedKeyChanged="SelectGraphNode" InitiallyFit="true" ShowStateLegend="false" />
+                        <p class="resource-plan-graph-hint">@T("GraphHint")</p>
+                    </div>
+                    @if (SelectedGraphChange is { } change)
+                    {
+                        <aside class="resource-plan-graph-details" aria-live="polite">
+                            <header><h3>@change.LogicalId</h3><button type="button" @onclick="() => selectedGraphKey = null" aria-label="@T("CloseNodeDetails")">×</button></header>
+                            <dl>
+                                <dt>@T("ResourceKind")</dt><dd>@change.Proposed.Kind</dd>
+                                <dt>@T("Operation")</dt><dd><StatusBadge Text="@T($"Operation.{change.Operation}")" Status="@OperationTone(change.Operation)" /></dd>
+                                <dt>@T("ResourceName")</dt><dd><code>@change.Proposed.Metadata.Name</code></dd>
+                                <dt>@T("DependsOn")</dt><dd>@(change.DependsOn.Count == 0 ? T("NoDependencies") : string.Join(", ", change.DependsOn))</dd>
+                            </dl>
+                        </aside>
+                    }
+                </div>
+                <ol class="sr-only">@foreach (var graphChange in graphChanges.OrderBy(value => value.Order)) { <li>@graphChange.LogicalId · @graphChange.Proposed.Kind @if (graphChange.DependsOn.Count > 0) { <span>@T("DependsOn") @string.Join(", ", graphChange.DependsOn)</span> }</li> }</ol>
+            }
+        }
+        else if (activeView == "Validation")
+        {
+            <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ReviewResult")</p><h2>@T("Validation")</h2><p>@T("ValidationIntro")</p></div>@if (showRecordedChanges && selected is not null && application is null) { <button class="button-secondary" type="button" @onclick="ValidateAsync" disabled="@(!CanReview || busy || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value))">@T("Revalidate")</button> }</div>
+            @if (!showRecordedChanges) { <p>@T("PreviewRequiresChangeSet")</p> }
+            else if (selected is null) { <p>@T("NoChangeSets")</p> }
+            else if (latestValidation is null) { <p>@T("NotValidated")</p> }
+            else
+            {
+                <div class="resource-plan-validation-summary @(latestValidation.Readiness == ResourceChangeSetReadiness.Ready ? "is-ready" : "is-blocked")" role="status">
+                    <span class="resource-plan-validation-symbol" aria-hidden="true">@(latestValidation.Readiness == ResourceChangeSetReadiness.Ready ? "✓" : "!")</span>
+                    <div><p class="resource-plan-validation-kicker">@T("ValidationState")</p><h3>@(latestValidation.Readiness == ResourceChangeSetReadiness.Ready ? T("ValidationReadyTitle") : latestValidation.Issues.Count == 1 ? T("ValidationIssueSingular") : T("ValidationIssuePlural", latestValidation.Issues.Count))</h3><p>@(latestValidation.Readiness == ResourceChangeSetReadiness.Ready ? T("ValidationReadyDescription") : T("ValidationBlockedDescription"))</p>
+                        <div class="resource-plan-validation-meta"><StatusBadge Text="@T($"Readiness.{latestValidation.Readiness}")" Status="@(latestValidation.Readiness == ResourceChangeSetReadiness.Ready ? UiStatus.Success : UiStatus.Danger)" /><span>@T("ValidatedAt") <time datetime="@latestValidation.ValidatedAt.ToString("O")">@latestValidation.ValidatedAt.ToLocalTime().ToString("g")</time></span>@if (ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, latestValidation)) { <StatusBadge Text="@T("StaleValidation")" Status="UiStatus.Warning" /> }</div>
+                    </div>
+                </div>
+                @if (latestValidation.Issues.Count == 0) { <p class="resource-plan-validation-empty">@T("NoIssues")</p> }
+                else
+                {
+                    <ol class="resource-plan-issues">
+                    @foreach (var issue in latestValidation.Issues)
+                    {
+                        var affected = ResourcePlanReviewProjection.ChangeForIssue(selected.Value, issue);
+                        <li class="@(issue.Severity == ResourceChangeSetValidationSeverity.Warning ? "is-warning" : "is-error")"><span class="resource-plan-issue-symbol" aria-hidden="true">!</span><div class="resource-plan-issue-content"><p class="resource-plan-issue-category">@T($"Severity.{issue.Severity}")@if (affected is not null) { <span> · @ResourceKindLabel(affected.Proposed.Kind)</span> }</p><h3>@IssueTitle(issue.Code)</h3>
+                            @if (affected is not null) { <p class="resource-plan-issue-resource">@ResourcePlanReviewProjection.DisplayName(affected) <code>@affected.LogicalId</code></p> }
+                            <p>@IssueDescription(issue.Code, affected)</p>
+                            @if (issue.Code == "resource_change_model_profile_invalid") { <p class="resource-plan-issue-action">@T("Issue.ModelProfile.Action")</p> }
+                            <details class="resource-plan-issue-technical"><summary>@T("TechnicalDetails")</summary><code>@issue.Code</code><code>@issue.Path</code><p>@issue.Message</p></details>
+                        </div></li>
+                    }
+                    </ol>
+            }
+                @if (latestValidation.Readiness == ResourceChangeSetReadiness.Ready && !ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, latestValidation))
+                {
+                    <div class="resource-plan-validation-next"><div><strong>@T("ValidationNextTitle")</strong><p>@T("ValidationNextDescription")</p></div><button class="button-secondary" type="button" @onclick="ShowApplication">@T("OpenApplication")</button></div>
+                }
+            }
+        }
+        else if (activeView == "Application")
+        {
+            <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ApplicationKicker")</p><h2>@T("View.Application")</h2><p>@T("ApplicationIntro")</p></div></div>
+            @if (application is not null)
+            {
+                <div class="resource-plan-application-summary @(application.Value.Status == ResourceChangeSetApplicationStatus.Applied ? "is-applied" : application.Value.Status == ResourceChangeSetApplicationStatus.Applying ? "is-applying" : "is-failed")" role="status">
+                    <span class="resource-plan-application-symbol" aria-hidden="true">@(application.Value.Status == ResourceChangeSetApplicationStatus.Applied ? "✓" : application.Value.Status == ResourceChangeSetApplicationStatus.Applying ? "…" : "!")</span>
+                    <div><p class="resource-plan-validation-kicker">@T("ApplicationResult")</p><h3>@T($"ApplicationSummary.{application.Value.Status}")</h3><p>@T($"ApplicationDescription.{application.Value.Status}")</p>
+                        <div class="resource-plan-validation-meta"><StatusBadge Text="@T($"Application.{application.Value.Status}")" Status="@(application.Value.Status == ResourceChangeSetApplicationStatus.Applied ? UiStatus.Success : application.Value.Status == ResourceChangeSetApplicationStatus.Applying ? UiStatus.Warning : UiStatus.Danger)" /><span>@T("ApplicationAttempts", application.Value.Attempts)</span>@if (application.Value.CompletedAt is { } completedAt) { <span>@T("ApplicationCompletedAt") <time datetime="@completedAt.ToString("O")">@completedAt.ToLocalTime().ToString("g")</time></span> }</div>
+                    </div>
+                </div>
+                <div class="resource-plan-application-counts" aria-label="@T("ApplicationProgress")"><div><strong>@application.Value.Operations.Count(value => value.Outcome is ResourceChangeApplicationOutcome.Applied or ResourceChangeApplicationOutcome.AlreadyApplied)</strong><span>@T("ApplicationAppliedCount")</span></div><div><strong>@application.Value.Operations.Count(value => value.Outcome == ResourceChangeApplicationOutcome.Skipped)</strong><span>@T("ApplicationSkippedCount")</span></div><div><strong>@application.Value.Operations.Count(value => value.Outcome == ResourceChangeApplicationOutcome.Failed)</strong><span>@T("ApplicationFailedCount")</span></div></div>
+                <section class="resource-plan-application-operations" aria-label="@T("ApplicationOperations")">
+                    <h3>@T("ApplicationOperations")</h3>
+                    @if (application.Value.Operations.Count == 0) { <p class="resource-plan-validation-empty">@T("ApplicationNoOperations")</p> }
+                    else
+                    {
+                        <ol>
+                            @foreach (var operation in application.Value.Operations.OrderBy(value => value.Order))
+                            {
+                                var change = selected?.Value.Changes.FirstOrDefault(value => value.LogicalId == operation.LogicalId);
+                                var resourceUrl = ResourcePlanReviewProjection.AppliedResourceUrl(change, operation);
+                                var resourceName = change is null ? operation.LogicalId : ResourcePlanReviewProjection.DisplayName(change);
+                                <li>
+                                    <span class="resource-plan-application-order">@(operation.Order + 1)</span>
+                                    <div class="resource-plan-application-resource">
+                                        @if (resourceUrl is not null) { <a class="resource-name-link" href="@resourceUrl">@resourceName</a> } else { <strong>@resourceName</strong> }
+                                        <small>@(change is null ? operation.LogicalId : $"{ResourceKindLabel(change.Proposed.Kind)} · {operation.LogicalId}")</small>
+                                        @if (!string.IsNullOrWhiteSpace(operation.ErrorMessage)) { <p class="resource-plan-application-error">@operation.ErrorMessage</p> }
+                                    </div>
+                                    <StatusBadge Text="@T($"Outcome.{operation.Outcome}")" Status="@ApplicationOutcomeTone(operation.Outcome)" />
+                                </li>
+                            }
+                        </ol>
+                    }
+                </section>
+            }
+            else if (!showRecordedChanges || selected is null || latestValidation is null || latestValidation.Readiness != ResourceChangeSetReadiness.Ready || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, latestValidation))
+            {
+                <div class="resource-plan-application-pending"><span class="resource-plan-application-symbol" aria-hidden="true">3</span><div><h3>@T("ApplicationPendingTitle")</h3><p>@T("ApplicationPendingDescription")</p></div><button class="button-secondary" type="button" @onclick="ShowValidation">@T("View.Validation")</button></div>
+            }
+            @if (showRecordedChanges && selected is not null && latestValidation is { Readiness: ResourceChangeSetReadiness.Ready } readyValidation && !ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, readyValidation) && application?.Value.Status is not (ResourceChangeSetApplicationStatus.Applied or ResourceChangeSetApplicationStatus.Applying))
+            {
+                <div class="resource-plan-application-action"><div><strong>@T("ApplyTitle")</strong><p>@T("ApplyDescription")</p></div><button class="button-primary" type="button" @onclick="ApplyAsync" disabled="@(!CanApply || busy)">@T(application?.Value.Status is ResourceChangeSetApplicationStatus.Failed or ResourceChangeSetApplicationStatus.PartiallyApplied ? "RetryApply" : "ApplyProposal")</button></div>
+            }
+        }
+        else
+        {
+            <div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ActivityKicker")</p><h2>@T("Activity")</h2><p>@T("ActivityIntro")</p></div></div>
+            <div class="resource-plan-activity-layout">
+                <section class="resource-plan-origin-card" aria-label="@T("OriginTitle")">
+                    <div class="resource-plan-activity-card-heading"><span class="resource-plan-origin-symbol" aria-hidden="true">◎</span><div><h3>@T("OriginTitle")</h3><p>@T("OriginDescription")</p></div></div>
+                    <dl class="resource-plan-origin">
+                        <div><dt>@T("Principal")</dt><dd>@if (PrincipalDisplayName(plan.Value.Origin.PrincipalId) is { } creatorName) { <strong>@creatorName</strong> }<code>@plan.Value.Origin.PrincipalId</code></dd></div>
+                        @if (activities.Where(value => value.Type == ResourcePlanActivityType.Applied).OrderByDescending(value => value.CreatedAt).FirstOrDefault() is { } appliedActivity) { <div><dt>@T("AppliedBy")</dt><dd>@if (PrincipalDisplayName(appliedActivity.ActorPrincipalId) is { } appliedByName) { <strong>@appliedByName</strong> }<code>@appliedActivity.ActorPrincipalId</code></dd></div> }
+                        @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.WorkItemId)) { <div><dt>@T("Work")</dt><dd><a href="@($"/api/work/workitems/{Uri.EscapeDataString(plan.Value.Origin.WorkItemId)}")">@plan.Value.Origin.WorkItemId</a></dd></div> }
+                        @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.FlowRunId)) { <div><dt>@T("FlowRun")</dt><dd><a href="@($"/flow-runs/{Uri.EscapeDataString(plan.Value.Origin.FlowRunId)}")">@plan.Value.Origin.FlowRunId</a></dd></div> }
+                        @if (!string.IsNullOrWhiteSpace(plan.Value.Origin.CorrelationId)) { <div><dt>@T("Correlation")</dt><dd><code>@plan.Value.Origin.CorrelationId</code></dd></div> }
+                    </dl>
+                </section>
+                <section class="resource-plan-history" aria-label="@T("HistoryTitle")">
+                    <div class="resource-plan-history-heading"><div><h3>@T("HistoryTitle")</h3><p>@T("HistoryDescription")</p></div><span class="resource-plan-history-count">@T("HistoryCount", activities.Count)</span></div>
+                    @if (activities.Count == 0) { <p class="resource-plan-history-empty">@T("HistoryEmpty")</p> }
+                    else
+                    {
+                        <ol class="resource-plan-timeline">
+                            @foreach (var activity in activities.OrderByDescending(value => value.CreatedAt))
+                            {
+                                <li class="@ActivityToneClass(activity.Type)"><span class="resource-plan-timeline-marker" aria-hidden="true"></span><article><div class="resource-plan-timeline-heading"><strong>@T($"Activity.{activity.Type}")</strong><span>@T("Revision", activity.PlanRevision)</span></div><time datetime="@activity.CreatedAt.ToString("O")">@activity.CreatedAt.ToLocalTime().ToString("g")</time>@if (!string.IsNullOrWhiteSpace(activity.Detail)) { <p>@activity.Detail</p> }</article></li>
+                            }
+                        </ol>
+                    }
+                </section>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private static readonly string[] Views = ["Overview", "Changes", "Graph", "Validation", "Application", "Activity"];
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly CancellationTokenSource lifetime = new();
+    private ResourcePlanSnapshot? plan;
+    private IReadOnlyList<ResourcePlanActivity> activities = [];
+    private IReadOnlyDictionary<Guid, string> principalNames = new Dictionary<Guid, string>();
+    private IReadOnlyList<ResourceChangeSetSnapshot> changeSets = [];
+    private ResourceChangeSetSnapshot? selected;
+    private string? selectedGraphKey;
+    private IReadOnlyList<ResourceChangeSetValidation> validations = [];
+    private ResourceChangeSetApplicationSnapshot? application;
+    private ResourcePlanMaterialization? materialization;
+    private FunctionalResourcePlanV1? functional;
+    private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
+    private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
+    private IReadOnlyList<ToolResource> tools = [];
+    private readonly Dictionary<string, ResourceReference> modelBindings = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ResourceReference> runtimeBindings = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ResourceReference> toolBindings = new(StringComparer.OrdinalIgnoreCase);
+    private ResourcePlanBindingDraftSnapshot? bindingDraft;
+    private bool bindingSaveFailed;
+    private bool bindingSaving;
+    private bool bindingsConflict;
+    private bool bindingsOutdated;
+    private int CompleteBindings => functional?.Roles.Count(role => modelBindings.ContainsKey(role.LogicalId) && runtimeBindings.ContainsKey(role.LogicalId)) ?? 0;
+    private int CompleteToolBindings => functional?.Integrations.Count(value => toolBindings.ContainsKey(value.LogicalId)) ?? 0;
+    private bool BindingsComplete => functional is not null && CompleteBindings == functional.Roles.Count && CompleteToolBindings == functional.Integrations.Count;
+    private bool bindingsDirty;
+    private bool showRecordedChanges = true;
+    private string ReviewSelectionValue => showRecordedChanges ? selected?.Value.Id.Value.ToString("D") ?? string.Empty : materialization is null ? "pending" : "preview";
+    private IReadOnlyList<ResourceChange>? DisplayedChanges => !showRecordedChanges && materialization is not null ? MaterializedChanges(materialization)
+        : showRecordedChanges ? selected?.Value.Changes : null;
+    private IReadOnlyList<ResourcePlanResolvedBinding>? DisplayedBindings => !showRecordedChanges && materialization is not null ? materialization.ResolvedBindings : selected?.Value.ResolvedBindings;
+    private string activeView = "Overview";
+    private void ShowValidation() => activeView = "Validation";
+    private void ShowApplication() => activeView = "Application";
+    private string? error;
+    private bool busy;
+    private bool reloadRequested;
+    private int contextVersion;
+    private Guid loadedId;
+    private bool CanReview => ContextState.HasPermission("resources/write") && application is null && plan?.Value.Status is not (ResourcePlanStatus.Applied or ResourcePlanStatus.Archived or ResourcePlanStatus.Cancelled);
+    private bool CanApply => ContextState.HasPermission("resources/write") && plan?.Value.Status is not (ResourcePlanStatus.Archived or ResourcePlanStatus.Cancelled);
+    private bool CanMaterialize => plan?.Value.Status is ResourcePlanStatus.Ready or ResourcePlanStatus.Materialized or ResourcePlanStatus.Validated;
+    private ResourceChangeSetValidation? latestValidation => selected is null ? null : ResourcePlanReviewProjection.LatestValidation(selected.Value, validations);
+    private ResourceChange? SelectedGraphChange
+    {
+        get
+        {
+            if (DisplayedChanges is not { } displayedChanges || selectedGraphKey is null || !selectedGraphKey.StartsWith("resource:", StringComparison.Ordinal)
+                || !int.TryParse(selectedGraphKey.AsSpan("resource:".Length), out var index)) return null;
+            return displayedChanges.OrderBy(value => value.Order).ElementAtOrDefault(index);
+        }
+    }
+    private string T(string key, params object[] args) => Localizer[key, args].Value;
+    private string? PrincipalDisplayName(Guid id) => principalNames.TryGetValue(id, out var name) && !string.IsNullOrWhiteSpace(name) ? name : null;
+    private string DiagnosticLabel(ResourcePlanMaterializationDiagnostic diagnostic)
+    {
+        var localized = Localizer[$"MaterializationDiagnostic.{diagnostic.Code}"];
+        return localized.ResourceNotFound ? diagnostic.Message : localized.Value;
+    }
+    private static bool IsInvalidModel(ModelProfileSummaryResponse profile) => ModelManagementUi.IsInvalid(profile);
+    private static bool UsableTool(ToolResource tool) => tool.Definition.Enabled && tool.Definition.Discovery?.Available == true;
+    private static bool IsVisible(ResourceScopeRef? scopeRef, ResourcePlanScope scope) => scopeRef is { } candidate
+        && (candidate == ResourceScopeRef.Instance || candidate == ResourceScopeRef.Tenant(scope.TenantId) || candidate == ResourceScopeRef.Workspace(scope.WorkspaceId.Value));
+    private static ResourceReference Reference(string name, string @namespace, ResourceScopeRef? scope) => new(name, scope, ResourceNamespace.Parse(@namespace));
+    private string SelectedModelIndex(string role) => modelBindings.TryGetValue(role, out var reference)
+        ? modelProfiles.Select((profile, index) => (profile, index)).Where(item => Reference(item.profile.Name, item.profile.Namespace, item.profile.ScopeRef) == reference).Select(item => item.index.ToString(System.Globalization.CultureInfo.InvariantCulture)).FirstOrDefault() ?? string.Empty
+        : string.Empty;
+    private string SelectedRuntimeIndex(string role) => runtimeBindings.TryGetValue(role, out var reference)
+        ? runtimeProfiles.Select((profile, index) => (profile, index)).Where(item => Reference(item.profile.Name, item.profile.Namespace, item.profile.ScopeRef) == reference).Select(item => item.index.ToString(System.Globalization.CultureInfo.InvariantCulture)).FirstOrDefault() ?? string.Empty
+        : string.Empty;
+    private string SelectedToolIndex(string integration) => toolBindings.TryGetValue(integration, out var reference)
+        ? tools.Select((tool, index) => (tool, index)).Where(item => Reference(item.tool.Metadata.Name, item.tool.Metadata.Namespace.Value, item.tool.ScopeRef) == reference).Select(item => item.index.ToString(System.Globalization.CultureInfo.InvariantCulture)).FirstOrDefault() ?? string.Empty
+        : string.Empty;
+    private async Task SelectModelAsync(string role, ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var index) && index >= 0 && index < modelProfiles.Count && !IsInvalidModel(modelProfiles[index]))
+        {
+            var profile = modelProfiles[index];
+            modelBindings[role] = Reference(profile.Name, profile.Namespace, profile.ScopeRef);
+        }
+        else modelBindings.Remove(role);
+        await BindingChangedAsync();
+    }
+    private async Task SelectRuntimeAsync(string role, ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var index) && index >= 0 && index < runtimeProfiles.Count)
+        {
+            var profile = runtimeProfiles[index];
+            runtimeBindings[role] = Reference(profile.Name, profile.Namespace, profile.ScopeRef);
+        }
+        else runtimeBindings.Remove(role);
+        await BindingChangedAsync();
+    }
+    private async Task SelectToolAsync(string integration, ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var index) && index >= 0 && index < tools.Count && UsableTool(tools[index]))
+        {
+            var tool = tools[index];
+            toolBindings[integration] = Reference(tool.Metadata.Name, tool.Metadata.Namespace.Value, tool.ScopeRef);
+        }
+        else toolBindings.Remove(integration);
+        await BindingChangedAsync();
+    }
+    private async Task BindingChangedAsync()
+    {
+        materialization = null;
+        bindingsDirty = true;
+        showRecordedChanges = false;
+        selectedGraphKey = null;
+        if (plan is null) return;
+        busy = true;
+        bindingSaving = true;
+        var version = contextVersion;
+        try
+        {
+            var saved = await Client.SaveBindingsAsync(Id, new(plan.Value.Revision, functional?.Roles
+                .Where(role => modelBindings.ContainsKey(role.LogicalId) || runtimeBindings.ContainsKey(role.LogicalId))
+                .Select(role => new ResourcePlanAgentBindingSelection(role.LogicalId,
+                    modelBindings.GetValueOrDefault(role.LogicalId), runtimeBindings.GetValueOrDefault(role.LogicalId))).ToArray() ?? [],
+                functional?.Integrations.Where(value => toolBindings.ContainsKey(value.LogicalId))
+                    .Select(value => new ResourcePlanIntegrationBinding(value.LogicalId, toolBindings[value.LogicalId])).ToArray() ?? []), bindingDraft?.ETag, lifetime.Token);
+            if (version == contextVersion) { bindingDraft = saved; bindingSaveFailed = false; bindingsConflict = false; bindingsOutdated = false; error = null; }
+        }
+        catch (Exception exception)
+        {
+            if (version == contextVersion)
+            {
+                bindingSaveFailed = true;
+                bindingsConflict = exception is AgentstrationApiException { StatusCode: System.Net.HttpStatusCode.Conflict };
+                error = T(bindingsConflict ? "BindingsConflict" : "BindingsSaveFailed");
+            }
+        }
+        finally { if (version == contextVersion) bindingSaving = false; EndBusy(); }
+        if (version == contextVersion && !bindingSaveFailed && BindingsComplete && CanMaterialize)
+            await MaterializeAsync();
+    }
+    private Task RetryBindingsAsync() => bindingsConflict ? LoadAsync() : BindingChangedAsync();
+    private static IReadOnlyList<ResourceChange> MaterializedChanges(ResourcePlanMaterialization preview) => preview.Proposals.Select((proposal, order) => new ResourceChange(
+        order, proposal.LogicalId, proposal.Operation switch
+        {
+            ResourcePlanProposedOperation.Create => ResourceChangeOperation.Create,
+            ResourcePlanProposedOperation.Update => ResourceChangeOperation.Update,
+            ResourcePlanProposedOperation.Delete => ResourceChangeOperation.Delete,
+            ResourcePlanProposedOperation.NoOp => ResourceChangeOperation.NoOp,
+            _ => throw new ArgumentOutOfRangeException(nameof(proposal))
+        }, proposal.Resource, proposal.Current, proposal.DependsOn, proposal.ProposedDigest)).ToArray();
+    private ResourcePlanMaterializationRequest BindingRequest() => new(functional?.Roles
+        .Where(role => modelBindings.ContainsKey(role.LogicalId) && runtimeBindings.ContainsKey(role.LogicalId))
+        .Select(role => new ResourcePlanAgentBinding(role.LogicalId, modelBindings[role.LogicalId], runtimeBindings[role.LogicalId])).ToArray() ?? [], null,
+        functional?.Integrations.Where(value => toolBindings.ContainsKey(value.LogicalId))
+            .Select(value => new ResourcePlanIntegrationBinding(value.LogicalId, toolBindings[value.LogicalId])).ToArray() ?? []);
+    private bool MatchesSavedChangeSet(ResourceChangeSetSnapshot? changeSet) => changeSet?.Value.ResolvedBindings is { } resolved
+        && functional?.Roles.All(role => modelBindings.TryGetValue(role.LogicalId, out var model)
+            && runtimeBindings.TryGetValue(role.LogicalId, out var runtime)
+            && resolved.Any(value => value.LogicalId.Equals(role.LogicalId, StringComparison.OrdinalIgnoreCase) && value.Field == "modelProfile" && value.Reference == model)
+            && resolved.Any(value => value.LogicalId.Equals(role.LogicalId, StringComparison.OrdinalIgnoreCase) && value.Field == "runtimeProfile" && value.Reference == runtime)) == true
+        && functional.Integrations.All(integration => toolBindings.TryGetValue(integration.LogicalId, out var tool)
+            && resolved.Any(value => value.LogicalId.Equals(integration.LogicalId, StringComparison.OrdinalIgnoreCase) && value.Field == "tool" && value.Reference == tool));
+    private string OperationCountLabel(ResourceChangeOperation operation, int count) => T($"Operation{(count == 1 ? string.Empty : "Plural")}.{operation}");
+    private string DisplayValue(string path, string? value)
+    {
+        if (value?.Equals("true", StringComparison.OrdinalIgnoreCase) == true) return T("Yes");
+        if (value?.Equals("false", StringComparison.OrdinalIgnoreCase) == true) return T("No");
+        if (value is not null)
+        {
+            var localized = Localizer[$"Value.{path}.{value}"];
+            if (!localized.ResourceNotFound) return localized.Value;
+        }
+        return ResourcePlanReviewProjection.FormatValue(value);
+    }
+    private string ResourceKindLabel(string kind) => kind switch
+    {
+        "Agent" => T("Kind.Agent"),
+        "Flow" => T("Kind.Flow"),
+        "Entry" => T("Kind.Entry"),
+        _ => kind
+    };
+    private string FieldLabel(string path)
+    {
+        var value = Localizer[$"Field.{path}"];
+        if (!value.ResourceNotFound) return value.Value;
+        if (path.StartsWith("definition.spec.", StringComparison.Ordinal)) return T("Field.FlowSpec");
+        if (path.StartsWith("definition.presentation.", StringComparison.Ordinal)) return T("Field.Presentation");
+        if (path.StartsWith("definition.binding.", StringComparison.Ordinal)) return T("Field.Binding");
+        return T("Field.Other");
+    }
+    private string IssueTitle(string code) => code switch
+    {
+        "resource_change_model_profile_invalid" => T("Issue.ModelProfile.Title"),
+        "resource_change_canonical_invalid" => T("Issue.Canonical.Title"),
+        "resource_change_create_conflict" => T("Issue.Conflict.Title"),
+        "resource_change_current_missing" or "resource_change_stale" => T("Issue.Stale.Title"),
+        "resource_change_binding_stale" => T("Issue.BindingStale.Title"),
+        "resource_change_dependency_missing" or "resource_change_dependency_order_invalid" => T("Issue.Dependency.Title"),
+        _ => T("Issue.Generic.Title")
+    };
+    private string IssueDescription(string code, ResourceChange? change) => code switch
+    {
+        "resource_change_model_profile_invalid" => T("Issue.ModelProfile.Description", change is null ? T("UnknownProfile") : ResourcePlanReviewProjection.ModelProfile(change) ?? T("UnknownProfile")),
+        "resource_change_canonical_invalid" => T("Issue.Canonical.Description"),
+        "resource_change_create_conflict" => T("Issue.Conflict.Description"),
+        "resource_change_current_missing" or "resource_change_stale" => T("Issue.Stale.Description"),
+        "resource_change_binding_stale" => T("Issue.BindingStale.Description"),
+        "resource_change_dependency_missing" or "resource_change_dependency_order_invalid" => T("Issue.Dependency.Description"),
+        _ => T("Issue.Generic.Description")
+    };
+
+    private FlowTopologyGraph GraphTopology(ResourcePlanGraph graph)
+    {
+        var ids = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var nodes = graph.Nodes.Select((node, index) =>
+        {
+            var id = $"resource:{index}";
+            ids.TryAdd(node.LogicalId, id);
+            return new FlowTopologyNode(id, id, node.LogicalId, node.Kind, node.X, node.Y, T($"Operation.{node.Operation}"));
+        }).ToArray();
+        var edges = graph.Edges.Where(edge => ids.ContainsKey(edge.From) && ids.ContainsKey(edge.To))
+            .Select((edge, index) => new FlowTopologyEdge($"dependency:{index}", ids[edge.From], ids[edge.To]))
+            .ToArray();
+        return new(nodes, edges, "resource-plan", T("GraphLabel"));
+    }
+
+    private void SelectGraphNode(string key) => selectedGraphKey = key;
+    private void ShowChanges() => activeView = "Changes";
+
+    protected override void OnInitialized() => ContextState.Changed += OnContextChanged;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedId != Id) { loadedId = Id; plan = null; principalNames = new Dictionary<Guid, string>(); modelBindings.Clear(); runtimeBindings.Clear(); toolBindings.Clear(); bindingDraft = null; bindingsDirty = false; showRecordedChanges = true; contextVersion++; }
+        await LoadAsync();
+    }
+    private void OnContextChanged() => _ = InvokeAsync(async () =>
+    {
+        contextVersion++;
+        plan = null;
+        principalNames = new Dictionary<Guid, string>();
+        selected = null;
+        selectedGraphKey = null;
+        changeSets = [];
+        validations = [];
+        materialization = null;
+        modelBindings.Clear();
+        runtimeBindings.Clear();
+        toolBindings.Clear();
+        bindingDraft = null;
+        bindingsDirty = false;
+        showRecordedChanges = true;
+        await LoadAsync();
+    });
+
+    private async Task<IReadOnlyDictionary<Guid, string>> LoadPrincipalNamesAsync(ResourcePlan loadedPlan, IReadOnlyList<ResourcePlanActivity> loadedActivities, CancellationToken cancellationToken)
+    {
+        var relevantIds = loadedActivities.Where(value => value.Type == ResourcePlanActivityType.Applied)
+            .Select(value => value.ActorPrincipalId).Append(loadedPlan.Origin.PrincipalId).ToHashSet();
+        var names = new Dictionary<Guid, string>();
+        if (ContextState.Current is { } current && relevantIds.Contains(current.UserId) && !string.IsNullOrWhiteSpace(current.UserDisplayName))
+            names[current.UserId] = current.UserDisplayName;
+        if (!ContextState.HasPermission("authorization/read")) return names;
+
+        try
+        {
+            var organization = await IdentityClient.GetOrganizationAsync(cancellationToken);
+            foreach (var member in organization.Members.Where(value => relevantIds.Contains(value.Principal.Id) && !string.IsNullOrWhiteSpace(value.Principal.DisplayName)))
+                names[member.Principal.Id] = member.Principal.DisplayName;
+        }
+        catch (AgentstrationApiException) { }
+        catch (HttpRequestException) { }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+        return names;
+    }
+
+    private async Task LoadAsync()
+    {
+        if (busy) { reloadRequested = true; return; }
+        busy = true; error = null; materialization = null;
+        var version = contextVersion;
+        var previewOnLoad = false;
+        try
+        {
+            var loadedPlan = await Client.GetPlanAsync(Id, lifetime.Token);
+            if (loadedPlan is null)
+            {
+                if (version == contextVersion) { plan = null; activities = []; principalNames = new Dictionary<Guid, string>(); changeSets = []; selected = null; selectedGraphKey = null; }
+                return;
+            }
+            var loadedFunctional = loadedPlan.Value.Content.Document.Deserialize<FunctionalResourcePlanV1>(JsonOptions);
+            var loadedModelProfiles = await ModelProfilesClient.GetModelProfilesAsync(null, null, null, lifetime.Token);
+            var loadedRuntimeProfiles = await RuntimeProfilesClient.GetRuntimeProfilesAsync(lifetime.Token);
+            IReadOnlyList<ToolResource> loadedTools = loadedFunctional?.Integrations.Count > 0
+                ? await ToolsClient.GetToolsAsync(cancellationToken: lifetime.Token) : [];
+            var loadedActivities = await Client.ListActivitiesAsync(Id, lifetime.Token);
+            var loadedPrincipalNames = await LoadPrincipalNamesAsync(loadedPlan.Value, loadedActivities, lifetime.Token);
+            var page = await Client.ListChangeSetsAsync(Id, 0, 200, lifetime.Token);
+            var loadedSets = page.Items.OrderByDescending(value => value.Value.PlanRevision).ThenByDescending(value => value.Value.CreatedAt).ToArray();
+            var loadedSelected = ResourcePlanReviewProjection.LatestChangeSet(loadedPlan.Value, loadedSets);
+            var loadedDraft = await Client.GetBindingsAsync(Id, lifetime.Token);
+            IReadOnlyList<ResourceChangeSetValidation> loadedValidations = loadedSelected is null ? [] : await Client.ListValidationsAsync(loadedSelected.Value.Id.Value, lifetime.Token);
+            var loadedApplication = loadedSelected is null ? null : await Client.GetApplicationAsync(loadedSelected.Value.Id.Value, lifetime.Token);
+            if (version != contextVersion) return;
+            plan = loadedPlan;
+            functional = loadedFunctional;
+            modelProfiles = loadedModelProfiles.Where(profile => IsVisible(profile.ScopeRef, loadedPlan.Value.Scope)).ToArray();
+            runtimeProfiles = loadedRuntimeProfiles.Where(profile => IsVisible(profile.ScopeRef, loadedPlan.Value.Scope)).ToArray();
+            tools = loadedTools.Where(tool => IsVisible(tool.ScopeRef, loadedPlan.Value.Scope)).ToArray();
+            activities = loadedActivities;
+            principalNames = loadedPrincipalNames;
+            changeSets = loadedSets;
+            selected = loadedSelected;
+            selectedGraphKey = null;
+            validations = loadedValidations;
+            application = loadedApplication;
+            bindingDraft = loadedDraft;
+            bindingSaveFailed = false;
+            bindingsConflict = false;
+            bindingsOutdated = loadedDraft is not null && loadedDraft.Value.PlanRevision != loadedPlan.Value.Revision;
+            modelBindings.Clear();
+            runtimeBindings.Clear();
+            toolBindings.Clear();
+            if (loadedDraft?.Value.PlanRevision == loadedPlan.Value.Revision)
+            {
+                foreach (var binding in loadedDraft.Value.Bindings.Where(binding => loadedFunctional?.Roles.Any(role => role.LogicalId.Equals(binding.LogicalId, StringComparison.OrdinalIgnoreCase)) == true))
+                {
+                    if (binding.ModelProfile is { } model) modelBindings[binding.LogicalId] = model;
+                    if (binding.RuntimeProfile is { } runtime) runtimeBindings[binding.LogicalId] = runtime;
+                }
+                foreach (var binding in loadedDraft.Value.IntegrationBindings ?? [])
+                    if (loadedFunctional?.Integrations.Any(value => value.LogicalId.Equals(binding.LogicalId, StringComparison.OrdinalIgnoreCase)) == true)
+                        toolBindings[binding.LogicalId] = binding.Tool;
+            }
+            else if (loadedSelected?.Value.PlanRevision == loadedPlan.Value.Revision && loadedSelected.Value.ResolvedBindings is { } resolved)
+            {
+                foreach (var role in loadedFunctional?.Roles ?? [])
+                {
+                    var model = resolved.FirstOrDefault(value => value.LogicalId.Equals(role.LogicalId, StringComparison.OrdinalIgnoreCase) && value.Field == "modelProfile");
+                    var runtime = resolved.FirstOrDefault(value => value.LogicalId.Equals(role.LogicalId, StringComparison.OrdinalIgnoreCase) && value.Field == "runtimeProfile");
+                    if (model is not null) modelBindings[role.LogicalId] = model.Reference;
+                    if (runtime is not null) runtimeBindings[role.LogicalId] = runtime.Reference;
+                }
+                foreach (var integration in loadedFunctional?.Integrations ?? [])
+                {
+                    var tool = resolved.FirstOrDefault(value => value.LogicalId.Equals(integration.LogicalId, StringComparison.OrdinalIgnoreCase) && value.Field == "tool");
+                    if (tool is not null) toolBindings[integration.LogicalId] = tool.Reference;
+                }
+            }
+            bindingsDirty = loadedDraft?.Value.PlanRevision == loadedPlan.Value.Revision && !MatchesSavedChangeSet(loadedSelected);
+            showRecordedChanges = !bindingsDirty;
+            previewOnLoad = bindingsDirty && CanReview && CanMaterialize && BindingsComplete;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
+        finally { EndBusy(); }
+        if (previewOnLoad && version == contextVersion) await MaterializeAsync();
+    }
+
+    private async Task LoadValidationsAsync() => validations = selected is null ? [] : await Client.ListValidationsAsync(selected.Value.Id.Value, lifetime.Token);
+
+    private async Task SelectChangeSetAsync(ChangeEventArgs args)
+    {
+        if (args.Value?.ToString() is "preview" or "pending") { showRecordedChanges = false; selectedGraphKey = null; return; }
+        if (!Guid.TryParse(args.Value?.ToString(), out var id)) return;
+        var version = contextVersion;
+        var next = changeSets.FirstOrDefault(value => value.Value.Id.Value == id);
+        try
+        {
+            IReadOnlyList<ResourceChangeSetValidation> nextValidations = next is null ? [] : await Client.ListValidationsAsync(next.Value.Id.Value, lifetime.Token);
+            var nextApplication = next is null ? null : await Client.GetApplicationAsync(next.Value.Id.Value, lifetime.Token);
+            if (version == contextVersion) { selected = next; showRecordedChanges = true; selectedGraphKey = null; validations = nextValidations; application = nextApplication; }
+        }
+        catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
+    }
+
+    private async Task MaterializeAsync()
+    {
+        if (plan is null || !CanReview || bindingSaveFailed || !CanMaterialize || busy) return;
+        busy = true; error = null;
+        var version = contextVersion;
+        try { var result = await Client.MaterializeAsync(Id, BindingRequest(), lifetime.Token); if (version == contextVersion) { materialization = result; bindingsDirty = true; showRecordedChanges = false; selectedGraphKey = null; } }
+        catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
+        finally { EndBusy(); }
+    }
+
+    private async Task CreateChangeSetAsync()
+    {
+        if (plan is null || !CanReview || bindingSaveFailed || showRecordedChanges || materialization?.CanCreateChangeSet != true || busy) return;
+        busy = true; error = null;
+        var version = contextVersion;
+        try
+        {
+            var created = await Client.CreateChangeSetAsync(Id, BindingRequest() with { ExpectedDigest = materialization!.Digest }, lifetime.Token);
+            if (version != contextVersion) return;
+            var page = await Client.ListChangeSetsAsync(Id, 0, 200, lifetime.Token);
+            if (version != contextVersion) return;
+            changeSets = page.Items.OrderByDescending(value => value.Value.PlanRevision).ThenByDescending(value => value.Value.CreatedAt).ToArray();
+            selected = changeSets.FirstOrDefault(value => value.Value.Id == created.Value.Id);
+            materialization = null;
+            bindingsDirty = false;
+            showRecordedChanges = true;
+            selectedGraphKey = null;
+            await LoadValidationsAsync();
+            if (version != contextVersion) return;
+            activeView = "Changes";
+        }
+        catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
+        finally { EndBusy(); }
+    }
+
+    private async Task ValidateAsync()
+    {
+        if (plan is null || selected is null || !CanReview || !showRecordedChanges || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value) || busy) return;
+        busy = true; error = null;
+        var version = contextVersion;
+        try { _ = await Client.ValidateChangeSetAsync(selected.Value.Id.Value, lifetime.Token); if (version == contextVersion) { await LoadValidationsAsync(); if (version == contextVersion) activeView = "Validation"; } }
+        catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
+        finally { EndBusy(); }
+    }
+
+    private async Task ApplyAsync()
+    {
+        if (plan is null || selected is null || latestValidation is null || latestValidation.Readiness != ResourceChangeSetReadiness.Ready ||
+            application?.Value.Status is ResourceChangeSetApplicationStatus.Applied or ResourceChangeSetApplicationStatus.Applying ||
+            !CanApply || !showRecordedChanges || busy || ResourcePlanReviewProjection.IsStale(plan.Value, selected.Value, latestValidation)) return;
+        busy = true; error = null;
+        var version = contextVersion;
+        try
+        {
+            var applied = await Client.ApplyChangeSetAsync(selected.Value.Id.Value,
+                new(plan.Value.Id, plan.Value.Revision, selected.Value.Digest, latestValidation.Id), lifetime.Token);
+            if (version == contextVersion) { application = applied; activeView = "Application"; await LoadAsync(); }
+        }
+        catch (Exception exception) { if (version == contextVersion) error = exception.Message; }
+        finally { EndBusy(); }
+    }
+
+    private void EndBusy()
+    {
+        busy = false;
+        if (reloadRequested && !lifetime.IsCancellationRequested)
+        {
+            reloadRequested = false;
+            _ = InvokeAsync(LoadAsync);
+        }
+    }
+
+    private static UiStatus Tone(ResourcePlanStatus status) => status switch { ResourcePlanStatus.Validated or ResourcePlanStatus.Applied => UiStatus.Success, ResourcePlanStatus.Failed or ResourcePlanStatus.Cancelled => UiStatus.Danger, ResourcePlanStatus.Ready or ResourcePlanStatus.Materialized => UiStatus.Info, _ => UiStatus.Neutral };
+    private static UiStatus OperationTone(ResourceChangeOperation operation) => operation switch { ResourceChangeOperation.Create => UiStatus.Success, ResourceChangeOperation.Update => UiStatus.Info, ResourceChangeOperation.Delete => UiStatus.Danger, _ => UiStatus.Neutral };
+    private static UiStatus ApplicationOutcomeTone(ResourceChangeApplicationOutcome outcome) => outcome switch { ResourceChangeApplicationOutcome.Applied or ResourceChangeApplicationOutcome.AlreadyApplied => UiStatus.Success, ResourceChangeApplicationOutcome.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
+    private static string ActivityToneClass(ResourcePlanActivityType type) => type switch { ResourcePlanActivityType.Applied => "is-success", ResourcePlanActivityType.Failed or ResourcePlanActivityType.Cancelled => "is-danger", ResourcePlanActivityType.StatusChanged or ResourcePlanActivityType.Validated or ResourcePlanActivityType.Materialized => "is-info", _ => "is-neutral" };
+    public void Dispose() { ContextState.Changed -= OnContextChanged; lifetime.Cancel(); lifetime.Dispose(); }
+}

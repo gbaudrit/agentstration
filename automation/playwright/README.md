@@ -80,6 +80,12 @@ The resource-administration inventory renders every management list and creation
 npm run capture -- --plan examples/inspect-resource-administration.capture-plan.json --output .work/resource-administration
 ```
 
+The descendant Secret and Vault journey checks that a Tenant Vault is unavailable to a Workspace Secret before an explicit grant, then saves and reloads both Vault and Secret grants without using a credential value. Its capture plan requires an existing, selected campaign Workspace named by `workspaceName`; prepare it on the same external instance before running the plan:
+
+```powershell
+npm run capture -- --plan examples/exercise-descendant-secrets.capture-plan.json --output .work/descendant-secrets --console-url https://agentstration.example.com
+```
+
 The local Ollama extension backs a fully offline create/update/delete journey for a model provider, model profile, and runtime profile:
 
 ```powershell

@@ -17,6 +17,7 @@ using Agentstration.Secrets.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using OllamaSharp;
@@ -328,6 +329,86 @@ public sealed class AepVerticalTests
     }
 
     [TestMethod]
+    public async Task AepResolutionRequiresDeclaredSecretBindingBeforeInvocation()
+    {
+        await using var factory = new AepExtensionFactory(requireSecret: true);
+        using var httpClient = factory.CreateClient();
+        var provider = new AepModelProvider(new FixedHttpClientFactory(httpClient));
+        var configuration = new ModelProviderConfiguration
+        {
+            Uid = Guid.NewGuid(),
+            Name = "test-local",
+            AdapterType = AepModelProvider.AdapterType,
+            ContributionId = "test",
+            Extension = new ResourceReference("test-extension"),
+            Endpoint = httpClient.BaseAddress!
+        };
+        var deployment = new ModelDeploymentConfiguration
+        {
+            Name = "profile",
+            ProviderName = "test-local",
+            ModelName = "test-model"
+        };
+
+        var missing = await Assert.ThrowsExactlyAsync<ModelProviderConfigurationException>(() =>
+            provider.ResolveCapabilitiesAsync(configuration, deployment).AsTask());
+        StringAssert.Contains(missing.Message, "Required Secret requirement 'credential' has no binding");
+
+        var bound = deployment with
+        {
+            SecretBindings = [new("credential", new(new(ResourceNamespace.Default, "Secret", "api-key"), ResourceScopeRef.Instance))]
+        };
+        var capabilities = await provider.ResolveCapabilitiesAsync(configuration, bound);
+        Assert.AreEqual(CapabilitySupport.Native, capabilities.Provider.Tools.Support);
+    }
+
+    [TestMethod]
+    public async Task BoundModelInvocationPassesOnlyLogicalGrantAndRevokesItAfterUse()
+    {
+        await using var factory = new AepExtensionFactory(requireSecret: true);
+        using var http = factory.CreateClient();
+        var capabilities = new RecordingCapabilityService();
+        var hostConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Agentstration:Aep:SecretAccess:PublicBaseUrl"] = "http://localhost"
+        }).Build();
+        var adapter = new AepModelProvider(new FixedHttpClientFactory(http),
+            capabilities: capabilities, configuration: hostConfiguration);
+        var extensionId = (await new AepClient(http).DiscoverAsync()).Extension.Id;
+        var provider = new ModelProviderConfiguration
+        {
+            Uid = Guid.NewGuid(),
+            Name = "test-local",
+            AdapterType = AepModelProvider.AdapterType,
+            ContributionId = "test",
+            Extension = new ResourceReference("test-extension"),
+            ExtensionScopeRef = ResourceScopeRef.Instance,
+            ExpectedExtensionId = extensionId,
+            Endpoint = http.BaseAddress!
+        };
+        var deployment = new ModelDeploymentConfiguration
+        {
+            Name = "profile",
+            ScopeRef = ResourceScopeRef.Instance,
+            ProviderName = "test-local",
+            ModelName = "test-model",
+            SecretBindings = [new("credential", new(new(ResourceNamespace.Default, "Secret", "api-key"), ResourceScopeRef.Instance))]
+        };
+
+        using var chat = adapter.CreateChatClient(provider, deployment);
+        var response = await chat.GetResponseAsync([new ChatMessage(ChatRole.User, "ping")]);
+
+        Assert.AreEqual("pong", response.Text);
+        Assert.AreEqual("credential", capabilities.Issued?.RequirementId);
+        Assert.AreEqual(1, capabilities.Revocations);
+        var grant = factory.Provider.LastSecretAccess?.Single();
+        Assert.IsNotNull(grant);
+        Assert.AreEqual("credential", grant.RequirementId);
+        Assert.AreEqual("opaque-test", grant.SecretCapability);
+        Assert.AreEqual("[REDACTED]", grant.ToString());
+    }
+
+    [TestMethod]
     public async Task AepResolutionFailsClosedWhenPinnedOptionVersionWasRemoved()
     {
         await using var factory = new AepExtensionFactory();
@@ -508,7 +589,7 @@ public sealed class AepVerticalTests
 
     private static AepChatRequest Request() => new("test-model", [new(AepRole.User, [AepContent.FromText("ping")])]);
 
-    private sealed class AepExtensionFactory(bool addSecondOptionVersion = false, bool addThirdOptionVersion = false) : WebApplicationFactory<OllamaAepModelProvider>
+    private sealed class AepExtensionFactory(bool addSecondOptionVersion = false, bool addThirdOptionVersion = false, bool requireSecret = false) : WebApplicationFactory<OllamaAepModelProvider>
     {
         public FakeProvider Provider { get; } = new();
 
@@ -520,6 +601,11 @@ public sealed class AepVerticalTests
             if (addThirdOptionVersion) services.AddSingleton<IAepOptionMigrator, ThirdOptionMigrator>();
             services.PostConfigure<AepExtensionOptions>(options =>
             {
+                if (requireSecret)
+                {
+                    options.SecretRequirements.Add(new("credential", true));
+                    options.Capabilities[AepCapabilityNames.SecretAccess] = new(AepProtocol.SecretAccessVersion);
+                }
                 var original = options.OptionSets.Single() with { ContributionId = "test" };
                 options.OptionSets.Clear();
                 if (!addSecondOptionVersion)
@@ -572,12 +658,14 @@ public sealed class AepVerticalTests
     {
         public int InvocationCount { get; private set; }
         public AepChatRequest? LastRequest { get; private set; }
+        public IReadOnlyList<AepSecretAccessGrant>? LastSecretAccess { get; private set; }
         public AepModelProviderDescriptor Descriptor { get; } = new("test", "Test", new(Tools: true, ModelDiscovery: true));
         public Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             InvocationCount++;
             LastRequest = request;
+            LastSecretAccess = request.SecretAccess;
             Assert.AreEqual("test-model", request.Model);
             if (request.Options?.Temperature == 0.25f)
             {
@@ -600,6 +688,30 @@ public sealed class AepVerticalTests
         }
         public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<AepModelDescriptor>>([new("test-model", "Test model", ["chat", "streaming", "tools"])]);
+    }
+
+    private sealed class RecordingCapabilityService : ISecretCapabilityService
+    {
+        public SecretCapabilityContext? Issued { get; private set; }
+        public int Revocations { get; private set; }
+
+        public Task<SecretCapabilityHandle> IssueAsync(SecretCapabilityContext context, SecretBinding binding,
+            IReadOnlyCollection<string> declaredRequirements, CancellationToken lifetimeToken,
+            CancellationToken cancellationToken = default)
+        {
+            Issued = context;
+            Assert.AreEqual("credential", binding.RequirementId);
+            Assert.IsTrue(declaredRequirements.Contains("credential"));
+            return Task.FromResult(new SecretCapabilityHandle("opaque-test"));
+        }
+
+        public Task<ResolvedSecret> RedeemAsync(string token, SecretCapabilityContext context,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<ResolvedSecret> RedeemAsync(string token, string extensionId, string requirementId,
+            string executionId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public void Revoke(SecretCapabilityHandle handle) => Revocations++;
+        public void RevokeExecution(SecretCapabilityContext context) { }
+        public int PruneExpired() => 0;
     }
 
     private sealed class FixedHttpClientFactory(HttpClient client) : IHttpClientFactory

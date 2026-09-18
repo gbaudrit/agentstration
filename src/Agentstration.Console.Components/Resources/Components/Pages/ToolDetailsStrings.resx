@@ -17,6 +17,25 @@
   <data name="FirstSeen"><value>First seen</value></data>
   <data name="LastSeen"><value>Last seen</value></data>
   <data name="InputSchema"><value>Input schema</value></data>
+  <data name="Capability"><value>What this tool does</value></data>
+  <data name="NoDescription"><value>No capability description was provided by the tool source.</value></data>
+  <data name="InputContract"><value>Inputs</value></data>
+  <data name="OutputContract"><value>Outputs</value></data>
+  <data name="NoSchema"><value>No schema was provided by the tool source.</value></data>
+  <data name="UnstructuredSchema"><value>This schema cannot be summarized as a list of fields. Open the raw JSON below for the complete contract.</value></data>
+  <data name="NoProperties"><value>No fields are declared in this schema.</value></data>
+  <data name="RawInputSchema"><value>View raw input schema</value></data>
+  <data name="RawOutputSchema"><value>View raw output schema</value></data>
+  <data name="Required"><value>Required</value></data>
+  <data name="Optional"><value>Optional</value></data>
+  <data name="Type"><value>Type: {0}</value></data>
+  <data name="MinLength"><value>Minimum length: {0}</value></data>
+  <data name="MaxLength"><value>Maximum length: {0}</value></data>
+  <data name="Minimum"><value>Minimum: {0}</value></data>
+  <data name="Maximum"><value>Maximum: {0}</value></data>
+  <data name="Pattern"><value>Pattern: {0}</value></data>
+  <data name="Format"><value>Format: {0}</value></data>
+  <data name="AllowedValues"><value>Allowed values: {0}</value></data>
   <data name="Yes"><value>Yes</value></data>
   <data name="No"><value>No</value></data>
 </root>

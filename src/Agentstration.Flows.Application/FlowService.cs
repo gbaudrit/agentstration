@@ -101,6 +101,15 @@ public sealed class FlowService(
     }
 
     public Task<StoredFlowVersion?> GetVersionAsync(WorkspaceId workspaceId, FlowId id, string version, CancellationToken cancellationToken) => repository.GetVersionAsync(workspaceId, id, version, cancellationToken);
+    public async Task<StoredFlow> ActivateVersionAsync(WorkspaceId workspaceId, FlowId id, string version, CancellationToken cancellationToken)
+    {
+        var stored = await repository.GetAsync(workspaceId, id, cancellationToken) ?? throw new FlowNotFoundException(id);
+        var published = await repository.GetVersionAsync(workspaceId, id, version, cancellationToken)
+            ?? throw new FlowValidationException("flow_version_not_published", "The Flow version must be published before activation.");
+        if (stored.Value.ActiveVersion == version) return stored;
+        foreach (var guard in activationGuards ?? []) await guard.ValidateActivationAsync(workspaceId, published.Value, cancellationToken);
+        return await repository.UpdateAsync(stored.Value with { ActiveVersion = version, Enabled = true, UpdatedAt = timeProvider.GetUtcNow() }, stored.ETag, cancellationToken);
+    }
     public Task<IReadOnlyList<StoredFlowVersion>> ListVersionsAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken) => repository.ListVersionsAsync(workspaceId, id, cancellationToken);
 
     public async Task<FlowVersion> ResolveAsync(WorkspaceId workspaceId, FlowReference reference, CancellationToken cancellationToken)

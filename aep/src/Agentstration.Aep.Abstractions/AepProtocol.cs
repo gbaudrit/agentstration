@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -14,6 +15,9 @@ public static class AepProtocol
     public const string SourceProvidersPath = "/aep/source-providers";
     public const string ConfigurationPath = "/aep/configuration";
     public const string ConfigurationMigrationPath = "/aep/configuration/migrate";
+    public const string SecretRequirementsCapabilityVersion = "1.0";
+    public const string SecretAccessVersion = "1.0";
+    public const string SecretAccessPath = "/api/aep/secrets/redeem";
 
     public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();
 
@@ -32,6 +36,8 @@ public static class AepCapabilityNames
     public const string SourceProvider = "aep.source-provider";
     public const string Tools = "aep.tools";
     public const string Configuration = "aep.configuration";
+    public const string SecretRequirements = "aep.secret-requirements";
+    public const string SecretAccess = "aep.secret-access";
 }
 
 public sealed record AepExtensionIdentity(string Id, string Name, string Version, string? Description = null);
@@ -228,7 +234,36 @@ public sealed record AepManifest(
     AepExtensionIdentity Extension,
     IReadOnlyDictionary<string, AepCapabilityDescriptor> Capabilities,
     AepContributions Contributions,
-    AepMcpDescriptor? Mcp = null);
+    AepMcpDescriptor? Mcp = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepSecretRequirement>? SecretRequirements = null);
+
+public sealed record AepSecretRequirement(string Id, [property: JsonRequired] bool Required, string? Description = null);
+
+public sealed record AepSecretAccessGrant(
+    string Version,
+    Uri Endpoint,
+    string ExtensionId,
+    string RequirementId,
+    string ExecutionId,
+    string SecretCapability)
+{
+    public override string ToString() => "[REDACTED]";
+}
+
+public sealed record AepSecretAccessRequest(
+    string Version,
+    string ExtensionId,
+    string RequirementId,
+    string ExecutionId,
+    string SecretCapability)
+{
+    public override string ToString() => "[REDACTED]";
+}
+
+public sealed record AepSecretAccessResponse(string Version, string SecretValueBase64)
+{
+    public override string ToString() => "[REDACTED]";
+}
 
 public sealed record AepHealth(string Status, string? Details = null);
 
@@ -291,6 +326,9 @@ public sealed record AepToolContribution(
 
 public static class AepDescriptorValidator
 {
+    private static readonly SearchValues<char> SecretRequirementIdCharacters =
+        SearchValues.Create("abcdefghijklmnopqrstuvwxyz0123456789._-");
+
     public static IReadOnlyList<string> Validate(AepManifest descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
@@ -319,6 +357,29 @@ public static class AepDescriptorValidator
             else if (!sourceProviders.Add(provider.Id)) errors.Add($"Source provider contribution '{provider.Id}' is duplicated.");
             if (string.IsNullOrWhiteSpace(provider.DisplayName)) errors.Add($"Source provider contribution '{provider.Id}' displayName is required.");
         }
+        var requirements = descriptor.SecretRequirements ?? [];
+        var hasCapability = descriptor.Capabilities.TryGetValue(AepCapabilityNames.SecretRequirements, out var secretCapability);
+        if (requirements.Count > 0 && !hasCapability)
+            errors.Add("Secret requirements need the aep.secret-requirements capability.");
+        if (hasCapability && !string.Equals(secretCapability!.Version, AepProtocol.SecretRequirementsCapabilityVersion, StringComparison.Ordinal))
+            errors.Add($"Secret requirements capability version '{secretCapability.Version}' is not supported.");
+        if (hasCapability && requirements.Count == 0)
+            errors.Add("The aep.secret-requirements capability needs at least one secret requirement.");
+        var requirementIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var requirement in requirements)
+        {
+            if (requirement is null)
+            {
+                errors.Add("A secret requirement cannot be null.");
+                continue;
+            }
+            if (!IsValidSecretRequirementId(requirement.Id))
+                errors.Add($"Secret requirement id '{requirement.Id}' must start with a lowercase ASCII letter and contain only lowercase letters, digits, '.', '_' or '-' (maximum 64 characters).");
+            else if (!requirementIds.Add(requirement.Id))
+                errors.Add($"Secret requirement '{requirement.Id}' is duplicated.");
+            if (requirement.Description is { Length: > 256 } || requirement.Description?.Any(char.IsControl) == true)
+                errors.Add($"Secret requirement '{requirement.Id}' description must contain at most 256 printable characters.");
+        }
         return errors;
     }
 
@@ -342,6 +403,11 @@ public static class AepDescriptorValidator
         if (string.IsNullOrWhiteSpace(endpoint) || !Uri.TryCreate(endpoint, UriKind.RelativeOrAbsolute, out var uri)) return false;
         return !uri.IsAbsoluteUri || uri.Scheme is "http" or "https";
     }
+
+    private static bool IsValidSecretRequirementId(string? id) =>
+        id is { Length: >= 1 and <= 64 }
+        && id[0] is >= 'a' and <= 'z'
+        && id.AsSpan(1).IndexOfAnyExcept(SecretRequirementIdCharacters) < 0;
 }
 
 public sealed record AepModelProviderDescriptor(
@@ -409,7 +475,8 @@ public sealed record AepChatRequest(
     IReadOnlyList<AepMessage> Messages,
     AepModelOptions? Options = null,
     IReadOnlyList<AepToolDefinition>? Tools = null,
-    IReadOnlyDictionary<string, JsonElement>? Metadata = null);
+    IReadOnlyDictionary<string, JsonElement>? Metadata = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepSecretAccessGrant>? SecretAccess = null);
 
 public sealed record AepUsage(long? InputTokens = null, long? OutputTokens = null, long? TotalTokens = null);
 

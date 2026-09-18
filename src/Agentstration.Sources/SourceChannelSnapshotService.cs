@@ -232,7 +232,8 @@ public sealed class SourceChannelSnapshotService(
                 extension.Value.Name,
                 extension.Value.Definition.AuthenticationMode,
                 extension.Value.Definition.Credential,
-                extension.Value.Definition.ExpectedExtensionId);
+                extension.Value.Definition.ExpectedExtensionId,
+                selection.SecretBindings);
             var resolved = await materializer.ResolveAsync(invocation, cancellationToken);
             var observed = await LoadObservedAsync(scopeRef, source, versionUid, channel.Name, cancellationToken);
             if (observed?.Value.Definition.CurrentSnapshotUid is { } currentUid

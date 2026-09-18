@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
+using Agentstration.Aep.Abstractions;
 using Agentstration.Extensions;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
@@ -14,6 +15,7 @@ using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 using Agentstration.Security.Contracts;
 using Agentstration.Sources;
 using Agentstration.Sources.Contracts;
@@ -662,6 +664,42 @@ public sealed class SourceTests
         Assert.IsTrue(removedStatus.Ready);
         Assert.IsEmpty(removedStatus.Bindings);
         Assert.AreEqual("git-distribution", removedStatus.StaleSelections.Single().Name);
+    }
+
+    [TestMethod]
+    public async Task SourceSecretBindingsStayLocalAndRequiredRequirementsGateReadinessAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        fixture.Inspector.SecretRequirements = [new("credential", true), new("proxy-auth", false)];
+        await fixture.CreateSourceProviderAsync();
+        var imported = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: true), default);
+        var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var binding = new SecretBinding("credential", new(new(ResourceNamespace.Default, "Secret", "company-a"), scope));
+
+        var configured = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid,
+            [Selection() with { SecretBindings = [binding] }], imported.Source.Configuration.ETag!, default);
+
+        Assert.IsTrue(configured.Status.Ready);
+        Assert.AreEqual(binding, configured.Configuration.Definition.Bindings.Single().SecretBindings.Single());
+        Assert.IsFalse(imported.Version.Definition.RawManifest.Contains("company-a", StringComparison.Ordinal));
+        var saved = await fixture.Store.GetExactAsync<SourceConfigurationResource>(
+            ScopedResourceAddress.Create(configured.Configuration.ScopeRef!.Value, configured.Configuration.Namespace,
+                SourceResourceKinds.SourceConfiguration, configured.Configuration.Name), default);
+        Assert.IsNotNull(saved);
+        Assert.AreEqual(scope, saved.Value.Definition.Bindings.Single().SecretBindings.Single().Secret.ScopeRef);
+
+        var unknown = await Assert.ThrowsExactlyAsync<SourceValidationException>(() => fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid,
+            [Selection() with { SecretBindings = [new("unknown", binding.Secret)] }], configured.Configuration.ETag!, default));
+        Assert.AreEqual("secret_binding_unknown", unknown.Code);
+
+        var unbound = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid,
+            [Selection()], configured.Configuration.ETag!, default);
+        Assert.IsFalse(unbound.Status.Ready);
+        Assert.AreEqual("secret_binding_required", unbound.Status.Bindings.Single().Issues.Single().Code);
     }
 
     [TestMethod]
@@ -1822,6 +1860,7 @@ public sealed class SourceTests
         public string Status { get; set; } = "available";
         public bool IncludeContribution { get; set; } = true;
         public string SchemaDigest { get; set; } = "sha256:test";
+        public IReadOnlyList<AepSecretRequirement>? SecretRequirements { get; set; }
         public bool CanHandle(string providerType) => true;
         public bool CanInspectEndpoint(Uri endpoint) => true;
         public ValueTask<ExtensionInspection> InspectAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default) =>
@@ -1834,7 +1873,8 @@ public sealed class SourceTests
                 new("source-extension", "Source extension", "1.0.0", null),
                 IncludeContribution ? [new("source-provider", "git")] : [],
                 [new("git/source-channel", "source-provider", "git", ExtensionOptionScopes.SourceChannel, "1.0", [new("1.0", SchemaDigest, Schema, false)])],
-                Status == "available" ? null : "The extension is unavailable."));
+                Status == "available" ? null : "The extension is unavailable.",
+                SecretRequirements));
     }
 
     private sealed class FakeSourceProviderMaterializer : ISourceProviderMaterializer

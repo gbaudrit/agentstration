@@ -17,6 +17,9 @@ deploy/compose/.env.foundry
 *.db-wal
 *.log
 docs/site/node_modules/
+tests/Agentstration.Console.Playwright/node_modules/
+tests/Agentstration.Console.Playwright/test-results/
+tests/Agentstration.Console.Playwright/playwright-report/
 docs/site/build/
 docs/site/.docusaurus/
 automation/playwright/node_modules/
