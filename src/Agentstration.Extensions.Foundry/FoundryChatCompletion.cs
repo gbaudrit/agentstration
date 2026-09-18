@@ -18,6 +18,7 @@ internal static class FoundryChatCompletion
         FoundryExtensionOptions options,
         FoundryRequestAuthenticator authenticator,
         AepChatRequest chat,
+        FoundryDiagnostics diagnostics,
         CancellationToken cancellationToken)
     {
         var body = BuildRequest(chat);
@@ -38,6 +39,7 @@ internal static class FoundryChatCompletion
         {
             await authenticator.ApplyInferenceAsync(request, options, timeout.Token);
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            diagnostics.SetStatus(response.StatusCode);
             if (!response.IsSuccessStatusCode) throw await FailureAsync(response, timeout.Token);
             if (!string.Equals(response.Content.Headers.ContentType?.MediaType, "application/json", StringComparison.OrdinalIgnoreCase))
                 throw new AepServerException("invalid_response", "Foundry chat returned a non-JSON response.");
@@ -57,6 +59,10 @@ internal static class FoundryChatCompletion
         catch (HttpRequestException exception)
         {
             throw new AepServerException("provider_unavailable", "Foundry chat is unavailable.", innerException: exception);
+        }
+        catch (IOException exception)
+        {
+            throw new AepServerException("provider_unavailable", "Foundry chat response was interrupted.", innerException: exception);
         }
     }
 
