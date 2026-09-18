@@ -32,8 +32,10 @@ public sealed class FoundryAepModelProvider(
         try
         {
             _ = FoundryChatCompletion.BuildRequest(request!);
-            await ValidateAdvancedCapabilitiesAsync(request!, cancellationToken);
-            var response = await FoundryChatCompletion.ExecuteAsync(httpClient, options, authenticator, request!, diagnostics, cancellationToken);
+            var boundKey = request!.SecretAccess is { Count: > 0 } grants
+                ? await authenticator.RedeemBoundKeyAsync(grants, cancellationToken) : null;
+            await ValidateAdvancedCapabilitiesAsync(request, boundKey, cancellationToken);
+            var response = await FoundryChatCompletion.ExecuteAsync(httpClient, options, authenticator, request, diagnostics, cancellationToken, boundKey);
             diagnostics.SetUsage(response.Usage);
             diagnostics.Complete("success");
             return response;
@@ -52,8 +54,10 @@ public sealed class FoundryAepModelProvider(
     {
         using var diagnostics = new FoundryDiagnostics(diagnosticsLogger, "chat_stream", request?.Model);
         _ = FoundryChatCompletion.BuildRequest(request!, streaming: true);
-        await ValidateAdvancedCapabilitiesAsync(request!, cancellationToken);
-        await using var updates = FoundryChatStream.ExecuteAsync(httpClient, options, authenticator, request!, diagnostics, cancellationToken)
+        var boundKey = request!.SecretAccess is { Count: > 0 } grants
+            ? await authenticator.RedeemBoundKeyAsync(grants, cancellationToken) : null;
+        await ValidateAdvancedCapabilitiesAsync(request, boundKey, cancellationToken);
+        await using var updates = FoundryChatStream.ExecuteAsync(httpClient, options, authenticator, request, diagnostics, cancellationToken, boundKey)
             .GetAsyncEnumerator(cancellationToken);
         while (true)
         {
@@ -71,12 +75,13 @@ public sealed class FoundryAepModelProvider(
         diagnostics.Complete("success");
     }
 
-    private async Task ValidateAdvancedCapabilitiesAsync(AepChatRequest request, CancellationToken cancellationToken)
+    private async Task ValidateAdvancedCapabilitiesAsync(AepChatRequest request, string? boundKey,
+        CancellationToken cancellationToken)
     {
         var format = FoundryChatCompletion.RequestedFormat(request.Options);
         var effort = FoundryChatCompletion.RequestedReasoningEffort(request.Options);
         if ((format is null or "text") && effort is null) return;
-        var model = (await ListModelsAsync(cancellationToken)).SingleOrDefault(value => value.Id == request.Model);
+        var model = (await ListModelsWithKeyAsync(boundKey, cancellationToken)).SingleOrDefault(value => value.Id == request.Model);
         if (model is null) throw new AepServerException("model_unavailable", "The Foundry deployment is not available.", 400);
         if (format is "json_object" or "json_schema"
             && !model.Metadata!.ContainsKey(format == "json_object" ? "jsonObject" : "jsonSchema"))
@@ -92,11 +97,23 @@ public sealed class FoundryAepModelProvider(
     }
 
     public async Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default)
+        => await ListModelsWithKeyAsync(null, cancellationToken);
+
+    public async Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(AepModelDiscoveryRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var key = await authenticator.RedeemBoundKeyAsync(request.SecretAccess, cancellationToken);
+        return await ListModelsWithKeyAsync(key, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<AepModelDescriptor>> ListModelsWithKeyAsync(string? boundKey,
+        CancellationToken cancellationToken)
     {
         using var diagnostics = new FoundryDiagnostics(diagnosticsLogger, "discovery", null);
         try
         {
-            var result = await ListModelsCoreAsync(diagnostics, cancellationToken);
+            var result = await ListModelsCoreAsync(diagnostics, boundKey, cancellationToken);
             diagnostics.Complete("success");
             return result;
         }
@@ -104,7 +121,8 @@ public sealed class FoundryAepModelProvider(
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { diagnostics.Complete("cancelled"); throw; }
     }
 
-    private async Task<IReadOnlyList<AepModelDescriptor>> ListModelsCoreAsync(FoundryDiagnostics diagnostics, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<AepModelDescriptor>> ListModelsCoreAsync(FoundryDiagnostics diagnostics,
+        string? boundKey, CancellationToken cancellationToken)
     {
         var models = new Dictionary<string, AepModelDescriptor>(StringComparer.Ordinal);
         var current = options.DeploymentsEndpoint();
@@ -122,7 +140,7 @@ public sealed class FoundryAepModelProvider(
             HttpResponseMessage response;
             try
             {
-                response = await SendDiscoveryPageAsync(current, diagnostics, timeout.Token);
+                response = await SendDiscoveryPageAsync(current, diagnostics, boundKey, timeout.Token);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -202,13 +220,15 @@ public sealed class FoundryAepModelProvider(
         }
     }
 
-    private async Task<HttpResponseMessage> SendDiscoveryPageAsync(Uri endpoint, FoundryDiagnostics diagnostics, CancellationToken cancellationToken)
+    private async Task<HttpResponseMessage> SendDiscoveryPageAsync(Uri endpoint, FoundryDiagnostics diagnostics,
+        string? boundKey, CancellationToken cancellationToken)
     {
         // Discovery is a read-only request. A chat POST, including a stream, is never replayed.
         for (var attempt = 0; ; attempt++)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
-            await authenticator.ApplyAsync(request, cancellationToken);
+            if (boundKey is null) await authenticator.ApplyAsync(request, cancellationToken);
+            else authenticator.ApplyBoundDiscovery(request, boundKey);
             HttpResponseMessage response;
             try
             {

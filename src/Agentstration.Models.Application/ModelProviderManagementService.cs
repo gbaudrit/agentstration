@@ -183,6 +183,23 @@ public sealed class ModelProviderManagementService(
             throw new ModelProviderValidationException($"Referenced extension registration '{extensionAddress}' does not exist or is not visible from '{ownerScopeRef}'.");
         if (FindDiscovery(AepModelProvider.AdapterType) is null)
             throw new ModelProviderValidationException("The AEP model-provider adapter is not registered in this host.");
+        if (definition.SecretBindings is null)
+            throw new ModelProviderValidationException("Secret bindings must be an array.");
+        if (definition.SecretBindings.Count > 0)
+        {
+            var extension = await references.ResolveAsync<ExtensionRegistrationResource>(definition.Extension,
+                ownerNamespace, ExtensionKinds.ExtensionRegistration, ownerScopeRef, cancellationToken)
+                ?? throw new ModelProviderValidationException("The extension registration is unavailable.");
+            var discovery = FindDiscovery(AepModelProvider.AdapterType);
+            var inspector = discovery as IExtensionInspector
+                ?? throw new ModelProviderValidationException("The AEP extension cannot validate Secret bindings.");
+            var inspection = await inspector.InspectAsync(extension.Value, cancellationToken);
+            if (inspection.Status != "available")
+                throw new ModelProviderValidationException("The extension must be available to validate Secret bindings.");
+            var issues = ExtensionSecretBindingValidator.Validate(definition.SecretBindings,
+                inspection.SecretRequirements, requireAll: false);
+            if (issues.Count > 0) throw new ModelProviderValidationException(issues[0].Message);
+        }
         return definition with
         {
             DisplayName = definition.DisplayName.Trim(),
@@ -217,7 +234,8 @@ public sealed class ModelProviderManagementService(
             EndpointDisplayName = extension.Value.Definition.DisplayName,
             ExtensionScopeRef = extension.Value.ScopeRef,
             AuthenticationMode = extension.Value.Definition.AuthenticationMode,
-            Credential = extension.Value.Definition.Credential
+            Credential = extension.Value.Definition.Credential,
+            SecretBindings = resource.Definition.SecretBindings
         };
     }
 

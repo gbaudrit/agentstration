@@ -62,4 +62,10 @@
   <data name="Status.Unavailable"><value>Indisponible</value></data>
   <data name="Status.Failed"><value>Échec</value></data>
   <data name="Status.Unknown"><value>Inconnu</value></data>
+  <data name="Credential"><value>Identifiant</value></data>
+  <data name="BoundSecret"><value>Secret lié</value></data>
+  <data name="BoundSecretHelp"><value>Liez ce fournisseur à un Secret gouverné. Sa valeur est résolue uniquement lorsque Foundry en a besoin.</value></data>
+  <data name="FoundryApiKeySecret"><value>Secret de la clé API Foundry</value></data>
+  <data name="NoBoundSecret"><value>Aucun Secret lié</value></data>
+  <data name="BoundSecretUnavailable"><value>Le Secret lié est indisponible</value></data>
 </root>

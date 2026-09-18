@@ -1,5 +1,7 @@
 # Docker Compose topologies
 
+The optional Foundry overlay supports `FOUNDRY_AUTHENTICATION_MODE=ApiKeyBinding`. Bind a scoped Secret to the Foundry Model Provider in the Console and set `AEP_SECRET_ACCESS_PUBLIC_BASE_URL` in the ignored `.env.foundry` file to a trusted HTTPS URL for the Agentstration host, reachable from `foundry-extension`. The AEP Secret callback does not accept an HTTP container hostname. The environment-key mode remains available during migration; leave `FOUNDRY_API_KEY` empty for `ApiKeyBinding`.
+
 Run these commands from the repository root. Only one provider topology should run at a time because each publishes Agentstration on `http://localhost:5100` by default.
 
 ## SQLite

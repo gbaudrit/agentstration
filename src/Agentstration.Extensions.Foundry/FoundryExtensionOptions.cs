@@ -6,6 +6,7 @@ namespace Agentstration.Extensions.Foundry;
 public enum FoundryAuthenticationMode
 {
     ApiKeyEnvironment,
+    ApiKeyBinding,
     ManagedIdentity,
     WorkloadIdentity,
     Development
@@ -28,7 +29,7 @@ public sealed record FoundryExtensionOptions
         ArgumentNullException.ThrowIfNull(configuration);
         if (!Enum.TryParse<FoundryAuthenticationMode>(configuration["Foundry:AuthenticationMode"], true, out var mode)
             || !Enum.IsDefined(mode))
-            throw new InvalidOperationException("Foundry:AuthenticationMode must explicitly select ApiKeyEnvironment, ManagedIdentity, WorkloadIdentity, or Development.");
+            throw new InvalidOperationException("Foundry:AuthenticationMode must explicitly select ApiKeyBinding, ApiKeyEnvironment, ManagedIdentity, WorkloadIdentity, or Development.");
         if (!Uri.TryCreate(configuration["Foundry:ProjectEndpoint"], UriKind.Absolute, out var project)
             || !Uri.TryCreate(configuration["Foundry:InferenceEndpoint"], UriKind.Absolute, out var inference))
             throw new InvalidOperationException("Foundry project and inference endpoints must be absolute URLs.");

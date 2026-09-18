@@ -101,6 +101,145 @@ public sealed class FoundryProviderTests
     }
 
     [TestMethod]
+    public async Task BoundCredentialOverridesEnvironmentKeyAndFailsClosedOnInvalidGrant()
+    {
+        var previous = Environment.GetEnvironmentVariable("FOUNDRY_API_KEY");
+        try
+        {
+            Environment.SetEnvironmentVariable("FOUNDRY_API_KEY", "transitional-key");
+            var callbackCount = 0;
+            using var callback = Client((request, _) =>
+            {
+                callbackCount++;
+                Assert.AreEqual(HttpMethod.Post, request.Method);
+                Assert.AreEqual("https://console.example/api/aep/secrets/redeem", request.RequestUri!.AbsoluteUri);
+                return Task.FromResult(Json(HttpStatusCode.OK,
+                    """{"version":"1.0","secretValueBase64":"Ym91bmQta2V5"}"""));
+            });
+            var authenticator = new FoundryRequestAuthenticator(Options(),
+                httpClientFactory: new FixedHttpClientFactory(callback));
+            var grant = new AepSecretAccessGrant(AepProtocol.SecretAccessVersion,
+                new Uri("https://console.example/api/aep/secrets/redeem"),
+                "Agentstration.Extensions.Foundry", "credential", "execution-1", "opaque-handle");
+            using var request = new HttpRequestMessage(HttpMethod.Post,
+                "https://foundry.example/openai/v1/chat/completions");
+            await authenticator.ApplyInferenceAsync(request, Options(),
+                new AepChatRequest("model", [], SecretAccess: [grant]), default);
+            Assert.AreEqual("bound-key", request.Headers.GetValues("api-key").Single());
+            Assert.AreEqual(1, callbackCount);
+
+            using var invalid = new HttpRequestMessage(HttpMethod.Post,
+                "https://foundry.example/openai/v1/chat/completions");
+            var error = await Assert.ThrowsAsync<AepServerException>(() => authenticator.ApplyInferenceAsync(
+                invalid, Options(), new AepChatRequest("model", [], SecretAccess: [grant with { RequirementId = "other" }]), default));
+            Assert.AreEqual("secret_binding_invalid", error.Code);
+            Assert.IsFalse(invalid.Headers.Contains("api-key"));
+            Assert.AreEqual(1, callbackCount);
+        }
+        finally { Environment.SetEnvironmentVariable("FOUNDRY_API_KEY", previous); }
+    }
+
+    [TestMethod]
+    public async Task BoundDiscoveryRedeemsAtEachRequestAndRequiresAGrant()
+    {
+        var key = "first-key";
+        var callbackFactory = new CallbackHttpClientFactory((_, _) =>
+        {
+            var payload = new AepSecretAccessResponse(AepProtocol.SecretAccessVersion,
+                Convert.ToBase64String(Encoding.UTF8.GetBytes(key)));
+            return Task.FromResult(Json(HttpStatusCode.OK,
+                System.Text.Json.JsonSerializer.Serialize(payload)));
+        });
+        var options = Options() with { AuthenticationMode = FoundryAuthenticationMode.ApiKeyBinding };
+        var authenticator = new FoundryRequestAuthenticator(options,
+            httpClientFactory: callbackFactory);
+        var observed = new List<string>();
+        using var foundry = Client((request, _) =>
+        {
+            observed.Add(request.Headers.GetValues("api-key").Single());
+            return Task.FromResult(Json(HttpStatusCode.OK,
+                """{"value":[{"type":"ModelDeployment","name":"chat-a","capabilities":{"chat":true}}]}"""));
+        });
+        var provider = new FoundryAepModelProvider(foundry, options, authenticator);
+        var grant = new AepSecretAccessGrant(AepProtocol.SecretAccessVersion,
+            new Uri("https://console.example/api/aep/secrets/redeem"),
+            "Agentstration.Extensions.Foundry", "credential", "execution-1", "opaque-handle");
+        Assert.HasCount(1, await provider.ListModelsAsync(new AepModelDiscoveryRequest([grant]), default));
+        key = "rotated-key";
+        Assert.HasCount(1, await provider.ListModelsAsync(new AepModelDiscoveryRequest(
+            [grant with { ExecutionId = "execution-2", SecretCapability = "next-opaque-handle" }]), default));
+        CollectionAssert.AreEqual(new[] { "first-key", "rotated-key" }, observed);
+        var error = await Assert.ThrowsAsync<AepServerException>(() => provider.ListModelsAsync());
+        Assert.AreEqual("secret_binding_required", error.Code);
+        Assert.HasCount(2, observed);
+    }
+
+    [TestMethod]
+    public async Task BoundAdvancedChatUsesOneGrantForCapabilityCheckAndInference()
+    {
+        var redemptions = 0;
+        var callbackFactory = new CallbackHttpClientFactory((_, _) =>
+        {
+            redemptions++;
+            var payload = new AepSecretAccessResponse(AepProtocol.SecretAccessVersion,
+                Convert.ToBase64String(Encoding.UTF8.GetBytes("bound-key")));
+            return Task.FromResult(Json(HttpStatusCode.OK,
+                System.Text.Json.JsonSerializer.Serialize(payload)));
+        });
+        var options = Options() with { AuthenticationMode = FoundryAuthenticationMode.ApiKeyBinding };
+        var seen = new List<string>();
+        using var foundry = Client((request, _) =>
+        {
+            Assert.AreEqual("bound-key", request.Headers.GetValues("api-key").Single());
+            seen.Add(request.Method.Method);
+            return Task.FromResult(request.Method == HttpMethod.Get
+                ? Json(HttpStatusCode.OK, """
+                    {"value":[{"type":"ModelDeployment","name":"chat-a","capabilities":{"chat":true,"jsonObject":true}}]}
+                    """)
+                : Json(HttpStatusCode.OK, """
+                    {"choices":[{"index":0,"message":{"role":"assistant","content":"{}"},"finish_reason":"stop"}]}
+                    """));
+        });
+        var provider = new FoundryAepModelProvider(foundry, options,
+            new FoundryRequestAuthenticator(options, httpClientFactory: callbackFactory));
+        using var format = System.Text.Json.JsonDocument.Parse("""{"type":"json_object"}""");
+        var grant = new AepSecretAccessGrant(AepProtocol.SecretAccessVersion,
+            new Uri("https://console.example/api/aep/secrets/redeem"),
+            "Agentstration.Extensions.Foundry", "credential", "execution-1", "opaque-handle");
+        var request = new AepChatRequest("chat-a", [new(AepRole.User, [AepContent.FromText("hello")])],
+            new AepModelOptions { ResponseFormat = format.RootElement.Clone() }, SecretAccess: [grant]);
+        var result = await provider.ChatAsync(request, default);
+        Assert.AreEqual(AepFinishReason.Stop, result.FinishReason);
+        Assert.AreEqual(1, redemptions);
+        CollectionAssert.AreEqual(new[] { "GET", "POST" }, seen);
+    }
+
+    [TestMethod]
+    public async Task DeniedBoundCredentialNeverReachesFoundry()
+    {
+        var callbackFactory = new CallbackHttpClientFactory((_, _) =>
+            Task.FromResult(Json(HttpStatusCode.Forbidden,
+                """{"error":{"code":"access_denied","message":"Denied"}}""")));
+        var options = Options() with { AuthenticationMode = FoundryAuthenticationMode.ApiKeyBinding };
+        var foundryCalls = 0;
+        using var foundry = Client((_, _) =>
+        {
+            foundryCalls++;
+            return Task.FromResult(Json(HttpStatusCode.OK, """{"value":[]}"""));
+        });
+        var provider = new FoundryAepModelProvider(foundry, options,
+            new FoundryRequestAuthenticator(options, httpClientFactory: callbackFactory));
+        var grant = new AepSecretAccessGrant(AepProtocol.SecretAccessVersion,
+            new Uri("https://console.example/api/aep/secrets/redeem"),
+            "Agentstration.Extensions.Foundry", "credential", "execution-1", "opaque-handle");
+        var error = await Assert.ThrowsAsync<AepServerException>(() =>
+            provider.ListModelsAsync(new AepModelDiscoveryRequest([grant]), default));
+        Assert.AreEqual("access_denied", error.Code);
+        Assert.AreEqual(0, foundryCalls);
+        Assert.IsFalse(error.Message.Contains("opaque-handle", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task DiscoveryFiltersUnknownCapabilitiesAndKeepsAuthenticationOnEachRequest()
     {
         var seen = new List<Uri>();
@@ -456,6 +595,17 @@ public sealed class FoundryProviderTests
     private sealed class StubHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handle) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => handle(request, cancellationToken);
+    }
+
+    private sealed class FixedHttpClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => client;
+    }
+
+    private sealed class CallbackHttpClientFactory(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handle) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => Client(handle);
     }
 
     private sealed class RecordingCredential : TokenCredential

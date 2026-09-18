@@ -478,6 +478,11 @@ public sealed record AepChatRequest(
     IReadOnlyDictionary<string, JsonElement>? Metadata = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepSecretAccessGrant>? SecretAccess = null);
 
+public sealed record AepModelDiscoveryRequest(IReadOnlyList<AepSecretAccessGrant> SecretAccess)
+{
+    public override string ToString() => "[REDACTED]";
+}
+
 public sealed record AepUsage(long? InputTokens = null, long? OutputTokens = null, long? TotalTokens = null);
 
 public sealed record AepChatResponse(

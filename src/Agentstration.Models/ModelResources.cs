@@ -21,6 +21,7 @@ public sealed record ModelProviderProperties
     public required string DisplayName { get; init; }
     public required ResourceReference Extension { get; init; }
     public required string ContributionId { get; init; }
+    public IReadOnlyList<SecretBinding> SecretBindings { get; init; } = [];
 }
 
 public sealed record ModelProviderResource : Resource

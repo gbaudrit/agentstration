@@ -156,6 +156,9 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
 console.WithEnvironment("Agentstration__Extensions__DiscoverOnStartup", "false");
+if (foundryEnabled && string.Equals(builder.Configuration["Foundry:AuthenticationMode"],
+    "ApiKeyBinding", StringComparison.OrdinalIgnoreCase))
+    console.WithEnvironment("Agentstration__Aep__SecretAccess__PublicBaseUrl", console.GetEndpoint("http"));
 if (usePairingCode)
 {
     foreach (var extension in developmentExtensions)

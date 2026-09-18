@@ -1,7 +1,9 @@
 using Agentstration.Extensions.Contracts;
+using System.Net;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -109,12 +111,43 @@ public sealed class ModelProviderNavigationTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IModelProvidersClient>(providers);
         context.Services.AddSingleton<IExtensionsClient>(new StubExtensionsClient());
+        context.Services.AddSingleton<ISecretsClient>(new SecretsApiClient(
+            new HttpClient(new EmptySecretsHandler()) { BaseAddress = new Uri("https://console.test/") }));
         context.Services.AddSingleton(new NotificationState());
         return context;
     }
 
+    [TestMethod]
+    [DataRow("en-US", "Bound Secret")]
+    [DataRow("fr-FR", "Secret lié")]
+    public void FoundryProviderShowsScopedBoundSecretInBothCultures(string cultureName, string heading)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var context = CreateContext(out var providers);
+        providers.UseFoundry = true;
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/modelproviders/foundry?namespace=shared.models");
+        var rendered = context.Render<ModelProviderDetails>(parameters => parameters
+            .Add(component => component.Name, "foundry"));
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsTrue(rendered.Markup.Contains(heading, StringComparison.Ordinal));
+            Assert.AreEqual("/instance|default|foundry-key",
+                rendered.Find("[data-testid='foundry-credential-secret']").GetAttribute("value"));
+        });
+    }
+
+    private sealed class EmptySecretsHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("[]", System.Text.Encoding.UTF8, "application/json")
+            });
+    }
+
     private sealed class StubModelProvidersClient : IModelProvidersClient
     {
+        public bool UseFoundry { get; set; }
         public ResourceNamespace? RequestedModelNamespace { get; private set; }
         public string? RequestedModelProvider { get; private set; }
 
@@ -151,16 +184,21 @@ public sealed class ModelProviderNavigationTests
         public Task DeleteModelProviderAsync(string providerName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderStatusResponse> TestProviderAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
 
-        private static ModelProviderResource ProviderResource(string name) => new()
+        private ModelProviderResource ProviderResource(string name) => new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ModelResourceKinds.ModelProvider,
             Metadata = new ResourceMetadata { Name = name, Namespace = ProviderNamespace },
+            ScopeRef = ResourceScopeRef.Instance,
             Definition = new ModelProviderProperties
             {
-                DisplayName = "Local Ollama",
-                Extension = new ResourceReference("ollama-extension", @namespace: ProviderNamespace),
-                ContributionId = "ollama"
+                DisplayName = UseFoundry ? "Microsoft Foundry" : "Local Ollama",
+                Extension = new ResourceReference(UseFoundry ? "foundry-extension" : "ollama-extension", @namespace: ProviderNamespace),
+                ContributionId = UseFoundry ? "microsoft-foundry" : "ollama",
+                SecretBindings = UseFoundry
+                    ? [new SecretBinding("credential", new SecretReference(
+                        ResourceAddress.Create(ResourceNamespace.Default, "Secret", "foundry-key"), ResourceScopeRef.Instance))]
+                    : []
             }
         };
     }

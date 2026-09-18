@@ -38,6 +38,7 @@ services:
         condition: service_started
     environment:
       Agentstration__Bootstrap__Path: /app/bootstrap/profiles
+      Agentstration__Aep__SecretAccess__PublicBaseUrl: ${AEP_SECRET_ACCESS_PUBLIC_BASE_URL:-}
       Agentstration__Aep__Transport__AllowedHttpHosts__4: foundry-extension
       Agentstration__Aep__Transport__AllowedPrivateNetworkHosts__4: foundry-extension
       Agentstration__Extensions__Agentstration.Extensions.Foundry__Endpoint: http://foundry-extension:8080
