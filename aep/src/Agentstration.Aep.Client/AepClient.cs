@@ -229,6 +229,7 @@ public sealed class AepClient(
                 yield return update;
                 if (update.FinishReason is not null) yield break;
             }
+            throw new AepProtocolException("invalid_response", "The extension streaming response ended without a finish reason.", response.StatusCode);
         }
     }
 

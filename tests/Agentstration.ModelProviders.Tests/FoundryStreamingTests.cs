@@ -1,0 +1,179 @@
+using System.Net;
+using System.Text;
+using System.Text.Json;
+using Agentstration.Aep.Abstractions;
+using Agentstration.Aep.AspNetCore;
+using Agentstration.Extensions.Foundry;
+
+namespace Agentstration.ModelProviders.Tests;
+
+[TestClass]
+[DoNotParallelize]
+public sealed class FoundryStreamingTests
+{
+    [TestMethod]
+    public async Task StreamsTextUsageFinishAndGovernedToolExchange()
+    {
+        await WithKeyAsync(async () =>
+        {
+            var calls = 0;
+            using var client = Client(async (request, token) =>
+            {
+                calls++;
+                using var json = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(token));
+                var body = json.RootElement;
+                Assert.IsTrue(body.GetProperty("stream").GetBoolean());
+                Assert.IsTrue(body.GetProperty("stream_options").GetProperty("include_usage").GetBoolean());
+                Assert.AreEqual("lookup", body.GetProperty("tools")[0].GetProperty("function").GetProperty("name").GetString());
+                Assert.AreEqual("call-1", body.GetProperty("messages")[1].GetProperty("tool_calls")[0].GetProperty("id").GetString());
+                Assert.AreEqual("call-1", body.GetProperty("messages")[2].GetProperty("tool_call_id").GetString());
+                return Stream("""
+                    data: {"choices":[{"delta":{"role":"assistant","content":"hel"},"finish_reason":null}]}
+
+                    data: {"choices":[{"delta":{"content":"lo"},"finish_reason":null}]}
+
+                    data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-2","type":"function","function":{"name":"lookup","arguments":"{\"q\":"}}]},"finish_reason":null}]}
+
+                    data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"term\"}"}}]},"finish_reason":"tool_calls"}]}
+
+                    data: {"choices":[],"usage":{"prompt_tokens":3,"completion_tokens":4,"total_tokens":7}}
+
+                    data: [DONE]
+
+                    """);
+            });
+            var provider = Provider(client);
+            Assert.IsTrue(provider.Descriptor.Capabilities.Streaming);
+            Assert.IsTrue(provider.Descriptor.Capabilities.Tools);
+            var request = Request() with
+            {
+                Tools = [new("lookup", "search", JsonSerializer.SerializeToElement(new { type = "object" }))],
+                Messages =
+                [
+                    new(AepRole.User, [AepContent.FromText("hello")]),
+                    new(AepRole.Assistant, [new AepContent { Kind = AepContentKind.ToolCall,
+                        ToolCall = new("call-1", "lookup", JsonSerializer.SerializeToElement(new { q = "prior" })) }]),
+                    new(AepRole.Tool, [new AepContent { Kind = AepContentKind.ToolResult,
+                        ToolResult = new("call-1", JsonSerializer.SerializeToElement("done")) }])
+                ]
+            };
+            var updates = await CollectAsync(provider, request);
+            Assert.AreEqual(1, calls);
+            Assert.AreEqual("hello", string.Concat(updates.SelectMany(x => x.Contents).Where(x => x.Kind == AepContentKind.Text).Select(x => x.Text)));
+            var call = updates.SelectMany(x => x.Contents).Single(x => x.Kind == AepContentKind.ToolCall).ToolCall!;
+            Assert.AreEqual("call-2", call.Id);
+            Assert.AreEqual("term", call.Arguments.GetProperty("q").GetString());
+            Assert.AreEqual(3L, updates[^2].Usage?.InputTokens);
+            Assert.AreEqual(4L, updates[^2].Usage?.OutputTokens);
+            Assert.AreEqual(AepFinishReason.ToolCalls, updates[^1].FinishReason);
+        });
+    }
+
+    [TestMethod]
+    public async Task MalformedIncompleteAndOversizedStreamsFailWithoutRetry()
+    {
+        await WithKeyAsync(async () =>
+        {
+            var cases = new[]
+            {
+                ("data: nonsense\n\n", "invalid_response"),
+                ("data: {\"choices\":[{\"delta\":{\"content\":\"partial\"},\"finish_reason\":null}]}\n\n", "invalid_response"),
+                ("data: {\"choices\":[{\"delta\":{\"content\":{\"bad\":true}},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n", "invalid_response"),
+                ("data: " + new string('x', 128 * 1024) + "\n\n", "response_limit")
+            };
+            foreach (var (body, expected) in cases)
+            {
+                var calls = 0;
+                using var client = Client((_, _) => { calls++; return Task.FromResult(Stream(body)); });
+                var exception = await Assert.ThrowsAsync<AepServerException>(async () => await CollectAsync(Provider(client), Request()));
+                Assert.AreEqual(expected, exception.Code);
+                Assert.AreEqual(1, calls);
+            }
+        });
+    }
+
+    [TestMethod]
+    public async Task InterruptedStreamFailsAfterFirstDeltaWithoutReissuingRequest()
+    {
+        await WithKeyAsync(async () =>
+        {
+            var calls = 0;
+            using var client = Client((_, _) =>
+            {
+                calls++;
+                return Task.FromResult(Stream("data: {\"choices\":[{\"delta\":{\"content\":\"partial\"},\"finish_reason\":null}]}\n\n"));
+            });
+            await using var updates = Provider(client).ChatStreamingAsync(Request(), default).GetAsyncEnumerator();
+            Assert.IsTrue(await updates.MoveNextAsync());
+            Assert.AreEqual("partial", updates.Current.Contents.Single().Text);
+            var exception = await Assert.ThrowsAsync<AepServerException>(async () => { _ = await updates.MoveNextAsync(); });
+            Assert.AreEqual("invalid_response", exception.Code);
+            Assert.AreEqual(1, calls);
+        });
+    }
+
+    [TestMethod]
+    public async Task CancellationAndUnsupportedOptionsDoNotInvokeOrRetryProvider()
+    {
+        await WithKeyAsync(async () =>
+        {
+            var calls = 0;
+            using var client = Client(async (_, token) =>
+            {
+                calls++;
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                return Stream("");
+            });
+            var provider = Provider(client);
+            var bad = Request() with { Options = new AepModelOptions
+                { ResponseFormat = JsonSerializer.SerializeToElement(new { type = "json_object" }) } };
+            Assert.AreEqual("unsupported_option", (await Assert.ThrowsAsync<AepServerException>(
+                async () => await CollectAsync(provider, bad))).Code);
+            Assert.AreEqual(0, calls);
+            using var cancellation = new CancellationTokenSource();
+            cancellation.CancelAfter(TimeSpan.FromMilliseconds(100));
+            await Assert.ThrowsAsync<OperationCanceledException>(
+                async () => await CollectAsync(provider, Request(), cancellation.Token));
+            Assert.AreEqual(1, calls);
+        });
+    }
+
+    private static async Task<List<AepChatUpdate>> CollectAsync(FoundryAepModelProvider provider,
+        AepChatRequest request, CancellationToken token = default)
+    {
+        var updates = new List<AepChatUpdate>();
+        await foreach (var update in provider.ChatStreamingAsync(request, token)) updates.Add(update);
+        return updates;
+    }
+
+    private static AepChatRequest Request() => new("deployment", [new AepMessage(AepRole.User, [AepContent.FromText("hello")])]);
+    private static FoundryAepModelProvider Provider(HttpClient client)
+    {
+        var options = new FoundryExtensionOptions
+        {
+            ProjectEndpoint = new Uri("https://foundry.example/api/projects/demo"),
+            InferenceEndpoint = new Uri("https://foundry.example/openai/v1"),
+            AuthenticationMode = FoundryAuthenticationMode.ApiKeyEnvironment
+        };
+        return new(client, options, new FoundryRequestAuthenticator(options));
+    }
+    private static HttpClient Client(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler) =>
+        new(new StubHandler(handler));
+    private static HttpResponseMessage Stream(string body) => new(HttpStatusCode.OK)
+    { Content = new StringContent(body + "\n\n", Encoding.UTF8, "text/event-stream") };
+    private static async Task WithKeyAsync(Func<Task> action)
+    {
+        var prior = Environment.GetEnvironmentVariable("FOUNDRY_API_KEY");
+        try
+        {
+            Environment.SetEnvironmentVariable("FOUNDRY_API_KEY", "offline-test-key");
+            await action();
+        }
+        finally { Environment.SetEnvironmentVariable("FOUNDRY_API_KEY", prior); }
+    }
+    private sealed class StubHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) =>
+            handler(request, token);
+    }
+}

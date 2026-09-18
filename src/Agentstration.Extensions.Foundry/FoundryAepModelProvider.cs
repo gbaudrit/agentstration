@@ -1,5 +1,4 @@
 using System.Net;
-using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
@@ -16,8 +15,8 @@ public sealed class FoundryAepModelProvider(
         "Microsoft Foundry",
         new AepModelProviderCapabilities(
             Chat: true,
-            Streaming: false,
-            Tools: false,
+            Streaming: true,
+            Tools: true,
             Thinking: false,
             StructuredOutput: false,
             Vision: false,
@@ -26,15 +25,10 @@ public sealed class FoundryAepModelProvider(
     public Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken) =>
         FoundryChatCompletion.ExecuteAsync(httpClient, options, authenticator, request, cancellationToken);
 
-    public async IAsyncEnumerable<AepChatUpdate> ChatStreamingAsync(
+    public IAsyncEnumerable<AepChatUpdate> ChatStreamingAsync(
         AepChatRequest request,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        await Task.CompletedTask;
-        if (request is not null)
-            throw new AepServerException("not_implemented", "Foundry streaming is not available in this extension increment.", 501);
-        yield break;
-    }
+        CancellationToken cancellationToken) =>
+        FoundryChatStream.ExecuteAsync(httpClient, options, authenticator, request, cancellationToken);
 
     public async Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default)
     {
@@ -107,7 +101,10 @@ public sealed class FoundryAepModelProvider(
                         AddMetadata(item, metadata, "modelPublisher", "publisher");
                         AddMetadata(item, metadata, "modelName", "model");
                         AddMetadata(item, metadata, "modelVersion", "version");
-                        models.Add(name, new AepModelDescriptor(name, name, ["chat"], metadata));
+                        var capabilities = new List<string> { "chat", "streaming" };
+                        if (HasTrueCapability(item, "toolCalling", "tool_calls", "functionCalling"))
+                            capabilities.Add("tools");
+                        models.Add(name, new AepModelDescriptor(name, name, capabilities, metadata));
                     }
                     if (!root.TryGetProperty("nextLink", out var nextLink) || nextLink.ValueKind == JsonValueKind.Null)
                         return models.Values.ToArray();
@@ -174,16 +171,15 @@ public sealed class FoundryAepModelProvider(
         throw new AepServerException(code, $"Foundry deployment discovery returned HTTP {(int)response.StatusCode}.");
     }
 
-    private static bool HasChatCapability(JsonElement item)
+    private static bool HasChatCapability(JsonElement item) =>
+        HasTrueCapability(item, "chat", "chatCompletion", "chatCompletions", "chat_completion", "chat_completions");
+
+    private static bool HasTrueCapability(JsonElement item, params string[] names)
     {
         if (!item.TryGetProperty("capabilities", out var capabilities) || capabilities.ValueKind != JsonValueKind.Object) return false;
         foreach (var capability in capabilities.EnumerateObject())
         {
-            if (!string.Equals(capability.Name, "chat", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(capability.Name, "chatCompletion", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(capability.Name, "chatCompletions", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(capability.Name, "chat_completion", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(capability.Name, "chat_completions", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!names.Contains(capability.Name, StringComparer.OrdinalIgnoreCase)) continue;
             if (capability.Value.ValueKind == JsonValueKind.True
                 || capability.Value.ValueKind == JsonValueKind.String && string.Equals(capability.Value.GetString(), "true", StringComparison.OrdinalIgnoreCase))
                 return true;
