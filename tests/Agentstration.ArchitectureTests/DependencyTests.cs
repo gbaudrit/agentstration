@@ -46,6 +46,7 @@ using Agentstration.Workplace.Components;
 using Agentstration.Workplace.Web;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using YamlDotNet.RepresentationModel;
 
 namespace Agentstration.ArchitectureTests;
 
@@ -88,6 +89,30 @@ public sealed class DependencyTests
         Assert.Contains("AddParameterFromConfiguration(\"foundry-api-key\", \"FOUNDRY_API_KEY\", secret: true)", appHost, StringComparison.Ordinal);
         Assert.Contains("developmentExtensions.Add(new DevelopmentAepExtension(", appHost, StringComparison.Ordinal);
         Assert.DoesNotContain("WithEnvironment(\"FOUNDRY_API_KEY\", builder.Configuration", appHost, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public void FoundryComposeOverlayParsesAndKeepsTheDefaultTopologyOffline()
+    {
+        var composeRoot = Path.Combine(FindRepositoryRoot(), "deploy", "compose");
+        static YamlMappingNode Services(string path)
+        {
+            var stream = new YamlStream();
+            using var reader = File.OpenText(path);
+            stream.Load(reader);
+            var root = (YamlMappingNode)stream.Documents.Single().RootNode;
+            return (YamlMappingNode)root.Children[new YamlScalarNode("services")];
+        }
+
+        var baseline = Services(Path.Combine(composeRoot, "base.yml"));
+        var overlay = Services(Path.Combine(composeRoot, "foundry.yml"));
+        Assert.IsFalse(baseline.Children.ContainsKey(new YamlScalarNode("foundry-extension")));
+        Assert.IsTrue(overlay.Children.ContainsKey(new YamlScalarNode("foundry-extension")));
+        var extension = (YamlMappingNode)overlay.Children[new YamlScalarNode("foundry-extension")];
+        var environment = (YamlMappingNode)extension.Children[new YamlScalarNode("environment")];
+        Assert.AreEqual("${FOUNDRY_API_KEY:-}", ((YamlScalarNode)environment.Children[new YamlScalarNode("FOUNDRY_API_KEY")]).Value);
+        Assert.IsTrue(overlay.Children.ContainsKey(new YamlScalarNode("foundry-key-provisioner")));
+        Assert.Contains("deploy/compose/.env.foundry", File.ReadAllText(Path.Combine(FindRepositoryRoot(), ".dockerignore")), StringComparison.Ordinal);
     }
 
     [TestMethod]

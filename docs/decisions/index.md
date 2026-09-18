@@ -160,3 +160,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 129. [ADR-0129 — Foundry streaming preserves governed Tool execution](0129-foundry-streaming-preserves-governed-tool-execution.md)
 130. [ADR-0130 — Foundry advanced options follow deployment capabilities](0130-foundry-advanced-options-follow-deployment-capabilities.md)
 131. [ADR-0131 — Foundry egress and diagnostics are bounded](0131-foundry-egress-and-diagnostics-are-bounded.md)
+132. [ADR-0132 — Foundry operator workflow reuses model resources](0132-foundry-operator-workflow-reuses-model-resources.md)

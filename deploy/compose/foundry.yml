@@ -1,0 +1,51 @@
+name: agentstration
+
+services:
+  foundry-key-provisioner:
+    image: alpine:3.22
+    command: >-
+      sh -ec 'target=/keys/token; if [ ! -f "$$target" ]; then temporary="$$target.tmp"; head -c 32 /dev/urandom | base64 | tr -d "\r\n" > "$$temporary"; chmod 600 "$$temporary"; mv "$$temporary" "$$target"; fi; test "$$(wc -c < "$$target")" -ge 32'
+    volumes:
+      - aep-foundry-key:/keys
+    restart: "no"
+
+  foundry-extension:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.extension
+      args:
+        PROJECT: src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj
+        ENTRYPOINT_DLL: Agentstration.Extensions.Foundry.dll
+    depends_on:
+      foundry-key-provisioner:
+        condition: service_completed_successfully
+    environment:
+      Foundry__ProjectEndpoint: ${FOUNDRY_PROJECT_ENDPOINT:?Set FOUNDRY_PROJECT_ENDPOINT outside the repository}
+      Foundry__InferenceEndpoint: ${FOUNDRY_INFERENCE_ENDPOINT:?Set FOUNDRY_INFERENCE_ENDPOINT outside the repository}
+      Foundry__AuthenticationMode: ${FOUNDRY_AUTHENTICATION_MODE:-ApiKeyEnvironment}
+      Foundry__AllowedPrivateHosts: ${FOUNDRY_ALLOWED_PRIVATE_HOSTS:-}
+      FOUNDRY_API_KEY: ${FOUNDRY_API_KEY:-}
+      Aep__EnrollmentMode: SharedKeyFile
+      Aep__SharedKeyFile__Path: /run/aep-key/token
+    volumes:
+      - aep-foundry-key:/run/aep-key:ro
+
+  agentstration:
+    depends_on:
+      foundry-key-provisioner:
+        condition: service_completed_successfully
+      foundry-extension:
+        condition: service_started
+    environment:
+      Agentstration__Bootstrap__Path: /app/bootstrap/profiles
+      Agentstration__Aep__Transport__AllowedHttpHosts__4: foundry-extension
+      Agentstration__Aep__Transport__AllowedPrivateNetworkHosts__4: foundry-extension
+      Agentstration__Extensions__Agentstration.Extensions.Foundry__Endpoint: http://foundry-extension:8080
+      Agentstration__Extensions__Agentstration.Extensions.Foundry__AuthenticationMode: StaticBearer
+      Agentstration__Extensions__Agentstration.Extensions.Foundry__EnrollmentMode: SharedKeyFile
+      Agentstration__Extensions__Agentstration.Extensions.Foundry__SharedKeyFile__Path: /run/aep-keys/foundry/token
+    volumes:
+      - aep-foundry-key:/run/aep-keys/foundry:ro
+
+volumes:
+  aep-foundry-key:
