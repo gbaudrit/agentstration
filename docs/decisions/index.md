@@ -151,3 +151,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 119. [ADR-0119 — Foundry model deployments use an isolated AEP extension](0119-foundry-model-deployments-use-an-isolated-aep-extension.md)
 120. [ADR-0120 — Foundry local Aspire discovery is explicitly opt-in](0120-foundry-local-aspire-discovery-is-explicitly-opt-in.md)
 121. [ADR-0121 — Foundry non-streaming chat uses the existing AEP runtime path](0121-foundry-chat-uses-the-existing-aep-runtime-path.md)
+122. [ADR-0122 — Foundry streaming preserves governed Tool execution](0122-foundry-streaming-preserves-governed-tool-execution.md)

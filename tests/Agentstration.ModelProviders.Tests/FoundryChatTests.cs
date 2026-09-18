@@ -93,6 +93,27 @@ public sealed class FoundryChatTests
     }
 
     [TestMethod]
+    public async Task NonStreamingToolCallsRemainAepDataForTheRuntimePipeline()
+    {
+        await WithKeyAsync(async _ =>
+        {
+            using var client = Client((_, _) => Task.FromResult(Json(HttpStatusCode.OK, """
+                {"choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call-1","type":"function","function":{"name":"lookup","arguments":"{\"q\":\"term\"}"}}]},"finish_reason":"tool_calls"}]}
+                """)));
+            var request = Request() with
+            {
+                Tools = [new AepToolDefinition("lookup", "search", JsonSerializer.SerializeToElement(new { type = "object" }))]
+            };
+            var response = await Provider(client).ChatAsync(request, default);
+            Assert.AreEqual(AepFinishReason.ToolCalls, response.FinishReason);
+            var call = response.Messages.Single().Contents.Single().ToolCall!;
+            Assert.AreEqual("call-1", call.Id);
+            Assert.AreEqual("lookup", call.Name);
+            Assert.AreEqual("term", call.Arguments.GetProperty("q").GetString());
+        });
+    }
+
+    [TestMethod]
     public async Task UnsupportedOptionsAndNonTextContentFailBeforeNetworkAccess()
     {
         await WithKeyAsync(async _ =>
@@ -106,7 +127,6 @@ public sealed class FoundryChatTests
                 Request() with { Options = new AepModelOptions { ResponseFormat = JsonSerializer.SerializeToElement(new { type = "json_object" }) } },
                 Request() with { Options = new AepModelOptions { ResponseFormat = JsonSerializer.SerializeToElement(new { type = "text", schema = "ignored" }) } },
                 Request() with { Options = new AepModelOptions { AdditionalOptions = new Dictionary<string, JsonElement> { ["reasoning_effort"] = JsonSerializer.SerializeToElement("high") } } },
-                Request() with { Tools = [new AepToolDefinition("lookup", null, JsonSerializer.SerializeToElement(new { type = "object" }))] },
                 Request() with { Messages = [new AepMessage(AepRole.User, [new AepContent { Kind = AepContentKind.Image, MediaType = "image/png" }])] }
             };
             foreach (var request in requests)
@@ -188,7 +208,7 @@ public sealed class FoundryChatTests
             using var malformed = Client((_, _) => Task.FromResult(Json(HttpStatusCode.OK, """
                 {"choices":[{"message":{"role":"assistant","content":"text"},"finish_reason":"tool_calls"}]}
                 """)));
-            Assert.AreEqual("unsupported_response", (await Assert.ThrowsAsync<AepServerException>(() => Provider(malformed).ChatAsync(Request(), default))).Code);
+            Assert.AreEqual("invalid_response", (await Assert.ThrowsAsync<AepServerException>(() => Provider(malformed).ChatAsync(Request(), default))).Code);
 
             using var slow = Client(async (_, token) =>
             {

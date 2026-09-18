@@ -112,8 +112,9 @@ public sealed class FoundryProviderTests
             Assert.AreEqual(2, models.Count);
             Assert.AreEqual("chat-a", models[0].Id);
             Assert.AreEqual("Microsoft", models[0].Metadata?["publisher"]);
-            CollectionAssert.AreEqual(new[] { "chat" }, models[0].Capabilities!.ToArray());
+            CollectionAssert.AreEqual(new[] { "chat", "streaming", "tools" }, models[0].Capabilities!.ToArray());
             Assert.AreEqual("chat-b", models[1].Id);
+            CollectionAssert.AreEqual(new[] { "chat", "streaming" }, models[1].Capabilities!.ToArray());
             Assert.AreEqual(2, seen.Count);
             Assert.IsTrue(provider.Descriptor.Capabilities.Chat);
             Assert.IsTrue(provider.Descriptor.Capabilities.ModelDiscovery);
@@ -133,7 +134,7 @@ public sealed class FoundryProviderTests
 
             Assert.HasCount(1, models);
             Assert.AreEqual("Phi-4-reasoning", models[0].Id);
-            CollectionAssert.AreEqual(new[] { "chat" }, models[0].Capabilities!.ToArray());
+            CollectionAssert.AreEqual(new[] { "chat", "streaming" }, models[0].Capabilities!.ToArray());
         });
     }
 
