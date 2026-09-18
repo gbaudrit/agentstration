@@ -5,6 +5,7 @@ using Agentstration.Aep.Client;
 using Agentstration.Agents;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
@@ -35,6 +36,9 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace },
             ResourceScopePolicy.AllowedScopes(SecretResourceKinds.Secret).ToArray());
+        CollectionAssert.AreEquivalent(
+            new[] { ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace },
+            ResourceScopePolicy.AllowedScopes(ParameterResourceKinds.Parameter).ToArray());
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace },
             ResourceScopePolicy.AllowedScopes(SourceResourceKinds.SourceProvider).ToArray());
