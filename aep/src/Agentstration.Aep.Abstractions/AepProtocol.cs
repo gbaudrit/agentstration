@@ -240,14 +240,20 @@ public sealed record AepManifest(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepValueRequirement>? ValueRequirements = null);
 
 public enum AepValueProtection { Standard, Secured }
-public enum AepValueType { String, Integer, Number, Boolean }
+public enum AepValueType
+{
+    [JsonStringEnumMemberName("string")] Text,
+    [JsonStringEnumMemberName("integer")] WholeNumber,
+    [JsonStringEnumMemberName("number")] DecimalNumber,
+    [JsonStringEnumMemberName("boolean")] Logical
+}
 
 public sealed record AepValueRequirement(
     string ContributionKind,
     string ContributionId,
     string Id,
     [property: JsonRequired] bool Required,
-    AepValueType Type = AepValueType.String,
+    AepValueType Type = AepValueType.Text,
     AepValueProtection Protection = AepValueProtection.Standard,
     string? Format = null,
     string? Description = null);
@@ -343,10 +349,10 @@ public static class AepBoundValueValidator
 
     private static bool MatchesType(JsonElement value, AepValueType type) => type switch
     {
-        AepValueType.String => value.ValueKind == JsonValueKind.String,
-        AepValueType.Integer => value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out _),
-        AepValueType.Number => value.ValueKind == JsonValueKind.Number,
-        AepValueType.Boolean => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
+        AepValueType.Text => value.ValueKind == JsonValueKind.String,
+        AepValueType.WholeNumber => value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out _),
+        AepValueType.DecimalNumber => value.ValueKind == JsonValueKind.Number,
+        AepValueType.Logical => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
         _ => false
     };
 }

@@ -7,7 +7,7 @@ namespace Agentstration.Aep.Client;
 
 public sealed class AepValueResolver
 {
-    private readonly IReadOnlyDictionary<string, AepBoundValue> values;
+    private readonly Dictionary<string, AepBoundValue> values;
     private readonly AepSecretAccessClient secrets;
 
     public AepValueResolver(
@@ -72,7 +72,7 @@ public sealed class AepResolvedValue : IDisposable
     public JsonElement ReadJson()
     {
         if (InlineValue is { } inline) return inline.Clone();
-        if (secretValue is null) throw new ObjectDisposedException(nameof(AepResolvedValue));
+        ObjectDisposedException.ThrowIf(secretValue is null, this);
         try { return JsonSerializer.Deserialize<JsonElement>(secretValue, AepProtocol.JsonOptions); }
         catch (JsonException exception)
         {

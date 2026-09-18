@@ -697,7 +697,7 @@ public sealed class AepConformanceTests
         var requirements = new AepValueRequirement[]
         {
             new(AepContributionKinds.ModelProvider, "test", "credential", true, Protection: AepValueProtection.Secured),
-            new(AepContributionKinds.ModelProvider, "test", "timeout", false, AepValueType.Integer)
+            new(AepContributionKinds.ModelProvider, "test", "timeout", false, AepValueType.WholeNumber)
         };
         var wrongProtection = AepBoundValue.Inline("credential", JsonSerializer.SerializeToElement("not-secret"));
         var wrongType = AepBoundValue.Inline("timeout", JsonSerializer.SerializeToElement("ten"));
