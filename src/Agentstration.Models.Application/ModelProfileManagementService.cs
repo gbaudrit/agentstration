@@ -15,7 +15,8 @@ public sealed class ModelProfileManagementService(
     ResourceScopeOperationService scopeOperations,
     ModelProviderManagementService providerConfigurations,
     IEnumerable<IModelProviderDiscovery> discoveries,
-    IEnumerable<IModelProviderCapabilitiesResolver> capabilityResolvers) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
+    IEnumerable<IModelProviderCapabilitiesResolver> capabilityResolvers,
+    IEnumerable<IExtensionInspector> inspectors) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
 {
     public static string ProfileId(string name) => name;
     public async Task ValidateForCreateAsync(ModelProfileResource resource, CancellationToken cancellationToken)
@@ -126,7 +127,8 @@ public sealed class ModelProfileManagementService(
                 Name = profile.Metadata.Name,
                 ProviderName = provider.Name,
                 ModelName = profile.Definition.Model.Name,
-                ProviderOptions = profile.Definition.ProviderOptions
+                ProviderOptions = profile.Definition.ProviderOptions,
+                SecretBindings = profile.Definition.SecretBindings
             };
             var levels = await capabilityResolver.ResolveCapabilitiesAsync(provider, deployment, cancellationToken);
             var effective = EffectiveCapabilityResolver.Intersect(levels.Provider, levels.Model, levels.Adapter);
@@ -191,7 +193,7 @@ public sealed class ModelProfileManagementService(
     {
         var profile = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelDeploymentNotFoundException($"{@namespace}/{name}");
         var provider = profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ModelResourceKinds.ModelProvider);
-        return new() { Name = profile.Value.Metadata.Name, ProviderName = provider.Name, ProviderNamespace = provider.Namespace, ModelName = profile.Value.Definition.Model.Name, ProviderOptions = profile.Value.Definition.ProviderOptions };
+        return new() { Name = profile.Value.Metadata.Name, ScopeRef = profile.Value.ScopeRef, ProviderName = provider.Name, ProviderNamespace = provider.Namespace, ModelName = profile.Value.Definition.Model.Name, ProviderOptions = profile.Value.Definition.ProviderOptions, SecretBindings = profile.Value.Definition.SecretBindings };
     }
 
     public async Task ValidateReferenceAsync(ResourceReference profileReference, ResourceNamespace ownerNamespace, ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken)
@@ -217,11 +219,23 @@ public sealed class ModelProfileManagementService(
         try { provider = await providerConfigurations.GetConfigurationRequiredAsync(definition.Provider, ownerNamespace, ownerScopeRef, cancellationToken); }
         catch (ModelProviderResolutionException) { throw Invalid("definition.provider.name", "The referenced model provider does not exist."); }
         if (string.IsNullOrWhiteSpace(definition.Model.Name)) throw Invalid("definition.model.name", "A model name is required.");
+        if (definition.SecretBindings is null) throw Invalid("definition.secretBindings", "Secret bindings must be an array.");
         if (definition.Generation.Temperature is < 0 or > 2) throw Invalid("definition.generation.temperature", "Temperature must be between 0 and 2.");
         foreach (var option in definition.ProviderOptions.Keys)
             if (!string.Equals(option, provider.ContributionId, StringComparison.OrdinalIgnoreCase)) throw Invalid($"definition.providerOptions.{option}", $"Provider options for '{option}' cannot be used with contribution '{provider.ContributionId}'.");
         if (definition.ProviderOptions.TryGetValue(provider.ContributionId, out var options))
             ValidateVersionedOptions(provider.ContributionId, options);
+        if (definition.SecretBindings.Count > 0)
+        {
+            var inspector = inspectors.SingleOrDefault(candidate => candidate.CanHandle(provider.AdapterType))
+                ?? throw Invalid("definition.secretBindings", "The model provider does not support AEP Secret bindings.");
+            var inspection = await inspector.InspectAsync(provider, cancellationToken);
+            if (!string.Equals(inspection.Status, "available", StringComparison.Ordinal))
+                throw Invalid("definition.secretBindings", "The extension must be available to validate Secret bindings.");
+            var issues = ExtensionSecretBindingValidator.Validate(definition.SecretBindings, inspection.SecretRequirements, requireAll: false);
+            if (issues.Count > 0)
+                throw Invalid("definition.secretBindings", issues[0].Message);
+        }
     }
 
     private static void ValidateVersionedOptions(string providerType, VersionedExtensionOptions options)

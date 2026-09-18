@@ -4,6 +4,7 @@
     <ProjectReference Include="../Agentstration.Agents.Api/Agentstration.Agents.Api.csproj" />
     <ProjectReference Include="../Agentstration.Flows.Api/Agentstration.Flows.Api.csproj" />
     <ProjectReference Include="../Agentstration.Models.Api/Agentstration.Models.Api.csproj" />
+    <ProjectReference Include="../Agentstration.ResourcePlanning.Api/Agentstration.ResourcePlanning.Api.csproj" />
     <ProjectReference Include="../Agentstration.Secrets.Api/Agentstration.Secrets.Api.csproj" />
     <ProjectReference Include="../Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Tools.Api/Agentstration.Tools.Api.csproj" />

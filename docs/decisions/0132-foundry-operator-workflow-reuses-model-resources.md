@@ -1,4 +1,4 @@
-# ADR-0125: Foundry operator workflow reuses model resources
+# ADR-0132: Foundry operator workflow reuses model resources
 
 Status: Accepted — 2026-09-18
 

@@ -78,6 +78,14 @@
     <Project Path="src/Agentstration.ResourceManagement.Storage.Sqlite/Agentstration.ResourceManagement.Storage.Sqlite.csproj" />
     <Project Path="src/Agentstration.ResourceManagement.Storage.PostgreSql/Agentstration.ResourceManagement.Storage.PostgreSql.csproj" />
   </Folder>
+  <Folder Name="/src/ResourcePlanning/">
+    <Project Path="src/Agentstration.ResourcePlanning.Api/Agentstration.ResourcePlanning.Api.csproj" />
+    <Project Path="src/Agentstration.ResourcePlanning.Contracts/Agentstration.ResourcePlanning.Contracts.csproj" />
+    <Project Path="src/Agentstration.ResourcePlanning/Agentstration.ResourcePlanning.csproj" />
+    <Project Path="src/Agentstration.ResourcePlanning.Storage.Abstractions/Agentstration.ResourcePlanning.Storage.Abstractions.csproj" />
+    <Project Path="src/Agentstration.ResourcePlanning.Storage.Sqlite/Agentstration.ResourcePlanning.Storage.Sqlite.csproj" />
+    <Project Path="src/Agentstration.ResourcePlanning.Storage.PostgreSql/Agentstration.ResourcePlanning.Storage.PostgreSql.csproj" />
+  </Folder>
   <Folder Name="/src/Runtime/">
     <Project Path="src/Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
     <Project Path="src/Agentstration.Runtime.Api/Agentstration.Runtime.Api.csproj" />
@@ -150,6 +158,7 @@
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Resources/">
+    <Project Path="tests/Agentstration.ResourcePlanning.Tests/Agentstration.ResourcePlanning.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Storage.Tests/Agentstration.Management.Storage.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Sources.Tests/Agentstration.Management.Sources.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Api.Tests/Agentstration.Management.Api.Tests.csproj" />

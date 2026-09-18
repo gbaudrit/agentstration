@@ -13,6 +13,7 @@ import { ConsoleAdministrationPage } from './console-administration.page.js';
 import { OperationsPage } from './operations.page.js';
 import { ResourceAdministrationPage } from './resource-administration.page.js';
 import { ModelAdministrationPage } from './model-administration.page.js';
+import { DescendantSecretsPage } from './descendant-secrets.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -28,6 +29,7 @@ export class ProductPages {
   public readonly operations: OperationsPage;
   public readonly resourceAdministration: ResourceAdministrationPage;
   public readonly modelAdministration: ModelAdministrationPage;
+  public readonly descendantSecrets: DescendantSecretsPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -43,6 +45,7 @@ export class ProductPages {
     this.operations = new OperationsPage(page);
     this.resourceAdministration = new ResourceAdministrationPage(page);
     this.modelAdministration = new ModelAdministrationPage(page);
+    this.descendantSecrets = new DescendantSecretsPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

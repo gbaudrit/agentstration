@@ -35,6 +35,7 @@ It is built on the Microsoft .NET AI stack and currently executes agents through
 - workspace Dashboards that organize published Entries without exposing runtime details;
 - a responsive, conversation-first Workplace that projects agent turns, progress, human input and outcomes;
 - an operations Console for configuration, supervision, run inspection and governance.
+- Console Resource Plan review with saved per-agent profile choices, proposed changes, dependency graph, validation, and activity history.
 
 ### Packs and automation
 
@@ -54,7 +55,7 @@ Agentstration is a modular monolith with explicit **Management**, **Runtime**, *
 - the **Work Plane** receives, represents and tracks delegated work and its outcomes;
 - the **Flow module** owns composition, publication, orchestration and durable Flow Runs.
 
-Packs form a distribution layer above these boundaries. The repository produces multiple local hosts from one codebase: the operations Console and authoritative server, the standalone Workplace, the Work API and an Aspire AppHost. SQLite-backed stores keep the main module boundaries explicit.
+Packs form a distribution layer above these boundaries. The repository produces multiple local hosts from one codebase: the operations Console and authoritative server, the standalone Workplace, the Work API and an Aspire AppHost. SQLite-backed stores keep the main module boundaries explicit. Resource Planning owns durable reviewed proposals outside executable Management state.
 
 The Agentstration Extension Protocol SDK, conformance validator, CLI, samples and standalone Inspector are staged autonomously in [`aep/`](aep/README.md). AEP gives extensions versioned discovery, capability and option contracts without leaking provider-specific concerns into portable Agentstration resources.
 
@@ -209,7 +210,7 @@ Copy-Item deploy/compose/.env.postgresql.example deploy/compose/.env.postgresql
 docker compose --env-file deploy/compose/.env.postgresql -f deploy/compose/ollama.yml -f deploy/compose/postgresql.yml up --build
 ```
 
-Replace `ollama.yml` with `base.yml`, `llama-cpp.yml`, or `localai.yml` to select another PostgreSQL-backed variant. PostgreSQL stores relational module data in six schemas but leaves secrets, Data Protection keys, Pack archives, and Work artifacts on the existing file stores. Changing provider does not migrate SQLite data and does not enable multi-instance operation. Readiness is exposed at `/health/ready`; `/health` remains liveness.
+Replace `ollama.yml` with `base.yml`, `llama-cpp.yml`, or `localai.yml` to select another PostgreSQL-backed variant. PostgreSQL stores relational module data in seven schemas but leaves secrets, Data Protection keys, Pack archives, and Work artifacts on the existing file stores. Changing provider does not migrate SQLite data and does not enable multi-instance operation. Readiness is exposed at `/health/ready`; `/health` remains liveness.
 
 For Aspire, set `Agentstration:Storage:Provider=PostgreSql`. Its generated password is persisted in user-secrets and relational data is kept in the worktree-isolated Docker volume `agentstration-<slot>-<instance-id>-postgresql`; file-backed state remains under the slot data directory. See [configuration](docs/getting-started/configuration.md#postgresql-storage-profile) for startup behavior, reset, troubleshooting, and backup guidance.
 

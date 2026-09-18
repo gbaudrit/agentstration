@@ -74,6 +74,14 @@ export const Checkpoints = {
     profileEditors: 'resource-administration-profile-editors',
     protectedEditors: 'resource-administration-protected-editors',
   },
+  descendantSecrets: {
+    vaultCreated: 'descendant-secrets-vault-created',
+    vaultUnavailable: 'descendant-secrets-vault-unavailable',
+    vaultGranted: 'descendant-secrets-vault-granted',
+    workspaceSecretCreated: 'descendant-secrets-workspace-secret-created',
+    secretGranted: 'descendant-secrets-secret-granted',
+    secretRevoked: 'descendant-secrets-secret-revoked',
+  },
   modelAdministration: {
     provider: 'model-administration-provider',
     runtime: 'model-administration-runtime',

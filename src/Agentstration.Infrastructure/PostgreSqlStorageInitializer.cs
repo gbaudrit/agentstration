@@ -43,13 +43,14 @@ internal sealed class PostgreSqlStorageInitializer(
 
         try
         {
-            await using (var command = new NpgsqlCommand("CREATE SCHEMA IF NOT EXISTS management; CREATE SCHEMA IF NOT EXISTS work; CREATE SCHEMA IF NOT EXISTS flow; CREATE SCHEMA IF NOT EXISTS runtime; CREATE SCHEMA IF NOT EXISTS identity; CREATE SCHEMA IF NOT EXISTS scheduler;", connection))
+            await using (var command = new NpgsqlCommand("CREATE SCHEMA IF NOT EXISTS management; CREATE SCHEMA IF NOT EXISTS work; CREATE SCHEMA IF NOT EXISTS flow; CREATE SCHEMA IF NOT EXISTS runtime; CREATE SCHEMA IF NOT EXISTS identity; CREATE SCHEMA IF NOT EXISTS scheduler; CREATE SCHEMA IF NOT EXISTS resource_planning;", connection))
                 await command.ExecuteNonQueryAsync(cancellationToken);
 
             await MigrateFactoryAsync<Agentstration.ResourceManagement.Storage.PostgreSql.ResourceManagementDbContext>(services, cancellationToken);
             await MigrateFactoryAsync<Agentstration.Work.Storage.PostgreSql.WorkDbContext>(services, cancellationToken);
             await MigrateFactoryAsync<Agentstration.Flows.Storage.PostgreSql.FlowDbContext>(services, cancellationToken);
             await MigrateFactoryAsync<Agentstration.Runtime.Storage.PostgreSql.RuntimeRunDbContext>(services, cancellationToken);
+            await MigrateFactoryAsync<Agentstration.ResourcePlanning.Storage.PostgreSql.ResourcePlanningDbContext>(services, cancellationToken);
             await using var scope = services.CreateAsyncScope();
             await scope.ServiceProvider.GetRequiredService<LocalIdentityDbContext>().Database.MigrateAsync(cancellationToken);
             await InitializeQuartzAsync(connection, cancellationToken);

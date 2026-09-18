@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Agentstration.Aep.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
@@ -106,7 +107,7 @@ public abstract class ModelManagementApiTestBase
                 UnavailableDetails));
     }
 
-    protected sealed class ConfiguredEndpointInspector : IExtensionInspector
+    protected sealed class ConfiguredEndpointInspector(IReadOnlyList<AepSecretRequirement>? secretRequirements = null) : IExtensionInspector
     {
         public bool CanHandle(string providerType) => true;
         public bool CanInspectEndpoint(Uri endpoint) => true;
@@ -124,7 +125,8 @@ public abstract class ModelManagementApiTestBase
                 "available",
                 new ExtensionIdentity(registrationName == "extension-discovered" ? "extension.discovered" : registrationName, "Discovered extension", "1.0.0", null),
                 [new ExtensionContribution("model-provider", "discovered")],
-                []));
+                [],
+                SecretRequirements: secretRequirements));
     }
 
     protected sealed class MigrationExtensionAdapter : IExtensionInspector, IExtensionOptionsMigrator

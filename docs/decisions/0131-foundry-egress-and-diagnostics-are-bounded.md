@@ -1,4 +1,4 @@
-# ADR-0124: Foundry egress and diagnostics are bounded
+# ADR-0131: Foundry egress and diagnostics are bounded
 
 Status: Accepted — 2026-09-18
 

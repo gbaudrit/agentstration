@@ -241,8 +241,8 @@
 .resource-context-field { display: flex; align-items: center; gap: 7px; height: 38px; padding-left: 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); color: var(--muted); font-size: var(--font-size-xs); }
 .resource-context-field input { width: 110px; padding-inline: 7px; border: 0; background: transparent; font-family: var(--font-family-mono); }
 .resource-summary { margin-top: var(--space-3); color: var(--muted); font-size: var(--font-size-sm); }
-.data-grid .resource-name-link { color: var(--text); font-weight: 750; text-decoration: none; }
-.data-grid .resource-name-link:hover { color: var(--primary); }
+.data-grid .resource-name-link, .resource-plan-application-resource .resource-name-link { color: var(--text); font-weight: 750; text-decoration: none; }
+.data-grid .resource-name-link:hover, .resource-plan-application-resource .resource-name-link:hover { color: var(--primary); }
 .resource-secondary { display: block; margin-top: 4px; color: var(--muted); font-size: var(--font-size-xs); }
 .resource-secondary code { font-size: inherit; }
 .row-actions-menu { position: relative; }

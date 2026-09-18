@@ -1,10 +1,10 @@
-# ADR-0120: Foundry local Aspire discovery is explicitly opt-in
+# ADR-0127: Foundry local Aspire discovery is explicitly opt-in
 
 Status: Accepted — 2026-09-17
 
 ## Context
 
-[ADR-0119](0119-foundry-model-deployments-use-an-isolated-aep-extension.md) isolates Foundry behind an autonomous AEP extension and reserves secure orchestrated preview for the later security and deployment gates. A local developer still needs to start that discovery-only extension alongside Agentstration in Aspire to exercise its enrollment and model catalog. Always starting it would break the offline default because Foundry requires explicit endpoints and authentication.
+[ADR-0126](0126-foundry-model-deployments-use-an-isolated-aep-extension.md) isolates Foundry behind an autonomous AEP extension and reserves secure orchestrated preview for the later security and deployment gates. A local developer still needs to start that discovery-only extension alongside Agentstration in Aspire to exercise its enrollment and model catalog. Always starting it would break the offline default because Foundry requires explicit endpoints and authentication.
 
 ## Decision
 

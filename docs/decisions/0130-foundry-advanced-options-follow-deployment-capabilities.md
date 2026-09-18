@@ -1,10 +1,10 @@
-# ADR-0123: Foundry advanced options follow deployment capabilities
+# ADR-0130: Foundry advanced options follow deployment capabilities
 
 Status: Accepted — 2026-09-18
 
 ## Context
 
-ADR-0122 added streaming and governed Tool calls. FR-448 adds structured output and explicit reasoning through the same AEP chat contribution. Foundry deployments can differ in supported options, and a model name alone is not evidence of support.
+ADR-0129 added streaming and governed Tool calls. FR-448 adds structured output and explicit reasoning through the same AEP chat contribution. Foundry deployments can differ in supported options, and a model name alone is not evidence of support.
 
 ## Decision
 

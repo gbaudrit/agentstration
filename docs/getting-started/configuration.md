@@ -142,7 +142,7 @@ Remove the matching volume and secret only for a full reset. Keep `.agentstratio
 
 ### Startup and readiness
 
-The Web host validates the selected provider and PostgreSQL connection string, obtains a bounded advisory lock, creates the six schemas, applies the five EF Core migration sets in deterministic order, and initializes the Quartz schema. Bootstrap and background workers start only after storage initialization. `/health` reports process liveness; `/health/ready` returns success only after storage is ready.
+The Web host validates the selected provider and PostgreSQL connection string, obtains a bounded advisory lock, creates the seven schemas, applies the six EF Core migration sets in deterministic order, and initializes the Quartz schema. Bootstrap and background workers start only after storage initialization. `/health` reports process liveness; `/health/ready` returns success only after storage is ready.
 
 On the first start, PostgreSQL may log that the `agentstration` database or a schema-specific `__EFMigrationsHistory` relation does not exist while Aspire and EF Core probe and create them. These messages are expected only during initialization and are harmless when `/health/ready` subsequently becomes ready. Treat repeated authentication failures, migration exceptions, Quartz SQL errors, or a readiness endpoint that remains unavailable as startup failures.
 
@@ -168,6 +168,6 @@ dotnet test --project tests/Agentstration.Performance.Tests/Agentstration.Perfor
 
 Back up the PostgreSQL database and the file-backed Data Protection keys, local secrets, Pack archives, and Work artifacts as one consistent set. Restoring only the database is insufficient and can invalidate cookies, lifecycle tokens, secret references, Pack content, or Work artifacts.
 
-Use `pg_dump`/`pg_restore` or the equivalent managed PostgreSQL tooling for all six schemas. Stop writes or take a transactionally consistent database snapshot, copy the file-backed state from `Data:Directory`, and record the application version. Restore those components together before starting Agentstration. Do not restore a PostgreSQL volume by copying files between major PostgreSQL versions; use logical dump/restore or a supported PostgreSQL upgrade procedure.
+Use `pg_dump`/`pg_restore` or the equivalent managed PostgreSQL tooling for all seven schemas. Stop writes or take a transactionally consistent database snapshot, copy the file-backed state from `Data:Directory`, and record the application version. Restore those components together before starting Agentstration. Do not restore a PostgreSQL volume by copying files between major PostgreSQL versions; use logical dump/restore or a supported PostgreSQL upgrade procedure.
 
 PostgreSQL remains single-instance in this release, and switching providers does not migrate data; a supported export/import path is future work.

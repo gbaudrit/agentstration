@@ -44,7 +44,7 @@ public sealed class AepTracingHandler(IAepHttpTraceSink sink) : DelegatingHandle
             await sink.RecordAsync(new AepHttpTrace(
                 startedAt,
                 request.Method.Method,
-                request.RequestUri,
+                SafeUrl(request.RequestUri),
                 response is null ? null : (int)response.StatusCode,
                 stopwatch.Elapsed,
                 Headers(request.Headers.Select(value => (value.Key, value.Value))),
@@ -70,7 +70,7 @@ public sealed class AepTracingHandler(IAepHttpTraceSink sink) : DelegatingHandle
             using (var writer = new Utf8JsonWriter(stream)) WriteRedacted(writer, document.RootElement);
             return Limit(Encoding.UTF8.GetString(stream.ToArray()));
         }
-        catch (JsonException) { return Limit(value); }
+        catch (JsonException) { return "[payload omitted: invalid JSON]"; }
     }
 
     private static void WriteRedacted(Utf8JsonWriter writer, JsonElement element, string? propertyName = null)
@@ -93,5 +93,12 @@ public sealed class AepTracingHandler(IAepHttpTraceSink sink) : DelegatingHandle
     }
 
     private static bool IsSensitive(string name) => SensitiveNames.Any(value => name.Contains(value, StringComparison.OrdinalIgnoreCase));
+    private static Uri? SafeUrl(Uri? value)
+    {
+        if (value is null) return null;
+        if (!value.IsAbsoluteUri)
+            return new Uri(value.OriginalString.Split('?', '#')[0], UriKind.Relative);
+        return new UriBuilder(value) { UserName = string.Empty, Password = string.Empty, Query = string.Empty, Fragment = string.Empty }.Uri;
+    }
     private static string Limit(string value) => value.Length <= MaximumBodyLength ? value : value[..MaximumBodyLength] + "…";
 }

@@ -76,6 +76,8 @@ internal static class SecretEndpoints
         catch (ResourceConcurrencyException exception) { return Results.Problem(statusCode: 409, title: "Resource version conflict", detail: exception.Message); }
         catch (ResourceScopeAccessDeniedException exception) { return Results.Problem(statusCode: 403, title: "Resource scope access denied", detail: exception.Message); }
         catch (ResourceScopePolicyException exception) { return Results.Problem(statusCode: 422, title: "Invalid resource scope", detail: exception.Message); }
+        catch (InvalidDescendantUseGrantException exception) { return Results.Problem(statusCode: 422, title: "Invalid use grant", detail: exception.Message); }
+        catch (SecretAccessDeniedException exception) { return Results.Problem(statusCode: 403, title: "Secret access denied", detail: exception.Message); }
         catch (Exception exception) when (exception is SecretManagementException or ArgumentException or InvalidOperationException) { return Results.Problem(statusCode: 422, title: "Invalid secret operation", detail: exception.Message); }
     }
 }

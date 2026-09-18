@@ -1,10 +1,10 @@
-# ADR-0121: Foundry non-streaming chat uses the existing AEP runtime path
+# ADR-0128: Foundry non-streaming chat uses the existing AEP runtime path
 
 Status: Accepted — 2026-09-17
 
 ## Context
 
-ADR-0119 introduced an isolated Foundry AEP extension with deployment discovery but no inference. FR-446 must use a selected Model Profile through Agentstration's durable Runtime and Flow paths. The configured inference endpoint may be resource-routed (`/openai/v1`) or project-routed (`/api/projects/{project}/openai/v1`), and these routes require different Microsoft Entra token audiences. Runtime Runs default to automatic streaming, whereas this increment cannot stream.
+ADR-0126 introduced an isolated Foundry AEP extension with deployment discovery but no inference. FR-446 must use a selected Model Profile through Agentstration's durable Runtime and Flow paths. The configured inference endpoint may be resource-routed (`/openai/v1`) or project-routed (`/api/projects/{project}/openai/v1`), and these routes require different Microsoft Entra token audiences. Runtime Runs default to automatic streaming, whereas this increment cannot stream.
 
 ## Decision
 

@@ -123,6 +123,31 @@ public sealed class AgentManagementService(
         await eventBus.PublishAsync(new AgentDeleted(existing.Value.Uid, name, timeProvider.GetUtcNow()), cancellationToken);
     }
 
+    public async Task DeleteAgentExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
+    {
+        var key = new ResourceKey(AgentResourceKinds.Agent, name, @namespace);
+        var address = ScopedResourceAddress.Create(scopeRef, @namespace, AgentResourceKinds.Agent, name);
+        var existing = await store.GetExactAsync<AgentResource>(address, cancellationToken) ?? throw new ResourceNotFoundException(key);
+        foreach (var guard in deletionGuards) await guard.ValidateDeleteAsync(key, cancellationToken);
+        if (ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
+            throw new ResourceConcurrencyException("The supplied ETag does not match the current resource version.");
+
+        var deployments = await agentQueries.ListDeploymentsForAgentAsync(@namespace, name, cancellationToken);
+        foreach (var deployment in deployments.Where(value => value.Value.ScopeRef == scopeRef))
+        {
+            var stopped = deployment.Value.DesiredState == DesiredAgentState.Stopped
+                ? deployment
+                : await StopAsync(deployment, cancellationToken);
+            var reconciled = await ReconcileAsync(stopped, cancellationToken);
+            await store.DeleteExactAsync(
+                ScopedResourceAddress.Create(scopeRef, @namespace, AgentResourceKinds.AgentDeployment, reconciled.Value.Metadata.Name),
+                reconciled.ETag, cancellationToken);
+        }
+
+        await store.DeleteExactAsync(address, ifMatch, cancellationToken);
+        await eventBus.PublishAsync(new AgentDeleted(existing.Value.Uid, name, timeProvider.GetUtcNow()), cancellationToken);
+    }
+
     public Task<IReadOnlyList<StoredResource<AgentResource>>> ListAgentsAsync(int skip, int take, CancellationToken cancellationToken) =>
         ListAgentsAsync(ResourceNamespace.Default, skip, take, cancellationToken);
 
