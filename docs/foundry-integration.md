@@ -16,7 +16,7 @@ Microsoft Foundry is an optional AEP model-provider extension, not an Agent host
 
 FR-433 adds explicit descendant grants for higher-scope Secrets. It is not required for a same-tenant Model Provider and Secret binding. Foundry-hosted Agents, model deployment administration and non-chat media APIs are outside this integration.
 
-## FR-445/FR-446 configuration for a local test
+## Configuration for a local test
 
 `Agentstration.Extensions.Foundry` is an autonomous process and is not started by the default Agentstration profile. Configure it explicitly with the project data-plane endpoint, an OpenAI/v1 inference base URL, and one authentication mode:
 
@@ -32,7 +32,7 @@ FR-433 adds explicit descendant grants for higher-scope Secrets. It is not requi
 
 For Visual Studio local testing, select the Foundry project and **Manage User Secrets**. In the local `secrets.json` stored outside the repository, set `Foundry:ProjectEndpoint`, `Foundry:InferenceEndpoint`, `Foundry:AuthenticationMode` (`ApiKeyEnvironment`) and `FOUNDRY_API_KEY`. The launch environment must be `Development`; in another environment only the `FOUNDRY_API_KEY` process variable is accepted. The environment variable takes precedence if both are set. User Secrets are local development storage, not an encrypted production vault or an Agentstration Secret.
 
-### Opt-in Aspire launch for local discovery tests
+### Opt-in Aspire launch for local tests
 
 When starting **Agentstration.AppHost** in Visual Studio, open **Manage User Secrets** on the *AppHost project*. It has a separate User Secrets store from the standalone Foundry extension. Put the following values there (substitute your endpoint and key locally; never commit the resulting `secrets.json`):
 
@@ -59,7 +59,7 @@ No Azure account, key or live model is needed for the default test suite. The op
 ## Release stages
 
 1. **Local developer preview:** explicit standalone extension against a test or existing Foundry project; no default bootstrap changes.
-2. **Local Aspire discovery and non-streaming chat test:** explicit AppHost User Secrets opt-in; the existing AEP enrollment path applies. This is a local developer test, not the secured orchestrated preview.
+2. **Local Aspire discovery and chat test:** explicit AppHost User Secrets opt-in; the existing AEP enrollment path applies. Streaming and governed Tool calls are available for deployments that report Tool calling. This is a local developer test, not the secured orchestrated preview.
 3. **Secure orchestrated preview:** only after FR-449 and the remaining topology/Console work of FR-451. AEP enrollment, scope and transport prerequisites #174, #175, #178, #179 and #180 are already delivered.
 4. **Manual remote extension:** only after the same security gate plus pairing prerequisites #176 and #177. Managed API-key use awaits FR-439/FR-452; the environment mode remains a documented temporary deployment mechanism.
 
