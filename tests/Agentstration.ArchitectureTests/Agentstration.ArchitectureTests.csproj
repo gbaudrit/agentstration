@@ -29,6 +29,8 @@
     <ProjectReference Include="../../src/Agentstration.Models.Application/Agentstration.Models.Application.csproj" />
     <ProjectReference Include="../../src/Agentstration.Packs/Agentstration.Packs.csproj" />
     <ProjectReference Include="../../src/Agentstration.Packs.Contracts/Agentstration.Packs.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Parameters/Agentstration.Parameters.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Parameters.Contracts/Agentstration.Parameters.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Sources/Agentstration.Sources.csproj" />
     <ProjectReference Include="../../src/Agentstration.Api.Contracts/Agentstration.Api.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
