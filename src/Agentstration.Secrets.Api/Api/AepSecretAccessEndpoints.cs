@@ -11,6 +11,11 @@ internal static class AepSecretAccessEndpoints
         endpoints.MapPost(AepProtocol.SecretAccessPath, RedeemAsync)
             .AllowAnonymous()
             .RequireRateLimiting("aep-secret-access")
+            .Produces<AepSecretAccessResponse>(StatusCodes.Status200OK)
+            .Produces<AepErrorResponse>(StatusCodes.Status403Forbidden)
+            .Produces<AepErrorResponse>(StatusCodes.Status410Gone)
+            .Produces<AepErrorResponse>(StatusCodes.Status422UnprocessableEntity)
+            .Produces<AepErrorResponse>(StatusCodes.Status503ServiceUnavailable)
             .WithSummary("Redeem a one-use AEP Secret capability")
             .WithMetadata(new RequestSizeLimitAttribute(4096));
     }
