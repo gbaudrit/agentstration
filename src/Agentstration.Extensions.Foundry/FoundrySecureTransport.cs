@@ -12,6 +12,7 @@ public static class FoundrySecureTransport
         return new SocketsHttpHandler
         {
             AllowAutoRedirect = false,
+            UseProxy = false,
             ConnectTimeout = TimeSpan.FromSeconds(10),
             PooledConnectionLifetime = TimeSpan.FromMinutes(2),
             ConnectCallback = (context, cancellationToken) => ConnectAllowedAsync(context, options, cancellationToken)
@@ -25,10 +26,13 @@ public static class FoundrySecureTransport
         if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
         if (address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any)
             || address.Equals(IPAddress.Broadcast) || address.IsIPv6Multicast || address.IsIPv6LinkLocal
-            || InRange(address, 169, 254, 0, 0, 16) || InRange(address, 224, 0, 0, 0, 4)
+            || InRange(address, 0, 0, 0, 0, 8) || InRange(address, 169, 254, 0, 0, 16)
+            || InRange(address, 224, 0, 0, 0, 4)
             || InRange(address, 240, 0, 0, 0, 4)) return false;
         if (IPAddress.IsLoopback(address) || InRange(address, 10, 0, 0, 0, 8)
             || InRange(address, 172, 16, 0, 0, 12) || InRange(address, 192, 168, 0, 0, 16)
+            || InRange(address, 100, 64, 0, 0, 10) || InRange(address, 198, 18, 0, 0, 15)
+            || address.IsIPv6SiteLocal
             || address.AddressFamily == AddressFamily.InterNetworkV6 && (address.GetAddressBytes()[0] & 0xfe) == 0xfc)
             return options.AllowedPrivateHosts.Contains(host);
         return true;

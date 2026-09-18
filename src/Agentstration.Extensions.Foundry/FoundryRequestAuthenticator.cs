@@ -11,10 +11,12 @@ public sealed class FoundryRequestAuthenticator
     private static readonly TokenRequestContext ResourceInferenceTokenContext = new(["https://cognitiveservices.azure.com/.default"]);
     private readonly TokenCredential? credential;
     private readonly string? apiKey;
+    private readonly FoundryExtensionOptions options;
 
     public FoundryRequestAuthenticator(FoundryExtensionOptions options, string? developmentApiKey = null, TokenCredential? tokenCredential = null)
     {
         ArgumentNullException.ThrowIfNull(options);
+        this.options = options;
         if (options.AuthenticationMode == FoundryAuthenticationMode.ApiKeyEnvironment)
         {
             apiKey = Environment.GetEnvironmentVariable("FOUNDRY_API_KEY") ?? developmentApiKey;
@@ -34,15 +36,36 @@ public sealed class FoundryRequestAuthenticator
         });
     }
 
-    public Task ApplyAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-        ApplyAsync(request, ProjectTokenContext, cancellationToken);
+    public Task ApplyAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        ValidateTarget(request, options.DeploymentsEndpoint(), HttpMethod.Get, discovery: true);
+        return ApplyAsync(request, ProjectTokenContext, cancellationToken);
+    }
 
-    public Task ApplyInferenceAsync(HttpRequestMessage request, FoundryExtensionOptions options, CancellationToken cancellationToken) =>
-        ApplyAsync(
-            request,
+    public Task ApplyInferenceAsync(HttpRequestMessage request, FoundryExtensionOptions options, CancellationToken cancellationToken)
+    {
+        if (options.ProjectEndpoint != this.options.ProjectEndpoint
+            || options.InferenceEndpoint != this.options.InferenceEndpoint
+            || options.AuthenticationMode != this.options.AuthenticationMode)
+            throw new AepServerException("provider_target_invalid", "Foundry authentication requires the configured endpoint.");
+        ValidateTarget(request, new Uri(options.InferenceEndpoint.AbsoluteUri.TrimEnd('/') + "/chat/completions"), HttpMethod.Post, discovery: false);
+        return ApplyAsync(request,
             options.InferenceEndpoint.AbsolutePath.StartsWith("/api/projects/", StringComparison.Ordinal)
                 ? ProjectTokenContext : ResourceInferenceTokenContext,
             cancellationToken);
+    }
+
+    private static void ValidateTarget(HttpRequestMessage request, Uri expected, HttpMethod method, bool discovery)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var target = request.RequestUri;
+        if (request.Method != method || target is null || !target.IsAbsoluteUri || target.Scheme != Uri.UriSchemeHttps
+            || !string.Equals(target.IdnHost, expected.IdnHost, StringComparison.OrdinalIgnoreCase)
+            || target.Port != expected.Port || target.AbsolutePath != expected.AbsolutePath
+            || target.UserInfo.Length > 0 || target.Fragment.Length > 0
+            || (discovery ? target.Query.Length > 2048 : target.Query.Length > 0))
+            throw new AepServerException("provider_target_invalid", "Foundry authentication requires the configured endpoint.");
+    }
 
     private async Task ApplyAsync(HttpRequestMessage request, TokenRequestContext tokenContext, CancellationToken cancellationToken)
     {
