@@ -4,6 +4,9 @@
 
 ADRs record durable architectural choices and their consequences. Existing decisions are numbered in chronological order and remain in Git when superseded.
 
+The Resource Planning integration adds [ADR-0117 — Resource Plans are reviewed proposals](0117-resource-plans-are-reviewed-proposals.md).
+Governed application follows [ADR-0120 — Resource ChangeSet application is durable and ordered](0120-resource-change-set-application-is-durable-and-ordered.md).
+
 ## Format
 
 ```markdown
@@ -149,3 +152,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 117. [ADR-0117 — Browser journeys are product-owned reusable automation assets](0117-product-owned-browser-journeys.md)
 118. [ADR-0118 — Browser campaigns use dedicated Workspaces](0118-browser-campaigns-use-dedicated-workspaces.md)
 119. [ADR-0119 — Descendant use grants govern Secrets and Vaults](0119-descendant-use-grants-for-secrets-and-vaults.md)
+121. [ADR-0121 — AEP Secret access uses one-use capabilities](0121-aep-secret-access-capabilities.md)

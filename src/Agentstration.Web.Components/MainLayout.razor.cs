@@ -19,7 +19,7 @@ public partial class MainLayout
     private static readonly NavigationGroup[] NavigationGroups =
     [
         new("", [new("Nav.Overview", "/", "home")]),
-        new("Group.Build", [new("Nav.Agents", "/agents", "agent", "agent"), new("Nav.ModelProfiles", "/modelprofiles", "layers", "model"), new("Nav.Flows", "/flows", "workflow", "flow"), new("Nav.Entries", "/entries", "entry", "work")]),
+        new("Group.Build", [new("Nav.Agents", "/agents", "agent", "agent"), new("Nav.ModelProfiles", "/modelprofiles", "layers", "model"), new("Nav.Flows", "/flows", "workflow", "flow"), new("Nav.Entries", "/entries", "entry", "work"), new("Nav.ResourcePlans", "/resource-plans", "layers", "work", ["resources/read"])]),
         new("Group.Operate", [new("Nav.Triggers", "/triggers", "clock", "work"), new("Nav.Deployments", "/deployments", "server", "runtime"), new("Nav.Tasks", "/tasks", "tasks", "work")]),
         new("Group.Runs", [new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
         new("Group.Configure", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work"), new("Nav.Packs", "/packs", "package"), new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.SourceProviders", "/sourceproviders", "database", "source"), new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key")]),
@@ -37,6 +37,7 @@ public partial class MainLayout
         new("Command.CreateFlow", "/flows/new", "+", "Command", "new nouveau workflow flux"),
         new("Nav.Entries", "/entries", "↳", "Group.Build", "workplace entry entrée"),
         new("Command.CreateEntry", "/entries/new", "+", "Command", "new nouvelle workplace entry entrée"),
+        new("Nav.ResourcePlans", "/resource-plans", "◇", "Group.Build", "planning plans resources ressources review revue", ["resources/read"]),
         new("Nav.Deployments", "/deployments", "◉", "Group.Operate", "agent runtime deployments déploiements"),
         new("Nav.AgentRuns", "/agent-runs", "▶", "Group.Runs", "agent execution history exécution historique"),
         new("Nav.FlowRuns", "/flow-runs", "▷", "Group.Runs", "workflow executions flux exécutions"),

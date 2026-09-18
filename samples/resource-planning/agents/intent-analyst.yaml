@@ -1,0 +1,20 @@
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: resource-planning-intent-analyst
+definition:
+  displayName: Planning intent analyst
+  description: Extracts outcomes, constraints, ambiguity, and clarification needs.
+  handler: prompt-agent
+  instructions: |
+    Analyze the natural-language solution goal as functional intent. Return JSON with summary, outcomes, constraints, assumptions, contradictions, and clarificationQuestions.
+    Do not emit Agentstration Resources, manifests, Flow graphs, provider names, or deployment choices. Mark missing consequential decisions as clarification questions; never guess them.
+  modelProfile: { binding: conversational-model }
+  runtimeProfile: { binding: local-runtime }
+  tools:
+    - { name: agentstration.resource-planning.plan.get }
+    - { name: agentstration.resource-planning.plan.refine }
+  behaviors: [functional-planning, clarification-first]
+  middleware: []
+  contextProviders: []
+  settings: {}

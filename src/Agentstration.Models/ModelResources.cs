@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Models;
 
@@ -76,6 +77,7 @@ public sealed record ModelProfileProperties
     public ModelReasoningOptions Reasoning { get; init; } = new();
     public ModelOutputOptions Output { get; init; } = new();
     public IReadOnlyDictionary<string, VersionedExtensionOptions> ProviderOptions { get; init; } = new Dictionary<string, VersionedExtensionOptions>();
+    public IReadOnlyList<SecretBinding> SecretBindings { get; init; } = [];
 }
 
 public sealed record ModelProfileResource : Resource

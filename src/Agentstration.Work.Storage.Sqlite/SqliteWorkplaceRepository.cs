@@ -178,6 +178,19 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task UpsertEntryDraftAsync(EntryDraft draft, long? expectedRevision, CancellationToken cancellationToken)
+    {
+        WorkplaceValidation.Validate(draft);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var key = EntryStorageKey(draft.WorkspaceId, draft.Id);
+        var document = await context.EntryDrafts.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
+        var actualRevision = document is null ? (long?)null : Deserialize<EntryDraft>(document.Payload).Revision;
+        if (actualRevision != expectedRevision) throw new WorkValidationException("entry_revision_conflict", "The Entry changed since the proposal was verified.");
+        if (document is null) context.EntryDrafts.Add(new EntryDraftDocument { Id = key, WorkspaceId = draft.WorkspaceId.ToString(), Name = draft.Name, Payload = JsonSerializer.Serialize(draft, JsonOptions) });
+        else { document.Name = draft.Name; document.Payload = JsonSerializer.Serialize(draft, JsonOptions); }
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<EntryDraft>> ListEntryDraftsAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);

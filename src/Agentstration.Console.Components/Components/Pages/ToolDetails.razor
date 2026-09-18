@@ -2,8 +2,219 @@
 @inject IToolsClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolDetailsStrings> Localizer
 
-@if (tool is null) { <LoadingState Message="@T("Loading")" /> }
-else { <PageTitle>@tool.Definition.DisplayName · Agentstration</PageTitle><ResourceHeader ResourceType="@T("Tool")" Domain="tool" Icon="⌁" Name="@tool.Definition.DisplayName" Description="@tool.Definition.Description" StatusText="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" TestId="resource-tool-details"><Actions><button class="button-primary" @onclick="ToggleAsync">@T(tool.Definition.Enabled ? "Disable" : "Enable")</button></Actions></ResourceHeader>
-<section class="panel"><div class="panel-header"><h2>@T("GovernanceAndSource")</h2></div><dl class="resource-details"><dt>@T("Provider")</dt><dd><code>@tool.Definition.Provider?.ResourceId</code></dd><dt>@T("ExternalName")</dt><dd><code>@tool.Definition.ExternalId</code></dd><dt>@T("Enabled")</dt><dd>@BooleanLabel(tool.Definition.Enabled)</dd><dt>@T("RequiresApproval")</dt><dd>@BooleanLabel(tool.Definition.RequiresApproval)</dd><dt>@T("AvailableLabel")</dt><dd>@BooleanLabel(tool.Definition.Discovery?.Available == true)</dd><dt>@T("FirstSeen")</dt><dd>@tool.Definition.Discovery?.FirstSeenAt.ToString("g")</dd><dt>@T("LastSeen")</dt><dd>@tool.Definition.Discovery?.LastSeenAt.ToString("g")</dd></dl></section>
-<section class="panel"><div class="panel-header"><h2>@T("InputSchema")</h2></div><pre>@Pretty(tool.Definition.Schema?.Input)</pre></section> }
-@code { [Parameter] public string Name {get;set;}=""; private ToolResource? tool; private string? etag; private string T(string key, params object[] arguments) => Localizer[key, arguments]; private string AvailabilityLabel(bool available) => T(available ? "Available" : "Unavailable"); private string BooleanLabel(bool value) => T(value ? "Yes" : "No"); protected override async Task OnParametersSetAsync(){var value=await Client.GetToolAsync(Name,default);tool=value.Value;etag=value.ETag;} private async Task ToggleAsync(){var value=await Client.SetEnabledAsync(Name,!tool!.Definition.Enabled,etag,default);tool=value.Value;etag=value.ETag;} private static string Pretty(JsonElement? value)=>value is null?"—":JsonSerializer.Serialize(value.Value,new JsonSerializerOptions{WriteIndented=true}); }
+@if (tool is null)
+{
+    <LoadingState Message="@T("Loading")" />
+}
+else
+{
+    <PageTitle>@tool.Definition.DisplayName · Agentstration</PageTitle>
+    <ResourceHeader ResourceType="@T("Tool")" Domain="tool" Icon="⌁" Name="@tool.Definition.DisplayName"
+                    StatusText="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)"
+                    Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)"
+                    TestId="resource-tool-details">
+        <Actions><button class="button-primary" @onclick="ToggleAsync">@T(tool.Definition.Enabled ? "Disable" : "Enable")</button></Actions>
+    </ResourceHeader>
+
+    <section class="panel tool-capability" aria-labelledby="tool-capability-heading">
+        <div class="panel-header"><h2 id="tool-capability-heading">@T("Capability")</h2></div>
+        <p>@(string.IsNullOrWhiteSpace(tool.Definition.Description) ? T("NoDescription") : tool.Definition.Description)</p>
+    </section>
+
+    <section class="panel tool-contract" aria-labelledby="tool-input-heading">
+        <div class="panel-header"><h2 id="tool-input-heading">@T("InputContract")</h2></div>
+        @SchemaSummary(tool.Definition.Schema?.Input)
+        @RawSchema(tool.Definition.Schema?.Input, "RawInputSchema")
+    </section>
+
+    <section class="panel tool-contract" aria-labelledby="tool-output-heading">
+        <div class="panel-header"><h2 id="tool-output-heading">@T("OutputContract")</h2></div>
+        @SchemaSummary(tool.Definition.Schema?.Output)
+        @RawSchema(tool.Definition.Schema?.Output, "RawOutputSchema")
+    </section>
+
+    <section class="panel" aria-labelledby="tool-governance-heading">
+        <div class="panel-header"><h2 id="tool-governance-heading">@T("GovernanceAndSource")</h2></div>
+        <dl class="resource-details">
+            <dt>@T("Provider")</dt><dd><code>@tool.Definition.Provider?.ResourceId</code></dd>
+            <dt>@T("ExternalName")</dt><dd><code>@tool.Definition.ExternalId</code></dd>
+            <dt>@T("Enabled")</dt><dd>@BooleanLabel(tool.Definition.Enabled)</dd>
+            <dt>@T("RequiresApproval")</dt><dd>@BooleanLabel(tool.Definition.RequiresApproval)</dd>
+            <dt>@T("AvailableLabel")</dt><dd>@BooleanLabel(tool.Definition.Discovery?.Available == true)</dd>
+            <dt>@T("FirstSeen")</dt><dd>@tool.Definition.Discovery?.FirstSeenAt.ToString("g")</dd>
+            <dt>@T("LastSeen")</dt><dd>@tool.Definition.Discovery?.LastSeenAt.ToString("g")</dd>
+        </dl>
+    </section>
+}
+
+@code {
+    [Parameter] public string Name { get; set; } = "";
+    private ToolResource? tool;
+    private string? etag;
+
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string AvailabilityLabel(bool available) => T(available ? "Available" : "Unavailable");
+    private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var value = await Client.GetToolAsync(Name, default);
+        tool = value.Value;
+        etag = value.ETag;
+    }
+
+    private async Task ToggleAsync()
+    {
+        var value = await Client.SetEnabledAsync(Name, !tool!.Definition.Enabled, etag, default);
+        tool = value.Value;
+        etag = value.ETag;
+    }
+
+    private RenderFragment SchemaSummary(JsonElement? schema) => builder =>
+    {
+        if (schema is null || schema.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            builder.OpenElement(0, "p");
+            builder.AddAttribute(1, "class", "tool-contract-note");
+            builder.AddContent(2, T("NoSchema"));
+            builder.CloseElement();
+            return;
+        }
+
+        if (schema.Value.ValueKind != JsonValueKind.Object ||
+            !schema.Value.TryGetProperty("properties", out var properties) ||
+            properties.ValueKind != JsonValueKind.Object)
+        {
+            builder.OpenElement(0, "p");
+            builder.AddAttribute(1, "class", "tool-contract-note");
+            builder.AddContent(2, T("UnstructuredSchema"));
+            builder.CloseElement();
+            return;
+        }
+
+        var fields = properties.EnumerateObject().ToArray();
+        if (fields.Length == 0)
+        {
+            builder.OpenElement(0, "p");
+            builder.AddAttribute(1, "class", "tool-contract-note");
+            builder.AddContent(2, T("NoProperties"));
+            builder.CloseElement();
+            return;
+        }
+
+        var required = new HashSet<string>(StringComparer.Ordinal);
+        if (schema.Value.TryGetProperty("required", out var requiredValue) && requiredValue.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in requiredValue.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String && item.GetString() is { } fieldName)
+                {
+                    required.Add(fieldName);
+                }
+            }
+        }
+
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "tool-fields");
+        foreach (var field in fields)
+        {
+            builder.OpenElement(2, "article");
+            builder.AddAttribute(3, "class", "tool-field");
+            builder.OpenElement(4, "div");
+            builder.AddAttribute(5, "class", "tool-field-heading");
+            builder.OpenElement(6, "code");
+            builder.AddContent(7, field.Name);
+            builder.CloseElement();
+            builder.OpenElement(8, "span");
+            builder.AddAttribute(9, "class", required.Contains(field.Name) ? "tool-field-required" : "tool-field-optional");
+            builder.AddContent(10, T(required.Contains(field.Name) ? "Required" : "Optional"));
+            builder.CloseElement();
+            builder.CloseElement();
+
+            var type = PropertyText(field.Value, "type");
+            if (type is not null)
+            {
+                builder.OpenElement(11, "p");
+                builder.AddAttribute(12, "class", "tool-field-type");
+                builder.AddContent(13, T("Type", type));
+                builder.CloseElement();
+            }
+
+            var description = PropertyText(field.Value, "description");
+            if (!string.IsNullOrWhiteSpace(description))
+            {
+                builder.OpenElement(14, "p");
+                builder.AddContent(15, description);
+                builder.CloseElement();
+            }
+
+            var constraints = Constraints(field.Value);
+            if (constraints.Count > 0)
+            {
+                builder.OpenElement(16, "ul");
+                builder.AddAttribute(17, "class", "tool-field-constraints");
+                foreach (var constraint in constraints)
+                {
+                    builder.OpenElement(18, "li");
+                    builder.AddContent(19, constraint);
+                    builder.CloseElement();
+                }
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    };
+
+    private RenderFragment RawSchema(JsonElement? schema, string titleKey) => builder =>
+    {
+        if (schema is null || schema.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return;
+        }
+
+        builder.OpenElement(0, "details");
+        builder.AddAttribute(1, "class", "tool-raw-schema");
+        builder.OpenElement(2, "summary");
+        builder.AddContent(3, T(titleKey));
+        builder.CloseElement();
+        builder.OpenElement(4, "pre");
+        builder.AddContent(5, JsonSerializer.Serialize(schema.Value, new JsonSerializerOptions { WriteIndented = true }));
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private static string? PropertyText(JsonElement element, string name) =>
+        element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
+    private List<string> Constraints(JsonElement property)
+    {
+        var result = new List<string>();
+        if (property.ValueKind != JsonValueKind.Object)
+        {
+            return result;
+        }
+
+        AddConstraint("minLength", "MinLength");
+        AddConstraint("maxLength", "MaxLength");
+        AddConstraint("minimum", "Minimum");
+        AddConstraint("maximum", "Maximum");
+        AddConstraint("pattern", "Pattern");
+        AddConstraint("format", "Format");
+        if (property.TryGetProperty("enum", out var allowed) && allowed.ValueKind == JsonValueKind.Array)
+        {
+            result.Add(T("AllowedValues", string.Join(", ", allowed.EnumerateArray().Select(item => item.ToString()))));
+        }
+        return result;
+
+        void AddConstraint(string jsonName, string label)
+        {
+            if (property.TryGetProperty(jsonName, out var value) && value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined))
+            {
+                result.Add(T(label, value.ToString()));
+            }
+        }
+    }
+}
