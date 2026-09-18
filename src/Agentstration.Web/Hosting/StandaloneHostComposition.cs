@@ -11,6 +11,7 @@ using Agentstration.Infrastructure.Agents;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourcePlanning;
 using Agentstration.Runtime.Abstractions;
@@ -137,6 +138,7 @@ internal static class StandaloneHostCompositionExtensions
             sourceRegistryTransportOptions: sourceRegistryTransportOptions);
         builder.Services.AddAgentstrationModelProviders(builder.Configuration, useManagedProfileResolver);
         builder.Services.AddSingleton<ModelProviderManagementService>();
+        builder.Services.AddSingleton<IParameterUsageProvider, ModelProviderParameterUsageProvider>();
         builder.Services.AddSingleton<SourceProviderManagementService>();
         builder.Services.AddSingleton<IModelProviderConfigurationStore>(provider => provider.GetRequiredService<ModelProviderManagementService>());
         builder.Services.AddSingleton<ModelProfileManagementService>();

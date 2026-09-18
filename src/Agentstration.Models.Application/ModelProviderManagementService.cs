@@ -1,10 +1,13 @@
+using Agentstration.Aep.Abstractions;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Models;
@@ -14,6 +17,9 @@ public sealed class ModelProviderManagementService(
     IResourceReferenceResolver references,
     ResourceScopeOperationService scopeOperations,
     IEnumerable<IModelProviderDiscovery> discoveries,
+    IEnumerable<IExtensionInspector> inspectors,
+    IParameterResolver parameters,
+    ISecretAccessAuthorizer secrets,
     TimeProvider timeProvider) : IModelProviderConfigurationStore
 {
     public static string ModelProviderId(string name) => name;
@@ -22,7 +28,7 @@ public sealed class ModelProviderManagementService(
         ValidateIdentity(resource);
         var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ModelResourceKinds.ModelProvider);
         ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
-        _ = await ValidateAndNormalizeAsync(resource.Namespace, resource.Definition, scopeRef, cancellationToken);
+        _ = await ValidateAndNormalizeAsync(resource.Namespace, resource.Name, resource.Definition, scopeRef, cancellationToken);
     }
 
     public async Task<StoredResource<ModelProviderResource>> CreateAsync(ModelProviderResource resource, CancellationToken cancellationToken)
@@ -34,7 +40,7 @@ public sealed class ModelProviderManagementService(
             var address = ScopedResourceAddress.Create(scopeRef, resource.Namespace, ModelResourceKinds.ModelProvider, resource.Name);
             if (await store.GetExactAsync<ModelProviderResource>(address, token) is not null)
                 throw new ResourceConcurrencyException($"Model provider '{resource.Address}' already exists in scope '{scopeRef}'.");
-            var definition = await ValidateAndNormalizeAsync(resource.Namespace, resource.Definition, scopeRef, token);
+            var definition = await ValidateAndNormalizeAsync(resource.Namespace, resource.Name, resource.Definition, scopeRef, token);
             return await store.PutExactAsync(scopeRef, resource with
             {
                 ScopeRef = scopeRef,
@@ -54,7 +60,7 @@ public sealed class ModelProviderManagementService(
         var scopeRef = existing.Value.ScopeRef ?? throw new ModelProviderValidationException("The model provider has no ownership scope.");
         return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
-            var validated = await ValidateAndNormalizeAsync(existing.Value.Namespace, definition, scopeRef, token);
+            var validated = await ValidateAndNormalizeAsync(existing.Value.Namespace, existing.Value.Name, definition, scopeRef, token);
             return await store.PutExactAsync(scopeRef, existing.Value with
             {
                 Generation = checked(existing.Value.Generation + 1),
@@ -171,6 +177,7 @@ public sealed class ModelProviderManagementService(
 
     private async Task<ModelProviderProperties> ValidateAndNormalizeAsync(
         ResourceNamespace ownerNamespace,
+        string ownerName,
         ModelProviderProperties definition,
         ResourceScopeRef ownerScopeRef,
         CancellationToken cancellationToken)
@@ -178,16 +185,85 @@ public sealed class ModelProviderManagementService(
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.DisplayName);
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.ContributionId);
+        if (definition.ValueBindings is null)
+            throw new ModelProviderValidationException("Value Bindings must be an array.");
         var extensionAddress = definition.Extension.Resolve(ownerNamespace, ExtensionKinds.ExtensionRegistration);
-        if (await references.ResolveAsync<ExtensionRegistrationResource>(definition.Extension, ownerNamespace, ExtensionKinds.ExtensionRegistration, ownerScopeRef, cancellationToken) is null)
+        var extension = await references.ResolveAsync<ExtensionRegistrationResource>(definition.Extension, ownerNamespace,
+            ExtensionKinds.ExtensionRegistration, ownerScopeRef, cancellationToken);
+        if (extension is null)
             throw new ModelProviderValidationException($"Referenced extension registration '{extensionAddress}' does not exist or is not visible from '{ownerScopeRef}'.");
         if (FindDiscovery(AepModelProvider.AdapterType) is null)
             throw new ModelProviderValidationException("The AEP model-provider adapter is not registered in this host.");
+        await ValidateValueBindingsAsync(ownerNamespace, ownerName, ownerScopeRef, definition, extension.Value, cancellationToken);
         return definition with
         {
             DisplayName = definition.DisplayName.Trim(),
-            ContributionId = definition.ContributionId.Trim()
+            ContributionId = definition.ContributionId.Trim(),
+            ValueBindings = definition.ValueBindings.ToArray()
         };
+    }
+
+    private async Task ValidateValueBindingsAsync(
+        ResourceNamespace ownerNamespace,
+        string ownerName,
+        ResourceScopeRef ownerScopeRef,
+        ModelProviderProperties definition,
+        ExtensionRegistrationResource extension,
+        CancellationToken cancellationToken)
+    {
+        // A required secured value may intentionally be supplied by the existing Model Profile Secret override.
+        if (definition.ValueBindings.Count == 0) return;
+        var inspector = inspectors.SingleOrDefault(value => value.CanInspectEndpoint(extension.Definition.Endpoint));
+        if (inspector is null)
+            throw new ModelProviderValidationException("No AEP inspector can validate the Model Provider Value Bindings.");
+        var inspection = await inspector.InspectAsync(extension, cancellationToken);
+        if (!string.Equals(inspection.Status, "available", StringComparison.Ordinal))
+            throw new ModelProviderValidationException("The extension must be available to validate Model Provider Value Bindings.");
+        if (!inspection.Contributions.Any(value =>
+                string.Equals(value.Kind, AepContributionKinds.ModelProvider, StringComparison.Ordinal)
+                && string.Equals(value.Id, definition.ContributionId, StringComparison.OrdinalIgnoreCase)))
+            throw new ModelProviderValidationException($"The extension does not contribute Model Provider '{definition.ContributionId}'.");
+        var issues = ModelProviderValueBindingValidator.Validate(
+            definition.ValueBindings, inspection.ValueRequirements, definition.ContributionId, requireAll: true);
+        if (issues.Count > 0) throw new ModelProviderValidationException(issues[0].Message);
+
+        var consumer = new ParameterResolutionContext(ownerScopeRef,
+            ResourceAddress.Create(ownerNamespace, ModelResourceKinds.ModelProvider, ownerName));
+        var inlineValues = new List<AepBoundValue>();
+        foreach (var binding in definition.ValueBindings)
+        {
+            if (binding.Kind == ModelProviderValueBindingKind.Parameter)
+            {
+                try
+                {
+                    var resolved = await parameters.ResolveAsync(binding.Parameter!, consumer, cancellationToken)
+                        ?? throw new ModelProviderValidationException($"Parameter for Value requirement '{binding.RequirementId}' was not found.");
+                    inlineValues.Add(AepBoundValue.Inline(binding.RequirementId, resolved.Value));
+                }
+                catch (ParameterAccessDeniedException exception)
+                {
+                    throw new ModelProviderValidationException(exception.Message);
+                }
+            }
+            else
+            {
+                try
+                {
+                    var status = await secrets.GetAuthorizedStatusAsync(binding.Secret!,
+                        new SecretResolutionContext(ownerScopeRef, consumer.Consumer), cancellationToken);
+                    if (status != SecretValueStatus.Configured)
+                        throw new ModelProviderValidationException($"Secret for Value requirement '{binding.RequirementId}' is not configured.");
+                }
+                catch (SecretResolutionException exception)
+                {
+                    throw new ModelProviderValidationException(exception.Message);
+                }
+            }
+        }
+        var valueIssues = AepBoundValueValidator.Validate(inlineValues, inspection.ValueRequirements,
+            AepContributionKinds.ModelProvider, definition.ContributionId, requireAll: false);
+        if (valueIssues.Count > 0)
+            throw new ModelProviderValidationException($"Value requirement '{valueIssues[0].RequirementId}' failed validation ({valueIssues[0].Code}).");
     }
 
     private async Task<ModelProviderConfiguration> ToConfigurationAsync(ModelProviderResource resource, CancellationToken cancellationToken)
@@ -217,7 +293,8 @@ public sealed class ModelProviderManagementService(
             EndpointDisplayName = extension.Value.Definition.DisplayName,
             ExtensionScopeRef = extension.Value.ScopeRef,
             AuthenticationMode = extension.Value.Definition.AuthenticationMode,
-            Credential = extension.Value.Definition.Credential
+            Credential = extension.Value.Definition.Credential,
+            ValueBindings = resource.Definition.ValueBindings
         };
     }
 

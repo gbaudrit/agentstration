@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="../Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Models/Agentstration.Models.csproj" />
+    <ProjectReference Include="../Agentstration.Parameters/Agentstration.Parameters.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.Secrets/Agentstration.Secrets.csproj" />
     <ProjectReference Include="../Agentstration.Secrets.Abstractions/Agentstration.Secrets.Abstractions.csproj" />
