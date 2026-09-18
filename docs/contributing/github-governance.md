@@ -55,13 +55,19 @@ When a maintainer supplied the complete classification and the agent only applie
 
 GitHub API clients do not execute issue forms. Automation and coding agents must therefore reproduce the selected form's required sections, labels, and ordering explicitly. Repository-wide instructions for coding agents are maintained in `AGENTS.md`.
 
+### Issue hierarchy and relationships
+
+When an issue is a genuine child or decomposition of a parent issue, create it and attach it to the parent with GitHub's native Sub-issue relationship. A textual `Parent: #123` or `Child of #123` reference, reciprocal links in issue bodies, or a checklist entry never replaces that relationship. Textual references may remain as a readability aid.
+
+Use `Depends on` / `Blocked by` for execution dependencies and `Related to` for non-hierarchical relationships. These relationships serve different purposes: an issue can be a Sub-issue of one parent and also depend on another issue. Before closing a parent, verify that all its Sub-issues are closed or that an explicit maintainer-approved exception is documented on the parent issue.
+
 ### UX test scenario follow-up
 
-A feature request that adds or materially changes a Console or Workplace journey records its UX impact and planned browser scenario in the feature form. After the feature request has a number, create a distinct child issue with the Technical task form and both `technical-task` and `test-scenario-task` labels. Link the two issues in both directions before opening the UX implementation pull request. The child describes the routes, deterministic prerequisites, user actions, and observable success and expected-failure assertions. If an existing Playwright journey already covers the change, document that evidence and mark the follow-up `Not applicable` instead.
+A feature request that adds or materially changes a Console or Workplace journey records its UX impact and planned browser scenario in the feature form. After the feature request has a number, create a distinct child issue with the Technical task form and both `technical-task` and `test-scenario-task` labels. Attach it to the parent as a native Sub-issue and link the two issues in both bodies for readability before opening the UX implementation pull request. The child describes the routes, deterministic prerequisites, user actions, and observable success and expected-failure assertions. If an existing Playwright journey already covers the change, document that evidence and mark the follow-up `Not applicable` instead.
 
 The UX pull request links the child in its Validation section. It still includes tests for behavior changes, repairs affected existing Playwright tests, and reports desktop and mobile smoke results. Only the new reusable Playwright journey is deferred. Mark the child blocked until the maintainer explicitly validates the UX in the pull request or parent issue and the UX pull request merges. Record the validation and merged pull request in the child before starting its implementation.
 
-Keep the parent feature request open until the child scenario merges and the catalog marks its surface `covered`, unless a maintainer records a reasoned waiver. The UX-only pull request must not auto-close the parent issue.
+Keep the parent feature request open until the child scenario merges and the catalog marks its surface `covered`, unless a maintainer documents an explicit reasoned waiver. Before closing the parent, verify that every Sub-issue is closed or a maintainer-approved exception is documented on the parent. The UX-only pull request must not auto-close the parent issue.
 
 ## AI defect learning
 
