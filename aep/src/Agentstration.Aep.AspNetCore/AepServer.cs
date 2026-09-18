@@ -19,6 +19,9 @@ public interface IAepModelProvider
     IAsyncEnumerable<AepChatUpdate> ChatStreamingAsync(AepChatRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<AepModelDescriptor>>(Descriptor.Models ?? []);
+    Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(
+        IReadOnlyList<AepBoundValue>? boundValues,
+        CancellationToken cancellationToken = default) => ListModelsAsync(cancellationToken);
     Task<AepProviderHealth> GetHealthAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(new AepProviderHealth("available"));
 }
@@ -482,7 +485,7 @@ public static class AepServerExtensions
         try
         {
             ValidateBoundValues(providerId, request.BoundValues, options.Value.ValueRequirements.ToArray());
-            return Results.Json(await provider.ListModelsAsync(cancellationToken), AepProtocol.JsonOptions);
+            return Results.Json(await provider.ListModelsAsync(request.BoundValues, cancellationToken), AepProtocol.JsonOptions);
         }
         catch (AepServerException exception) { return Error(exception.StatusCode, exception.Code, exception.Message); }
     }

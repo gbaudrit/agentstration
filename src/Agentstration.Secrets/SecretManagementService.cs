@@ -1,5 +1,6 @@
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.Models;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Secrets;
@@ -227,6 +228,24 @@ public sealed class SecretManagementService(
     public async Task<IReadOnlyList<SecretUsage>> GetSecretUsagesAsync(ResourceScopeRef scopeRef, string name, CancellationToken cancellationToken)
     {
         var usages = new List<SecretUsage>();
+        foreach (var provider in await store.ListAllAsync<ModelProviderResource>(ModelResourceKinds.ModelProvider, cancellationToken))
+        {
+            if (provider.Value.Definition.ValueBindings.Any(binding =>
+                    binding.Kind == ModelProviderValueBindingKind.Secret
+                    && binding.Secret is { } reference
+                    && reference.ScopeRef == scopeRef
+                    && reference.Address.Namespace == ResourceNamespace.Default
+                    && string.Equals(reference.Address.Name, name, StringComparison.Ordinal)))
+                usages.Add(new(provider.Value.Kind, provider.Value.Name, provider.Value.Definition.DisplayName));
+        }
+        foreach (var profile in await store.ListAllAsync<ModelProfileResource>(ModelResourceKinds.ModelProfile, cancellationToken))
+        {
+            if (profile.Value.Definition.SecretBindings.Any(binding =>
+                    binding.Secret.ScopeRef == scopeRef
+                    && binding.Secret.Address.Namespace == ResourceNamespace.Default
+                    && string.Equals(binding.Secret.Address.Name, name, StringComparison.Ordinal)))
+                usages.Add(new(profile.Value.Kind, profile.Value.Name, profile.Value.Definition.DisplayName));
+        }
         foreach (var registration in await store.ListAllAsync<ExtensionRegistrationResource>(ExtensionKinds.ExtensionRegistration, cancellationToken))
         {
             var credential = registration.Value.Definition.Credential;
