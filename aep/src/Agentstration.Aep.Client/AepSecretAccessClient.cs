@@ -8,6 +8,13 @@ namespace Agentstration.Aep.Client;
 /// <summary>Redeems a host-issued, one-use Secret grant during an AEP operation.</summary>
 public sealed class AepSecretAccessClient(HttpClient httpClient)
 {
+    private static readonly HashSet<string> KnownErrors = new(StringComparer.Ordinal)
+    {
+        "secret_access_version_unsupported", "capability_invalid", "capability_expired",
+        "context_mismatch", "context_terminated", "access_denied", "secret_unavailable",
+        "vault_unavailable", "secret_value_invalid", "rate_limited"
+    };
+
     public async Task<byte[]> RedeemAsync(AepSecretAccessGrant grant, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(grant);
@@ -36,7 +43,9 @@ public sealed class AepSecretAccessClient(HttpClient httpClient)
             AepErrorResponse? error;
             try { error = await response.Content.ReadFromJsonAsync<AepErrorResponse>(AepProtocol.JsonOptions, cancellationToken); }
             catch (JsonException) { error = null; }
-            throw new AepProtocolException(error?.Error.Code ?? "secret_access_failed", "The Secret access request failed.", response.StatusCode);
+            var code = error?.Error.Code;
+            throw new AepProtocolException(code is not null && KnownErrors.Contains(code) ? code : "secret_access_failed",
+                "The Secret access request failed.", response.StatusCode);
         }
         AepSecretAccessResponse? payload;
         try { payload = await response.Content.ReadFromJsonAsync<AepSecretAccessResponse>(AepProtocol.JsonOptions, cancellationToken); }

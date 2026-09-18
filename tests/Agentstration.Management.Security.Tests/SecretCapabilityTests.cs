@@ -1,8 +1,10 @@
 using System.Text;
 using System.Text.Json;
+using System.Collections.Concurrent;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Management.Security.Tests;
 
@@ -47,6 +49,70 @@ public sealed class SecretCapabilityTests
         Assert.AreEqual("test-value", Encoding.UTF8.GetString(secret.Value.AccessValue().Span));
         await AssertCodeAsync("capability_invalid", () => capabilities.RedeemAsync(correct.RevealForTransport(),
             context.ExtensionId, context.RequirementId, context.ExecutionId));
+    }
+
+    [TestMethod]
+    public async Task AuditLogsContainOnlyContextAndNeverHandleOrValue()
+    {
+        var logger = new RecordingLogger();
+        using var capabilities = new SecretCapabilityService(new FakeAccessAuthorizer(), new FakeResolver(),
+            new ManualTimeProvider(), logger);
+        var context = Context();
+        var handle = await capabilities.IssueAsync(context, Binding(), ["credential"], CancellationToken.None);
+        using var secret = await capabilities.RedeemAsync(handle.RevealForTransport(), context);
+
+        var messages = string.Join(' ', logger.Messages);
+        StringAssert.Contains(messages, context.ExtensionId);
+        StringAssert.Contains(messages, context.RequirementId);
+        Assert.IsFalse(messages.Contains(handle.RevealForTransport(), StringComparison.Ordinal));
+        Assert.IsFalse(messages.Contains("test-value", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task DeletedVaultProducesControlledValueFreeFailures()
+    {
+        var authorizer = new FakeAccessAuthorizer { VaultMissing = true };
+        var resolver = new FakeResolver();
+        using var capabilities = new SecretCapabilityService(authorizer, resolver, new ManualTimeProvider());
+        var context = Context();
+        await AssertCodeAsync("vault_unavailable", () => capabilities.IssueAsync(
+            context, Binding(), ["credential"], CancellationToken.None));
+
+        authorizer.VaultMissing = false;
+        var handle = await capabilities.IssueAsync(context, Binding(), ["credential"], CancellationToken.None);
+        resolver.VaultMissing = true;
+        await AssertCodeAsync("vault_unavailable", () => capabilities.RedeemAsync(handle.RevealForTransport(), context));
+        Assert.AreEqual(1, resolver.Calls);
+    }
+
+    [TestMethod]
+    public async Task CancellationAndCleanupRaceLeaveNoRedeemableCapability()
+    {
+        var resolver = new FakeResolver();
+        using var capabilities = new SecretCapabilityService(new FakeAccessAuthorizer(), resolver, new ManualTimeProvider());
+        using var lifetime = new CancellationTokenSource();
+        var context = Context();
+        var handles = new ConcurrentBag<SecretCapabilityHandle>();
+        var issuance = Enumerable.Range(0, 40).Select(_ => Task.Run(async () =>
+        {
+            try
+            {
+                handles.Add(await capabilities.IssueAsync(context, Binding(), ["credential"], lifetime.Token));
+            }
+            catch (SecretCapabilityException exception) when (exception.Code == "context_terminated") { }
+        })).ToArray();
+        lifetime.Cancel();
+        capabilities.RevokeExecution(context);
+        await Task.WhenAll(issuance);
+        capabilities.RevokeExecution(context);
+
+        foreach (var handle in handles)
+        {
+            var failure = await Assert.ThrowsExactlyAsync<SecretCapabilityException>(() =>
+                capabilities.RedeemAsync(handle.RevealForTransport(), context));
+            Assert.IsTrue(failure.Code is "capability_invalid" or "context_terminated");
+        }
+        Assert.AreEqual(0, resolver.Calls);
     }
 
     [TestMethod]
@@ -178,9 +244,11 @@ public sealed class SecretCapabilityTests
     {
         public int Calls { get; private set; }
         public SecretValueStatus Status { get; set; } = SecretValueStatus.Configured;
+        public bool VaultMissing { get; set; }
         public Task<SecretValueStatus> GetAuthorizedStatusAsync(SecretReference secret, SecretResolutionContext context, CancellationToken cancellationToken = default)
         {
             Calls++;
+            if (VaultMissing) throw new VaultResourceNotFoundException("vault");
             return Task.FromResult(Status);
         }
     }
@@ -189,13 +257,30 @@ public sealed class SecretCapabilityTests
     {
         public int Calls => Volatile.Read(ref calls);
         public bool Available { get; set; } = true;
+        public bool VaultMissing { get; set; }
         public Task<ResolvedSecret?> ResolveAsync(SecretReference secret, SecretResolutionContext context, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref calls);
+            if (VaultMissing) throw new VaultResourceNotFoundException("vault");
             return Task.FromResult<ResolvedSecret?>(Available
                 ? new(secret.Address, new(ResourceNamespace.Default, "Vault", "local"), new SecretValue("test-value"u8))
                 : null);
         }
         private int calls;
+    }
+
+    private sealed class RecordingLogger : ILogger<SecretCapabilityService>
+    {
+        public List<string> Messages { get; } = [];
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter) => Messages.Add(formatter(state, exception));
+
+        private sealed class NullScope : IDisposable
+        {
+            public static NullScope Instance { get; } = new();
+            public void Dispose() { }
+        }
     }
 }
