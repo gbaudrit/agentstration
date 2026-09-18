@@ -24,7 +24,7 @@ public sealed class SecretManagementService(
     IResourceScopeOperations scopeOperations,
     IRequestContextScopeFactory requestContexts,
     DescendantResourceUseAuthorizer useAuthorizer,
-    IEnumerable<ISecretVaultProvider> providers) : ISecretResolver
+    IEnumerable<ISecretVaultProvider> providers) : ISecretResolver, ISecretAccessAuthorizer
 {
     public Task<IReadOnlyList<StoredResource<VaultResource>>> ListVaultsAsync(CancellationToken cancellationToken) => store.ListAllAsync<VaultResource>(SecretResourceKinds.Vault, cancellationToken);
     public async Task<IReadOnlyList<VaultView>> ListVaultViewsAsync(CancellationToken cancellationToken) =>
@@ -260,6 +260,26 @@ public sealed class SecretManagementService(
 
     public async Task<ResolvedSecret?> ResolveAsync(SecretReference reference, SecretResolutionContext resolution, CancellationToken cancellationToken = default)
     {
+        var authorized = await AuthorizeCoreAsync(reference, resolution, cancellationToken);
+        if (authorized is null) return null;
+        var (secret, provider, context) = authorized.Value;
+        var value = await provider.GetAsync(context, secret.Definition.Key, cancellationToken);
+        return value is null ? null : new ResolvedSecret(secret.Address, context.Vault, value);
+    }
+
+    public async Task<SecretValueStatus> GetAuthorizedStatusAsync(SecretReference reference, SecretResolutionContext resolution, CancellationToken cancellationToken = default)
+    {
+        var authorized = await AuthorizeCoreAsync(reference, resolution, cancellationToken);
+        if (authorized is null) return SecretValueStatus.Missing;
+        var (secret, provider, context) = authorized.Value;
+        return await provider.GetStatusAsync(context, secret.Definition.Key, cancellationToken);
+    }
+
+    private async Task<(SecretResource Secret, ISecretVaultProvider Provider, SecretVaultContext Context)?> AuthorizeCoreAsync(
+        SecretReference reference,
+        SecretResolutionContext resolution,
+        CancellationToken cancellationToken)
+    {
         if (reference.Address.Kind != SecretResourceKinds.Secret)
             throw new SecretManagementException("The referenced resource must be a Secret.");
         // An omitted scope retains the legacy same-scope reference, without searching ancestors.
@@ -273,8 +293,7 @@ public sealed class SecretManagementService(
                 secret.Definition.UsePolicy, cancellationToken))
             throw new SecretAccessDeniedException(reference.Address);
         var (provider, context) = await ProviderAsync(secret, cancellationToken);
-        var value = await provider.GetAsync(context, secret.Definition.Key, cancellationToken);
-        return value is null ? null : new ResolvedSecret(secret.Address, context.Vault, value);
+        return (secret, provider, context);
     }
 
     private async Task<SecretView> ViewAsync(SecretResource secret, CancellationToken cancellationToken)
