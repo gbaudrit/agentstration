@@ -33,7 +33,7 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
             [
                 new AepValueRequirement(
                     AepContributionKinds.ModelProvider,
-                    "discovered",
+                    "ollama",
                     "credential",
                     true,
                     Protection: AepValueProtection.Secured)

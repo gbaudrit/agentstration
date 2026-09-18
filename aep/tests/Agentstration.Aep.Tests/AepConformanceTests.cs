@@ -48,6 +48,7 @@ public sealed class AepConformanceTests
     {
         await using var factory = new WebApplicationFactory<global::Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
                 services.AddSingleton<IAepModelProvider, TerminalThenTrailingProvider>();
                 services.Configure<AepExtensionOptions>(options =>
                 {
@@ -64,7 +65,8 @@ public sealed class AepConformanceTests
                         "proxy-host",
                         false,
                         Format: "hostname"));
-                })));
+                });
+            }));
         using var httpClient = factory.CreateClient();
         var client = new AepClient(httpClient);
 

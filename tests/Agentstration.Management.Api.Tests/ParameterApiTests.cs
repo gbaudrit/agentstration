@@ -74,7 +74,7 @@ public sealed class ParameterApiTests : ModelManagementApiTestBase
                 await Assert.ThrowsExactlyAsync<ParameterAccessDeniedException>(() => resolver.ResolveAsync(reference, denied));
             }
         }
-        Assert.AreEqual(HttpStatusCode.Forbidden,
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity,
             (await client.GetAsync(Url("shared-setting", ResourceScopeRef.Workspace(foreignWorkspaceId)))).StatusCode);
 
         using var stale = await PutAsync(client, "shared-setting", tenant, tenantRead.Headers.ETag!.ToString(),
