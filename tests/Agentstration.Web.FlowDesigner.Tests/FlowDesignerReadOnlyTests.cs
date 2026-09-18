@@ -383,7 +383,6 @@ public sealed class FlowDesignerReadOnlyTests
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Markup, "Called Flow");
-            StringAssert.Contains(rendered.Markup, "article");
             StringAssert.Contains(rendered.Markup, "summary");
         });
         Assert.AreEqual("/namespaces/pack.news/flows/analysis", rendered.Find(".inspector-resource-link").GetAttribute("href"));
@@ -391,11 +390,11 @@ public sealed class FlowDesignerReadOnlyTests
         Assert.HasCount(1, rendered.FindAll(".inspector-resource-heading .inspector-resource-link"));
         StringAssert.Contains(rendered.Find(".inspector-resource-id").TextContent, "Flow ID");
 
-        rendered.Find("[data-testid='flow-pass-transition-output']").Change(true);
         var call = Assert.IsInstanceOfType<FlowCallStepDefinition>(context.Services.GetRequiredService<FlowEditorStore>()
             .State.Resource!.Definition.Steps.Single(step => step.Type() == "flow"));
         Assert.AreEqual(JsonValueKind.String, call.InputMapping?.ValueKind);
         Assert.AreEqual("${transition.output}", call.InputMapping?.GetString());
+        Assert.IsTrue(rendered.Find("[data-testid='flow-pass-transition-output']").HasAttribute("checked"));
         StringAssert.Contains(rendered.Markup, "Pass incoming transition output");
 
         rendered.Find("[data-testid='flow-pass-transition-output']").Change(false);
@@ -403,6 +402,29 @@ public sealed class FlowDesignerReadOnlyTests
             .State.Resource!.Definition.Steps.Single(step => step.Type() == "flow"));
         Assert.AreEqual(JsonValueKind.Object, call.InputMapping?.ValueKind);
         rendered.WaitForAssertion(() => StringAssert.Contains(rendered.Markup, "article"));
+    }
+
+    [TestMethod]
+    public void NewAgentAndOutputStepsMapTheIncomingTransitionOutput()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "parent"));
+        rendered.FindAll(".step-palette button").Single(button => button.TextContent.Trim() == "Agent").Click();
+        rendered.FindAll(".step-palette button").Single(button => button.TextContent.Trim() == "Output").Click();
+
+        var steps = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps;
+        Assert.AreEqual("${transition.output}", steps.OfType<AgentFlowStepDefinition>().Single().InputMapping?.GetString());
+        Assert.AreEqual("${transition.output}", steps.OfType<OutputFlowStepDefinition>().Last().OutputMapping?.GetString());
     }
 
     [TestMethod]
