@@ -6,6 +6,7 @@ using Agentstration.Aep.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -19,6 +20,8 @@ public interface IAepModelProvider
     IAsyncEnumerable<AepChatUpdate> ChatStreamingAsync(AepChatRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<AepModelDescriptor>>(Descriptor.Models ?? []);
+    Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(AepModelDiscoveryRequest request, CancellationToken cancellationToken) =>
+        ListModelsAsync(cancellationToken);
     Task<AepProviderHealth> GetHealthAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(new AepProviderHealth("available"));
 }
@@ -86,6 +89,8 @@ public static class AepServerExtensions
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat", ChatAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat/stream", StreamAsync));
         protocolEndpoints.Add(endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/models", ListModelsAsync));
+        protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/models/discover", ListModelsWithAccessAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(16 * 1024)));
         protocolEndpoints.Add(endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/health", ProviderHealthAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/resolve", ResolveSourceAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/materialize", MaterializeSourceAsync));
@@ -472,6 +477,17 @@ public static class AepServerExtensions
         var provider = Find(providers, providerId);
         if (provider is null) return Error(StatusCodes.Status404NotFound, "provider_unavailable", $"Model provider '{providerId}' is not registered.");
         try { return Results.Json(await provider.ListModelsAsync(cancellationToken), AepProtocol.JsonOptions); }
+        catch (AepServerException exception) { return Error(exception.StatusCode, exception.Code, exception.Message); }
+    }
+
+    private static async Task<IResult> ListModelsWithAccessAsync(string providerId,
+        AepModelDiscoveryRequest request, IEnumerable<IAepModelProvider> providers, CancellationToken cancellationToken)
+    {
+        var provider = Find(providers, providerId);
+        if (provider is null) return Error(StatusCodes.Status404NotFound, "provider_unavailable", $"Model provider '{providerId}' is not registered.");
+        if (request.SecretAccess is not { Count: > 0 and <= 8 })
+            return Error(StatusCodes.Status400BadRequest, "secret_binding_invalid", "A bounded Secret grant list is required.");
+        try { return Results.Json(await provider.ListModelsAsync(request, cancellationToken), AepProtocol.JsonOptions); }
         catch (AepServerException exception) { return Error(exception.StatusCode, exception.Code, exception.Message); }
     }
 

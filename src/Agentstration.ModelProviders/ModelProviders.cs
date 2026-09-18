@@ -26,6 +26,7 @@ public sealed record ModelProviderConfiguration
     public ResourceScopeRef? ExtensionScopeRef { get; init; }
     public AepTransportAuthenticationMode AuthenticationMode { get; init; }
     public ResourceReference? Credential { get; init; }
+    public IReadOnlyList<SecretBinding> SecretBindings { get; init; } = [];
 }
 
 public sealed record ModelDeploymentConfiguration

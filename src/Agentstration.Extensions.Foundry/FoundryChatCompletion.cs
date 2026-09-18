@@ -19,7 +19,8 @@ internal static class FoundryChatCompletion
         FoundryRequestAuthenticator authenticator,
         AepChatRequest chat,
         FoundryDiagnostics diagnostics,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? boundKey = null)
     {
         var body = BuildRequest(chat);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(body, AepProtocol.JsonOptions);
@@ -37,7 +38,7 @@ internal static class FoundryChatCompletion
         timeout.CancelAfter(options.RequestTimeout);
         try
         {
-            await authenticator.ApplyInferenceAsync(request, options, timeout.Token);
+            await authenticator.ApplyInferenceAsync(request, options, chat, timeout.Token, boundKey);
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             diagnostics.SetStatus(response.StatusCode);
             if (!response.IsSuccessStatusCode) throw await FailureAsync(response, timeout.Token);

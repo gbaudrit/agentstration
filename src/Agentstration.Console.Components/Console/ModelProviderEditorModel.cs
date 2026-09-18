@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Web.Console;
 
@@ -13,6 +14,12 @@ public sealed class ModelProviderEditorModel
     [Required] public string DisplayName { get; set; } = string.Empty;
     [Required] public string ExtensionId { get; set; } = string.Empty;
     [Required] public string ContributionId { get; set; } = string.Empty;
+    public IReadOnlyList<SecretBinding> SecretBindings { get; set; } = [];
+    public SecretReference? CredentialSecret => SecretBindings.SingleOrDefault(value => value.RequirementId == "credential")?.Secret;
+
+    public void BindCredential(SecretReference? secret) => SecretBindings =
+        SecretBindings.Where(value => value.RequirementId != "credential")
+            .Concat(secret is null ? [] : [new SecretBinding("credential", secret)]).ToArray();
 
     public CreateModelProviderRequest ToCreateRequest() => new(Name.Trim(), ToProperties(), ResourceNamespace.Parse(Namespace).Value);
     public PutModelProviderRequest ToPutRequest() => new(ToProperties());
@@ -21,7 +28,8 @@ public sealed class ModelProviderEditorModel
     {
         DisplayName = DisplayName.Trim(),
         Extension = ParseExtension(ExtensionId),
-        ContributionId = ContributionId.Trim()
+        ContributionId = ContributionId.Trim(),
+        SecretBindings = SecretBindings
     };
 
     public static ModelProviderEditorModel FromResource(ModelProviderResource resource) => new()
@@ -30,7 +38,8 @@ public sealed class ModelProviderEditorModel
         Namespace = resource.Namespace.Value,
         DisplayName = resource.Definition.DisplayName,
         ExtensionId = $"{(resource.Definition.Extension.Namespace ?? resource.Namespace).Value}:{resource.Definition.Extension.Name}",
-        ContributionId = resource.Definition.ContributionId
+        ContributionId = resource.Definition.ContributionId,
+        SecretBindings = resource.Definition.SecretBindings
     };
 
     private static ResourceReference ParseExtension(string value)

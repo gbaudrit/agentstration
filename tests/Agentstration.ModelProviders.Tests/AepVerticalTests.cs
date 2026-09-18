@@ -409,6 +409,66 @@ public sealed class AepVerticalTests
     }
 
     [TestMethod]
+    public async Task ProviderBoundDiscoveryIssuesASeparateGrantForEachConsumer()
+    {
+        await using var factory = new AepExtensionFactory(requireSecret: true);
+        using var http = factory.CreateClient();
+        var capabilities = new RecordingCapabilityService(perSecretHandles: true);
+        var hostConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Agentstration:Aep:SecretAccess:PublicBaseUrl"] = "http://localhost"
+        }).Build();
+        var adapter = new AepModelProvider(new FixedHttpClientFactory(http),
+            capabilities: capabilities, configuration: hostConfiguration);
+        var extensionId = (await new AepClient(http).DiscoverAsync()).Extension.Id;
+        var first = new ModelProviderConfiguration
+        {
+            Uid = Guid.NewGuid(), Name = "foundry-a", Namespace = ResourceNamespace.Default,
+            ScopeRef = ResourceScopeRef.Instance, AdapterType = AepModelProvider.AdapterType,
+            ContributionId = "test", Extension = new("test-extension"),
+            ExtensionScopeRef = ResourceScopeRef.Instance, ExpectedExtensionId = extensionId,
+            Endpoint = http.BaseAddress!, SecretBindings =
+                [new("credential", new(new(ResourceNamespace.Default, "Secret", "key-a"), ResourceScopeRef.Instance))]
+        };
+        var second = first with
+        {
+            Uid = Guid.NewGuid(), Name = "foundry-b", SecretBindings =
+                [new("credential", new(new(ResourceNamespace.Default, "Secret", "key-b"), ResourceScopeRef.Instance))]
+        };
+        Assert.HasCount(1, await adapter.ListModelsAsync(first));
+        Assert.AreEqual("foundry-a", capabilities.Issued?.Consumer.Name);
+        Assert.AreEqual(ModelResourceKinds.ModelProvider, capabilities.Issued?.Consumer.Kind);
+        Assert.AreEqual("credential", factory.Provider.LastDiscoveryAccess?.Single().RequirementId);
+        Assert.AreEqual("opaque-key-a", factory.Provider.LastDiscoveryAccess?.Single().SecretCapability);
+        Assert.HasCount(1, await adapter.ListModelsAsync(second));
+        Assert.AreEqual("foundry-b", capabilities.Issued?.Consumer.Name);
+        Assert.AreEqual("opaque-key-b", factory.Provider.LastDiscoveryAccess?.Single().SecretCapability);
+        Assert.AreEqual(2, capabilities.Revocations);
+    }
+
+    [TestMethod]
+    public async Task BoundDiscoveryRejectsMalformedAndExcessiveGrantLists()
+    {
+        await using var factory = new AepExtensionFactory(requireSecret: true);
+        using var http = factory.CreateClient();
+        var endpoint = $"{AepProtocol.ModelProvidersPath}/test/models/discover";
+        using var malformed = await http.PostAsync(endpoint,
+            new StringContent("{\"secretAccess\":[]}", Encoding.UTF8, "application/json"));
+        Assert.AreEqual(System.Net.HttpStatusCode.BadRequest, malformed.StatusCode);
+        Assert.IsNull(factory.Provider.LastDiscoveryAccess);
+
+        var grants = Enumerable.Range(0, 9).Select(_ => new AepSecretAccessGrant(
+            AepProtocol.SecretAccessVersion, new Uri("http://localhost/aep/secret-access"),
+            "extension.test", "credential", Guid.NewGuid().ToString("N"), "opaque-test")).ToArray();
+        using var excessive = await http.PostAsync(endpoint,
+            new StringContent(JsonSerializer.Serialize(new AepModelDiscoveryRequest(grants), AepProtocol.JsonOptions),
+                Encoding.UTF8, "application/json"));
+        Assert.AreEqual(System.Net.HttpStatusCode.BadRequest, excessive.StatusCode);
+        Assert.IsNull(factory.Provider.LastDiscoveryAccess);
+
+    }
+
+    [TestMethod]
     public async Task AepResolutionFailsClosedWhenPinnedOptionVersionWasRemoved()
     {
         await using var factory = new AepExtensionFactory();
@@ -659,6 +719,7 @@ public sealed class AepVerticalTests
         public int InvocationCount { get; private set; }
         public AepChatRequest? LastRequest { get; private set; }
         public IReadOnlyList<AepSecretAccessGrant>? LastSecretAccess { get; private set; }
+        public IReadOnlyList<AepSecretAccessGrant>? LastDiscoveryAccess { get; private set; }
         public AepModelProviderDescriptor Descriptor { get; } = new("test", "Test", new(Tools: true, ModelDiscovery: true));
         public Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken)
         {
@@ -688,9 +749,15 @@ public sealed class AepVerticalTests
         }
         public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<AepModelDescriptor>>([new("test-model", "Test model", ["chat", "streaming", "tools"])]);
+        public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(AepModelDiscoveryRequest request,
+            CancellationToken cancellationToken)
+        {
+            LastDiscoveryAccess = request.SecretAccess;
+            return ListModelsAsync(cancellationToken);
+        }
     }
 
-    private sealed class RecordingCapabilityService : ISecretCapabilityService
+    private sealed class RecordingCapabilityService(bool perSecretHandles = false) : ISecretCapabilityService
     {
         public SecretCapabilityContext? Issued { get; private set; }
         public int Revocations { get; private set; }
@@ -702,7 +769,8 @@ public sealed class AepVerticalTests
             Issued = context;
             Assert.AreEqual("credential", binding.RequirementId);
             Assert.IsTrue(declaredRequirements.Contains("credential"));
-            return Task.FromResult(new SecretCapabilityHandle("opaque-test"));
+            return Task.FromResult(new SecretCapabilityHandle(perSecretHandles
+                ? $"opaque-{binding.Secret.Address.Name}" : "opaque-test"));
         }
 
         public Task<ResolvedSecret> RedeemAsync(string token, SecretCapabilityContext context,

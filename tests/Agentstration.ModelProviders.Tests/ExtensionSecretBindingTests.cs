@@ -35,6 +35,13 @@ public sealed class ExtensionSecretBindingTests
             Model = new ModelSelection { Name = "model" },
             SecretBindings = [first]
         };
+        var modelProvider = new ModelProviderProperties
+        {
+            DisplayName = "Foundry B",
+            Extension = new ResourceReference("foundry-extension"),
+            ContributionId = "microsoft-foundry",
+            SecretBindings = [second]
+        };
         var source = new SourceBindingSelection
         {
             Name = "provider",
@@ -43,13 +50,17 @@ public sealed class ExtensionSecretBindingTests
             SecretBindings = [second]
         };
         var savedProfile = JsonSerializer.Deserialize<ModelProfileProperties>(JsonSerializer.Serialize(profile));
+        var savedProvider = JsonSerializer.Deserialize<ModelProviderProperties>(JsonSerializer.Serialize(modelProvider));
         var savedSource = JsonSerializer.Deserialize<SourceBindingSelection>(JsonSerializer.Serialize(source));
 
         Assert.IsNotNull(savedProfile);
+        Assert.IsNotNull(savedProvider);
         Assert.IsNotNull(savedSource);
         Assert.AreEqual(firstScope, savedProfile.SecretBindings.Single().Secret.ScopeRef);
         Assert.AreEqual(secondScope, savedSource.SecretBindings.Single().Secret.ScopeRef);
         Assert.AreEqual("company-a", savedProfile.SecretBindings.Single().Secret.Address.Name);
+        Assert.AreEqual(secondScope, savedProvider.SecretBindings.Single().Secret.ScopeRef);
+        Assert.AreEqual("company-b", savedProvider.SecretBindings.Single().Secret.Address.Name);
         Assert.AreEqual("company-b", savedSource.SecretBindings.Single().Secret.Address.Name);
     }
 

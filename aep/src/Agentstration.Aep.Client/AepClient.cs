@@ -184,6 +184,15 @@ public sealed class AepClient(
         return await ReadAsync<AepModelDescriptor[]>(response, cancellationToken);
     }
 
+    internal async Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(string providerId,
+        AepModelDiscoveryRequest request, CancellationToken cancellationToken)
+    {
+        _ = await DiscoverAsync(cancellationToken);
+        using var response = await SendAsync(HttpMethod.Post,
+            $"{AepProtocol.ModelProvidersPath}/{Uri.EscapeDataString(providerId)}/models/discover", request, cancellationToken);
+        return await ReadAsync<AepModelDescriptor[]>(response, cancellationToken);
+    }
+
     internal async Task<AepProviderHealth> GetHealthAsync(string providerId, CancellationToken cancellationToken)
     {
         _ = await DiscoverAsync(cancellationToken);
@@ -306,6 +315,9 @@ public sealed class AepModelProviderClient(AepClient client, string providerId)
 
     public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>
         client.ListModelsAsync(providerId, cancellationToken);
+
+    public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(AepModelDiscoveryRequest request,
+        CancellationToken cancellationToken = default) => client.ListModelsAsync(providerId, request, cancellationToken);
 
     public Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken = default) =>
         client.ChatAsync(providerId, request, cancellationToken);

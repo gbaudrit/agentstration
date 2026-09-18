@@ -1,7 +1,11 @@
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
 using Azure.Core;
 using Azure.Identity;
+using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
+using Agentstration.Aep.Client;
 
 namespace Agentstration.Extensions.Foundry;
 
@@ -12,11 +16,16 @@ public sealed class FoundryRequestAuthenticator
     private readonly TokenCredential? credential;
     private readonly string? apiKey;
     private readonly FoundryExtensionOptions options;
+    private readonly IHttpClientFactory? httpClientFactory;
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
-    public FoundryRequestAuthenticator(FoundryExtensionOptions options, string? developmentApiKey = null, TokenCredential? tokenCredential = null)
+    public FoundryRequestAuthenticator(FoundryExtensionOptions options, string? developmentApiKey = null,
+        TokenCredential? tokenCredential = null, IHttpClientFactory? httpClientFactory = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         this.options = options;
+        this.httpClientFactory = httpClientFactory;
+        if (options.AuthenticationMode == FoundryAuthenticationMode.ApiKeyBinding) return;
         if (options.AuthenticationMode == FoundryAuthenticationMode.ApiKeyEnvironment)
         {
             apiKey = Environment.GetEnvironmentVariable("FOUNDRY_API_KEY") ?? developmentApiKey;
@@ -42,17 +51,67 @@ public sealed class FoundryRequestAuthenticator
         return ApplyAsync(request, ProjectTokenContext, cancellationToken);
     }
 
-    public Task ApplyInferenceAsync(HttpRequestMessage request, FoundryExtensionOptions options, CancellationToken cancellationToken)
+    public Task ApplyInferenceAsync(HttpRequestMessage request, FoundryExtensionOptions options,
+        AepChatRequest chat, CancellationToken cancellationToken, string? boundKey = null)
     {
         if (options.ProjectEndpoint != this.options.ProjectEndpoint
             || options.InferenceEndpoint != this.options.InferenceEndpoint
             || options.AuthenticationMode != this.options.AuthenticationMode)
             throw new AepServerException("provider_target_invalid", "Foundry authentication requires the configured endpoint.");
         ValidateTarget(request, new Uri(options.InferenceEndpoint.AbsoluteUri.TrimEnd('/') + "/chat/completions"), HttpMethod.Post, discovery: false);
+        if (boundKey is not null)
+        {
+            request.Headers.Add("api-key", boundKey);
+            return Task.CompletedTask;
+        }
+        if (chat.SecretAccess is { Count: > 0 })
+            return ApplyBoundKeyAsync(request, chat.SecretAccess, cancellationToken);
         return ApplyAsync(request,
             options.InferenceEndpoint.AbsolutePath.StartsWith("/api/projects/", StringComparison.Ordinal)
                 ? ProjectTokenContext : ResourceInferenceTokenContext,
             cancellationToken);
+    }
+
+    public void ApplyBoundDiscovery(HttpRequestMessage request, string key)
+    {
+        ValidateTarget(request, options.DeploymentsEndpoint(), HttpMethod.Get, discovery: true);
+        request.Headers.Add("api-key", key);
+    }
+
+    public async Task<string> RedeemBoundKeyAsync(IReadOnlyList<AepSecretAccessGrant> grants,
+        CancellationToken cancellationToken)
+    {
+        if (grants.Count != 1 || grants[0].RequirementId != "credential" || httpClientFactory is null)
+            throw new AepServerException("secret_binding_invalid", "Foundry requires one bound credential grant.", 400);
+        using var client = httpClientFactory.CreateClient("foundry-secret-access");
+        byte[] value;
+        try { value = await new AepSecretAccessClient(client).RedeemAsync(grants[0], cancellationToken); }
+        catch (AepProtocolException exception)
+        {
+            throw new AepServerException(exception.Code, "Foundry credential access failed.", 502);
+        }
+        try
+        {
+            var key = StrictUtf8.GetString(value);
+            if (string.IsNullOrWhiteSpace(key) || key.Length > 8192 || key.Any(char.IsWhiteSpace) || key.Any(char.IsControl))
+                throw new AepServerException("secret_value_invalid", "Foundry credential has invalid encoding.", 502);
+            return key;
+        }
+        catch (DecoderFallbackException)
+        {
+            throw new AepServerException("secret_value_invalid", "Foundry credential has invalid encoding.", 502);
+        }
+        finally { CryptographicOperations.ZeroMemory(value); }
+    }
+
+    public Task ApplyInferenceAsync(HttpRequestMessage request, FoundryExtensionOptions options,
+        CancellationToken cancellationToken) =>
+        ApplyInferenceAsync(request, options, new AepChatRequest(string.Empty, []), cancellationToken);
+
+    private async Task ApplyBoundKeyAsync(HttpRequestMessage request,
+        IReadOnlyList<AepSecretAccessGrant> grants, CancellationToken cancellationToken)
+    {
+        request.Headers.Add("api-key", await RedeemBoundKeyAsync(grants, cancellationToken));
     }
 
     private static void ValidateTarget(HttpRequestMessage request, Uri expected, HttpMethod method, bool discovery)
@@ -75,6 +134,8 @@ public sealed class FoundryRequestAuthenticator
             request.Headers.Add("api-key", apiKey);
             return;
         }
+        if (options.AuthenticationMode == FoundryAuthenticationMode.ApiKeyBinding)
+            throw new AepServerException("secret_binding_required", "Foundry requires a bound credential.", 400);
         try
         {
             var token = await credential!.GetTokenAsync(tokenContext, cancellationToken);

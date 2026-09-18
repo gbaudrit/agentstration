@@ -16,7 +16,8 @@ internal static class FoundryChatStream
 
     public static async IAsyncEnumerable<AepChatUpdate> ExecuteAsync(
         HttpClient client, FoundryExtensionOptions options, FoundryRequestAuthenticator authenticator,
-        AepChatRequest chat, FoundryDiagnostics diagnostics, [EnumeratorCancellation] CancellationToken cancellationToken)
+        AepChatRequest chat, FoundryDiagnostics diagnostics,
+        [EnumeratorCancellation] CancellationToken cancellationToken, string? boundKey = null)
     {
         var body = FoundryChatCompletion.BuildRequest(chat, streaming: true);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(body, AepProtocol.JsonOptions);
@@ -32,7 +33,7 @@ internal static class FoundryChatStream
         HttpResponseMessage response;
         try
         {
-            await authenticator.ApplyInferenceAsync(request, options, timeout.Token);
+            await authenticator.ApplyInferenceAsync(request, options, chat, timeout.Token, boundKey);
             response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)

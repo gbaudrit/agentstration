@@ -62,4 +62,10 @@
   <data name="Status.Unavailable"><value>Unavailable</value></data>
   <data name="Status.Failed"><value>Failed</value></data>
   <data name="Status.Unknown"><value>Unknown</value></data>
+  <data name="Credential"><value>Credential</value></data>
+  <data name="BoundSecret"><value>Bound Secret</value></data>
+  <data name="BoundSecretHelp"><value>Bind this provider to a governed Secret. The value is resolved only when Foundry needs it.</value></data>
+  <data name="FoundryApiKeySecret"><value>Foundry API key Secret</value></data>
+  <data name="NoBoundSecret"><value>No bound Secret</value></data>
+  <data name="BoundSecretUnavailable"><value>Bound Secret is unavailable</value></data>
 </root>
