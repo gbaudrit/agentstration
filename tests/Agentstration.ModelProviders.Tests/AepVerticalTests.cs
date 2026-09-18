@@ -250,6 +250,24 @@ public sealed class AepVerticalTests
     }
 
     [TestMethod]
+    public async Task AepAdapterPreservesStrictJsonSchemaWithoutLeakingItsMarker()
+    {
+        await using var factory = new AepExtensionFactory();
+        using var client = factory.CreateClient();
+        using var adapter = new AepChatClient(new AepClient(client).CreateModelProvider("test"), "test-model");
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        await adapter.GetResponseAsync([new ChatMessage(ChatRole.User, "ping")], new ChatOptions
+        {
+            ResponseFormat = ChatResponseFormat.ForJsonSchema(schema.RootElement, "answer"),
+            AdditionalProperties = new AdditionalPropertiesDictionary { ["json_schema_strict"] = true }
+        });
+        var request = factory.Provider.LastRequest!;
+        Assert.IsTrue(request.Options!.ResponseFormat!.Value.GetProperty("json_schema").GetProperty("strict").GetBoolean());
+        Assert.AreEqual("answer", request.Options.ResponseFormat.Value.GetProperty("json_schema").GetProperty("name").GetString());
+        Assert.IsFalse(request.Options.AdditionalOptions!.ContainsKey("json_schema_strict"));
+    }
+
+    [TestMethod]
     public async Task OllamaExtensionMapsModelAndNativeOptionsWithoutCallingARealServer()
     {
         using var inner = new CapturingChatClient();
@@ -743,6 +761,7 @@ public sealed class AepVerticalTests
         public int InvocationCount { get; private set; }
         public IReadOnlyList<AepBoundValue>? LastBoundValues { get; private set; }
         public ConcurrentBag<string[]> ObservedBoundValueSets { get; } = [];
+        public AepChatRequest? LastRequest { get; private set; }
         public AepModelProviderDescriptor Descriptor { get; } = new("test", "Test", new(Tools: true, ModelDiscovery: true));
         public Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken)
         {
@@ -750,6 +769,7 @@ public sealed class AepVerticalTests
             InvocationCount++;
             LastBoundValues = request.BoundValues;
             Record(request.BoundValues);
+            LastRequest = request;
             Assert.AreEqual("test-model", request.Model);
             if (request.Options?.Temperature == 0.25f)
             {

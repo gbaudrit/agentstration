@@ -124,9 +124,9 @@ public sealed class FoundryChatTests
             var requests = new[]
             {
                 Request() with { Options = new AepModelOptions { TopK = 10 } },
-                Request() with { Options = new AepModelOptions { ResponseFormat = JsonSerializer.SerializeToElement(new { type = "json_object" }) } },
+                Request() with { Options = new AepModelOptions { ResponseFormat = JsonSerializer.SerializeToElement(new { type = "json_object", extra = true }) } },
                 Request() with { Options = new AepModelOptions { ResponseFormat = JsonSerializer.SerializeToElement(new { type = "text", schema = "ignored" }) } },
-                Request() with { Options = new AepModelOptions { AdditionalOptions = new Dictionary<string, JsonElement> { ["reasoning_effort"] = JsonSerializer.SerializeToElement("high") } } },
+                Request() with { Options = new AepModelOptions { AdditionalOptions = new Dictionary<string, JsonElement> { ["reasoning_effort"] = JsonSerializer.SerializeToElement("extreme") } } },
                 Request() with { Messages = [new AepMessage(AepRole.User, [new AepContent { Kind = AepContentKind.Image, MediaType = "image/png" }])] }
             };
             foreach (var request in requests)
@@ -140,6 +140,104 @@ public sealed class FoundryChatTests
             };
             Assert.AreEqual("request_limit", (await Assert.ThrowsAsync<AepServerException>(() => provider.ChatAsync(oversized, default))).Code);
             Assert.AreEqual(0, calls);
+        });
+    }
+
+    [TestMethod]
+    public async Task AdvancedOutputAndReasoningRequireFreshDeploymentCapabilities()
+    {
+        await WithKeyAsync(async _ =>
+        {
+            var available = true;
+            var inferenceCalls = 0;
+            using var client = Client(async (request, token) =>
+            {
+                if (request.Method == HttpMethod.Get)
+                    return Json(HttpStatusCode.OK, available
+                        ? """{"value":[{"type":"ModelDeployment","name":"Phi-4-reasoning","capabilities":{"chat":true,"jsonObject":true,"jsonSchema":true,"reasoning":true,"reasoningEfforts":["low","high"]}}]}"""
+                        : """{"value":[{"type":"ModelDeployment","name":"Phi-4-reasoning","capabilities":{"chat":true}}]}""");
+                inferenceCalls++;
+                using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(token));
+                var format = body.RootElement.GetProperty("response_format");
+                Assert.AreEqual("json_schema", format.GetProperty("type").GetString());
+                Assert.IsTrue(format.GetProperty("json_schema").GetProperty("strict").GetBoolean());
+                Assert.AreEqual("high", body.RootElement.GetProperty("reasoning_effort").GetString());
+                return Json(HttpStatusCode.OK, Success);
+            });
+            var advanced = Request() with { Options = new AepModelOptions
+            {
+                ResponseFormat = JsonSerializer.SerializeToElement(new { type = "json_schema", json_schema = new
+                { name = "answer", schema = new { type = "object" }, strict = true } }),
+                AdditionalOptions = new Dictionary<string, JsonElement>
+                { ["reasoning_enabled"] = JsonSerializer.SerializeToElement(true), ["reasoning_effort"] = JsonSerializer.SerializeToElement("high") }
+            } };
+            await Provider(client).ChatAsync(advanced, default);
+            Assert.AreEqual(1, inferenceCalls);
+
+            available = false;
+            var exception = await Assert.ThrowsAsync<AepServerException>(() => Provider(client).ChatAsync(advanced, default));
+            Assert.AreEqual("unsupported_option", exception.Code);
+            Assert.AreEqual(1, inferenceCalls);
+        });
+    }
+
+    [TestMethod]
+    public async Task MalformedSchemaAndUnknownReasoningFailBeforeDiscovery()
+    {
+        await WithKeyAsync(async _ =>
+        {
+            var calls = 0;
+            using var client = Client((_, _) => { calls++; return Task.FromResult(Json(HttpStatusCode.OK, Success)); });
+            var badSchema = Request() with { Options = new AepModelOptions { ResponseFormat = JsonSerializer.SerializeToElement(new
+            { type = "json_schema", json_schema = new { name = "answer", schema = new { type = "object" }, extra = 1 } }) } };
+            var badEffort = Request() with { Options = new AepModelOptions { AdditionalOptions = new Dictionary<string, JsonElement>
+            { ["reasoning_effort"] = JsonSerializer.SerializeToElement("extreme") } } };
+            Assert.AreEqual("unsupported_option", (await Assert.ThrowsAsync<AepServerException>(() => Provider(client).ChatAsync(badSchema, default))).Code);
+            Assert.AreEqual("unsupported_option", (await Assert.ThrowsAsync<AepServerException>(() => Provider(client).ChatAsync(badEffort, default))).Code);
+            var oversizedTool = Request() with { Tools = [new AepToolDefinition("lookup", "search",
+                JsonSerializer.SerializeToElement(new { type = "object", description = new string('x', 65536) }))] };
+            Assert.AreEqual("invalid_request", (await Assert.ThrowsAsync<AepServerException>(() => Provider(client).ChatAsync(oversizedTool, default))).Code);
+            Assert.AreEqual(0, calls);
+        });
+    }
+
+    [TestMethod]
+    public async Task UnadvertisedReasoningEffortFailsBeforeInference()
+    {
+        await WithKeyAsync(async _ =>
+        {
+            var inferenceCalls = 0;
+            using var client = Client((request, _) =>
+            {
+                if (request.Method == HttpMethod.Get)
+                    return Task.FromResult(Json(HttpStatusCode.OK, """{"value":[{"type":"ModelDeployment","name":"Phi-4-reasoning","capabilities":{"chat":true,"reasoning":true,"reasoningEfforts":["low"]}}]}"""));
+                inferenceCalls++;
+                return Task.FromResult(Json(HttpStatusCode.OK, Success));
+            });
+            var request = Request() with { Options = new AepModelOptions { AdditionalOptions = new Dictionary<string, JsonElement>
+            { ["reasoning_enabled"] = JsonSerializer.SerializeToElement(true), ["reasoning_effort"] = JsonSerializer.SerializeToElement("high") } } };
+            var exception = await Assert.ThrowsAsync<AepServerException>(() => Provider(client).ChatAsync(request, default));
+            Assert.AreEqual("unsupported_option", exception.Code);
+            Assert.AreEqual(0, inferenceCalls);
+        });
+    }
+
+    [TestMethod]
+    public async Task DisabledReasoningMapsToNoneWhenDeploymentAdvertisesIt()
+    {
+        await WithKeyAsync(async _ =>
+        {
+            using var client = Client(async (request, token) =>
+            {
+                if (request.Method == HttpMethod.Get)
+                    return Json(HttpStatusCode.OK, """{"value":[{"type":"ModelDeployment","name":"Phi-4-reasoning","capabilities":{"chat":true,"reasoning":true,"reasoningEfforts":["none"]}}]}""");
+                using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(token));
+                Assert.AreEqual("none", body.RootElement.GetProperty("reasoning_effort").GetString());
+                return Json(HttpStatusCode.OK, Success);
+            });
+            var request = Request() with { Options = new AepModelOptions { AdditionalOptions = new Dictionary<string, JsonElement>
+            { ["reasoning_enabled"] = JsonSerializer.SerializeToElement(false) } } };
+            await Provider(client).ChatAsync(request, default);
         });
     }
 

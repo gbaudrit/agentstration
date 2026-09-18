@@ -21,6 +21,11 @@ public static class AgentFrameworkChatOptionsMapper
             StopSequences = execution?.StopSequences?.ToList() ?? generation.StopSequences?.ToList(),
             ResponseFormat = MapOutput(model?.Output)
         };
+        if (model?.Output is { Format: ModelOutputFormat.JsonSchema, Strict: true })
+        {
+            options.AdditionalProperties ??= [];
+            options.AdditionalProperties["json_schema_strict"] = true;
+        }
         MapReasoning(options, model?.Reasoning);
         return options;
     }
