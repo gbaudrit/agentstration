@@ -3,6 +3,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Sources;
 
@@ -96,6 +97,8 @@ public sealed class SourceBindingManagementService(
                 throw Invalid("source_binding_selection_kind_invalid", $"Source binding '{selection.Name}' must target '{declaration.TargetKind}'.");
             if (selection.Target is null || string.IsNullOrWhiteSpace(selection.Target.Name))
                 throw Invalid("source_binding_selection_target_invalid", $"Source binding '{selection.Name}' requires a Source Provider target.");
+            if (selection.SecretBindings is null)
+                throw Invalid("secret_binding_invalid", $"Source binding '{selection.Name}' needs a Secret bindings array.");
 
             var target = new ResourceReference(
                 selection.Target.Name.Trim(),
@@ -109,6 +112,8 @@ public sealed class SourceBindingManagementService(
                 cancellationToken);
             if (resolved is null)
                 throw Invalid("source_binding_provider_missing", $"Source Provider '{target.Namespace}/{target.Name}' selected for binding '{selection.Name}' was not found.");
+            if (selection.SecretBindings.Count > 0)
+                await ValidateSecretBindingsAsync(resolved.Value, selection.SecretBindings, cancellationToken);
             normalized.Add(selection with
             {
                 TargetKind = declaration.TargetKind,
@@ -247,7 +252,9 @@ public sealed class SourceBindingManagementService(
             return Status(declaration, selection.Target, "incompatible", channels,
                 new SourceBindingIssue("source_binding_contribution_missing", $"Extension '{extension.Value.Name}' does not contribute Source Provider '{provider.Value.Definition.ContributionId}'."));
 
-        var issues = new List<SourceBindingIssue>();
+        var issues = ExtensionSecretBindingValidator.Validate(selection.SecretBindings, inspection.SecretRequirements, requireAll: true)
+            .Select(value => new SourceBindingIssue(value.Code, value.Message))
+            .ToList();
         foreach (var channel in version.Definition.PublishedDefinition.Channels.Where(value =>
                      string.Equals(value.Provider.Binding, declaration.Name, StringComparison.Ordinal)))
         {
@@ -284,6 +291,31 @@ public sealed class SourceBindingManagementService(
         IReadOnlyList<string> channels,
         params SourceBindingIssue[] issues) =>
         new(declaration.Name, declaration.TargetKind, target, status, channels, issues);
+
+    private async Task ValidateSecretBindingsAsync(
+        SourceProviderResource provider,
+        IReadOnlyList<SecretBinding> secretBindings,
+        CancellationToken cancellationToken)
+    {
+        var extension = await references.ResolveAsync<ExtensionRegistrationResource>(
+            provider.Definition.Extension,
+            provider.Namespace,
+            ExtensionKinds.ExtensionRegistration,
+            RequireScope(provider),
+            cancellationToken)
+            ?? throw Invalid("source_binding_extension_missing", "The selected Source Provider's extension registration was not found.");
+        var inspector = inspectors.SingleOrDefault(value => value.CanInspectEndpoint(extension.Value.Definition.Endpoint))
+            ?? throw Invalid("source_binding_inspector_unavailable", "No inspector can validate the selected extension.");
+        var inspection = await inspector.InspectAsync(extension.Value, cancellationToken);
+        if (!string.Equals(inspection.Status, Available, StringComparison.Ordinal))
+            throw Invalid("source_binding_extension_unavailable", "The selected extension must be available to validate Secret bindings.");
+        if (extension.Value.Definition.ExpectedExtensionId is { Length: > 0 } expectedId
+            && !string.Equals(inspection.Extension?.Id, expectedId, StringComparison.Ordinal))
+            throw Invalid("source_binding_extension_identity_mismatch", "The selected extension does not report its expected identity.");
+        var issues = ExtensionSecretBindingValidator.Validate(secretBindings, inspection.SecretRequirements, requireAll: false);
+        if (issues.Count > 0)
+            throw Invalid(issues[0].Code, issues[0].Message);
+    }
 
     private static ResourceScopeRef RequireScope(Resource resource) =>
         resource.ScopeRef ?? throw new InvalidOperationException($"Resource '{resource.Address}' has no ownership scope.");

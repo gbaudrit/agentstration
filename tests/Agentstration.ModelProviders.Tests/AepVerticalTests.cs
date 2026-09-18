@@ -307,6 +307,40 @@ public sealed class AepVerticalTests
     }
 
     [TestMethod]
+    public async Task AepResolutionRequiresDeclaredSecretBindingBeforeInvocation()
+    {
+        await using var factory = new AepExtensionFactory(requireSecret: true);
+        using var httpClient = factory.CreateClient();
+        var provider = new AepModelProvider(new FixedHttpClientFactory(httpClient));
+        var configuration = new ModelProviderConfiguration
+        {
+            Uid = Guid.NewGuid(),
+            Name = "test-local",
+            AdapterType = AepModelProvider.AdapterType,
+            ContributionId = "test",
+            Extension = new ResourceReference("test-extension"),
+            Endpoint = httpClient.BaseAddress!
+        };
+        var deployment = new ModelDeploymentConfiguration
+        {
+            Name = "profile",
+            ProviderName = "test-local",
+            ModelName = "test-model"
+        };
+
+        var missing = await Assert.ThrowsExactlyAsync<ModelProviderConfigurationException>(() =>
+            provider.ResolveCapabilitiesAsync(configuration, deployment).AsTask());
+        StringAssert.Contains(missing.Message, "Required Secret requirement 'credential' has no binding");
+
+        var bound = deployment with
+        {
+            SecretBindings = [new("credential", new(new(ResourceNamespace.Default, "Secret", "api-key"), ResourceScopeRef.Instance))]
+        };
+        var capabilities = await provider.ResolveCapabilitiesAsync(configuration, bound);
+        Assert.AreEqual(CapabilitySupport.Native, capabilities.Provider.Tools.Support);
+    }
+
+    [TestMethod]
     public async Task AepResolutionFailsClosedWhenPinnedOptionVersionWasRemoved()
     {
         await using var factory = new AepExtensionFactory();
@@ -487,7 +521,7 @@ public sealed class AepVerticalTests
 
     private static AepChatRequest Request() => new("test-model", [new(AepRole.User, [AepContent.FromText("ping")])]);
 
-    private sealed class AepExtensionFactory(bool addSecondOptionVersion = false, bool addThirdOptionVersion = false) : WebApplicationFactory<OllamaAepModelProvider>
+    private sealed class AepExtensionFactory(bool addSecondOptionVersion = false, bool addThirdOptionVersion = false, bool requireSecret = false) : WebApplicationFactory<OllamaAepModelProvider>
     {
         public FakeProvider Provider { get; } = new();
 
@@ -499,6 +533,7 @@ public sealed class AepVerticalTests
             if (addThirdOptionVersion) services.AddSingleton<IAepOptionMigrator, ThirdOptionMigrator>();
             services.PostConfigure<AepExtensionOptions>(options =>
             {
+                if (requireSecret) options.SecretRequirements.Add(new("credential", true));
                 var original = options.OptionSets.Single() with { ContributionId = "test" };
                 options.OptionSets.Clear();
                 if (!addSecondOptionVersion)

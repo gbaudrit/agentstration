@@ -30,6 +30,7 @@ public sealed class ResolvedSecret(ResourceAddress secret, ResourceAddress vault
 }
 
 public sealed record SecretReference(ResourceAddress Address, ResourceScopeRef? ScopeRef = null);
+public sealed record SecretBinding(string RequirementId, SecretReference Secret);
 public sealed record SecretResolutionContext(ResourceScopeRef ConsumerScopeRef, ResourceAddress Consumer);
 public sealed record SecretVaultContext(ResourceScopeRef ScopeRef, ResourceAddress Vault, IReadOnlyDictionary<string, JsonElement> Options);
 

@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Agentstration.Extensions.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Sources.Contracts;
 
@@ -312,6 +313,7 @@ public sealed record SourceBindingSelection
     public required string Name { get; init; }
     public required string TargetKind { get; init; }
     public required ResourceReference Target { get; init; }
+    public IReadOnlyList<SecretBinding> SecretBindings { get; init; } = [];
 }
 
 public sealed record SourceConfigurationResource : Resource
@@ -480,7 +482,8 @@ public sealed record SourceProviderInvocation(
     string? ExtensionName = null,
     AepTransportAuthenticationMode AuthenticationMode = AepTransportAuthenticationMode.None,
     ResourceReference? Credential = null,
-    string? ExpectedExtensionId = null);
+    string? ExpectedExtensionId = null,
+    IReadOnlyList<SecretBinding>? SecretBindings = null);
 
 public sealed record ResolvedSourceRevision(
     string Revision,
