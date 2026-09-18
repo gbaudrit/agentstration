@@ -8,6 +8,12 @@ public enum MembershipStatus { Active, Suspended }
 public enum PrincipalType { User, Group, ServicePrincipal }
 public enum ThemePreference { System, Light, Dark }
 
+public static class OfficialWorkspaceIdentities
+{
+    public const string AgentstrationAssistant = "agentstration-assistant";
+    public const string AgentstrationAssistantDisplayName = "Agentstration Assistant";
+}
+
 public sealed record Tenant(
     Guid Id,
     string Name,
