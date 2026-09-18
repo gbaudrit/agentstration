@@ -177,10 +177,17 @@ public sealed class AepClient(
         return await ReadAsync<AepChatResponse>(response, cancellationToken);
     }
 
-    internal async Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(string providerId, CancellationToken cancellationToken)
+    internal async Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(
+        string providerId,
+        IReadOnlyList<AepBoundValue>? boundValues,
+        CancellationToken cancellationToken)
     {
         _ = await DiscoverAsync(cancellationToken);
-        using var response = await SendAsync(HttpMethod.Get, $"{AepProtocol.ModelProvidersPath}/{Uri.EscapeDataString(providerId)}/models", null, cancellationToken);
+        using var response = await SendAsync(
+            HttpMethod.Post,
+            $"{AepProtocol.ModelProvidersPath}/{Uri.EscapeDataString(providerId)}/models",
+            new AepBoundValuesRequest(boundValues),
+            cancellationToken);
         return await ReadAsync<AepModelDescriptor[]>(response, cancellationToken);
     }
 
@@ -304,7 +311,12 @@ public sealed class AepModelProviderClient(AepClient client, string providerId)
         client.GetHealthAsync(providerId, cancellationToken);
 
     public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>
-        client.ListModelsAsync(providerId, cancellationToken);
+        client.ListModelsAsync(providerId, null, cancellationToken);
+
+    public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(
+        IReadOnlyList<AepBoundValue> boundValues,
+        CancellationToken cancellationToken = default) =>
+        client.ListModelsAsync(providerId, boundValues, cancellationToken);
 
     public Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken = default) =>
         client.ChatAsync(providerId, request, cancellationToken);

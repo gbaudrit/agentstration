@@ -252,7 +252,12 @@ public sealed class SourceBindingManagementService(
             return Status(declaration, selection.Target, "incompatible", channels,
                 new SourceBindingIssue("source_binding_contribution_missing", $"Extension '{extension.Value.Name}' does not contribute Source Provider '{provider.Value.Definition.ContributionId}'."));
 
-        var issues = ExtensionSecretBindingValidator.Validate(selection.SecretBindings, inspection.SecretRequirements, requireAll: true)
+        var issues = ExtensionSecretBindingValidator.Validate(
+                selection.SecretBindings,
+                inspection.ValueRequirements,
+                SourceProviderContribution,
+                provider.Value.Definition.ContributionId,
+                requireAll: true)
             .Select(value => new SourceBindingIssue(value.Code, value.Message))
             .ToList();
         foreach (var channel in version.Definition.PublishedDefinition.Channels.Where(value =>
@@ -312,7 +317,12 @@ public sealed class SourceBindingManagementService(
         if (extension.Value.Definition.ExpectedExtensionId is { Length: > 0 } expectedId
             && !string.Equals(inspection.Extension?.Id, expectedId, StringComparison.Ordinal))
             throw Invalid("source_binding_extension_identity_mismatch", "The selected extension does not report its expected identity.");
-        var issues = ExtensionSecretBindingValidator.Validate(secretBindings, inspection.SecretRequirements, requireAll: false);
+        var issues = ExtensionSecretBindingValidator.Validate(
+            secretBindings,
+            inspection.ValueRequirements,
+            SourceProviderContribution,
+            provider.Definition.ContributionId,
+            requireAll: false);
         if (issues.Count > 0)
             throw Invalid(issues[0].Code, issues[0].Message);
     }

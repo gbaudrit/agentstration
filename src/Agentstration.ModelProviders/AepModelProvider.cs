@@ -36,7 +36,7 @@ public sealed class AepModelProvider(
             deployment.SecretBindings.Count == 0 ? null : token => IssueSecretAccessAsync(provider, deployment, token));
     }
 
-    private async Task<AepSecretAccessLease> IssueSecretAccessAsync(
+    private async Task<AepBoundValuesLease> IssueSecretAccessAsync(
         ModelProviderConfiguration provider,
         ModelDeploymentConfiguration deployment,
         CancellationToken cancellationToken)
@@ -55,7 +55,12 @@ public sealed class AepModelProvider(
         if (!manifest.Capabilities.TryGetValue(AepCapabilityNames.SecretAccess, out var feature)
             || feature.Version != AepProtocol.SecretAccessVersion)
             throw new ModelProviderConfigurationException("The AEP extension does not support Secret access version 1.0.");
-        var issues = ExtensionSecretBindingValidator.Validate(deployment.SecretBindings, manifest.SecretRequirements, requireAll: true);
+        var issues = ExtensionSecretBindingValidator.Validate(
+            deployment.SecretBindings,
+            manifest.ValueRequirements,
+            AepContributionKinds.ModelProvider,
+            provider.ContributionId,
+            requireAll: true);
         if (issues.Count > 0)
             throw new ModelProviderConfigurationException(issues[0].Message);
 
@@ -64,9 +69,13 @@ public sealed class AepModelProvider(
         var consumer = new ScopedResourceAddress(consumerScope, provider.Namespace, ModelResourceKinds.ModelProfile, deployment.Name);
         var executionId = Guid.NewGuid().ToString("N");
         var endpoint = new Uri(baseUri, AepProtocol.SecretAccessPath);
-        var declared = manifest.SecretRequirements?.Select(value => value.Id).ToArray() ?? [];
+        var declared = (manifest.ValueRequirements ?? [])
+            .Where(value => string.Equals(value.ContributionKind, AepContributionKinds.ModelProvider, StringComparison.Ordinal)
+                && string.Equals(value.ContributionId, provider.ContributionId, StringComparison.OrdinalIgnoreCase))
+            .Select(value => value.Id)
+            .ToArray();
         var handles = new List<SecretCapabilityHandle>();
-        var grants = new List<AepSecretAccessGrant>();
+        var values = new List<AepBoundValue>();
         try
         {
             foreach (var binding in deployment.SecretBindings)
@@ -74,10 +83,15 @@ public sealed class AepModelProvider(
                 var context = new SecretCapabilityContext(extension, manifest.Extension.Id, consumer, binding.RequirementId, executionId);
                 var handle = await capabilities.IssueAsync(context, binding, declared, cancellationToken, cancellationToken);
                 handles.Add(handle);
-                grants.Add(new AepSecretAccessGrant(AepProtocol.SecretAccessVersion, endpoint, manifest.Extension.Id,
-                    binding.RequirementId, executionId, handle.RevealForTransport()));
+                values.Add(AepBoundValue.Secured(binding.RequirementId, new AepSecretAccessGrant(
+                    AepProtocol.SecretAccessVersion,
+                    endpoint,
+                    manifest.Extension.Id,
+                    binding.RequirementId,
+                    executionId,
+                    handle.RevealForTransport())));
             }
-            return new AepSecretAccessLease(grants, () =>
+            return new AepBoundValuesLease(values, () =>
             {
                 foreach (var handle in handles) capabilities.Revoke(handle);
             });
@@ -138,7 +152,12 @@ public sealed class AepModelProvider(
             && (!manifest.Capabilities.TryGetValue(AepCapabilityNames.SecretAccess, out var secretAccess)
                 || secretAccess.Version != AepProtocol.SecretAccessVersion))
             throw new ModelProviderConfigurationException("The AEP extension does not support Secret access version 1.0.");
-        var bindingIssues = ExtensionSecretBindingValidator.Validate(deployment.SecretBindings, manifest.SecretRequirements, requireAll: true);
+        var bindingIssues = ExtensionSecretBindingValidator.Validate(
+            deployment.SecretBindings,
+            manifest.ValueRequirements,
+            AepContributionKinds.ModelProvider,
+            provider.ContributionId,
+            requireAll: true);
         if (bindingIssues.Count > 0)
             throw new ModelProviderConfigurationException(bindingIssues[0].Message);
         var contribution = manifest.Contributions.ModelProviders.SingleOrDefault(
@@ -149,7 +168,12 @@ public sealed class AepModelProvider(
             var catalog = await client.GetConfigurationAsync(cancellationToken);
             ValidateNativeOptions(provider.ContributionId, nativeOptions, catalog);
         }
-        var models = await client.CreateModelProvider(provider.ContributionId).ListModelsAsync(cancellationToken);
+        using var values = deployment.SecretBindings.Count == 0
+            ? null
+            : await IssueSecretAccessAsync(provider, deployment, cancellationToken);
+        var models = values is null
+            ? await client.CreateModelProvider(provider.ContributionId).ListModelsAsync(cancellationToken)
+            : await client.CreateModelProvider(provider.ContributionId).ListModelsAsync(values.Values, cancellationToken);
         var model = models.SingleOrDefault(value => string.Equals(value.Id, deployment.ModelName, StringComparison.Ordinal));
         if (model is null) throw new ModelProviderConfigurationException($"Model '{deployment.ModelName}' is not available from provider '{provider.Name}'.");
         return new ResolvedModelProviderCapabilities(
@@ -219,7 +243,7 @@ public sealed class AepModelProvider(
                         .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.SourceProvider, value.Id)))
                     .ToArray(),
                 catalog.OptionSets.Select(Map).ToArray(),
-                SecretRequirements: manifest.SecretRequirements);
+                ValueRequirements: manifest.ValueRequirements);
         }
         catch (AepProtocolException exception)
         {

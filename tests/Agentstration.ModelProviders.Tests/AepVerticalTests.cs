@@ -380,11 +380,12 @@ public sealed class AepVerticalTests
         Assert.AreEqual("pong", response.Text);
         Assert.AreEqual("credential", capabilities.Issued?.RequirementId);
         Assert.AreEqual(1, capabilities.Revocations);
-        var grant = factory.Provider.LastSecretAccess?.Single();
-        Assert.IsNotNull(grant);
-        Assert.AreEqual("credential", grant.RequirementId);
-        Assert.AreEqual("opaque-test", grant.SecretCapability);
-        Assert.AreEqual("[REDACTED]", grant.ToString());
+        var boundValue = factory.Provider.LastBoundValues?.Single();
+        Assert.IsNotNull(boundValue);
+        Assert.AreEqual(AepBoundValueKind.SecretGrant, boundValue.Kind);
+        Assert.AreEqual("credential", boundValue.RequirementId);
+        Assert.AreEqual("opaque-test", boundValue.SecretGrant?.SecretCapability);
+        Assert.AreEqual("[REDACTED]", boundValue.ToString());
     }
 
     [TestMethod]
@@ -582,7 +583,12 @@ public sealed class AepVerticalTests
             {
                 if (requireSecret)
                 {
-                    options.SecretRequirements.Add(new("credential", true));
+                    options.ValueRequirements.Add(new(
+                        AepContributionKinds.ModelProvider,
+                        "test",
+                        "credential",
+                        true,
+                        Protection: AepValueProtection.Secured));
                     options.Capabilities[AepCapabilityNames.SecretAccess] = new(AepProtocol.SecretAccessVersion);
                 }
                 var original = options.OptionSets.Single() with { ContributionId = "test" };
@@ -636,13 +642,13 @@ public sealed class AepVerticalTests
     private sealed class FakeProvider : IAepModelProvider
     {
         public int InvocationCount { get; private set; }
-        public IReadOnlyList<AepSecretAccessGrant>? LastSecretAccess { get; private set; }
+        public IReadOnlyList<AepBoundValue>? LastBoundValues { get; private set; }
         public AepModelProviderDescriptor Descriptor { get; } = new("test", "Test", new(Tools: true, ModelDiscovery: true));
         public Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             InvocationCount++;
-            LastSecretAccess = request.SecretAccess;
+            LastBoundValues = request.BoundValues;
             Assert.AreEqual("test-model", request.Model);
             if (request.Options?.Temperature == 0.25f)
             {

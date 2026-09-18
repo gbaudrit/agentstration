@@ -23,7 +23,7 @@ public interface IAepHttpTraceSink
 public sealed class AepTracingHandler(IAepHttpTraceSink sink) : DelegatingHandler
 {
     private const int MaximumBodyLength = 64 * 1024;
-    private static readonly string[] SensitiveNames = ["authorization", "cookie", "token", "secret", "password", "apikey", "api-key"];
+    private static readonly string[] SensitiveNames = ["authorization", "cookie", "token", "secret", "password", "apikey", "api-key", "boundvalue"];
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
