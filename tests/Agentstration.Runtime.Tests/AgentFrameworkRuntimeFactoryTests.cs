@@ -356,6 +356,47 @@ public sealed class AgentFrameworkRuntimeFactoryTests
     }
 
     [TestMethod]
+    public async Task StreamingAgentToolCallStillUsesGovernedPipeline()
+    {
+        using var chatClient = new RecordingChatClient
+        {
+            ResponseFactory = (call, _, options) => call == 1
+                ? new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                [
+                    new FunctionCallContent("stream-call-1", options!.Tools!.Single().Name,
+                        new Dictionary<string, object?> { ["value"] = "hello" })
+                ]))
+                : new ChatResponse(new ChatMessage(ChatRole.Assistant, "STREAM_OK"))
+        };
+        var tool = new TestTool();
+        var pipeline = new RecordingToolExecutionPipeline();
+        var runtime = await new AgentFrameworkRuntimeFactory(
+                new RecordingResolver(chatClient), NullLoggerFactory.Instance, new GenAiObservabilityOptions())
+            .CreateAsync(Definition() with { EffectiveToolNames = [tool.Id] }, "revision-stream",
+                new AgentRuntimeContext(new SingleToolCatalog(tool), pipeline), default);
+        var workspaceId = new WorkspaceId(Guid.Parse("55555555-5555-5555-5555-555555555555"));
+        var events = new List<AgentExecutionEvent>();
+        await foreach (var item in runtime.ExecuteEventsAsync(new AgentExecutionRequest(
+            "Use the tool", "run-stream",
+            Execution: new AgentExecutionOptions { Streaming = RuntimeStreamingMode.Enabled },
+            ToolExecution: new ToolExecutionScope
+            {
+                TenantId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                WorkspaceId = workspaceId,
+                PrincipalId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                ExecutionId = "run-stream",
+                CorrelationId = "correlation-stream"
+            }))) events.Add(item);
+
+        Assert.IsTrue(chatClient.StreamingCalls > 0);
+        Assert.AreEqual("STREAM_OK", events.OfType<ExecutionCompleted>().Single().Result.Output);
+        var invocation = pipeline.Contexts.Single();
+        Assert.AreEqual(workspaceId, invocation.WorkspaceId);
+        Assert.AreEqual("run-stream", invocation.RunId);
+        Assert.AreEqual("revision-stream", invocation.AgentRevisionId);
+    }
+
+    [TestMethod]
     public async Task MafToolAdapterPropagatesCancellationAndProviderDiagnostics()
     {
         var tool = new TestTool();
