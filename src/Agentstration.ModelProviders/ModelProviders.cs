@@ -2,8 +2,8 @@ using System.Text.Json;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Models;
 using Agentstration.Resources;
-using Agentstration.Secrets.Abstractions;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets.Abstractions;
 using Microsoft.Extensions.AI;
 
 namespace Agentstration.ModelProviders;

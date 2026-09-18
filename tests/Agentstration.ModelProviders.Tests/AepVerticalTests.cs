@@ -356,15 +356,21 @@ public sealed class AepVerticalTests
         var extensionId = (await new AepClient(http).DiscoverAsync()).Extension.Id;
         var provider = new ModelProviderConfiguration
         {
-            Uid = Guid.NewGuid(), Name = "test-local", AdapterType = AepModelProvider.AdapterType,
-            ContributionId = "test", Extension = new ResourceReference("test-extension"),
-            ExtensionScopeRef = ResourceScopeRef.Instance, ExpectedExtensionId = extensionId,
+            Uid = Guid.NewGuid(),
+            Name = "test-local",
+            AdapterType = AepModelProvider.AdapterType,
+            ContributionId = "test",
+            Extension = new ResourceReference("test-extension"),
+            ExtensionScopeRef = ResourceScopeRef.Instance,
+            ExpectedExtensionId = extensionId,
             Endpoint = http.BaseAddress!
         };
         var deployment = new ModelDeploymentConfiguration
         {
-            Name = "profile", ScopeRef = ResourceScopeRef.Instance,
-            ProviderName = "test-local", ModelName = "test-model",
+            Name = "profile",
+            ScopeRef = ResourceScopeRef.Instance,
+            ProviderName = "test-local",
+            ModelName = "test-model",
             SecretBindings = [new("credential", new(new(ResourceNamespace.Default, "Secret", "api-key"), ResourceScopeRef.Instance))]
         };
 
