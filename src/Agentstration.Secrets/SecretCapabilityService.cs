@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using Agentstration.Secrets.Abstractions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Agentstration.Secrets;
 
@@ -14,15 +16,18 @@ public sealed class SecretCapabilityService : ISecretCapabilityService, IDisposa
     private readonly ISecretAccessAuthorizer authorizer;
     private readonly ISecretResolver resolver;
     private readonly TimeProvider timeProvider;
+    private readonly ILogger<SecretCapabilityService> logger;
     private readonly ConcurrentDictionary<string, Entry> entries = new(StringComparer.Ordinal);
     private readonly object issuanceGate = new();
     private readonly ITimer cleanupTimer;
 
-    public SecretCapabilityService(ISecretAccessAuthorizer authorizer, ISecretResolver resolver, TimeProvider timeProvider)
+    public SecretCapabilityService(ISecretAccessAuthorizer authorizer, ISecretResolver resolver, TimeProvider timeProvider,
+        ILogger<SecretCapabilityService>? logger = null)
     {
         this.authorizer = authorizer;
         this.resolver = resolver;
         this.timeProvider = timeProvider;
+        this.logger = logger ?? NullLogger<SecretCapabilityService>.Instance;
         cleanupTimer = timeProvider.CreateTimer(static state => ((SecretCapabilityService)state!).PruneExpired(),
             this, CleanupInterval, CleanupInterval);
     }
@@ -80,6 +85,10 @@ public sealed class SecretCapabilityService : ISecretCapabilityService, IDisposa
         {
             throw Failure("vault_unavailable", "The bound Secret's Vault is unavailable.");
         }
+        catch (VaultResourceNotFoundException)
+        {
+            throw Failure("vault_unavailable", "The bound Secret's Vault is unavailable.");
+        }
 
         cancellationToken.ThrowIfCancellationRequested();
         if (lifetimeToken.IsCancellationRequested)
@@ -108,6 +117,17 @@ public sealed class SecretCapabilityService : ISecretCapabilityService, IDisposa
         {
             entries.TryRemove(Hash(token), out _);
             throw Failure("context_terminated", "The execution context has ended.");
+        }
+        try
+        {
+            if (logger.IsEnabled(LogLevel.Information))
+                logger.LogInformation("AEP Secret capability issued for extension {ExtensionId}, consumer {Consumer}, requirement {RequirementId}, execution {ExecutionId}",
+                    context.ExtensionId, context.Consumer, context.RequirementId, context.ExecutionId);
+        }
+        catch
+        {
+            entries.TryRemove(Hash(token), out _);
+            throw;
         }
         return new SecretCapabilityHandle(token);
     }
@@ -147,16 +167,32 @@ public sealed class SecretCapabilityService : ISecretCapabilityService, IDisposa
 
         try
         {
-            return await resolver.ResolveAsync(entry.Secret,
+            var resolved = await resolver.ResolveAsync(entry.Secret,
                 new SecretResolutionContext(entry.Context.Consumer.ScopeRef, entry.Context.Consumer.Address),
                 cancellationToken)
                 ?? throw Failure("secret_unavailable", "The bound Secret is unavailable.");
+            try
+            {
+                if (logger.IsEnabled(LogLevel.Information))
+                    logger.LogInformation("AEP Secret capability redeemed for extension {ExtensionId}, consumer {Consumer}, requirement {RequirementId}, execution {ExecutionId}",
+                        entry.Context.ExtensionId, entry.Context.Consumer, entry.Context.RequirementId, entry.Context.ExecutionId);
+            }
+            catch
+            {
+                resolved.Dispose();
+                throw;
+            }
+            return resolved;
         }
         catch (SecretAccessDeniedException)
         {
             throw Failure("access_denied", "Access to the bound Secret was denied.");
         }
         catch (SecretVaultUnavailableException)
+        {
+            throw Failure("vault_unavailable", "The bound Secret's Vault is unavailable.");
+        }
+        catch (VaultResourceNotFoundException)
         {
             throw Failure("vault_unavailable", "The bound Secret's Vault is unavailable.");
         }

@@ -24,6 +24,7 @@ internal static class AepSecretAccessEndpoints
         AepSecretAccessRequest request,
         HttpResponse response,
         ISecretCapabilityService capabilities,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         response.Headers.CacheControl = "no-store";
@@ -46,6 +47,9 @@ internal static class AepSecretAccessEndpoints
         }
         catch (SecretCapabilityException exception)
         {
+            var logger = loggerFactory.CreateLogger("Agentstration.Aep.SecretAccess");
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.LogDebug("AEP Secret redemption denied with code {Code}", exception.Code);
             var status = exception.Code switch
             {
                 "secret_unavailable" or "vault_unavailable" => StatusCodes.Status503ServiceUnavailable,
