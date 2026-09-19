@@ -1,4 +1,4 @@
-# ADR-0123: Foundry advanced options follow deployment capabilities
+# ADR-0130: Foundry advanced options follow deployment capabilities
 
 Status: Accepted — 2026-09-18
 

@@ -171,30 +171,31 @@ public sealed class FoundryStreamingTests
         return updates;
     }
 
-    private static AepChatRequest Request() => new("deployment", [new AepMessage(AepRole.User, [AepContent.FromText("hello")])]);
+    private static AepChatRequest Request() => new("deployment", [new AepMessage(AepRole.User, [AepContent.FromText("hello")])],
+        BoundValues: BoundValues());
     private static FoundryAepModelProvider Provider(HttpClient client)
     {
-        var options = new FoundryExtensionOptions
-        {
-            ProjectEndpoint = new Uri("https://foundry.example/api/projects/demo"),
-            InferenceEndpoint = new Uri("https://foundry.example/openai/v1"),
-            AuthenticationMode = FoundryAuthenticationMode.ApiKeyEnvironment
-        };
-        return new(client, options, new FoundryRequestAuthenticator(options));
+        return new(client, new FoundryExtensionOptions(), new FoundryBoundConnectionResolver(Client((_, _) => Task.FromResult(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(
+                new AepSecretAccessResponse(AepProtocol.SecretAccessVersion, Convert.ToBase64String(Encoding.UTF8.GetBytes("offline-test-key"))),
+                AepProtocol.JsonOptions), Encoding.UTF8, "application/json") }))));
     }
+    private static IReadOnlyList<AepBoundValue> BoundValues() =>
+    [
+        AepBoundValue.Inline(FoundryValueRequirements.ProjectEndpoint, JsonSerializer.SerializeToElement("https://foundry.example/api/projects/demo")),
+        AepBoundValue.Inline(FoundryValueRequirements.InferenceEndpoint, JsonSerializer.SerializeToElement("https://foundry.example/openai/v1")),
+        AepBoundValue.Inline(FoundryValueRequirements.AuthenticationMode, JsonSerializer.SerializeToElement("ApiKey")),
+        AepBoundValue.Secured(FoundryValueRequirements.Credential, new AepSecretAccessGrant(AepProtocol.SecretAccessVersion,
+            new Uri("https://secrets.test/api/aep/secrets/redeem"), "Agentstration.Extensions.Foundry",
+            FoundryValueRequirements.Credential, "execution", "capability"))
+    ];
     private static HttpClient Client(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler) =>
         new(new StubHandler(handler));
     private static HttpResponseMessage Stream(string body) => new(HttpStatusCode.OK)
     { Content = new StringContent(body + "\n\n", Encoding.UTF8, "text/event-stream") };
     private static async Task WithKeyAsync(Func<Task> action)
     {
-        var prior = Environment.GetEnvironmentVariable("FOUNDRY_API_KEY");
-        try
-        {
-            Environment.SetEnvironmentVariable("FOUNDRY_API_KEY", "offline-test-key");
-            await action();
-        }
-        finally { Environment.SetEnvironmentVariable("FOUNDRY_API_KEY", prior); }
+        await action();
     }
     private sealed class StubHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler) : HttpMessageHandler
     {

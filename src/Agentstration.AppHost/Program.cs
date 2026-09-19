@@ -101,32 +101,18 @@ var developmentExtensions = new List<DevelopmentAepExtension>
 };
 if (foundryEnabled)
 {
-    var projectEndpoint = builder.Configuration["Foundry:ProjectEndpoint"];
-    var inferenceEndpoint = builder.Configuration["Foundry:InferenceEndpoint"];
-    var authenticationMode = builder.Configuration["Foundry:AuthenticationMode"];
-    if (string.IsNullOrWhiteSpace(projectEndpoint) || string.IsNullOrWhiteSpace(inferenceEndpoint)
-        || string.IsNullOrWhiteSpace(authenticationMode))
-        throw new InvalidOperationException("Enabled Foundry requires project endpoint, inference endpoint, and authentication mode.");
     var foundryExtension = builder.AddProject<Projects.Agentstration_Extensions_Foundry>("foundry-extension")
         .WithEnvironment("Agentstration__Slot", slot)
-        .WithEnvironment("Foundry__ProjectEndpoint", projectEndpoint)
-        .WithEnvironment("Foundry__InferenceEndpoint", inferenceEndpoint)
-        .WithEnvironment("Foundry__AuthenticationMode", authenticationMode)
         .WithHttpHealthCheck("/health")
         .WithDynamicHostPorts(dynamicApplicationPorts);
     foreach (var key in new[]
     {
-        "ManagedIdentityClientId", "AllowedPrivateHosts", "MaximumDiscoveryPages",
-        "MaximumDiscoveredModels", "MaximumDiscoveryResponseBytes", "RequestTimeoutSeconds"
+        "AllowedPrivateHosts", "MaximumDiscoveryPages", "MaximumDiscoveredModels",
+        "MaximumDiscoveryResponseBytes", "RequestTimeoutSeconds"
     })
     {
         if (builder.Configuration[$"Foundry:{key}"] is { } value)
             foundryExtension.WithEnvironment($"Foundry__{key}", value);
-    }
-    if (string.Equals(authenticationMode, "ApiKeyEnvironment", StringComparison.OrdinalIgnoreCase))
-    {
-        var apiKey = builder.AddParameterFromConfiguration("foundry-api-key", "FOUNDRY_API_KEY", secret: true);
-        foundryExtension.WithEnvironment("FOUNDRY_API_KEY", apiKey);
     }
     developmentExtensions.Add(new DevelopmentAepExtension(
         "Agentstration.Extensions.Foundry", "foundry-extension", foundryExtension));

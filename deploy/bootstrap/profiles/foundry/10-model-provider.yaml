@@ -7,3 +7,20 @@ definition:
   extension:
     name: foundry-extension
   contributionId: microsoft-foundry
+  valueBindings:
+    - requirementId: projectEndpoint
+      kind: parameter
+      parameter:
+        binding: project-endpoint
+    - requirementId: inferenceEndpoint
+      kind: parameter
+      parameter:
+        binding: inference-endpoint
+    - requirementId: authenticationMode
+      kind: parameter
+      parameter:
+        binding: authentication-mode
+    - requirementId: credential
+      kind: secret
+      secret:
+        binding: credential

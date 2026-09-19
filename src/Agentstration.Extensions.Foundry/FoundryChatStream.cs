@@ -15,7 +15,7 @@ internal static class FoundryChatStream
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     public static async IAsyncEnumerable<AepChatUpdate> ExecuteAsync(
-        HttpClient client, FoundryExtensionOptions options, FoundryRequestAuthenticator authenticator,
+        HttpClient client, FoundryExtensionOptions options, FoundryConnection connection, FoundryRequestAuthenticator authenticator,
         AepChatRequest chat, FoundryDiagnostics diagnostics, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var body = FoundryChatCompletion.BuildRequest(chat, streaming: true);
@@ -23,7 +23,7 @@ internal static class FoundryChatStream
         if (bytes.Length > FoundryChatCompletion.MaximumRequestBytes)
             throw new AepServerException("request_limit", "Foundry chat request exceeds its size limit.", 400);
         using var request = new HttpRequestMessage(HttpMethod.Post,
-            new Uri(options.InferenceEndpoint.AbsoluteUri.TrimEnd('/') + "/chat/completions", UriKind.Absolute))
+            new Uri(connection.InferenceEndpoint.AbsoluteUri.TrimEnd('/') + "/chat/completions", UriKind.Absolute))
         { Content = new ByteArrayContent(bytes) };
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
@@ -32,7 +32,7 @@ internal static class FoundryChatStream
         HttpResponseMessage response;
         try
         {
-            await authenticator.ApplyInferenceAsync(request, options, timeout.Token);
+            await authenticator.ApplyInferenceAsync(request, timeout.Token);
             response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)

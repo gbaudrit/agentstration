@@ -1,4 +1,4 @@
-# ADR-0119: Foundry model deployments use an isolated AEP extension
+# ADR-0126: Foundry model deployments use an isolated AEP extension
 
 Status: Accepted — 2026-09-17
 

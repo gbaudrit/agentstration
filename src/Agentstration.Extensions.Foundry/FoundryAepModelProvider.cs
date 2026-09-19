@@ -10,7 +10,7 @@ namespace Agentstration.Extensions.Foundry;
 public sealed class FoundryAepModelProvider(
     HttpClient httpClient,
     FoundryExtensionOptions options,
-    FoundryRequestAuthenticator authenticator,
+    FoundryBoundConnectionResolver connectionResolver,
     ILogger<FoundryAepModelProvider>? logger = null) : IAepModelProvider
 {
     private readonly ILogger diagnosticsLogger = logger ?? NullLogger<FoundryAepModelProvider>.Instance;
@@ -31,9 +31,11 @@ public sealed class FoundryAepModelProvider(
         using var diagnostics = new FoundryDiagnostics(diagnosticsLogger, "chat", request?.Model);
         try
         {
+            using var lease = await connectionResolver.ResolveAsync(request!.BoundValues, cancellationToken);
+            var authenticator = new FoundryRequestAuthenticator(lease.Connection);
             _ = FoundryChatCompletion.BuildRequest(request!);
-            await ValidateAdvancedCapabilitiesAsync(request!, cancellationToken);
-            var response = await FoundryChatCompletion.ExecuteAsync(httpClient, options, authenticator, request!, diagnostics, cancellationToken);
+            await ValidateAdvancedCapabilitiesAsync(request!, lease.Connection, authenticator, cancellationToken);
+            var response = await FoundryChatCompletion.ExecuteAsync(httpClient, options, lease.Connection, authenticator, request!, diagnostics, cancellationToken);
             diagnostics.SetUsage(response.Usage);
             diagnostics.Complete("success");
             return response;
@@ -51,9 +53,11 @@ public sealed class FoundryAepModelProvider(
         AepChatRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         using var diagnostics = new FoundryDiagnostics(diagnosticsLogger, "chat_stream", request?.Model);
+        using var lease = await connectionResolver.ResolveAsync(request!.BoundValues, cancellationToken);
+        var authenticator = new FoundryRequestAuthenticator(lease.Connection);
         _ = FoundryChatCompletion.BuildRequest(request!, streaming: true);
-        await ValidateAdvancedCapabilitiesAsync(request!, cancellationToken);
-        await using var updates = FoundryChatStream.ExecuteAsync(httpClient, options, authenticator, request!, diagnostics, cancellationToken)
+        await ValidateAdvancedCapabilitiesAsync(request!, lease.Connection, authenticator, cancellationToken);
+        await using var updates = FoundryChatStream.ExecuteAsync(httpClient, options, lease.Connection, authenticator, request!, diagnostics, cancellationToken)
             .GetAsyncEnumerator(cancellationToken);
         while (true)
         {
@@ -71,12 +75,17 @@ public sealed class FoundryAepModelProvider(
         diagnostics.Complete("success");
     }
 
-    private async Task ValidateAdvancedCapabilitiesAsync(AepChatRequest request, CancellationToken cancellationToken)
+    private async Task ValidateAdvancedCapabilitiesAsync(
+        AepChatRequest request,
+        FoundryConnection connection,
+        FoundryRequestAuthenticator authenticator,
+        CancellationToken cancellationToken)
     {
         var format = FoundryChatCompletion.RequestedFormat(request.Options);
         var effort = FoundryChatCompletion.RequestedReasoningEffort(request.Options);
         if ((format is null or "text") && effort is null) return;
-        var model = (await ListModelsAsync(cancellationToken)).SingleOrDefault(value => value.Id == request.Model);
+        using var diagnostics = new FoundryDiagnostics(diagnosticsLogger, "capabilities", request.Model);
+        var model = (await ListModelsCoreAsync(connection, authenticator, diagnostics, cancellationToken)).SingleOrDefault(value => value.Id == request.Model);
         if (model is null) throw new AepServerException("model_unavailable", "The Foundry deployment is not available.", 400);
         if (format is "json_object" or "json_schema"
             && !model.Metadata!.ContainsKey(format == "json_object" ? "jsonObject" : "jsonSchema"))
@@ -91,12 +100,19 @@ public sealed class FoundryAepModelProvider(
         }
     }
 
-    public async Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromException<IReadOnlyList<AepModelDescriptor>>(new AepServerException(
+            "bound_value_required", "Foundry model discovery requires provider values.", 422));
+
+    public async Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(
+        IReadOnlyList<AepBoundValue>? boundValues,
+        CancellationToken cancellationToken = default)
     {
         using var diagnostics = new FoundryDiagnostics(diagnosticsLogger, "discovery", null);
         try
         {
-            var result = await ListModelsCoreAsync(diagnostics, cancellationToken);
+            using var lease = await connectionResolver.ResolveAsync(boundValues, cancellationToken);
+            var result = await ListModelsCoreAsync(lease.Connection, new FoundryRequestAuthenticator(lease.Connection), diagnostics, cancellationToken);
             diagnostics.Complete("success");
             return result;
         }
@@ -104,16 +120,20 @@ public sealed class FoundryAepModelProvider(
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { diagnostics.Complete("cancelled"); throw; }
     }
 
-    private async Task<IReadOnlyList<AepModelDescriptor>> ListModelsCoreAsync(FoundryDiagnostics diagnostics, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<AepModelDescriptor>> ListModelsCoreAsync(
+        FoundryConnection connection,
+        FoundryRequestAuthenticator authenticator,
+        FoundryDiagnostics diagnostics,
+        CancellationToken cancellationToken)
     {
         var models = new Dictionary<string, AepModelDescriptor>(StringComparer.Ordinal);
-        var current = options.DeploymentsEndpoint();
+        var current = connection.DeploymentsEndpoint();
         var visited = new HashSet<string>(StringComparer.Ordinal);
         for (var page = 0; ; page++)
         {
             if (page >= options.MaximumDiscoveryPages)
                 throw new AepServerException("discovery_limit", "Foundry deployment discovery exceeded its page limit.");
-            ValidatePageUri(current);
+            ValidatePageUri(current, connection);
             if (!visited.Add(current.AbsoluteUri))
                 throw new AepServerException("discovery_invalid", "Foundry deployment pagination contains a cycle.");
 
@@ -122,7 +142,7 @@ public sealed class FoundryAepModelProvider(
             HttpResponseMessage response;
             try
             {
-                response = await SendDiscoveryPageAsync(current, diagnostics, timeout.Token);
+                response = await SendDiscoveryPageAsync(current, authenticator, diagnostics, timeout.Token);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -202,7 +222,11 @@ public sealed class FoundryAepModelProvider(
         }
     }
 
-    private async Task<HttpResponseMessage> SendDiscoveryPageAsync(Uri endpoint, FoundryDiagnostics diagnostics, CancellationToken cancellationToken)
+    private async Task<HttpResponseMessage> SendDiscoveryPageAsync(
+        Uri endpoint,
+        FoundryRequestAuthenticator authenticator,
+        FoundryDiagnostics diagnostics,
+        CancellationToken cancellationToken)
     {
         // Discovery is a read-only request. A chat POST, including a stream, is never replayed.
         for (var attempt = 0; ; attempt++)
@@ -232,20 +256,12 @@ public sealed class FoundryAepModelProvider(
         }
     }
 
-    public async Task<AepProviderHealth> GetHealthAsync(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            _ = await ListModelsAsync(cancellationToken);
-            return new AepProviderHealth("available");
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-        catch (AepServerException exception) { return new AepProviderHealth("unavailable", exception.Code); }
-    }
+    public Task<AepProviderHealth> GetHealthAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(new AepProviderHealth("available"));
 
-    private void ValidatePageUri(Uri uri)
+    private static void ValidatePageUri(Uri uri, FoundryConnection connection)
     {
-        var first = options.DeploymentsEndpoint();
+        var first = connection.DeploymentsEndpoint();
         if (!uri.IsAbsoluteUri || uri.Scheme != Uri.UriSchemeHttps
             || !string.Equals(uri.IdnHost, first.IdnHost, StringComparison.OrdinalIgnoreCase)
             || uri.Port != first.Port || uri.AbsolutePath != first.AbsolutePath
