@@ -152,6 +152,7 @@ public static class DependencyInjection
         services.AddScoped<IBootstrapResourceHandler, WorkspaceBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, PrincipalDefaultContextBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, PackInstallationBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, ParameterBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ModelProviderBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, RuntimeProfileBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ModelProfileBootstrapResourceHandler>();
@@ -188,6 +189,7 @@ public static class DependencyInjection
         services.AddSingleton<IPackArchiveReader, ZipPackArchiveReader>();
         services.AddSingleton<IPackArtifactStore>(_ => new FileSystemPackArtifactStore(Path.Combine(dataDirectory, "pack-artifacts")));
         services.AddSingleton<IPackResourceHandler, ModelProviderPackResourceHandler>();
+        services.AddSingleton<IPackResourceHandler, ParameterPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, RuntimeProfilePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, ModelProfilePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, AgentPackResourceHandler>();

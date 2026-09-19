@@ -1,6 +1,7 @@
 using Agentstration.Bootstrap.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
@@ -103,6 +104,9 @@ public sealed class BootstrapProfileManagementService(
             BootstrapBindingTargetKind.ExtensionRegistration => Options(
                 await store.ListAsync<ExtensionRegistrationResource>(ExtensionKinds.ExtensionRegistration, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
+            BootstrapBindingTargetKind.Parameter => Options(
+                await store.ListAsync<ParameterResource>(ParameterResourceKinds.Parameter, 0, 1000, cancellationToken),
+                resource => resource.Definition.DisplayName),
             BootstrapBindingTargetKind.Secret => Options(
                 await store.ListAsync<SecretResource>(SecretResourceKinds.Secret, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
@@ -114,6 +118,7 @@ public sealed class BootstrapProfileManagementService(
             BootstrapBindingTargetKind.ModelProvider => ModelResourceKinds.ModelProvider,
             BootstrapBindingTargetKind.RuntimeProfile => RuntimeProfileResourceKinds.RuntimeProfile,
             BootstrapBindingTargetKind.ExtensionRegistration => ExtensionKinds.ExtensionRegistration,
+            BootstrapBindingTargetKind.Parameter => ParameterResourceKinds.Parameter,
             BootstrapBindingTargetKind.Secret => SecretResourceKinds.Secret,
             _ => throw new DeclarativeBootstrapException($"Unsupported bootstrap binding target kind '{targetKind}'.")
         };
@@ -127,7 +132,10 @@ public sealed class BootstrapProfileManagementService(
                 source.Resource.Metadata.Name,
                 source.Resource.Metadata.Namespace.Value,
                 source.Resource.Metadata.Name,
-                Planned: true));
+                Planned: true,
+                ScopeRef: targetKind == BootstrapBindingTargetKind.Parameter
+                    ? ResourceScopeRef.Tenant(target.TenantId.Value)
+                    : null));
         return existing.Concat(planned)
             .GroupBy(option => (option.Namespace, option.Name))
             .Select(group => group.OrderBy(option => option.Planned).First())
@@ -371,5 +379,6 @@ public sealed class BootstrapProfileManagementService(
         resources.Select(resource => new BootstrapBindingTargetOption(
             resource.Value.Name,
             resource.Value.Namespace.Value,
-            displayName(resource.Value))).ToArray();
+            displayName(resource.Value),
+            ScopeRef: resource.Value.ScopeRef)).ToArray();
 }

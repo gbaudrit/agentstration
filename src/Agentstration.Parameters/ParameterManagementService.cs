@@ -25,6 +25,13 @@ public sealed class ParameterManagementService(
     public Task<StoredResource<ParameterResource>?> GetExactAsync(ResourceScopeRef scopeRef, string name,
         CancellationToken cancellationToken) => store.GetExactAsync<ParameterResource>(Scoped(scopeRef, name), cancellationToken);
 
+    public async Task ValidateForCreateAsync(ParameterResource resource, CancellationToken cancellationToken)
+    {
+        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ParameterResourceKinds.Parameter);
+        ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
+        await ValidateAsync(resource with { ScopeRef = scopeRef }, cancellationToken);
+    }
+
     public async Task<StoredResource<ParameterResource>> CreateAsync(ParameterResource resource,
         CancellationToken cancellationToken)
     {
@@ -32,7 +39,7 @@ public sealed class ParameterManagementService(
         var scoped = resource with { ScopeRef = scopeRef };
         return await scopeOperations.WriteAsync(scoped, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
-            await ValidateAsync(scoped, token);
+            await ValidateForCreateAsync(scoped, token);
             return await store.PutExactAsync(scopeRef,
                 scoped with { Generation = 1, Status = Succeeded() }, null, true, token);
         }, cancellationToken);

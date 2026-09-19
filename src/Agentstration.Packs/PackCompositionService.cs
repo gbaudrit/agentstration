@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Agentstration.Agents;
 using Agentstration.Flows;
 using Agentstration.Models;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -201,7 +202,8 @@ public sealed partial class PackCompositionService(
             }
             if (dependency.Mode == PackCompositionDependencyMode.Binding && dependency.BindingTargetKind is { } targetKind)
             {
-                if (explicitlySelectedResources.Contains(dependency.Target.Address))
+                if (targetKind != PackBindingTargetKind.Parameter
+                    && explicitlySelectedResources.Contains(dependency.Target.Address))
                 {
                     await IncludeAsync(dependency.Target, false, explicitlySelectedResources, included, bindings, visiting, issues, cancellationToken);
                     continue;
@@ -235,6 +237,7 @@ public sealed partial class PackCompositionService(
             var prefix = pair.Value.TargetKind switch
             {
                 PackBindingTargetKind.Secret => "secret",
+                PackBindingTargetKind.Parameter => "parameter",
                 PackBindingTargetKind.ModelProvider => "provider",
                 PackBindingTargetKind.RuntimeProfile => "runtime",
                 PackBindingTargetKind.ExtensionRegistration => "extension",
@@ -278,15 +281,17 @@ public sealed partial class PackCompositionService(
             EntryResourceKinds.Entry => "entries",
             ModelResourceKinds.ModelProfile => "model-profiles",
             ModelResourceKinds.ModelProvider => "model-providers",
+            ParameterResourceKinds.Parameter => "parameters",
             RuntimeProfileResourceKinds.RuntimeProfile => "runtime-profiles",
             _ => $"{resource.Kind.ToLowerInvariant()}s"
         };
         return $"{directory}/{resource.Name}.json";
     }
-    private static int KindOrder(string kind) => kind switch { ModelResourceKinds.ModelProvider => 10, RuntimeProfileResourceKinds.RuntimeProfile => 20, ModelResourceKinds.ModelProfile => 30, AgentResourceKinds.Agent => 40, FlowResourceKinds.Flow => 50, EntryResourceKinds.Entry => 60, _ => 100 };
+    private static int KindOrder(string kind) => kind switch { ParameterResourceKinds.Parameter => 5, ModelResourceKinds.ModelProvider => 10, RuntimeProfileResourceKinds.RuntimeProfile => 20, ModelResourceKinds.ModelProfile => 30, AgentResourceKinds.Agent => 40, FlowResourceKinds.Flow => 50, EntryResourceKinds.Entry => 60, _ => 100 };
     private static string BindingLabel(PackBindingTargetKind kind) => kind switch
     {
         PackBindingTargetKind.Secret => "Secret",
+        PackBindingTargetKind.Parameter => "Parameter",
         PackBindingTargetKind.ModelProvider => "Model Provider",
         PackBindingTargetKind.RuntimeProfile => "Runtime Profile",
         PackBindingTargetKind.ExtensionRegistration => "Extension registration",

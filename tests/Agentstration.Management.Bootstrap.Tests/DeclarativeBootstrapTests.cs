@@ -1,9 +1,13 @@
+using Agentstration.Aep.Abstractions;
 using Agentstration.Agents;
 using Agentstration.Extensions;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
+using Agentstration.ModelProviders;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
@@ -19,6 +23,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -606,6 +611,120 @@ public sealed class DeclarativeBootstrapTests
     }
 
     [TestMethod]
+    public async Task ParameterAndBoundModelProviderArePlannedAppliedAndReappliedTogether()
+    {
+        using var directory = new TemporaryDirectory();
+        var initial = Directory.CreateDirectory(Path.Combine(directory.Path, "initial-parameter-binding"));
+        var resources = Directory.CreateDirectory(Path.Combine(directory.Path, "parameter-binding"));
+        await File.WriteAllTextAsync(Path.Combine(initial.FullName, "00-platform-admin.yaml"), PlatformAdministrator());
+        await File.WriteAllTextAsync(Path.Combine(initial.FullName, "10-tenant.yaml"), Tenant("dev", "Development"));
+        await File.WriteAllTextAsync(Path.Combine(initial.FullName, "20-workspace.yaml"), Workspace("default", "Default workspace", "dev"));
+        await File.WriteAllTextAsync(Path.Combine(initial.FullName, "30-default-context.yaml"), DefaultContext("bootstrap-admin", "dev", "default"));
+        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "profile.yaml"), """
+            apiVersion: agentstration.io/v1
+            kind: BootstrapProfile
+            metadata:
+              name: parameter-binding
+            definition:
+              displayName: Parameter binding
+              targetScope: workspace
+              bindings:
+                - name: provider-endpoint
+                  targetKind: parameter
+                  displayName: Provider endpoint
+                  required: true
+            """);
+        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "10-parameter.yaml"), """
+            apiVersion: agentstration.io/v1
+            kind: Parameter
+            metadata:
+              name: provider-endpoint
+            definition:
+              displayName: Provider endpoint
+              valueType: string
+              value: https://provider.test
+            """);
+        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "20-provider.yaml"), """
+            apiVersion: agentstration.io/v1
+            kind: ModelProvider
+            metadata:
+              name: bound-provider
+            definition:
+              displayName: Bound provider
+              extension:
+                name: ollama-extension
+              contributionId: ollama
+              valueBindings:
+                - requirementId: endpoint
+                  kind: parameter
+                  parameter:
+                    binding: provider-endpoint
+            """);
+        await using var factory = Factory(initial.FullName, InitialPassword, services =>
+        {
+            services.RemoveAll<IExtensionInspector>();
+            services.AddSingleton<IExtensionInspector>(new BootstrapValueInspector());
+        }, configureOllamaExtension: true);
+        using var client = factory.CreateClient();
+        using var health = await client.GetAsync("/health");
+        health.EnsureSuccessStatusCode();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var account = await scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>()
+            .FindByNameAsync("bootstrap-admin");
+        Assert.IsNotNull(account);
+        var principal = await scope.ServiceProvider.GetRequiredService<IPrincipalResolver>()
+            .ResolveLocalAsync(account.Id, default);
+        Assert.IsNotNull(principal);
+        var identities = scope.ServiceProvider.GetRequiredService<IIdentityStore>();
+        var tenant = await identities.FindTenantByNameAsync("dev", default);
+        Assert.IsNotNull(tenant);
+        var workspace = await identities.FindWorkspaceByNameAsync(tenant.Id, "default", default);
+        Assert.IsNotNull(workspace);
+        using (scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>()
+            .Push(new RequestContext(principal.Id, tenant.Id, workspace.Id)))
+        {
+            _ = await scope.ServiceProvider.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverAsync(default);
+        }
+
+        var target = new BootstrapApplicationTarget(tenant.Id, workspace.Id);
+        var parameterScope = ResourceScopeRef.Tenant(tenant.Id);
+        var selection = new BootstrapProfileSelection(
+            ["parameter-binding"],
+            target,
+            [new BootstrapBindingSelection("parameter-binding", "provider-endpoint",
+                new ResourceReference("provider-endpoint", parameterScope))]);
+        var management = scope.ServiceProvider.GetRequiredService<BootstrapProfileManagementService>();
+
+        var options = await management.GetBindingTargetsAsync(target, BootstrapBindingTargetKind.Parameter,
+            selection.Profiles, principal.Id, default);
+        var planned = options.Single(option => option.Name == "provider-endpoint");
+        Assert.IsTrue(planned.Planned);
+        Assert.AreEqual(parameterScope, planned.ScopeRef);
+        var preview = await management.PreviewAsync(selection, principal.Id, default);
+        Assert.IsTrue(preview.CanApply,
+            string.Join(Environment.NewLine, preview.Resources.Select(resource => resource.Message)));
+        Assert.IsTrue(preview.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Create));
+
+        var application = await management.ApplyAsync(selection, preview.Digest, principal.Id, default);
+        Assert.AreEqual(BootstrapApplicationStatus.Succeeded, application.Definition.Status);
+        using (scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>()
+            .Push(new RequestContext(principal.Id, tenant.Id, workspace.Id)))
+        {
+            var parameter = await scope.ServiceProvider.GetRequiredService<ParameterManagementService>()
+                .GetExactAsync(parameterScope, "provider-endpoint", default);
+            var provider = await scope.ServiceProvider.GetRequiredService<ModelProviderManagementService>()
+                .GetExactAsync(parameterScope, ResourceNamespace.Default, "bound-provider", default);
+            Assert.IsNotNull(parameter);
+            Assert.IsNotNull(provider);
+            Assert.AreEqual(parameterScope, provider.Value.Definition.ValueBindings.Single().Parameter?.ScopeRef);
+        }
+
+        var secondPreview = await management.PreviewAsync(selection, principal.Id, default);
+        Assert.IsTrue(secondPreview.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Skip));
+    }
+
+    [TestMethod]
     public async Task ExistingNonAdministratorAccountIsANonFatalConflictWithoutResolvingTheSecret()
     {
         using var directory = new TemporaryDirectory();
@@ -1139,6 +1258,35 @@ public sealed class DeclarativeBootstrapTests
             Found = await registrations.GetAsync(ResourceNamespace.Default, "startup-order", cancellationToken) is not null;
             return BootstrapResourceApplyResult.Created;
         }
+    }
+
+    private sealed class BootstrapValueInspector : IExtensionInspector
+    {
+        private static readonly IReadOnlyList<AepValueRequirement> Requirements =
+        [
+            new(AepContributionKinds.ModelProvider, "ollama", "endpoint", true, AepValueType.Text)
+        ];
+
+        public bool CanHandle(string providerType) => true;
+        public bool CanInspectEndpoint(Uri endpoint) => true;
+
+        public ValueTask<ExtensionInspection> InspectAsync(
+            ModelProviderConfiguration provider,
+            CancellationToken cancellationToken = default) =>
+            InspectAsync(provider.Name, provider.Endpoint, cancellationToken);
+
+        public ValueTask<ExtensionInspection> InspectAsync(
+            string registrationName,
+            Uri endpoint,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ExtensionInspection(
+                registrationName,
+                endpoint,
+                "available",
+                new ExtensionIdentity("ollama-extension", "Ollama extension", "1.0.0", null),
+                [new ExtensionContribution(AepContributionKinds.ModelProvider, "ollama")],
+                [],
+                ValueRequirements: Requirements));
     }
 
     private sealed class TestHostEnvironment(string contentRoot) : IHostEnvironment
