@@ -141,6 +141,28 @@ public sealed class DeclarativeBootstrapTests
     }
 
     [TestMethod]
+    public async Task FoundryProviderBootstrapIsAnOptionalWorkspaceProfileWithValueBindings()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var profilesPath = Path.Combine(repositoryRoot, "deploy", "bootstrap", "profiles");
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Agentstration:Bootstrap:Path"] = profilesPath
+        }).Build();
+        var snapshot = await new BootstrapProfileCatalog(configuration, new TestHostEnvironment(repositoryRoot))
+            .GetSnapshotAsync(default);
+        var profile = snapshot.Profiles.Single(value => value.Name == "foundry");
+
+        Assert.IsTrue(profile.Valid, profile.Error);
+        Assert.AreEqual(BootstrapProfileScope.Workspace, profile.Scope);
+        Assert.AreEqual(1, profile.ResourceCount);
+        Assert.AreEqual(4, profile.Bindings.Count);
+        Assert.AreEqual(3, profile.Bindings.Count(value => value.TargetKind == BootstrapBindingTargetKind.Parameter));
+        Assert.AreEqual(1, profile.Bindings.Count(value => value.TargetKind == BootstrapBindingTargetKind.Secret));
+        Assert.IsFalse(snapshot.InitialProfiles.Contains("foundry", StringComparer.Ordinal));
+    }
+
+    [TestMethod]
     public async Task InvalidYamlUnknownKindAndUnsupportedApiVersionFailClearly()
     {
         using var directory = new TemporaryDirectory();

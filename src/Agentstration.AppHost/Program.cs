@@ -63,6 +63,10 @@ if (!Uri.TryCreate(localAiEndpoint, UriKind.Absolute, out var parsedLocalAiEndpo
 {
     throw new InvalidOperationException("LocalAI:Endpoint must be an absolute HTTP(S) URL.");
 }
+var foundryEnabledSetting = builder.Configuration["Foundry:Enabled"];
+if (foundryEnabledSetting is not null && !bool.TryParse(foundryEnabledSetting, out _))
+    throw new InvalidOperationException("Foundry:Enabled must be true or false.");
+var foundryEnabled = bool.TryParse(foundryEnabledSetting, out var configuredFoundryEnabled) && configuredFoundryEnabled;
 
 var ollamaExtension = builder.AddProject<Projects.Agentstration_Extensions_Ollama>("ollama-extension")
     .WithEnvironment("Agentstration__Slot", slot)
@@ -87,7 +91,7 @@ var utilitiesExtension = builder.AddProject<Projects.Agentstration_Extensions_Ut
     .WithEnvironment("Agentstration__Slot", slot)
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
-var developmentExtensions = new[]
+var developmentExtensions = new List<DevelopmentAepExtension>
 {
     new DevelopmentAepExtension("Agentstration.Extensions.Ollama", "ollama-extension", ollamaExtension),
     new DevelopmentAepExtension("Agentstration.Extensions.LlamaCpp", "llama-cpp-extension", llamaCppExtension),
@@ -95,6 +99,24 @@ var developmentExtensions = new[]
     new DevelopmentAepExtension("Agentstration.Extensions.Git", "git-source-extension", gitExtension),
     new DevelopmentAepExtension("Agentstration.Extensions.Utilities", "utilities-extension", utilitiesExtension)
 };
+if (foundryEnabled)
+{
+    var foundryExtension = builder.AddProject<Projects.Agentstration_Extensions_Foundry>("foundry-extension")
+        .WithEnvironment("Agentstration__Slot", slot)
+        .WithHttpHealthCheck("/health")
+        .WithDynamicHostPorts(dynamicApplicationPorts);
+    foreach (var key in new[]
+    {
+        "AllowedPrivateHosts", "MaximumDiscoveryPages", "MaximumDiscoveredModels",
+        "MaximumDiscoveryResponseBytes", "RequestTimeoutSeconds"
+    })
+    {
+        if (builder.Configuration[$"Foundry:{key}"] is { } value)
+            foundryExtension.WithEnvironment($"Foundry__{key}", value);
+    }
+    developmentExtensions.Add(new DevelopmentAepExtension(
+        "Agentstration.Extensions.Foundry", "foundry-extension", foundryExtension));
+}
 var sharedKeys = usePairingCode
     ? new Dictionary<string, string>(StringComparer.Ordinal)
     : AepDevelopmentSharedKeys.Provision(

@@ -445,7 +445,7 @@ public sealed record AepToolContribution(
 public static class AepDescriptorValidator
 {
     private static readonly SearchValues<char> ValueRequirementIdCharacters =
-        SearchValues.Create("abcdefghijklmnopqrstuvwxyz0123456789._-");
+        SearchValues.Create("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-");
 
     public static IReadOnlyList<string> Validate(AepManifest descriptor)
     {
@@ -499,7 +499,7 @@ public static class AepDescriptorValidator
             if (!IsKnownContribution(descriptor.Contributions, requirement.ContributionKind, requirement.ContributionId))
                 errors.Add($"Value requirement '{requirement.Id}' targets unknown contribution '{requirement.ContributionKind}/{requirement.ContributionId}'.");
             if (!IsValidValueRequirementId(requirement.Id))
-                errors.Add($"Value requirement id '{requirement.Id}' must start with a lowercase ASCII letter and contain only lowercase letters, digits, '.', '_' or '-' (maximum 64 characters).");
+                errors.Add($"Value requirement id '{requirement.Id}' must start with a lowercase ASCII letter and contain only ASCII letters, digits, '.', '_' or '-' (maximum 64 characters).");
             else if (!requirementIds.Add(contributionKey))
                 errors.Add($"Value requirement '{requirement.Id}' is duplicated for contribution '{requirement.ContributionKind}/{requirement.ContributionId}'.");
             if (requirement.Format is { Length: > 64 } || requirement.Format?.Any(char.IsControl) == true)

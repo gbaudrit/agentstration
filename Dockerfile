@@ -6,6 +6,7 @@ RUN dotnet publish src/Agentstration.Web/Agentstration.Web.csproj -c Release -o 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app/publish .
+COPY --from=build /src/deploy/bootstrap/profiles /app/bootstrap/profiles
 ENV ASPNETCORE_URLS=http://+:8080
 ENV Data__Directory=/data
 EXPOSE 8080
