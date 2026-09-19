@@ -80,15 +80,16 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void AspireFoundryRegistrationIsOptInAndKeepsItsApiKeySecret()
+    public void AspireFoundryRegistrationIsOptInAndKeepsProviderConnectionsOutOfProcessConfiguration()
     {
         var appHost = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Agentstration.AppHost", "Program.cs"));
 
         Assert.Contains("Foundry:Enabled", appHost, StringComparison.Ordinal);
         Assert.Contains("if (foundryEnabled)", appHost, StringComparison.Ordinal);
-        Assert.Contains("AddParameterFromConfiguration(\"foundry-api-key\", \"FOUNDRY_API_KEY\", secret: true)", appHost, StringComparison.Ordinal);
         Assert.Contains("developmentExtensions.Add(new DevelopmentAepExtension(", appHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("WithEnvironment(\"FOUNDRY_API_KEY\", builder.Configuration", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("Foundry__ProjectEndpoint", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("Foundry__InferenceEndpoint", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("FOUNDRY_API_KEY", appHost, StringComparison.Ordinal);
     }
 
     [TestMethod]
@@ -110,7 +111,11 @@ public sealed class DependencyTests
         Assert.IsTrue(overlay.Children.ContainsKey(new YamlScalarNode("foundry-extension")));
         var extension = (YamlMappingNode)overlay.Children[new YamlScalarNode("foundry-extension")];
         var environment = (YamlMappingNode)extension.Children[new YamlScalarNode("environment")];
-        Assert.AreEqual("${FOUNDRY_API_KEY:-}", ((YamlScalarNode)environment.Children[new YamlScalarNode("FOUNDRY_API_KEY")]).Value);
+        Assert.IsFalse(environment.Children.ContainsKey(new YamlScalarNode("Foundry__ProjectEndpoint")));
+        Assert.IsFalse(environment.Children.ContainsKey(new YamlScalarNode("Foundry__InferenceEndpoint")));
+        Assert.IsFalse(environment.Children.ContainsKey(new YamlScalarNode("FOUNDRY_API_KEY")));
+        Assert.AreEqual("${FOUNDRY_ALLOWED_PRIVATE_HOSTS:-}",
+            ((YamlScalarNode)environment.Children[new YamlScalarNode("Foundry__AllowedPrivateHosts")]).Value);
         Assert.IsTrue(overlay.Children.ContainsKey(new YamlScalarNode("foundry-key-provisioner")));
         Assert.Contains("deploy/compose/.env.foundry", File.ReadAllText(Path.Combine(FindRepositoryRoot(), ".dockerignore")), StringComparison.Ordinal);
     }

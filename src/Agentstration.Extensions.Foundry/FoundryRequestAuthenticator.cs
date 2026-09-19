@@ -1,7 +1,7 @@
 using System.Net.Http.Headers;
+using Agentstration.Aep.AspNetCore;
 using Azure.Core;
 using Azure.Identity;
-using Agentstration.Aep.AspNetCore;
 
 namespace Agentstration.Extensions.Foundry;
 
@@ -9,91 +9,58 @@ public sealed class FoundryRequestAuthenticator
 {
     private static readonly TokenRequestContext ProjectTokenContext = new(["https://ai.azure.com/.default"]);
     private static readonly TokenRequestContext ResourceInferenceTokenContext = new(["https://cognitiveservices.azure.com/.default"]);
-    private readonly TokenCredential? credential;
-    private readonly string? apiKey;
-    private readonly FoundryExtensionOptions options;
+    private readonly FoundryConnection connection;
+    private readonly TokenCredential? tokenCredential;
 
-    public FoundryRequestAuthenticator(FoundryExtensionOptions options, string? developmentApiKey = null, TokenCredential? tokenCredential = null)
+    public FoundryRequestAuthenticator(FoundryConnection connection, TokenCredential? tokenCredential = null)
     {
-        ArgumentNullException.ThrowIfNull(options);
-        this.options = options;
-        if (options.AuthenticationMode == FoundryAuthenticationMode.ApiKeyEnvironment)
-        {
-            apiKey = Environment.GetEnvironmentVariable("FOUNDRY_API_KEY") ?? developmentApiKey;
-            if (string.IsNullOrWhiteSpace(apiKey) || apiKey.Length > 8192 || apiKey.Any(char.IsWhiteSpace) || apiKey.Any(char.IsControl))
-                throw new InvalidOperationException("FOUNDRY_API_KEY must contain a bounded, single-line API key in ApiKeyEnvironment mode.");
-            return;
-        }
-        credential = tokenCredential ?? (options.AuthenticationMode switch
-        {
-            FoundryAuthenticationMode.ManagedIdentity => new ManagedIdentityCredential(
-                options.ManagedIdentityClientId is { Length: > 0 } clientId
-                    ? ManagedIdentityId.FromUserAssignedClientId(clientId)
-                    : ManagedIdentityId.SystemAssigned),
-            FoundryAuthenticationMode.WorkloadIdentity => CreateWorkloadIdentity(),
-            FoundryAuthenticationMode.Development => new AzureCliCredential(),
-            _ => throw new InvalidOperationException("Unsupported Foundry authentication mode.")
-        });
+        this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
+        connection.Validate();
+        this.tokenCredential = tokenCredential ?? CreateCredential(connection);
     }
 
     public Task ApplyAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        ValidateTarget(request, options.DeploymentsEndpoint(), HttpMethod.Get, discovery: true);
+        ValidateTarget(request, connection.DeploymentsEndpoint(), HttpMethod.Get, true);
         return ApplyAsync(request, ProjectTokenContext, cancellationToken);
     }
-
-    public Task ApplyInferenceAsync(HttpRequestMessage request, FoundryExtensionOptions options, CancellationToken cancellationToken)
+    public Task ApplyInferenceAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        if (options.ProjectEndpoint != this.options.ProjectEndpoint
-            || options.InferenceEndpoint != this.options.InferenceEndpoint
-            || options.AuthenticationMode != this.options.AuthenticationMode)
-            throw new AepServerException("provider_target_invalid", "Foundry authentication requires the configured endpoint.");
-        ValidateTarget(request, new Uri(options.InferenceEndpoint.AbsoluteUri.TrimEnd('/') + "/chat/completions"), HttpMethod.Post, discovery: false);
-        return ApplyAsync(request,
-            options.InferenceEndpoint.AbsolutePath.StartsWith("/api/projects/", StringComparison.Ordinal)
-                ? ProjectTokenContext : ResourceInferenceTokenContext,
-            cancellationToken);
+        ValidateTarget(request, new Uri(connection.InferenceEndpoint.AbsoluteUri.TrimEnd('/') + "/chat/completions"), HttpMethod.Post, false);
+        return ApplyAsync(request, connection.InferenceEndpoint.AbsolutePath.StartsWith("/api/projects/", StringComparison.Ordinal)
+            ? ProjectTokenContext : ResourceInferenceTokenContext, cancellationToken);
     }
+
+    private static TokenCredential? CreateCredential(FoundryConnection value) => value.AuthenticationMode switch
+    {
+        FoundryAuthenticationMode.ApiKey => null,
+        FoundryAuthenticationMode.ManagedIdentity => new ManagedIdentityCredential(value.ManagedIdentityClientId is { Length: > 0 } clientId
+            ? ManagedIdentityId.FromUserAssignedClientId(clientId) : ManagedIdentityId.SystemAssigned),
+        FoundryAuthenticationMode.WorkloadIdentity => new WorkloadIdentityCredential(new WorkloadIdentityCredentialOptions
+        { TenantId = value.WorkloadIdentityTenantId, ClientId = value.WorkloadIdentityClientId, TokenFilePath = value.WorkloadIdentityTokenFile }),
+        FoundryAuthenticationMode.Development => new AzureCliCredential(),
+        _ => throw new InvalidOperationException("Unsupported Foundry authentication mode.")
+    };
 
     private static void ValidateTarget(HttpRequestMessage request, Uri expected, HttpMethod method, bool discovery)
     {
-        ArgumentNullException.ThrowIfNull(request);
         var target = request.RequestUri;
         if (request.Method != method || target is null || !target.IsAbsoluteUri || target.Scheme != Uri.UriSchemeHttps
-            || !string.Equals(target.IdnHost, expected.IdnHost, StringComparison.OrdinalIgnoreCase)
-            || target.Port != expected.Port || target.AbsolutePath != expected.AbsolutePath
-            || target.UserInfo.Length > 0 || target.Fragment.Length > 0
+            || !string.Equals(target.IdnHost, expected.IdnHost, StringComparison.OrdinalIgnoreCase) || target.Port != expected.Port
+            || target.AbsolutePath != expected.AbsolutePath || target.UserInfo.Length > 0 || target.Fragment.Length > 0
             || (discovery ? target.Query.Length > 2048 : target.Query.Length > 0))
-            throw new AepServerException("provider_target_invalid", "Foundry authentication requires the configured endpoint.");
+            throw new AepServerException("provider_target_invalid", "Foundry authentication requires the resolved endpoint.");
     }
 
     private async Task ApplyAsync(HttpRequestMessage request, TokenRequestContext tokenContext, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(request);
-        if (apiKey is not null)
-        {
-            request.Headers.Add("api-key", apiKey);
-            return;
-        }
+        if (connection.AuthenticationMode == FoundryAuthenticationMode.ApiKey) { request.Headers.Add("api-key", connection.Credential!); return; }
         try
         {
-            var token = await credential!.GetTokenAsync(tokenContext, cancellationToken);
+            var token = await tokenCredential!.GetTokenAsync(tokenContext, cancellationToken);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-        catch (AuthenticationFailedException)
-        {
-            throw new AepServerException("authentication_failed", "Foundry identity authentication failed.", 502);
-        }
-    }
-
-    private static WorkloadIdentityCredential CreateWorkloadIdentity()
-    {
-        var tokenFile = Environment.GetEnvironmentVariable("AZURE_FEDERATED_TOKEN_FILE");
-        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AZURE_TENANT_ID"))
-            || string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AZURE_CLIENT_ID"))
-            || string.IsNullOrWhiteSpace(tokenFile) || !File.Exists(tokenFile))
-            throw new InvalidOperationException("WorkloadIdentity mode requires AZURE_TENANT_ID, AZURE_CLIENT_ID, and AZURE_FEDERATED_TOKEN_FILE.");
-        return new WorkloadIdentityCredential();
+        catch (AuthenticationFailedException) { throw new AepServerException("authentication_failed", "Foundry identity authentication failed.", 502); }
     }
 }

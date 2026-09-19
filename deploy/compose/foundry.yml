@@ -20,11 +20,7 @@ services:
       foundry-key-provisioner:
         condition: service_completed_successfully
     environment:
-      Foundry__ProjectEndpoint: ${FOUNDRY_PROJECT_ENDPOINT:?Set FOUNDRY_PROJECT_ENDPOINT outside the repository}
-      Foundry__InferenceEndpoint: ${FOUNDRY_INFERENCE_ENDPOINT:?Set FOUNDRY_INFERENCE_ENDPOINT outside the repository}
-      Foundry__AuthenticationMode: ${FOUNDRY_AUTHENTICATION_MODE:-ApiKeyEnvironment}
       Foundry__AllowedPrivateHosts: ${FOUNDRY_ALLOWED_PRIVATE_HOSTS:-}
-      FOUNDRY_API_KEY: ${FOUNDRY_API_KEY:-}
       Aep__EnrollmentMode: SharedKeyFile
       Aep__SharedKeyFile__Path: /run/aep-key/token
     volumes:

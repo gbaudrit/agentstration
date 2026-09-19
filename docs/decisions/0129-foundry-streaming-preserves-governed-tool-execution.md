@@ -1,4 +1,4 @@
-# ADR-0122: Foundry streaming preserves governed Tool execution
+# ADR-0129: Foundry streaming preserves governed Tool execution
 
 Status: Accepted — 2026-09-18
 

@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Extensions.Foundry;
@@ -9,19 +10,19 @@ namespace Agentstration.ModelProviders.Tests;
 public sealed class FoundryLiveTests
 {
     [TestMethod]
-    [DataRow("ApiKeyEnvironment")]
+    [DataRow("ApiKey")]
     [DataRow("Development")]
     [DataRow("ManagedIdentity")]
     [DataRow("WorkloadIdentity")]
     public async Task ExistingDeploymentSupportsDiscoveryChatAndStream(string authenticationMode)
     {
         using var live = Open(authenticationMode);
-        var models = await live.Provider.ListModelsAsync();
+        var models = await live.Provider.ListModelsAsync(live.Values);
         Assert.IsTrue(models.Any(model => model.Id == live.Deployment), "The selected deployment was not discovered.");
 
         var request = new AepChatRequest(live.Deployment,
             [new AepMessage(AepRole.User, [AepContent.FromText("Reply with one short word.")])],
-            new AepModelOptions { MaxOutputTokens = 64 });
+            new AepModelOptions { MaxOutputTokens = 64 }, BoundValues: live.Values);
         var response = await live.Provider.ChatAsync(request, default);
         Assert.IsNotNull(response.FinishReason);
 
@@ -32,14 +33,14 @@ public sealed class FoundryLiveTests
     }
 
     [TestMethod]
-    [DataRow("ApiKeyEnvironment")]
+    [DataRow("ApiKey")]
     [DataRow("Development")]
     [DataRow("ManagedIdentity")]
     [DataRow("WorkloadIdentity")]
     public async Task ExistingToolCapableDeploymentAcceptsGovernedToolRoundTrip(string authenticationMode)
     {
         using var live = Open(authenticationMode);
-        var model = (await live.Provider.ListModelsAsync()).SingleOrDefault(value => value.Id == live.Deployment);
+        var model = (await live.Provider.ListModelsAsync(live.Values)).SingleOrDefault(value => value.Id == live.Deployment);
         if (model?.Capabilities?.Contains("tools") != true)
             Assert.Inconclusive("The selected deployment does not affirmatively advertise Tools.");
 
@@ -55,7 +56,7 @@ public sealed class FoundryLiveTests
             [new AepToolDefinition("echo", "Return the supplied text", JsonSerializer.SerializeToElement(new
             {
                 type = "object", properties = new { value = new { type = "string" } }, required = new[] { "value" }
-            }))]);
+            }))], BoundValues: live.Values);
         var completed = false;
         await foreach (var update in live.Provider.ChatStreamingAsync(request, default))
             completed |= update.FinishReason is not null;
@@ -74,20 +75,52 @@ public sealed class FoundryLiveTests
             Assert.Inconclusive("Provide existing Foundry project, inference and deployment values for the optional live test.");
         var options = new FoundryExtensionOptions
         {
-            ProjectEndpoint = new Uri(project, UriKind.Absolute),
-            InferenceEndpoint = new Uri(inference, UriKind.Absolute),
-            AuthenticationMode = Enum.Parse<FoundryAuthenticationMode>(authenticationMode),
             AllowedPrivateHosts = new HashSet<string>((Environment.GetEnvironmentVariable("AGENTSTRATION_FOUNDRY_LIVE_ALLOWED_PRIVATE_HOSTS") ?? string.Empty)
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), StringComparer.OrdinalIgnoreCase),
             RequestTimeout = TimeSpan.FromSeconds(60)
         };
         options.Validate();
+        var values = new List<AepBoundValue>
+        {
+            Inline(FoundryValueRequirements.ProjectEndpoint, project),
+            Inline(FoundryValueRequirements.InferenceEndpoint, inference),
+            Inline(FoundryValueRequirements.AuthenticationMode, authenticationMode)
+        };
+        var key = Environment.GetEnvironmentVariable("AGENTSTRATION_FOUNDRY_LIVE_API_KEY");
+        if (authenticationMode == "ApiKey")
+        {
+            if (string.IsNullOrWhiteSpace(key)) Assert.Inconclusive("Provide AGENTSTRATION_FOUNDRY_LIVE_API_KEY for ApiKey live tests.");
+            values.Add(AepBoundValue.Secured(FoundryValueRequirements.Credential, new AepSecretAccessGrant(
+                AepProtocol.SecretAccessVersion, new Uri("https://live-secret.test/api/aep/secrets/redeem"),
+                "Agentstration.Extensions.Foundry", FoundryValueRequirements.Credential, "live", "live")));
+        }
+        AddOptional(values, FoundryValueRequirements.ManagedIdentityClientId, "AGENTSTRATION_FOUNDRY_LIVE_MANAGED_IDENTITY_CLIENT_ID");
+        AddOptional(values, FoundryValueRequirements.WorkloadIdentityTenantId, "AZURE_TENANT_ID");
+        AddOptional(values, FoundryValueRequirements.WorkloadIdentityClientId, "AZURE_CLIENT_ID");
+        AddOptional(values, FoundryValueRequirements.WorkloadIdentityTokenFile, "AZURE_FEDERATED_TOKEN_FILE");
         var client = new HttpClient(FoundrySecureTransport.Create(options)) { Timeout = Timeout.InfiniteTimeSpan };
-        return new LiveProvider(new FoundryAepModelProvider(client, options, new FoundryRequestAuthenticator(options)), client, deployment);
+        var secretClient = new HttpClient(new SecretHandler(key));
+        return new LiveProvider(new FoundryAepModelProvider(client, options, new FoundryBoundConnectionResolver(secretClient)),
+            client, secretClient, deployment, values);
     }
 
-    private sealed record LiveProvider(FoundryAepModelProvider Provider, HttpClient Client, string Deployment) : IDisposable
+    private static AepBoundValue Inline(string id, string value) => AepBoundValue.Inline(id, JsonSerializer.SerializeToElement(value));
+    private static void AddOptional(ICollection<AepBoundValue> values, string id, string environmentName)
     {
-        public void Dispose() => Client.Dispose();
+        if (Environment.GetEnvironmentVariable(environmentName) is { Length: > 0 } value) values.Add(Inline(id, value));
+    }
+    private sealed record LiveProvider(FoundryAepModelProvider Provider, HttpClient Client, HttpClient SecretClient,
+        string Deployment, IReadOnlyList<AepBoundValue> Values) : IDisposable
+    {
+        public void Dispose() { Client.Dispose(); SecretClient.Dispose(); }
+    }
+    private sealed class SecretHandler(string? key) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new AepSecretAccessResponse(AepProtocol.SecretAccessVersion,
+                    Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(key ?? "unused"))), options: AepProtocol.JsonOptions)
+            });
     }
 }

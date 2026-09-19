@@ -141,7 +141,7 @@ public sealed class DeclarativeBootstrapTests
     }
 
     [TestMethod]
-    public async Task FoundryProviderBootstrapIsAnOptionalTenantProfile()
+    public async Task FoundryProviderBootstrapIsAnOptionalWorkspaceProfileWithValueBindings()
     {
         var repositoryRoot = FindRepositoryRoot();
         var profilesPath = Path.Combine(repositoryRoot, "deploy", "bootstrap", "profiles");
@@ -154,8 +154,11 @@ public sealed class DeclarativeBootstrapTests
         var profile = snapshot.Profiles.Single(value => value.Name == "foundry");
 
         Assert.IsTrue(profile.Valid, profile.Error);
-        Assert.AreEqual(BootstrapProfileScope.Tenant, profile.Scope);
+        Assert.AreEqual(BootstrapProfileScope.Workspace, profile.Scope);
         Assert.AreEqual(1, profile.ResourceCount);
+        Assert.AreEqual(4, profile.Bindings.Count);
+        Assert.AreEqual(3, profile.Bindings.Count(value => value.TargetKind == BootstrapBindingTargetKind.Parameter));
+        Assert.AreEqual(1, profile.Bindings.Count(value => value.TargetKind == BootstrapBindingTargetKind.Secret));
         Assert.IsFalse(snapshot.InitialProfiles.Contains("foundry", StringComparer.Ordinal));
     }
 

@@ -16,6 +16,7 @@ internal static class FoundryChatCompletion
     public static async Task<AepChatResponse> ExecuteAsync(
         HttpClient client,
         FoundryExtensionOptions options,
+        FoundryConnection connection,
         FoundryRequestAuthenticator authenticator,
         AepChatRequest chat,
         FoundryDiagnostics diagnostics,
@@ -26,7 +27,7 @@ internal static class FoundryChatCompletion
         if (bytes.Length > MaximumRequestBytes)
             throw new AepServerException("request_limit", "Foundry chat request exceeds its size limit.", 400);
 
-        var endpoint = new Uri(options.InferenceEndpoint.AbsoluteUri.TrimEnd('/') + "/chat/completions", UriKind.Absolute);
+        var endpoint = new Uri(connection.InferenceEndpoint.AbsoluteUri.TrimEnd('/') + "/chat/completions", UriKind.Absolute);
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {
             Content = new ByteArrayContent(bytes)
@@ -37,7 +38,7 @@ internal static class FoundryChatCompletion
         timeout.CancelAfter(options.RequestTimeout);
         try
         {
-            await authenticator.ApplyInferenceAsync(request, options, timeout.Token);
+            await authenticator.ApplyInferenceAsync(request, timeout.Token);
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             diagnostics.SetStatus(response.StatusCode);
             if (!response.IsSuccessStatusCode) throw await FailureAsync(response, timeout.Token);

@@ -161,3 +161,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 130. [ADR-0130 — Foundry advanced options follow deployment capabilities](0130-foundry-advanced-options-follow-deployment-capabilities.md)
 131. [ADR-0131 — Foundry egress and diagnostics are bounded](0131-foundry-egress-and-diagnostics-are-bounded.md)
 132. [ADR-0132 — Foundry operator workflow reuses model resources](0132-foundry-operator-workflow-reuses-model-resources.md)
+133. [ADR-0133 — Foundry provider Secret binding covers discovery](0133-foundry-provider-secret-binding-covers-discovery.md)
+134. [ADR-0134 — Foundry connections are provider-owned AEP values](0134-foundry-connections-are-provider-owned-aep-values.md)

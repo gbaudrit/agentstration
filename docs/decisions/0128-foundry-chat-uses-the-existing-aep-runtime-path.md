@@ -1,4 +1,4 @@
-# ADR-0121: Foundry non-streaming chat uses the existing AEP runtime path
+# ADR-0128: Foundry non-streaming chat uses the existing AEP runtime path
 
 Status: Accepted — 2026-09-17
 
