@@ -1,0 +1,41 @@
+apiVersion: agentstration.io/v1
+kind: Entry
+metadata:
+  name: ask-agentstration
+definition:
+  displayName: Ask Agentstration
+  description: Product help, evidence-backed diagnostics, and governed agentic resource planning through one stable Assistant.
+  exposure:
+    version: 1
+    surfaces: [console, workplace]
+    workplacePlacements: [owningSpace]
+  presentation:
+    kind: prompt
+    placeholder: Ask about Agentstration, diagnose a problem, or plan agentic resources…
+    icon: assistant
+    allowAttachments: false
+    allowVoiceInput: false
+    participants: { visibility: hidden }
+    progress: { visibility: compact }
+    task: { display: auto }
+    results: { display: auto }
+    suggestions:
+      - { label: Understand Agentstration, value: Explain the main Agentstration concepts and where to configure them. }
+      - { label: Diagnose an issue, value: Diagnose the current installation using available evidence. }
+      - { label: Plan a solution, value: Help me design a governed agentic solution as a Resource Plan. }
+    fields:
+      - name: prompt
+        type: prompt
+        label: Request
+        description: Describe the help, diagnostic, or resource-planning outcome you need.
+        placeholder: How can Agentstration help with this solution?
+        required: true
+        order: 0
+        role: primaryInput
+  binding: { kind: flow, resourceId: assistant-router }
+  behavior:
+    taskCreationMode: automatic
+    allowConversation: true
+    streamResponse: true
+    conversation: { enabled: true }
+  publish: true

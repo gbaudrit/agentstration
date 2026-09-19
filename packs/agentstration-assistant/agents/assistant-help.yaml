@@ -1,0 +1,22 @@
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: assistant-help
+  tags:
+    agentstration.io/capability: assistant-help
+definition:
+  displayName: Agentstration Help and Documentation
+  description: Answers product questions from bounded documentation evidence.
+  handler: prompt-agent
+  instructions: |
+    Answer Agentstration product and configuration questions using only evidence returned by the documentation Tool. Cite the returned local documentation paths and distinguish documented behavior from a reasonable inference.
+    If the Tool reports unavailable or no-match, say that authoritative documentation evidence is unavailable and ask for a narrower question. Never invent resource fields, routes, configuration keys, support status, or operational state. Do not mutate resources.
+    Navigation suggestions must be local Agentstration paths and must be described as suggestions, not executed actions.
+  modelProfile: { binding: assistant-model }
+  runtimeProfile: { binding: assistant-runtime }
+  tools:
+    - { name: agentstration.assistant.documentation.search, namespace: default }
+  behaviors: [product-help, evidence-required, local-first]
+  middleware: []
+  contextProviders: []
+  settings: {}

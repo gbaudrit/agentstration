@@ -7,6 +7,7 @@ using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Agents;
 using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.Assistant;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.Events;
 using Agentstration.Infrastructure.Flows;
@@ -334,6 +335,10 @@ public static class DependencyInjection
         services.AddSingleton<WorkNotificationMcpToolDefinitionProvider>();
         services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<WorkNotificationMcpToolDefinitionProvider>());
         services.AddSingleton<WorkNotificationMcpTool>();
+        services.AddSingleton(provider => new AssistantDocumentationCatalog(
+            Path.Combine(provider.GetRequiredService<IHostEnvironment>().ContentRootPath, "docs")));
+        AddInternalTool<AssistantDocumentationMcpTool>(services);
+        AddInternalTool<AssistantDiagnosticsMcpTool>(services);
         AddInternalTool<ResourcePlanCreateMcpTool>(services);
         AddInternalTool<ResourcePlanGetMcpTool>(services);
         AddInternalTool<ResourcePlanRefineMcpTool>(services);
