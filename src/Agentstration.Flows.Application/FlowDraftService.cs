@@ -185,7 +185,7 @@ public static class FlowDraftTemplates
         };
     }
 
-    private static FlowGraphDefinition Empty() => new() { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input", DisplayName = "Input" }, new OutputFlowStepDefinition { Name = "output", DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${input}") }], Transitions = [new("input-output", "input", "completed", "output")], Designer = new() { NodePositions = Positions("input", "output") } };
+    private static FlowGraphDefinition Empty() => new() { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input", DisplayName = "Input" }, new OutputFlowStepDefinition { Name = "output", DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") }], Transitions = [new("input-output", "input", "completed", "output")], Designer = new() { NodePositions = Positions("input", "output") } };
     private static FlowGraphDefinition Sequential() => Empty();
     private static FlowGraphDefinition Conditional() => AgentRouting();
     private static IReadOnlyDictionary<string, FlowNodePosition> Positions(params string[] names) => names.Select((name, index) => new KeyValuePair<string, FlowNodePosition>(name, new(index < names.Length - 1 ? index * 210 : 630, index == names.Length - 1 ? 190 : 40))).ToDictionary();
