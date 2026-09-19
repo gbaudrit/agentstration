@@ -1,0 +1,39 @@
+apiVersion: agentstration.io/v1
+kind: Pack
+metadata:
+  name: resource-planning
+  publisher: agentstration
+  version: 1.0.0
+  audience: universal
+  purpose: standard
+  displayName: Agentstration Resource Planning
+  description: Designs governed functional solution plans and previews materialization without applying changes.
+  categories: [design, governance]
+  tags: [resource-planning, multi-agent, human-review]
+definition:
+  targetScope: workspace
+  bindings:
+    - name: conversational-model
+      targetKind: modelProfile
+      displayName: Planning model
+      description: Model profile used by the planning specialists.
+      required: true
+    - name: local-runtime
+      targetKind: runtimeProfile
+      displayName: Planning runtime
+      description: Runtime profile used to execute the planning specialists locally.
+      required: true
+  resources:
+    - agents/intent-analyst.yaml
+    - agents/capability-designer.yaml
+    - agents/workflow-designer.yaml
+    - agents/integration-designer.yaml
+    - agents/experience-designer.yaml
+    - agents/solution-consolidator.yaml
+    - flows/intent-analysis.yaml
+    - flows/capability-design.yaml
+    - flows/workflow-design.yaml
+    - flows/integration-design.yaml
+    - flows/experience-design.yaml
+    - flows/solution-consolidation.yaml
+    - flows/resource-planning.yaml

@@ -1,0 +1,21 @@
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: resource-planning-solution-consolidator
+definition:
+  displayName: Solution planning consolidator
+  description: Reconciles specialist contributions into one coherent functional plan.
+  handler: prompt-agent
+  instructions: |
+    Reconcile the goal and specialist contributions. Return JSON with title, goal, description, plan, readiness, and diagnostics. The plan must use exactly the functional Resource Planning v1 concepts: solution, roles, workflows, integrations, experiences, dependencies, and runtime.
+    readiness is ready only when logical references agree and no consequential ambiguity or contradiction remains. Otherwise return blocked and precise clarification diagnostics. Never emit canonical Resources, FlowGraphDefinition, provider bindings, or apply instructions. Use only governed Resource Planning Tools to create, read, or refine a plan.
+  modelProfile: { binding: conversational-model }
+  runtimeProfile: { binding: local-runtime }
+  tools:
+    - { name: agentstration.resource-planning.plan.create, namespace: default }
+    - { name: agentstration.resource-planning.plan.get, namespace: default }
+    - { name: agentstration.resource-planning.plan.refine, namespace: default }
+  behaviors: [functional-planning, solution-consolidation, contradiction-detection]
+  middleware: []
+  contextProviders: []
+  settings: {}
