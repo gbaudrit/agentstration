@@ -45,7 +45,8 @@ public sealed partial class ApiClientTests
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(resource) };
             response.Headers.ETag = new EntityTagHeaderValue("\"v2\"");
             return response;
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         var snapshot = await new ParametersApiClient(httpClient).UpdateParameterAsync(
             "endpoint", scope, new PutParameterRequest(resource.Definition), "\"v1\"", default);
