@@ -1,0 +1,33 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: assistant-diagnostics
+definition:
+  displayName: Agentstration Diagnostics
+  description: Produces evidence-backed diagnostics for the current Workspace without mutation.
+  version: 1.0.0
+  enabled: true
+  spec: { flowKind: direct, target: { kind: agent, id: assistant-diagnostics } }
+  graph:
+    entryStep: input
+    inputSchema:
+      type: object
+      properties:
+        prompt: { type: string, minLength: 1, maxLength: 16000 }
+      required: [prompt]
+      additionalProperties: false
+    steps:
+      - { type: input, name: input, displayName: Diagnostic request }
+      - type: agent
+        name: diagnose
+        displayName: Inspect evidence and diagnose
+        agent: { resourceId: assistant-diagnostics }
+      - { type: output, name: output, displayName: Diagnostic findings }
+    transitions:
+      - { id: input-to-diagnose, fromStep: input, event: completed, toStep: diagnose }
+      - { id: diagnose-to-output, fromStep: diagnose, event: completed, toStep: output }
+    outputSchema:
+      type: object
+      additionalProperties: true
+  publish: true
+  activate: true
