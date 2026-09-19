@@ -42,6 +42,7 @@ public enum BootstrapBindingTargetKind
     [JsonStringEnumMemberName("modelProvider")] ModelProvider,
     [JsonStringEnumMemberName("runtimeProfile")] RuntimeProfile,
     [JsonStringEnumMemberName("extensionRegistration")] ExtensionRegistration,
+    [JsonStringEnumMemberName("parameter")] Parameter,
     [JsonStringEnumMemberName("secret")] Secret
 }
 
@@ -52,8 +53,19 @@ public sealed record BootstrapResourcePlanResult(BootstrapResourceDisposition Di
 public sealed class BootstrapPlanningContext
 {
     private readonly HashSet<(string Kind, string Name, string? Parent)> planned = [];
-    public void Register(string kind, string name, string? parent = null) => planned.Add((kind, name, parent));
+    private readonly Dictionary<(string Kind, string Name, string? Parent), BootstrapResourceDocument> documents = [];
+
+    public void Register(string kind, string name, string? parent = null, BootstrapResourceDocument? document = null)
+    {
+        var key = (kind, name, parent);
+        planned.Add(key);
+        if (document is not null) documents[key] = document;
+    }
+
     public bool Contains(string kind, string name, string? parent = null) => planned.Contains((kind, name, parent));
+
+    public bool TryGetDocument(string kind, string name, string? parent, out BootstrapResourceDocument document) =>
+        documents.TryGetValue((kind, name, parent), out document!);
 }
 
 public interface IBootstrapResourceHandler

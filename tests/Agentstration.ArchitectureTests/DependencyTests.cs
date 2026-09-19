@@ -21,6 +21,7 @@ using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Packs;
 using Agentstration.Packs.Contracts;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
@@ -720,13 +721,13 @@ public sealed class DependencyTests
     {
         var expected = new[]
         {
-            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "ModelProvider", "ModelProfile", "RuntimeProfile",
+            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "ModelProvider", "ModelProfile", "RuntimeProfile", "Parameter",
             "Secret", "Vault", "Tool", "ToolDefinition", "ToolProvider", "ToolExecutionHook", "Trigger", "Source", "SourceVersion", "SourceProvider"
         };
         var actual = new[]
         {
             AgentResourceKinds.Agent, AgentResourceKinds.AgentRevision, AgentResourceKinds.AgentDeployment, FlowResourceKinds.Flow,
-            EntryResourceKinds.Entry, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile,
+            EntryResourceKinds.Entry, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile, ParameterResourceKinds.Parameter,
             SecretResourceKinds.Secret, SecretResourceKinds.Vault, ToolResourceKinds.Tool, ToolResourceKinds.ToolDefinition,
             ToolResourceKinds.ToolProvider, ToolResourceKinds.ToolExecutionHook, TriggerResourceKinds.Trigger, SourceResourceKinds.Source,
             SourceResourceKinds.SourceVersion, SourceResourceKinds.SourceProvider
@@ -746,6 +747,7 @@ public sealed class DependencyTests
             typeof(Agentstration.Extensions.Contracts.ExtensionResponse).Assembly,
             typeof(Agentstration.Identity.Contracts.IdentityConsoleContextResponse).Assembly,
             typeof(Agentstration.Models.Contracts.ModelProviderResponse).Assembly,
+            typeof(Agentstration.Parameters.Contracts.CreateParameterRequest).Assembly,
             typeof(Agentstration.ResourceManagement.Contracts.ResourceDeclaration<>).Assembly,
             typeof(Agentstration.Runtime.Contracts.RuntimeProfileSummaryResponse).Assembly,
             typeof(Agentstration.Secrets.Contracts.SecretResponse).Assembly,

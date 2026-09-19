@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.Parameters/Agentstration.Parameters.csproj" />
     <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />
     <ProjectReference Include="../Agentstration.Secrets.Abstractions/Agentstration.Secrets.Abstractions.csproj" />
   </ItemGroup>

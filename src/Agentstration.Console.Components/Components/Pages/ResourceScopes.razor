@@ -172,6 +172,7 @@ else
             RuntimeProfileResourceKinds.RuntimeProfile => $"/runtimeprofiles/{name}?namespace={resourceNamespace}",
             SecretResourceKinds.Vault => $"/vaults/{name}?scopeRef={scopeRef}",
             SecretResourceKinds.Secret => $"/secrets/{name}?scopeRef={scopeRef}",
+            ParameterResourceKinds.Parameter => $"/parameters/{name}?scopeRef={scopeRef}",
             ToolResourceKinds.Tool => $"/tools/{name}",
             ToolResourceKinds.ToolProvider => $"/tools/providers/{name}",
             TriggerResourceKinds.Trigger when resource.Namespace.IsDefault => $"/triggers/{name}",

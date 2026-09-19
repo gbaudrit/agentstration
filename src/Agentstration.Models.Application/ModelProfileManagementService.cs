@@ -1,3 +1,4 @@
+using Agentstration.Aep.Abstractions;
 using Agentstration.Agents;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
@@ -232,7 +233,12 @@ public sealed class ModelProfileManagementService(
             var inspection = await inspector.InspectAsync(provider, cancellationToken);
             if (!string.Equals(inspection.Status, "available", StringComparison.Ordinal))
                 throw Invalid("definition.secretBindings", "The extension must be available to validate Secret bindings.");
-            var issues = ExtensionSecretBindingValidator.Validate(definition.SecretBindings, inspection.SecretRequirements, requireAll: false);
+            var issues = ExtensionSecretBindingValidator.Validate(
+                definition.SecretBindings,
+                inspection.ValueRequirements,
+                AepContributionKinds.ModelProvider,
+                provider.ContributionId,
+                requireAll: false);
             if (issues.Count > 0)
                 throw Invalid("definition.secretBindings", issues[0].Message);
         }

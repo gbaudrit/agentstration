@@ -19,6 +19,7 @@ using Agentstration.Infrastructure.Triggers;
 using Agentstration.Infrastructure.Work;
 using Agentstration.ModelProviders;
 using Agentstration.Packs;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Storage.PostgreSql;
 using Agentstration.ResourceManagement.Storage.Sqlite;
@@ -126,6 +127,8 @@ public static class DependencyInjection
             provider.GetRequiredService<IMasterKeyProvider>()));
         services.AddSingleton<ISecretVaultProvider, SharedKeyFileSecretVaultProvider>();
         services.AddSingleton<DescendantResourceUseAuthorizer>();
+        services.AddSingleton<ParameterManagementService>();
+        services.AddSingleton<IParameterResolver>(provider => provider.GetRequiredService<ParameterManagementService>());
         services.AddSingleton<SecretManagementService>();
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
         services.AddSingleton<ISecretAccessAuthorizer>(provider => provider.GetRequiredService<SecretManagementService>());
@@ -149,6 +152,7 @@ public static class DependencyInjection
         services.AddScoped<IBootstrapResourceHandler, WorkspaceBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, PrincipalDefaultContextBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, PackInstallationBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, ParameterBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ModelProviderBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, RuntimeProfileBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ModelProfileBootstrapResourceHandler>();
@@ -185,6 +189,7 @@ public static class DependencyInjection
         services.AddSingleton<IPackArchiveReader, ZipPackArchiveReader>();
         services.AddSingleton<IPackArtifactStore>(_ => new FileSystemPackArtifactStore(Path.Combine(dataDirectory, "pack-artifacts")));
         services.AddSingleton<IPackResourceHandler, ModelProviderPackResourceHandler>();
+        services.AddSingleton<IPackResourceHandler, ParameterPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, RuntimeProfilePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, ModelProfilePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, AgentPackResourceHandler>();

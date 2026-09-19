@@ -209,6 +209,13 @@ else
                                                     <option value="@BindingValue(runtimeProfile.Name, ResourceNamespace.Parse(runtimeProfile.Namespace))">@runtimeProfile.Properties.DisplayName — @runtimeProfile.Namespace/@runtimeProfile.Name · @runtimeProfile.Properties.RuntimeType</option>
                                                 }
                                             }
+                                            else if (binding.TargetKind == PackBindingTargetKind.Parameter)
+                                            {
+                                                @foreach (var parameter in parameters)
+                                                {
+                                                    <option value="@BindingValue(parameter.Name, parameter.Namespace, parameter.ScopeRef)">@parameter.Definition.DisplayName — @parameter.ScopeRef · @parameter.Namespace/@parameter.Name</option>
+                                                }
+                                            }
                                             else
                                             {
                                                 @foreach (var secret in secrets)

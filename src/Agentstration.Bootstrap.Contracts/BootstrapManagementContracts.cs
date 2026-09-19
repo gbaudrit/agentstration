@@ -77,7 +77,8 @@ public sealed record BootstrapBindingTargetOption(
     string Name,
     string Namespace,
     string DisplayName,
-    bool Planned = false);
+    bool Planned = false,
+    ResourceScopeRef? ScopeRef = null);
 
 public sealed record BootstrapManagementView(
     BootstrapCatalogSnapshot Catalog,
