@@ -97,11 +97,11 @@ else
                     var key = BindingKey(item.Profile, item.Binding.Name);
                     var input = bindingTargets[key];
                     var options = bindingOptions.GetValueOrDefault(item.Binding.TargetKind) ?? [];
-                    <fieldset class="bootstrap-binding">
+                    <fieldset class="bootstrap-binding" data-target-kind="@item.Binding.TargetKind">
                         <legend>@item.Binding.DisplayName</legend>
                         <p><code>@item.Profile/@item.Binding.Name</code> · @BindingTargetKindLabel(item.Binding.TargetKind)@if (item.Binding.Required) { <span> · @T("Required")</span> }</p>
                         @if (item.Binding.Description is not null) { <p class="muted">@item.Binding.Description</p> }
-                        <label><span>@T("Resource")</span><select value="@BindingTargetValue(input)" disabled="@(selectedWorkspaceId is null || busy)" @onchange="args => UpdateBindingTarget(key, args)"><option value="">@T("SelectCompatibleResource")</option>@foreach (var option in options) { <option value="@BindingTargetValue(option)">@option.DisplayName — @option.Namespace/@option.Name@(option.Planned ? $" ({T("Planned")})" : null)</option> }</select></label>
+                        <label><span>@T("Resource")</span><select value="@BindingTargetValue(input)" disabled="@(selectedWorkspaceId is null || busy)" @onchange="args => UpdateBindingTarget(key, args)"><option value="">@T("SelectCompatibleResource")</option>@foreach (var option in options) { <option value="@BindingTargetValue(option)">@option.DisplayName — @(option.ScopeRef?.Value ?? T("InheritedScope"))/@option.Namespace/@option.Name@(option.Planned ? $" ({T("Planned")})" : null)</option> }</select></label>
                         @if (selectedWorkspaceId is not null && options.Count == 0) { <p class="inline-warning">@T("NoCompatibleResource", BindingTargetKindLabel(item.Binding.TargetKind))</p> }
                     </fieldset>
                 }
@@ -283,8 +283,9 @@ else
                 if (string.IsNullOrWhiteSpace(input.Name)) continue;
                 var available = bindingOptions[item.Binding.TargetKind].Any(option =>
                     string.Equals(option.Name, input.Name, StringComparison.Ordinal)
-                    && string.Equals(option.Namespace, input.Namespace, StringComparison.Ordinal));
-                if (!available) { input.Name = string.Empty; input.Namespace = "default"; }
+                    && string.Equals(option.Namespace, input.Namespace, StringComparison.Ordinal)
+                    && option.ScopeRef == input.ScopeRef);
+                if (!available) { input.Name = string.Empty; input.Namespace = "default"; input.ScopeRef = null; }
             }
         }
         catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; }
@@ -296,7 +297,7 @@ else
         .Select(item =>
         {
             var input = bindingTargets[BindingKey(item.Profile, item.Binding.Name)];
-            return new BootstrapBindingSelection(item.Profile, item.Binding.Name, new(input.Name.Trim(), @namespace: new(string.IsNullOrWhiteSpace(input.Namespace) ? "default" : input.Namespace.Trim())));
+            return new BootstrapBindingSelection(item.Profile, item.Binding.Name, new(input.Name.Trim(), input.ScopeRef, new(string.IsNullOrWhiteSpace(input.Namespace) ? "default" : input.Namespace.Trim())));
         }).ToArray();
 
     private async Task PreviewAsync()
@@ -362,20 +363,21 @@ else
         {
             var key = BindingKey(item.Profile, item.Binding.Name);
             if (!bindingTargets.ContainsKey(key))
-                bindingTargets[key] = new(item.Binding.DefaultTarget?.Name ?? string.Empty, item.Binding.DefaultTarget?.Namespace?.Value ?? "default");
+                bindingTargets[key] = new(item.Binding.DefaultTarget?.Name ?? string.Empty, item.Binding.DefaultTarget?.Namespace?.Value ?? "default", item.Binding.DefaultTarget?.ScopeRef);
         }
     }
     private void UpdateBindingTarget(string key, ChangeEventArgs args)
     {
-        var parts = (args.Value?.ToString() ?? string.Empty).Split('\n', 2);
-        bindingTargets[key].Namespace = parts.Length == 2 ? parts[0] : "default";
-        bindingTargets[key].Name = parts.Length == 2 ? parts[1] : string.Empty;
+        var parts = (args.Value?.ToString() ?? string.Empty).Split('\n', 3);
+        bindingTargets[key].ScopeRef = parts.Length == 3 && !string.IsNullOrWhiteSpace(parts[0]) ? ResourceScopeRef.Parse(parts[0]) : null;
+        bindingTargets[key].Namespace = parts.Length == 3 ? parts[1] : "default";
+        bindingTargets[key].Name = parts.Length == 3 ? parts[2] : string.Empty;
         preview = null;
     }
     private static string BindingKey(string profile, string name) => $"{profile}\n{name}";
-    private static string BindingTargetValue(BindingInput input) => string.IsNullOrWhiteSpace(input.Name) ? string.Empty : $"{input.Namespace}\n{input.Name}";
-    private static string BindingTargetValue(BootstrapBindingTargetOption option) => $"{option.Namespace}\n{option.Name}";
+    private static string BindingTargetValue(BindingInput input) => string.IsNullOrWhiteSpace(input.Name) ? string.Empty : $"{input.ScopeRef?.Value}\n{input.Namespace}\n{input.Name}";
+    private static string BindingTargetValue(BootstrapBindingTargetOption option) => $"{option.ScopeRef?.Value}\n{option.Namespace}\n{option.Name}";
     private static string BindingLabel(BootstrapBindingSelection binding) => $"{binding.Profile}/{binding.Name} → {binding.Target.Namespace?.Value ?? "default"}/{binding.Target.Name}";
-    private sealed class BindingInput(string name, string @namespace) { public string Name { get; set; } = name; public string Namespace { get; set; } = @namespace; }
+    private sealed class BindingInput(string name, string @namespace, ResourceScopeRef? scopeRef = null) { public string Name { get; set; } = name; public string Namespace { get; set; } = @namespace; public ResourceScopeRef? ScopeRef { get; set; } = scopeRef; }
     public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
 }

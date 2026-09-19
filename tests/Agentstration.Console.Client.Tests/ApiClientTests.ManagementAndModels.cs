@@ -8,6 +8,8 @@ using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
+using Agentstration.Parameters;
+using Agentstration.Parameters.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
@@ -22,6 +24,37 @@ namespace Agentstration.Web.Tests;
 
 public sealed partial class ApiClientTests
 {
+    [TestMethod]
+    public async Task ParametersClientPreservesExactScopeAndConcurrencyToken()
+    {
+        var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var resource = new ParameterResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ParameterResourceKinds.Parameter,
+            Metadata = new() { Name = "endpoint" },
+            ScopeRef = scope,
+            Definition = new() { DisplayName = "Endpoint", ValueType = ParameterValueType.Text, Value = JsonSerializer.SerializeToElement("https://example.test") }
+        };
+        string? path = null;
+        string? ifMatch = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            path = request.RequestUri?.PathAndQuery;
+            ifMatch = request.Headers.IfMatch.SingleOrDefault()?.ToString();
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(resource) };
+            response.Headers.ETag = new EntityTagHeaderValue("\"v2\"");
+            return response;
+        })) { BaseAddress = new Uri("http://localhost/") };
+
+        var snapshot = await new ParametersApiClient(httpClient).UpdateParameterAsync(
+            "endpoint", scope, new PutParameterRequest(resource.Definition), "\"v1\"", default);
+
+        Assert.AreEqual($"/api/parameters/endpoint?scopeRef={Uri.EscapeDataString(scope.Value)}", path);
+        Assert.AreEqual("\"v1\"", ifMatch);
+        Assert.AreEqual("\"v2\"", snapshot.ETag);
+    }
+
     [TestMethod]
     public async Task ManagementClientPreservesETagAndSendsCreatePrecondition()
     {

@@ -31,4 +31,5 @@
 <data name="VisibleScopes"><value>Périmètres visibles</value></data>
   <data name="SourceProvenance" xml:space="preserve"><value>Provenance de la Source</value></data><data name="SourceVersion" xml:space="preserve"><value>Version de la Source</value></data><data name="Channel" xml:space="preserve"><value>Channel</value></data><data name="Snapshot" xml:space="preserve"><value>Snapshot</value></data><data name="CatalogEntry" xml:space="preserve"><value>Entrée de catalogue</value></data>
   <data name="OpenSource" xml:space="preserve"><value>Ouvrir la Source</value></data>
+<data name="Binding.Parameter"><value>Paramètre</value></data>
 </root>
