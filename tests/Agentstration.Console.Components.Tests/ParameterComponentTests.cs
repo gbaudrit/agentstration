@@ -33,7 +33,7 @@ public sealed class ParameterComponentTests
 
         rendered.WaitForAssertion(() =>
         {
-            Assert.AreEqual("12", rendered.Find("[data-testid='parameter-row'] code").TextContent);
+            Assert.AreEqual("12", rendered.Find("[data-testid='parameter-row'] td:nth-child(3) code").TextContent);
             StringAssert.Contains(rendered.Markup, scope.Value);
             StringAssert.Contains(rendered.Markup, "/parameters/retry-count?scopeRef=");
         });
