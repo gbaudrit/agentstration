@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity;
@@ -24,11 +25,18 @@ public sealed class ModelProviderManagementService(
 {
     public static string ModelProviderId(string name) => name;
     public async Task ValidateForCreateAsync(ModelProviderResource resource, CancellationToken cancellationToken)
+        => await ValidateForCreateAsync(resource, null, cancellationToken);
+
+    public async Task ValidateForCreateAsync(
+        ModelProviderResource resource,
+        IReadOnlyDictionary<ScopedResourceAddress, JsonElement>? plannedParameters,
+        CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
         var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ModelResourceKinds.ModelProvider);
         ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
-        _ = await ValidateAndNormalizeAsync(resource.Namespace, resource.Name, resource.Definition, scopeRef, cancellationToken);
+        _ = await ValidateAndNormalizeAsync(resource.Namespace, resource.Name, resource.Definition, scopeRef,
+            plannedParameters, cancellationToken);
     }
 
     public async Task<StoredResource<ModelProviderResource>> CreateAsync(ModelProviderResource resource, CancellationToken cancellationToken)
@@ -40,7 +48,7 @@ public sealed class ModelProviderManagementService(
             var address = ScopedResourceAddress.Create(scopeRef, resource.Namespace, ModelResourceKinds.ModelProvider, resource.Name);
             if (await store.GetExactAsync<ModelProviderResource>(address, token) is not null)
                 throw new ResourceConcurrencyException($"Model provider '{resource.Address}' already exists in scope '{scopeRef}'.");
-            var definition = await ValidateAndNormalizeAsync(resource.Namespace, resource.Name, resource.Definition, scopeRef, token);
+            var definition = await ValidateAndNormalizeAsync(resource.Namespace, resource.Name, resource.Definition, scopeRef, null, token);
             return await store.PutExactAsync(scopeRef, resource with
             {
                 ScopeRef = scopeRef,
@@ -60,7 +68,7 @@ public sealed class ModelProviderManagementService(
         var scopeRef = existing.Value.ScopeRef ?? throw new ModelProviderValidationException("The model provider has no ownership scope.");
         return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
-            var validated = await ValidateAndNormalizeAsync(existing.Value.Namespace, existing.Value.Name, definition, scopeRef, token);
+            var validated = await ValidateAndNormalizeAsync(existing.Value.Namespace, existing.Value.Name, definition, scopeRef, null, token);
             return await store.PutExactAsync(scopeRef, existing.Value with
             {
                 Generation = checked(existing.Value.Generation + 1),
@@ -180,6 +188,7 @@ public sealed class ModelProviderManagementService(
         string ownerName,
         ModelProviderProperties definition,
         ResourceScopeRef ownerScopeRef,
+        IReadOnlyDictionary<ScopedResourceAddress, JsonElement>? plannedParameters,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(definition);
@@ -194,7 +203,8 @@ public sealed class ModelProviderManagementService(
             throw new ModelProviderValidationException($"Referenced extension registration '{extensionAddress}' does not exist or is not visible from '{ownerScopeRef}'.");
         if (FindDiscovery(AepModelProvider.AdapterType) is null)
             throw new ModelProviderValidationException("The AEP model-provider adapter is not registered in this host.");
-        await ValidateValueBindingsAsync(ownerNamespace, ownerName, ownerScopeRef, definition, extension.Value, cancellationToken);
+        await ValidateValueBindingsAsync(ownerNamespace, ownerName, ownerScopeRef, definition, extension.Value,
+            plannedParameters, cancellationToken);
         return definition with
         {
             DisplayName = definition.DisplayName.Trim(),
@@ -209,6 +219,7 @@ public sealed class ModelProviderManagementService(
         ResourceScopeRef ownerScopeRef,
         ModelProviderProperties definition,
         ExtensionRegistrationResource extension,
+        IReadOnlyDictionary<ScopedResourceAddress, JsonElement>? plannedParameters,
         CancellationToken cancellationToken)
     {
         // A required secured value may intentionally be supplied by the existing Model Profile Secret override.
@@ -236,9 +247,19 @@ public sealed class ModelProviderManagementService(
             {
                 try
                 {
-                    var resolved = await parameters.ResolveAsync(binding.Parameter!, consumer, cancellationToken)
-                        ?? throw new ModelProviderValidationException($"Parameter for Value requirement '{binding.RequirementId}' was not found.");
-                    inlineValues.Add(AepBoundValue.Inline(binding.RequirementId, resolved.Value));
+                    var parameter = binding.Parameter!;
+                    var resolved = await parameters.ResolveAsync(parameter, consumer, cancellationToken);
+                    if (resolved is not null)
+                    {
+                        inlineValues.Add(AepBoundValue.Inline(binding.RequirementId, resolved.Value));
+                        continue;
+                    }
+
+                    var address = ScopedResourceAddress.Create(parameter.ScopeRef, parameter.Address.Namespace,
+                        ParameterResourceKinds.Parameter, parameter.Address.Name);
+                    if (plannedParameters is null || !plannedParameters.TryGetValue(address, out var plannedValue))
+                        throw new ModelProviderValidationException($"Parameter for Value requirement '{binding.RequirementId}' was not found.");
+                    inlineValues.Add(AepBoundValue.Inline(binding.RequirementId, plannedValue));
                 }
                 catch (ParameterAccessDeniedException exception)
                 {

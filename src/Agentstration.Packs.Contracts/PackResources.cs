@@ -71,6 +71,7 @@ public enum PackBindingTargetKind
     [JsonStringEnumMemberName("modelProvider")] ModelProvider,
     [JsonStringEnumMemberName("runtimeProfile")] RuntimeProfile,
     [JsonStringEnumMemberName("extensionRegistration")] ExtensionRegistration,
+    [JsonStringEnumMemberName("parameter")] Parameter,
     [JsonStringEnumMemberName("secret")] Secret
 }
 

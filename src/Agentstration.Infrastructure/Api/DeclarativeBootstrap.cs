@@ -288,6 +288,25 @@ public sealed class DeclarativeBootstrapService(
                     && string.Equals(binding.Name, bindingName, StringComparison.Ordinal));
                 if (selection is null)
                     throw new DeclarativeBootstrapException($"Bootstrap resource '{location}' references unresolved optional binding '{bindingName}'.");
+                var declaration = profile.Summary.Bindings.Single(binding => string.Equals(binding.Name, bindingName, StringComparison.Ordinal));
+                if (declaration.TargetKind is BootstrapBindingTargetKind.Parameter or BootstrapBindingTargetKind.Secret)
+                {
+                    if (selection.Target.ScopeRef is not { } scopeRef || scopeRef == default)
+                        throw new DeclarativeBootstrapException($"Bootstrap binding '{profile.Summary.Name}/{bindingName}' requires an exact scoped target.");
+                    var kind = declaration.TargetKind == BootstrapBindingTargetKind.Parameter
+                        ? "Parameter"
+                        : "Secret";
+                    return new JsonObject
+                    {
+                        ["address"] = new JsonObject
+                        {
+                            ["namespace"] = (selection.Target.Namespace ?? ResourceNamespace.Default).Value,
+                            ["kind"] = kind,
+                            ["name"] = selection.Target.Name
+                        },
+                        ["scopeRef"] = scopeRef.Value
+                    };
+                }
                 return JsonSerializer.SerializeToNode(selection.Target, JsonOptions);
             }
             foreach (var property in value.ToArray())

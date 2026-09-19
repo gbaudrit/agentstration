@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Agentstration.Models;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -64,6 +65,9 @@ public sealed partial class PackManagementService
             PackBindingTargetKind.ModelProvider => await store.GetAsync<ModelProviderResource>(new(ModelResourceKinds.ModelProvider, target.Name, @namespace), cancellationToken) is not null,
             PackBindingTargetKind.RuntimeProfile => await store.GetAsync<RuntimeProfileResource>(new(RuntimeProfileResourceKinds.RuntimeProfile, target.Name, @namespace), cancellationToken) is not null,
             PackBindingTargetKind.ExtensionRegistration => await store.GetAsync<ExtensionRegistrationResource>(new(ExtensionKinds.ExtensionRegistration, target.Name, @namespace), cancellationToken) is not null,
+            PackBindingTargetKind.Parameter => target.ScopeRef is { } parameterScope
+                && await store.GetExactAsync<ParameterResource>(ScopedResourceAddress.Create(parameterScope, @namespace,
+                    ParameterResourceKinds.Parameter, target.Name), cancellationToken) is not null,
             PackBindingTargetKind.Secret => await store.GetAsync<SecretResource>(new(SecretResourceKinds.Secret, target.Name, @namespace), cancellationToken) is not null,
             _ => false
         };
@@ -110,13 +114,37 @@ public sealed partial class PackManagementService
     private static JsonNode? ResolveNode(JsonNode? node, IReadOnlyDictionary<string, ResourceReference?> targets)
     {
         if (node is JsonObject bindingObject
-            && bindingObject.Count == 1
+            && bindingObject.Count is 1 or 2
             && bindingObject["binding"] is JsonValue bindingValue
             && bindingValue.TryGetValue<string>(out var bindingName))
         {
             if (!targets.TryGetValue(bindingName, out var target))
                 throw new PackValidationException("pack_binding_reference_unknown", $"Resource references undeclared Pack binding '{bindingName}'.");
             if (target is null) return null;
+            if (bindingObject.Count == 2)
+            {
+                if (bindingObject["referenceKind"] is not JsonValue kindValue
+                    || !kindValue.TryGetValue<string>(out var referenceKind))
+                    throw new PackValidationException("pack_binding_reference_invalid", $"Pack binding '{bindingName}' has an invalid exact reference kind.");
+                var resourceKind = referenceKind switch
+                {
+                    "parameter" => ParameterResourceKinds.Parameter,
+                    "secret" => SecretResourceKinds.Secret,
+                    _ => throw new PackValidationException("pack_binding_reference_invalid", $"Pack binding '{bindingName}' has unsupported exact reference kind '{referenceKind}'.")
+                };
+                if (target.ScopeRef is not { } scopeRef || scopeRef == default)
+                    throw new PackValidationException("pack_binding_scope_required", $"Pack binding '{bindingName}' requires an exact scoped target.");
+                return new JsonObject
+                {
+                    ["address"] = new JsonObject
+                    {
+                        ["namespace"] = (target.Namespace ?? ResourceNamespace.Default).Value,
+                        ["kind"] = resourceKind,
+                        ["name"] = target.Name
+                    },
+                    ["scopeRef"] = scopeRef.Value
+                };
+            }
             return new JsonObject
             {
                 ["name"] = target.Name,
@@ -155,11 +183,12 @@ public sealed partial class PackManagementService
         if (element.ValueKind == JsonValueKind.Object)
         {
             var properties = element.EnumerateObject().ToArray();
-            if (properties.Length == 1
-                && properties[0].NameEquals("binding")
-                && properties[0].Value.ValueKind == JsonValueKind.String)
+            var binding = properties.SingleOrDefault(property => property.NameEquals("binding"));
+            if (properties.Length is 1 or 2
+                && binding.Value.ValueKind == JsonValueKind.String
+                && (properties.Length == 1 || properties.Any(property => property.NameEquals("referenceKind"))))
             {
-                names.Add(properties[0].Value.GetString()!);
+                names.Add(binding.Value.GetString()!);
                 return;
             }
             foreach (var property in properties) Visit(property.Value, names);
