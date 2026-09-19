@@ -118,6 +118,7 @@ public interface IInternalMcpToolHandler : IInternalMcpToolDefinitionProvider
 
 public static class AgentstrationInternalTools
 {
+    public const string AssistantDocumentationSearch = "assistant.documentation.search";
     public const string NotificationCreate = "work.notification.create";
     public const string ResourcePlanCreate = "resource-planning.plan.create";
     public const string ResourcePlanGet = "resource-planning.plan.get";
