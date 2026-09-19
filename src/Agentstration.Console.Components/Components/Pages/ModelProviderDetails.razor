@@ -132,7 +132,7 @@ else
     {
         var value = args.Value?.ToString() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(value)) { binding.Name = binding.ScopeRef = string.Empty; return; }
-        var resource = binding.Kind == ModelProviderValueBindingKind.Parameter
+        Resource? resource = binding.Kind == ModelProviderValueBindingKind.Parameter
             ? AvailableParameters.FirstOrDefault(candidate => TargetValue(candidate) == value)
             : AvailableSecrets.Select(candidate => candidate.Resource).FirstOrDefault(candidate => TargetValue(candidate) == value);
         if (resource?.ScopeRef is not { } scopeRef) return;

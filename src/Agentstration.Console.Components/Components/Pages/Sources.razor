@@ -547,7 +547,7 @@ else
         var parts = scoped[^1].Split(':', 2);
         if (parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]) || string.IsNullOrWhiteSpace(parts[1]))
             throw new SourceValidationException("source_pack_binding_invalid", "Pack binding targets must use namespace:resource-name.");
-        var scopeRef = scoped.Length == 2 && !string.IsNullOrWhiteSpace(scoped[0]) ? ResourceScopeRef.Parse(scoped[0]) : null;
+        ResourceScopeRef? scopeRef = scoped.Length == 2 && !string.IsNullOrWhiteSpace(scoped[0]) ? ResourceScopeRef.Parse(scoped[0]) : null;
         return new(parts[1], scopeRef, ResourceNamespace.Parse(parts[0]));
     }
     private ResourceScopeRef? PackTargetScope() => packPreview?.TargetScope switch { ResourceScopeKind.Instance => ResourceScopeRef.Instance, ResourceScopeKind.Tenant => ResourceScopeRef.Tenant(ContextState.Current?.TenantId ?? Guid.Empty), _ => ResourceScopeRef.Workspace(ContextState.Current?.WorkspaceId ?? Guid.Empty) };

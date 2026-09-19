@@ -311,7 +311,7 @@ public partial class Packs
         var scoped = value.Split('|', 2);
         var parts = scoped[^1].Split(':', 2);
         if (parts.Length != 2) throw new InvalidOperationException(T("InvalidPackBinding"));
-        var scopeRef = scoped.Length == 2 && !string.IsNullOrWhiteSpace(scoped[0]) ? ResourceScopeRef.Parse(scoped[0]) : null;
+        ResourceScopeRef? scopeRef = scoped.Length == 2 && !string.IsNullOrWhiteSpace(scoped[0]) ? ResourceScopeRef.Parse(scoped[0]) : null;
         return new(parts[1], scopeRef, ResourceNamespace.Parse(parts[0]));
     }
     private string BindingKindLabel(PackBindingTargetKind kind) => kind switch
