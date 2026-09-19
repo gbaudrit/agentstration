@@ -501,9 +501,13 @@ public sealed class AepVerticalTests
         _ = await provider.ListModelsAsync(configuration);
 
         CollectionAssert.AreEqual(
-            new[] { "Bearer first-token", "Bearer first-token", "Bearer second-token", "Bearer second-token" },
+            new[]
+            {
+                "Bearer first-token", "Bearer first-token", "Bearer first-token",
+                "Bearer second-token", "Bearer second-token", "Bearer second-token"
+            },
             handler.Authorizations);
-        Assert.AreEqual(4, resolver.ResolutionCount);
+        Assert.AreEqual(6, resolver.ResolutionCount);
     }
 
     [TestMethod]
@@ -583,8 +587,8 @@ public sealed class AepVerticalTests
             first.ListModelsAsync(firstConfiguration).AsTask(),
             second.ListModelsAsync(secondConfiguration).AsTask());
 
-        Assert.HasCount(2, firstHandler.Authorizations);
-        Assert.HasCount(2, secondHandler.Authorizations);
+        Assert.HasCount(3, firstHandler.Authorizations);
+        Assert.HasCount(3, secondHandler.Authorizations);
         Assert.IsTrue(firstHandler.Authorizations.All(value => value == "Bearer first-token"));
         Assert.IsTrue(secondHandler.Authorizations.All(value => value == "Bearer second-token"));
     }

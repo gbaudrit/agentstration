@@ -482,7 +482,7 @@ public sealed class PackTests
             archive,
             [new PackBindingSelection("temperature", new("temperature"))],
             default));
-        Assert.AreEqual("pack_binding_unresolved", missingScope.Code);
+        Assert.AreEqual("pack_binding_scope_required", missingScope.Code);
 
         _ = await service.InstallAsync(
             archive,
