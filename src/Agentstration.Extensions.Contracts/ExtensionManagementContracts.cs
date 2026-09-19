@@ -12,6 +12,14 @@ public sealed record PutExtensionRegistrationRequest(ExtensionRegistrationProper
 public sealed record ExtensionDiscoveryResponse(int Sources, int Created, int Updated, int Unchanged);
 public sealed record ExtensionIdentityResponse(string Id, string Name, string Version, string? Description);
 public sealed record ExtensionContributionResponse(string Kind, string Id);
+public sealed record ExtensionValueRequirementResponse(
+    string ContributionKind,
+    string ContributionId,
+    string Id,
+    bool Required,
+    string ValueType,
+    string Protection,
+    string? Description);
 public sealed record ExtensionOptionSetVersionResponse(string Version, string SchemaDigest, JsonElement Schema, bool Deprecated);
 public sealed record ExtensionOptionMigrationDescriptorResponse(string FromVersion, string ToVersion);
 public sealed record ExtensionOptionSetResponse(
@@ -45,7 +53,8 @@ public sealed record ExtensionResponse(
     string DiscoverySource,
     bool RegistrationEnabled = true,
     AepEnrollmentMode EnrollmentMode = AepEnrollmentMode.Disabled,
-    ResourceScopeRef? RegistrationScopeRef = null);
+    ResourceScopeRef? RegistrationScopeRef = null,
+    IReadOnlyList<ExtensionValueRequirementResponse>? ValueRequirements = null);
 public sealed record ExtensionInventoryItemResponse(
     string Key,
     string? RegistrationName,

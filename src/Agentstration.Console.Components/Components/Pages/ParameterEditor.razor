@@ -1,0 +1,76 @@
+@page "/parameters/new"
+@page "/parameters/{Name}"
+@implements IDisposable
+@inject IParametersClient Client
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ParameterStrings> Localizer
+
+<PageTitle>@(IsNew ? T("CreateParameter") : $"{Name} · {T("Parameter")}") · Agentstration</PageTitle>
+<PageHeader Title="@(IsNew ? T("CreateParameter") : model.DisplayName)" Description="@T("Editor.Description")" TestId="resource-parameter-editor"><Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete" data-testid="parameter-delete">@T("Delete")</button> }<a class="button-secondary" href="/parameters">@T("Back")</a></Actions></PageHeader>
+<div class="form-alert form-alert-info"><strong>@T("ReadableConfiguration")</strong><span>@T("SecretGuidance")</span></div>
+@if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
+@if (usages.Count > 0) { <div class="form-alert form-alert-warning">@T("Referenced", usages.Count)</div> }
+<EditForm Model="model" OnValidSubmit="SaveAsync" FormName="parameter-editor" class="resource-form" data-testid="parameter-form"><DataAnnotationsValidator /><ValidationSummary />
+    <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ParameterResource")</h2></div></div><div class="form-grid">
+        <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" data-testid="parameter-name" /></label>
+        <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" data-testid="parameter-display-name" /></label>
+        <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" /></label>
+        @if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }
+        <label><span>@T("ValueType")</span><InputSelect @bind-Value="model.ValueType" data-testid="parameter-value-type">@foreach (var type in Enum.GetValues<ParameterValueType>()) { <option value="@type">@T($"ValueType.{type}")</option> }</InputSelect></label>
+        <label class="form-span-2"><span>@T("Value")</span><InputText @bind-Value="model.Value" data-testid="parameter-value" /><small>@T("Value.Help")</small></label>
+    </div></section>
+    <DescendantUseGrantEditor OwnerScopeRef="selectedScope" Targets="scopeTargets" Grants="model.UseGrants" />
+    <div class="form-actions"><a class="button-secondary" href="/parameters">@T("Cancel")</a><button type="submit" class="button-primary" disabled="@busy" data-testid="parameter-save">@(busy ? T("Saving") : T("Save"))</button></div>
+</EditForm>
+@if (!IsNew && usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>@T("Usages")</h2><span>@usages.Count</span></div><ul class="resource-links">@foreach (var usage in usages) { <li><a href="@usage.Url"><strong>@usage.DisplayName</strong><code>@usage.Name</code></a></li> }</ul></section> }
+<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteParameter")" Message="@T("DeleteMessage", Name ?? string.Empty)" ConfirmLabel="@T("Delete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private ParameterEditorModel model = new();
+    private IReadOnlyList<ResourceScopeTargetResponse> scopeTargets = [];
+    private IReadOnlyList<ParameterUsageResponse> usages = [];
+    private ResourceScopeRef? selectedScope;
+    private string? etag;
+    private bool busy, confirmDelete;
+    private Exception? error;
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    protected override async Task OnParametersSetAsync()
+    {
+        error = null;
+        try
+        {
+            scopeTargets = await Client.GetScopeTargetsAsync(cancellation.Token);
+            if (IsNew) { selectedScope ??= scopeTargets.FirstOrDefault(target => target.Kind == ResourceScopeKind.Workspace && target.CanWrite)?.ScopeRef ?? scopeTargets.FirstOrDefault(target => target.CanWrite)?.ScopeRef; return; }
+            var scope = ResourceScopeRef.Parse(ScopeRefValue ?? throw new ArgumentException(T("ScopeRequired")));
+            var snapshot = await Client.GetParameterAsync(Name!, scope, cancellation.Token);
+            model = ParameterEditorModel.From(snapshot.Value);
+            selectedScope = scope;
+            etag = snapshot.ETag;
+            usages = (await Client.GetParameterUsagesAsync(Name!, scope, cancellation.Token)).Value;
+        }
+        catch (Exception exception) { error = exception; }
+    }
+    private async Task SaveAsync()
+    {
+        if (selectedScope is null) { error = new ArgumentException(T("ScopeRequired")); return; }
+        busy = true; error = null;
+        try
+        {
+            var snapshot = IsNew
+                ? await Client.CreateParameterAsync(new(model.Name, model.Properties(), selectedScope), cancellation.Token)
+                : await Client.UpdateParameterAsync(model.Name, selectedScope.Value, new(model.Properties()), etag!, cancellation.Token);
+            if (IsNew) Navigation.NavigateTo(ResourceUrl(snapshot.Value));
+            else { model = ParameterEditorModel.From(snapshot.Value); etag = snapshot.ETag; }
+        }
+        catch (Exception exception) { error = exception; }
+        finally { busy = false; }
+    }
+    private void RequestDelete() { if (usages.Count > 0) error = new AgentstrationApiException(T("InUse", usages.Count), Guid.NewGuid().ToString("N")); else confirmDelete = true; }
+    private async Task DeleteAsync() { confirmDelete = false; try { await Client.DeleteParameterAsync(model.Name, selectedScope!.Value, etag!, cancellation.Token); Navigation.NavigateTo("/parameters"); } catch (Exception exception) { error = exception; } }
+    private static string ResourceUrl(ParameterResource resource) => $"/parameters/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(resource.ScopeRef!.Value.Value)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

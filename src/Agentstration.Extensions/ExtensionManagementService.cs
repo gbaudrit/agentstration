@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agentstration.Extensions.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
@@ -19,6 +20,15 @@ public sealed record ExtensionProviderBinding(
     string Namespace,
     string ContributionId);
 
+public sealed record ExtensionValueRequirement(
+    string ContributionKind,
+    string ContributionId,
+    string Id,
+    bool Required,
+    string ValueType,
+    string Protection,
+    string? Description);
+
 public sealed record ExtensionView(
     string RegistrationName,
     string RegistrationNamespace,
@@ -34,7 +44,8 @@ public sealed record ExtensionView(
     bool RegistrationEnabled,
     AepEnrollmentMode EnrollmentMode,
     ResourceScopeRef? RegistrationScopeRef,
-    string RegistrationDisplayName);
+    string RegistrationDisplayName,
+    IReadOnlyList<ExtensionValueRequirement> ValueRequirements);
 
 public sealed class ExtensionManagementService(
     IModelProviderConfigurationStore providers,
@@ -92,10 +103,30 @@ public sealed class ExtensionManagementService(
                 resource.Definition.Enabled,
                 resource.Definition.EnrollmentMode,
                 resource.ScopeRef,
-                resource.Definition.DisplayName));
+                resource.Definition.DisplayName,
+                (inspection.ValueRequirements ?? []).Select(MapRequirement).ToArray()));
         }
         return views;
     }
+
+    private static ExtensionValueRequirement MapRequirement(Agentstration.Aep.Abstractions.AepValueRequirement requirement)
+    {
+        var descriptor = JsonSerializer.SerializeToElement(requirement);
+        return new(
+            requirement.ContributionKind,
+            requirement.ContributionId,
+            requirement.Id,
+            requirement.Required,
+            Text(descriptor, "valueType") ?? Text(descriptor, "type") ?? "unknown",
+            requirement.Protection.ToString().ToLowerInvariant(),
+            Text(descriptor, "description"));
+    }
+
+    private static string? Text(JsonElement value, string name) => value.EnumerateObject()
+        .FirstOrDefault(property => string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+        .Value is { ValueKind: JsonValueKind.String } property
+            ? property.GetString()
+            : null;
 
     private static bool References(ModelProviderConfiguration provider, ExtensionRegistrationResource registration)
     {
