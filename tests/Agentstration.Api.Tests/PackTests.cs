@@ -32,6 +32,27 @@ namespace Agentstration.Management.Tests;
 public sealed class PackTests
 {
     [TestMethod]
+    public async Task OfficialAssistantCompositionHasStableEntryAndExplicitPlanningBoundary()
+    {
+        var root = FindRepositoryRoot();
+        var planning = await ReadPackDirectoryAsync(Path.Combine(root, "packs", "agentstration-resource-planning"));
+        var assistant = await ReadPackDirectoryAsync(Path.Combine(root, "packs", "agentstration-assistant"));
+
+        Assert.AreEqual("resource-planning", planning.Manifest.Metadata.Name);
+        Assert.HasCount(13, planning.Resources);
+        CollectionAssert.AreEquivalent(
+            new[] { "conversational-model", "local-runtime" },
+            planning.Manifest.Definition.Bindings.Select(value => value.Name).ToArray());
+        Assert.AreEqual("assistant", assistant.Manifest.Metadata.Name);
+        Assert.HasCount(9, assistant.Resources);
+        Assert.AreEqual("ask-agentstration", assistant.Resources.Single(value => value.Kind == EntryResourceKinds.Entry).Name);
+        var router = assistant.Resources.Single(value => value.Kind == FlowResourceKinds.Flow && value.Name == "assistant-router");
+        var planningStep = router.Manifest.GetProperty("definition").GetProperty("graph").GetProperty("steps")
+            .EnumerateArray().Single(value => value.TryGetProperty("name", out var name) && name.GetString() == "resource-planning");
+        Assert.AreEqual("agentstration.resource-planning", planningStep.GetProperty("flow").GetProperty("namespace").GetString());
+    }
+
+    [TestMethod]
     public void PackDefinitionDefaultsToWorkspaceScope()
     {
         Assert.AreEqual(ResourceScopeKind.Workspace, new PackDefinition().TargetScope);
@@ -829,6 +850,34 @@ public sealed class PackTests
             Metadata = new PackMetadata { Publisher = "agentstration", Name = "test-pack", Version = "1.0.0" },
             Definition = new PackDefinition { Resources = resources.Select(value => value.Path).ToArray() }
         }, resources, "test.pack.zip");
+
+    private static async Task<PackArchive> ReadPackDirectoryAsync(string directory)
+    {
+        await using var stream = new MemoryStream();
+        using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var path in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
+            {
+                var entry = zip.CreateEntry(Path.GetRelativePath(directory, path).Replace(Path.DirectorySeparatorChar, '/'));
+                await using var target = entry.Open();
+                await using var source = File.OpenRead(path);
+                await source.CopyToAsync(target);
+            }
+        }
+        stream.Position = 0;
+        return await new ZipPackArchiveReader().ReadAsync(stream, Path.GetFileName(directory) + ".zip", default);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "Agentstration.slnx"))) return current.FullName;
+            current = current.Parent;
+        }
+        throw new DirectoryNotFoundException("Could not locate the Agentstration repository root.");
+    }
 
     private static PackResourceDocument Document(string kind, string name)
     {

@@ -55,7 +55,7 @@ definition:
       - type: flow
         name: resource-planning
         displayName: Resource planning
-        flow: { resourceId: resource-planning, versionStrategy: active }
+        flow: { resourceId: resource-planning, namespace: agentstration.resource-planning, versionStrategy: active }
         inputMapping: { goal: "${input.prompt}" }
       - type: flow
         name: fallback
