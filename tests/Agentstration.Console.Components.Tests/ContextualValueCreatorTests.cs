@@ -60,6 +60,7 @@ public sealed class ContextualValueCreatorTests
             .Add(component => component.OnCreated, address => created = address));
 
         rendered.WaitForElement("option[value*='local-vault']");
+        Assert.AreEqual("api-key", rendered.Find("[data-testid='contextual-secret-name']").GetAttribute("value"));
         rendered.Find("[data-testid='contextual-secret-value']").Change("do-not-render-this-value");
         rendered.Find("form").Submit();
 
