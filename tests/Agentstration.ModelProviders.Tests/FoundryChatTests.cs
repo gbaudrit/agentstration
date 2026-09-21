@@ -163,13 +163,27 @@ public sealed class FoundryChatTests
                 Assert.AreEqual("high", body.RootElement.GetProperty("reasoning_effort").GetString());
                 return Json(HttpStatusCode.OK, Success);
             });
-            var advanced = Request() with { Options = new AepModelOptions
+            var advanced = Request() with
             {
-                ResponseFormat = JsonSerializer.SerializeToElement(new { type = "json_schema", json_schema = new
-                { name = "answer", schema = new { type = "object" }, strict = true } }),
-                AdditionalOptions = new Dictionary<string, JsonElement>
-                { ["reasoning_enabled"] = JsonSerializer.SerializeToElement(true), ["reasoning_effort"] = JsonSerializer.SerializeToElement("high") }
-            } };
+                Options = new AepModelOptions
+                {
+                    ResponseFormat = JsonSerializer.SerializeToElement(new
+                    {
+                        type = "json_schema",
+                        json_schema = new
+                        {
+                            name = "answer",
+                            schema = new { type = "object" },
+                            strict = true
+                        }
+                    }),
+                    AdditionalOptions = new Dictionary<string, JsonElement>
+                    {
+                        ["reasoning_enabled"] = JsonSerializer.SerializeToElement(true),
+                        ["reasoning_effort"] = JsonSerializer.SerializeToElement("high")
+                    }
+                }
+            };
             await Provider(client).ChatAsync(advanced, default);
             Assert.AreEqual(1, inferenceCalls);
 
@@ -187,14 +201,29 @@ public sealed class FoundryChatTests
         {
             var calls = 0;
             using var client = Client((_, _) => { calls++; return Task.FromResult(Json(HttpStatusCode.OK, Success)); });
-            var badSchema = Request() with { Options = new AepModelOptions { ResponseFormat = JsonSerializer.SerializeToElement(new
-            { type = "json_schema", json_schema = new { name = "answer", schema = new { type = "object" }, extra = 1 } }) } };
-            var badEffort = Request() with { Options = new AepModelOptions { AdditionalOptions = new Dictionary<string, JsonElement>
-            { ["reasoning_effort"] = JsonSerializer.SerializeToElement("extreme") } } };
+            var badSchema = Request() with
+            {
+                Options = new AepModelOptions
+                {
+                    ResponseFormat = JsonSerializer.SerializeToElement(new
+                    { type = "json_schema", json_schema = new { name = "answer", schema = new { type = "object" }, extra = 1 } })
+                }
+            };
+            var badEffort = Request() with
+            {
+                Options = new AepModelOptions
+                {
+                    AdditionalOptions = new Dictionary<string, JsonElement>
+                    { ["reasoning_effort"] = JsonSerializer.SerializeToElement("extreme") }
+                }
+            };
             Assert.AreEqual("unsupported_option", (await Assert.ThrowsAsync<AepServerException>(() => Provider(client).ChatAsync(badSchema, default))).Code);
             Assert.AreEqual("unsupported_option", (await Assert.ThrowsAsync<AepServerException>(() => Provider(client).ChatAsync(badEffort, default))).Code);
-            var oversizedTool = Request() with { Tools = [new AepToolDefinition("lookup", "search",
-                JsonSerializer.SerializeToElement(new { type = "object", description = new string('x', 65536) }))] };
+            var oversizedTool = Request() with
+            {
+                Tools = [new AepToolDefinition("lookup", "search",
+                JsonSerializer.SerializeToElement(new { type = "object", description = new string('x', 65536) }))]
+            };
             Assert.AreEqual("invalid_request", (await Assert.ThrowsAsync<AepServerException>(() => Provider(client).ChatAsync(oversizedTool, default))).Code);
             Assert.AreEqual(0, calls);
         });
@@ -213,8 +242,14 @@ public sealed class FoundryChatTests
                 inferenceCalls++;
                 return Task.FromResult(Json(HttpStatusCode.OK, Success));
             });
-            var request = Request() with { Options = new AepModelOptions { AdditionalOptions = new Dictionary<string, JsonElement>
-            { ["reasoning_enabled"] = JsonSerializer.SerializeToElement(true), ["reasoning_effort"] = JsonSerializer.SerializeToElement("high") } } };
+            var request = Request() with
+            {
+                Options = new AepModelOptions
+                {
+                    AdditionalOptions = new Dictionary<string, JsonElement>
+                    { ["reasoning_enabled"] = JsonSerializer.SerializeToElement(true), ["reasoning_effort"] = JsonSerializer.SerializeToElement("high") }
+                }
+            };
             var exception = await Assert.ThrowsAsync<AepServerException>(() => Provider(client).ChatAsync(request, default));
             Assert.AreEqual("unsupported_option", exception.Code);
             Assert.AreEqual(0, inferenceCalls);
@@ -234,8 +269,14 @@ public sealed class FoundryChatTests
                 Assert.AreEqual("none", body.RootElement.GetProperty("reasoning_effort").GetString());
                 return Json(HttpStatusCode.OK, Success);
             });
-            var request = Request() with { Options = new AepModelOptions { AdditionalOptions = new Dictionary<string, JsonElement>
-            { ["reasoning_enabled"] = JsonSerializer.SerializeToElement(false) } } };
+            var request = Request() with
+            {
+                Options = new AepModelOptions
+                {
+                    AdditionalOptions = new Dictionary<string, JsonElement>
+                    { ["reasoning_enabled"] = JsonSerializer.SerializeToElement(false) }
+                }
+            };
             await Provider(client).ChatAsync(request, default);
         });
     }

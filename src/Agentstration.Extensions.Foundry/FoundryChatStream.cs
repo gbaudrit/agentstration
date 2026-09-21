@@ -55,20 +55,20 @@ internal static class FoundryChatStream
             catch (HttpRequestException exception)
             { throw new AepServerException("provider_unavailable", "Foundry chat stream was interrupted.", innerException: exception); }
             await using (stream)
-            await foreach (var data in ReadEventsAsync(stream, timeout.Token))
-            {
-                if (data == "[DONE]")
+                await foreach (var data in ReadEventsAsync(stream, timeout.Token))
                 {
-                    foreach (var update in state.Complete()) yield return update;
-                    yield break;
+                    if (data == "[DONE]")
+                    {
+                        foreach (var update in state.Complete()) yield return update;
+                        yield break;
+                    }
+                    JsonDocument document;
+                    try { document = JsonDocument.Parse(data, new JsonDocumentOptions { MaxDepth = 32 }); }
+                    catch (JsonException exception)
+                    { throw new AepServerException("invalid_response", "Foundry chat returned malformed stream JSON.", innerException: exception); }
+                    using (document)
+                        foreach (var update in state.Accept(document.RootElement)) yield return update;
                 }
-                JsonDocument document;
-                try { document = JsonDocument.Parse(data, new JsonDocumentOptions { MaxDepth = 32 }); }
-                catch (JsonException exception)
-                { throw new AepServerException("invalid_response", "Foundry chat returned malformed stream JSON.", innerException: exception); }
-                using (document)
-                    foreach (var update in state.Accept(document.RootElement)) yield return update;
-            }
             throw FoundryChatCompletion.InvalidResponse("Foundry chat stream ended without a completion marker.");
         }
     }

@@ -718,6 +718,25 @@ public sealed class AepConformanceTests
         Assert.IsFalse(denied.Message.Contains("private-value", StringComparison.Ordinal));
         Assert.IsFalse(denied.Message.Contains("private-secret", StringComparison.Ordinal));
 
+        using var problemHttp = new HttpClient(new SecretAccessResponseHandler(HttpStatusCode.BadRequest,
+            "{\"title\":\"Bad Request\",\"detail\":\"private-detail\"}"));
+        var problem = await Assert.ThrowsExactlyAsync<AepProtocolException>(() =>
+            new AepSecretAccessClient(problemHttp).RedeemAsync(grant));
+        Assert.AreEqual("secret_access_failed", problem.Code);
+        Assert.AreEqual(HttpStatusCode.BadRequest, problem.StatusCode);
+        Assert.IsFalse(problem.Message.Contains("private-detail", StringComparison.Ordinal));
+
+        using var extensionHttp = new HttpClient(new SecretAccessResponseHandler(HttpStatusCode.BadRequest,
+            "{\"title\":\"Bad Request\",\"detail\":\"private-detail\"}"))
+        {
+            BaseAddress = new Uri("https://extension.example/")
+        };
+        var extensionProblem = await Assert.ThrowsExactlyAsync<AepProtocolException>(() =>
+            new AepClient(extensionHttp).GetManifestAsync());
+        Assert.AreEqual("extension_request_failed", extensionProblem.Code);
+        Assert.AreEqual(HttpStatusCode.BadRequest, extensionProblem.StatusCode);
+        Assert.IsFalse(extensionProblem.Message.Contains("private-detail", StringComparison.Ordinal));
+
         using var invalidHttp = new HttpClient(new SecretAccessResponseHandler(HttpStatusCode.OK,
             "{\"version\":\"1.0\",\"secretValueBase64\":\"not-base64\"}"));
         var invalid = await Assert.ThrowsExactlyAsync<AepProtocolException>(() =>

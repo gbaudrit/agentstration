@@ -78,16 +78,22 @@ public sealed class FoundryStreamingTests
             using var client = Client(async (request, token) =>
             {
                 if (request.Method == HttpMethod.Get)
-                    return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(
                         """{"value":[{"type":"ModelDeployment","name":"deployment","capabilities":{"chat":true,"jsonObject":true}}]}""",
-                        Encoding.UTF8, "application/json") };
+                        Encoding.UTF8, "application/json")
+                    };
                 inferenceCalls++;
                 using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(token));
                 Assert.AreEqual("json_object", body.RootElement.GetProperty("response_format").GetProperty("type").GetString());
                 return Stream("data: {\"choices\":[{\"delta\":{\"content\":\"{}\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n");
             });
-            var request = Request() with { Options = new AepModelOptions
-            { ResponseFormat = JsonSerializer.SerializeToElement(new { type = "json_object" }) } };
+            var request = Request() with
+            {
+                Options = new AepModelOptions
+                { ResponseFormat = JsonSerializer.SerializeToElement(new { type = "json_object" }) }
+            };
             var updates = await CollectAsync(Provider(client), request);
             Assert.AreEqual("{}", string.Concat(updates.SelectMany(update => update.Contents).Select(content => content.Text)));
             Assert.AreEqual(1, inferenceCalls);
@@ -150,8 +156,11 @@ public sealed class FoundryStreamingTests
                 return Stream("");
             });
             var provider = Provider(client);
-            var bad = Request() with { Options = new AepModelOptions
-                { ResponseFormat = JsonSerializer.SerializeToElement(new { type = "json_object", extra = true }) } };
+            var bad = Request() with
+            {
+                Options = new AepModelOptions
+                { ResponseFormat = JsonSerializer.SerializeToElement(new { type = "json_object", extra = true }) }
+            };
             Assert.AreEqual("unsupported_option", (await Assert.ThrowsAsync<AepServerException>(
                 async () => await CollectAsync(provider, bad))).Code);
             Assert.AreEqual(0, calls);
@@ -176,9 +185,12 @@ public sealed class FoundryStreamingTests
     private static FoundryAepModelProvider Provider(HttpClient client)
     {
         return new(client, new FoundryExtensionOptions(), new FoundryBoundConnectionResolver(Client((_, _) => Task.FromResult(
-            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(
                 new AepSecretAccessResponse(AepProtocol.SecretAccessVersion, Convert.ToBase64String(Encoding.UTF8.GetBytes("offline-test-key"))),
-                AepProtocol.JsonOptions), Encoding.UTF8, "application/json") }))));
+                AepProtocol.JsonOptions), Encoding.UTF8, "application/json")
+            }))));
     }
     private static IReadOnlyList<AepBoundValue> BoundValues() =>
     [

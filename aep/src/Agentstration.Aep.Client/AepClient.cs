@@ -300,8 +300,8 @@ public sealed class AepClient(
         try { error = await response.Content.ReadFromJsonAsync<AepErrorResponse>(AepProtocol.JsonOptions, cancellationToken); }
         catch (JsonException) { }
         throw new AepProtocolException(
-            error?.Error.Code ?? "extension_request_failed",
-            error?.Error.Message ?? $"The AEP extension returned HTTP {(int)response.StatusCode}.",
+            error?.Error?.Code ?? "extension_request_failed",
+            error?.Error?.Message ?? $"The AEP extension returned HTTP {(int)response.StatusCode}.",
             response.StatusCode);
     }
 }
