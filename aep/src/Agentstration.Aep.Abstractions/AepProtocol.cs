@@ -500,6 +500,10 @@ public static class AepDescriptorValidator
             && (!descriptor.Capabilities.TryGetValue(AepCapabilityNames.BoundValues, out var boundValuesCapability)
                 || !string.Equals(boundValuesCapability.Version, AepProtocol.BoundValuesCapabilityVersion, StringComparison.Ordinal)))
             errors.Add("Value requirements need the aep.bound-values capability version 1.0.");
+        if (requirements.Any(requirement => requirement?.Protection == AepValueProtection.Secured)
+            && (!descriptor.Capabilities.TryGetValue(AepCapabilityNames.SecretAccess, out var secretAccessCapability)
+                || !string.Equals(secretAccessCapability.Version, AepProtocol.SecretAccessVersion, StringComparison.Ordinal)))
+            errors.Add("Secured value requirements need the aep.secret-access capability version 1.0.");
         var requirementIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var requirement in requirements)
         {

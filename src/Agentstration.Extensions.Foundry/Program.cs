@@ -1,3 +1,4 @@
+using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Extensions.Foundry;
 
@@ -17,6 +18,7 @@ builder.Services.AddAgentstrationAep(options =>
         "Microsoft Foundry",
         "1.0.0",
         "Optional Microsoft Foundry model-deployment discovery for Agentstration.");
+    options.Capabilities[AepCapabilityNames.SecretAccess] = new(AepProtocol.SecretAccessVersion);
     foreach (var requirement in FoundryValueRequirements.All) options.ValueRequirements.Add(requirement);
 });
 builder.Services.AddSingleton<IAepModelProvider>(services => services.GetRequiredService<FoundryAepModelProvider>());

@@ -22,6 +22,8 @@ public sealed class FoundryProviderTests
         Assert.IsNotNull(manifest);
         Assert.IsTrue(manifest.Capabilities.ContainsKey(AepCapabilityNames.ValueRequirements));
         Assert.IsTrue(manifest.Capabilities.ContainsKey(AepCapabilityNames.BoundValues));
+        Assert.AreEqual(AepProtocol.SecretAccessVersion,
+            manifest.Capabilities[AepCapabilityNames.SecretAccess].Version);
         var requirements = manifest.ValueRequirements!.OrderBy(value => value.Id, StringComparer.Ordinal).ToArray();
         CollectionAssert.AreEqual(new[]
         {
