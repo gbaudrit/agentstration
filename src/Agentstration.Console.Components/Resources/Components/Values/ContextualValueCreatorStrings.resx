@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
+  <data name="Parameter.Title"><value>Create a Parameter</value></data><data name="Parameter.Help"><value>Create a reusable configuration value without leaving the current task.</value></data>
+  <data name="Secret.Title"><value>Create a Secret</value></data><data name="Secret.Help"><value>Create write-only secret metadata and store its value in an eligible Vault.</value></data>
+  <data name="Name"><value>Name</value></data><data name="DisplayName"><value>Display name</value></data><data name="Description"><value>Description</value></data><data name="Scope"><value>Ownership scope</value></data>
+  <data name="ValueType"><value>Value type</value></data><data name="ValueType.Text"><value>Text</value></data><data name="ValueType.WholeNumber"><value>Whole number</value></data><data name="ValueType.DecimalNumber"><value>Decimal number</value></data><data name="ValueType.Logical"><value>Boolean</value></data>
+  <data name="ExpectedFormat"><value>Expected format: {0}</value></data><data name="Value"><value>Value</value></data>
+  <data name="Vault"><value>Vault</value></data><data name="SelectVault"><value>Select a Vault</value></data><data name="VaultKey"><value>Vault key</value></data><data name="SecretValue"><value>Secret value</value></data>
+  <data name="NoEligibleVault"><value>No Vault can be used from this scope. Create or grant a Vault first.</value></data><data name="Secret.WriteOnly"><value>The value is sent directly to the Vault and is never read back by the Console.</value></data><data name="Secret.ValueWriteFailed"><value>Secret '{0}' was created, but its value could not be stored. Open the Secret page to complete its configuration.</value></data>
+  <data name="Cancel"><value>Cancel</value></data><data name="Creating"><value>Creating…</value></data><data name="CreateAndUse"><value>Create and use</value></data>
+  <data name="DefaultNamespaceOnly"><value>Parameters and Secrets currently use the default namespace.</value></data>
+</root>

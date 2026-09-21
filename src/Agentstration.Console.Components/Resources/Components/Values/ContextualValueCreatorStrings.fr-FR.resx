@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
+  <data name="Parameter.Title"><value>Créer un paramètre</value></data><data name="Parameter.Help"><value>Créez une valeur de configuration réutilisable sans quitter la tâche en cours.</value></data>
+  <data name="Secret.Title"><value>Créer un secret</value></data><data name="Secret.Help"><value>Créez les métadonnées d’un secret en écriture seule et stockez sa valeur dans un coffre éligible.</value></data>
+  <data name="Name"><value>Nom</value></data><data name="DisplayName"><value>Nom d’affichage</value></data><data name="Description"><value>Description</value></data><data name="Scope"><value>Périmètre propriétaire</value></data>
+  <data name="ValueType"><value>Type de valeur</value></data><data name="ValueType.Text"><value>Texte</value></data><data name="ValueType.WholeNumber"><value>Nombre entier</value></data><data name="ValueType.DecimalNumber"><value>Nombre décimal</value></data><data name="ValueType.Logical"><value>Booléen</value></data>
+  <data name="ExpectedFormat"><value>Format attendu : {0}</value></data><data name="Value"><value>Valeur</value></data>
+  <data name="Vault"><value>Coffre</value></data><data name="SelectVault"><value>Sélectionner un coffre</value></data><data name="VaultKey"><value>Clé dans le coffre</value></data><data name="SecretValue"><value>Valeur du secret</value></data>
+  <data name="NoEligibleVault"><value>Aucun coffre n’est utilisable depuis ce périmètre. Créez ou autorisez d’abord un coffre.</value></data><data name="Secret.WriteOnly"><value>La valeur est envoyée directement au coffre et n’est jamais relue par la Console.</value></data><data name="Secret.ValueWriteFailed"><value>Le secret « {0} » a été créé, mais sa valeur n’a pas pu être enregistrée. Ouvrez la page du secret pour terminer sa configuration.</value></data>
+  <data name="Cancel"><value>Annuler</value></data><data name="Creating"><value>Création…</value></data><data name="CreateAndUse"><value>Créer et utiliser</value></data>
+  <data name="DefaultNamespaceOnly"><value>Les paramètres et secrets utilisent actuellement l’espace de noms par défaut.</value></data>
+</root>
