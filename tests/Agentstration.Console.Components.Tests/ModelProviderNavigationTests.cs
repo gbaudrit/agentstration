@@ -42,6 +42,42 @@ public sealed class ModelProviderNavigationTests
     }
 
     [TestMethod]
+    public void NewProviderDisplaysCanonicalRequirementTypeAndFormat()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        ExtensionResponse extension = new(
+            RegistrationName: "typed-extension",
+            RegistrationNamespace: ResourceNamespace.DefaultValue,
+            Endpoint: new Uri("http://localhost:5000"),
+            Status: "available",
+            Extension: new ExtensionIdentityResponse("typed.extension", "Typed extension", "1.0.0", null),
+            Contributions: [new ExtensionContributionResponse("model-provider", "typed")],
+            OptionSets: [],
+            Usages: [],
+            Providers: [],
+            Details: null,
+            DiscoverySource: "manual",
+            ValueRequirements:
+            [
+                new ExtensionValueRequirementResponse(
+                    "model-provider", "typed", "endpoint", true, "string", "standard", null, "uri")
+            ]);
+        using var context = CreateContext(out _, [extension]);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelproviders/new?extension=typed-extension&extensionNamespace=default&contributionId=typed");
+
+        var rendered = context.Render<ModelProviderDetails>();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var requirement = rendered.Find("[data-requirement-id='endpoint']");
+            StringAssert.Contains(requirement.TextContent, "Type attendu: string");
+            StringAssert.Contains(requirement.TextContent, "Format: uri");
+            Assert.IsFalse(requirement.TextContent.Contains("unknown", StringComparison.OrdinalIgnoreCase));
+        });
+    }
+
+    [TestMethod]
     public void NewModelProfilePreselectsAndLoadsSuggestedProvider()
     {
         using var culture = new TestCultureScope("en-US");
@@ -84,13 +120,14 @@ public sealed class ModelProviderNavigationTests
         });
     }
 
-    private static BunitContext CreateContext(out StubModelProvidersClient providers)
+    private static BunitContext CreateContext(out StubModelProvidersClient providers,
+        IReadOnlyList<ExtensionResponse>? extensions = null)
     {
         var context = new BunitContext();
         providers = new StubModelProvidersClient();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IModelProvidersClient>(providers);
-        context.Services.AddSingleton<IExtensionsClient>(new StubExtensionsClient());
+        context.Services.AddSingleton<IExtensionsClient>(new StubExtensionsClient(extensions ?? []));
         context.Services.AddSingleton<IParametersClient>(new StubParametersClient());
         context.Services.AddSingleton<ISecretsClient>(new StubSecretsClient());
         context.Services.AddSingleton(new NotificationState());
@@ -149,9 +186,9 @@ public sealed class ModelProviderNavigationTests
         };
     }
 
-    private sealed class StubExtensionsClient : IExtensionsClient
+    private sealed class StubExtensionsClient(IReadOnlyList<ExtensionResponse> extensions) : IExtensionsClient
     {
-        public Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ExtensionResponse>>([]);
+        public Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) => Task.FromResult(extensions);
         public Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
