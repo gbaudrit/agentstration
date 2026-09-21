@@ -256,7 +256,8 @@ public sealed record AepValueRequirement(
     AepValueType Type = AepValueType.Text,
     AepValueProtection Protection = AepValueProtection.Standard,
     string? Format = null,
-    string? Description = null);
+    string? Description = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<JsonElement>? AllowedValues = null);
 
 public enum AepBoundValueKind { Inline, SecretGrant }
 
@@ -284,6 +285,8 @@ public static class AepBoundValueValidator
 {
     public const int MaximumBoundValues = 64;
     public const int MaximumInlineValueBytes = 65_536;
+    public const int MaximumAllowedValues = 64;
+    public const int MaximumAllowedValuesBytes = 65_536;
 
     public static IReadOnlyList<AepBoundValueValidationIssue> Validate(
         IReadOnlyList<AepBoundValue>? values,
@@ -334,10 +337,17 @@ public static class AepBoundValueValidator
                     issues.Add(new("bound_value_too_large", value.RequirementId));
                 else if (!MatchesType(value.InlineValue.Value, requirement.Type))
                     issues.Add(new("bound_value_type_invalid", value.RequirementId));
+                else if (requirement.AllowedValues is { } allowedValues && !Contains(allowedValues, value.InlineValue.Value))
+                    issues.Add(new("bound_value_not_allowed", value.RequirementId));
             }
-            else if (!string.Equals(value.SecretGrant!.Version, AepProtocol.SecretAccessVersion, StringComparison.Ordinal)
-                || !string.Equals(value.SecretGrant.RequirementId, value.RequirementId, StringComparison.Ordinal))
-                issues.Add(new("bound_value_grant_invalid", value.RequirementId));
+            else
+            {
+                if (!string.Equals(value.SecretGrant!.Version, AepProtocol.SecretAccessVersion, StringComparison.Ordinal)
+                    || !string.Equals(value.SecretGrant.RequirementId, value.RequirementId, StringComparison.Ordinal))
+                    issues.Add(new("bound_value_grant_invalid", value.RequirementId));
+                else if (requirement.AllowedValues is not null)
+                    issues.Add(new("bound_value_allowed_values_require_inline", value.RequirementId));
+            }
         }
         if (requireAll)
         {
@@ -347,7 +357,7 @@ public static class AepBoundValueValidator
         return issues;
     }
 
-    private static bool MatchesType(JsonElement value, AepValueType type) => type switch
+    internal static bool MatchesType(JsonElement value, AepValueType type) => type switch
     {
         AepValueType.Text => value.ValueKind == JsonValueKind.String,
         AepValueType.WholeNumber => value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out _),
@@ -355,6 +365,9 @@ public static class AepBoundValueValidator
         AepValueType.Logical => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
         _ => false
     };
+
+    internal static bool Contains(IReadOnlyList<JsonElement> values, JsonElement candidate) =>
+        values.Any(value => JsonElement.DeepEquals(value, candidate));
 }
 
 public sealed record AepSecretAccessGrant(
@@ -506,6 +519,25 @@ public static class AepDescriptorValidator
                 errors.Add($"Value requirement '{requirement.Id}' format must contain at most 64 printable characters.");
             if (requirement.Description is { Length: > 256 } || requirement.Description?.Any(char.IsControl) == true)
                 errors.Add($"Value requirement '{requirement.Id}' description must contain at most 256 printable characters.");
+            if (requirement.AllowedValues is { } allowedValues)
+            {
+                if (requirement.Protection == AepValueProtection.Secured)
+                    errors.Add($"Secured Value requirement '{requirement.Id}' cannot declare allowed values.");
+                if (allowedValues.Count == 0)
+                    errors.Add($"Value requirement '{requirement.Id}' allowedValues must contain at least one value when present.");
+                if (allowedValues.Count > AepBoundValueValidator.MaximumAllowedValues)
+                    errors.Add($"Value requirement '{requirement.Id}' allowedValues may contain at most {AepBoundValueValidator.MaximumAllowedValues} values.");
+                if (allowedValues.All(value => value.ValueKind != JsonValueKind.Undefined)
+                    && JsonSerializer.SerializeToUtf8Bytes(allowedValues, AepProtocol.JsonOptions).Length > AepBoundValueValidator.MaximumAllowedValuesBytes)
+                    errors.Add($"Value requirement '{requirement.Id}' allowedValues exceeds the maximum serialized size.");
+                for (var index = 0; index < allowedValues.Count; index++)
+                {
+                    if (!AepBoundValueValidator.MatchesType(allowedValues[index], requirement.Type))
+                        errors.Add($"Value requirement '{requirement.Id}' allowedValues contains a value that does not match its declared type.");
+                    if (allowedValues.Take(index).Any(value => JsonElement.DeepEquals(value, allowedValues[index])))
+                        errors.Add($"Value requirement '{requirement.Id}' allowedValues contains a duplicate value.");
+                }
+            }
         }
         return errors;
     }

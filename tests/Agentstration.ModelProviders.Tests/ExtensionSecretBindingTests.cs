@@ -70,6 +70,25 @@ public sealed class ExtensionSecretBindingTests
         Assert.IsEmpty(Validate([], requireAll: false));
     }
 
+    [TestMethod]
+    public void AllowedValuesRequireAnInlineParameterBinding()
+    {
+        var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var requirements = new AepValueRequirement[]
+        {
+            new(AepContributionKinds.ModelProvider, "test", "mode", true, AllowedValues:
+            [
+                JsonSerializer.SerializeToElement("ApiKey"),
+                JsonSerializer.SerializeToElement("ManagedIdentity")
+            ])
+        };
+        var binding = ModelProviderValueBinding.FromSecret("mode", Reference("mode-secret", scope));
+
+        var issues = ModelProviderValueBindingValidator.Validate([binding], requirements, "test", requireAll: true);
+
+        Assert.IsTrue(issues.Any(value => value.Code == "value_binding_allowed_values_require_parameter"));
+    }
+
     private static IReadOnlyList<ExtensionSecretBindingIssue> Validate(
         IReadOnlyList<SecretBinding> bindings,
         bool requireAll) =>

@@ -82,7 +82,11 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
     {
         var requirements = new AepValueRequirement[]
         {
-            new(AepContributionKinds.ModelProvider, "discovered", "endpoint", true, AepValueType.Text),
+            new(AepContributionKinds.ModelProvider, "discovered", "endpoint", true, AepValueType.Text, AllowedValues:
+            [
+                JsonSerializer.SerializeToElement("https://provider.test"),
+                JsonSerializer.SerializeToElement("https://backup.test")
+            ]),
             new(AepContributionKinds.ModelProvider, "discovered", "credential", false,
                 AepValueType.Text, AepValueProtection.Secured)
         };
@@ -113,6 +117,15 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
                 Value = JsonSerializer.SerializeToElement("https://provider.test")
             }, tenant));
         Assert.AreEqual(HttpStatusCode.Created, parameter.StatusCode);
+        using var disallowedParameter = await client.PostAsJsonAsync("/api/parameters", new CreateParameterRequest(
+            "disallowed-endpoint",
+            new ParameterProperties
+            {
+                DisplayName = "Disallowed endpoint",
+                ValueType = ParameterValueType.Text,
+                Value = JsonSerializer.SerializeToElement("https://other.test")
+            }, tenant));
+        Assert.AreEqual(HttpStatusCode.Created, disallowedParameter.StatusCode);
         var reference = new ParameterReference(
             ResourceAddress.Create(ResourceNamespace.Default, ParameterResourceKinds.Parameter, "provider-endpoint"), tenant);
         ModelProviderProperties Properties(string name, IReadOnlyList<ModelProviderValueBinding> bindings) => new()
@@ -137,6 +150,10 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
                 ModelProviderValueBinding.FromParameter("endpoint", reference),
                 ModelProviderValueBinding.FromParameter("endpoint", reference)]),
             Properties("Wrong protection", [ModelProviderValueBinding.FromParameter("credential", reference)]),
+            Properties("Disallowed", [ModelProviderValueBinding.FromParameter("endpoint", reference with
+            {
+                Address = ResourceAddress.Create(ResourceNamespace.Default, ParameterResourceKinds.Parameter, "disallowed-endpoint")
+            })]),
             Properties("Missing", [ModelProviderValueBinding.FromParameter("endpoint", reference with
             {
                 Address = ResourceAddress.Create(ResourceNamespace.Default, ParameterResourceKinds.Parameter, "missing")
@@ -147,6 +164,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
             using var invalid = await client.PostAsJsonAsync("/api/modelproviders", new CreateModelProviderRequest(
                 $"invalid-binding-{index}", invalidCases[index], ScopeRef: tenant));
             Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+            Assert.IsFalse((await invalid.Content.ReadAsStringAsync()).Contains("https://other.test", StringComparison.Ordinal));
         }
 
         using var delete = new HttpRequestMessage(HttpMethod.Delete,

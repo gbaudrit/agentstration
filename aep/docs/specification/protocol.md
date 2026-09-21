@@ -59,14 +59,17 @@ An extension may declare logical, contribution-scoped Value Requirements in the 
   },
   "valueRequirements": [
     { "contributionKind": "model-provider", "contributionId": "foundry", "id": "credential", "required": true, "type": "string", "protection": "secured", "description": "API credential" },
-    { "contributionKind": "model-provider", "contributionId": "foundry", "id": "project-endpoint", "required": true, "type": "string", "protection": "standard", "format": "uri" }
+    { "contributionKind": "model-provider", "contributionId": "foundry", "id": "project-endpoint", "required": true, "type": "string", "protection": "standard", "format": "uri" },
+    { "contributionKind": "model-provider", "contributionId": "foundry", "id": "authentication-mode", "required": true, "type": "string", "protection": "standard", "allowedValues": ["ApiKey", "ManagedIdentity", "WorkloadIdentity", "Development"] }
   ]
 }
 ```
 
 Each identifier is a stable contribution-contract name: 1–64 characters, beginning with a lowercase ASCII letter, then lowercase letters, digits, `.`, `_` or `-`. Duplicate identifiers are rejected within one contribution. A requirement declares scalar type (`string`, `integer`, `number`, or `boolean`), optional format, required status and `standard` or `secured` protection. It contains no Parameter or Secret name, resource reference, scope or value.
 
-Model discovery uses `POST /aep/model-providers/{providerId}/models` with an `AepBoundValuesRequest`. Chat and streaming carry the same `boundValues` list in `AepChatRequest`. Each entry is exactly one inline JSON scalar or one Secret grant. Inline values are bounded to 65,536 serialized bytes. A secured requirement rejects inline values. Before contribution invocation, the server rejects duplicate, unknown, missing, malformed, oversized, mistyped and wrong-protection entries with value-free error messages.
+A standard requirement may declare one to 64 typed `allowedValues`, with a maximum combined serialized size of 65,536 bytes. Every entry must match the declared scalar type and values must be unique; string comparison is ordinal and case-sensitive. An absent list leaves the value unconstrained. A secured requirement cannot declare allowed values, and a constrained requirement must use an inline bound value rather than a Secret grant. These rules keep validation deterministic without resolving or exposing Secret material.
+
+Model discovery uses `POST /aep/model-providers/{providerId}/models` with an `AepBoundValuesRequest`. Chat and streaming carry the same `boundValues` list in `AepChatRequest`. Each entry is exactly one inline JSON scalar or one Secret grant. Inline values are bounded to 65,536 serialized bytes. A secured requirement rejects inline values, and an inline value outside its requirement's allowed set is rejected. Before contribution invocation, the server rejects duplicate, unknown, missing, malformed, oversized, mistyped, disallowed and wrong-protection entries with value-free error messages.
 
 ### Bound Secret access
 

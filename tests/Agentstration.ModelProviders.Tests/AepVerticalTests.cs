@@ -449,6 +449,30 @@ public sealed class AepVerticalTests
     }
 
     [TestMethod]
+    public async Task ProviderRejectsAParameterChangedToADisallowedValueBeforeInvocation()
+    {
+        var allowed = JsonSerializer.SerializeToElement("ApiKey");
+        await using var factory = new AepExtensionFactory(requireParameter: true, parameterAllowedValues: [allowed]);
+        using var http = factory.CreateClient();
+        var scope = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var parameter = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ParameterResourceKinds.Parameter, "authentication-mode");
+        var resolver = new RecordingParameterResolver(new Dictionary<ScopedResourceAddress, JsonElement>
+        {
+            [parameter] = allowed
+        });
+        var adapter = new AepModelProvider(new FixedHttpClientFactory(http), parameters: resolver);
+        var provider = BoundProvider("provider", scope, "authentication-mode", http.BaseAddress!);
+
+        await adapter.ListModelsAsync(provider);
+        resolver.Set(parameter, JsonSerializer.SerializeToElement("Password"));
+
+        var exception = await Assert.ThrowsExactlyAsync<ModelProviderConfigurationException>(
+            () => adapter.ListModelsAsync(provider).AsTask());
+        StringAssert.Contains(exception.Message, "bound_value_not_allowed");
+        Assert.HasCount(1, factory.Provider.ObservedBoundValueSets);
+    }
+
+    [TestMethod]
     public async Task AepResolutionFailsClosedWhenPinnedOptionVersionWasRemoved()
     {
         await using var factory = new AepExtensionFactory();
@@ -657,7 +681,8 @@ public sealed class AepVerticalTests
     };
 
     private sealed class AepExtensionFactory(bool addSecondOptionVersion = false, bool addThirdOptionVersion = false,
-        bool requireSecret = false, bool requireParameter = false) : WebApplicationFactory<OllamaAepModelProvider>
+        bool requireSecret = false, bool requireParameter = false,
+        IReadOnlyList<JsonElement>? parameterAllowedValues = null) : WebApplicationFactory<OllamaAepModelProvider>
     {
         public FakeProvider Provider { get; } = new();
 
@@ -685,7 +710,8 @@ public sealed class AepVerticalTests
                         AepContributionKinds.ModelProvider,
                         "test",
                         "endpoint",
-                        true));
+                        true,
+                        AllowedValues: parameterAllowedValues));
                 }
                 var original = options.OptionSets.Single() with { ContributionId = "test" };
                 options.OptionSets.Clear();

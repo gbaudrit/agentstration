@@ -54,6 +54,8 @@ public static class ModelProviderValueBindingValidator
                 case ModelProviderValueBindingKind.Secret:
                     if (!ValidSecret(binding.Secret) || binding.Parameter is not null)
                         issues.Add(new("value_binding_reference_invalid", $"Value requirement '{binding.RequirementId}' needs one exact scoped Secret reference.", binding.RequirementId));
+                    else if (requirement.AllowedValues is not null)
+                        issues.Add(new("value_binding_allowed_values_require_parameter", $"Value requirement '{binding.RequirementId}' declares allowed values and must bind a Parameter.", binding.RequirementId));
                     break;
                 default:
                     issues.Add(new("value_binding_kind_invalid", $"Value requirement '{binding.RequirementId}' has an unsupported binding kind.", binding.RequirementId));
