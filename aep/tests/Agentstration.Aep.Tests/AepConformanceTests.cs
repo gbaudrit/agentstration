@@ -64,7 +64,12 @@ public sealed class AepConformanceTests
                         "terminal",
                         "proxy-host",
                         false,
-                        Format: "hostname"));
+                        Format: "hostname",
+                        AllowedValues:
+                        [
+                            JsonSerializer.SerializeToElement("proxy.internal"),
+                            JsonSerializer.SerializeToElement("proxy.backup")
+                        ]));
                 });
             }));
         using var httpClient = factory.CreateClient();
@@ -83,6 +88,7 @@ public sealed class AepConformanceTests
         Assert.HasCount(2, manifest.ValueRequirements);
         Assert.AreEqual(AepValueProtection.Secured, manifest.ValueRequirements[0].Protection);
         Assert.AreEqual("hostname", manifest.ValueRequirements[1].Format);
+        Assert.AreEqual("proxy.internal", manifest.ValueRequirements[1].AllowedValues?[0].GetString());
         StringAssert.Contains(json, "\"valueRequirements\"");
         Assert.IsFalse(json.Contains("secretRequirements", StringComparison.Ordinal));
         Assert.IsFalse(json.Contains("secretReference", StringComparison.OrdinalIgnoreCase));
@@ -147,6 +153,42 @@ public sealed class AepConformanceTests
                 [AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion)
             }
         }).Any(value => value.Contains("not supported", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void ValueRequirementsRejectInvalidAllowedValues()
+    {
+        AepManifest Manifest(AepValueRequirement requirement) => new(
+            AepProtocol.Version,
+            new("sample", "Sample", "1.0.0"),
+            new Dictionary<string, AepCapabilityDescriptor>
+            {
+                [AepCapabilityNames.ValueRequirements] = new(AepProtocol.ValueRequirementsCapabilityVersion),
+                [AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion)
+            },
+            new([new("test", "Test", new())]),
+            ValueRequirements: [requirement]);
+
+        var empty = new AepValueRequirement(AepContributionKinds.ModelProvider, "test", "mode", true, AllowedValues: []);
+        var secured = empty with
+        {
+            Protection = AepValueProtection.Secured,
+            AllowedValues = [JsonSerializer.SerializeToElement("ApiKey")]
+        };
+        var wrongType = empty with { AllowedValues = [JsonSerializer.SerializeToElement(42)] };
+        var duplicate = empty with
+        {
+            AllowedValues =
+            [
+                JsonSerializer.SerializeToElement("ApiKey"),
+                JsonSerializer.SerializeToElement("ApiKey")
+            ]
+        };
+
+        Assert.IsTrue(AepDescriptorValidator.Validate(Manifest(empty)).Any(value => value.Contains("at least one", StringComparison.Ordinal)));
+        Assert.IsTrue(AepDescriptorValidator.Validate(Manifest(secured)).Any(value => value.Contains("Secured", StringComparison.Ordinal)));
+        Assert.IsTrue(AepDescriptorValidator.Validate(Manifest(wrongType)).Any(value => value.Contains("declared type", StringComparison.Ordinal)));
+        Assert.IsTrue(AepDescriptorValidator.Validate(Manifest(duplicate)).Any(value => value.Contains("duplicate", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -699,14 +741,20 @@ public sealed class AepConformanceTests
         var requirements = new AepValueRequirement[]
         {
             new(AepContributionKinds.ModelProvider, "test", "credential", true, Protection: AepValueProtection.Secured),
-            new(AepContributionKinds.ModelProvider, "test", "timeout", false, AepValueType.WholeNumber)
+            new(AepContributionKinds.ModelProvider, "test", "timeout", false, AepValueType.WholeNumber),
+            new(AepContributionKinds.ModelProvider, "test", "mode", false, AllowedValues:
+            [
+                JsonSerializer.SerializeToElement("ApiKey"),
+                JsonSerializer.SerializeToElement("ManagedIdentity")
+            ])
         };
         var wrongProtection = AepBoundValue.Inline("credential", JsonSerializer.SerializeToElement("not-secret"));
         var wrongType = AepBoundValue.Inline("timeout", JsonSerializer.SerializeToElement("ten"));
         var unknown = AepBoundValue.Inline("other", JsonSerializer.SerializeToElement("value"));
+        var disallowed = AepBoundValue.Inline("mode", JsonSerializer.SerializeToElement("Password"));
 
         var issues = AepBoundValueValidator.Validate(
-            [wrongProtection, wrongType, unknown],
+            [wrongProtection, wrongType, unknown, disallowed],
             requirements,
             AepContributionKinds.ModelProvider,
             "test",
@@ -715,6 +763,63 @@ public sealed class AepConformanceTests
         Assert.IsTrue(issues.Any(value => value.Code == "bound_value_protection_invalid"));
         Assert.IsTrue(issues.Any(value => value.Code == "bound_value_type_invalid"));
         Assert.IsTrue(issues.Any(value => value.Code == "bound_value_unknown"));
+        Assert.IsTrue(issues.Any(value => value.Code == "bound_value_not_allowed"));
+    }
+
+    [TestMethod]
+    public void AllowedValuesValidateEveryScalarTypeAndRejectSecretGrants()
+    {
+        var cases = new (AepValueType Type, JsonElement Allowed, JsonElement Rejected)[]
+        {
+            (AepValueType.Text, JsonSerializer.SerializeToElement("ApiKey"), JsonSerializer.SerializeToElement("Password")),
+            (AepValueType.WholeNumber, JsonSerializer.SerializeToElement(4), JsonSerializer.SerializeToElement(5)),
+            (AepValueType.DecimalNumber, JsonSerializer.SerializeToElement(0.25m), JsonSerializer.SerializeToElement(0.5m)),
+            (AepValueType.Logical, JsonSerializer.SerializeToElement(true), JsonSerializer.SerializeToElement(false))
+        };
+
+        foreach (var testCase in cases)
+        {
+            var requirement = new AepValueRequirement(
+                AepContributionKinds.ModelProvider,
+                "test",
+                "choice",
+                true,
+                testCase.Type,
+                AllowedValues: [testCase.Allowed]);
+            Assert.IsEmpty(AepBoundValueValidator.Validate(
+                [AepBoundValue.Inline("choice", testCase.Allowed)],
+                [requirement],
+                AepContributionKinds.ModelProvider,
+                "test",
+                requireAll: true));
+            Assert.IsTrue(AepBoundValueValidator.Validate(
+                [AepBoundValue.Inline("choice", testCase.Rejected)],
+                [requirement],
+                AepContributionKinds.ModelProvider,
+                "test",
+                requireAll: true).Any(value => value.Code == "bound_value_not_allowed"));
+        }
+
+        var constrained = new AepValueRequirement(
+            AepContributionKinds.ModelProvider,
+            "test",
+            "choice",
+            true,
+            AllowedValues: [JsonSerializer.SerializeToElement("ApiKey")]);
+        var grant = new AepSecretAccessGrant(
+            AepProtocol.SecretAccessVersion,
+            new Uri("https://host.test/aep/secret-access"),
+            "extension",
+            "choice",
+            "execution",
+            "opaque");
+
+        Assert.IsTrue(AepBoundValueValidator.Validate(
+            [AepBoundValue.Secured("choice", grant)],
+            [constrained],
+            AepContributionKinds.ModelProvider,
+            "test",
+            requireAll: true).Any(value => value.Code == "bound_value_allowed_values_require_inline"));
     }
 
     [TestMethod]
