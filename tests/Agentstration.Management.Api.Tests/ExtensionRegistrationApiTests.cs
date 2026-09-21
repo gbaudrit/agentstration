@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Agentstration.Aep.Abstractions;
 using Agentstration.Api.Contracts;
 using Agentstration.Extensions.Contracts;
 using Agentstration.ModelProviders;
@@ -117,6 +118,34 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
         Assert.AreEqual("http://127.0.0.1:1/", extension.Endpoint.AbsoluteUri);
         Assert.IsEmpty(extension.OptionSets);
         Assert.IsTrue(extension.Providers.Any(value => value.Name == "ollama-local" && value.ContributionId == "ollama"));
+    }
+
+    [TestMethod]
+    public async Task ExtensionsApiProjectsCanonicalValueRequirementTypesAndFormats()
+    {
+        AepValueRequirement[] requirements =
+        [
+            new(AepContributionKinds.ModelProvider, "discovered", "text", true, AepValueType.Text, Format: "uri"),
+            new(AepContributionKinds.ModelProvider, "discovered", "integer", true, AepValueType.WholeNumber),
+            new(AepContributionKinds.ModelProvider, "discovered", "number", true, AepValueType.DecimalNumber),
+            new(AepContributionKinds.ModelProvider, "discovered", "boolean", true, AepValueType.Logical)
+        ];
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IExtensionInspector>();
+            services.AddSingleton<IExtensionInspector>(new ConfiguredEndpointInspector(requirements));
+        }));
+        using var client = factory.CreateClient();
+
+        var response = await client.GetFromJsonAsync<ValueResponse<ExtensionResponse>>("/api/extensions");
+        var projected = response!.Value.Single(value => value.RegistrationName == "ollama-extension").ValueRequirements!;
+
+        Assert.AreEqual("string", projected.Single(value => value.Id == "text").ValueType);
+        Assert.AreEqual("uri", projected.Single(value => value.Id == "text").Format);
+        Assert.AreEqual("integer", projected.Single(value => value.Id == "integer").ValueType);
+        Assert.AreEqual("number", projected.Single(value => value.Id == "number").ValueType);
+        Assert.AreEqual("boolean", projected.Single(value => value.Id == "boolean").ValueType);
+        Assert.IsTrue(projected.Where(value => value.Id != "text").All(value => value.Format is null));
     }
 
     [TestMethod]

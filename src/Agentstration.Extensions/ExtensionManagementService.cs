@@ -1,4 +1,4 @@
-using System.Text.Json;
+using Agentstration.Aep.Abstractions;
 using Agentstration.Extensions.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
@@ -27,7 +27,8 @@ public sealed record ExtensionValueRequirement(
     bool Required,
     string ValueType,
     string Protection,
-    string? Description);
+    string? Description,
+    string? Format = null);
 
 public sealed record ExtensionView(
     string RegistrationName,
@@ -109,24 +110,22 @@ public sealed class ExtensionManagementService(
         return views;
     }
 
-    private static ExtensionValueRequirement MapRequirement(Agentstration.Aep.Abstractions.AepValueRequirement requirement)
-    {
-        var descriptor = JsonSerializer.SerializeToElement(requirement);
-        return new(
-            requirement.ContributionKind,
-            requirement.ContributionId,
-            requirement.Id,
-            requirement.Required,
-            Text(descriptor, "valueType") ?? Text(descriptor, "type") ?? "unknown",
-            requirement.Protection.ToString().ToLowerInvariant(),
-            Text(descriptor, "description"));
-    }
-
-    private static string? Text(JsonElement value, string name) => value.EnumerateObject()
-        .FirstOrDefault(property => string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
-        .Value is { ValueKind: JsonValueKind.String } property
-            ? property.GetString()
-            : null;
+    private static ExtensionValueRequirement MapRequirement(AepValueRequirement requirement) => new(
+        requirement.ContributionKind,
+        requirement.ContributionId,
+        requirement.Id,
+        requirement.Required,
+        requirement.Type switch
+        {
+            AepValueType.Text => "string",
+            AepValueType.WholeNumber => "integer",
+            AepValueType.DecimalNumber => "number",
+            AepValueType.Logical => "boolean",
+            _ => "unknown"
+        },
+        requirement.Protection.ToString().ToLowerInvariant(),
+        requirement.Description,
+        requirement.Format);
 
     private static bool References(ModelProviderConfiguration provider, ExtensionRegistrationResource registration)
     {

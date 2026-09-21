@@ -152,7 +152,8 @@ public static class ExtensionEndpoints
             requirement.Required,
             requirement.ValueType,
             requirement.Protection,
-            requirement.Description)).ToArray());
+            requirement.Description,
+            requirement.Format)).ToArray());
 
     private static ExtensionInventoryItemResponse MapInventory(ExtensionInventoryItem item) => new(
         item.Key,
