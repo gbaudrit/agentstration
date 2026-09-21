@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
@@ -106,6 +107,43 @@ public sealed class ModelProviderNavigationTests
             Assert.AreEqual(ParameterValueType.Text.ToString(), rendered.Find("[data-testid='contextual-parameter-value-type']").GetAttribute("value"));
             StringAssert.Contains(rendered.Markup, "Format attendu : uri");
         });
+    }
+
+    [TestMethod]
+    public void NewProviderProjectsAllowedValuesIntoTheReusableParameterCreator()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        ExtensionResponse extension = new(
+            RegistrationName: "typed-extension",
+            RegistrationNamespace: ResourceNamespace.DefaultValue,
+            Endpoint: new Uri("http://localhost:5000"),
+            Status: "available",
+            Extension: new ExtensionIdentityResponse("typed.extension", "Typed extension", "1.0.0", null),
+            Contributions: [new ExtensionContributionResponse("model-provider", "typed")],
+            OptionSets: [], Usages: [], Providers: [], Details: null, DiscoverySource: "manual",
+            ValueRequirements:
+            [
+                new("model-provider", "typed", "authenticationMode", true, "string", "standard", "Authentication mode",
+                    AllowedValues:
+                    [
+                        JsonSerializer.SerializeToElement("ApiKey"),
+                        JsonSerializer.SerializeToElement("ManagedIdentity"),
+                        JsonSerializer.SerializeToElement("WorkloadIdentity"),
+                        JsonSerializer.SerializeToElement("Development")
+                    ])
+            ]);
+        using var context = CreateContext(out _, [extension]);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelproviders/new?extension=typed-extension&extensionNamespace=default&contributionId=typed");
+
+        var rendered = context.Render<ModelProviderDetails>();
+        rendered.WaitForElement("[data-testid='model-provider-binding-create']:not([disabled])").Click();
+
+        var select = rendered.WaitForElement("select[data-testid='contextual-parameter-value']");
+        CollectionAssert.AreEqual(
+            new[] { "ApiKey", "ManagedIdentity", "WorkloadIdentity", "Development" },
+            select.QuerySelectorAll("option").Select(option => option.GetAttribute("value")).ToArray());
+        Assert.AreEqual("ApiKey", ((AngleSharp.Html.Dom.IHtmlSelectElement)select).Value);
     }
 
     [TestMethod]

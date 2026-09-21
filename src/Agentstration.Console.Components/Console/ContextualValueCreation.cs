@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agentstration.Parameters;
 using Agentstration.Resources;
 
@@ -10,7 +11,8 @@ public sealed record ContextualValueCreationContext(
     string? Description = null,
     ResourceNamespace? Namespace = null,
     ParameterValueType? ValueType = null,
-    string? Format = null)
+    string? Format = null,
+    IReadOnlyList<JsonElement>? AllowedValues = null)
 {
     public ResourceNamespace EffectiveNamespace => Namespace ?? ResourceNamespace.Default;
 }

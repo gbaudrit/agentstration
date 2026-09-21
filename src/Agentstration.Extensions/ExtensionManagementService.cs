@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Extensions.Contracts;
 using Agentstration.ModelProviders;
@@ -28,7 +29,8 @@ public sealed record ExtensionValueRequirement(
     string ValueType,
     string Protection,
     string? Description,
-    string? Format = null);
+    string? Format = null,
+    IReadOnlyList<JsonElement>? AllowedValues = null);
 
 public sealed record ExtensionView(
     string RegistrationName,
@@ -125,7 +127,8 @@ public sealed class ExtensionManagementService(
         },
         requirement.Protection.ToString().ToLowerInvariant(),
         requirement.Description,
-        requirement.Format);
+        requirement.Format,
+        requirement.AllowedValues?.Select(value => value.Clone()).ToArray());
 
     private static bool References(ModelProviderConfiguration provider, ExtensionRegistrationResource registration)
     {

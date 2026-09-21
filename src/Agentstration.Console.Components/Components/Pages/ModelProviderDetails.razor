@@ -158,7 +158,8 @@ else
             requirement.Description,
             ResourceNamespace.Default,
             ParameterType(requirement.ValueType),
-            requirement.Format);
+            requirement.Format,
+            requirement.AllowedValues);
     }
     private async Task ValueCreatedAsync(ScopedResourceAddress address)
     {

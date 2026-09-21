@@ -20,7 +20,8 @@ public sealed record ExtensionValueRequirementResponse(
     string ValueType,
     string Protection,
     string? Description,
-    string? Format = null);
+    string? Format = null,
+    IReadOnlyList<JsonElement>? AllowedValues = null);
 public sealed record ExtensionOptionSetVersionResponse(string Version, string SchemaDigest, JsonElement Schema, bool Deprecated);
 public sealed record ExtensionOptionMigrationDescriptorResponse(string FromVersion, string ToVersion);
 public sealed record ExtensionOptionSetResponse(

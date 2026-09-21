@@ -121,14 +121,18 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
-    public async Task ExtensionsApiProjectsCanonicalValueRequirementTypesAndFormats()
+    public async Task ExtensionsApiProjectsCanonicalValueRequirementTypesFormatsAndAllowedValues()
     {
         AepValueRequirement[] requirements =
         [
-            new(AepContributionKinds.ModelProvider, "discovered", "text", true, AepValueType.Text, Format: "uri"),
-            new(AepContributionKinds.ModelProvider, "discovered", "integer", true, AepValueType.WholeNumber),
-            new(AepContributionKinds.ModelProvider, "discovered", "number", true, AepValueType.DecimalNumber),
-            new(AepContributionKinds.ModelProvider, "discovered", "boolean", true, AepValueType.Logical)
+            new(AepContributionKinds.ModelProvider, "discovered", "text", true, AepValueType.Text, Format: "uri",
+                AllowedValues: [JsonSerializer.SerializeToElement("primary"), JsonSerializer.SerializeToElement("secondary")]),
+            new(AepContributionKinds.ModelProvider, "discovered", "integer", true, AepValueType.WholeNumber,
+                AllowedValues: [JsonSerializer.SerializeToElement(1), JsonSerializer.SerializeToElement(2)]),
+            new(AepContributionKinds.ModelProvider, "discovered", "number", true, AepValueType.DecimalNumber,
+                AllowedValues: [JsonSerializer.SerializeToElement(0.25m), JsonSerializer.SerializeToElement(0.5m)]),
+            new(AepContributionKinds.ModelProvider, "discovered", "boolean", true, AepValueType.Logical,
+                AllowedValues: [JsonSerializer.SerializeToElement(true), JsonSerializer.SerializeToElement(false)])
         ];
         await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
@@ -146,6 +150,18 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
         Assert.AreEqual("number", projected.Single(value => value.Id == "number").ValueType);
         Assert.AreEqual("boolean", projected.Single(value => value.Id == "boolean").ValueType);
         Assert.IsTrue(projected.Where(value => value.Id != "text").All(value => value.Format is null));
+        CollectionAssert.AreEqual(
+            new[] { "primary", "secondary" },
+            projected.Single(value => value.Id == "text").AllowedValues!.Select(value => value.GetString()).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { 1, 2 },
+            projected.Single(value => value.Id == "integer").AllowedValues!.Select(value => value.GetInt32()).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { 0.25m, 0.5m },
+            projected.Single(value => value.Id == "number").AllowedValues!.Select(value => value.GetDecimal()).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { true, false },
+            projected.Single(value => value.Id == "boolean").AllowedValues!.Select(value => value.GetBoolean()).ToArray());
     }
 
     [TestMethod]

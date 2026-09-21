@@ -44,6 +44,53 @@ public sealed class ContextualValueCreatorTests
     }
 
     [TestMethod]
+    public void ParameterCreatorRendersAndPersistsTypedAllowedValues()
+    {
+        var cases = new[]
+        {
+            new AllowedValueCase(ParameterValueType.Text, "primary", "secondary", JsonValueKind.String, "secondary"),
+            new AllowedValueCase(ParameterValueType.WholeNumber, "1", "2", JsonValueKind.Number, "2"),
+            new AllowedValueCase(ParameterValueType.DecimalNumber, "0.25", "0.5", JsonValueKind.Number, "0.5"),
+            new AllowedValueCase(ParameterValueType.Logical, "true", "false", JsonValueKind.False, "false")
+        };
+
+        foreach (var testCase in cases)
+        {
+            using var culture = new TestCultureScope("fr-FR");
+            using var context = new BunitContext();
+            var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
+            var client = new ParameterClient(scope);
+            context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+            context.Services.AddSingleton<IParametersClient>(client);
+            JsonElement[] allowedValues =
+            [
+                ParseAllowedValue(testCase.ValueType, testCase.First),
+                ParseAllowedValue(testCase.ValueType, testCase.Second)
+            ];
+
+            var rendered = context.Render<ContextualParameterCreator>(parameters => parameters
+                .Add(component => component.IsOpen, true)
+                .Add(component => component.Context, new(
+                    scope, "mode", "Mode", ValueType: testCase.ValueType, AllowedValues: allowedValues)));
+
+            var select = rendered.Find("select[data-testid='contextual-parameter-value']");
+            Assert.AreEqual(testCase.First, ((AngleSharp.Html.Dom.IHtmlSelectElement)select).Value);
+            CollectionAssert.AreEqual(
+                new[] { testCase.First, testCase.Second },
+                select.QuerySelectorAll("option").Select(option => option.GetAttribute("value")).ToArray());
+            select.Change(testCase.Second);
+            rendered.Find("form").Submit();
+
+            rendered.WaitForAssertion(() =>
+            {
+                Assert.IsNotNull(client.Request);
+                Assert.AreEqual(testCase.ExpectedKind, client.Request.Properties.Value.ValueKind);
+                Assert.AreEqual(testCase.ExpectedRawValue, ValueText(client.Request.Properties.Value));
+            });
+        }
+    }
+
+    [TestMethod]
     public void SecretCreatorWritesValueOnceAndReturnsExactReference()
     {
         using var culture = new TestCultureScope("fr-FR");
@@ -96,6 +143,26 @@ public sealed class ContextualValueCreatorTests
         public Task DeleteParameterAsync(string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ParameterUsagesResponse> GetParameterUsagesAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
+
+    private static JsonElement ParseAllowedValue(ParameterValueType valueType, string value) => valueType switch
+    {
+        ParameterValueType.Text => JsonSerializer.SerializeToElement(value),
+        ParameterValueType.WholeNumber => JsonSerializer.SerializeToElement(int.Parse(value, System.Globalization.CultureInfo.InvariantCulture)),
+        ParameterValueType.DecimalNumber => JsonSerializer.SerializeToElement(decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture)),
+        ParameterValueType.Logical => JsonSerializer.SerializeToElement(bool.Parse(value)),
+        _ => throw new ArgumentOutOfRangeException(nameof(valueType))
+    };
+
+    private static string ValueText(JsonElement value) => value.ValueKind == JsonValueKind.String
+        ? value.GetString()!
+        : value.GetRawText();
+
+    private sealed record AllowedValueCase(
+        ParameterValueType ValueType,
+        string First,
+        string Second,
+        JsonValueKind ExpectedKind,
+        string ExpectedRawValue);
 
     private sealed class SecretClient(ResourceScopeRef scope) : ISecretsClient
     {
