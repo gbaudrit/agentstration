@@ -38,6 +38,10 @@ public sealed class FoundryProviderTests
             Assert.IsTrue(requirements.Single(value => value.Id == id).Required);
         Assert.AreEqual("uri", requirements.Single(value => value.Id == "projectEndpoint").Format);
         Assert.AreEqual("uri", requirements.Single(value => value.Id == "inferenceEndpoint").Format);
+        CollectionAssert.AreEqual(
+            new[] { "ApiKey", "ManagedIdentity", "WorkloadIdentity", "Development" },
+            requirements.Single(value => value.Id == "authenticationMode").AllowedValues!
+                .Select(value => value.GetString()).ToArray());
     }
 
     [TestMethod]
@@ -52,6 +56,12 @@ public sealed class FoundryProviderTests
         issues = AepBoundValueValidator.Validate(missing, FoundryValueRequirements.All,
             AepContributionKinds.ModelProvider, "microsoft-foundry", requireAll: true);
         Assert.IsTrue(issues.Any(value => value.Code == "bound_value_required" && value.RequirementId == "projectEndpoint"));
+
+        var obsoleteMode = StandardValues("first", "ApiKeyEnvironment").ToArray();
+        issues = AepBoundValueValidator.Validate(obsoleteMode, FoundryValueRequirements.All,
+            AepContributionKinds.ModelProvider, "microsoft-foundry", requireAll: true);
+        Assert.IsTrue(issues.Any(value => value.Code == "bound_value_not_allowed"
+            && value.RequirementId == FoundryValueRequirements.AuthenticationMode));
     }
 
     [TestMethod]
@@ -76,6 +86,10 @@ public sealed class FoundryProviderTests
             FoundryValueRequirements.ManagedIdentityClientId, "11111111-1111-1111-1111-111111111111")).ToArray();
         Assert.AreEqual("bound_value_invalid", (await Assert.ThrowsAsync<AepServerException>(async () =>
             await resolver.ResolveAsync(wrongIdentity))).Code);
+
+        var wrongCase = await Assert.ThrowsAsync<AepServerException>(async () =>
+            await resolver.ResolveAsync(StandardValues("first", "apikey").ToArray()));
+        Assert.AreEqual("bound_value_invalid", wrongCase.Code);
     }
 
     [TestMethod]

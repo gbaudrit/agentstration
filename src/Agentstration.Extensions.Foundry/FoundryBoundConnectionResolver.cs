@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
@@ -15,7 +16,7 @@ public sealed class FoundryBoundConnectionResolver(HttpClient secretAccessClient
             var project = await ResolveRequiredAsync(resolver, FoundryValueRequirements.ProjectEndpoint, resolved, cancellationToken);
             var inference = await ResolveRequiredAsync(resolver, FoundryValueRequirements.InferenceEndpoint, resolved, cancellationToken);
             var modeText = await ResolveRequiredAsync(resolver, FoundryValueRequirements.AuthenticationMode, resolved, cancellationToken);
-            if (!Enum.TryParse<FoundryAuthenticationMode>(modeText, true, out var mode) || !Enum.IsDefined(mode))
+            if (!Enum.TryParse<FoundryAuthenticationMode>(modeText, out var mode) || !Enum.IsDefined(mode))
                 throw new InvalidOperationException("authenticationMode is invalid.");
             var connection = new FoundryConnection
             {
@@ -65,6 +66,11 @@ public sealed class FoundryConnectionLease(FoundryConnection connection, IReadOn
 
 public static class FoundryValueRequirements
 {
+    private static readonly IReadOnlyList<JsonElement> AuthenticationModes =
+        Enum.GetNames<FoundryAuthenticationMode>()
+            .Select(value => JsonSerializer.SerializeToElement(value, AepProtocol.JsonOptions))
+            .ToArray();
+
     public const string ProjectEndpoint = "projectEndpoint";
     public const string InferenceEndpoint = "inferenceEndpoint";
     public const string AuthenticationMode = "authenticationMode";
@@ -76,12 +82,18 @@ public static class FoundryValueRequirements
 
     public static IReadOnlyList<AepValueRequirement> All { get; } =
     [
-        Standard(ProjectEndpoint, true, "uri"), Standard(InferenceEndpoint, true, "uri"), Standard(AuthenticationMode, true),
+        Standard(ProjectEndpoint, true, "uri"), Standard(InferenceEndpoint, true, "uri"),
+        Standard(AuthenticationMode, true, allowedValues: AuthenticationModes),
         new(AepContributionKinds.ModelProvider, "microsoft-foundry", Credential, false, AepValueType.Text, AepValueProtection.Secured),
         Standard(ManagedIdentityClientId, false, "uuid"), Standard(WorkloadIdentityTenantId, false, "uuid"),
         Standard(WorkloadIdentityClientId, false, "uuid"), Standard(WorkloadIdentityTokenFile, false)
     ];
 
-    private static AepValueRequirement Standard(string id, bool required, string? format = null) =>
-        new(AepContributionKinds.ModelProvider, "microsoft-foundry", id, required, AepValueType.Text, AepValueProtection.Standard, format);
+    private static AepValueRequirement Standard(
+        string id,
+        bool required,
+        string? format = null,
+        IReadOnlyList<JsonElement>? allowedValues = null) =>
+        new(AepContributionKinds.ModelProvider, "microsoft-foundry", id, required, AepValueType.Text,
+            AepValueProtection.Standard, format, AllowedValues: allowedValues);
 }
