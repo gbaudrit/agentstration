@@ -42,7 +42,7 @@ else
                             <p><span>@T("ExpectedType"):</span> <code>@requirement.ValueType</code>@if (!string.IsNullOrWhiteSpace(requirement.Format)) { <span> · @T("ExpectedFormat"): <code>@requirement.Format</code></span> }</p>
                             <div class="form-grid">
                                 <label><span>@T("ValueSource")</span><select value="@binding.Kind" @onchange="args => SourceChanged(binding, args)" data-testid="model-provider-binding-kind"><option value="@ModelProviderValueBindingKind.Parameter" disabled="@secured">@T("Source.Parameter")</option><option value="@ModelProviderValueBindingKind.Secret">@T("Source.Secret")</option></select></label>
-                                <label><span>@T("ExactResource")</span><select value="@TargetValue(binding)" @onchange="args => TargetChanged(binding, args)" data-testid="model-provider-binding-target"><option value="">@T("SelectValueSource")</option>@if (!BindingAvailable(binding) && binding.IsConfigured) { <option value="@TargetValue(binding)" disabled>@T("UnavailableSelection", binding.ScopeRef, binding.Namespace, binding.Name)</option> }@if (binding.Kind == ModelProviderValueBindingKind.Parameter) { @foreach (var item in AvailableParameters) { <option value="@TargetValue(item)">@item.Definition.DisplayName — @item.ScopeRef/@item.Namespace/@item.Name</option> } } else { @foreach (var item in AvailableSecrets) { <option value="@TargetValue(item.Resource)">@item.Resource.Definition.DisplayName — @item.Resource.ScopeRef/@item.Resource.Namespace/@item.Resource.Name</option> } }</select></label>
+                                <div class="contextual-binding-target"><label><span>@T("ExactResource")</span><select value="@TargetValue(binding)" @onchange="args => TargetChanged(binding, args)" data-testid="model-provider-binding-target"><option value="">@T("SelectValueSource")</option>@if (!BindingAvailable(binding) && binding.IsConfigured) { <option value="@TargetValue(binding)" disabled>@T("UnavailableSelection", binding.ScopeRef, binding.Namespace, binding.Name)</option> }@if (binding.Kind == ModelProviderValueBindingKind.Parameter) { @foreach (var item in AvailableParameters) { <option value="@TargetValue(item)">@item.Definition.DisplayName — @item.ScopeRef/@item.Namespace/@item.Name</option> } } else { @foreach (var item in AvailableSecrets) { <option value="@TargetValue(item.Resource)">@item.Resource.Definition.DisplayName — @item.Resource.ScopeRef/@item.Resource.Namespace/@item.Resource.Name</option> } }</select></label><button type="button" class="button-secondary" disabled="@(selectedScope is null)" @onclick="() => OpenValueCreator(requirement, binding)" data-testid="model-provider-binding-create">@(binding.Kind == ModelProviderValueBindingKind.Parameter ? T("CreateParameter") : T("CreateSecret"))</button></div>
                             </div>
                             @if (requirement.Required && !binding.IsConfigured) { <p class="inline-warning">@T("RequiredBindingMissing")</p> }
                             @if (binding.Kind == ModelProviderValueBindingKind.Secret) { <p class="inline-info">@T("SecretValueHidden")</p> }
@@ -67,6 +67,8 @@ else
 }
 
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" TestId="model-provider-delete-dialog" />
+<ContextualParameterCreator IsOpen="@(creationBinding?.Kind == ModelProviderValueBindingKind.Parameter)" Context="creationContext" OnCreated="ValueCreatedAsync" OnCancel="CloseValueCreator" />
+<ContextualSecretCreator IsOpen="@(creationBinding?.Kind == ModelProviderValueBindingKind.Secret)" Context="creationContext" OnCreated="ValueCreatedAsync" OnCancel="CloseValueCreator" />
 
 @code {
     [Parameter] public string? Name { get; set; }
@@ -83,6 +85,8 @@ else
     private ModelProviderEditorModel? model; private IReadOnlyList<ModelProviderUsageResponse> usages = []; private IReadOnlyList<AvailableModelResponse> models = []; private IReadOnlyList<ExtensionResponse> extensions = [];
     private IReadOnlyList<ParameterResource> parameters = []; private IReadOnlyList<SecretResponse> secrets = [];
     private ModelProviderStatusResponse? status; private AgentstrationApiException? error; private string? modelsError; private string? etag; private bool saving; private bool testing; private bool confirmDelete;
+    private ModelProviderValueBindingEditorModel? creationBinding;
+    private ContextualValueCreationContext? creationContext;
     private ResourceScopeRef? selectedScope;
     private bool interactive;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
@@ -140,6 +144,41 @@ else
         binding.Namespace = resource.Namespace.Value;
         binding.ScopeRef = scopeRef.Value;
     }
+    private void OpenValueCreator(ExtensionValueRequirementResponse requirement, ModelProviderValueBindingEditorModel binding)
+    {
+        if (selectedScope is not { } scopeRef) return;
+        creationBinding = binding;
+        var suggestedName = SecretEditorModel.IdentifierFromDisplayName(requirement.Id);
+        creationContext = new ContextualValueCreationContext(
+            scopeRef,
+            suggestedName,
+            requirement.Id,
+            requirement.Description,
+            ResourceNamespace.Default,
+            ParameterType(requirement.ValueType),
+            requirement.Format);
+    }
+    private async Task ValueCreatedAsync(ScopedResourceAddress address)
+    {
+        if (creationBinding is null) return;
+        creationBinding.Name = address.Name;
+        creationBinding.Namespace = address.Namespace.Value;
+        creationBinding.ScopeRef = address.ScopeRef.Value;
+        if (creationBinding.Kind == ModelProviderValueBindingKind.Parameter)
+            parameters = await ParametersClient.GetParametersAsync(cancellation.Token);
+        else
+            secrets = await SecretsClient.GetSecretsAsync(cancellation.Token);
+        CloseValueCreator();
+    }
+    private void CloseValueCreator() { creationBinding = null; creationContext = null; }
+    private static ParameterValueType? ParameterType(string valueType) => valueType.ToLowerInvariant() switch
+    {
+        "string" => ParameterValueType.Text,
+        "integer" => ParameterValueType.WholeNumber,
+        "number" => ParameterValueType.DecimalNumber,
+        "boolean" => ParameterValueType.Logical,
+        _ => null
+    };
     private bool BindingAvailable(ModelProviderValueBindingEditorModel binding) => binding.Kind == ModelProviderValueBindingKind.Parameter
         ? AvailableParameters.Any(value => TargetValue(value) == TargetValue(binding))
         : AvailableSecrets.Any(value => TargetValue(value.Resource) == TargetValue(binding));

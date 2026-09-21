@@ -21,6 +21,7 @@ namespace Agentstration.Web.Tests;
 public sealed class ModelProviderNavigationTests
 {
     private static readonly ResourceNamespace ProviderNamespace = new("shared.models");
+    private static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(Guid.Parse("b07e7249-b525-4c32-a7bb-5e805fc768e7"));
 
     [TestMethod]
     public void ProviderDetailsOffersModelProfileCreationWithProviderContext()
@@ -78,6 +79,36 @@ public sealed class ModelProviderNavigationTests
     }
 
     [TestMethod]
+    public void NewProviderOpensReusableContextualParameterCreator()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        ExtensionResponse extension = new(
+            RegistrationName: "typed-extension",
+            RegistrationNamespace: ResourceNamespace.DefaultValue,
+            Endpoint: new Uri("http://localhost:5000"),
+            Status: "available",
+            Extension: new ExtensionIdentityResponse("typed.extension", "Typed extension", "1.0.0", null),
+            Contributions: [new ExtensionContributionResponse("model-provider", "typed")],
+            OptionSets: [], Usages: [], Providers: [], Details: null, DiscoverySource: "manual",
+            ValueRequirements: [new("model-provider", "typed", "projectEndpoint", true, "string", "standard", "Project endpoint", "uri")]);
+        using var context = CreateContext(out _, [extension]);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelproviders/new?extension=typed-extension&extensionNamespace=default&contributionId=typed");
+
+        var rendered = context.Render<ModelProviderDetails>();
+        var create = rendered.WaitForElement("[data-testid='model-provider-binding-create']:not([disabled])");
+        create.Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsNotNull(rendered.Find("[data-testid='contextual-parameter-creator']"));
+            Assert.AreEqual("projectendpoint", rendered.Find("[data-testid='contextual-parameter-name']").GetAttribute("value"));
+            Assert.AreEqual(ParameterValueType.Text.ToString(), rendered.Find("[data-testid='contextual-parameter-value-type']").GetAttribute("value"));
+            StringAssert.Contains(rendered.Markup, "Format attendu : uri");
+        });
+    }
+
+    [TestMethod]
     public void NewModelProfilePreselectsAndLoadsSuggestedProvider()
     {
         using var culture = new TestCultureScope("en-US");
@@ -130,8 +161,16 @@ public sealed class ModelProviderNavigationTests
         context.Services.AddSingleton<IExtensionsClient>(new StubExtensionsClient(extensions ?? []));
         context.Services.AddSingleton<IParametersClient>(new StubParametersClient());
         context.Services.AddSingleton<ISecretsClient>(new StubSecretsClient());
+        context.Services.AddSingleton<IResourceScopeInventoryClient>(new StubResourceScopeInventoryClient());
         context.Services.AddSingleton(new NotificationState());
         return context;
+    }
+
+    private sealed class StubResourceScopeInventoryClient : IResourceScopeInventoryClient
+    {
+        public Task<ResourceScopeInventoryResponse> GetAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetTargetsAsync(string kind, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(WorkspaceScope, ResourceScopeKind.Workspace, "Default workspace", true)]);
     }
 
     private sealed class StubModelProvidersClient : IModelProvidersClient
