@@ -173,6 +173,7 @@ else
 for (var index = 0; index < initialBootstrapProfiles.Length; index++)
     console.WithEnvironment($"Agentstration__Bootstrap__InitialProfiles__{index}", initialBootstrapProfiles[index]);
 console
+    .WithEnvironment("Agentstration__Aep__SecretAccess__PublicBaseUrl", console.GetEndpoint("http"))
     .WithEnvironment("Agentstration__ManagementApi__BaseAddress", console.GetEndpoint("http"))
     .WithEnvironment("Agentstration__ManagementApi__ForwardSessionCookie", "true")
     .WithEnvironment("Agentstration__RuntimeApi__BaseAddress", console.GetEndpoint("http"))

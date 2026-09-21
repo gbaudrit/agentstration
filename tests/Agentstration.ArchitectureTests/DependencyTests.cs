@@ -87,6 +87,7 @@ public sealed class DependencyTests
         Assert.Contains("Foundry:Enabled", appHost, StringComparison.Ordinal);
         Assert.Contains("if (foundryEnabled)", appHost, StringComparison.Ordinal);
         Assert.Contains("developmentExtensions.Add(new DevelopmentAepExtension(", appHost, StringComparison.Ordinal);
+        Assert.Contains("Agentstration__Aep__SecretAccess__PublicBaseUrl\", console.GetEndpoint(\"http\")", appHost, StringComparison.Ordinal);
         Assert.DoesNotContain("Foundry__ProjectEndpoint", appHost, StringComparison.Ordinal);
         Assert.DoesNotContain("Foundry__InferenceEndpoint", appHost, StringComparison.Ordinal);
         Assert.DoesNotContain("FOUNDRY_API_KEY", appHost, StringComparison.Ordinal);
