@@ -42,7 +42,7 @@ else
                             <p><span>@T("ExpectedType"):</span> <code>@requirement.ValueType</code>@if (!string.IsNullOrWhiteSpace(requirement.Format)) { <span> · @T("ExpectedFormat"): <code>@requirement.Format</code></span> }</p>
                             <div class="form-grid">
                                 <label><span>@T("ValueSource")</span><select value="@binding.Kind" @onchange="args => SourceChanged(binding, args)" data-testid="model-provider-binding-kind"><option value="@ModelProviderValueBindingKind.Parameter" disabled="@secured">@T("Source.Parameter")</option><option value="@ModelProviderValueBindingKind.Secret">@T("Source.Secret")</option></select></label>
-                                <div class="contextual-binding-target"><label><span>@T("ExactResource")</span><select value="@TargetValue(binding)" @onchange="args => TargetChanged(binding, args)" data-testid="model-provider-binding-target"><option value="">@T("SelectValueSource")</option>@if (!BindingAvailable(binding) && binding.IsConfigured) { <option value="@TargetValue(binding)" disabled>@T("UnavailableSelection", binding.ScopeRef, binding.Namespace, binding.Name)</option> }@if (binding.Kind == ModelProviderValueBindingKind.Parameter) { @foreach (var item in AvailableParameters) { <option value="@TargetValue(item)">@item.Definition.DisplayName — @item.ScopeRef/@item.Namespace/@item.Name</option> } } else { @foreach (var item in AvailableSecrets) { <option value="@TargetValue(item.Resource)">@item.Resource.Definition.DisplayName — @item.Resource.ScopeRef/@item.Resource.Namespace/@item.Resource.Name</option> } }</select></label><button type="button" class="button-secondary" disabled="@(selectedScope is null)" @onclick="() => OpenValueCreator(requirement, binding)" data-testid="model-provider-binding-create">@(binding.Kind == ModelProviderValueBindingKind.Parameter ? T("CreateParameter") : T("CreateSecret"))</button></div>
+                                <div class="contextual-binding-target"><label><span>@T("ExactResource")</span><select @key="TargetValue(binding)" @onchange="args => TargetChanged(binding, args)" data-testid="model-provider-binding-target"><option value="" selected="@(!binding.IsConfigured)">@T("SelectValueSource")</option>@if (!BindingAvailable(binding) && binding.IsConfigured) { <option value="@TargetValue(binding)" selected disabled>@T("UnavailableSelection", binding.ScopeRef, binding.Namespace, binding.Name)</option> }@if (binding.Kind == ModelProviderValueBindingKind.Parameter) { @foreach (var item in AvailableParameters) { <option value="@TargetValue(item)" selected="@(TargetValue(item) == TargetValue(binding))">@item.Definition.DisplayName — @item.ScopeRef/@item.Namespace/@item.Name</option> } } else { @foreach (var item in AvailableSecrets) { <option value="@TargetValue(item.Resource)" selected="@(TargetValue(item.Resource) == TargetValue(binding))">@item.Resource.Definition.DisplayName — @item.Resource.ScopeRef/@item.Resource.Namespace/@item.Resource.Name</option> } }</select></label><button type="button" class="button-secondary" disabled="@(selectedScope is null)" @onclick="() => OpenValueCreator(requirement, binding)" data-testid="model-provider-binding-create">@(binding.Kind == ModelProviderValueBindingKind.Parameter ? T("CreateParameter") : T("CreateSecret"))</button></div>
                             </div>
                             @if (requirement.Required && !binding.IsConfigured) { <p class="inline-warning">@T("RequiredBindingMissing")</p> }
                             @if (binding.Kind == ModelProviderValueBindingKind.Secret) { <p class="inline-info">@T("SecretValueHidden")</p> }
@@ -148,11 +148,13 @@ else
     {
         if (selectedScope is not { } scopeRef) return;
         creationBinding = binding;
-        var suggestedName = SecretEditorModel.IdentifierFromDisplayName(requirement.Id);
+        var consumerName = !string.IsNullOrWhiteSpace(model?.Name) ? model.Name : model?.ContributionId ?? "provider";
+        var consumerDisplayName = !string.IsNullOrWhiteSpace(model?.DisplayName) ? model.DisplayName : consumerName;
+        var suggestedName = SecretEditorModel.IdentifierFromDisplayName($"mp-{consumerName}-{requirement.Id}");
         creationContext = new ContextualValueCreationContext(
             scopeRef,
             suggestedName,
-            requirement.Id,
+            $"{consumerDisplayName} — {requirement.Id}",
             requirement.Description,
             ResourceNamespace.Default,
             ParameterType(requirement.ValueType),

@@ -102,9 +102,69 @@ public sealed class ModelProviderNavigationTests
         rendered.WaitForAssertion(() =>
         {
             Assert.IsNotNull(rendered.Find("[data-testid='contextual-parameter-creator']"));
-            Assert.AreEqual("projectendpoint", rendered.Find("[data-testid='contextual-parameter-name']").GetAttribute("value"));
+            Assert.AreEqual("mp-typed-projectendpoint", rendered.Find("[data-testid='contextual-parameter-name']").GetAttribute("value"));
             Assert.AreEqual(ParameterValueType.Text.ToString(), rendered.Find("[data-testid='contextual-parameter-value-type']").GetAttribute("value"));
             StringAssert.Contains(rendered.Markup, "Format attendu : uri");
+        });
+    }
+
+    [TestMethod]
+    public void ContextuallyCreatedParameterBecomesTheVisibleBindingSelection()
+    {
+        using var culture = new TestCultureScope("en-US");
+        ExtensionResponse extension = new(
+            RegistrationName: "typed-extension", RegistrationNamespace: ResourceNamespace.DefaultValue,
+            Endpoint: new Uri("http://localhost:5000"), Status: "available",
+            Extension: new ExtensionIdentityResponse("typed.extension", "Typed extension", "1.0.0", null),
+            Contributions: [new ExtensionContributionResponse("model-provider", "typed")],
+            OptionSets: [], Usages: [], Providers: [], Details: null, DiscoverySource: "manual",
+            ValueRequirements: [new("model-provider", "typed", "projectEndpoint", true, "string", "standard", "Project endpoint", "uri")]);
+        using var context = CreateContext(out _, [extension]);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelproviders/new?extension=typed-extension&extensionNamespace=default&contributionId=typed");
+        var rendered = context.Render<ModelProviderDetails>();
+        rendered.WaitForElement("[data-testid='model-provider-name']").Change("foundry");
+        rendered.WaitForElement("[data-testid='model-provider-binding-create']:not([disabled])").Click();
+        rendered.WaitForElement("[data-testid='contextual-parameter-value']").Change("https://example.test/projects/demo");
+        rendered.Find("[data-testid='contextual-parameter-create']").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var target = rendered.Find("[data-testid='model-provider-binding-target']");
+            Assert.AreEqual($"{WorkspaceScope.Value}|default|mp-foundry-projectendpoint", ((AngleSharp.Html.Dom.IHtmlSelectElement)target).Value);
+            Assert.AreEqual($"{WorkspaceScope.Value}|default|mp-foundry-projectendpoint", target.QuerySelector("option[selected]")?.GetAttribute("value"));
+            StringAssert.Contains(target.TextContent, "projectEndpoint");
+            Assert.IsFalse(rendered.Markup.Contains("contextual-parameter-creator", StringComparison.Ordinal));
+        });
+    }
+
+    [TestMethod]
+    public void ContextuallyCreatedSecretBecomesTheVisibleBindingSelectionWithoutRenderingItsValue()
+    {
+        using var culture = new TestCultureScope("en-US");
+        ExtensionResponse extension = new(
+            RegistrationName: "secured-extension", RegistrationNamespace: ResourceNamespace.DefaultValue,
+            Endpoint: new Uri("http://localhost:5000"), Status: "available",
+            Extension: new ExtensionIdentityResponse("secured.extension", "Secured extension", "1.0.0", null),
+            Contributions: [new ExtensionContributionResponse("model-provider", "secured")],
+            OptionSets: [], Usages: [], Providers: [], Details: null, DiscoverySource: "manual",
+            ValueRequirements: [new("model-provider", "secured", "credential", true, "string", "secured", "API credential")]);
+        using var context = CreateContext(out _, [extension]);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelproviders/new?extension=secured-extension&extensionNamespace=default&contributionId=secured");
+        var rendered = context.Render<ModelProviderDetails>();
+        rendered.WaitForElement("[data-testid='model-provider-name']").Change("foundry");
+        rendered.WaitForElement("[data-testid='model-provider-binding-create']:not([disabled])").Click();
+        rendered.WaitForElement("[data-testid='contextual-secret-value']").Change("browser-secret-must-disappear");
+        rendered.Find("[data-testid='contextual-secret-create']").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var target = rendered.Find("[data-testid='model-provider-binding-target']");
+            var expected = $"{WorkspaceScope.Value}|default|mp-foundry-credential";
+            Assert.AreEqual(expected, ((AngleSharp.Html.Dom.IHtmlSelectElement)target).Value);
+            Assert.AreEqual(expected, target.QuerySelector("option[selected]")?.GetAttribute("value"));
+            Assert.IsFalse(rendered.Markup.Contains("browser-secret-must-disappear", StringComparison.Ordinal));
         });
     }
 
@@ -237,10 +297,23 @@ public sealed class ModelProviderNavigationTests
 
     private sealed class StubParametersClient : IParametersClient
     {
-        public Task<IReadOnlyList<ParameterResource>> GetParametersAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ParameterResource>>([]);
+        private readonly List<ParameterResource> resources = [];
+        public Task<IReadOnlyList<ParameterResource>> GetParametersAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ParameterResource>>(resources.ToArray());
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ParameterResource>> GetParameterAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<ParameterResource>> CreateParameterAsync(CreateParameterRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ParameterResource>> CreateParameterAsync(CreateParameterRequest request, CancellationToken cancellationToken)
+        {
+            var resource = new ParameterResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ParameterResourceKinds.Parameter,
+                Metadata = new() { Name = request.Name },
+                ScopeRef = request.ScopeRef,
+                Definition = request.Properties
+            };
+            resources.Add(resource);
+            return Task.FromResult(new ResourceSnapshot<ParameterResource>(resource, "\"parameter-etag\""));
+        }
         public Task<ResourceSnapshot<ParameterResource>> UpdateParameterAsync(string name, ResourceScopeRef scopeRef, PutParameterRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task DeleteParameterAsync(string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ParameterUsagesResponse> GetParameterUsagesAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => throw new NotSupportedException();
@@ -248,17 +321,42 @@ public sealed class ModelProviderNavigationTests
 
     private sealed class StubSecretsClient : ISecretsClient
     {
-        public Task<IReadOnlyList<SecretResponse>> GetSecretsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SecretResponse>>([]);
-        public Task<IReadOnlyList<VaultResponse>> GetVaultsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        private readonly List<SecretResponse> resources = [];
+        public Task<IReadOnlyList<SecretResponse>> GetSecretsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SecretResponse>>(resources.ToArray());
+        public Task<IReadOnlyList<VaultResponse>> GetVaultsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<VaultResponse>>([new(new VaultResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Vault,
+            Metadata = new() { Name = "local-vault" },
+            ScopeRef = WorkspaceScope,
+            Definition = new VaultProperties { DisplayName = "Local vault", ProviderType = "local" }
+        }, "available")]);
         public Task<ResourceSnapshot<VaultResponse>> GetVaultAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<VaultResource>> CreateVaultAsync(CreateVaultRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<VaultResource>> UpdateVaultAsync(string name, PutVaultRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task DeleteVaultAsync(string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<VaultInitializationResponse> InitializeVaultAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<SecretResponse>> GetSecretAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<SecretResource>> CreateSecretAsync(CreateSecretRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<SecretResource>> CreateSecretAsync(CreateSecretRequest request, CancellationToken cancellationToken)
+        {
+            var resource = new SecretResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SecretResourceKinds.Secret,
+                Metadata = new() { Name = request.Name },
+                ScopeRef = request.ScopeRef,
+                Definition = request.Properties
+            };
+            resources.Add(new(resource, "Missing", false));
+            return Task.FromResult(new ResourceSnapshot<SecretResource>(resource, "\"secret-etag\""));
+        }
         public Task<ResourceSnapshot<SecretResource>> UpdateSecretAsync(string name, PutSecretRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task SetSecretValueAsync(string name, string value, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task SetSecretValueAsync(string name, string value, CancellationToken cancellationToken)
+        {
+            var index = resources.FindIndex(value => value.Resource.Name == name);
+            resources[index] = resources[index] with { ValueStatus = "Configured", ValueConfigured = true };
+            return Task.CompletedTask;
+        }
         public Task DeleteSecretValueAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task DeleteSecretAsync(string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<SecretUsagesResponse> GetSecretUsagesAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
