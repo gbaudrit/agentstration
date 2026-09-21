@@ -155,6 +155,7 @@ public sealed class ModelProviderNavigationTests
         var rendered = context.Render<ModelProviderDetails>();
         rendered.WaitForElement("[data-testid='model-provider-name']").Change("foundry");
         rendered.WaitForElement("[data-testid='model-provider-binding-create']:not([disabled])").Click();
+        Assert.AreEqual("mp-foundry-credential", rendered.WaitForElement("[data-testid='contextual-secret-name']").GetAttribute("value"));
         rendered.WaitForElement("[data-testid='contextual-secret-value']").Change("browser-secret-must-disappear");
         rendered.Find("[data-testid='contextual-secret-create']").Click();
 
