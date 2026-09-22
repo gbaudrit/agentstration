@@ -5,6 +5,7 @@ using System.Text;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Identity.Contracts;
+using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
@@ -19,6 +20,84 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class AepSecretAccessApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task AnonymousCallbackRedeemsTenantSecretGrantedToWorkspace()
+    {
+        await using var factory = Factory().WithWebHostBuilder(builder =>
+            builder.UseSetting("Agentstration:Authentication:Mode", "Disabled"));
+        var requestContext = await GetBootstrapContextAsync(factory);
+        var tenant = ResourceScopeRef.Tenant(requestContext.TenantId);
+        var workspace = ResourceScopeRef.Workspace(requestContext.WorkspaceId);
+        var requestScopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var secrets = factory.Services.GetRequiredService<SecretManagementService>();
+        var capabilities = factory.Services.GetRequiredService<ISecretCapabilityService>();
+        const string secretValue = "tenant-secret-redeemed-anonymously";
+        var capabilityContext = new SecretCapabilityContext(
+            ScopedResourceAddress.Create(tenant, ResourceNamespace.Default, "ExtensionRegistration", "foundry-extension"),
+            "microsoft.foundry",
+            ScopedResourceAddress.Create(workspace, ResourceNamespace.Default, "ModelProvider", "foundry"),
+            "credential",
+            "foundry-execution");
+        SecretCapabilityHandle handle;
+
+        using (requestScopes.PushSystem())
+        {
+            await secrets.CreateVaultAsync(new VaultResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SecretResourceKinds.Vault,
+                Metadata = new() { Name = "tenant-aep-vault" },
+                ScopeRef = tenant,
+                Definition = new VaultProperties
+                {
+                    DisplayName = "Tenant AEP Vault",
+                    ProviderType = "local",
+                    UsePolicy = new() { Grants = [new(workspace)] }
+                }
+            }, default);
+            await secrets.InitializeVaultExactAsync(tenant, "tenant-aep-vault", default);
+            await secrets.CreateSecretAsync(new SecretResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SecretResourceKinds.Secret,
+                Metadata = new() { Name = "tenant-aep-secret" },
+                ScopeRef = tenant,
+                Definition = new SecretProperties
+                {
+                    DisplayName = "Tenant AEP Secret",
+                    Vault = new ResourceReference("tenant-aep-vault", tenant),
+                    Key = "credential",
+                    UsePolicy = new() { Grants = [new(workspace)] }
+                }
+            }, default);
+            using var value = new SecretValue(Encoding.UTF8.GetBytes(secretValue));
+            await secrets.SetValueExactAsync(tenant, "tenant-aep-secret", value, default);
+            handle = await capabilities.IssueAsync(
+                capabilityContext,
+                new SecretBinding("credential", new SecretReference(
+                    ResourceAddress.Create(ResourceNamespace.Default, SecretResourceKinds.Secret, "tenant-aep-secret"), tenant)),
+                ["credential"],
+                CancellationToken.None);
+        }
+
+        Assert.AreEqual(ControlPlaneAccessMode.Unavailable,
+            factory.Services.GetRequiredService<ICurrentRequestContext>().AccessMode);
+        using var http = factory.CreateClient();
+        using var response = await http.PostAsJsonAsync(AepProtocol.SecretAccessPath,
+            new AepSecretAccessRequest(AepProtocol.SecretAccessVersion,
+                capabilityContext.ExtensionId,
+                capabilityContext.RequirementId,
+                capabilityContext.ExecutionId,
+                handle.RevealForTransport()));
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<AepSecretAccessResponse>();
+        Assert.IsNotNull(payload);
+        Assert.AreEqual(secretValue, Encoding.UTF8.GetString(Convert.FromBase64String(payload.SecretValueBase64)));
+        Assert.AreEqual(ControlPlaneAccessMode.Unavailable,
+            factory.Services.GetRequiredService<ICurrentRequestContext>().AccessMode);
+    }
+
     [TestMethod]
     public async Task LocalVaultValueIsLateBoundThroughCapabilityAndAbsentFromResourceReads()
     {

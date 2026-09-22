@@ -299,10 +299,10 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
                 await authorizer.GetAuthorizedStatusAsync(new SecretReference(address, tenant), context));
             await Assert.ThrowsAsync<SecretAccessDeniedException>(async () =>
                 await resolver.ResolveAsync(new SecretReference(address, tenant), context));
-            var denied = await Assert.ThrowsExactlyAsync<SecretCapabilityException>(() =>
-                capabilities.RedeemAsync(capability.RevealForTransport(), capabilityContext));
-            Assert.AreEqual("access_denied", denied.Code);
         }
+        var revokedDenial = await Assert.ThrowsExactlyAsync<SecretCapabilityException>(() =>
+            capabilities.RedeemAsync(capability.RevealForTransport(), capabilityContext));
+        Assert.AreEqual("access_denied", revokedDenial.Code);
     }
 
     private sealed class TestVaultProvider : ISecretVaultProvider
