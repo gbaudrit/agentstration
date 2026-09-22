@@ -13,4 +13,5 @@
   <data name="Nav.Sources" xml:space="preserve"><value>Sources</value></data>
   <data name="Nav.SourceRegistries" xml:space="preserve"><value>Registres de Sources</value></data>
   <data name="Command.DiscoverSources" xml:space="preserve"><value>Découvrir des Sources</value></data>
+  <data name="Nav.Conversations" xml:space="preserve"><value>Conversations</value></data>
 </root>

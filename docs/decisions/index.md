@@ -167,3 +167,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 135. [ADR-0135 — Work conversations and tasks are principal-owned](0135-work-conversations-and-tasks-are-principal-owned.md)
 136. [ADR-0136 — Console command fallback is a presentation role](0136-console-command-fallback-is-a-presentation-role.md)
 137. [ADR-0137 — Console Entry interactions reuse durable Work](0137-console-entry-interactions-reuse-durable-work.md)
+138. [ADR-0138 — Console conversation browsing projects durable Interactions](0138-console-conversation-browsing-projects-durable-interactions.md)

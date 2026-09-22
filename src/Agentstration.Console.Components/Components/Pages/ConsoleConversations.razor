@@ -1,0 +1,176 @@
+@page "/conversations"
+@implements IDisposable
+@inject IConsoleEntryInteractionApiClient Interactions
+@inject IEntryAdministrationApiClient Entries
+@inject IWorkOperationsRealtimeClient Realtime
+@inject ConsoleContextState ContextState
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ConsoleConversationsStrings> Localizer
+
+<PageTitle>@T("PageTitle")</PageTitle>
+
+<PageHeader Title="@T("Title")" Description="@T("Description")">
+    <Actions>
+        <Agentstration.Web.Components.WorkOperations.RealtimeStatus State="Realtime.State" />
+        <button class="button-secondary" type="button" @onclick="LoadAsync" disabled="@loading" data-testid="conversations-refresh">@T("Refresh")</button>
+    </Actions>
+</PageHeader>
+
+@if (loading && conversations is null)
+{
+    <LoadingState Message="@T("Loading")" />
+}
+else if (unavailable)
+{
+    <EmptyState Title="@T("UnavailableTitle")" Message="@T("UnavailableMessage")" />
+}
+else if (conversations is null || conversations.Count == 0)
+{
+    <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" />
+}
+else
+{
+    <section class="conversation-browser" aria-label="@T("ConversationList")" data-testid="console-conversations" data-workspace-id="@WorkspaceId">
+        <header class="conversation-browser-summary">
+            <span>@F("RecentCount", conversations.Count)</span>
+            <span>@F("CurrentWorkspace", WorkspaceDisplayName)</span>
+        </header>
+        <div class="conversation-list">
+            @foreach (var conversation in conversations)
+            {
+                <a class="conversation-row" href="@conversation.Url" data-testid="conversation-row" data-interaction-id="@conversation.Interaction.Id" data-entry-name="@conversation.Entry.Name" data-status="@conversation.Interaction.Status">
+                    <span class="conversation-icon" aria-hidden="true"><UiIcon Name="message-circle" /></span>
+                    <span class="conversation-main">
+                        <strong>@conversation.Title</strong>
+                        <span>@conversation.Entry.DisplayName · @WorkspaceDisplayName</span>
+                    </span>
+                    <span class="conversation-state">
+                        <StatusBadge Text="@StatusLabel(conversation.Interaction.Status)" Status="@Status(conversation.Interaction.Status)" />
+                        @if (conversation.Interaction.PendingActionId is not null)
+                        {
+                            <small class="conversation-pending">@T("NeedsInput")</small>
+                        }
+                    </span>
+                    <time datetime="@conversation.Interaction.LastActivityAt.ToString("O")">@conversation.Interaction.LastActivityAt.ToLocalTime().ToString("g")</time>
+                    <span class="conversation-open" aria-hidden="true">→</span>
+                </a>
+            }
+        </div>
+        @if (conversations.Count == MaximumConversations)
+        {
+            <p class="conversation-limit">@F("BoundedHistory", MaximumConversations)</p>
+        }
+    </section>
+}
+
+@code {
+    private const int MaximumConversations = 50;
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<ConversationItem>? conversations;
+    private bool loading;
+    private bool unavailable;
+    private bool realtimeStarted;
+
+    private Guid WorkspaceId => ContextState.Current?.WorkspaceId ?? Guid.Empty;
+    private string WorkspaceDisplayName => ContextState.Current?.WorkspaceDisplayName ?? T("UnknownWorkspace");
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ContextState.Current is null) await ContextState.LoadAsync(lifetime.Token);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (WorkspaceId == Guid.Empty)
+        {
+            unavailable = true;
+            conversations = null;
+            return;
+        }
+
+        loading = true;
+        unavailable = false;
+        try
+        {
+            var interactionTask = Interactions.ListInteractionsAsync(WorkspaceId, MaximumConversations, lifetime.Token);
+            var entryTask = Entries.GetConsoleEntriesAsync(lifetime.Token);
+            await Task.WhenAll(interactionTask, entryTask);
+            var entryLookup = (await entryTask)
+                .Where(entry => entry.WorkspaceId == WorkspaceId && entry.Execution?.CanInvoke == true)
+                .GroupBy(entry => (entry.Namespace, entry.Name))
+                .Where(group => group.Count() == 1)
+                .Select(group => group.Single())
+                .ToDictionary(entry => (entry.Namespace, entry.Name));
+            conversations = (await interactionTask)
+                .Select(interaction => entryLookup.TryGetValue((interaction.EntryNamespace, interaction.EntryId), out var entry)
+                    ? new ConversationItem(interaction, entry, ConversationTitle(interaction), ConsoleEntryInteractionNavigation.Build(
+                        interaction.WorkspaceId,
+                        interaction.EntryNamespace,
+                        interaction.EntryId,
+                        interactionId: interaction.Id))
+                    : null)
+                .OfType<ConversationItem>()
+                .OrderByDescending(item => item.Interaction.LastActivityAt)
+                .ToArray();
+
+            if (!realtimeStarted)
+            {
+                realtimeStarted = true;
+                Realtime.Updated += OnRealtimeAsync;
+                Realtime.StateChanged += OnRealtimeStateChanged;
+                await Realtime.StartAsync([WorkspaceId.ToString("D")], lifetime.Token);
+            }
+        }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException)
+        {
+            unavailable = true;
+            conversations = null;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private Task OnRealtimeAsync(WorkOperationsRealtimeUpdate update) =>
+        InvokeAsync(async () =>
+        {
+            if (update.RequiresResynchronization
+                || update.InteractionId is not null
+                || update.TaskId is not null)
+                await LoadAsync();
+            StateHasChanged();
+        });
+
+    private void OnRealtimeStateChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private string ConversationTitle(InteractionResponse interaction)
+    {
+        var source = interaction.Messages.FirstOrDefault(message => message.Role == ConversationRole.User)?.Content;
+        if (string.IsNullOrWhiteSpace(source)) return T("UntitledConversation");
+        var normalized = string.Join(' ', source.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Length <= 96 ? normalized : $"{normalized[..95]}…";
+    }
+
+    private string StatusLabel(InteractionStatus status) => Localizer[$"Status.{status}"];
+    private static UiStatus Status(InteractionStatus status) => status switch
+    {
+        InteractionStatus.Completed => UiStatus.Success,
+        InteractionStatus.Failed or InteractionStatus.Cancelled or InteractionStatus.Closed => UiStatus.Danger,
+        InteractionStatus.WaitingForUser => UiStatus.Warning,
+        _ => UiStatus.Info
+    };
+    private string T(string key) => Localizer[key];
+    private string F(string key, params object[] arguments) => Localizer[key, arguments];
+
+    public void Dispose()
+    {
+        Realtime.Updated -= OnRealtimeAsync;
+        Realtime.StateChanged -= OnRealtimeStateChanged;
+        lifetime.Cancel();
+        lifetime.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    private sealed record ConversationItem(InteractionResponse Interaction, EntryResponse Entry, string Title, string Url);
+}

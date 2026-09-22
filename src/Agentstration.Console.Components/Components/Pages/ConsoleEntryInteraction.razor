@@ -24,6 +24,7 @@ else
 {
     <PageHeader Eyebrow="@T("ConsoleEntry")" Title="@entry.DisplayName" Description="@(entry.Description ?? T("Description"))">
         <Actions>
+            <a class="button-secondary" href="/conversations" data-testid="back-to-conversations">← Conversations</a>
             @if (CanCancel)
             {
                 <button class="button-danger" type="button" disabled="@busy" @onclick="CancelAsync" data-testid="console-entry-cancel">@T("Cancel")</button>

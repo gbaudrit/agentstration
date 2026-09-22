@@ -167,9 +167,10 @@ public sealed partial class ApiClientTests
         var requests = new List<(HttpMethod Method, string Path)>();
         using var httpClient = new HttpClient(new StubHandler(request =>
         {
-            requests.Add((request.Method, request.RequestUri!.AbsolutePath));
+            requests.Add((request.Method, request.RequestUri!.PathAndQuery));
             object body = request.RequestUri.AbsolutePath switch
             {
+                var path when path.EndsWith("/interactions", StringComparison.Ordinal) => new InteractionPageResponse([interaction]),
                 var path when path.EndsWith($"/interactions/{interactionId:D}", StringComparison.Ordinal) => interaction,
                 var path when path.EndsWith("/messages", StringComparison.Ordinal) => Array.Empty<ConversationMessage>(),
                 var path when path.EndsWith("/pending-actions", StringComparison.Ordinal) => Array.Empty<PendingActionContract>(),
@@ -183,6 +184,7 @@ public sealed partial class ApiClientTests
         { BaseAddress = new Uri("http://work-api/") };
         var client = new ConsoleEntryInteractionApiClient(httpClient);
 
+        _ = await client.ListInteractionsAsync(workspaceId, 50, default);
         _ = await client.GetInteractionAsync(workspaceId, interactionId, default);
         _ = await client.ListMessagesAsync(workspaceId, interactionId, default);
         _ = await client.ListPendingActionsAsync(workspaceId, interactionId, default);
@@ -194,6 +196,7 @@ public sealed partial class ApiClientTests
 
         CollectionAssert.AreEqual(new[]
         {
+            (HttpMethod.Get, $"/api/workspaces/{workspaceId:D}/interactions?take=50"),
             (HttpMethod.Get, $"/api/workspaces/{workspaceId:D}/interactions/{interactionId:D}"),
             (HttpMethod.Get, $"/api/workspaces/{workspaceId:D}/interactions/{interactionId:D}/messages"),
             (HttpMethod.Get, $"/api/workspaces/{workspaceId:D}/interactions/{interactionId:D}/pending-actions"),
