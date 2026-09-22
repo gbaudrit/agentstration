@@ -52,6 +52,7 @@ public sealed class AepConformanceTests
                 services.AddSingleton<IAepModelProvider, TerminalThenTrailingProvider>();
                 services.Configure<AepExtensionOptions>(options =>
                 {
+                    options.Capabilities[AepCapabilityNames.SecretAccess] = new(AepProtocol.SecretAccessVersion);
                     options.ValueRequirements.Add(new(
                         AepContributionKinds.ModelProvider,
                         "terminal",
@@ -84,6 +85,8 @@ public sealed class AepConformanceTests
             manifest.Capabilities[AepCapabilityNames.ValueRequirements].Version);
         Assert.AreEqual(AepProtocol.BoundValuesCapabilityVersion,
             manifest.Capabilities[AepCapabilityNames.BoundValues].Version);
+        Assert.AreEqual(AepProtocol.SecretAccessVersion,
+            manifest.Capabilities[AepCapabilityNames.SecretAccess].Version);
         Assert.IsNotNull(manifest.ValueRequirements);
         Assert.HasCount(2, manifest.ValueRequirements);
         Assert.AreEqual(AepValueProtection.Secured, manifest.ValueRequirements[0].Protection);
@@ -105,7 +108,8 @@ public sealed class AepConformanceTests
             new Dictionary<string, AepCapabilityDescriptor>
             {
                 [AepCapabilityNames.ValueRequirements] = new(AepProtocol.ValueRequirementsCapabilityVersion),
-                [AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion)
+                [AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion),
+                [AepCapabilityNames.SecretAccess] = new(AepProtocol.SecretAccessVersion)
             },
             new([new("test", "Test", new())]),
             ValueRequirements:
@@ -114,6 +118,19 @@ public sealed class AepConformanceTests
                 new(AepContributionKinds.ModelProvider, "test", "proxy-host", false)
             ]);
         Assert.IsEmpty(AepDescriptorValidator.Validate(manifest));
+        Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
+        {
+            Capabilities = manifest.Capabilities
+                .Where(value => value.Key != AepCapabilityNames.SecretAccess)
+                .ToDictionary()
+        }).Any(value => value.Contains("aep.secret-access", StringComparison.Ordinal)));
+        Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
+        {
+            Capabilities = new Dictionary<string, AepCapabilityDescriptor>(manifest.Capabilities, StringComparer.Ordinal)
+            {
+                [AepCapabilityNames.SecretAccess] = new("2.0")
+            }
+        }).Any(value => value.Contains("aep.secret-access", StringComparison.Ordinal)));
 
         var invalid = manifest with
         {
@@ -150,7 +167,8 @@ public sealed class AepConformanceTests
             Capabilities = new Dictionary<string, AepCapabilityDescriptor>
             {
                 [AepCapabilityNames.ValueRequirements] = new("2.0"),
-                [AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion)
+                [AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion),
+                [AepCapabilityNames.SecretAccess] = new(AepProtocol.SecretAccessVersion)
             }
         }).Any(value => value.Contains("not supported", StringComparison.Ordinal)));
     }
@@ -699,6 +717,25 @@ public sealed class AepConformanceTests
         Assert.AreEqual("secret_access_failed", denied.Code);
         Assert.IsFalse(denied.Message.Contains("private-value", StringComparison.Ordinal));
         Assert.IsFalse(denied.Message.Contains("private-secret", StringComparison.Ordinal));
+
+        using var problemHttp = new HttpClient(new SecretAccessResponseHandler(HttpStatusCode.BadRequest,
+            "{\"title\":\"Bad Request\",\"detail\":\"private-detail\"}"));
+        var problem = await Assert.ThrowsExactlyAsync<AepProtocolException>(() =>
+            new AepSecretAccessClient(problemHttp).RedeemAsync(grant));
+        Assert.AreEqual("secret_access_failed", problem.Code);
+        Assert.AreEqual(HttpStatusCode.BadRequest, problem.StatusCode);
+        Assert.IsFalse(problem.Message.Contains("private-detail", StringComparison.Ordinal));
+
+        using var extensionHttp = new HttpClient(new SecretAccessResponseHandler(HttpStatusCode.BadRequest,
+            "{\"title\":\"Bad Request\",\"detail\":\"private-detail\"}"))
+        {
+            BaseAddress = new Uri("https://extension.example/")
+        };
+        var extensionProblem = await Assert.ThrowsExactlyAsync<AepProtocolException>(() =>
+            new AepClient(extensionHttp).GetManifestAsync());
+        Assert.AreEqual("extension_request_failed", extensionProblem.Code);
+        Assert.AreEqual(HttpStatusCode.BadRequest, extensionProblem.StatusCode);
+        Assert.IsFalse(extensionProblem.Message.Contains("private-detail", StringComparison.Ordinal));
 
         using var invalidHttp = new HttpClient(new SecretAccessResponseHandler(HttpStatusCode.OK,
             "{\"version\":\"1.0\",\"secretValueBase64\":\"not-base64\"}"));

@@ -236,6 +236,7 @@ public sealed class AepClient(
                 yield return update;
                 if (update.FinishReason is not null) yield break;
             }
+            throw new AepProtocolException("invalid_response", "The extension streaming response ended without a finish reason.", response.StatusCode);
         }
     }
 
@@ -299,8 +300,8 @@ public sealed class AepClient(
         try { error = await response.Content.ReadFromJsonAsync<AepErrorResponse>(AepProtocol.JsonOptions, cancellationToken); }
         catch (JsonException) { }
         throw new AepProtocolException(
-            error?.Error.Code ?? "extension_request_failed",
-            error?.Error.Message ?? $"The AEP extension returned HTTP {(int)response.StatusCode}.",
+            error?.Error?.Code ?? "extension_request_failed",
+            error?.Error?.Message ?? $"The AEP extension returned HTTP {(int)response.StatusCode}.",
             response.StatusCode);
     }
 }

@@ -46,12 +46,81 @@ using Agentstration.Workplace.Components;
 using Agentstration.Workplace.Web;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using YamlDotNet.RepresentationModel;
 
 namespace Agentstration.ArchitectureTests;
 
 [TestClass]
 public sealed class DependencyTests
 {
+    [TestMethod]
+    public void FoundryDependenciesStayInsideTheAutonomousExtension()
+    {
+        var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
+        var foundryProject = Path.Combine(sourceRoot, "Agentstration.Extensions.Foundry", "Agentstration.Extensions.Foundry.csproj");
+        var appHostProject = Path.Combine(sourceRoot, "Agentstration.AppHost", "Agentstration.AppHost.csproj");
+        Assert.IsTrue(File.Exists(foundryProject));
+        Assert.Contains("<PackageReference Include=\"Azure.Identity\"", File.ReadAllText(foundryProject));
+        Assert.Contains("../Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj", File.ReadAllText(appHostProject));
+
+        var violations = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !string.Equals(path, foundryProject, StringComparison.OrdinalIgnoreCase))
+            .Where(path =>
+            {
+                var project = File.ReadAllText(path);
+                return (!string.Equals(path, appHostProject, StringComparison.OrdinalIgnoreCase)
+                        && project.Contains("Agentstration.Extensions.Foundry", StringComparison.Ordinal))
+                    || project.Contains("<PackageReference Include=\"Azure.Identity\"", StringComparison.Ordinal)
+                    || project.Contains("<PackageReference Include=\"Azure.AI.", StringComparison.Ordinal);
+            })
+            .Select(path => Path.GetRelativePath(sourceRoot, path))
+            .ToArray();
+
+        Assert.IsEmpty(violations, $"Foundry dependencies must not enter product modules: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
+    public void AspireFoundryRegistrationIsOptInAndKeepsProviderConnectionsOutOfProcessConfiguration()
+    {
+        var appHost = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Agentstration.AppHost", "Program.cs"));
+
+        Assert.Contains("Foundry:Enabled", appHost, StringComparison.Ordinal);
+        Assert.Contains("if (foundryEnabled)", appHost, StringComparison.Ordinal);
+        Assert.Contains("developmentExtensions.Add(new DevelopmentAepExtension(", appHost, StringComparison.Ordinal);
+        Assert.Contains("Agentstration__Aep__SecretAccess__PublicBaseUrl\", console.GetEndpoint(\"http\")", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("Foundry__ProjectEndpoint", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("Foundry__InferenceEndpoint", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("FOUNDRY_API_KEY", appHost, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public void FoundryComposeOverlayParsesAndKeepsTheDefaultTopologyOffline()
+    {
+        var composeRoot = Path.Combine(FindRepositoryRoot(), "deploy", "compose");
+        static YamlMappingNode Services(string path)
+        {
+            var stream = new YamlStream();
+            using var reader = File.OpenText(path);
+            stream.Load(reader);
+            var root = (YamlMappingNode)stream.Documents.Single().RootNode;
+            return (YamlMappingNode)root.Children[new YamlScalarNode("services")];
+        }
+
+        var baseline = Services(Path.Combine(composeRoot, "base.yml"));
+        var overlay = Services(Path.Combine(composeRoot, "foundry.yml"));
+        Assert.IsFalse(baseline.Children.ContainsKey(new YamlScalarNode("foundry-extension")));
+        Assert.IsTrue(overlay.Children.ContainsKey(new YamlScalarNode("foundry-extension")));
+        var extension = (YamlMappingNode)overlay.Children[new YamlScalarNode("foundry-extension")];
+        var environment = (YamlMappingNode)extension.Children[new YamlScalarNode("environment")];
+        Assert.IsFalse(environment.Children.ContainsKey(new YamlScalarNode("Foundry__ProjectEndpoint")));
+        Assert.IsFalse(environment.Children.ContainsKey(new YamlScalarNode("Foundry__InferenceEndpoint")));
+        Assert.IsFalse(environment.Children.ContainsKey(new YamlScalarNode("FOUNDRY_API_KEY")));
+        Assert.AreEqual("${FOUNDRY_ALLOWED_PRIVATE_HOSTS:-}",
+            ((YamlScalarNode)environment.Children[new YamlScalarNode("Foundry__AllowedPrivateHosts")]).Value);
+        Assert.IsTrue(overlay.Children.ContainsKey(new YamlScalarNode("foundry-key-provisioner")));
+        Assert.Contains("deploy/compose/.env.foundry", File.ReadAllText(Path.Combine(FindRepositoryRoot(), ".dockerignore")), StringComparison.Ordinal);
+    }
+
     [TestMethod]
     public void ConsoleClientDoesNotReferenceAuthoritativeServerImplementations()
     {

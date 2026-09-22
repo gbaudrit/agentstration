@@ -243,7 +243,28 @@ public sealed class AepVerticalTests
 
         Assert.AreEqual("pong", response.Text);
         Assert.AreEqual("pong", string.Concat(updates.Select(value => value.Text)));
+        var usage = updates.SelectMany(value => value.Contents).OfType<UsageContent>().Single().Details;
+        Assert.AreEqual(2L, usage.InputTokenCount);
+        Assert.AreEqual(3L, usage.OutputTokenCount);
         await Assert.ThrowsAsync<OperationCanceledException>(() => adapter.GetResponseAsync([new ChatMessage(ChatRole.User, "ping")], cancellationToken: cancellation.Token));
+    }
+
+    [TestMethod]
+    public async Task AepAdapterPreservesStrictJsonSchemaWithoutLeakingItsMarker()
+    {
+        await using var factory = new AepExtensionFactory();
+        using var client = factory.CreateClient();
+        using var adapter = new AepChatClient(new AepClient(client).CreateModelProvider("test"), "test-model");
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        await adapter.GetResponseAsync([new ChatMessage(ChatRole.User, "ping")], new ChatOptions
+        {
+            ResponseFormat = ChatResponseFormat.ForJsonSchema(schema.RootElement, "answer"),
+            AdditionalProperties = new AdditionalPropertiesDictionary { ["json_schema_strict"] = true }
+        });
+        var request = factory.Provider.LastRequest!;
+        Assert.IsTrue(request.Options!.ResponseFormat!.Value.GetProperty("json_schema").GetProperty("strict").GetBoolean());
+        Assert.AreEqual("answer", request.Options.ResponseFormat.Value.GetProperty("json_schema").GetProperty("name").GetString());
+        Assert.IsFalse(request.Options.AdditionalOptions!.ContainsKey("json_schema_strict"));
     }
 
     [TestMethod]
@@ -766,6 +787,7 @@ public sealed class AepVerticalTests
         public int InvocationCount { get; private set; }
         public IReadOnlyList<AepBoundValue>? LastBoundValues { get; private set; }
         public ConcurrentBag<string[]> ObservedBoundValueSets { get; } = [];
+        public AepChatRequest? LastRequest { get; private set; }
         public AepModelProviderDescriptor Descriptor { get; } = new("test", "Test", new(Tools: true, ModelDiscovery: true));
         public Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken)
         {
@@ -773,6 +795,7 @@ public sealed class AepVerticalTests
             InvocationCount++;
             LastBoundValues = request.BoundValues;
             Record(request.BoundValues);
+            LastRequest = request;
             Assert.AreEqual("test-model", request.Model);
             if (request.Options?.Temperature == 0.25f)
             {
@@ -791,6 +814,7 @@ public sealed class AepVerticalTests
             Record(request.BoundValues);
             yield return new([AepContent.FromText("po")], AepRole.Assistant, request.Model);
             await Task.Yield();
+            yield return new([], Usage: new AepUsage(2, 3, 5));
             yield return new([AepContent.FromText("ng")], FinishReason: AepFinishReason.Stop);
         }
         public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>

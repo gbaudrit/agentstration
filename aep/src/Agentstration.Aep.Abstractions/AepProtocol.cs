@@ -458,7 +458,7 @@ public sealed record AepToolContribution(
 public static class AepDescriptorValidator
 {
     private static readonly SearchValues<char> ValueRequirementIdCharacters =
-        SearchValues.Create("abcdefghijklmnopqrstuvwxyz0123456789._-");
+        SearchValues.Create("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-");
 
     public static IReadOnlyList<string> Validate(AepManifest descriptor)
     {
@@ -500,6 +500,10 @@ public static class AepDescriptorValidator
             && (!descriptor.Capabilities.TryGetValue(AepCapabilityNames.BoundValues, out var boundValuesCapability)
                 || !string.Equals(boundValuesCapability.Version, AepProtocol.BoundValuesCapabilityVersion, StringComparison.Ordinal)))
             errors.Add("Value requirements need the aep.bound-values capability version 1.0.");
+        if (requirements.Any(requirement => requirement?.Protection == AepValueProtection.Secured)
+            && (!descriptor.Capabilities.TryGetValue(AepCapabilityNames.SecretAccess, out var secretAccessCapability)
+                || !string.Equals(secretAccessCapability.Version, AepProtocol.SecretAccessVersion, StringComparison.Ordinal)))
+            errors.Add("Secured value requirements need the aep.secret-access capability version 1.0.");
         var requirementIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var requirement in requirements)
         {
@@ -512,7 +516,7 @@ public static class AepDescriptorValidator
             if (!IsKnownContribution(descriptor.Contributions, requirement.ContributionKind, requirement.ContributionId))
                 errors.Add($"Value requirement '{requirement.Id}' targets unknown contribution '{requirement.ContributionKind}/{requirement.ContributionId}'.");
             if (!IsValidValueRequirementId(requirement.Id))
-                errors.Add($"Value requirement id '{requirement.Id}' must start with a lowercase ASCII letter and contain only lowercase letters, digits, '.', '_' or '-' (maximum 64 characters).");
+                errors.Add($"Value requirement id '{requirement.Id}' must start with a lowercase ASCII letter and contain only ASCII letters, digits, '.', '_' or '-' (maximum 64 characters).");
             else if (!requirementIds.Add(contributionKey))
                 errors.Add($"Value requirement '{requirement.Id}' is duplicated for contribution '{requirement.ContributionKind}/{requirement.ContributionId}'.");
             if (requirement.Format is { Length: > 64 } || requirement.Format?.Any(char.IsControl) == true)
