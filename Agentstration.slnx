@@ -69,6 +69,11 @@
     <Project Path="src/Agentstration.Packs.Api/Agentstration.Packs.Api.csproj" />
     <Project Path="src/Agentstration.Packs.Contracts/Agentstration.Packs.Contracts.csproj" />
   </Folder>
+  <Folder Name="/src/Parameters/">
+    <Project Path="src/Agentstration.Parameters/Agentstration.Parameters.csproj" />
+    <Project Path="src/Agentstration.Parameters.Api/Agentstration.Parameters.Api.csproj" />
+    <Project Path="src/Agentstration.Parameters.Contracts/Agentstration.Parameters.Contracts.csproj" />
+  </Folder>
   <Folder Name="/src/Resources/">
     <Project Path="src/Agentstration.Resources/Agentstration.Resources.csproj" />
     <Project Path="src/Agentstration.Resources.Api/Agentstration.Resources.Api.csproj" />

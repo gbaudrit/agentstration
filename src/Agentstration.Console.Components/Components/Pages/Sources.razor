@@ -306,7 +306,7 @@ else
                     <section class="source-pack-bindings"><h3>@T("PackBindingsTitle")</h3><p>@T("PackBindingsHelp")</p>
                     @foreach (var binding in packPreview.Bindings)
                     {
-                        <label class="source-pack-binding"><span class="source-pack-binding-heading"><span><strong>@BindingKindLabel(binding.TargetKind)</strong><small><code>@binding.Name</code></small></span><StatusBadge Text="@(binding.Required ? T("Required") : T("Optional"))" Status="@(binding.Required ? UiStatus.Info : UiStatus.Neutral)" /></span><select value="@PackBindingValue(binding.Name)" @onchange="args => SetPackBindingAsync(binding.Name, args)"><option value="">@F("SelectPackBindingTarget", BindingKindLabel(binding.TargetKind).ToLowerInvariant())</option>@if (binding.TargetKind == PackBindingTargetKind.ModelProfile) { @foreach (var item in packModelProfiles) { <option value="@BindingValue(item.Name, ResourceNamespace.Parse(item.Namespace))">@item.Properties.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.ModelProvider) { @foreach (var item in packModelProviders) { <option value="@BindingValue(item.Name, ResourceNamespace.Default)">@item.Properties.DisplayName — default/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.RuntimeProfile) { @foreach (var item in packRuntimeProfiles) { <option value="@BindingValue(item.Name, ResourceNamespace.Parse(item.Namespace))">@item.Properties.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.ExtensionRegistration) { @foreach (var item in packExtensions) { <option value="@BindingValue(item.Name, item.Namespace)">@item.Definition.DisplayName — @item.Namespace/@item.Name</option> } } else { @foreach (var item in packSecrets) { <option value="@BindingValue(item.Resource.Name, item.Resource.Namespace)">@item.Resource.Definition.DisplayName — @item.Resource.Namespace/@item.Resource.Name</option> } }</select></label>
+                        <label class="source-pack-binding"><span class="source-pack-binding-heading"><span><strong>@BindingKindLabel(binding.TargetKind)</strong><small><code>@binding.Name</code></small></span><StatusBadge Text="@(binding.Required ? T("Required") : T("Optional"))" Status="@(binding.Required ? UiStatus.Info : UiStatus.Neutral)" /></span><select value="@PackBindingValue(binding.Name)" @onchange="args => SetPackBindingAsync(binding.Name, args)"><option value="">@F("SelectPackBindingTarget", BindingKindLabel(binding.TargetKind).ToLowerInvariant())</option>@if (binding.TargetKind == PackBindingTargetKind.ModelProfile) { @foreach (var item in packModelProfiles) { <option value="@BindingValue(item.Name, ResourceNamespace.Parse(item.Namespace))">@item.Properties.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.ModelProvider) { @foreach (var item in packModelProviders) { <option value="@BindingValue(item.Name, ResourceNamespace.Default)">@item.Properties.DisplayName — default/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.RuntimeProfile) { @foreach (var item in packRuntimeProfiles) { <option value="@BindingValue(item.Name, ResourceNamespace.Parse(item.Namespace))">@item.Properties.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.ExtensionRegistration) { @foreach (var item in packExtensions) { <option value="@BindingValue(item.Name, item.Namespace)">@item.Definition.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.Parameter) { @foreach (var item in packParameters) { <option value="@BindingValue(item.Name, item.Namespace, item.ScopeRef)">@item.Definition.DisplayName — @item.ScopeRef · @item.Namespace/@item.Name</option> } } else { @foreach (var item in packSecrets) { <option value="@BindingValue(item.Resource.Name, item.Resource.Namespace)">@item.Resource.Definition.DisplayName — @item.Resource.Namespace/@item.Resource.Name</option> } }</select></label>
                     }
                     </section>
                 }
@@ -357,6 +357,7 @@ else
     private IReadOnlyList<ModelProviderResponse> packModelProviders = [];
     private IReadOnlyList<RuntimeProfileSummaryResponse> packRuntimeProfiles = [];
     private IReadOnlyList<ExtensionRegistrationResource> packExtensions = [];
+    private IReadOnlyList<ParameterResource> packParameters = [];
     private IReadOnlyList<SecretResponse> packSecrets = [];
     private string? packError;
     private bool packPreviewing;
@@ -535,15 +536,19 @@ else
         if (bindings.Any(value => value.TargetKind == PackBindingTargetKind.ModelProvider)) packModelProviders = await Services.GetRequiredService<IModelProvidersClient>().GetModelProvidersAsync(lifetime.Token);
         if (bindings.Any(value => value.TargetKind == PackBindingTargetKind.RuntimeProfile)) packRuntimeProfiles = await Services.GetRequiredService<IRuntimeProfilesClient>().GetRuntimeProfilesAsync(lifetime.Token);
         if (bindings.Any(value => value.TargetKind == PackBindingTargetKind.ExtensionRegistration)) packExtensions = await Services.GetRequiredService<IExtensionsClient>().GetRegistrationsAsync(lifetime.Token);
+        if (bindings.Any(value => value.TargetKind == PackBindingTargetKind.Parameter)) packParameters = await Services.GetRequiredService<IParametersClient>().GetParametersAsync(lifetime.Token);
         if (bindings.Any(value => value.TargetKind == PackBindingTargetKind.Secret)) packSecrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(lifetime.Token);
     }
-    private static string BindingValue(string name, ResourceNamespace @namespace) => $"{@namespace.Value}:{name}";
+    private static string BindingValue(string name, ResourceNamespace @namespace, ResourceScopeRef? scopeRef = null) =>
+        scopeRef is null ? $"{@namespace.Value}:{name}" : $"{scopeRef.Value.Value}|{@namespace.Value}:{name}";
     private static ResourceReference ParsePackBinding(string value)
     {
-        var parts = value.Split(':', 2);
+        var scoped = value.Split('|', 2);
+        var parts = scoped[^1].Split(':', 2);
         if (parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]) || string.IsNullOrWhiteSpace(parts[1]))
             throw new SourceValidationException("source_pack_binding_invalid", "Pack binding targets must use namespace:resource-name.");
-        return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
+        ResourceScopeRef? scopeRef = scoped.Length == 2 && !string.IsNullOrWhiteSpace(scoped[0]) ? ResourceScopeRef.Parse(scoped[0]) : null;
+        return new(parts[1], scopeRef, ResourceNamespace.Parse(parts[0]));
     }
     private ResourceScopeRef? PackTargetScope() => packPreview?.TargetScope switch { ResourceScopeKind.Instance => ResourceScopeRef.Instance, ResourceScopeKind.Tenant => ResourceScopeRef.Tenant(ContextState.Current?.TenantId ?? Guid.Empty), _ => ResourceScopeRef.Workspace(ContextState.Current?.WorkspaceId ?? Guid.Empty) };
     private string PackResourceCount(int count) => F(count == 1 ? "PackResourceCount.One" : "PackResourceCount.Many", count);

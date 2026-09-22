@@ -1,0 +1,90 @@
+@namespace Agentstration.Web.Components.Values
+@implements IDisposable
+@inject IParametersClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ContextualValueCreatorStrings> Localizer
+
+@if (IsOpen && Context is not null)
+{
+    <div class="dialog-backdrop" role="presentation" @onclick="CancelAsync">
+        <section class="dialog contextual-value-dialog" role="dialog" aria-modal="true" aria-labelledby="contextual-parameter-title" @onclick:stopPropagation data-testid="contextual-parameter-creator">
+            <h2 id="contextual-parameter-title">@T("Parameter.Title")</h2>
+            <p>@T("Parameter.Help")</p>
+            @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
+            <EditForm Model="model" OnValidSubmit="CreateAsync" FormName="contextual-parameter-creator-form">
+                <DataAnnotationsValidator /><ValidationSummary />
+                <div class="form-grid">
+                    <label><span>@T("Name")</span><InputText @bind-Value="model.Name" data-testid="contextual-parameter-name" /></label>
+                    <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" data-testid="contextual-parameter-display-name" /></label>
+                    <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" /></label>
+                    <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="Context.ScopeRef" /></label>
+                    <label><span>@T("ValueType")</span><InputSelect @bind-Value="model.ValueType" data-testid="contextual-parameter-value-type">@foreach (var type in Enum.GetValues<ParameterValueType>()) { <option value="@type">@T($"ValueType.{type}")</option> }</InputSelect></label>
+                    @if (!string.IsNullOrWhiteSpace(Context.Format)) { <p class="form-span-2 inline-info">@T("ExpectedFormat", Context.Format)</p> }
+                    <label class="form-span-2"><span>@T("Value")</span>
+                        @if (Context.AllowedValues is { Count: > 0 })
+                        {
+                            <InputSelect @bind-Value="model.Value" data-testid="contextual-parameter-value">
+                                @foreach (var value in Context.AllowedValues) { <option value="@EditorValue(value)">@EditorValue(value)</option> }
+                            </InputSelect>
+                        }
+                        else
+                        {
+                            <InputText @bind-Value="model.Value" data-testid="contextual-parameter-value" />
+                        }
+                    </label>
+                </div>
+                <div class="dialog-actions"><button type="button" class="button-secondary" @onclick="CancelAsync">@T("Cancel")</button><button type="submit" class="button-primary" disabled="@busy" data-testid="contextual-parameter-create">@(busy ? T("Creating") : T("CreateAndUse"))</button></div>
+            </EditForm>
+        </section>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public ContextualValueCreationContext? Context { get; set; }
+    [Parameter] public EventCallback<ScopedResourceAddress> OnCreated { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private readonly CancellationTokenSource cancellation = new();
+    private ParameterEditorModel model = new();
+    private ContextualValueCreationContext? initializedContext;
+    private Exception? error;
+    private bool busy;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+
+    protected override void OnParametersSet()
+    {
+        if (!IsOpen) { initializedContext = null; return; }
+        if (Context is null || ReferenceEquals(initializedContext, Context)) return;
+        initializedContext = Context;
+        model = new ParameterEditorModel
+        {
+            Name = Context.SuggestedName,
+            DisplayName = Context.SuggestedDisplayName,
+            Description = Context.Description,
+            ValueType = Context.ValueType ?? ParameterValueType.Text,
+            Value = Context.AllowedValues is { Count: > 0 } ? EditorValue(Context.AllowedValues[0]) : string.Empty
+        };
+        error = null;
+    }
+
+    private async Task CreateAsync()
+    {
+        if (Context is null || busy) return;
+        busy = true; error = null;
+        try
+        {
+            if (Context.EffectiveNamespace != ResourceNamespace.Default)
+                throw new ArgumentException(T("DefaultNamespaceOnly"));
+            var snapshot = await Client.CreateParameterAsync(new(model.Name, model.Properties(), Context.ScopeRef), cancellation.Token);
+            await OnCreated.InvokeAsync(ScopedResourceAddress.Create(Context.ScopeRef, snapshot.Value.Namespace, snapshot.Value.Kind, snapshot.Value.Name));
+        }
+        catch (Exception exception) { error = exception; }
+        finally { busy = false; }
+    }
+
+    private Task CancelAsync() => OnCancel.InvokeAsync();
+    private static string EditorValue(System.Text.Json.JsonElement value) => value.ValueKind == System.Text.Json.JsonValueKind.String
+        ? value.GetString() ?? string.Empty
+        : value.GetRawText();
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

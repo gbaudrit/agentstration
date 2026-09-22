@@ -80,6 +80,7 @@ public static class ConsoleHostServiceCollectionExtensions
         AddClient<ToolsApiClient, IToolsClient>(services, configured.ManagementApi);
         AddClient<ToolDefinitionsApiClient, IToolDefinitionsClient>(services, configured.ManagementApi);
         AddClient<SecretsApiClient, ISecretsClient>(services, configured.ManagementApi, resilient: false);
+        AddClient<ParametersApiClient, IParametersClient>(services, configured.ManagementApi, resilient: false);
         services.AddTransient<BffWorkloadSigningHandler>();
         Configure(
             services.AddHttpClient<IBffWorkloadTrustClient, BffWorkloadTrustClient>()

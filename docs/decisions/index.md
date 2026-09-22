@@ -153,3 +153,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 118. [ADR-0118 — Browser campaigns use dedicated Workspaces](0118-browser-campaigns-use-dedicated-workspaces.md)
 119. [ADR-0119 — Descendant use grants govern Secrets and Vaults](0119-descendant-use-grants-for-secrets-and-vaults.md)
 121. [ADR-0121 — AEP Secret access uses one-use capabilities](0121-aep-secret-access-capabilities.md)
+122. [ADR-0122 — AEP contributions declare protected Value Requirements](0122-aep-value-requirements-and-bound-values.md)
+123. [ADR-0123 — AEP Value Requirements may constrain invariant allowed values](0123-aep-value-requirements-constrain-allowed-values.md)

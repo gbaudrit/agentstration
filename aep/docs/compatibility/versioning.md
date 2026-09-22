@@ -2,14 +2,14 @@
 
 AEP uses four independent version axes:
 
-- protocol version, currently `2026-08-01`;
+- protocol version, currently `2026-09-18`;
 - SDK/package version, initially `0.1.0`;
 - extension version, owned by each extension;
 - consuming-product version, owned by Agentstration or another host.
 
 Breaking wire changes require a new protocol version. Additive capability names do not. A capability may evolve independently through its descriptor version. Clients reject unsupported protocol versions but preserve unknown capability descriptors for forward-compatible inspection.
 
-`aep.secret-requirements` version `1.0` is an additive discovery capability. An older extension omits the capability and declaration; consumers treat that as zero declared requirements. Changing the meaning or fields of a requirement needs a new capability version. Requirement identifiers remain stable contract names so future consumer bindings can refer to them without depending on installation-specific Secrets.
+`aep.value-requirements` and `aep.bound-values` version `1.0` are part of protocol `2026-09-18`. They replace the former extension-wide Secret requirement declaration and chat-only Secret access field. Requirements are scoped to one contribution and retain stable logical identifiers independent of installation Parameters or Secrets. There is no legacy wire compatibility path.
 
 Configuration has an additional compatibility axis. An option-set version is immutable and its schema digest must remain stable. Extensions preserve existing consumers by continuing to publish and execute pinned versions when a newer version becomes preferred. Removing a published option-set version is a breaking change for consumers that still reference it and must be diagnosed before invocation.
 
