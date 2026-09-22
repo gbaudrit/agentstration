@@ -155,6 +155,60 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task ConsoleEntryInteractionClientUsesOnlyOwnerWorkspaceWorkRoutes()
+    {
+        var workspaceId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        var interactionId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var taskId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+        var artifactId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+        var now = DateTimeOffset.UtcNow;
+        var interaction = new InteractionResponse(interactionId, workspaceId, "assistant", InteractionStatus.Active, now, now, new Dictionary<string, JsonElement>(), [], [], null, taskId, null, 1);
+        var task = new WorkTaskResponse(taskId, workspaceId, "assistant", interactionId, "Task", null, WorkTaskStatus.Running, now, now, null, [], [], [], null, null, new CreateTaskAction(new(taskId), "Task", null, "/tasks"), 1);
+        var requests = new List<(HttpMethod Method, string Path)>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add((request.Method, request.RequestUri!.AbsolutePath));
+            object body = request.RequestUri.AbsolutePath switch
+            {
+                var path when path.EndsWith($"/interactions/{interactionId:D}", StringComparison.Ordinal) => interaction,
+                var path when path.EndsWith("/messages", StringComparison.Ordinal) => Array.Empty<ConversationMessage>(),
+                var path when path.EndsWith("/pending-actions", StringComparison.Ordinal) => Array.Empty<PendingActionContract>(),
+                var path when path.EndsWith("/activities", StringComparison.Ordinal) => Array.Empty<WorkTaskActivity>(),
+                var path when path.EndsWith("/results", StringComparison.Ordinal) => Array.Empty<WorkTaskResult>(),
+                var path when path.EndsWith("/artifacts", StringComparison.Ordinal) => Array.Empty<WorkTaskArtifact>(),
+                _ => task
+            };
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(body, body.GetType()) };
+        }))
+        { BaseAddress = new Uri("http://work-api/") };
+        var client = new ConsoleEntryInteractionApiClient(httpClient);
+
+        _ = await client.GetInteractionAsync(workspaceId, interactionId, default);
+        _ = await client.ListMessagesAsync(workspaceId, interactionId, default);
+        _ = await client.ListPendingActionsAsync(workspaceId, interactionId, default);
+        _ = await client.GetTaskAsync(workspaceId, taskId, default);
+        _ = await client.ListActivitiesAsync(workspaceId, taskId, default);
+        _ = await client.ListResultsAsync(workspaceId, taskId, default);
+        _ = await client.ListArtifactsAsync(workspaceId, taskId, default);
+        _ = await client.CancelTaskAsync(workspaceId, taskId, default);
+
+        CollectionAssert.AreEqual(new[]
+        {
+            (HttpMethod.Get, $"/api/workspaces/{workspaceId:D}/interactions/{interactionId:D}"),
+            (HttpMethod.Get, $"/api/workspaces/{workspaceId:D}/interactions/{interactionId:D}/messages"),
+            (HttpMethod.Get, $"/api/workspaces/{workspaceId:D}/interactions/{interactionId:D}/pending-actions"),
+            (HttpMethod.Get, $"/api/workspaces/{workspaceId:D}/tasks/{taskId:D}"),
+            (HttpMethod.Get, $"/api/workspaces/{workspaceId:D}/tasks/{taskId:D}/activities"),
+            (HttpMethod.Get, $"/api/workspaces/{workspaceId:D}/tasks/{taskId:D}/results"),
+            (HttpMethod.Get, $"/api/workspaces/{workspaceId:D}/tasks/{taskId:D}/artifacts"),
+            (HttpMethod.Post, $"/api/workspaces/{workspaceId:D}/tasks/{taskId:D}/cancel")
+        }, requests);
+        Assert.AreEqual(
+            $"http://work-api/api/workspaces/{workspaceId:D}/tasks/{taskId:D}/artifacts/{artifactId:D}/content",
+            client.GetArtifactContentUri(workspaceId, taskId, artifactId).AbsoluteUri);
+    }
+
+    [TestMethod]
     public async Task FlowAuthoringClientPreservesETagAndPublishesImmutableVersion()
     {
         var now = new DateTimeOffset(2026, 8, 13, 10, 0, 0, TimeSpan.Zero);
