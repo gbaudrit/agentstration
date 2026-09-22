@@ -5,6 +5,7 @@ using Agentstration.Aep.Client;
 using Agentstration.Agents;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
@@ -35,6 +36,9 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace },
             ResourceScopePolicy.AllowedScopes(SecretResourceKinds.Secret).ToArray());
+        CollectionAssert.AreEquivalent(
+            new[] { ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace },
+            ResourceScopePolicy.AllowedScopes(ParameterResourceKinds.Parameter).ToArray());
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace },
             ResourceScopePolicy.AllowedScopes(SourceResourceKinds.SourceProvider).ToArray());
@@ -295,10 +299,10 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
                 await authorizer.GetAuthorizedStatusAsync(new SecretReference(address, tenant), context));
             await Assert.ThrowsAsync<SecretAccessDeniedException>(async () =>
                 await resolver.ResolveAsync(new SecretReference(address, tenant), context));
-            var denied = await Assert.ThrowsExactlyAsync<SecretCapabilityException>(() =>
-                capabilities.RedeemAsync(capability.RevealForTransport(), capabilityContext));
-            Assert.AreEqual("access_denied", denied.Code);
         }
+        var revokedDenial = await Assert.ThrowsExactlyAsync<SecretCapabilityException>(() =>
+            capabilities.RedeemAsync(capability.RevealForTransport(), capabilityContext));
+        Assert.AreEqual("access_denied", revokedDenial.Code);
     }
 
     private sealed class TestVaultProvider : ISecretVaultProvider

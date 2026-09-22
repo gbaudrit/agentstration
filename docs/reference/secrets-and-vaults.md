@@ -60,6 +60,8 @@ To use a Vault owned by an ancestor scope, first add a use grant on the Vault fo
 
 An ancestor resource reference must name its exact `scopeRef`; an omitted scope means the consumer's own scope for Secret resolution. Names are never searched through parent scopes. `PUT /api/vaults/{name}` and `PUT /api/secrets/{name}` accept `usePolicy.grants` in their properties and require the current ETag. For example:
 
+One-use AEP Secret capabilities retain the exact consumer scope. After the host validates and consumes a capability, it opens a bounded internal system context only to load the exact Secret and Vault metadata. Their descendant-use grants are then re-evaluated against that retained consumer scope before the value is returned. This internal lookup does not grant the extension or the descendant caller permission to read ancestor resources through the Management API.
+
 ```json
 {
   "usePolicy": {

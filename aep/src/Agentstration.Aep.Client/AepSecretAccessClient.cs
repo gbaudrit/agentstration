@@ -43,7 +43,7 @@ public sealed class AepSecretAccessClient(HttpClient httpClient)
             AepErrorResponse? error;
             try { error = await response.Content.ReadFromJsonAsync<AepErrorResponse>(AepProtocol.JsonOptions, cancellationToken); }
             catch (JsonException) { error = null; }
-            var code = error?.Error.Code;
+            var code = error?.Error?.Code;
             throw new AepProtocolException(code is not null && KnownErrors.Contains(code) ? code : "secret_access_failed",
                 "The Secret access request failed.", response.StatusCode);
         }

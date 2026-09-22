@@ -8,6 +8,7 @@ public sealed class ConsoleResourceSearchProvider(
     IModelProfilesClient modelProfiles,
     IModelProvidersClient modelProviders,
     ISourceProvidersClient sourceProviders,
+    IParametersClient parameters,
     ISecretsClient secrets,
     IRuntimeProfilesClient runtimeProfiles,
     IFlowApiClient flows,
@@ -50,6 +51,7 @@ public sealed class ConsoleResourceSearchProvider(
             var providersTask = SafeLoadAsync("model providers", token => modelProviders.GetModelProvidersAsync(token), cancellationToken);
             var sourceProvidersTask = SafeLoadAsync("source providers", token => sourceProviders.GetSourceProvidersAsync(token), cancellationToken);
             var runtimeProfilesTask = SafeLoadAsync("runtime profiles", token => runtimeProfiles.GetRuntimeProfilesAsync(token), cancellationToken);
+            var parametersTask = SafeLoadAsync("parameters", token => parameters.GetParametersAsync(token), cancellationToken);
             var secretsTask = SafeLoadAsync("secrets", token => secrets.GetSecretsAsync(token), cancellationToken);
             var vaultsTask = SafeLoadAsync("vaults", token => secrets.GetVaultsAsync(token), cancellationToken);
             var flowsTask = SafeLoadAsync("flows", token => flows.GetFlowsAsync(token), cancellationToken);
@@ -57,7 +59,7 @@ public sealed class ConsoleResourceSearchProvider(
             var executionsTask = SafeLoadAsync("executions", token => runtime.GetExecutionsAsync(token), cancellationToken);
             var workTask = SafeLoadAsync("work items", token => work.GetWorkItemsAsync(token), cancellationToken);
 
-            await Task.WhenAll(agentsTask, profilesTask, providersTask, sourceProvidersTask, runtimeProfilesTask, secretsTask, vaultsTask, flowsTask, deploymentsTask, executionsTask, workTask);
+            await Task.WhenAll(agentsTask, profilesTask, providersTask, sourceProvidersTask, runtimeProfilesTask, parametersTask, secretsTask, vaultsTask, flowsTask, deploymentsTask, executionsTask, workTask);
 
             cache =
             [
@@ -66,6 +68,7 @@ public sealed class ConsoleResourceSearchProvider(
                 .. providersTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model provider", item.Id, ResourceUrl("modelproviders", item.Namespace, item.Name), item.Properties.Status, "⬡", $"{item.Namespace} {item.Name} {item.Properties.ContributionId}")),
                 .. sourceProvidersTask.Result.Select(item => new ResourceSearchResult(item.DisplayName, "Source provider", item.Id, ResourceUrl("sourceproviders", item.Namespace, item.Name), item.Status, "◫", $"{item.Namespace} {item.Name} {item.ContributionId} {item.ExtensionName}")),
                 .. runtimeProfilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Runtime profile", item.Id, ResourceUrl("runtimeprofiles", item.Namespace, item.Name), "Configured", "◈", $"{item.Namespace} {item.Name} {item.Properties.RuntimeType}")),
+                .. parametersTask.Result.Select(item => new ResourceSearchResult(item.Definition.DisplayName, "Parameter", item.Address.ToString(), $"/parameters/{Escape(item.Name)}?scopeRef={Escape(item.ScopeRef!.Value.Value)}", "Configured", "◧", $"{item.Namespace.Value} {item.Name} {item.Definition.ValueType}")),
                 .. secretsTask.Result.Select(item => new ResourceSearchResult(item.Resource.Definition.DisplayName, "Secret", item.Resource.Address.ToString(), $"/secrets/{Escape(item.Resource.Name)}", item.ValueStatus, "◆", $"{item.Resource.Name} {item.Resource.Definition.Vault.Name}")),
                 .. vaultsTask.Result.Select(item => new ResourceSearchResult(item.Resource.Definition.DisplayName, "Vault", item.Resource.Address.ToString(), $"/vaults/{Escape(item.Resource.Name)}", item.Status, "▰", $"{item.Resource.Name} {item.Resource.Definition.ProviderType}")),
                 .. flowsTask.Result.Select(item => new ResourceSearchResult(item.Name, "Flow", item.Id, item.DetailsUrl, item.Status, "⌘", $"{item.Namespace.Value} {item.Kind} {item.Version}")),

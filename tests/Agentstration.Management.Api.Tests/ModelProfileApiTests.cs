@@ -29,7 +29,15 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
         await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
             services.RemoveAll<IExtensionInspector>();
-            services.AddSingleton<IExtensionInspector>(new ConfiguredEndpointInspector([new AepSecretRequirement("credential", true)]));
+            services.AddSingleton<IExtensionInspector>(new ConfiguredEndpointInspector(
+            [
+                new AepValueRequirement(
+                    AepContributionKinds.ModelProvider,
+                    "ollama",
+                    "credential",
+                    true,
+                    Protection: AepValueProtection.Secured)
+            ]));
         }));
         var context = await GetBootstrapContextAsync(factory);
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);

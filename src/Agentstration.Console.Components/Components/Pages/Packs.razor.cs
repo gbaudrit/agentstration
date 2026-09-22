@@ -4,6 +4,7 @@ using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models.Contracts;
+using Agentstration.Parameters;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
@@ -40,6 +41,7 @@ public partial class Packs
     private IReadOnlyList<ModelProviderResponse> modelProviders = [];
     private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
     private IReadOnlyList<ExtensionRegistrationResource> extensionRegistrations = [];
+    private IReadOnlyList<ParameterResource> parameters = [];
     private IReadOnlyList<SecretResponse> secrets = [];
     private readonly Dictionary<string, string> bindingSelections = new(StringComparer.Ordinal);
     private byte[]? archive;
@@ -145,7 +147,7 @@ public partial class Packs
             foreach (var binding in preview.Bindings)
             {
                 if (binding.TargetAvailable && binding.Target is not null)
-                    bindingSelections[binding.Name] = BindingValue(binding.Target.Name, binding.Target.Namespace ?? ResourceNamespace.Default);
+                    bindingSelections[binding.Name] = BindingValue(binding.Target.Name, binding.Target.Namespace ?? ResourceNamespace.Default, binding.Target.ScopeRef);
             }
             if (preview.Bindings.Count > 0)
             {
@@ -157,6 +159,8 @@ public partial class Packs
                     runtimeProfiles = await Services.GetRequiredService<IRuntimeProfilesClient>().GetRuntimeProfilesAsync(cancellation.Token);
                 if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ExtensionRegistration))
                     extensionRegistrations = await Services.GetRequiredService<IExtensionsClient>().GetRegistrationsAsync(cancellation.Token);
+                if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.Parameter))
+                    parameters = await Services.GetRequiredService<IParametersClient>().GetParametersAsync(cancellation.Token);
                 if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.Secret))
                     secrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(cancellation.Token);
             }
@@ -292,7 +296,8 @@ public partial class Packs
     private static string DisplayName(InstalledPackResource pack) => pack.Definition.DisplayName ?? pack.Definition.PackName;
     private string? SelectedBinding(string name) => bindingSelections.GetValueOrDefault(name);
     private void BindingChanged(string name, ChangeEventArgs args) => bindingSelections[name] = args.Value?.ToString() ?? string.Empty;
-    private static string BindingValue(string name, ResourceNamespace @namespace) => $"{@namespace.Value}:{name}";
+    private static string BindingValue(string name, ResourceNamespace @namespace, ResourceScopeRef? scopeRef = null) =>
+        scopeRef is null ? $"{@namespace.Value}:{name}" : $"{scopeRef.Value.Value}|{@namespace.Value}:{name}";
     private static string? DefinitionFormUrl(ManagedPackResource resource) => resource.Kind switch
     {
         AgentResourceKinds.Agent => $"/namespaces/{Uri.EscapeDataString(resource.Namespace.Value)}/agents/{Uri.EscapeDataString(resource.Name)}?view=definition",
@@ -303,13 +308,16 @@ public partial class Packs
     private static string BindingTarget(ResourceReference target) => $"{(target.Namespace ?? ResourceNamespace.Default).Value}/{target.Name}";
     private ResourceReference ParseBindingTarget(string value)
     {
-        var parts = value.Split(':', 2);
+        var scoped = value.Split('|', 2);
+        var parts = scoped[^1].Split(':', 2);
         if (parts.Length != 2) throw new InvalidOperationException(T("InvalidPackBinding"));
-        return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
+        ResourceScopeRef? scopeRef = scoped.Length == 2 && !string.IsNullOrWhiteSpace(scoped[0]) ? ResourceScopeRef.Parse(scoped[0]) : null;
+        return new(parts[1], scopeRef, ResourceNamespace.Parse(parts[0]));
     }
     private string BindingKindLabel(PackBindingTargetKind kind) => kind switch
     {
         PackBindingTargetKind.Secret => T("Binding.Secret"),
+        PackBindingTargetKind.Parameter => T("Binding.Parameter"),
         PackBindingTargetKind.ModelProvider => T("Binding.ModelProvider"),
         PackBindingTargetKind.RuntimeProfile => T("Binding.RuntimeProfile"),
         PackBindingTargetKind.ExtensionRegistration => T("Binding.ExtensionRegistration"),

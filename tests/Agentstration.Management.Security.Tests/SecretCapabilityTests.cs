@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
+using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
@@ -16,7 +18,7 @@ public sealed class SecretCapabilityTests
     {
         var authorizer = new FakeAccessAuthorizer();
         var resolver = new FakeResolver();
-        using var capabilities = new SecretCapabilityService(authorizer, resolver, new ManualTimeProvider());
+        using var capabilities = CreateCapabilities(authorizer, resolver, new ManualTimeProvider());
         var context = Context();
 
         var handle = await capabilities.IssueAsync(context, Binding(), ["credential"], CancellationToken.None);
@@ -32,10 +34,27 @@ public sealed class SecretCapabilityTests
     }
 
     [TestMethod]
+    public async Task RedemptionUsesABoundedSystemContextForExactResourceResolution()
+    {
+        var requestContext = new CurrentRequestContext();
+        var resolver = new FakeResolver(requestContext);
+        using var capabilities = new SecretCapabilityService(
+            new FakeAccessAuthorizer(), resolver, requestContext, new ManualTimeProvider());
+        var context = Context();
+        var handle = await capabilities.IssueAsync(context, Binding(), ["credential"], CancellationToken.None);
+
+        Assert.AreEqual(ControlPlaneAccessMode.Unavailable, requestContext.AccessMode);
+        using var secret = await capabilities.RedeemAsync(handle.RevealForTransport(), context);
+
+        Assert.AreEqual(ControlPlaneAccessMode.System, resolver.AccessModeAtResolution);
+        Assert.AreEqual(ControlPlaneAccessMode.Unavailable, requestContext.AccessMode);
+    }
+
+    [TestMethod]
     public async Task ProtocolRedemptionMatchesExtensionRequirementAndExecution()
     {
         var resolver = new FakeResolver();
-        using var capabilities = new SecretCapabilityService(new FakeAccessAuthorizer(), resolver, new ManualTimeProvider());
+        using var capabilities = CreateCapabilities(new FakeAccessAuthorizer(), resolver, new ManualTimeProvider());
         var context = Context();
         var wrong = await capabilities.IssueAsync(context, Binding(), ["credential"], CancellationToken.None);
         await AssertCodeAsync("context_mismatch", () => capabilities.RedeemAsync(
@@ -55,7 +74,7 @@ public sealed class SecretCapabilityTests
     public async Task AuditLogsContainOnlyContextAndNeverHandleOrValue()
     {
         var logger = new RecordingLogger();
-        using var capabilities = new SecretCapabilityService(new FakeAccessAuthorizer(), new FakeResolver(),
+        using var capabilities = CreateCapabilities(new FakeAccessAuthorizer(), new FakeResolver(),
             new ManualTimeProvider(), logger);
         var context = Context();
         var handle = await capabilities.IssueAsync(context, Binding(), ["credential"], CancellationToken.None);
@@ -73,7 +92,7 @@ public sealed class SecretCapabilityTests
     {
         var authorizer = new FakeAccessAuthorizer { VaultMissing = true };
         var resolver = new FakeResolver();
-        using var capabilities = new SecretCapabilityService(authorizer, resolver, new ManualTimeProvider());
+        using var capabilities = CreateCapabilities(authorizer, resolver, new ManualTimeProvider());
         var context = Context();
         await AssertCodeAsync("vault_unavailable", () => capabilities.IssueAsync(
             context, Binding(), ["credential"], CancellationToken.None));
@@ -89,7 +108,7 @@ public sealed class SecretCapabilityTests
     public async Task CancellationAndCleanupRaceLeaveNoRedeemableCapability()
     {
         var resolver = new FakeResolver();
-        using var capabilities = new SecretCapabilityService(new FakeAccessAuthorizer(), resolver, new ManualTimeProvider());
+        using var capabilities = CreateCapabilities(new FakeAccessAuthorizer(), resolver, new ManualTimeProvider());
         using var lifetime = new CancellationTokenSource();
         var context = Context();
         var handles = new ConcurrentBag<SecretCapabilityHandle>();
@@ -119,7 +138,7 @@ public sealed class SecretCapabilityTests
     public async Task ContextMismatchConsumesTheCapabilityWithoutResolving()
     {
         var resolver = new FakeResolver();
-        using var capabilities = new SecretCapabilityService(new FakeAccessAuthorizer(), resolver, new ManualTimeProvider());
+        using var capabilities = CreateCapabilities(new FakeAccessAuthorizer(), resolver, new ManualTimeProvider());
         var context = Context();
         var wrongContexts = new[]
         {
@@ -141,7 +160,7 @@ public sealed class SecretCapabilityTests
     public async Task ExpiryCancellationAndRevocationFailClosed()
     {
         var time = new ManualTimeProvider();
-        using var capabilities = new SecretCapabilityService(new FakeAccessAuthorizer(), new FakeResolver(), time);
+        using var capabilities = CreateCapabilities(new FakeAccessAuthorizer(), new FakeResolver(), time);
         var context = Context();
         var expired = await capabilities.IssueAsync(context, Binding(), ["credential"], CancellationToken.None);
         time.Advance(TimeSpan.FromMinutes(2));
@@ -165,7 +184,7 @@ public sealed class SecretCapabilityTests
     public async Task ConcurrentReplayResolvesOnlyOnce()
     {
         var resolver = new FakeResolver();
-        using var capabilities = new SecretCapabilityService(new FakeAccessAuthorizer(), resolver, new ManualTimeProvider());
+        using var capabilities = CreateCapabilities(new FakeAccessAuthorizer(), resolver, new ManualTimeProvider());
         var context = Context();
         var handle = await capabilities.IssueAsync(context, Binding(), ["credential"], CancellationToken.None);
 
@@ -191,7 +210,7 @@ public sealed class SecretCapabilityTests
     {
         var authorizer = new FakeAccessAuthorizer();
         var resolver = new FakeResolver();
-        using var capabilities = new SecretCapabilityService(authorizer, resolver, new ManualTimeProvider());
+        using var capabilities = CreateCapabilities(authorizer, resolver, new ManualTimeProvider());
         var context = Context();
         await AssertCodeAsync("requirement_undeclared", () => capabilities.IssueAsync(
             context, Binding(), ["other"], CancellationToken.None));
@@ -211,6 +230,13 @@ public sealed class SecretCapabilityTests
         await AssertCodeAsync("secret_unavailable", () => capabilities.RedeemAsync(handle.RevealForTransport(), context));
         await AssertCodeAsync("capability_invalid", () => capabilities.RedeemAsync(handle.RevealForTransport(), context));
     }
+
+    private static SecretCapabilityService CreateCapabilities(
+        ISecretAccessAuthorizer authorizer,
+        ISecretResolver resolver,
+        TimeProvider timeProvider,
+        ILogger<SecretCapabilityService>? logger = null) =>
+        new(authorizer, resolver, new CurrentRequestContext(), timeProvider, logger);
 
     private static async Task AssertCodeAsync(string code, Func<Task> operation)
     {
@@ -253,14 +279,16 @@ public sealed class SecretCapabilityTests
         }
     }
 
-    private sealed class FakeResolver : ISecretResolver
+    private sealed class FakeResolver(ICurrentRequestContext? requestContext = null) : ISecretResolver
     {
         public int Calls => Volatile.Read(ref calls);
         public bool Available { get; set; } = true;
         public bool VaultMissing { get; set; }
+        public ControlPlaneAccessMode? AccessModeAtResolution { get; private set; }
         public Task<ResolvedSecret?> ResolveAsync(SecretReference secret, SecretResolutionContext context, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref calls);
+            AccessModeAtResolution = requestContext?.AccessMode;
             if (VaultMissing) throw new VaultResourceNotFoundException("vault");
             return Task.FromResult<ResolvedSecret?>(Available
                 ? new(secret.Address, new(ResourceNamespace.Default, "Vault", "local"), new SecretValue("test-value"u8))

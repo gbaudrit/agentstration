@@ -10,15 +10,15 @@ public sealed class AepChatClient(
     AepModelProviderClient provider,
     string model,
     AepVersionedOptions? nativeOptions = null,
-    Func<CancellationToken, Task<AepSecretAccessLease>>? secretAccess = null) : IChatClient
+    Func<CancellationToken, Task<AepBoundValuesLease>>? boundValues = null) : IChatClient
 {
     public async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        using var lease = secretAccess is null ? null : await secretAccess(cancellationToken);
-        var request = MapRequest(messages, options) with { SecretAccess = lease?.Grants };
+        using var lease = boundValues is null ? null : await boundValues(cancellationToken);
+        var request = MapRequest(messages, options) with { BoundValues = lease?.Values };
         var response = await provider.ChatAsync(request, cancellationToken);
         var result = new ChatResponse(response.Messages.Select(MapMessage).ToList())
         {
@@ -42,11 +42,19 @@ public sealed class AepChatClient(
         ChatOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        using var lease = secretAccess is null ? null : await secretAccess(cancellationToken);
-        var request = MapRequest(messages, options) with { SecretAccess = lease?.Grants };
+        using var lease = boundValues is null ? null : await boundValues(cancellationToken);
+        var request = MapRequest(messages, options) with { BoundValues = lease?.Values };
         await foreach (var update in provider.ChatStreamingAsync(request, cancellationToken).WithCancellation(cancellationToken))
         {
-            var mapped = new ChatResponseUpdate(MapRole(update.Role), MapContents(update.Contents))
+            var contents = MapContents(update.Contents);
+            if (update.Usage is { } usage)
+                contents.Add(new UsageContent(new UsageDetails
+                {
+                    InputTokenCount = usage.InputTokens,
+                    OutputTokenCount = usage.OutputTokens,
+                    TotalTokenCount = usage.TotalTokens
+                }));
+            var mapped = new ChatResponseUpdate(MapRole(update.Role), contents)
             {
                 ModelId = update.Model ?? model,
                 FinishReason = MapFinishReason(update.FinishReason)
@@ -72,7 +80,8 @@ public sealed class AepChatClient(
         var additional = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         if (options?.AdditionalProperties is not null)
             foreach (var value in options.AdditionalProperties)
-                additional[value.Key] = JsonSerializer.SerializeToElement(value.Value, AepProtocol.JsonOptions);
+                if (value.Key != "json_schema_strict")
+                    additional[value.Key] = JsonSerializer.SerializeToElement(value.Value, AepProtocol.JsonOptions);
         var tools = options?.Tools?.OfType<AIFunctionDeclaration>()
             .Select(tool => new AepToolDefinition(tool.Name, tool.Description, tool.JsonSchema))
             .ToArray();
@@ -87,14 +96,15 @@ public sealed class AepChatClient(
                 TopK = options?.TopK,
                 Seed = options?.Seed,
                 StopSequences = options?.StopSequences?.ToArray(),
-                ResponseFormat = MapResponseFormat(options?.ResponseFormat),
+                ResponseFormat = MapResponseFormat(options?.ResponseFormat,
+                    options?.AdditionalProperties?.TryGetValue("json_schema_strict", out var strict) == true && strict is true),
                 NativeOptions = nativeOptions,
                 AdditionalOptions = additional
             },
             tools);
     }
 
-    private static JsonElement? MapResponseFormat(ChatResponseFormat? format)
+    private static JsonElement? MapResponseFormat(ChatResponseFormat? format, bool strict)
     {
         if (format is null) return null;
         if (format == ChatResponseFormat.Text)
@@ -103,11 +113,13 @@ public sealed class AepChatClient(
             return JsonSerializer.SerializeToElement(new { type = "json_object" }, AepProtocol.JsonOptions);
         if (format is ChatResponseFormatJson { Schema: { } schema } json)
         {
-            return JsonSerializer.SerializeToElement(new
+            var definition = new System.Text.Json.Nodes.JsonObject
             {
-                type = "json_schema",
-                json_schema = new { name = json.SchemaName ?? "agentstration_output", schema }
-            }, AepProtocol.JsonOptions);
+                ["name"] = json.SchemaName ?? "agentstration_output",
+                ["schema"] = System.Text.Json.Nodes.JsonNode.Parse(schema.GetRawText())
+            };
+            if (strict) definition["strict"] = true;
+            return JsonSerializer.SerializeToElement(new { type = "json_schema", json_schema = definition }, AepProtocol.JsonOptions);
         }
         return null;
     }
@@ -182,8 +194,8 @@ public sealed class AepChatClient(
     };
 }
 
-public sealed class AepSecretAccessLease(IReadOnlyList<AepSecretAccessGrant> grants, Action revoke) : IDisposable
+public sealed class AepBoundValuesLease(IReadOnlyList<AepBoundValue> values, Action revoke) : IDisposable
 {
-    public IReadOnlyList<AepSecretAccessGrant> Grants { get; } = grants;
+    public IReadOnlyList<AepBoundValue> Values { get; } = values;
     public void Dispose() => revoke();
 }

@@ -14,6 +14,7 @@
     <ProjectReference Include="../Agentstration.Extensions.Aep/Agentstration.Extensions.Aep.csproj" />
     <ProjectReference Include="../Agentstration.Identity/Agentstration.Identity.csproj" />
     <ProjectReference Include="../Agentstration.Models.Application/Agentstration.Models.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Parameters/Agentstration.Parameters.csproj" />
     <ProjectReference Include="../Agentstration.Packs/Agentstration.Packs.csproj" />
     <ProjectReference Include="../Agentstration.Sources/Agentstration.Sources.csproj" />
     <ProjectReference Include="../Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />

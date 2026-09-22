@@ -7,6 +7,8 @@ using Agentstration.Flows.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
+using Agentstration.Parameters;
+using Agentstration.Parameters.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
@@ -377,6 +379,16 @@ internal static class OpenApiSuccessResponseCatalog
             if (path.EndsWith("/initialize", StringComparison.OrdinalIgnoreCase)) return Json<VaultInitializationResponse>(200, "Initialize a Vault");
             return Json<VaultResponse>(200, "Get or update a Vault");
         }
+        if (path.StartsWith("/api/parameters", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path.EndsWith("/usages", StringComparison.OrdinalIgnoreCase))
+                return Json<ParameterUsagesResponse>(200, "List Parameter usages");
+            if (path == "/api/parameters")
+                return method == "POST"
+                    ? Json<ParameterResource>(201, "Create a Parameter")
+                    : Json<IReadOnlyList<ParameterResource>>(200, "List Parameters");
+            return Json<ParameterResource>(200, method == "PUT" ? "Update a Parameter" : "Get a Parameter");
+        }
         if (path.StartsWith("/api/secrets", StringComparison.OrdinalIgnoreCase))
         {
             if (path.EndsWith("/value", StringComparison.OrdinalIgnoreCase)) return NoContent(method == "PUT" ? "Set a Secret value" : "Delete a Secret value");
@@ -471,6 +483,7 @@ internal static class OpenApiSuccessResponseCatalog
         || path.StartsWith("/api/toolproviders", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/tools", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/toolexecutionhooks", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/api/parameters", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/vaults", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/secrets", StringComparison.OrdinalIgnoreCase);
 

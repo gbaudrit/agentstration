@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agentstration.Parameters;
 using Agentstration.Resources;
 using Agentstration.Secrets.Abstractions;
 
@@ -21,6 +22,30 @@ public sealed record ModelProviderProperties
     public required string DisplayName { get; init; }
     public required ResourceReference Extension { get; init; }
     public required string ContributionId { get; init; }
+    public IReadOnlyList<ModelProviderValueBinding> ValueBindings { get; init; } = [];
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<ModelProviderValueBindingKind>))]
+public enum ModelProviderValueBindingKind
+{
+    [JsonStringEnumMemberName("parameter")] Parameter,
+    [JsonStringEnumMemberName("secret")] Secret
+}
+
+public sealed record ModelProviderValueBinding
+{
+    public required string RequirementId { get; init; }
+    public required ModelProviderValueBindingKind Kind { get; init; }
+    public ParameterReference? Parameter { get; init; }
+    public SecretReference? Secret { get; init; }
+
+    public static ModelProviderValueBinding FromParameter(string requirementId, ParameterReference parameter) =>
+        new() { RequirementId = requirementId, Kind = ModelProviderValueBindingKind.Parameter, Parameter = parameter };
+
+    public static ModelProviderValueBinding FromSecret(string requirementId, SecretReference secret) =>
+        new() { RequirementId = requirementId, Kind = ModelProviderValueBindingKind.Secret, Secret = secret };
+
+    public override string ToString() => $"{RequirementId}={Kind}:[REDACTED]";
 }
 
 public sealed record ModelProviderResource : Resource

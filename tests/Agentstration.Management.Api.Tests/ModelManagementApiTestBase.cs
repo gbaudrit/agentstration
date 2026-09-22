@@ -107,7 +107,7 @@ public abstract class ModelManagementApiTestBase
                 UnavailableDetails));
     }
 
-    protected sealed class ConfiguredEndpointInspector(IReadOnlyList<AepSecretRequirement>? secretRequirements = null) : IExtensionInspector
+    protected sealed class ConfiguredEndpointInspector(IReadOnlyList<AepValueRequirement>? valueRequirements = null) : IExtensionInspector
     {
         public bool CanHandle(string providerType) => true;
         public bool CanInspectEndpoint(Uri endpoint) => true;
@@ -126,7 +126,7 @@ public abstract class ModelManagementApiTestBase
                 new ExtensionIdentity(registrationName == "extension-discovered" ? "extension.discovered" : registrationName, "Discovered extension", "1.0.0", null),
                 [new ExtensionContribution("model-provider", "discovered")],
                 [],
-                SecretRequirements: secretRequirements));
+                ValueRequirements: valueRequirements));
     }
 
     protected sealed class MigrationExtensionAdapter : IExtensionInspector, IExtensionOptionsMigrator

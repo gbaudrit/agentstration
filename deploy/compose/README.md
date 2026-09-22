@@ -33,6 +33,15 @@ docker compose -f deploy/compose/localai.yml up -d --build --remove-orphans
 docker compose -f deploy/compose/localai.yml exec localai local-ai models install <model>
 ```
 
+Microsoft Foundry is an opt-in overlay on the deterministic base. Copy the example only when the extension needs an operator-approved private-network host, then start both files:
+
+```powershell
+Copy-Item deploy/compose/.env.foundry.example deploy/compose/.env.foundry
+docker compose --env-file deploy/compose/.env.foundry -f deploy/compose/base.yml -f deploy/compose/foundry.yml up -d --build --remove-orphans
+```
+
+The overlay adds only the Foundry extension, its own generated AEP shared key, the allowlisted internal host and the Bootstrap catalog. It does not deploy models or enable Foundry by default. Project endpoints, authentication mode and credentials belong to Model Provider Value Bindings, never Compose environment. Apply the `foundry` tenant Bootstrap profile from **Settings → Bootstrap**, or bind the extension manually in **Extensions → Model providers**; then choose a discovered deployment in a Model Profile. See [Foundry integration](../../docs/foundry-integration.md).
+
 ## PostgreSQL
 
 Create the ignored environment file once, then replace its disposable development password:
@@ -64,6 +73,8 @@ LocalAI:
 ```powershell
 docker compose --env-file deploy/compose/.env.postgresql -f deploy/compose/localai.yml -f deploy/compose/postgresql.yml up -d --build --remove-orphans
 ```
+
+Foundry can use the same PostgreSQL overlay: include `.env.foundry`, `base.yml`, `foundry.yml` and `postgresql.yml` in that order. The default remains SQLite.
 
 ## Operations
 

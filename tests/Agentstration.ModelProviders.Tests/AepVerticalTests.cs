@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -10,6 +11,7 @@ using Agentstration.Extensions.Contracts;
 using Agentstration.Extensions.Ollama;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
+using Agentstration.Parameters;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Secrets;
@@ -241,7 +243,28 @@ public sealed class AepVerticalTests
 
         Assert.AreEqual("pong", response.Text);
         Assert.AreEqual("pong", string.Concat(updates.Select(value => value.Text)));
+        var usage = updates.SelectMany(value => value.Contents).OfType<UsageContent>().Single().Details;
+        Assert.AreEqual(2L, usage.InputTokenCount);
+        Assert.AreEqual(3L, usage.OutputTokenCount);
         await Assert.ThrowsAsync<OperationCanceledException>(() => adapter.GetResponseAsync([new ChatMessage(ChatRole.User, "ping")], cancellationToken: cancellation.Token));
+    }
+
+    [TestMethod]
+    public async Task AepAdapterPreservesStrictJsonSchemaWithoutLeakingItsMarker()
+    {
+        await using var factory = new AepExtensionFactory();
+        using var client = factory.CreateClient();
+        using var adapter = new AepChatClient(new AepClient(client).CreateModelProvider("test"), "test-model");
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        await adapter.GetResponseAsync([new ChatMessage(ChatRole.User, "ping")], new ChatOptions
+        {
+            ResponseFormat = ChatResponseFormat.ForJsonSchema(schema.RootElement, "answer"),
+            AdditionalProperties = new AdditionalPropertiesDictionary { ["json_schema_strict"] = true }
+        });
+        var request = factory.Provider.LastRequest!;
+        Assert.IsTrue(request.Options!.ResponseFormat!.Value.GetProperty("json_schema").GetProperty("strict").GetBoolean());
+        Assert.AreEqual("answer", request.Options.ResponseFormat.Value.GetProperty("json_schema").GetProperty("name").GetString());
+        Assert.IsFalse(request.Options.AdditionalOptions!.ContainsKey("json_schema_strict"));
     }
 
     [TestMethod]
@@ -312,14 +335,24 @@ public sealed class AepVerticalTests
     {
         await using var factory = new AepExtensionFactory(requireSecret: true);
         using var httpClient = factory.CreateClient();
-        var provider = new AepModelProvider(new FixedHttpClientFactory(httpClient));
+        var capabilityService = new RecordingCapabilityService();
+        var hostConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Agentstration:Aep:SecretAccess:PublicBaseUrl"] = "http://localhost"
+        }).Build();
+        var provider = new AepModelProvider(new FixedHttpClientFactory(httpClient),
+            capabilities: capabilityService, configuration: hostConfiguration);
+        var extensionId = (await new AepClient(httpClient).DiscoverAsync()).Extension.Id;
         var configuration = new ModelProviderConfiguration
         {
             Uid = Guid.NewGuid(),
+            ScopeRef = ResourceScopeRef.Instance,
             Name = "test-local",
             AdapterType = AepModelProvider.AdapterType,
             ContributionId = "test",
             Extension = new ResourceReference("test-extension"),
+            ExtensionScopeRef = ResourceScopeRef.Instance,
+            ExpectedExtensionId = extensionId,
             Endpoint = httpClient.BaseAddress!
         };
         var deployment = new ModelDeploymentConfiguration
@@ -331,7 +364,7 @@ public sealed class AepVerticalTests
 
         var missing = await Assert.ThrowsExactlyAsync<ModelProviderConfigurationException>(() =>
             provider.ResolveCapabilitiesAsync(configuration, deployment).AsTask());
-        StringAssert.Contains(missing.Message, "Required Secret requirement 'credential' has no binding");
+        StringAssert.Contains(missing.Message, "Required Value requirement 'credential' has no binding");
 
         var bound = deployment with
         {
@@ -339,6 +372,7 @@ public sealed class AepVerticalTests
         };
         var capabilities = await provider.ResolveCapabilitiesAsync(configuration, bound);
         Assert.AreEqual(CapabilitySupport.Native, capabilities.Provider.Tools.Support);
+        Assert.AreEqual(ModelResourceKinds.ModelProvider, capabilityService.Issued?.Consumer.Address.Kind);
     }
 
     [TestMethod]
@@ -357,6 +391,7 @@ public sealed class AepVerticalTests
         var provider = new ModelProviderConfiguration
         {
             Uid = Guid.NewGuid(),
+            ScopeRef = ResourceScopeRef.Instance,
             Name = "test-local",
             AdapterType = AepModelProvider.AdapterType,
             ContributionId = "test",
@@ -380,11 +415,82 @@ public sealed class AepVerticalTests
         Assert.AreEqual("pong", response.Text);
         Assert.AreEqual("credential", capabilities.Issued?.RequirementId);
         Assert.AreEqual(1, capabilities.Revocations);
-        var grant = factory.Provider.LastSecretAccess?.Single();
-        Assert.IsNotNull(grant);
-        Assert.AreEqual("credential", grant.RequirementId);
-        Assert.AreEqual("opaque-test", grant.SecretCapability);
-        Assert.AreEqual("[REDACTED]", grant.ToString());
+        var boundValue = factory.Provider.LastBoundValues?.Single();
+        Assert.IsNotNull(boundValue);
+        Assert.AreEqual(AepBoundValueKind.SecretGrant, boundValue.Kind);
+        Assert.AreEqual("credential", boundValue.RequirementId);
+        Assert.AreEqual("opaque-test", boundValue.SecretGrant?.SecretCapability);
+        Assert.AreEqual("[REDACTED]", boundValue.ToString());
+    }
+
+    [TestMethod]
+    public async Task ProviderParametersStayIsolatedAcrossDiscoveryChatAndStreaming()
+    {
+        await using var factory = new AepExtensionFactory(requireParameter: true);
+        using var http = factory.CreateClient();
+        var firstScope = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var secondScope = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var firstParameter = ScopedResourceAddress.Create(firstScope, ResourceNamespace.Default, ParameterResourceKinds.Parameter, "first-endpoint");
+        var secondParameter = ScopedResourceAddress.Create(secondScope, ResourceNamespace.Default, ParameterResourceKinds.Parameter, "second-endpoint");
+        var resolver = new RecordingParameterResolver(new Dictionary<ScopedResourceAddress, JsonElement>
+        {
+            [firstParameter] = JsonSerializer.SerializeToElement("https://first.test"),
+            [secondParameter] = JsonSerializer.SerializeToElement("https://second.test")
+        });
+        var adapter = new AepModelProvider(new FixedHttpClientFactory(http), parameters: resolver);
+        var first = BoundProvider("first", firstScope, "first-endpoint", http.BaseAddress!);
+        var second = BoundProvider("second", secondScope, "second-endpoint", http.BaseAddress!);
+
+        await Task.WhenAll(
+            adapter.ListModelsAsync(first).AsTask(),
+            adapter.ListModelsAsync(second).AsTask());
+        await Task.WhenAll(
+            adapter.ResolveCapabilitiesAsync(first, Deployment(first)).AsTask(),
+            adapter.ResolveCapabilitiesAsync(second, Deployment(second)).AsTask());
+        using var firstChat = adapter.CreateChatClient(first, Deployment(first));
+        using var secondChat = adapter.CreateChatClient(second, Deployment(second));
+        await Task.WhenAll(
+            firstChat.GetResponseAsync([new ChatMessage(ChatRole.User, "ping")]),
+            secondChat.GetResponseAsync([new ChatMessage(ChatRole.User, "ping")]));
+        await foreach (var _ in firstChat.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "ping")])) { }
+        await foreach (var _ in secondChat.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "ping")])) { }
+        resolver.Set(firstParameter, JsonSerializer.SerializeToElement("https://first-rotated.test"));
+        await adapter.ListModelsAsync(first);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAsync<OperationCanceledException>(() => adapter.ListModelsAsync(first, cancellation.Token).AsTask());
+
+        Assert.AreEqual(9, resolver.Resolutions.Count);
+        Assert.AreEqual(5, resolver.Resolutions.Count(value => value.Parameter.Name == "first-endpoint" && value.Context.ConsumerScopeRef == firstScope));
+        Assert.AreEqual(4, resolver.Resolutions.Count(value => value.Parameter.Name == "second-endpoint" && value.Context.ConsumerScopeRef == secondScope));
+        Assert.HasCount(9, factory.Provider.ObservedBoundValueSets);
+        Assert.AreEqual(4, factory.Provider.ObservedBoundValueSets.Count(values => values.Single() == "https://first.test"));
+        Assert.AreEqual(4, factory.Provider.ObservedBoundValueSets.Count(values => values.Single() == "https://second.test"));
+        Assert.AreEqual(1, factory.Provider.ObservedBoundValueSets.Count(values => values.Single() == "https://first-rotated.test"));
+    }
+
+    [TestMethod]
+    public async Task ProviderRejectsAParameterChangedToADisallowedValueBeforeInvocation()
+    {
+        var allowed = JsonSerializer.SerializeToElement("ApiKey");
+        await using var factory = new AepExtensionFactory(requireParameter: true, parameterAllowedValues: [allowed]);
+        using var http = factory.CreateClient();
+        var scope = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var parameter = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ParameterResourceKinds.Parameter, "authentication-mode");
+        var resolver = new RecordingParameterResolver(new Dictionary<ScopedResourceAddress, JsonElement>
+        {
+            [parameter] = allowed
+        });
+        var adapter = new AepModelProvider(new FixedHttpClientFactory(http), parameters: resolver);
+        var provider = BoundProvider("provider", scope, "authentication-mode", http.BaseAddress!);
+
+        await adapter.ListModelsAsync(provider);
+        resolver.Set(parameter, JsonSerializer.SerializeToElement("Password"));
+
+        var exception = await Assert.ThrowsExactlyAsync<ModelProviderConfigurationException>(
+            () => adapter.ListModelsAsync(provider).AsTask());
+        StringAssert.Contains(exception.Message, "bound_value_not_allowed");
+        Assert.HasCount(1, factory.Provider.ObservedBoundValueSets);
     }
 
     [TestMethod]
@@ -440,9 +546,13 @@ public sealed class AepVerticalTests
         _ = await provider.ListModelsAsync(configuration);
 
         CollectionAssert.AreEqual(
-            new[] { "Bearer first-token", "Bearer first-token", "Bearer second-token", "Bearer second-token" },
+            new[]
+            {
+                "Bearer first-token", "Bearer first-token", "Bearer first-token",
+                "Bearer second-token", "Bearer second-token", "Bearer second-token"
+            },
             handler.Authorizations);
-        Assert.AreEqual(4, resolver.ResolutionCount);
+        Assert.AreEqual(6, resolver.ResolutionCount);
     }
 
     [TestMethod]
@@ -522,8 +632,8 @@ public sealed class AepVerticalTests
             first.ListModelsAsync(firstConfiguration).AsTask(),
             second.ListModelsAsync(secondConfiguration).AsTask());
 
-        Assert.HasCount(2, firstHandler.Authorizations);
-        Assert.HasCount(2, secondHandler.Authorizations);
+        Assert.HasCount(3, firstHandler.Authorizations);
+        Assert.HasCount(3, secondHandler.Authorizations);
         Assert.IsTrue(firstHandler.Authorizations.All(value => value == "Bearer first-token"));
         Assert.IsTrue(secondHandler.Authorizations.All(value => value == "Bearer second-token"));
     }
@@ -568,7 +678,32 @@ public sealed class AepVerticalTests
 
     private static AepChatRequest Request() => new("test-model", [new(AepRole.User, [AepContent.FromText("ping")])]);
 
-    private sealed class AepExtensionFactory(bool addSecondOptionVersion = false, bool addThirdOptionVersion = false, bool requireSecret = false) : WebApplicationFactory<OllamaAepModelProvider>
+    private static ModelProviderConfiguration BoundProvider(string name, ResourceScopeRef scope, string parameterName, Uri endpoint) => new()
+    {
+        Uid = Guid.NewGuid(),
+        Namespace = ResourceNamespace.Default,
+        ScopeRef = scope,
+        Name = name,
+        AdapterType = AepModelProvider.AdapterType,
+        ContributionId = "test",
+        Extension = new ResourceReference("test-extension", scope),
+        Endpoint = endpoint,
+        ValueBindings = [ModelProviderValueBinding.FromParameter("endpoint", new(
+            ResourceAddress.Create(ResourceNamespace.Default, ParameterResourceKinds.Parameter, parameterName), scope))]
+    };
+
+    private static ModelDeploymentConfiguration Deployment(ModelProviderConfiguration provider) => new()
+    {
+        Name = $"{provider.Name}-profile",
+        ScopeRef = ResourceScopeRef.Instance,
+        ProviderName = provider.Name,
+        ProviderNamespace = provider.Namespace,
+        ModelName = "test-model"
+    };
+
+    private sealed class AepExtensionFactory(bool addSecondOptionVersion = false, bool addThirdOptionVersion = false,
+        bool requireSecret = false, bool requireParameter = false,
+        IReadOnlyList<JsonElement>? parameterAllowedValues = null) : WebApplicationFactory<OllamaAepModelProvider>
     {
         public FakeProvider Provider { get; } = new();
 
@@ -582,8 +717,22 @@ public sealed class AepVerticalTests
             {
                 if (requireSecret)
                 {
-                    options.SecretRequirements.Add(new("credential", true));
+                    options.ValueRequirements.Add(new(
+                        AepContributionKinds.ModelProvider,
+                        "test",
+                        "credential",
+                        true,
+                        Protection: AepValueProtection.Secured));
                     options.Capabilities[AepCapabilityNames.SecretAccess] = new(AepProtocol.SecretAccessVersion);
+                }
+                if (requireParameter)
+                {
+                    options.ValueRequirements.Add(new(
+                        AepContributionKinds.ModelProvider,
+                        "test",
+                        "endpoint",
+                        true,
+                        AllowedValues: parameterAllowedValues));
                 }
                 var original = options.OptionSets.Single() with { ContributionId = "test" };
                 options.OptionSets.Clear();
@@ -636,13 +785,17 @@ public sealed class AepVerticalTests
     private sealed class FakeProvider : IAepModelProvider
     {
         public int InvocationCount { get; private set; }
-        public IReadOnlyList<AepSecretAccessGrant>? LastSecretAccess { get; private set; }
+        public IReadOnlyList<AepBoundValue>? LastBoundValues { get; private set; }
+        public ConcurrentBag<string[]> ObservedBoundValueSets { get; } = [];
+        public AepChatRequest? LastRequest { get; private set; }
         public AepModelProviderDescriptor Descriptor { get; } = new("test", "Test", new(Tools: true, ModelDiscovery: true));
         public Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             InvocationCount++;
-            LastSecretAccess = request.SecretAccess;
+            LastBoundValues = request.BoundValues;
+            Record(request.BoundValues);
+            LastRequest = request;
             Assert.AreEqual("test-model", request.Model);
             if (request.Options?.Temperature == 0.25f)
             {
@@ -658,12 +811,49 @@ public sealed class AepVerticalTests
         public async IAsyncEnumerable<AepChatUpdate> ChatStreamingAsync(AepChatRequest request, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            Record(request.BoundValues);
             yield return new([AepContent.FromText("po")], AepRole.Assistant, request.Model);
             await Task.Yield();
+            yield return new([], Usage: new AepUsage(2, 3, 5));
             yield return new([AepContent.FromText("ng")], FinishReason: AepFinishReason.Stop);
         }
         public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<AepModelDescriptor>>([new("test-model", "Test model", ["chat", "streaming", "tools"])]);
+
+        public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(
+            IReadOnlyList<AepBoundValue>? boundValues,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Record(boundValues);
+            return ListModelsAsync(cancellationToken);
+        }
+
+        private void Record(IReadOnlyList<AepBoundValue>? values)
+        {
+            if (values is null || values.Count == 0) return;
+            ObservedBoundValueSets.Add(values.Select(value => value.InlineValue?.GetString() ?? value.Kind.ToString()).ToArray());
+        }
+    }
+
+    private sealed class RecordingParameterResolver(IDictionary<ScopedResourceAddress, JsonElement> values) : IParameterResolver
+    {
+        public ConcurrentBag<(ResourceAddress Parameter, ParameterResolutionContext Context)> Resolutions { get; } = [];
+
+        public void Set(ScopedResourceAddress parameter, JsonElement value) => values[parameter] = value;
+
+        public Task<ResolvedParameter?> ResolveAsync(
+            ParameterReference parameter,
+            ParameterResolutionContext context,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Resolutions.Add((parameter.Address, context));
+            var scoped = new ScopedResourceAddress(parameter.ScopeRef, parameter.Address.Namespace, parameter.Address.Kind, parameter.Address.Name);
+            return Task.FromResult(values.TryGetValue(scoped, out var value)
+                ? new ResolvedParameter(parameter.Address, value)
+                : null);
+        }
     }
 
     private sealed class RecordingCapabilityService : ISecretCapabilityService

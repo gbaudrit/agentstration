@@ -31,4 +31,5 @@
 <data name="VisibleScopes"><value>Visible scopes</value></data>
   <data name="SourceProvenance" xml:space="preserve"><value>Source provenance</value></data><data name="SourceVersion" xml:space="preserve"><value>Source version</value></data><data name="Channel" xml:space="preserve"><value>Channel</value></data><data name="Snapshot" xml:space="preserve"><value>Snapshot</value></data><data name="CatalogEntry" xml:space="preserve"><value>Catalog entry</value></data>
   <data name="OpenSource" xml:space="preserve"><value>Open Source</value></data>
+<data name="Binding.Parameter"><value>Parameter</value></data>
 </root>

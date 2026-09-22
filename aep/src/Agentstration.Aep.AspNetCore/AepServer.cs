@@ -19,6 +19,9 @@ public interface IAepModelProvider
     IAsyncEnumerable<AepChatUpdate> ChatStreamingAsync(AepChatRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<AepModelDescriptor>>(Descriptor.Models ?? []);
+    Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(
+        IReadOnlyList<AepBoundValue>? boundValues,
+        CancellationToken cancellationToken = default) => ListModelsAsync(cancellationToken);
     Task<AepProviderHealth> GetHealthAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(new AepProviderHealth("available"));
 }
@@ -37,7 +40,7 @@ public sealed class AepExtensionOptions
     public IList<AepMcpServerDescriptor> McpServers { get; } = [];
     public IList<AepToolContribution> Tools { get; } = [];
     public IList<AepOptionSetDescriptor> OptionSets { get; } = [];
-    public IList<AepSecretRequirement> SecretRequirements { get; } = [];
+    public IList<AepValueRequirement> ValueRequirements { get; } = [];
     public AepSourceMaterializationLimits SourceMaterializationLimits { get; set; } = new(
         MaxArchiveBytes: 64 * 1024 * 1024,
         MaxEntries: 10_000,
@@ -85,7 +88,7 @@ public static class AepServerExtensions
         protocolEndpoints.Add(endpoints.MapPost(AepProtocol.ConfigurationMigrationPath, MigrateOptionsAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat", ChatAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat/stream", StreamAsync));
-        protocolEndpoints.Add(endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/models", ListModelsAsync));
+        protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/models", ListModelsAsync));
         protocolEndpoints.Add(endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/health", ProviderHealthAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/resolve", ResolveSourceAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/materialize", MaterializeSourceAsync));
@@ -191,15 +194,18 @@ public static class AepServerExtensions
         if (sources.Length > 0) capabilities[AepCapabilityNames.SourceProvider] = new("1.0", AepProtocol.SourceProvidersPath);
         if (options.Tools.Count > 0) capabilities[AepCapabilityNames.Tools] = new("1.0");
         if (options.OptionSets.Count > 0) capabilities[AepCapabilityNames.Configuration] = new("1.0", AepProtocol.ConfigurationPath);
-        if (options.SecretRequirements.Count > 0)
-            capabilities[AepCapabilityNames.SecretRequirements] = new(AepProtocol.SecretRequirementsCapabilityVersion);
+        if (options.ValueRequirements.Count > 0)
+        {
+            capabilities[AepCapabilityNames.ValueRequirements] = new(AepProtocol.ValueRequirementsCapabilityVersion);
+            capabilities[AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion);
+        }
         var descriptor = new AepManifest(
             AepProtocol.Version,
             options.Extension,
             capabilities,
             new AepContributions(modelProviders, options.Tools.ToArray(), sources),
             options.McpServers.Count == 0 ? null : new AepMcpDescriptor(options.McpServers.ToArray()),
-            options.SecretRequirements.Count == 0 ? null : options.SecretRequirements.ToArray());
+            options.ValueRequirements.Count == 0 ? null : options.ValueRequirements.ToArray());
         var errors = AepDescriptorValidator.Validate(descriptor);
         if (errors.Count > 0) throw new InvalidOperationException($"The AEP extension descriptor is invalid: {string.Join(" ", errors)}");
         return descriptor;
@@ -467,11 +473,20 @@ public static class AepServerExtensions
         return Results.Json(await provider.GetHealthAsync(cancellationToken), AepProtocol.JsonOptions);
     }
 
-    private static async Task<IResult> ListModelsAsync(string providerId, IEnumerable<IAepModelProvider> providers, CancellationToken cancellationToken)
+    private static async Task<IResult> ListModelsAsync(
+        string providerId,
+        AepBoundValuesRequest request,
+        IEnumerable<IAepModelProvider> providers,
+        IOptions<AepExtensionOptions> options,
+        CancellationToken cancellationToken)
     {
         var provider = Find(providers, providerId);
         if (provider is null) return Error(StatusCodes.Status404NotFound, "provider_unavailable", $"Model provider '{providerId}' is not registered.");
-        try { return Results.Json(await provider.ListModelsAsync(cancellationToken), AepProtocol.JsonOptions); }
+        try
+        {
+            ValidateBoundValues(providerId, request.BoundValues, options.Value.ValueRequirements.ToArray());
+            return Results.Json(await provider.ListModelsAsync(request.BoundValues, cancellationToken), AepProtocol.JsonOptions);
+        }
         catch (AepServerException exception) { return Error(exception.StatusCode, exception.Code, exception.Message); }
     }
 
@@ -487,6 +502,7 @@ public static class AepServerExtensions
         try
         {
             ValidateNativeOptions(providerId, request.Options?.NativeOptions, options.Value.OptionSets);
+            ValidateBoundValues(providerId, request.BoundValues, options.Value.ValueRequirements.ToArray());
             return Results.Json(await provider.ChatAsync(request, cancellationToken), AepProtocol.JsonOptions);
         }
         catch (AepServerException exception) { return Error(exception.StatusCode, exception.Code, exception.Message); }
@@ -507,7 +523,11 @@ public static class AepServerExtensions
             await response.WriteAsJsonAsync(new AepErrorResponse(new AepError("provider_unavailable", $"Model provider '{providerId}' is not registered.")), AepProtocol.JsonOptions, cancellationToken);
             return;
         }
-        try { ValidateNativeOptions(providerId, request.Options?.NativeOptions, options.Value.OptionSets); }
+        try
+        {
+            ValidateNativeOptions(providerId, request.Options?.NativeOptions, options.Value.OptionSets);
+            ValidateBoundValues(providerId, request.BoundValues, options.Value.ValueRequirements.ToArray());
+        }
         catch (AepServerException exception)
         {
             response.StatusCode = exception.StatusCode;
@@ -544,6 +564,27 @@ public static class AepServerExtensions
     {
         if (nativeOptions is null) return;
         ValidateVersionedOptions(providerId, nativeOptions, optionSets, AepContributionKinds.ModelProvider, AepOptionScopes.ModelProfile);
+    }
+
+    private static void ValidateBoundValues(
+        string providerId,
+        IReadOnlyList<AepBoundValue>? values,
+        IReadOnlyList<AepValueRequirement> requirements)
+    {
+        var issues = AepBoundValueValidator.Validate(
+            values,
+            requirements,
+            AepContributionKinds.ModelProvider,
+            providerId,
+            requireAll: true);
+        if (issues.Count == 0) return;
+        var issue = issues[0];
+        throw new AepServerException(
+            issue.Code,
+            string.IsNullOrEmpty(issue.RequirementId)
+                ? "The bound values are invalid."
+                : $"Bound value '{issue.RequirementId}' is invalid.",
+            StatusCodes.Status422UnprocessableEntity);
     }
 
     private static void ValidateVersionedOptions(

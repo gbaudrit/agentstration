@@ -37,6 +37,7 @@
     <Project Path="src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
     <Project Path="src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
     <Project Path="src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
+    <Project Path="src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj" />
     <Project Path="src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
     <Project Path="src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
   </Folder>
@@ -68,6 +69,11 @@
     <Project Path="src/Agentstration.Packs/Agentstration.Packs.csproj" />
     <Project Path="src/Agentstration.Packs.Api/Agentstration.Packs.Api.csproj" />
     <Project Path="src/Agentstration.Packs.Contracts/Agentstration.Packs.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/src/Parameters/">
+    <Project Path="src/Agentstration.Parameters/Agentstration.Parameters.csproj" />
+    <Project Path="src/Agentstration.Parameters.Api/Agentstration.Parameters.Api.csproj" />
+    <Project Path="src/Agentstration.Parameters.Contracts/Agentstration.Parameters.Contracts.csproj" />
   </Folder>
   <Folder Name="/src/Resources/">
     <Project Path="src/Agentstration.Resources/Agentstration.Resources.csproj" />

@@ -144,7 +144,17 @@ public static class ExtensionEndpoints
         view.DiscoverySource,
         view.RegistrationEnabled,
         view.EnrollmentMode,
-        view.RegistrationScopeRef);
+        view.RegistrationScopeRef,
+        view.ValueRequirements.Select(requirement => new ExtensionValueRequirementResponse(
+            requirement.ContributionKind,
+            requirement.ContributionId,
+            requirement.Id,
+            requirement.Required,
+            requirement.ValueType,
+            requirement.Protection,
+            requirement.Description,
+            requirement.Format,
+            requirement.AllowedValues)).ToArray());
 
     private static ExtensionInventoryItemResponse MapInventory(ExtensionInventoryItem item) => new(
         item.Key,
