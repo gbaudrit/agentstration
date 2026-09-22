@@ -26,6 +26,7 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(provider => provider.GetRequiredService<ConsoleRealtimeSession>());
         services.AddScoped<IConsoleContextProvider, ConsoleContextProvider>();
         services.AddScoped<IResourceSearchProvider, ConsoleResourceSearchProvider>();
+        services.AddScoped<ICommandPaletteFallbackProvider, ConsoleEntryCommandFallbackProvider>();
         services.AddAgentstrationFlowDesigner();
         services.AddScoped<PlatformDashboardService>();
         services.AddScoped<IFlowDesignerBackend, FlowDesignerBackend>();

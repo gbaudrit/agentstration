@@ -136,6 +136,12 @@ else
                         <label class="entry-toggle"><input type="checkbox" data-testid="placement-tenant-home" @bind="exposeTenantHome" /><span><strong>@T("Placement.TenantHome")</strong><small>@T("Placement.TenantHome.Help")</small></span></label>
                     </div>
                 }
+                @if (exposeConsole)
+                {
+                    <div class="entry-toggle-list">
+                        <label class="entry-toggle"><input type="checkbox" data-testid="console-primary" @bind="consolePrimary" /><span><strong>@T("ConsoleRole.Primary")</strong><small>@T("ConsoleRole.Primary.Help")</small></span></label>
+                    </div>
+                }
             </section>
 
             <section class="panel form-section" data-testid="entry-appearance-section">
@@ -332,7 +338,7 @@ else
     private EntryResultDisplay resultDisplay = EntryResultDisplay.Auto;
     private TaskCreationMode taskMode = TaskCreationMode.Automatic;
     private bool allowConversation = true, streamResponse = true, allowAttachments, allowVoiceInput, rawPublish;
-    private bool exposeWorkplace = true, exposeConsole, exposeOwningSpace = true, exposeTenantHome;
+    private bool exposeWorkplace = true, exposeConsole, exposeOwningSpace = true, exposeTenantHome, consolePrimary;
     private readonly List<EditorField> fields = [new() { Name = "request", Label = "Request", Type = EntryFieldType.Prompt, Required = true, Primary = true }];
     private readonly List<EditorSuggestion> suggestions = [];
     private EntryResource? published;
@@ -361,7 +367,7 @@ else
         {
             var response = await Client.GetEntryAsync(EntryResourceNamespace, Name, default); var draft = response.Value; published = response.Published; rawPublish = published is not null; publishedBinding = draft.PublishedBinding; draftRevision = draft.Revision;
             resourceName = draft.Name; displayName = draft.DisplayName; description = draft.Description ?? ""; placeholder = draft.Presentation.Placeholder ?? ""; icon = draft.Presentation.Icon ?? ""; presentationKind = draft.Presentation.Kind; participantsVisibility = draft.Presentation.Participants.Visibility; progressVisibility = draft.Presentation.Progress.Visibility; taskDisplay = draft.Presentation.Task.Display; resultDisplay = draft.Presentation.Results.Display; bindingKind = draft.Binding.Kind; resourceId = draft.Binding.ResourceId; taskMode = draft.Behavior.TaskCreationMode; allowConversation = draft.Behavior.AllowConversation; streamResponse = draft.Behavior.StreamResponse; allowAttachments = draft.Presentation.AllowAttachments; allowVoiceInput = draft.Presentation.AllowVoiceInput;
-            exposeWorkplace = draft.Exposure.Surfaces.Contains(EntryExposureSurface.Workplace); exposeConsole = draft.Exposure.Surfaces.Contains(EntryExposureSurface.Console); exposeOwningSpace = draft.Exposure.WorkplacePlacements.Contains(EntryWorkplacePlacement.OwningSpace); exposeTenantHome = draft.Exposure.WorkplacePlacements.Contains(EntryWorkplacePlacement.TenantHome);
+            exposeWorkplace = draft.Exposure.Surfaces.Contains(EntryExposureSurface.Workplace); exposeConsole = draft.Exposure.Surfaces.Contains(EntryExposureSurface.Console); exposeOwningSpace = draft.Exposure.WorkplacePlacements.Contains(EntryWorkplacePlacement.OwningSpace); exposeTenantHome = draft.Exposure.WorkplacePlacements.Contains(EntryWorkplacePlacement.TenantHome); consolePrimary = draft.Exposure.Console.Role == EntryConsoleRole.Primary;
             fields.Clear(); fields.AddRange(draft.Presentation.Fields.Select(value => new EditorField { Name = value.Name, Label = value.Label ?? "", Description = value.Description ?? "", Placeholder = value.Placeholder ?? "", Type = value.Type, Required = value.Required, Primary = value.Role == EntryFieldRole.PrimaryInput, Options = string.Join(", ", value.Options.Select(option => $"{option.Value}:{option.Label}")), DefaultValue = value.DefaultValue, Validation = value.Validation }));
             suggestions.Clear(); suggestions.AddRange(draft.Presentation.Suggestions.Select(value => new EditorSuggestion { Label = value.Label, Value = value.Value }));
             dependencies = await Client.GetDependenciesAsync(EntryResourceNamespace, Name, default);
@@ -413,7 +419,8 @@ else
         Surfaces = Enum.GetValues<EntryExposureSurface>().Where(value => value switch { EntryExposureSurface.Workplace => exposeWorkplace, EntryExposureSurface.Console => exposeConsole, _ => false }).ToArray(),
         WorkplacePlacements = exposeWorkplace
             ? Enum.GetValues<EntryWorkplacePlacement>().Where(value => value switch { EntryWorkplacePlacement.OwningSpace => exposeOwningSpace, EntryWorkplacePlacement.TenantHome => exposeTenantHome, _ => false }).ToArray()
-            : []
+            : [],
+        Console = new(exposeConsole && consolePrimary ? EntryConsoleRole.Primary : EntryConsoleRole.Standard)
     };
     private Agentstration.Resources.WorkspaceId CurrentWorkspaceId => new(workspaces.FirstOrDefault()?.Id ?? published?.WorkspaceId.Value ?? Guid.Empty);
     private EntryDraft Draft() => new() { WorkspaceId = CurrentWorkspaceId, Id = new(EntryIdValue, EntryResourceNamespace), Name = resourceName.Trim(), DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Presentation = Presentation(), Exposure = Exposure(), Binding = new(bindingKind, SelectedResource?.ResourceId ?? resourceId, SelectedResource?.Namespace), PublishedBinding = publishedBinding, Behavior = Behavior(), Revision = draftRevision };
@@ -430,7 +437,7 @@ else
             if (!IsNew && !string.Equals(manifest.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException(T("EntryNameImmutable"));
             resourceName = manifest.Metadata.Name; displayName = manifest.Definition.DisplayName ?? manifest.Metadata.Name; description = manifest.Definition.Description ?? "";
             var presentation = manifest.Definition.Presentation; presentationKind = presentation.Kind; placeholder = presentation.Placeholder ?? ""; icon = presentation.Icon ?? ""; allowAttachments = presentation.AllowAttachments; allowVoiceInput = presentation.AllowVoiceInput; participantsVisibility = presentation.Participants.Visibility; progressVisibility = presentation.Progress.Visibility; taskDisplay = presentation.Task.Display; resultDisplay = presentation.Results.Display;
-            var exposure = manifest.Definition.Exposure; exposeWorkplace = exposure.Surfaces.Contains(EntryExposureSurface.Workplace); exposeConsole = exposure.Surfaces.Contains(EntryExposureSurface.Console); exposeOwningSpace = exposure.WorkplacePlacements.Contains(EntryWorkplacePlacement.OwningSpace); exposeTenantHome = exposure.WorkplacePlacements.Contains(EntryWorkplacePlacement.TenantHome);
+            var exposure = manifest.Definition.Exposure; exposeWorkplace = exposure.Surfaces.Contains(EntryExposureSurface.Workplace); exposeConsole = exposure.Surfaces.Contains(EntryExposureSurface.Console); exposeOwningSpace = exposure.WorkplacePlacements.Contains(EntryWorkplacePlacement.OwningSpace); exposeTenantHome = exposure.WorkplacePlacements.Contains(EntryWorkplacePlacement.TenantHome); consolePrimary = exposure.Console.Role == EntryConsoleRole.Primary;
             fields.Clear(); fields.AddRange(presentation.Fields.Select(value => new EditorField { Name = value.Name, Label = value.Label ?? "", Description = value.Description ?? "", Placeholder = value.Placeholder ?? "", Type = value.Type, Required = value.Required, Primary = value.Role == EntryFieldRole.PrimaryInput, Options = string.Join(", ", value.Options.Select(option => $"{option.Value}:{option.Label}")), DefaultValue = value.DefaultValue, Validation = value.Validation }));
             suggestions.Clear(); suggestions.AddRange(presentation.Suggestions.Select(value => new EditorSuggestion { Label = value.Label, Value = value.Value }));
             bindingKind = manifest.Definition.Binding.Kind; resourceId = manifest.Definition.Binding.Namespace is { } ns ? $"{ns.Value}:{manifest.Definition.Binding.ResourceId}" : manifest.Definition.Binding.ResourceId; taskMode = manifest.Definition.Behavior.TaskCreationMode; allowConversation = manifest.Definition.Behavior.AllowConversation; streamResponse = manifest.Definition.Behavior.StreamResponse; rawPublish = manifest.Definition.Publish;

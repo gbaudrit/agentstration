@@ -14,7 +14,7 @@ public partial class MainLayout
     private sealed record NavigationItem(string LabelKey, string Url, string Icon, string Domain = "neutral", IReadOnlyList<string>? RequiredPermissions = null);
     private sealed record NavigationGroup(string LabelKey, IReadOnlyList<NavigationItem> Items);
     private sealed record CommandDefinition(string LabelKey, string Url, string Icon, string CategoryKey, string Keywords = "", IReadOnlyList<string>? RequiredPermissions = null);
-    private sealed record CommandItem(string Label, string Url, string Icon, string Category, string Keywords = "", string? Detail = null);
+    private sealed record CommandItem(string Label, string Url, string Icon, string Category, string Keywords = "", string? Detail = null, bool IsFallback = false);
 
     private static readonly NavigationGroup[] NavigationGroups =
     [
@@ -85,6 +85,7 @@ public partial class MainLayout
     private bool themeReady;
     private int selectedCommandIndex;
     private IReadOnlyList<CommandItem> resourceCommands = [];
+    private CommandItem? fallbackCommand;
     private CancellationTokenSource? resourceSearchCancellation;
     private readonly CancellationTokenSource lifetimeCancellation = new();
     private IReadOnlyList<CommandItem> Commands => CommandDefinitions.Where(command => CanNavigate(command.RequiredPermissions)).Select(command => new CommandItem(
@@ -100,6 +101,7 @@ public partial class MainLayout
         FilteredCommands.Concat(resourceCommands)
             .DistinctBy(command => command.Url, StringComparer.OrdinalIgnoreCase)
             .Take(12)
+            .Concat(fallbackCommand is null ? [] : [fallbackCommand])
             .ToArray();
 
     private string CurrentSection
@@ -162,6 +164,7 @@ public partial class MainLayout
         commandPaletteOpen = true;
         commandQuery = string.Empty;
         resourceCommands = [];
+        fallbackCommand = null;
         selectedCommandIndex = 0;
         focusCommandInput = true;
     }
@@ -171,6 +174,7 @@ public partial class MainLayout
         commandPaletteOpen = false;
         commandQuery = string.Empty;
         resourceCommands = [];
+        fallbackCommand = null;
         searchingResources = false;
         resourceSearchCancellation?.Cancel();
         selectedCommandIndex = 0;
@@ -181,6 +185,7 @@ public partial class MainLayout
         commandQuery = args.Value?.ToString() ?? string.Empty;
         selectedCommandIndex = 0;
         resourceCommands = [];
+        fallbackCommand = null;
         resourceSearchCancellation?.Cancel();
         resourceSearchCancellation?.Dispose();
         resourceSearchCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetimeCancellation.Token);
@@ -199,6 +204,18 @@ public partial class MainLayout
                 item.ResourceType,
                 item.SearchText ?? item.Identifier,
                 $"{item.Status} · {ShortIdentifier(item.Identifier)}")).ToArray();
+            if (FilteredCommands.Count == 0 && resourceCommands.Count == 0)
+            {
+                var fallback = await CommandFallback.ResolveAsync(commandQuery, cancellationToken);
+                if (fallback is not null)
+                    fallbackCommand = new CommandItem(
+                        F("AskEntry", fallback.Label, commandQuery),
+                        fallback.Url,
+                        fallback.Icon,
+                        T("Entry"),
+                        Detail: fallback.Detail,
+                        IsFallback: true);
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         finally

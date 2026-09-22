@@ -8,6 +8,7 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject IResourceSearchProvider ResourceSearch
+@inject ICommandPaletteFallbackProvider CommandFallback
 @inject ConsoleContextState ContextState
 @inject Microsoft.Extensions.Localization.IStringLocalizer<MainLayoutStrings> Localizer
 
@@ -109,7 +110,7 @@
                         {
                             var command = DisplayedCommands[index];
                             var commandIndex = index;
-                            <button type="button" class="command-result @(selectedCommandIndex == commandIndex ? "selected" : null)" role="option" aria-selected="@(selectedCommandIndex == commandIndex)" @onmouseenter="() => selectedCommandIndex = commandIndex" @onclick="() => ExecuteCommand(command)">
+                            <button type="button" class="command-result @(selectedCommandIndex == commandIndex ? "selected" : null)" role="option" aria-selected="@(selectedCommandIndex == commandIndex)" data-testid="@(command.IsFallback ? "console-entry-fallback" : null)" @onmouseenter="() => selectedCommandIndex = commandIndex" @onclick="() => ExecuteCommand(command)">
                                 <span class="command-icon" aria-hidden="true">@command.Icon</span><span><strong>@command.Label</strong><small>@command.Category@if (!string.IsNullOrWhiteSpace(command.Detail)) { <span> · @command.Detail</span> }</small></span><kbd>↵</kbd>
                             </button>
                         }
