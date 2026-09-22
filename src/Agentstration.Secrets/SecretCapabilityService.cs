@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using Agentstration.Identity.Contracts;
 using Agentstration.Secrets.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -15,17 +16,20 @@ public sealed class SecretCapabilityService : ISecretCapabilityService, IDisposa
 
     private readonly ISecretAccessAuthorizer authorizer;
     private readonly ISecretResolver resolver;
+    private readonly IRequestContextScopeFactory requestContexts;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<SecretCapabilityService> logger;
     private readonly ConcurrentDictionary<string, Entry> entries = new(StringComparer.Ordinal);
     private readonly object issuanceGate = new();
     private readonly ITimer cleanupTimer;
 
-    public SecretCapabilityService(ISecretAccessAuthorizer authorizer, ISecretResolver resolver, TimeProvider timeProvider,
+    public SecretCapabilityService(ISecretAccessAuthorizer authorizer, ISecretResolver resolver,
+        IRequestContextScopeFactory requestContexts, TimeProvider timeProvider,
         ILogger<SecretCapabilityService>? logger = null)
     {
         this.authorizer = authorizer;
         this.resolver = resolver;
+        this.requestContexts = requestContexts;
         this.timeProvider = timeProvider;
         this.logger = logger ?? NullLogger<SecretCapabilityService>.Instance;
         cleanupTimer = timeProvider.CreateTimer(static state => ((SecretCapabilityService)state!).PruneExpired(),
@@ -167,10 +171,12 @@ public sealed class SecretCapabilityService : ISecretCapabilityService, IDisposa
 
         try
         {
-            var resolved = await resolver.ResolveAsync(entry.Secret,
-                new SecretResolutionContext(entry.Context.Consumer.ScopeRef, entry.Context.Consumer.Address),
-                cancellationToken)
-                ?? throw Failure("secret_unavailable", "The bound Secret is unavailable.");
+            ResolvedSecret resolved;
+            using (requestContexts.PushSystem())
+                resolved = await resolver.ResolveAsync(entry.Secret,
+                    new SecretResolutionContext(entry.Context.Consumer.ScopeRef, entry.Context.Consumer.Address),
+                    cancellationToken)
+                    ?? throw Failure("secret_unavailable", "The bound Secret is unavailable.");
             try
             {
                 if (logger.IsEnabled(LogLevel.Information))
