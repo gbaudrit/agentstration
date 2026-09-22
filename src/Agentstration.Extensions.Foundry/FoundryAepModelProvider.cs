@@ -88,14 +88,17 @@ public sealed class FoundryAepModelProvider(
         var model = (await ListModelsCoreAsync(connection, authenticator, diagnostics, cancellationToken)).SingleOrDefault(value => value.Id == request.Model);
         if (model is null) throw new AepServerException("model_unavailable", "The Foundry deployment is not available.", 400);
         if (format is "json_object" or "json_schema"
-            && !model.Metadata!.ContainsKey(format == "json_object" ? "jsonObject" : "jsonSchema"))
+            && model.Specification?.Features.StructuredOutput?.Formats.ContainsKey(
+                format == "json_object"
+                    ? AepModelStructuredOutputFormat.JsonObject
+                    : AepModelStructuredOutputFormat.JsonSchema) != true)
             throw new AepServerException("unsupported_option", "The Foundry deployment does not advertise the requested output format.", 400);
         if (effort is not null)
         {
-            if (!model.Capabilities!.Contains("reasoning", StringComparer.Ordinal)
-                || effort != "default" && (model.Metadata is null
-                    || !model.Metadata.TryGetValue("reasoningEfforts", out var efforts)
-                    || !efforts.Split(',', StringSplitOptions.RemoveEmptyEntries).Contains(effort, StringComparer.Ordinal)))
+            var reasoning = model.Specification?.Features.Reasoning;
+            if (reasoning?.Support is not (AepModelFeatureSupport.Native or AepModelFeatureSupport.Emulated or AepModelFeatureSupport.Partial)
+                || effort != "default" && (!Enum.TryParse<AepModelReasoningEffort>(effort, true, out var parsed)
+                    || !reasoning.Efforts.ContainsKey(parsed)))
                 throw new AepServerException("unsupported_option", "The Foundry deployment does not advertise the requested reasoning effort.", 400);
         }
     }
@@ -194,22 +197,14 @@ public sealed class FoundryAepModelProvider(
                             throw new AepServerException("discovery_limit", "Foundry deployment discovery exceeded its model limit.");
                         if (models.ContainsKey(name))
                             throw new AepServerException("discovery_invalid", "Foundry returned a duplicate deployment name.");
-                        var metadata = new Dictionary<string, string>(StringComparer.Ordinal);
-                        AddMetadata(item, metadata, "modelPublisher", "publisher");
-                        AddMetadata(item, metadata, "modelName", "model");
-                        AddMetadata(item, metadata, "modelVersion", "version");
-                        var capabilities = new List<string> { "chat", "streaming" };
-                        if (HasTrueCapability(item, "toolCalling", "tool_calls", "functionCalling"))
-                            capabilities.Add("tools");
-                        if (HasTrueCapability(item, "jsonObject", "json_object")) metadata["jsonObject"] = "true";
-                        if (HasTrueCapability(item, "jsonSchema", "json_schema")) metadata["jsonSchema"] = "true";
-                        if (metadata.ContainsKey("jsonObject") || metadata.ContainsKey("jsonSchema")) capabilities.Add("structuredOutput");
-                        if (HasTrueCapability(item, "reasoning"))
-                        {
-                            capabilities.Add("reasoning");
-                            AddReasoningEfforts(item, metadata);
-                        }
-                        models.Add(name, new AepModelDescriptor(name, name, capabilities, metadata));
+                        models.Add(name, new AepModelDescriptor(
+                            name,
+                            name,
+                            CreateSpecification(item),
+                            new AepModelIdentity(
+                                SafeIdentity(item, "modelPublisher"),
+                                SafeIdentity(item, "modelName"),
+                                SafeIdentity(item, "modelVersion"))));
                     }
                     if (!root.TryGetProperty("nextLink", out var nextLink) || nextLink.ValueKind == JsonValueKind.Null)
                         return models.Values.ToArray();
@@ -319,24 +314,96 @@ public sealed class FoundryAepModelProvider(
         return false;
     }
 
-    private static void AddReasoningEfforts(JsonElement item, IDictionary<string, string> metadata)
+    private static AepModelSpecification CreateSpecification(JsonElement item)
+    {
+        var tools = ReadBooleanCapability(item, "toolCalling", "tool_calls", "functionCalling");
+        var jsonObject = ReadBooleanCapability(item, "jsonObject", "json_object");
+        var jsonSchema = ReadBooleanCapability(item, "jsonSchema", "json_schema");
+        var reasoning = ReadBooleanCapability(item, "reasoning");
+        var formats = new Dictionary<AepModelStructuredOutputFormat, AepModelStructuredOutputFormatSpecification>();
+        if (jsonObject == true) formats[AepModelStructuredOutputFormat.JsonObject] = new();
+        if (jsonSchema == true) formats[AepModelStructuredOutputFormat.JsonSchema] = new();
+        return new AepModelSpecification
+        {
+            Input = [AepModelContentType.Text],
+            Output = [AepModelContentType.Text],
+            Features = new AepModelFeatureSpecifications
+            {
+                Streaming = new() { Support = AepModelFeatureSupport.Native },
+                Tools = new()
+                {
+                    Support = Support(tools),
+                    Modes = tools == true
+                        ? new Dictionary<AepModelToolMode, AepModelToolModeSpecification>
+                        {
+                            [AepModelToolMode.Function] = new()
+                        }
+                        : new Dictionary<AepModelToolMode, AepModelToolModeSpecification>()
+                },
+                StructuredOutput = new()
+                {
+                    Support = Support(jsonObject == true || jsonSchema == true
+                        ? true
+                        : jsonObject == false || jsonSchema == false ? false : null),
+                    Formats = formats
+                },
+                Reasoning = new()
+                {
+                    Support = Support(reasoning),
+                    Efforts = reasoning == true ? ReadReasoningEfforts(item) :
+                        new Dictionary<AepModelReasoningEffort, AepModelReasoningEffortSpecification>()
+                }
+            }
+        };
+    }
+
+    private static AepModelFeatureSupport Support(bool? value) => value switch
+    {
+        true => AepModelFeatureSupport.Native,
+        false => AepModelFeatureSupport.Unsupported,
+        null => AepModelFeatureSupport.Unknown
+    };
+
+    private static bool? ReadBooleanCapability(JsonElement item, params string[] names)
+    {
+        if (!item.TryGetProperty("capabilities", out var capabilities) || capabilities.ValueKind != JsonValueKind.Object) return null;
+        var foundFalse = false;
+        foreach (var capability in capabilities.EnumerateObject())
+        {
+            if (!names.Contains(capability.Name, StringComparer.OrdinalIgnoreCase)) continue;
+            if (capability.Value.ValueKind == JsonValueKind.True
+                || capability.Value.ValueKind == JsonValueKind.String
+                && bool.TryParse(capability.Value.GetString(), out var parsedTrue) && parsedTrue)
+                return true;
+            if (capability.Value.ValueKind == JsonValueKind.False
+                || capability.Value.ValueKind == JsonValueKind.String
+                && bool.TryParse(capability.Value.GetString(), out var parsedFalse) && !parsedFalse)
+                foundFalse = true;
+        }
+        return foundFalse ? false : null;
+    }
+
+    private static IReadOnlyDictionary<AepModelReasoningEffort, AepModelReasoningEffortSpecification> ReadReasoningEfforts(JsonElement item)
     {
         if (!item.TryGetProperty("capabilities", out var capabilities)
             || !capabilities.TryGetProperty("reasoningEfforts", out var efforts)
-            || efforts.ValueKind != JsonValueKind.Array || efforts.GetArrayLength() > 8) return;
-        var allowed = new HashSet<string>(["none", "minimal", "low", "medium", "high"], StringComparer.Ordinal);
-        var values = efforts.EnumerateArray().Where(value => value.ValueKind == JsonValueKind.String)
-            .Select(value => value.GetString()!).Where(allowed.Contains).Distinct(StringComparer.Ordinal).ToArray();
-        if (values.Length > 0) metadata["reasoningEfforts"] = string.Join(',', values);
+            || efforts.ValueKind != JsonValueKind.Array || efforts.GetArrayLength() > 8)
+            return new Dictionary<AepModelReasoningEffort, AepModelReasoningEffortSpecification>();
+        return efforts.EnumerateArray().Where(value => value.ValueKind == JsonValueKind.String)
+            .Select(value => Enum.TryParse<AepModelReasoningEffort>(value.GetString(), true, out var parsed)
+                ? (AepModelReasoningEffort?)parsed : null)
+            .Where(value => value.HasValue).Select(value => value!.Value).Distinct().Order()
+            .ToDictionary(value => value, _ => new AepModelReasoningEffortSpecification());
     }
 
     private static string? GetString(JsonElement item, string property) =>
         item.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
-    private static void AddMetadata(JsonElement item, IDictionary<string, string> metadata, string property, string key)
+    private static string? SafeIdentity(JsonElement item, string property)
     {
         var value = GetString(item, property);
-        if (!string.IsNullOrWhiteSpace(value) && value.Length <= 128 && !value.Any(char.IsControl))
-            metadata[key] = value;
+        return !string.IsNullOrWhiteSpace(value) && value.Length <= 128 && value == value.Trim() && !value.Any(char.IsControl)
+            ? value
+            : null;
     }
 }

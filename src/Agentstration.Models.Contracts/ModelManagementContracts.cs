@@ -27,8 +27,8 @@ public sealed record AvailableModelResponse(
     string Name,
     string DisplayName,
     string Status,
-    IReadOnlyList<string> Capabilities,
-    IReadOnlyDictionary<string, string> Metadata);
+    ModelSpecification Specification,
+    ModelIdentity? Identity = null);
 
 public sealed record ModelProviderStatusResponse(string Provider, string Status, DateTimeOffset CheckedAt, string? Details);
 public sealed record CreateModelProviderRequest(
@@ -56,7 +56,7 @@ public sealed record CreateModelProfileRequest(
 public sealed record PutModelProfileRequest(ModelProfileProperties Properties);
 
 public sealed record ModelProviderReferenceResponse(string ResourceId, string Name, string? DisplayName = null, string? ContributionId = null, string? Status = null, string Namespace = "default");
-public sealed record ModelReferenceResponse(string Name, string? Status = null, IReadOnlyList<string>? Capabilities = null);
+public sealed record ModelReferenceResponse(string Name, string? Status = null, ModelSpecification? Specification = null);
 
 public sealed record ModelProfileSummaryPropertiesResponse(
     string DisplayName,

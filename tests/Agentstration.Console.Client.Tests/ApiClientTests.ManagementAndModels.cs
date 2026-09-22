@@ -232,7 +232,14 @@ public sealed partial class ApiClientTests
     public async Task ModelProvidersClientMapsProviderAndDynamicModels()
     {
         var provider = new ModelProviderResponse("provider-id", "ollama-local", new ModelProviderPropertiesResponse("Ollama local", "aep", "ollama", "ollama-extension", "default", "aspire", "available", "Ollama extension", 1));
-        var model = new AvailableModelResponse("qwen3:4b", "Qwen 3 4B", "available", ["chat"], new Dictionary<string, string> { ["parameterSize"] = "4B" });
+        var model = new AvailableModelResponse("qwen3:4b", "Qwen 3 4B", "available", new ModelSpecification
+        {
+            Input = [ModelContentType.Text],
+            Features = new ModelFeatureSpecifications
+            {
+                Streaming = new() { Support = ModelFeatureSupport.Native }
+            }
+        }, new ModelIdentity { Model = "qwen3", Version = "4b" });
         using var httpClient = new HttpClient(new StubHandler(request => request.RequestUri!.AbsolutePath.EndsWith("/models", StringComparison.Ordinal)
             ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new ValueResponse<AvailableModelResponse>([model])) }
             : new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new ValueResponse<ModelProviderResponse>([provider])) }))
@@ -244,7 +251,8 @@ public sealed partial class ApiClientTests
 
         Assert.AreEqual("aspire", providers[0].Properties.RegistrationSource);
         Assert.AreEqual("qwen3:4b", models[0].Name);
-        Assert.AreEqual("4B", models[0].Metadata["parameterSize"]);
+        Assert.AreEqual("4b", models[0].Identity!.Version);
+        CollectionAssert.AreEqual(new[] { ModelContentType.Text }, models[0].Specification.Input!.ToArray());
     }
 
     [TestMethod]

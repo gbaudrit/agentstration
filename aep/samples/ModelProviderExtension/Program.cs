@@ -23,7 +23,15 @@ public sealed class EchoModelProvider : IAepModelProvider
         "echo",
         "Echo model provider",
         new(Chat: true, Streaming: true, ModelDiscovery: true),
-        [new("echo-1", "Echo 1", ["chat", "streaming"])]);
+        [new("echo-1", "Echo 1", new AepModelSpecification
+        {
+            Input = [AepModelContentType.Text],
+            Output = [AepModelContentType.Text],
+            Features = new AepModelFeatureSpecifications
+            {
+                Streaming = new() { Support = AepModelFeatureSupport.Native }
+            }
+        }, new AepModelIdentity(Model: "echo-1"))]);
 
     public Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken)
     {

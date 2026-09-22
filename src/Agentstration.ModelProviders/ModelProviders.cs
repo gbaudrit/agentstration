@@ -73,8 +73,8 @@ public sealed record DiscoveredModel(
     string Name,
     string DisplayName,
     string Status,
-    IReadOnlyList<string> Capabilities,
-    IReadOnlyDictionary<string, string> Metadata);
+    ModelSpecification Specification,
+    ModelIdentity? Identity = null);
 
 public sealed record ModelProviderHealth(string Status, string? Details = null);
 

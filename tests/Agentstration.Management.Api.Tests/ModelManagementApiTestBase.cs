@@ -44,7 +44,14 @@ public abstract class ModelManagementApiTestBase
 
         public ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default) =>
             ValueTask.FromResult<IReadOnlyList<DiscoveredModel>>([
-                new("local-model", "Local model", "available", ["chat", "streaming", "structuredOutput"], new Dictionary<string, string>())
+                new("local-model", "Local model", "available", new ModelSpecification
+                {
+                    Features = new ModelFeatureSpecifications
+                    {
+                        Streaming = new() { Support = ModelFeatureSupport.Native },
+                        StructuredOutput = new() { Support = ModelFeatureSupport.Native }
+                    }
+                })
             ]);
 
         public ValueTask<ResolvedModelProviderCapabilities> ResolveCapabilitiesAsync(
