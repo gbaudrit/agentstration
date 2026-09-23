@@ -50,6 +50,7 @@ public sealed class WorkTransitionException(string code, string message) : Inval
 public sealed record WorkItemSnapshot(
     WorkItemId Id,
     WorkspaceId WorkspaceId,
+    Guid OwnerPrincipalId,
     string Type,
     string? Title,
     string Instruction,

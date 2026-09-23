@@ -88,7 +88,7 @@ public sealed class WorkplaceProjectionSink(
 
     private async Task CompleteInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, WorkTaskId taskId, string? flowRunId, string resultTitle, string? conversationText, DateTimeOffset now, CancellationToken token)
     {
-        var interaction = await repository.GetInteractionAsync(workspaceId, interactionId, token);
+        var interaction = await repository.GetInteractionForProjectionAsync(workspaceId, interactionId, token);
         if (interaction is null || interaction.Status == InteractionStatus.Closed) return;
         var messageText = string.IsNullOrWhiteSpace(conversationText)
             ? $"{resultTitle} is ready. You can ask for another version or continue with a follow-up."
@@ -107,7 +107,7 @@ public sealed class WorkplaceProjectionSink(
 
     private async Task FailInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, WorkTaskId taskId, string error, DateTimeOffset now, CancellationToken token)
     {
-        var interaction = await repository.GetInteractionAsync(workspaceId, interactionId, token);
+        var interaction = await repository.GetInteractionForProjectionAsync(workspaceId, interactionId, token);
         if (interaction is null || interaction.Status == InteractionStatus.Closed) return;
         var message = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, taskId, ConversationRole.Agentstration, $"I couldn’t complete that update. {error}", now);
         await repository.AddMessageAsync(message, token);

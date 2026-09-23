@@ -71,7 +71,7 @@ public sealed class StorageConcurrencyBenchmarkTests
                 try
                 {
                     var now = DateTimeOffset.UtcNow;
-                    var workItem = WorkItem.Create(WorkItemId.New(), workspaceId, "benchmark", $"Operation {index}", now);
+                    var workItem = WorkItem.Create(WorkItemId.New(), workspaceId, principalId, "benchmark", $"Operation {index}", now);
                     var storedWorkItem = await workItems.CreateAsync(workItem, default);
                     var expectedVersion = storedWorkItem.Value.Version;
                     storedWorkItem.Value.AddMessage("update", "benchmark", Guid.NewGuid(), now.AddMilliseconds(1));

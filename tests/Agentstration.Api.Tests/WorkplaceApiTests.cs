@@ -482,6 +482,7 @@ public sealed class WorkplaceApiTests
                 var item = WorkItem.Create(
                     WorkItemId.New(),
                     ownerScope.WorkspaceId,
+                    ownerScope.PrincipalId,
                     "isolation-test",
                     "Verify scoped Flow Run access",
                     TimeProvider.System.GetUtcNow(),
@@ -631,10 +632,12 @@ public sealed class WorkplaceApiTests
             var continuation = await continuationResponse.Content.ReadFromJsonAsync<AddConversationMessageResponse>();
             Assert.AreEqual(submitted.Task.Id, continuation?.Task?.Id, "A transformation continues the same public Task.");
 
+            var current = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+            using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(current))
             using (var scope = factory.Services.CreateScope())
             {
                 var workItems = scope.ServiceProvider.GetRequiredService<WorkItemService>();
-                var page = await workItems.QueryAsync(new WorkItemQuery(new Agentstration.Resources.WorkspaceId(submitted.Task.WorkspaceId), Take: 50), default);
+                var page = await workItems.QueryAsync(new WorkItemQuery(new Agentstration.Resources.WorkspaceId(submitted.Task.WorkspaceId), current.PrincipalId, Take: 50), default);
                 var child = page.Items.Select(value => value.Value).Single(value => value.Metadata.ContainsKey("workplace.continuation"));
                 Assert.AreEqual(firstFlowRunId, child.Metadata["workplace.parentFlowRunId"]);
                 Assert.AreEqual(submitted.Interaction.Id.ToString(), child.Metadata["workplace.interactionId"]);

@@ -75,6 +75,7 @@ public sealed record WorkplaceInteraction
 {
     public required InteractionId Id { get; init; }
     public required WorkspaceId WorkspaceId { get; init; }
+    public required Guid OwnerPrincipalId { get; init; }
     public required EntryId EntryId { get; init; }
     public EntryResource? EntrySnapshot { get; init; }
     public InteractionStatus Status { get; init; } = InteractionStatus.Active;

@@ -186,10 +186,10 @@ public sealed partial class FlowTests
     public void WorkItemCanReferenceAnExactFlowVersionWithoutEmbeddingDefinition()
     {
         var reference = new FlowReference(new FlowId("technical-router"), "1.0.0", false);
-        var item = WorkItem.Create(WorkItemId.New(), TestScope.WorkspaceId, "question", "Help me", Now, flow: reference);
+        var item = WorkItem.Create(WorkItemId.New(), TestScope.WorkspaceId, TestScope.PrincipalId, "question", "Help me", Now, flow: reference);
         var restored = WorkItem.Restore(item.ToSnapshot());
         Assert.AreEqual(reference, restored.Flow);
-        Assert.Throws<FlowValidationException>(() => WorkItem.Create(WorkItemId.New(), TestScope.WorkspaceId, "question", "Help", Now,
+        Assert.Throws<FlowValidationException>(() => WorkItem.Create(WorkItemId.New(), TestScope.WorkspaceId, TestScope.PrincipalId, "question", "Help", Now,
             flow: new FlowReference(new FlowId("technical-router"), "1.0.0", true)));
     }
 
