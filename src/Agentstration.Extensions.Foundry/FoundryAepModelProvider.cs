@@ -87,15 +87,16 @@ public sealed class FoundryAepModelProvider(
         using var diagnostics = new FoundryDiagnostics(diagnosticsLogger, "capabilities", request.Model);
         var model = (await ListModelsCoreAsync(connection, authenticator, diagnostics, cancellationToken)).SingleOrDefault(value => value.Id == request.Model);
         if (model is null) throw new AepServerException("model_unavailable", "The Foundry deployment is not available.", 400);
+        var specification = request.EffectiveSpecification ?? model.Specification;
         if (format is "json_object" or "json_schema"
-            && model.Specification?.Features.StructuredOutput?.Formats.ContainsKey(
+            && specification?.Features.StructuredOutput?.Formats.ContainsKey(
                 format == "json_object"
                     ? AepModelStructuredOutputFormat.JsonObject
                     : AepModelStructuredOutputFormat.JsonSchema) != true)
             throw new AepServerException("unsupported_option", "The Foundry deployment does not advertise the requested output format.", 400);
         if (effort is not null)
         {
-            var reasoning = model.Specification?.Features.Reasoning;
+            var reasoning = specification?.Features.Reasoning;
             if (reasoning?.Support is not (AepModelFeatureSupport.Native or AepModelFeatureSupport.Emulated or AepModelFeatureSupport.Partial)
                 || effort != "default" && (!Enum.TryParse<AepModelReasoningEffort>(effort, true, out var parsed)
                     || !reasoning.Efforts.ContainsKey(parsed)))

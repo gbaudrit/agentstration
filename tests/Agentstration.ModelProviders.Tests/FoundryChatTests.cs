@@ -191,6 +191,34 @@ public sealed class FoundryChatTests
             var exception = await Assert.ThrowsAsync<AepServerException>(() => Provider(client).ChatAsync(advanced, default));
             Assert.AreEqual("unsupported_option", exception.Code);
             Assert.AreEqual(1, inferenceCalls);
+
+            var governed = advanced with
+            {
+                EffectiveSpecification = new AepModelSpecification
+                {
+                    Features = new AepModelFeatureSpecifications
+                    {
+                        StructuredOutput = new()
+                        {
+                            Support = AepModelFeatureSupport.Native,
+                            Formats = new Dictionary<AepModelStructuredOutputFormat, AepModelStructuredOutputFormatSpecification>
+                            {
+                                [AepModelStructuredOutputFormat.JsonSchema] = new() { SupportsStrict = true }
+                            }
+                        },
+                        Reasoning = new()
+                        {
+                            Support = AepModelFeatureSupport.Native,
+                            Efforts = new Dictionary<AepModelReasoningEffort, AepModelReasoningEffortSpecification>
+                            {
+                                [AepModelReasoningEffort.High] = new()
+                            }
+                        }
+                    }
+                }
+            };
+            await Provider(client).ChatAsync(governed, default);
+            Assert.AreEqual(2, inferenceCalls);
         });
     }
 

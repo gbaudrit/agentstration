@@ -59,6 +59,8 @@ public sealed record ModelProviderProperties
     public required ResourceReference Extension { get; init; }
     public required string ContributionId { get; init; }
     public IReadOnlyList<ModelProviderValueBinding> ValueBindings { get; init; } = [];
+    public IReadOnlyDictionary<string, ModelSpecificationOverride> SpecificationOverrides { get; init; }
+        = new Dictionary<string, ModelSpecificationOverride>(StringComparer.Ordinal);
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<ModelProviderValueBindingKind>))]

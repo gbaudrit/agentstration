@@ -698,7 +698,7 @@ public static class AepModelObservationValidator
         return null;
     }
 
-    private static string? FindSpecificationIssue(AepModelSpecification? specification)
+    public static string? FindSpecificationIssue(AepModelSpecification? specification)
     {
         if (specification is null) return null;
         if (specification.Features is null || specification.Limits is null)
@@ -789,7 +789,8 @@ public sealed record AepChatRequest(
     AepModelOptions? Options = null,
     IReadOnlyList<AepToolDefinition>? Tools = null,
     IReadOnlyDictionary<string, JsonElement>? Metadata = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepBoundValue>? BoundValues = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepBoundValue>? BoundValues = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AepModelSpecification? EffectiveSpecification = null);
 
 public sealed record AepUsage(long? InputTokens = null, long? OutputTokens = null, long? TotalTokens = null);
 

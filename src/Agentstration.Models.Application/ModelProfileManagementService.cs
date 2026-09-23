@@ -115,7 +115,9 @@ public sealed class ModelProfileManagementService(
         if (!string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase)) return new(profile, provider, health, null, "unavailable", [health.Details ?? "Provider unavailable."]);
         var modelResource = await modelDiscovery.FindAsync(provider.Uid, profile.Definition.Model.Name, cancellationToken);
         if (modelResource is null) return new(profile, provider, health, null, "unavailable", ["The configured model has not been discovered."]);
-        var model = ModelDiscoveryService.ToDiscoveredModel(modelResource.Value);
+        var model = ModelDiscoveryService.ToDiscoveredModel(
+            modelResource.Value,
+            provider.SpecificationOverrides.GetValueOrDefault(profile.Definition.Model.Name));
         if (modelResource.Value.Definition.Observation.State != ModelObservationState.Available)
             return new(profile, provider, health, model, "unavailable",
                 [modelResource.Value.Definition.Observation.State == ModelObservationState.Missing
@@ -134,10 +136,12 @@ public sealed class ModelProfileManagementService(
                 Name = profile.Metadata.Name,
                 ProviderName = provider.Name,
                 ModelName = profile.Definition.Model.Name,
+                EffectiveSpecification = model.Specification,
                 ProviderOptions = profile.Definition.ProviderOptions,
                 SecretBindings = profile.Definition.SecretBindings
             };
             var levels = await capabilityResolver.ResolveCapabilitiesAsync(provider, deployment, cancellationToken);
+            levels = levels with { Model = ModelSpecificationCapabilities.Map(model.Specification) };
             var effective = EffectiveCapabilityResolver.Intersect(levels.Provider, levels.Model, levels.Adapter);
             IReadOnlyList<ExecutionCapabilityIssue> incompatibilities = [];
             try
@@ -199,8 +203,29 @@ public sealed class ModelProfileManagementService(
     async ValueTask<ModelDeploymentConfiguration> IModelDeploymentStore.GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
         var profile = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelDeploymentNotFoundException($"{@namespace}/{name}");
-        var provider = profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ModelResourceKinds.ModelProvider);
-        return new() { Name = profile.Value.Metadata.Name, ScopeRef = profile.Value.ScopeRef, ProviderName = provider.Name, ProviderNamespace = provider.Namespace, ModelName = profile.Value.Definition.Model.Name, ProviderOptions = profile.Value.Definition.ProviderOptions, SecretBindings = profile.Value.Definition.SecretBindings };
+        var providerReference = profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ModelResourceKinds.ModelProvider);
+        var provider = await providerConfigurations.GetConfigurationRequiredAsync(
+            profile.Value.Definition.Provider,
+            profile.Value.Namespace,
+            profile.Value.ScopeRef ?? throw new ModelDeploymentNotFoundException($"{@namespace}/{name}"),
+            cancellationToken);
+        var model = await modelDiscovery.FindAsync(provider.Uid, profile.Value.Definition.Model.Name, cancellationToken);
+        var effectiveSpecification = model is null
+            ? null
+            : EffectiveModelSpecificationResolver.Resolve(
+                model.Value.Definition.Specification,
+                provider.SpecificationOverrides.GetValueOrDefault(profile.Value.Definition.Model.Name));
+        return new()
+        {
+            Name = profile.Value.Metadata.Name,
+            ScopeRef = profile.Value.ScopeRef,
+            ProviderName = providerReference.Name,
+            ProviderNamespace = providerReference.Namespace,
+            ModelName = profile.Value.Definition.Model.Name,
+            EffectiveSpecification = effectiveSpecification,
+            ProviderOptions = profile.Value.Definition.ProviderOptions,
+            SecretBindings = profile.Value.Definition.SecretBindings
+        };
     }
 
     public async Task ValidateReferenceAsync(ResourceReference profileReference, ResourceNamespace ownerNamespace, ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken)

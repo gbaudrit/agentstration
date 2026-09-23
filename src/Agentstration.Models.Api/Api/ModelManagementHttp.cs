@@ -80,7 +80,9 @@ internal static class ModelsApiHttp
         new ModelReferenceResponse(
             resolution.Profile.Definition.Model.Name,
             resolution.Model?.Status ?? (resolution.Status == "modelUnavailable" ? "unavailable" : "unknown"),
-            resolution.Model?.Specification),
+            resolution.Model?.Specification,
+            resolution.Model?.ObservedSpecification,
+            resolution.Model?.SpecificationOverride),
         new EffectiveModelOptionsResponse(
             resolution.Profile.Definition.Generation,
             resolution.Profile.Definition.Reasoning,

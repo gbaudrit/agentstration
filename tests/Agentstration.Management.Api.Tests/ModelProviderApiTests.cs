@@ -155,6 +155,133 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
+    public async Task ProviderOwnedSpecificationOverridesAreIsolatedEffectiveAndConcurrencyProtected()
+    {
+        var discovery = new SequenceModelDiscovery(
+            () =>
+            [
+                Model("omitted-tools", ModelFeatureSupport.Unknown),
+                Model("explicitly-unsupported", ModelFeatureSupport.Unsupported)
+            ],
+            () =>
+            [
+                Model("omitted-tools", ModelFeatureSupport.Unsupported),
+                Model("explicitly-unsupported", ModelFeatureSupport.Unsupported)
+            ]);
+        await using var factory = DiscoveryFactory(discovery);
+        using var client = factory.CreateClient();
+        _ = await RefreshAsync(client);
+
+        using var providerResponse = await client.GetAsync("/api/modelproviders/ollama-local");
+        providerResponse.EnsureSuccessStatusCode();
+        var provider = await providerResponse.Content.ReadFromJsonAsync<ModelProviderResource>()
+            ?? throw new InvalidOperationException("The provider response was empty.");
+        var originalEtag = providerResponse.Headers.ETag?.ToString()
+            ?? throw new InvalidOperationException("The provider ETag was missing.");
+        var overrideValue = new ModelSpecificationOverride
+        {
+            Features = new ModelFeatureOverrides
+            {
+                Tools = new() { Support = ModelFeatureSupport.Native }
+            }
+        };
+        var properties = provider.Definition with
+        {
+            SpecificationOverrides = new Dictionary<string, ModelSpecificationOverride>(StringComparer.Ordinal)
+            {
+                ["omitted-tools"] = overrideValue,
+                ["explicitly-unsupported"] = overrideValue
+            }
+        };
+
+        using var put = new HttpRequestMessage(HttpMethod.Put, "/api/modelproviders/ollama-local")
+        {
+            Content = JsonContent.Create(new PutModelProviderRequest(properties))
+        };
+        put.Headers.IfMatch.ParseAdd(originalEtag);
+        using var updatedResponse = await client.SendAsync(put);
+        Assert.AreEqual(HttpStatusCode.OK, updatedResponse.StatusCode);
+        var updated = await updatedResponse.Content.ReadFromJsonAsync<ModelProviderResource>();
+        Assert.AreEqual(2, updated?.Definition.SpecificationOverrides.Count);
+
+        var effective = await client.GetFromJsonAsync<ValueResponse<AvailableModelResponse>>(
+            "/api/modelproviders/ollama-local/models");
+        Assert.AreEqual(ModelFeatureSupport.Native,
+            effective!.Value.Single(value => value.Name == "omitted-tools").Specification.Features.Tools?.Support);
+        Assert.AreEqual(ModelFeatureSupport.Unknown,
+            effective.Value.Single(value => value.Name == "omitted-tools").ObservedSpecification?.Features.Tools?.Support);
+        Assert.AreEqual(ModelFeatureSupport.Native,
+            effective.Value.Single(value => value.Name == "omitted-tools").SpecificationOverride?.Features.Tools?.Support);
+        Assert.AreEqual(ModelFeatureSupport.Unsupported,
+            effective.Value.Single(value => value.Name == "explicitly-unsupported").Specification.Features.Tools?.Support);
+        var observed = await client.GetFromJsonAsync<ValueResponse<ModelResource>>("/api/models");
+        Assert.AreEqual(ModelFeatureSupport.Unknown,
+            observed!.Value.Single(value => value.Definition.ExternalId == "omitted-tools").Definition.Specification.Features.Tools?.Support);
+
+        var discoveryChange = await RefreshAsync(client);
+        Assert.AreEqual(1, discoveryChange.Updated);
+        Assert.AreEqual(1, discoveryChange.Unchanged);
+        effective = await client.GetFromJsonAsync<ValueResponse<AvailableModelResponse>>(
+            "/api/modelproviders/ollama-local/models");
+        Assert.AreEqual(ModelFeatureSupport.Unsupported,
+            effective!.Value.Single(value => value.Name == "omitted-tools").Specification.Features.Tools?.Support);
+        Assert.IsNotNull(effective.Value.Single(value => value.Name == "omitted-tools").SpecificationOverride);
+
+        using var stalePut = new HttpRequestMessage(HttpMethod.Put, "/api/modelproviders/ollama-local")
+        {
+            Content = JsonContent.Create(new PutModelProviderRequest(properties with { SpecificationOverrides = new Dictionary<string, ModelSpecificationOverride>() }))
+        };
+        stalePut.Headers.IfMatch.ParseAdd(originalEtag);
+        using var staleResponse = await client.SendAsync(stalePut);
+        Assert.AreEqual(HttpStatusCode.Conflict, staleResponse.StatusCode);
+
+        var currentEtag = updatedResponse.Headers.ETag?.ToString()
+            ?? throw new InvalidOperationException("The updated provider ETag was missing.");
+        using var remove = new HttpRequestMessage(HttpMethod.Put, "/api/modelproviders/ollama-local")
+        {
+            Content = JsonContent.Create(new PutModelProviderRequest(properties with
+            {
+                SpecificationOverrides = new Dictionary<string, ModelSpecificationOverride>()
+            }))
+        };
+        remove.Headers.IfMatch.ParseAdd(currentEtag);
+        using var removedResponse = await client.SendAsync(remove);
+        Assert.AreEqual(HttpStatusCode.OK, removedResponse.StatusCode);
+        effective = await client.GetFromJsonAsync<ValueResponse<AvailableModelResponse>>(
+            "/api/modelproviders/ollama-local/models");
+        Assert.AreEqual(ModelFeatureSupport.Unsupported,
+            effective!.Value.Single(value => value.Name == "omitted-tools").Specification.Features.Tools?.Support);
+
+        var removedEtag = removedResponse.Headers.ETag?.ToString()
+            ?? throw new InvalidOperationException("The removal ETag was missing.");
+        using var invalid = new HttpRequestMessage(HttpMethod.Put, "/api/modelproviders/ollama-local")
+        {
+            Content = JsonContent.Create(new PutModelProviderRequest(properties with
+            {
+                SpecificationOverrides = new Dictionary<string, ModelSpecificationOverride>
+                {
+                    ["not-discovered"] = overrideValue
+                }
+            }))
+        };
+        invalid.Headers.IfMatch.ParseAdd(removedEtag);
+        using var invalidResponse = await client.SendAsync(invalid);
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalidResponse.StatusCode);
+
+        static DiscoveredModel Model(string name, ModelFeatureSupport support) => new(
+            name,
+            name,
+            "available",
+            new ModelSpecification
+            {
+                Features = new ModelFeatureSpecifications
+                {
+                    Tools = new() { Support = support }
+                }
+            });
+    }
+
+    [TestMethod]
     public async Task ProviderValidationAndDeletionProtectionReturnProblemDetails()
     {
         await using var factory = Factory();

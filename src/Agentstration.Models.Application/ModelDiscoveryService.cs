@@ -59,7 +59,9 @@ public sealed class ModelDiscoveryService(
             && string.Equals(value.Value.Definition.ExternalId, externalId, StringComparison.Ordinal));
     }
 
-    public static DiscoveredModel ToDiscoveredModel(ModelResource resource) => new(
+    public static DiscoveredModel ToDiscoveredModel(
+        ModelResource resource,
+        ModelSpecificationOverride? specificationOverride = null) => new(
         resource.Definition.ExternalId,
         resource.Definition.DisplayName,
         resource.Definition.Observation.State switch
@@ -68,8 +70,10 @@ public sealed class ModelDiscoveryService(
             ModelObservationState.Missing => "unavailable",
             _ => "failed"
         },
+        EffectiveModelSpecificationResolver.Resolve(resource.Definition.Specification, specificationOverride),
+        resource.Definition.Identity,
         resource.Definition.Specification,
-        resource.Definition.Identity);
+        specificationOverride);
 
     public async Task<ModelDiscoveryDiff> RefreshAsync(
         ResourceNamespace providerNamespace,
