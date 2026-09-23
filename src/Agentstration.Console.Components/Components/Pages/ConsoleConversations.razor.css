@@ -13,6 +13,7 @@
 .conversation-state { display:grid; justify-items:end; gap:.3rem; min-width:0; }
 .conversation-row time, .conversation-pending, .conversation-limit { color:var(--muted); font-size:.78rem; }
 .conversation-open { display:grid; place-items:center; width:2.25rem; height:2.25rem; border:1px solid var(--border); border-radius:50%; color:var(--muted); font-size:1.1rem; transition:border-color .15s ease, background .15s ease, color .15s ease, transform .15s ease; }
+.conversation-open ::deep .ui-icon { display:block; width:1rem; height:1rem; }
 .conversation-row:hover .conversation-open, .conversation-row:focus-visible .conversation-open { border-color:var(--primary); background:var(--primary-soft); color:var(--primary); transform:translateX(2px); }
 .conversation-limit { margin:0; text-align:center; }
 @media (max-width: 760px) { .conversation-row { grid-template-columns:auto minmax(0,1fr); align-items:start; min-height:0; padding:.9rem; } .conversation-meta { grid-column:2; grid-template-columns:minmax(0,1fr) auto; gap:.65rem; } .conversation-state { justify-items:start; } .conversation-open { grid-column:2; grid-row:1 / span 2; align-self:center; } .conversation-row time { grid-column:1; } }

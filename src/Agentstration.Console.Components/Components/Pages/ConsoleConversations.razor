@@ -8,7 +8,7 @@
 
 <PageTitle>@T("PageTitle")</PageTitle>
 
-<PageHeader Title="@T("Title")" Description="@T("Description")">
+<PageHeader Eyebrow="" Title="@T("Title")" Description="@T("Description")">
     <Actions>
         <button class="button-secondary" type="button" @onclick="LoadAsync" disabled="@loading" data-testid="conversations-refresh">@T("Refresh")</button>
     </Actions>
@@ -50,7 +50,7 @@ else
                             }
                         </span>
                         <time datetime="@conversation.Interaction.LastActivityAt.ToString("O")">@conversation.Interaction.LastActivityAt.ToLocalTime().ToString("g")</time>
-                        <span class="conversation-open" aria-hidden="true">→</span>
+                        <span class="conversation-open" aria-hidden="true"><UiIcon Name="arrow-right" /></span>
                     </span>
                 </a>
             }

@@ -46,6 +46,7 @@ public sealed class ConsoleConversationsTests
         Assert.AreEqual(WorkspaceId, client.ListWorkspaceId);
         Assert.AreEqual(50, client.ListTake);
         Assert.AreEqual(0, rendered.FindAll(".realtime-status").Count);
+        Assert.AreEqual(0, rendered.FindAll(".page-header .eyebrow").Count);
         Assert.IsFalse(rendered.Markup.Contains("Default workspace", StringComparison.Ordinal));
 
         var expected = ConsoleEntryInteractionNavigation.Build(
