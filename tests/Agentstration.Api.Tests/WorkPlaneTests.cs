@@ -146,7 +146,7 @@ public sealed class WorkPlaneTests
             Exposure = new EntryExposure
             {
                 Surfaces = [EntryExposureSurface.Workplace],
-                Console = new(EntryConsoleRole.Primary)
+                Console = new(EntryConsoleRole.Fallback)
             }
         }));
         Assert.AreEqual("entry_console_role_not_allowed", invalidConsoleRole.Code);

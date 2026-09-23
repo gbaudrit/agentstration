@@ -12,7 +12,7 @@ public sealed class CommandPaletteFallbackTests
     [TestMethod]
     public async Task ExistingPageMatchTakesPriorityOverEntryFallback()
     {
-        using var context = CreateContext([], new("Assistant", "/entry-interactions/primary"));
+        using var context = CreateContext([], [new("Assistant", "/entry-interactions/fallback")]);
         var fallback = context.Services.GetRequiredService<StubFallbackProvider>();
         var rendered = context.Render<MainLayout>(parameters => parameters.Add(value => value.Body, (RenderFragment)(_ => { })));
 
@@ -27,7 +27,7 @@ public sealed class CommandPaletteFallbackTests
     public async Task ExistingResourceMatchTakesPriorityOverEntryFallback()
     {
         var resource = new ResourceSearchResult("Ollama", "Model provider", "default/models/ollama", "/modelproviders/ollama", "Ready", "⬡");
-        using var context = CreateContext([resource], new("Assistant", "/entry-interactions/primary"));
+        using var context = CreateContext([resource], [new("Assistant", "/entry-interactions/fallback")]);
         var fallback = context.Services.GetRequiredService<StubFallbackProvider>();
         var rendered = context.Render<MainLayout>(parameters => parameters.Add(value => value.Body, (RenderFragment)(_ => { })));
 
@@ -41,7 +41,7 @@ public sealed class CommandPaletteFallbackTests
     public async Task UnmatchedQueryOffersFallbackWithoutExecutingAndKeyboardEnterNavigates()
     {
         const string target = "/entry-interactions/33333333-3333-3333-3333-333333333333/default/assistant?query=exact%20query";
-        using var context = CreateContext([], new("Assistant", target));
+        using var context = CreateContext([], [new("Assistant", target)]);
         var rendered = context.Render<MainLayout>(parameters => parameters.Add(value => value.Body, (RenderFragment)(_ => { })));
 
         await OpenAndSearchAsync(rendered, "exact query");
@@ -53,9 +53,26 @@ public sealed class CommandPaletteFallbackTests
     }
 
     [TestMethod]
-    public async Task UnmatchedQueryWithoutPrimaryKeepsTheEmptyState()
+    public async Task UnmatchedQueryOffersEveryFallbackAndSelectedEntryNavigates()
     {
-        using var context = CreateContext([], null);
+        const string firstTarget = "/entry-interactions/33333333-3333-3333-3333-333333333333/default/first?query=exact%20query";
+        const string secondTarget = "/entry-interactions/33333333-3333-3333-3333-333333333333/default/second?query=exact%20query";
+        using var context = CreateContext([], [new("First", firstTarget), new("Second", secondTarget)]);
+        var rendered = context.Render<MainLayout>(parameters => parameters.Add(value => value.Body, (RenderFragment)(_ => { })));
+
+        await OpenAndSearchAsync(rendered, "exact query");
+
+        var fallbacks = rendered.WaitForElements("[data-testid='console-entry-fallback']", 2, TimeSpan.FromSeconds(3));
+        StringAssert.Contains(fallbacks[0].TextContent, "First");
+        StringAssert.Contains(fallbacks[1].TextContent, "Second");
+        await fallbacks[1].ClickAsync(new());
+        Assert.AreEqual($"http://localhost{secondTarget}", context.Services.GetRequiredService<NavigationManager>().Uri);
+    }
+
+    [TestMethod]
+    public async Task UnmatchedQueryWithoutFallbackKeepsTheEmptyState()
+    {
+        using var context = CreateContext([], []);
         var rendered = context.Render<MainLayout>(parameters => parameters.Add(value => value.Body, (RenderFragment)(_ => { })));
 
         await OpenAndSearchAsync(rendered, "nothing matches this");
@@ -65,12 +82,12 @@ public sealed class CommandPaletteFallbackTests
 
     private static BunitContext CreateContext(
         IReadOnlyList<ResourceSearchResult> resources,
-        CommandPaletteFallbackResult? fallback)
+        IReadOnlyList<CommandPaletteFallbackResult> fallbacks)
     {
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddSingleton<IResourceSearchProvider>(new StubResourceSearchProvider(resources));
-        context.Services.AddSingleton(new StubFallbackProvider(fallback));
+        context.Services.AddSingleton(new StubFallbackProvider(fallbacks));
         context.Services.AddSingleton<ICommandPaletteFallbackProvider>(provider => provider.GetRequiredService<StubFallbackProvider>());
         context.Services.AddAgentstrationWebComponents();
         return context;
@@ -87,13 +104,13 @@ public sealed class CommandPaletteFallbackTests
         public Task<IReadOnlyList<ResourceSearchResult>> SearchAsync(string query, CancellationToken cancellationToken) => Task.FromResult(results);
     }
 
-    private sealed class StubFallbackProvider(CommandPaletteFallbackResult? result) : ICommandPaletteFallbackProvider
+    private sealed class StubFallbackProvider(IReadOnlyList<CommandPaletteFallbackResult> results) : ICommandPaletteFallbackProvider
     {
         public int Calls { get; private set; }
-        public Task<CommandPaletteFallbackResult?> ResolveAsync(string query, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<CommandPaletteFallbackResult>> ResolveAsync(string query, CancellationToken cancellationToken)
         {
             Calls++;
-            return Task.FromResult(result);
+            return Task.FromResult(results);
         }
     }
 }

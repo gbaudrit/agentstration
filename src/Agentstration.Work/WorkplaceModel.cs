@@ -57,7 +57,7 @@ public enum EntryBindingKind { Agent, Flow }
 public enum EntryVersionStrategy { Pinned }
 public enum EntryExposureSurface { Workplace, Console }
 public enum EntryWorkplacePlacement { OwningSpace, TenantHome }
-public enum EntryConsoleRole { Standard, Primary }
+public enum EntryConsoleRole { Standard, Fallback }
 public enum TaskCreationMode { Automatic, OnDemand, Never }
 public enum InteractionStatus { Active, WaitingForUser, ConvertedToTask, Completed, Cancelled, Failed, Processing, Idle, Closed }
 public enum WorkTaskStatus { Draft, Pending, Running, ActionRequired, Paused, Completed, Failed, Cancelled }

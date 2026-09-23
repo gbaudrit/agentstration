@@ -13,33 +13,46 @@ public sealed class ConsoleEntryCommandFallbackProviderTests
     private static readonly Guid OwnerWorkspaceId = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
     [TestMethod]
-    public async Task ResolvesTheSingleExecutablePrimaryEntryAndPreservesTheExactQuery()
+    public async Task ResolvesAnExecutableFallbackEntryAndPreservesTheExactQuery()
     {
         const string query = "  comment configurer ollama ? & plus  ";
-        var provider = CreateProvider(Entry("assistant", EntryConsoleRole.Primary, canInvoke: true));
+        var provider = CreateProvider(Entry("assistant", EntryConsoleRole.Fallback, canInvoke: true));
 
         var result = await provider.ResolveAsync(query, default);
 
-        Assert.IsNotNull(result);
-        Assert.AreEqual("Assistant", result.Label);
-        Assert.IsTrue(result.Url.StartsWith($"/entry-interactions/{OwnerWorkspaceId:D}/tools/assistant?query=", StringComparison.Ordinal));
-        var encoded = result.Url[(result.Url.IndexOf("?query=", StringComparison.Ordinal) + 7)..];
+        var fallback = result.Single();
+        Assert.AreEqual("Assistant", fallback.Label);
+        Assert.IsTrue(fallback.Url.StartsWith($"/entry-interactions/{OwnerWorkspaceId:D}/tools/assistant?query=", StringComparison.Ordinal));
+        var encoded = fallback.Url[(fallback.Url.IndexOf("?query=", StringComparison.Ordinal) + 7)..];
         Assert.AreEqual(query, Uri.UnescapeDataString(encoded));
     }
 
     [TestMethod]
-    public async Task FailsClosedWithoutOneEffectivePrimaryEntry()
+    public async Task ResolvesEveryExecutableFallbackEntryInDiscoveryOrder()
+    {
+        var provider = CreateProvider(
+            Entry("standard", EntryConsoleRole.Standard, canInvoke: true),
+            Entry("first", EntryConsoleRole.Fallback, canInvoke: true),
+            Entry("disabled", EntryConsoleRole.Fallback, canInvoke: false),
+            Entry("second", EntryConsoleRole.Fallback, canInvoke: true));
+
+        var results = await provider.ResolveAsync("unmatched query", default);
+
+        CollectionAssert.AreEqual(new[] { "first", "second" }, results.Select(value => value.Label).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ReturnsNoFallbackWithoutAnExecutableFallbackEntry()
     {
         var cases = new[]
         {
             Array.Empty<EntryResponse>(),
             new[] { Entry("standard", EntryConsoleRole.Standard, canInvoke: true) },
-            new[] { Entry("disabled", EntryConsoleRole.Primary, canInvoke: false) },
-            new[] { Entry("first", EntryConsoleRole.Primary, canInvoke: true), Entry("second", EntryConsoleRole.Primary, canInvoke: true) }
+            new[] { Entry("disabled", EntryConsoleRole.Fallback, canInvoke: false) }
         };
 
         foreach (var entries in cases)
-            Assert.IsNull(await CreateProvider(entries).ResolveAsync("unmatched query", default));
+            Assert.IsEmpty(await CreateProvider(entries).ResolveAsync("unmatched query", default));
     }
 
     [TestMethod]
@@ -49,7 +62,7 @@ public sealed class ConsoleEntryCommandFallbackProviderTests
             new StubEntryClient([], new InvalidOperationException("unauthorized")),
             NullLogger<ConsoleEntryCommandFallbackProvider>.Instance);
 
-        Assert.IsNull(await provider.ResolveAsync("unmatched query", default));
+        Assert.IsEmpty(await provider.ResolveAsync("unmatched query", default));
     }
 
     private static ConsoleEntryCommandFallbackProvider CreateProvider(params EntryResponse[] entries) =>

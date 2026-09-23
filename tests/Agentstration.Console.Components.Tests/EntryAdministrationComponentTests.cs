@@ -87,8 +87,8 @@ public sealed class EntryAdministrationComponentTests
         Assert.IsTrue(rendered.Find("[data-testid='exposure-workplace']").HasAttribute("checked"));
         Assert.IsTrue(rendered.Find("[data-testid='placement-owning-space']").HasAttribute("checked"));
         await rendered.Find("[data-testid='exposure-console']").ChangeAsync(new ChangeEventArgs { Value = true });
-        Assert.IsNotNull(rendered.Find("[data-testid='exposure-console-card']").QuerySelector("[data-testid='console-primary']"));
-        await rendered.Find("[data-testid='console-primary']").ChangeAsync(new ChangeEventArgs { Value = true });
+        Assert.IsNotNull(rendered.Find("[data-testid='exposure-console-card']").QuerySelector("[data-testid='console-fallback']"));
+        await rendered.Find("[data-testid='console-fallback']").ChangeAsync(new ChangeEventArgs { Value = true });
         await rendered.Find("[data-testid='placement-tenant-home']").ChangeAsync(new ChangeEventArgs { Value = true });
         await rendered.Find("[data-testid='icon-picker'] input[type='search']").InputAsync(new ChangeEventArgs { Value = "sparkles" });
         await rendered.Find("[data-testid='icon-picker'] [role='option'][title='sparkles']").ClickAsync(new());
@@ -121,7 +121,7 @@ public sealed class EntryAdministrationComponentTests
         CollectionAssert.AreEquivalent(
             new[] { EntryWorkplacePlacement.OwningSpace, EntryWorkplacePlacement.TenantHome },
             client.SavedEntry.Exposure.WorkplacePlacements.ToArray());
-        Assert.AreEqual(EntryConsoleRole.Primary, client.SavedEntry.Exposure.Console.Role);
+        Assert.AreEqual(EntryConsoleRole.Fallback, client.SavedEntry.Exposure.Console.Role);
         Assert.AreEqual("sparkles", client.SavedEntry.Presentation.Icon);
         Assert.HasCount(2, client.SavedEntry.Presentation.Fields);
         Assert.AreEqual("field2", client.SavedEntry.Presentation.Fields.Single(value => value.Role == EntryFieldRole.PrimaryInput).Name);

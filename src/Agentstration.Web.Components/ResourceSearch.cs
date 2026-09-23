@@ -22,7 +22,7 @@ public sealed record CommandPaletteFallbackResult(
 
 public interface ICommandPaletteFallbackProvider
 {
-    Task<CommandPaletteFallbackResult?> ResolveAsync(string query, CancellationToken cancellationToken);
+    Task<IReadOnlyList<CommandPaletteFallbackResult>> ResolveAsync(string query, CancellationToken cancellationToken);
 }
 
 internal sealed class EmptyResourceSearchProvider : IResourceSearchProvider
@@ -33,6 +33,6 @@ internal sealed class EmptyResourceSearchProvider : IResourceSearchProvider
 
 internal sealed class EmptyCommandPaletteFallbackProvider : ICommandPaletteFallbackProvider
 {
-    public Task<CommandPaletteFallbackResult?> ResolveAsync(string query, CancellationToken cancellationToken) =>
-        Task.FromResult<CommandPaletteFallbackResult?>(null);
+    public Task<IReadOnlyList<CommandPaletteFallbackResult>> ResolveAsync(string query, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<CommandPaletteFallbackResult>>([]);
 }
