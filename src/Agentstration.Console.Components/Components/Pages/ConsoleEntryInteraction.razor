@@ -24,7 +24,6 @@ else
 {
     <PageHeader Eyebrow="@T("ConsoleEntry")" Title="@entry.DisplayName" Description="@(entry.Description ?? T("Description"))">
         <Actions>
-            <Agentstration.Web.Components.WorkOperations.RealtimeStatus State="Realtime.State" />
             @if (CanCancel)
             {
                 <button class="button-danger" type="button" disabled="@busy" @onclick="CancelAsync" data-testid="console-entry-cancel">@T("Cancel")</button>
@@ -35,11 +34,6 @@ else
             }
         </Actions>
     </PageHeader>
-
-    <section class="console-entry-scope" aria-label="@T("ExecutionScope")" data-testid="console-entry-scope" data-owner-workspace="@WorkspaceId">
-        <span><UiIcon Name="entry" /> @T("RunsInOwningWorkspace")</span>
-        <code>@WorkspaceId</code>
-    </section>
 
     @if (!string.IsNullOrWhiteSpace(error))
     {
@@ -70,7 +64,6 @@ else
                              Results="results"
                              Artifacts="artifacts"
                              Busy="busy"
-                             RealtimeConnected="@(Realtime.State == WorkOperationsRealtimeState.Live)"
                              Error="@error"
                              OnPendingAction="RespondAsync"
                              OnMessage="ContinueAsync"
@@ -131,7 +124,6 @@ else
             {
                 realtimeStarted = true;
                 Realtime.Updated += OnRealtimeAsync;
-                Realtime.StateChanged += OnRealtimeStateChanged;
                 await Realtime.StartAsync([WorkspaceId.ToString("D")], lifetime.Token);
             }
 
@@ -284,8 +276,6 @@ else
             ? InvokeAsync(async () => { await RefreshInteractionAsync(); StateHasChanged(); })
             : Task.CompletedTask;
 
-    private void OnRealtimeStateChanged() => _ = InvokeAsync(StateHasChanged);
-
     private void ApplySubmission(EntrySubmissionResponse submission)
     {
         interaction = submission.Interaction;
@@ -358,7 +348,6 @@ else
     public void Dispose()
     {
         Realtime.Updated -= OnRealtimeAsync;
-        Realtime.StateChanged -= OnRealtimeStateChanged;
         lifetime.Cancel();
         lifetime.Dispose();
         GC.SuppressFinalize(this);

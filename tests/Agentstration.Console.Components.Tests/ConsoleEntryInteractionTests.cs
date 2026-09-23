@@ -28,7 +28,7 @@ public sealed class ConsoleEntryInteractionTests
 
         rendered.WaitForElement("[data-testid='workplace-prompt-input']");
         Assert.IsNull(entries.LastSubmission);
-        Assert.AreEqual(WorkspaceId.ToString("D"), rendered.Find("[data-testid='console-entry-scope']").GetAttribute("data-owner-workspace"));
+        Assert.IsEmpty(rendered.FindAll("[data-testid='console-entry-scope']"));
     }
 
     [TestMethod]
@@ -148,6 +148,8 @@ public sealed class ConsoleEntryInteractionTests
         Assert.AreEqual("diagnose", rendered.Find("[data-testid='workplace-conversation-message'] p").TextContent);
         Assert.AreEqual("Failed", rendered.Find("[data-testid='workplace-inline-task']").GetAttribute("data-task-status"));
         Assert.IsTrue(rendered.Markup.Contains("flow_failed", StringComparison.Ordinal));
+        Assert.IsEmpty(rendered.FindAll("[data-testid='workplace-realtime-status']"));
+        Assert.IsFalse(rendered.Markup.Contains("Current request", StringComparison.Ordinal));
     }
 
     [TestMethod]
