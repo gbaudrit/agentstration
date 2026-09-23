@@ -87,6 +87,7 @@ public sealed class EntryAdministrationComponentTests
         Assert.IsTrue(rendered.Find("[data-testid='exposure-workplace']").HasAttribute("checked"));
         Assert.IsTrue(rendered.Find("[data-testid='placement-owning-space']").HasAttribute("checked"));
         await rendered.Find("[data-testid='exposure-console']").ChangeAsync(new ChangeEventArgs { Value = true });
+        Assert.IsNotNull(rendered.Find("[data-testid='exposure-console-card']").QuerySelector("[data-testid='console-primary']"));
         await rendered.Find("[data-testid='console-primary']").ChangeAsync(new ChangeEventArgs { Value = true });
         await rendered.Find("[data-testid='placement-tenant-home']").ChangeAsync(new ChangeEventArgs { Value = true });
         await rendered.Find("[data-testid='icon-picker'] input[type='search']").InputAsync(new ChangeEventArgs { Value = "sparkles" });

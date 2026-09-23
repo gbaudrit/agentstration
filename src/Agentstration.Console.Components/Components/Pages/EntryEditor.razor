@@ -127,19 +127,19 @@ else
                 <div class="panel-header"><div><p class="eyebrow">@T("Exposure")</p><h2>@T("EntryExposure")</h2><p>@T("EntryExposureHelp")</p></div></div>
                 <div class="entry-toggle-list">
                     <label class="entry-toggle"><input type="checkbox" data-testid="exposure-workplace" @bind="exposeWorkplace" /><span><strong>@T("Exposure.Workplace")</strong><small>@T("Exposure.Workplace.Help")</small></span></label>
-                    <label class="entry-toggle"><input type="checkbox" data-testid="exposure-console" @bind="exposeConsole" /><span><strong>@T("Exposure.Console")</strong><small>@T("Exposure.Console.Help")</small></span></label>
+                    <div class="entry-toggle-card" data-testid="exposure-console-card">
+                        <label class="entry-toggle"><input type="checkbox" data-testid="exposure-console" @bind="exposeConsole" /><span><strong>@T("Exposure.Console")</strong><small>@T("Exposure.Console.Help")</small></span></label>
+                        @if (exposeConsole)
+                        {
+                            <label class="entry-toggle entry-toggle-option"><input type="checkbox" data-testid="console-primary" @bind="consolePrimary" /><span><strong>@T("ConsoleRole.Primary")</strong><small>@T("ConsoleRole.Primary.Help")</small></span></label>
+                        }
+                    </div>
                 </div>
                 @if (exposeWorkplace)
                 {
                     <div class="entry-toggle-list">
                         <label class="entry-toggle"><input type="checkbox" data-testid="placement-owning-space" @bind="exposeOwningSpace" /><span><strong>@T("Placement.OwningSpace")</strong><small>@T("Placement.OwningSpace.Help")</small></span></label>
                         <label class="entry-toggle"><input type="checkbox" data-testid="placement-tenant-home" @bind="exposeTenantHome" /><span><strong>@T("Placement.TenantHome")</strong><small>@T("Placement.TenantHome.Help")</small></span></label>
-                    </div>
-                }
-                @if (exposeConsole)
-                {
-                    <div class="entry-toggle-list">
-                        <label class="entry-toggle"><input type="checkbox" data-testid="console-primary" @bind="consolePrimary" /><span><strong>@T("ConsoleRole.Primary")</strong><small>@T("ConsoleRole.Primary.Help")</small></span></label>
                     </div>
                 }
             </section>
