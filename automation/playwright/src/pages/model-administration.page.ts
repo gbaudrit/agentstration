@@ -55,6 +55,17 @@ export class ModelAdministrationPage {
     }
   }
 
+  public async overrideFirstModelContextLimit(consoleUrl: string, providerName: string, contextTokens: number): Promise<void> {
+    await this.open(consoleUrl, `/modelproviders/${encodeURIComponent(providerName)}`, TestIds.resourceAdministration.modelProviderEditor);
+    await this.waitForPersisted(TestIds.modelAdministration.providerForm);
+    await this.page.getByTestId(TestIds.modelAdministration.openModelDetails).first().click();
+    await this.page.getByTestId(TestIds.resourceAdministration.modelDetails).waitFor({ state: 'visible' });
+    await this.page.getByTestId(TestIds.modelAdministration.editModelOverride).click();
+    await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.modelOverrideContextTokens), contextTokens.toString());
+    await this.page.getByTestId(TestIds.modelAdministration.saveModelOverride).click();
+    await this.page.getByTestId(TestIds.modelAdministration.modelOverrideMessage).waitFor({ state: 'visible' });
+  }
+
   public async createProfile(consoleUrl: string, definition: ModelAdministrationDefinition): Promise<Locator> {
     await this.open(consoleUrl, '/modelprofiles/new', TestIds.resourceAdministration.modelProfileEditor);
     await this.waitForInteractive(TestIds.modelAdministration.profileForm);

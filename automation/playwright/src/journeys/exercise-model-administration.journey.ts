@@ -18,6 +18,7 @@ export const exerciseModelAdministration: Journey<ExerciseModelAdministrationInp
   await context.checkpoint({ name: Checkpoints.modelAdministration.provider, page: context.pages.page, target: provider });
   await administration.updateProviderDisplayName(`${input.providerDisplayName} updated`);
   await administration.refreshProviderModels(context.consoleUrl, input.providerName);
+  await administration.overrideFirstModelContextLimit(context.consoleUrl, input.providerName, 4096);
 
   const runtime = await administration.createRuntime(context.consoleUrl, input);
   await context.checkpoint({ name: Checkpoints.modelAdministration.runtime, page: context.pages.page, target: runtime });

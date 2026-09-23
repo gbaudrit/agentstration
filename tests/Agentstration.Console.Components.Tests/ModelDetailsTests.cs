@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
@@ -80,6 +81,79 @@ public sealed class ModelDetailsTests
     }
 
     [TestMethod]
+    public async Task OverrideEditorAddsExactModelOverrideAndPreservesProviderState()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        var providers = new FakeProvidersClient(includeEffectiveModel: true, includeOverride: false);
+        context.Services.AddSingleton<IModelsClient>(new FakeModelsClient(ModelObservationState.Available));
+        context.Services.AddSingleton<IModelProvidersClient>(providers);
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/models/{FakeModelsClient.ResourceName}?namespace=shared.models");
+        var rendered = context.Render<ModelDetails>(parameters => parameters.Add(component => component.Name, FakeModelsClient.ResourceName));
+
+        await rendered.Find("[data-testid='edit-model-override']").ClickAsync(new());
+        await rendered.Find("[data-testid='model-override-context-tokens']").ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "64000" });
+        StringAssert.Contains(rendered.Find(".model-limit-grid").TextContent, "64,000");
+        await rendered.Find("[data-testid='save-model-override']").ClickAsync(new());
+
+        rendered.WaitForAssertion(() =>
+        {
+            var properties = providers.UpdatedRequest!.Properties;
+            Assert.AreEqual(64_000, properties.SpecificationOverrides["gpt-5"].Limits.ContextTokens);
+            Assert.IsTrue(properties.SpecificationOverrides.ContainsKey("other-model"));
+            Assert.AreEqual("Foundry", properties.DisplayName);
+            StringAssert.Contains(rendered.Find("[data-testid='model-override-message']").TextContent, "saved");
+        });
+    }
+
+    [TestMethod]
+    public async Task OverrideEditorRemovesOnlyExactModelOverride()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        var providers = new FakeProvidersClient(includeEffectiveModel: true);
+        context.Services.AddSingleton<IModelsClient>(new FakeModelsClient(ModelObservationState.Available));
+        context.Services.AddSingleton<IModelProvidersClient>(providers);
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/models/{FakeModelsClient.ResourceName}?namespace=shared.models");
+        var rendered = context.Render<ModelDetails>(parameters => parameters.Add(component => component.Name, FakeModelsClient.ResourceName));
+
+        await rendered.Find("[data-testid='edit-model-override']").ClickAsync(new());
+        await rendered.Find("[data-testid='remove-model-override']").ClickAsync(new());
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsFalse(providers.UpdatedRequest!.Properties.SpecificationOverrides.ContainsKey("gpt-5"));
+            Assert.IsTrue(providers.UpdatedRequest.Properties.SpecificationOverrides.ContainsKey("other-model"));
+            StringAssert.Contains(rendered.Find("[data-testid='model-override-message']").TextContent, "removed");
+        });
+    }
+
+    [TestMethod]
+    public async Task OverrideEditorSurfacesConcurrencyConflictWithoutOverwritingProvider()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        var providers = new FakeProvidersClient(includeEffectiveModel: true) { FailWithConcurrency = true };
+        context.Services.AddSingleton<IModelsClient>(new FakeModelsClient(ModelObservationState.Available));
+        context.Services.AddSingleton<IModelProvidersClient>(providers);
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/models/{FakeModelsClient.ResourceName}?namespace=shared.models");
+        var rendered = context.Render<ModelDetails>(parameters => parameters.Add(component => component.Name, FakeModelsClient.ResourceName));
+
+        await rendered.Find("[data-testid='edit-model-override']").ClickAsync(new());
+        await rendered.Find("[data-testid='model-override-context-tokens']").ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "64000" });
+        await rendered.Find("[data-testid='save-model-override']").ClickAsync(new());
+
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Find("[data-testid='model-override-error']").TextContent, "changed while you were editing");
+            StringAssert.Contains(rendered.Find("[data-testid='model-override-error']").TextContent, "Reload current version");
+        });
+    }
+
+    [TestMethod]
     public void FrenchCatalogKeepsEquivalentModelDetailMeaning()
     {
         using var culture = new TestCultureScope("fr-FR");
@@ -132,21 +206,21 @@ public sealed class ModelDetailsTests
         }
     }
 
-    private sealed class FakeProvidersClient(bool includeEffectiveModel) : IModelProvidersClient
+    private sealed class FakeProvidersClient(bool includeEffectiveModel, bool includeOverride = true) : IModelProvidersClient
     {
+        private ModelProviderResource provider = CreateProvider(includeOverride);
+        private string etag = "\"provider-etag\"";
         public ResourceNamespace RequestedNamespace { get; private set; }
         public string? RequestedProvider { get; private set; }
+        public PutModelProviderRequest? UpdatedRequest { get; private set; }
+        public bool FailWithConcurrency { get; init; }
 
         public Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken)
         {
             RequestedNamespace = @namespace;
             RequestedProvider = providerName;
             if (!includeEffectiveModel) return Task.FromResult<IReadOnlyList<AvailableModelResponse>>([]);
-            var @override = new ModelSpecificationOverride
-            {
-                Features = new ModelFeatureOverrides { Streaming = new ModelStreamingFeatureOverride { Support = ModelFeatureSupport.Native } },
-                Limits = new ModelLimitOverrides { MaxOutputTokens = 8_000 }
-            };
+            provider.Definition.SpecificationOverrides.TryGetValue("gpt-5", out var @override);
             return Task.FromResult<IReadOnlyList<AvailableModelResponse>>([new(
                 "gpt-5",
                 "GPT-5",
@@ -159,14 +233,56 @@ public sealed class ModelDetailsTests
         }
 
         public Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string providerName, CancellationToken cancellationToken) =>
+            GetModelProviderAsync(ResourceNamespace.Default, providerName, cancellationToken);
+        public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceSnapshot<ModelProviderResource>(provider, etag));
         public Task<ResourceSnapshot<ModelProviderResource>> CreateModelProviderAsync(CreateModelProviderRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<ModelProviderResource>> UpdateModelProviderAsync(string providerName, PutModelProviderRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProviderResource>> UpdateModelProviderAsync(string providerName, PutModelProviderRequest request, string currentEtag, CancellationToken cancellationToken) =>
+            UpdateModelProviderAsync(ResourceNamespace.Default, providerName, request, currentEtag, cancellationToken);
+        public Task<ResourceSnapshot<ModelProviderResource>> UpdateModelProviderAsync(ResourceNamespace @namespace, string providerName, PutModelProviderRequest request, string currentEtag, CancellationToken cancellationToken)
+        {
+            UpdatedRequest = request;
+            if (FailWithConcurrency) throw new AgentstrationApiException("The provider was modified by another administrator.", "conflict", HttpStatusCode.PreconditionFailed);
+            provider = provider with { Definition = request.Properties };
+            etag = "\"provider-etag-2\"";
+            return Task.FromResult(new ResourceSnapshot<ModelProviderResource>(provider, etag));
+        }
         public Task DeleteModelProviderAsync(string providerName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderUsagesResponse> GetModelProviderUsagesAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderStatusResponse> TestProviderAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        private static ModelProviderResource CreateProvider(bool includeTargetOverride)
+        {
+            var overrides = new Dictionary<string, ModelSpecificationOverride>(StringComparer.Ordinal)
+            {
+                ["other-model"] = new() { Limits = new ModelLimitOverrides { ContextTokens = 4_096 } }
+            };
+            if (includeTargetOverride)
+            {
+                overrides["gpt-5"] = new ModelSpecificationOverride
+                {
+                    Features = new ModelFeatureOverrides { Streaming = new ModelStreamingFeatureOverride { Support = ModelFeatureSupport.Native } },
+                    Limits = new ModelLimitOverrides { MaxOutputTokens = 8_000 }
+                };
+            }
+            return new ModelProviderResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ModelResourceKinds.ModelProvider,
+                Metadata = new ResourceMetadata { Name = "foundry", Namespace = new ResourceNamespace("shared.models") },
+                ScopeRef = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
+                Definition = new ModelProviderProperties
+                {
+                    DisplayName = "Foundry",
+                    Extension = new ResourceReference("foundry-extension"),
+                    ContributionId = "foundry",
+                    SpecificationOverrides = overrides
+                }
+            };
+        }
     }
 
     private static ModelSpecification ObservedSpecification() => new()
