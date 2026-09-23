@@ -93,6 +93,13 @@ public sealed class ModelDetailsTests
         var rendered = context.Render<ModelDetails>(parameters => parameters.Add(component => component.Name, FakeModelsClient.ResourceName));
 
         await rendered.Find("[data-testid='edit-model-override']").ClickAsync(new());
+        var editorText = rendered.Find("[data-testid='model-override-editor']").TextContent;
+        StringAssert.Contains(editorText, "Declared by provider — Unknown");
+        StringAssert.Contains(editorText, "Declared by provider — Available");
+        StringAssert.Contains(editorText, "Declare as supported");
+        StringAssert.Contains(editorText, "Declare as available");
+        Assert.IsFalse(rendered.FindAll("[data-testid='model-override-editor'] option")
+            .Any(option => string.Equals(option.TextContent.Trim(), "Inherit", StringComparison.Ordinal)));
         await rendered.Find("[data-testid='model-override-context-tokens']").ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "64000" });
         StringAssert.Contains(rendered.Find(".model-limit-grid").TextContent, "64,000");
         await rendered.Find("[data-testid='save-model-override']").ClickAsync(new());
@@ -165,6 +172,10 @@ public sealed class ModelDetailsTests
         Assert.AreEqual("Surcharge du fournisseur", localizer["ProviderOverride"].Value);
         Assert.AreEqual("Observé · lecture seule", localizer["ObservedReadOnly"].Value);
         Assert.AreEqual("Copier le YAML", localizer["CopyYaml"].Value);
+        Assert.AreEqual("Prise en charge", localizer["SupportOverride"].Value);
+        Assert.AreEqual("Déclaré par le fournisseur — Inconnu", localizer["ProviderDeclaredSupport", "Inconnu"].Value);
+        Assert.AreEqual("Déclarer comme pris en charge", localizer["OverrideSupport.Native"].Value);
+        Assert.AreEqual("Déclarer comme disponible", localizer["Operation.Add"].Value);
     }
 
     private sealed class FakeModelsClient(ModelObservationState state) : IModelsClient
