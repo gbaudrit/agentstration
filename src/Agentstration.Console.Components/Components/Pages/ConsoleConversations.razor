@@ -10,7 +10,6 @@
 
 <PageHeader Title="@T("Title")" Description="@T("Description")">
     <Actions>
-        <Agentstration.Web.Components.WorkOperations.RealtimeStatus State="Realtime.State" />
         <button class="button-secondary" type="button" @onclick="LoadAsync" disabled="@loading" data-testid="conversations-refresh">@T("Refresh")</button>
     </Actions>
 </PageHeader>
@@ -32,7 +31,6 @@ else
     <section class="conversation-browser" aria-label="@T("ConversationList")" data-testid="console-conversations" data-workspace-id="@WorkspaceId">
         <header class="conversation-browser-summary">
             <span>@F("RecentCount", conversations.Count)</span>
-            <span>@F("CurrentWorkspace", WorkspaceDisplayName)</span>
         </header>
         <div class="conversation-list">
             @foreach (var conversation in conversations)
@@ -41,7 +39,7 @@ else
                     <span class="conversation-icon" aria-hidden="true"><UiIcon Name="message-circle" /></span>
                     <span class="conversation-main">
                         <strong>@conversation.Title</strong>
-                        <span>@conversation.Entry.DisplayName · @WorkspaceDisplayName</span>
+                        <span>@conversation.Entry.DisplayName</span>
                     </span>
                     <span class="conversation-state">
                         <StatusBadge Text="@StatusLabel(conversation.Interaction.Status)" Status="@Status(conversation.Interaction.Status)" />
@@ -71,8 +69,6 @@ else
     private bool realtimeStarted;
 
     private Guid WorkspaceId => ContextState.Current?.WorkspaceId ?? Guid.Empty;
-    private string WorkspaceDisplayName => ContextState.Current?.WorkspaceDisplayName ?? T("UnknownWorkspace");
-
     protected override async Task OnInitializedAsync()
     {
         if (ContextState.Current is null) await ContextState.LoadAsync(lifetime.Token);

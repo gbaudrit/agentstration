@@ -1,5 +1,5 @@
 .conversation-browser { display:grid; gap:1rem; }
-.conversation-browser-summary { display:flex; justify-content:space-between; gap:1rem; color:var(--text-muted); font-size:.875rem; }
+.conversation-browser-summary { color:var(--text-muted); font-size:.875rem; }
 .conversation-list { display:grid; gap:.75rem; }
 .conversation-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto auto auto; align-items:center; gap:1rem; padding:1rem; border:1px solid var(--border); border-radius:.85rem; background:var(--surface); color:inherit; text-decoration:none; transition:border-color .15s ease, transform .15s ease; }
 .conversation-row:hover, .conversation-row:focus-visible { border-color:var(--accent); transform:translateY(-1px); outline:none; }
@@ -10,4 +10,4 @@
 .conversation-state { justify-items:start; }
 .conversation-open { color:var(--text-muted); font-size:1.25rem; }
 .conversation-limit { margin:0; text-align:center; }
-@media (max-width: 760px) { .conversation-row { grid-template-columns:auto minmax(0,1fr) auto; } .conversation-state, .conversation-row time { grid-column:2; } .conversation-open { grid-column:3; grid-row:1; } .conversation-browser-summary { align-items:flex-start; flex-direction:column; } }
+@media (max-width: 760px) { .conversation-row { grid-template-columns:auto minmax(0,1fr) auto; } .conversation-state, .conversation-row time { grid-column:2; } .conversation-open { grid-column:3; grid-row:1; } }

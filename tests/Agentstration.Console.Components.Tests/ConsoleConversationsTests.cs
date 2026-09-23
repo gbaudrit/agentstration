@@ -45,6 +45,8 @@ public sealed class ConsoleConversationsTests
         Assert.IsFalse(rendered.Markup.Contains("must not leak", StringComparison.Ordinal));
         Assert.AreEqual(WorkspaceId, client.ListWorkspaceId);
         Assert.AreEqual(50, client.ListTake);
+        Assert.AreEqual(0, rendered.FindAll(".realtime-status").Count);
+        Assert.IsFalse(rendered.Markup.Contains("Default workspace", StringComparison.Ordinal));
 
         var expected = ConsoleEntryInteractionNavigation.Build(
             WorkspaceId,
@@ -97,6 +99,7 @@ public sealed class ConsoleConversationsTests
         resumed.WaitForElement("[data-testid='workplace-conversation-message']");
         StringAssert.Contains(resumed.Markup, "Persisted request");
         Assert.AreEqual("/conversations", resumed.Find("[data-testid='back-to-conversations']").GetAttribute("href"));
+        Assert.AreEqual(0, resumed.FindAll(".page-actions .realtime-status").Count);
     }
 
     private static BunitContext CreateContext(
