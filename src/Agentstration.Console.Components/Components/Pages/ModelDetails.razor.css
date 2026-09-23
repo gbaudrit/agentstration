@@ -23,10 +23,10 @@
 .model-override-section > p, .model-feature-editor-grid small { color: var(--muted); }
 .model-override-columns, .model-feature-editor-grid, .model-limit-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .model-override-columns > div, .model-feature-editor-grid > article { display: grid; align-content: start; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
-.model-operation-field, .model-limit-editor-grid label { display: grid; grid-template-columns: minmax(0, 1fr) minmax(9rem, .7fr); align-items: center; gap: 12px; }
+.model-operation-field, .model-limit-editor-grid label { display: grid; grid-template-columns: minmax(8rem, .8fr) minmax(0, 1.6fr); align-items: center; gap: 12px; }
 .model-operation-field select, .model-limit-editor-grid input { width: 100%; }
-.model-override-control { display: grid; gap: 5px; min-width: 0; }
-.model-override-control small, .model-override-control label { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; }
+.model-override-control { display: grid; grid-template-columns: minmax(0, .8fr) minmax(8rem, 1.2fr); align-items: end; gap: 10px; min-width: 0; }
+.model-override-control small, .model-override-control label { display: grid; grid-template-columns: 1fr; align-items: center; gap: 5px; }
 .model-override-control small { color: var(--muted); }
 .model-override-control small strong { color: var(--text); font-weight: 600; }
 .model-override-control label > span { color: var(--muted); font-size: .78rem; }
@@ -34,4 +34,4 @@
 .model-limit-editor-grid small { color: var(--muted); }
 .model-override-diagnostics ul { margin: 6px 0 0; padding-left: 20px; }
 @media (max-width: 960px) { .model-detail-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 680px) { .model-detail-metrics, .model-capability-grid, .model-limit-grid, .model-override-columns, .model-feature-editor-grid, .model-limit-editor-grid { grid-template-columns: 1fr; } .model-yaml-actions, .model-capability-actions { align-items: stretch; flex-direction: column; } .model-operation-field { grid-template-columns: 1fr; gap: 5px; } }
+@media (max-width: 680px) { .model-detail-metrics, .model-capability-grid, .model-limit-grid, .model-override-columns, .model-feature-editor-grid, .model-limit-editor-grid, .model-operation-field, .model-override-control { grid-template-columns: 1fr; } .model-yaml-actions, .model-capability-actions { align-items: stretch; flex-direction: column; } .model-operation-field { gap: 5px; } }

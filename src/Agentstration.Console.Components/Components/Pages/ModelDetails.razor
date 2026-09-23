@@ -24,11 +24,12 @@ else if (model is not null)
 
     <nav class="section-tabs model-detail-tabs" role="tablist" aria-label="@T("ModelDetails")">
         <button id="model-overview-tab" type="button" role="tab" aria-selected="@(activeTab == PageTab.Overview ? "true" : "false")" aria-controls="model-tab-panel" class="@(activeTab == PageTab.Overview ? "active" : null)" @onclick="() => activeTab = PageTab.Overview">@T("Tab.Overview")</button>
+        <button id="model-overrides-tab" type="button" role="tab" aria-selected="@(activeTab == PageTab.Overrides ? "true" : "false")" aria-controls="model-tab-panel" class="@(activeTab == PageTab.Overrides ? "active" : null)" @onclick="OpenOverrides">@T("Tab.Overrides")</button>
         <button id="model-yaml-tab" type="button" role="tab" aria-selected="@(activeTab == PageTab.Yaml ? "true" : "false")" aria-controls="model-tab-panel" class="@(activeTab == PageTab.Yaml ? "active" : null)" @onclick="() => activeTab = PageTab.Yaml">@T("Tab.Yaml")</button>
     </nav>
 
-    <main id="model-tab-panel" role="tabpanel" aria-labelledby="@(activeTab == PageTab.Overview ? "model-overview-tab" : "model-yaml-tab")" tabindex="0">
-        @if (activeTab == PageTab.Overview)
+    <main id="model-tab-panel" role="tabpanel" aria-labelledby="@ActiveTabId" tabindex="0">
+        @if (activeTab is PageTab.Overview or PageTab.Overrides)
         {
             @if (model.Definition.Observation.State != ModelObservationState.Available)
             {
@@ -49,6 +50,8 @@ else if (model is not null)
                 <div class="form-alert form-alert-success" role="status" data-testid="model-override-message">@overrideMessage</div>
             }
 
+            @if (activeTab == PageTab.Overview)
+            {
             <section class="metric-grid model-detail-metrics" aria-label="@T("ModelSummary")">
                 <MetricCard Label="@T("Availability")" Value="@ObservationLabel" Detail="@model.Definition.ProviderStatus" HelpText="@T("AvailabilityHelp")" Status="@ObservationTone" />
                 <MetricCard Label="@T("LastObserved")" Value="@model.Definition.Observation.LastObservedAt.ToLocalTime().ToString("g")" Detail="@T("LastAttempted", model.Definition.Observation.LastAttemptedAt.ToLocalTime().ToString("g"))" HelpText="@T("FreshnessHelp")" Status="@ObservationTone" />
@@ -69,7 +72,7 @@ else if (model is not null)
             </section>
 
             <section class="panel form-section" data-testid="model-capabilities">
-                <div class="panel-header"><div><p class="eyebrow">@T("EffectiveSpecification")</p><h2>@T("Capabilities")</h2><p>@T("CapabilitiesHelp")</p></div><div class="model-capability-actions">@if (effective?.SpecificationOverride is not null) { <StatusBadge Text="@T("OverrideApplied")" Status="UiStatus.Info" /> }@if (providerSnapshot is not null && !editingOverride) { <button class="button-secondary" type="button" data-testid="edit-model-override" @onclick="BeginOverrideEdit">@(effective?.SpecificationOverride is null ? T("AddOverride") : T("EditOverride"))</button> }</div></div>
+                <div class="panel-header"><div><p class="eyebrow">@T("EffectiveSpecification")</p><h2>@T("Capabilities")</h2><p>@T("CapabilitiesHelp")</p></div><div class="model-capability-actions">@if (effective?.SpecificationOverride is not null) { <StatusBadge Text="@T("OverrideApplied")" Status="UiStatus.Info" /> }@if (providerSnapshot is not null) { <button class="button-secondary" type="button" data-testid="edit-model-override" @onclick="OpenOverrides">@(effective?.SpecificationOverride is null ? T("AddOverride") : T("EditOverride"))</button> }</div></div>
                 <div class="model-capability-grid">
                     @Capability(T("Streaming"), ObservedSpecification.Features.Streaming?.Support, EffectiveSpecification.Features.Streaming?.Support, HasStreamingOverride)
                     @Capability(T("Tools"), ObservedSpecification.Features.Tools?.Support, EffectiveSpecification.Features.Tools?.Support, HasToolsOverride, ToolDetails)
@@ -77,8 +80,9 @@ else if (model is not null)
                     @Capability(T("Reasoning"), ObservedSpecification.Features.Reasoning?.Support, EffectiveSpecification.Features.Reasoning?.Support, HasReasoningOverride, ReasoningDetails)
                 </div>
             </section>
+            }
 
-            @if (editingOverride && overrideEditor is not null)
+            @if (activeTab == PageTab.Overrides && editingOverride && overrideEditor is not null)
             {
                 <section class="panel form-section model-override-editor" data-testid="model-override-editor">
                     <div class="panel-header"><div><p class="eyebrow">@T("ProviderOverride")</p><h2>@T("OverrideEditor")</h2><p>@T("OverrideEditorHelp")</p></div><StatusBadge Text="@T("ProviderOwned")" Status="UiStatus.Info" /></div>
@@ -101,9 +105,9 @@ else if (model is not null)
                         <h3>@T("Capabilities")</h3><p>@T("FeatureOverrideHelp")</p>
                         <div class="model-feature-editor-grid">
                             @SupportField(T("Streaming"), overrideEditor.StreamingSupport, ObservedSpecification.Features.Streaming?.Support, value => SetSimpleSupport(value, support => overrideEditor.StreamingSupport = support))
-                            <article><h4>@T("Tools")</h4>@SupportSelect(overrideEditor.ToolsSupport, ObservedSpecification.Features.Tools?.Support, value => SetFeatureSupport(value, ObservedSpecification.Features.Tools?.Support, overrideEditor.ToolModes, support => overrideEditor.ToolsSupport = support, T("Tools")))@foreach (var value in Enum.GetValues<ModelToolMode>()) { @OperationField(T($"ToolMode.{value}"), value, overrideEditor.ToolModes, ObservedSpecification.Features.Tools?.Modes.ContainsKey(value), operation => SetDetailOperation(value, operation, overrideEditor.ToolModes, ObservedSpecification.Features.Tools?.Support, () => overrideEditor.ToolsSupport, support => overrideEditor.ToolsSupport = support, T("Tools"))) }<small>@T("ToolGovernanceWarning")</small></article>
-                            <article><h4>@T("StructuredOutput")</h4>@SupportSelect(overrideEditor.StructuredOutputSupport, ObservedSpecification.Features.StructuredOutput?.Support, value => SetFeatureSupport(value, ObservedSpecification.Features.StructuredOutput?.Support, overrideEditor.OutputFormats, support => overrideEditor.StructuredOutputSupport = support, T("StructuredOutput")))@foreach (var value in Enum.GetValues<ModelStructuredOutputFormat>()) { @OperationField(T($"OutputFormat.{value}"), value, overrideEditor.OutputFormats, ObservedSpecification.Features.StructuredOutput?.Formats.ContainsKey(value), operation => SetDetailOperation(value, operation, overrideEditor.OutputFormats, ObservedSpecification.Features.StructuredOutput?.Support, () => overrideEditor.StructuredOutputSupport, support => overrideEditor.StructuredOutputSupport = support, T("StructuredOutput"))) @if (overrideEditor.OutputFormats[value] == ModelOverrideOperation.Add) { @StrictField(value) } }</article>
-                            <article><h4>@T("Reasoning")</h4>@SupportSelect(overrideEditor.ReasoningSupport, ObservedSpecification.Features.Reasoning?.Support, value => SetFeatureSupport(value, ObservedSpecification.Features.Reasoning?.Support, overrideEditor.ReasoningEfforts, support => overrideEditor.ReasoningSupport = support, T("Reasoning")))@foreach (var value in Enum.GetValues<ReasoningEffort>()) { @OperationField(T($"ReasoningEffort.{value}"), value, overrideEditor.ReasoningEfforts, ObservedSpecification.Features.Reasoning?.Efforts.ContainsKey(value), operation => SetDetailOperation(value, operation, overrideEditor.ReasoningEfforts, ObservedSpecification.Features.Reasoning?.Support, () => overrideEditor.ReasoningSupport, support => overrideEditor.ReasoningSupport = support, T("Reasoning"))) }</article>
+                            <article><h4>@T("Tools")</h4>@SupportSelect(overrideEditor.ToolsSupport, ObservedSpecification.Features.Tools?.Support, value => SetFeatureSupport(value, ObservedSpecification.Features.Tools?.Support, overrideEditor.ToolModes, support => overrideEditor.ToolsSupport = support, T("Tools")))@foreach (var value in Enum.GetValues<ModelToolMode>()) { @OperationField(T($"ToolMode.{value}"), value, overrideEditor.ToolModes, DetailDiscoveryValue(ObservedSpecification.Features.Tools?.Support, ObservedSpecification.Features.Tools?.Modes.ContainsKey(value) == true), operation => SetDetailOperation(value, operation, overrideEditor.ToolModes, ObservedSpecification.Features.Tools?.Support, () => overrideEditor.ToolsSupport, support => overrideEditor.ToolsSupport = support, T("Tools"))) }<small>@T("ToolGovernanceWarning")</small></article>
+                            <article><h4>@T("StructuredOutput")</h4>@SupportSelect(overrideEditor.StructuredOutputSupport, ObservedSpecification.Features.StructuredOutput?.Support, value => SetFeatureSupport(value, ObservedSpecification.Features.StructuredOutput?.Support, overrideEditor.OutputFormats, support => overrideEditor.StructuredOutputSupport = support, T("StructuredOutput")))@foreach (var value in Enum.GetValues<ModelStructuredOutputFormat>()) { @OperationField(T($"OutputFormat.{value}"), value, overrideEditor.OutputFormats, DetailDiscoveryValue(ObservedSpecification.Features.StructuredOutput?.Support, ObservedSpecification.Features.StructuredOutput?.Formats.ContainsKey(value) == true), operation => SetDetailOperation(value, operation, overrideEditor.OutputFormats, ObservedSpecification.Features.StructuredOutput?.Support, () => overrideEditor.StructuredOutputSupport, support => overrideEditor.StructuredOutputSupport = support, T("StructuredOutput"))) @if (overrideEditor.OutputFormats[value] == ModelOverrideOperation.Add) { @StrictField(value) } }</article>
+                            <article><h4>@T("Reasoning")</h4>@SupportSelect(overrideEditor.ReasoningSupport, ObservedSpecification.Features.Reasoning?.Support, value => SetFeatureSupport(value, ObservedSpecification.Features.Reasoning?.Support, overrideEditor.ReasoningEfforts, support => overrideEditor.ReasoningSupport = support, T("Reasoning")))@foreach (var value in Enum.GetValues<ReasoningEffort>()) { @OperationField(T($"ReasoningEffort.{value}"), value, overrideEditor.ReasoningEfforts, DetailDiscoveryValue(ObservedSpecification.Features.Reasoning?.Support, ObservedSpecification.Features.Reasoning?.Efforts.ContainsKey(value) == true), operation => SetDetailOperation(value, operation, overrideEditor.ReasoningEfforts, ObservedSpecification.Features.Reasoning?.Support, () => overrideEditor.ReasoningSupport, support => overrideEditor.ReasoningSupport = support, T("Reasoning"))) }</article>
                         </div>
                     </div>
 
@@ -116,6 +120,8 @@ else if (model is not null)
                 </section>
             }
 
+            @if (activeTab == PageTab.Overview)
+            {
             <section class="panel form-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("Capacity")</p><h2>@T("KnownLimits")</h2><p>@T("LimitsHelp")</p></div></div>
                 <div class="model-limit-grid">
@@ -134,6 +140,7 @@ else if (model is not null)
                     @if (!string.IsNullOrWhiteSpace(model.Definition.Observation.ErrorMessage)) { <dt>@T("ErrorMessage")</dt><dd>@model.Definition.Observation.ErrorMessage</dd> }
                 </dl>
             </section>
+            }
         }
         else
         {
@@ -163,6 +170,7 @@ else if (model is not null)
     private bool savingOverride;
     private ModelSpecificationOverrideEditorModel? overrideEditor;
     private PageTab activeTab;
+    private string ActiveTabId => activeTab switch { PageTab.Overrides => "model-overrides-tab", PageTab.Yaml => "model-yaml-tab", _ => "model-overview-tab" };
     private ResourceNamespace ModelNamespace => ResourceNamespace.Parse(Namespace);
     private ModelSpecification ObservedSpecification => model!.Definition.Specification;
     private ModelSpecification EffectiveSpecification
@@ -232,12 +240,19 @@ else if (model is not null)
         editingOverride = true;
     }
 
+    private void OpenOverrides()
+    {
+        activeTab = PageTab.Overrides;
+        if (providerSnapshot is not null && (!editingOverride || overrideEditor is null)) BeginOverrideEdit();
+    }
+
     private void CancelOverrideEdit()
     {
         overrideEditor = null;
         overrideError = null;
         overrideInteractionMessage = null;
         editingOverride = false;
+        activeTab = PageTab.Overview;
     }
 
     private async Task SaveOverrideAsync() => await SaveOverrideAsync(remove: false);
@@ -268,6 +283,7 @@ else if (model is not null)
             overrideMessage = remove || overrideEditor.IsEmpty ? T("OverrideRemoved") : T("OverrideSaved");
             editingOverride = false;
             overrideEditor = null;
+            activeTab = PageTab.Overview;
         }
         catch (AgentstrationApiException exception) { overrideError = exception; }
         finally { savingOverride = false; }
@@ -344,10 +360,11 @@ else if (model is not null)
 
     private RenderFragment OperationField<TEnum>(string label, TEnum value, Dictionary<TEnum, ModelOverrideOperation> target, bool? providerValue, Action<ModelOverrideOperation>? setter = null) where TEnum : struct, Enum => @<div class="model-operation-field"><span>@label</span><div class="model-override-control"><small><span>@T("Discovery")</span><strong>@AvailabilityLabel(providerValue)</strong></small><label><span>@T("Override")</span><select value="@target[value]" @onchange="args => ChangeOperation(value, target, setter, args.Value?.ToString())"><option value="@ModelOverrideOperation.Inherit">@T("NotOverridden")</option><option value="@ModelOverrideOperation.Add">@T("Operation.Add")</option><option value="@ModelOverrideOperation.Remove">@T("Operation.Remove")</option></select></label></div></div>;
     private RenderFragment SupportField(string label, ModelFeatureSupport? value, ModelFeatureSupport? providerValue, Action<ModelFeatureSupport?> setter) => @<article><h4>@label</h4>@SupportSelect(value, providerValue, setter)</article>;
-    private RenderFragment SupportSelect(ModelFeatureSupport? value, ModelFeatureSupport? providerValue, Action<ModelFeatureSupport?> setter) => @<div class="model-override-control"><small><span>@T("Discovery")</span><strong>@DiscoverySupportLabel(providerValue)</strong></small><label><span>@T("Override")</span><select value="@(value?.ToString() ?? string.Empty)" @onchange="args => setter(ParseSupport(args.Value?.ToString()))"><option value="">@T("NotOverridden")</option>@foreach (var support in Enum.GetValues<ModelFeatureSupport>()) { <option value="@support">@OverrideSupportLabel(support)</option> }</select></label></div>;
+    private RenderFragment SupportSelect(ModelFeatureSupport? value, ModelFeatureSupport? providerValue, Action<ModelFeatureSupport?> setter) => @<div class="model-operation-field"><span>@T("FeatureSupport")</span><div class="model-override-control"><small><span>@T("Discovery")</span><strong>@DiscoverySupportLabel(providerValue)</strong></small><label><span>@T("Override")</span><select value="@(value?.ToString() ?? string.Empty)" @onchange="args => setter(ParseSupport(args.Value?.ToString()))"><option value="">@T("NotOverridden")</option>@foreach (var support in Enum.GetValues<ModelFeatureSupport>()) { <option value="@support">@OverrideSupportLabel(support)</option> }</select></label></div></div>;
     private string OverrideSupportLabel(ModelFeatureSupport support) => T($"OverrideSupport.{support}");
     private string DiscoverySupportLabel(ModelFeatureSupport? support) => T($"DiscoverySupport.{support?.ToString() ?? "Unknown"}");
     private string AvailabilityLabel(bool? available) => T(available switch { true => "Availability.Available", false => "Availability.Unavailable", null => "Availability.Unknown" });
+    private static bool? DetailDiscoveryValue(ModelFeatureSupport? parentSupport, bool declared) => declared ? true : parentSupport == ModelFeatureSupport.Unsupported ? false : null;
     private void SetSimpleSupport(ModelFeatureSupport? value, Action<ModelFeatureSupport?> setter) { overrideInteractionMessage = null; setter(value); }
     private void SetFeatureSupport<TEnum>(ModelFeatureSupport? value, ModelFeatureSupport? discovered, Dictionary<TEnum, ModelOverrideOperation> details, Action<ModelFeatureSupport?> setter, string feature) where TEnum : struct, Enum
     {
@@ -391,6 +408,6 @@ else if (model is not null)
         ReasoningEffort effort => T($"ReasoningEffort.{effort}"),
         _ => value.ToString()
     };
-    private enum PageTab { Overview, Yaml }
+    private enum PageTab { Overview, Overrides, Yaml }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

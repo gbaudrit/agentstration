@@ -35,11 +35,12 @@ public sealed class ModelDetailsTests
         Assert.AreEqual(FakeModelsClient.ResourceName, models.RequestedName);
         Assert.AreEqual(new ResourceNamespace("shared.models"), providers.RequestedNamespace);
         Assert.AreEqual("foundry", providers.RequestedProvider);
-        CollectionAssert.AreEqual(new[] { "Overview", "YAML" }, rendered.FindAll("[role='tab']").Select(value => value.TextContent.Trim()).ToArray());
+        CollectionAssert.AreEqual(new[] { "Overview", "Overrides", "YAML" }, rendered.FindAll("[role='tab']").Select(value => value.TextContent.Trim()).ToArray());
         Assert.AreEqual("true", rendered.Find("#model-overview-tab").GetAttribute("aria-selected"));
         Assert.AreEqual(4, rendered.FindAll(".model-detail-metrics .metric-card").Count);
-        Assert.IsTrue(rendered.Find("[data-testid='model-capabilities']").TextContent.Contains("Unknown", StringComparison.Ordinal));
-        Assert.IsTrue(rendered.Find("[data-testid='model-capabilities']").TextContent.Contains("Native", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Find("[data-testid='model-capabilities']").TextContent.Contains("Not specified", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Find("[data-testid='model-capabilities']").TextContent.Contains("Supported", StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Find("[data-testid='model-capabilities']").TextContent.Contains("Native", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Find("[data-testid='model-capabilities']").TextContent.Contains("Provider override", StringComparison.Ordinal));
         Assert.AreEqual("/modelproviders/foundry?namespace=shared.models", rendered.FindAll("a").First(link => link.TextContent.Contains("Open model provider", StringComparison.Ordinal)).GetAttribute("href"));
 
@@ -93,6 +94,7 @@ public sealed class ModelDetailsTests
         var rendered = context.Render<ModelDetails>(parameters => parameters.Add(component => component.Name, FakeModelsClient.ResourceName));
 
         await rendered.Find("[data-testid='edit-model-override']").ClickAsync(new());
+        Assert.AreEqual("true", rendered.Find("#model-overrides-tab").GetAttribute("aria-selected"));
         var editorText = rendered.Find("[data-testid='model-override-editor']").TextContent;
         StringAssert.Contains(editorText, "Discovery:");
         StringAssert.Contains(editorText, "Not specified");
@@ -102,7 +104,7 @@ public sealed class ModelDetailsTests
         Assert.IsFalse(rendered.FindAll("[data-testid='model-override-editor'] option")
             .Any(option => string.Equals(option.TextContent.Trim(), "Inherit", StringComparison.Ordinal)));
         await rendered.Find("[data-testid='model-override-context-tokens']").ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "64000" });
-        StringAssert.Contains(rendered.Find(".model-limit-grid").TextContent, "64,000");
+        Assert.AreEqual("64000", rendered.Find("[data-testid='model-override-context-tokens']").GetAttribute("value"));
         await rendered.Find("[data-testid='save-model-override']").ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
@@ -130,6 +132,7 @@ public sealed class ModelDetailsTests
         await rendered.Find("[data-testid='edit-model-override']").ClickAsync(new());
         var tools = rendered.FindAll(".model-feature-editor-grid > article")
             .Single(element => string.Equals(element.QuerySelector("h4")?.TextContent.Trim(), "Tools", StringComparison.Ordinal));
+        Assert.AreEqual(3, tools.QuerySelectorAll(".model-override-control strong").Count(value => string.Equals(value.TextContent.Trim(), "Not specified", StringComparison.Ordinal)));
         await tools.QuerySelectorAll("select")[1].ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = ModelOverrideOperation.Add.ToString() });
 
         tools = rendered.FindAll(".model-feature-editor-grid > article")
@@ -199,6 +202,7 @@ public sealed class ModelDetailsTests
         var localizer = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<ModelDetailsStrings>>();
 
         Assert.AreEqual("Vue d’ensemble", localizer["Tab.Overview"].Value);
+        Assert.AreEqual("Surcharges", localizer["Tab.Overrides"].Value);
         Assert.AreEqual("Surcharge du fournisseur", localizer["ProviderOverride"].Value);
         Assert.AreEqual("Observé · lecture seule", localizer["ObservedReadOnly"].Value);
         Assert.AreEqual("Copier le YAML", localizer["CopyYaml"].Value);
@@ -207,6 +211,7 @@ public sealed class ModelDetailsTests
         Assert.AreEqual("Non surchargé", localizer["NotOverridden"].Value);
         Assert.AreEqual("Non spécifié", localizer["DiscoverySupport.Unknown"].Value);
         Assert.AreEqual("Pris en charge", localizer["OverrideSupport.Native"].Value);
+        Assert.AreEqual("Pris en charge", localizer["Support.Native"].Value);
         Assert.AreEqual("Disponible", localizer["Operation.Add"].Value);
     }
 

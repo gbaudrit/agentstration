@@ -105,10 +105,11 @@
   <data name="DeclarativeResource"><value>Declarative resource</value></data>
   <data name="ReadOnly"><value>Read only</value></data>
   <data name="DeclarativeDefinitionUnavailable"><value>The declarative definition is unavailable until the configuration is structurally valid.</value></data>
-  <data name="Support.Native"><value>Native</value></data>
-  <data name="Support.Emulated"><value>Emulated</value></data>
-  <data name="Support.Partial"><value>Partial</value></data>
+  <data name="Support.Native"><value>Supported</value></data>
+  <data name="Support.Emulated"><value>Supported through emulation</value></data>
+  <data name="Support.Partial"><value>Partially supported</value></data>
   <data name="Support.Unsupported"><value>Unsupported</value></data>
+  <data name="Support.Unknown"><value>Not specified</value></data>
   <data name="Status.Available"><value>Available</value></data>
   <data name="Status.Ready"><value>Ready</value></data>
   <data name="Status.Succeeded"><value>Succeeded</value></data>
