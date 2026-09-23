@@ -17,6 +17,8 @@ public sealed class ModelProviderEditorModel
     [Required] public string ExtensionId { get; set; } = string.Empty;
     [Required] public string ContributionId { get; set; } = string.Empty;
     public List<ModelProviderValueBindingEditorModel> ValueBindings { get; set; } = [];
+    public IReadOnlyDictionary<string, ModelSpecificationOverride> SpecificationOverrides { get; set; }
+        = new Dictionary<string, ModelSpecificationOverride>(StringComparer.Ordinal);
 
     public CreateModelProviderRequest ToCreateRequest() => new(Name.Trim(), ToProperties(), ResourceNamespace.Parse(Namespace).Value);
     public PutModelProviderRequest ToPutRequest() => new(ToProperties());
@@ -26,7 +28,8 @@ public sealed class ModelProviderEditorModel
         DisplayName = DisplayName.Trim(),
         Extension = ParseExtension(ExtensionId),
         ContributionId = ContributionId.Trim(),
-        ValueBindings = ValueBindings.Where(binding => binding.IsConfigured).Select(binding => binding.ToBinding()).ToArray()
+        ValueBindings = ValueBindings.Where(binding => binding.IsConfigured).Select(binding => binding.ToBinding()).ToArray(),
+        SpecificationOverrides = new Dictionary<string, ModelSpecificationOverride>(SpecificationOverrides, StringComparer.Ordinal)
     };
 
     public static ModelProviderEditorModel FromResource(ModelProviderResource resource) => new()
@@ -36,7 +39,8 @@ public sealed class ModelProviderEditorModel
         DisplayName = resource.Definition.DisplayName,
         ExtensionId = $"{(resource.Definition.Extension.Namespace ?? resource.Namespace).Value}:{resource.Definition.Extension.Name}",
         ContributionId = resource.Definition.ContributionId,
-        ValueBindings = resource.Definition.ValueBindings.Select(ModelProviderValueBindingEditorModel.From).ToList()
+        ValueBindings = resource.Definition.ValueBindings.Select(ModelProviderValueBindingEditorModel.From).ToList(),
+        SpecificationOverrides = new Dictionary<string, ModelSpecificationOverride>(resource.Definition.SpecificationOverrides, StringComparer.Ordinal)
     };
 
     private static ResourceReference ParseExtension(string value)
