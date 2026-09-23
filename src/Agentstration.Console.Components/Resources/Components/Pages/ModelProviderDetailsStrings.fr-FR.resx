@@ -38,10 +38,16 @@
   <data name="SaveChanges"><value>Enregistrer les modifications</value></data>
   <data name="Discovery"><value>Découverte</value></data>
   <data name="AvailableModels"><value>Modèles disponibles</value></data>
+  <data name="RefreshModels"><value>Actualiser les modèles</value></data>
+  <data name="RefreshingModels"><value>Actualisation…</value></data>
+  <data name="DiscoverySummary"><value>{0} créé(s) · {1} mis à jour · {2} inchangé(s) · {3} absent(s) · {4} réapparu(s) · {5} au total</value></data>
+  <data name="InitialDiscoveryComplete"><value>Découverte initiale des modèles terminée</value></data>
+  <data name="InitialDiscoveryFailed"><value>Fournisseur créé ; échec de la découverte initiale</value></data>
+  <data name="DiscoveryRefreshed"><value>Découverte des modèles actualisée</value></data>
   <data name="ModelCount.One"><value>{0} modèle</value></data>
   <data name="ModelCount.Many"><value>{0} modèles</value></data>
   <data name="NoModelsDiscovered"><value>Aucun modèle découvert</value></data>
-  <data name="NoModelsMessage"><value>Testez le point de terminaison et vérifiez qu’un modèle est disponible chez le fournisseur.</value></data>
+  <data name="NoModelsMessage"><value>Actualisez la découverte et vérifiez qu’un modèle installé est disponible chez le fournisseur.</value></data>
   <data name="Model"><value>Modèle</value></data>
   <data name="Actions"><value>Actions</value></data>
   <data name="CreateProfileForModel"><value>Créer un profil</value></data>
