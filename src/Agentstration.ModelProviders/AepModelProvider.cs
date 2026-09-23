@@ -194,8 +194,13 @@ public sealed class AepModelProvider(
             value.Id,
             value.DisplayName,
             "available",
-            value.Capabilities ?? [],
-            value.Metadata ?? new Dictionary<string, string>())).ToArray();
+            Map(value.Specification),
+            value.Identity is null ? null : new ModelIdentity
+            {
+                Publisher = value.Identity.Publisher,
+                Model = value.Identity.Model,
+                Version = value.Identity.Version
+            })).ToArray();
     }
 
     public async ValueTask<ResolvedModelProviderCapabilities> ResolveCapabilitiesAsync(
@@ -220,7 +225,7 @@ public sealed class AepModelProvider(
         if (model is null) throw new ModelProviderConfigurationException($"Model '{deployment.ModelName}' is not available from provider '{provider.Name}'.");
         return new ResolvedModelProviderCapabilities(
             Map(contribution.Capabilities),
-            Map(model.Capabilities ?? []),
+            MapCapabilities(model.Specification),
             new AgentRuntimeCapabilities
             {
                 Streaming = new(CapabilitySupport.Native),
@@ -439,16 +444,102 @@ public sealed class AepModelProvider(
         Reasoning = new ReasoningCapability { Support = value.Thinking ? CapabilitySupport.Native : CapabilitySupport.Unsupported }
     };
 
-    private static AgentRuntimeCapabilities Map(IReadOnlyList<string> values)
+    private static AgentRuntimeCapabilities MapCapabilities(AepModelSpecification? specification)
     {
-        bool Has(string name) => values.Contains(name, StringComparer.OrdinalIgnoreCase);
-        FeatureCapability Feature(string name) => new(Has(name) ? CapabilitySupport.Native : CapabilitySupport.Unsupported);
+        static CapabilitySupport Support(AepModelFeatureSupport? support) => support switch
+        {
+            AepModelFeatureSupport.Native => CapabilitySupport.Native,
+            AepModelFeatureSupport.Emulated => CapabilitySupport.Emulated,
+            AepModelFeatureSupport.Partial => CapabilitySupport.Partial,
+            _ => CapabilitySupport.Unsupported
+        };
         return new AgentRuntimeCapabilities
         {
-            Streaming = Feature("streaming"),
-            Tools = Feature("tools"),
-            StructuredOutput = Feature("structuredOutput"),
-            Reasoning = new ReasoningCapability { Support = Has("reasoning") || Has("thinking") ? CapabilitySupport.Native : CapabilitySupport.Unsupported }
+            Streaming = new(Support(specification?.Features.Streaming?.Support)),
+            Tools = new(Support(specification?.Features.Tools?.Support)),
+            StructuredOutput = new(Support(specification?.Features.StructuredOutput?.Support)),
+            Reasoning = new ReasoningCapability { Support = Support(specification?.Features.Reasoning?.Support) }
         };
     }
+
+    private static ModelSpecification Map(AepModelSpecification? specification) => new()
+    {
+        Input = specification?.Input?.Select(Map).ToArray(),
+        Output = specification?.Output?.Select(Map).ToArray(),
+        Features = new ModelFeatureSpecifications
+        {
+            Streaming = specification?.Features.Streaming is { } streaming
+                ? new ModelStreamingFeatureSpecification { Support = Map(streaming.Support) } : null,
+            Tools = specification?.Features.Tools is { } tools
+                ? new ModelToolsFeatureSpecification
+                {
+                    Support = Map(tools.Support),
+                    Modes = tools.Modes.ToDictionary(value => Map(value.Key), _ => new ModelToolModeSpecification())
+                } : null,
+            StructuredOutput = specification?.Features.StructuredOutput is { } structured
+                ? new ModelStructuredOutputFeatureSpecification
+                {
+                    Support = Map(structured.Support),
+                    Formats = structured.Formats.ToDictionary(
+                        value => Map(value.Key),
+                        value => new ModelStructuredOutputFormatSpecification
+                        {
+                            SupportsStrict = value.Value.SupportsStrict
+                        })
+                } : null,
+            Reasoning = specification?.Features.Reasoning is { } reasoning
+                ? new ModelReasoningFeatureSpecification
+                {
+                    Support = Map(reasoning.Support),
+                    Efforts = reasoning.Efforts.Where(value => value.Key != AepModelReasoningEffort.None)
+                        .ToDictionary(value => Map(value.Key), _ => new ModelReasoningEffortSpecification())
+                } : null
+        },
+        Limits = new ModelLimits
+        {
+            ContextTokens = specification?.Limits.ContextTokens,
+            MaxOutputTokens = specification?.Limits.MaxOutputTokens
+        }
+    };
+
+    private static ModelContentType Map(AepModelContentType value) => value switch
+    {
+        AepModelContentType.Text => ModelContentType.Text,
+        AepModelContentType.Image => ModelContentType.Image,
+        AepModelContentType.Audio => ModelContentType.Audio,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static ModelFeatureSupport Map(AepModelFeatureSupport value) => value switch
+    {
+        AepModelFeatureSupport.Unknown => ModelFeatureSupport.Unknown,
+        AepModelFeatureSupport.Unsupported => ModelFeatureSupport.Unsupported,
+        AepModelFeatureSupport.Native => ModelFeatureSupport.Native,
+        AepModelFeatureSupport.Emulated => ModelFeatureSupport.Emulated,
+        AepModelFeatureSupport.Partial => ModelFeatureSupport.Partial,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static ModelToolMode Map(AepModelToolMode value) => value switch
+    {
+        AepModelToolMode.Function => ModelToolMode.Function,
+        AepModelToolMode.Parallel => ModelToolMode.Parallel,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static ModelStructuredOutputFormat Map(AepModelStructuredOutputFormat value) => value switch
+    {
+        AepModelStructuredOutputFormat.JsonObject => ModelStructuredOutputFormat.JsonObject,
+        AepModelStructuredOutputFormat.JsonSchema => ModelStructuredOutputFormat.JsonSchema,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static Agentstration.Models.ReasoningEffort Map(AepModelReasoningEffort value) => value switch
+    {
+        AepModelReasoningEffort.Minimal => Agentstration.Models.ReasoningEffort.Minimal,
+        AepModelReasoningEffort.Low => Agentstration.Models.ReasoningEffort.Low,
+        AepModelReasoningEffort.Medium => Agentstration.Models.ReasoningEffort.Medium,
+        AepModelReasoningEffort.High => Agentstration.Models.ReasoningEffort.High,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
 }

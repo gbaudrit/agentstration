@@ -321,7 +321,7 @@ public sealed class ModelProviderNavigationTests
             RequestedModelNamespace = @namespace;
             RequestedModelProvider = providerName;
             return Task.FromResult<IReadOnlyList<AvailableModelResponse>>([
-                new("qwen3", "Qwen 3", "available", [], new Dictionary<string, string>())
+                new("qwen3", "Qwen 3", "available", new ModelSpecification())
             ]);
         }
 

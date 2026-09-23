@@ -120,6 +120,33 @@ public sealed class FoundryProviderTests
     }
 
     [TestMethod]
+    public async Task DiscoveryPreservesTrueFalseAndOmittedCapabilityObservations()
+    {
+        using var providerHttp = Client((_, _) => Task.FromResult(Json(HttpStatusCode.OK, """
+            {"value":[
+              {"type":"ModelDeployment","name":"native","modelPublisher":"Microsoft","modelName":"phi","modelVersion":"1","capabilities":{"chat":true,"toolCalling":true,"reasoning":true,"reasoningEfforts":["low","high"]}},
+              {"type":"ModelDeployment","name":"unsupported","capabilities":{"chat":true,"toolCalling":false,"reasoning":false}},
+              {"type":"ModelDeployment","name":"unknown","capabilities":{"chat":true}}
+            ]}
+            """)));
+
+        var models = await Provider(providerHttp).ListModelsAsync(Values("first", "key"));
+        var native = models.Single(model => model.Id == "native");
+        var unsupported = models.Single(model => model.Id == "unsupported");
+        var unknown = models.Single(model => model.Id == "unknown");
+
+        Assert.AreEqual(AepModelFeatureSupport.Native, native.Specification!.Features.Tools!.Support);
+        Assert.AreEqual(AepModelFeatureSupport.Unsupported, unsupported.Specification!.Features.Tools!.Support);
+        Assert.AreEqual(AepModelFeatureSupport.Unknown, unknown.Specification!.Features.Tools!.Support);
+        CollectionAssert.AreEquivalent(
+            new[] { AepModelReasoningEffort.Low, AepModelReasoningEffort.High },
+            native.Specification.Features.Reasoning!.Efforts.Keys.ToArray());
+        Assert.AreEqual("Microsoft", native.Identity!.Publisher);
+        Assert.AreEqual("phi", native.Identity.Model);
+        Assert.AreEqual("1", native.Identity.Version);
+    }
+
+    [TestMethod]
     public async Task UpdatedAndRevokedValuesTakeEffectOnTheNextOperation()
     {
         var secretValues = new Dictionary<string, string> { ["current"] = "one" };

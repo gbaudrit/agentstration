@@ -2,6 +2,13 @@ using System.Text.Json.Serialization;
 
 namespace Agentstration.Models;
 
+public sealed record ModelIdentity
+{
+    public string? Publisher { get; init; }
+    public string? Model { get; init; }
+    public string? Version { get; init; }
+}
+
 [JsonConverter(typeof(JsonStringEnumConverter<ModelContentType>))]
 public enum ModelContentType
 {
@@ -51,7 +58,7 @@ public sealed record ModelToolsFeatureSpecification : ModelFeatureSpecification
 
 public sealed record ModelStructuredOutputFormatSpecification
 {
-    public bool SupportsStrict { get; init; }
+    public bool? SupportsStrict { get; init; }
 }
 
 public sealed record ModelStructuredOutputFeatureSpecification : ModelFeatureSpecification

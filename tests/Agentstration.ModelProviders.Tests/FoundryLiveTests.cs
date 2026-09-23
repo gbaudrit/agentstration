@@ -41,7 +41,7 @@ public sealed class FoundryLiveTests
     {
         using var live = Open(authenticationMode);
         var model = (await live.Provider.ListModelsAsync(live.Values)).SingleOrDefault(value => value.Id == live.Deployment);
-        if (model?.Capabilities?.Contains("tools") != true)
+        if (model?.Specification?.Features.Tools?.Support != AepModelFeatureSupport.Native)
             Assert.Inconclusive("The selected deployment does not affirmatively advertise Tools.");
 
         var request = new AepChatRequest(live.Deployment,

@@ -103,7 +103,7 @@ internal sealed class ListProviderModelsEndpoint : IModelManagementEndpoint
         {
             var models = await service.ListModelsAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken);
             return Results.Ok(new ValueResponse<AvailableModelResponse>(models.Select(model =>
-                new AvailableModelResponse(model.Name, model.DisplayName, model.Status, model.Capabilities, model.Metadata)).ToArray()));
+                new AvailableModelResponse(model.Name, model.DisplayName, model.Status, model.Specification, model.Identity)).ToArray()));
         });
 }
 

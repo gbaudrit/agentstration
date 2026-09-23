@@ -2,7 +2,7 @@
 
 ## Versions
 
-The protocol version is `2026-09-18`. Protocol, SDK, extension, and consuming-product versions are independent.
+The protocol version is `2026-09-22`. Protocol, SDK, extension, and consuming-product versions are independent.
 
 ## Discovery
 
@@ -16,7 +16,7 @@ The response is an `AepManifest` containing `protocolVersion`, extension identit
 
 ```json
 {
-  "protocolVersion": "2026-09-18",
+  "protocolVersion": "2026-09-22",
   "extension": { "id": "sample.hello", "name": "Hello", "version": "1.0.0" },
   "capabilities": {
     "aep.health": { "version": "1.0", "endpoint": "/aep/health" }
@@ -46,6 +46,12 @@ Initial registered names are:
 Unknown names are preserved. Each capability evolves through its own version and may declare an endpoint and metadata. The manifest is the only input an Inspector needs to decide which explorers to display.
 
 The model-provider capability currently uses `/aep/model-providers`. AEP tool contributions may map to MCP servers; MCP remains authoritative for tool schema and invocation.
+
+The model-provider capability is version `2.0`. `POST /aep/model-providers/{providerId}/models` returns bounded model observations. Each descriptor has a provider-local `id`, a `displayName`, an optional safe `identity` (`publisher`, `model`, and `version`) and an optional typed `specification`. The specification directly carries observed `input`, `output`, `features`, and `limits`; it does not contain a generic capabilities dictionary or provider metadata bag.
+
+Content types are `text`, `image`, and `audio`. Initial features are `streaming`, `tools`, `structuredOutput`, and `reasoning`. Feature support is `unknown`, `unsupported`, `native`, `emulated`, or `partial`. A missing feature or `unknown` support means it was not observed; it must not be interpreted as unsupported. Tool modes, structured-output formats, and reasoning efforts (`none`, `minimal`, `low`, `medium`, and `high`) are typed maps so future properties can be added to each entry. Limits are positive token counts when observed.
+
+Responses contain at most 1,000 models. Identifiers and display names are at most 256 characters; identity parts are at most 128 characters; strings are trimmed and contain no control characters. Content lists and feature-detail maps are bounded to 16 unique entries. Duplicate model identifiers, non-positive limits, and details attached to an explicitly unsupported feature are invalid. Both the server SDK and canonical client enforce these invariants.
 
 ### Value requirements and bound values
 

@@ -24,6 +24,54 @@ public sealed class AepConformanceTests
     private static readonly string WorkloadToken = AepStaticBearerCredentials.Generate("aep-conformance-tests").AccessToken;
 
     [TestMethod]
+    public void TypedPartialModelObservationsRoundTripWithoutInventingSupport()
+    {
+        var expected = new AepModelDescriptor("deployment", "Deployment", new AepModelSpecification
+        {
+            Input = [AepModelContentType.Text, AepModelContentType.Image],
+            Output = [AepModelContentType.Text],
+            Features = new AepModelFeatureSpecifications
+            {
+                Streaming = new() { Support = AepModelFeatureSupport.Native },
+                Tools = new() { Support = AepModelFeatureSupport.Unsupported },
+                Reasoning = new()
+            },
+            Limits = new AepModelLimits { ContextTokens = 128_000 }
+        }, new AepModelIdentity("publisher", "family", "2026-09-22"));
+
+        var json = JsonSerializer.Serialize(expected, AepProtocol.JsonOptions);
+        var actual = JsonSerializer.Deserialize<AepModelDescriptor>(json, AepProtocol.JsonOptions)!;
+
+        Assert.IsNull(AepModelObservationValidator.FindIssue([actual]));
+        Assert.AreEqual(AepModelFeatureSupport.Native, actual.Specification!.Features.Streaming!.Support);
+        Assert.AreEqual(AepModelFeatureSupport.Unsupported, actual.Specification.Features.Tools!.Support);
+        Assert.AreEqual(AepModelFeatureSupport.Unknown, actual.Specification.Features.Reasoning!.Support);
+        Assert.IsFalse(json.Contains("capabilities", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(json.Contains("metadata", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public void ModelObservationValidationBoundsIdentityCollectionsAndLimits()
+    {
+        Assert.IsNotNull(AepModelObservationValidator.FindIssue([
+            new("duplicate", "First"),
+            new("duplicate", "Second")
+        ]));
+        Assert.IsNotNull(AepModelObservationValidator.FindIssue([
+            new("model", "Model", new AepModelSpecification
+            {
+                Input = [AepModelContentType.Text, AepModelContentType.Text]
+            })
+        ]));
+        Assert.IsNotNull(AepModelObservationValidator.FindIssue([
+            new("model", "Model", new AepModelSpecification
+            {
+                Limits = new AepModelLimits { ContextTokens = -1 }
+            })
+        ]));
+    }
+
+    [TestMethod]
     public async Task CanonicalClientDiscoversCapabilitiesAndHealth()
     {
         await using var factory = new WebApplicationFactory<global::Program>();
@@ -81,6 +129,8 @@ public sealed class AepConformanceTests
         var json = await httpClient.GetStringAsync(AepProtocol.DiscoveryPath);
 
         Assert.IsTrue(validation.IsValid);
+        Assert.AreEqual(AepProtocol.ModelProviderCapabilityVersion,
+            manifest.Capabilities[AepCapabilityNames.ModelProvider].Version);
         Assert.AreEqual(AepProtocol.ValueRequirementsCapabilityVersion,
             manifest.Capabilities[AepCapabilityNames.ValueRequirements].Version);
         Assert.AreEqual(AepProtocol.BoundValuesCapabilityVersion,
