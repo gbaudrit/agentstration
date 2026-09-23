@@ -30,6 +30,14 @@ public sealed record AvailableModelResponse(
     ModelSpecification Specification,
     ModelIdentity? Identity = null);
 
+public sealed record ModelDiscoveryDiffResponse(
+    int Created,
+    int Updated,
+    int Unchanged,
+    int Missing,
+    int Reappeared,
+    int Total);
+
 public sealed record ModelProviderStatusResponse(string Provider, string Status, DateTimeOffset CheckedAt, string? Details);
 public sealed record CreateModelProviderRequest(
     string Name,

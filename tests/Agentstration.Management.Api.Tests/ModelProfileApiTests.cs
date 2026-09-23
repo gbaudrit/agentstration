@@ -458,8 +458,10 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
                 DisplayName = "Diagnostic provider",
                 Extension = new ResourceReference("ollama-extension"),
                 ContributionId = "diagnostic"
-            }));
+        }));
         Assert.AreEqual(HttpStatusCode.Created, providerResponse.StatusCode);
+        using var refreshResponse = await client.PostAsync("/api/modelproviders/diagnostic-local/models/refresh", null);
+        Assert.AreEqual(HttpStatusCode.OK, refreshResponse.StatusCode);
         using var profileResponse = await client.PostAsJsonAsync("/api/modelprofiles", new CreateModelProfileRequest(
             "incompatible-profile",
             new ModelProfileProperties

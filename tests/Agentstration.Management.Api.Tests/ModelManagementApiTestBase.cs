@@ -29,6 +29,13 @@ public abstract class ModelManagementApiTestBase
             services.AddSingleton<IModelProviderCapabilitiesResolver, DiagnosticModelProvider>();
         }));
 
+    protected static WebApplicationFactory<Program> DiscoveryFactory(IModelProviderDiscovery discovery) => Factory().WithWebHostBuilder(builder =>
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IModelProviderDiscovery>();
+            services.AddSingleton(discovery);
+        }));
+
     protected static Task<RequestContext> GetBootstrapContextAsync(WebApplicationFactory<Program> factory) =>
         factory.Services
             .GetRequiredService<ILocalEnvironmentBootstrapper>()

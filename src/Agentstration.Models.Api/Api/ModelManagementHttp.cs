@@ -38,6 +38,7 @@ internal static class ModelsApiHttp
             });
         }
         catch (ModelProviderUnavailableException exception) { return Problem("model-provider-unavailable", "Model provider unavailable", 503, exception.Message); }
+        catch (ModelDiscoveryFailedException exception) { return Problem("model-discovery-failed", "Model discovery failed", 503, exception.Message); }
         catch (ModelProfileValidationException exception)
         {
             return Problem(exception.Code, "Invalid model profile", 422, exception.Message, new Dictionary<string, object?> { ["errors"] = exception.Errors });
@@ -53,6 +54,12 @@ internal static class ModelsApiHttp
     }
 
     public static IResult ResourceResult(StoredResource<ModelProviderResource> stored, HttpResponse response, int statusCode)
+    {
+        response.Headers.ETag = stored.ETag;
+        return Results.Json(stored.Value, statusCode: statusCode);
+    }
+
+    public static IResult ResourceResult(StoredResource<ModelResource> stored, HttpResponse response, int statusCode)
     {
         response.Headers.ETag = stored.ETag;
         return Results.Json(stored.Value, statusCode: statusCode);

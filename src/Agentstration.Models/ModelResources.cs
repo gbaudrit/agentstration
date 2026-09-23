@@ -8,8 +8,44 @@ namespace Agentstration.Models;
 
 public static class ModelResourceKinds
 {
+    public const string Model = "Model";
     public const string ModelProvider = "ModelProvider";
     public const string ModelProfile = "ModelProfile";
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<ModelObservationState>))]
+public enum ModelObservationState
+{
+    [JsonStringEnumMemberName("available")] Available,
+    [JsonStringEnumMemberName("missing")] Missing,
+    [JsonStringEnumMemberName("failed")] Failed
+}
+
+public sealed record ModelObservation
+{
+    public ModelObservationState State { get; init; } = ModelObservationState.Available;
+    public required DateTimeOffset FirstObservedAt { get; init; }
+    public required DateTimeOffset LastObservedAt { get; init; }
+    public required DateTimeOffset LastAttemptedAt { get; init; }
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+
+public sealed record ModelProperties
+{
+    public required string DisplayName { get; init; }
+    public required ResourceReference Provider { get; init; }
+    public required Guid ProviderUid { get; init; }
+    public required string ExternalId { get; init; }
+    public required string ProviderStatus { get; init; }
+    public ModelIdentity? Identity { get; init; }
+    public required ModelSpecification Specification { get; init; }
+    public required ModelObservation Observation { get; init; }
+}
+
+public sealed record ModelResource : Resource
+{
+    public ModelProperties Definition { get; init; } = null!;
 }
 
 public sealed record ModelSelection

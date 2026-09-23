@@ -24,7 +24,7 @@ namespace Agentstration.Management.Tests;
 public sealed class ModelProviderApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
-    public async Task ReadOnlyProviderApisExposeConfiguredProviderAndUnavailableDiscovery()
+    public async Task ReadOnlyProviderApisExposeConfiguredProviderAndPersistedInventory()
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
@@ -36,8 +36,122 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
 
         Assert.AreEqual("aspire", provider.Properties.RegistrationSource);
         Assert.AreEqual("unavailable", status!.Status);
-        Assert.AreEqual(HttpStatusCode.ServiceUnavailable, models.StatusCode);
-        Assert.AreEqual("application/problem+json", models.Content.Headers.ContentType?.MediaType);
+        Assert.AreEqual(HttpStatusCode.OK, models.StatusCode);
+        var inventory = await models.Content.ReadFromJsonAsync<ValueResponse<AvailableModelResponse>>();
+        Assert.AreEqual(0, inventory?.Value.Count);
+    }
+
+    [TestMethod]
+    public async Task ExplicitRefreshReconcilesGovernedModelsAndRetainsLastValidObservation()
+    {
+        var observed = new ModelSpecification
+        {
+            Input = [ModelContentType.Text],
+            Output = [ModelContentType.Text],
+            Features = new ModelFeatureSpecifications
+            {
+                Streaming = new() { Support = ModelFeatureSupport.Native }
+            },
+            Limits = new ModelLimits { ContextTokens = 8192 }
+        };
+        var changed = observed with { Limits = new ModelLimits { ContextTokens = 16384 } };
+        var discovery = new SequenceModelDiscovery(
+            () => [new DiscoveredModel("shared/model", "Shared model", "available", observed, new ModelIdentity { Publisher = "test", Model = "shared", Version = "1" })],
+            () => [new DiscoveredModel("shared/model", "Shared model", "available", observed, new ModelIdentity { Publisher = "test", Model = "shared", Version = "1" })],
+            () => [],
+            () => [new DiscoveredModel("shared/model", "Shared model v2", "available", changed, new ModelIdentity { Publisher = "test", Model = "shared", Version = "2" })],
+            () => throw new InvalidOperationException("observation failed"));
+        await using var factory = DiscoveryFactory(discovery);
+        using var client = factory.CreateClient();
+
+        var before = await client.GetFromJsonAsync<ValueResponse<AvailableModelResponse>>("/api/modelproviders/ollama-local/models");
+        Assert.AreEqual(0, before?.Value.Count);
+        Assert.AreEqual(0, discovery.ListCalls);
+
+        var created = await RefreshAsync(client);
+        Assert.AreEqual(new ModelDiscoveryDiffResponse(1, 0, 0, 0, 0, 1), created);
+        Assert.AreEqual(1, discovery.ListCalls);
+
+        var provider = await client.GetFromJsonAsync<ModelProviderResource>("/api/modelproviders/ollama-local");
+        var models = await client.GetFromJsonAsync<ValueResponse<ModelResource>>("/api/models");
+        var model = models!.Value.Single();
+        Assert.AreEqual(provider!.Uid, model.Definition.ProviderUid);
+        Assert.AreEqual(provider.Namespace, model.Namespace);
+        Assert.AreEqual(provider.ScopeRef, model.ScopeRef);
+        Assert.AreEqual("shared/model", model.Definition.ExternalId);
+        Assert.AreEqual(ModelObservationState.Available, model.Definition.Observation.State);
+        Assert.AreEqual(8192, model.Definition.Specification.Limits.ContextTokens);
+
+        var unchanged = await RefreshAsync(client);
+        Assert.AreEqual(new ModelDiscoveryDiffResponse(0, 0, 1, 0, 0, 1), unchanged);
+
+        var missing = await RefreshAsync(client);
+        Assert.AreEqual(new ModelDiscoveryDiffResponse(0, 0, 0, 1, 0, 0), missing);
+        model = (await client.GetFromJsonAsync<ValueResponse<ModelResource>>("/api/models"))!.Value.Single();
+        Assert.AreEqual(ModelObservationState.Missing, model.Definition.Observation.State);
+        Assert.AreEqual(8192, model.Definition.Specification.Limits.ContextTokens);
+
+        var reappeared = await RefreshAsync(client);
+        Assert.AreEqual(new ModelDiscoveryDiffResponse(0, 0, 0, 0, 1, 1), reappeared);
+        model = (await client.GetFromJsonAsync<ValueResponse<ModelResource>>("/api/models"))!.Value.Single();
+        Assert.AreEqual(ModelObservationState.Available, model.Definition.Observation.State);
+        Assert.AreEqual("Shared model v2", model.Definition.DisplayName);
+        Assert.AreEqual(16384, model.Definition.Specification.Limits.ContextTokens);
+
+        using var failed = await client.PostAsync("/api/modelproviders/ollama-local/models/refresh", null);
+        Assert.AreEqual(HttpStatusCode.ServiceUnavailable, failed.StatusCode);
+        model = (await client.GetFromJsonAsync<ValueResponse<ModelResource>>("/api/models"))!.Value.Single();
+        Assert.AreEqual(ModelObservationState.Failed, model.Definition.Observation.State);
+        Assert.AreEqual("discovery_failed", model.Definition.Observation.ErrorCode);
+        Assert.AreEqual(16384, model.Definition.Specification.Limits.ContextTokens);
+
+        using var directCreate = await client.PostAsJsonAsync("/api/models", model);
+        Assert.AreEqual(HttpStatusCode.MethodNotAllowed, directCreate.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ProvidersWithTheSameExternalModelRemainIsolatedByProviderUid()
+    {
+        var discovery = new PerProviderModelDiscovery();
+        await using var factory = DiscoveryFactory(discovery);
+        using var client = factory.CreateClient();
+        var provider = await client.GetFromJsonAsync<ModelProviderResource>("/api/modelproviders/ollama-local");
+        var tenant = provider!.ScopeRef!.Value;
+
+        using var extension = await client.PostAsJsonAsync("/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("second-model-extension", new()
+            {
+                DisplayName = "Second model extension",
+                Endpoint = new Uri("http://127.0.0.1:6788"),
+                ExpectedExtensionId = "second-model-extension"
+            }, ScopeRef: tenant));
+        Assert.AreEqual(HttpStatusCode.Created, extension.StatusCode);
+        using var createdProvider = await client.PostAsJsonAsync("/api/modelproviders", new CreateModelProviderRequest(
+            "second-provider",
+            new ModelProviderProperties
+            {
+                DisplayName = "Second provider",
+                Extension = new ResourceReference("second-model-extension", tenant),
+                ContributionId = "second"
+            },
+            ScopeRef: tenant));
+        Assert.AreEqual(HttpStatusCode.Created, createdProvider.StatusCode);
+
+        _ = await RefreshAsync(client, "ollama-local");
+        _ = await RefreshAsync(client, "second-provider");
+        var models = (await client.GetFromJsonAsync<ValueResponse<ModelResource>>("/api/models"))!.Value;
+        Assert.AreEqual(2, models.Count);
+        Assert.IsTrue(models.All(value => value.Definition.ExternalId == "same-id"));
+        Assert.AreEqual(2, models.Select(value => value.Definition.ProviderUid).Distinct().Count());
+        Assert.AreEqual(2, models.Select(value => value.Name).Distinct(StringComparer.Ordinal).Count());
+
+        discovery.MissingProvider = "ollama-local";
+        _ = await RefreshAsync(client, "ollama-local");
+        models = (await client.GetFromJsonAsync<ValueResponse<ModelResource>>("/api/models"))!.Value;
+        Assert.AreEqual(ModelObservationState.Missing,
+            models.Single(value => value.Definition.Provider.Name == "ollama-local").Definition.Observation.State);
+        Assert.AreEqual(ModelObservationState.Available,
+            models.Single(value => value.Definition.Provider.Name == "second-provider").Definition.Observation.State);
     }
 
     [TestMethod]
@@ -172,6 +286,47 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         delete.Headers.IfMatch.ParseAdd(parameter.Headers.ETag!.ToString());
         using var protectedDelete = await client.SendAsync(delete);
         Assert.AreEqual(HttpStatusCode.Conflict, protectedDelete.StatusCode);
+    }
+
+    private static Task<ModelDiscoveryDiffResponse> RefreshAsync(HttpClient client) => RefreshAsync(client, "ollama-local");
+
+    private static async Task<ModelDiscoveryDiffResponse> RefreshAsync(HttpClient client, string providerName)
+    {
+        using var response = await client.PostAsync($"/api/modelproviders/{providerName}/models/refresh", null);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ModelDiscoveryDiffResponse>()
+            ?? throw new InvalidOperationException("The refresh response was empty.");
+    }
+
+    private sealed class SequenceModelDiscovery(params Func<IReadOnlyList<DiscoveredModel>>[] observations) : IModelProviderDiscovery
+    {
+        private int index;
+        public int ListCalls { get; private set; }
+        public string ProviderType => "test";
+        public bool CanHandle(string providerType) => true;
+        public ValueTask<ModelProviderHealth> GetHealthAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ModelProviderHealth("available"));
+        public ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ListCalls++;
+            var observation = observations[Math.Min(index++, observations.Length - 1)];
+            return ValueTask.FromResult(observation());
+        }
+    }
+
+    private sealed class PerProviderModelDiscovery : IModelProviderDiscovery
+    {
+        public string? MissingProvider { get; set; }
+        public string ProviderType => "test";
+        public bool CanHandle(string providerType) => true;
+        public ValueTask<ModelProviderHealth> GetHealthAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ModelProviderHealth("available"));
+        public ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult<IReadOnlyList<DiscoveredModel>>(
+                string.Equals(provider.Name, MissingProvider, StringComparison.Ordinal)
+                    ? []
+                    : [new DiscoveredModel("same-id", $"{provider.Name} model", "available", new ModelSpecification())]);
     }
 
 }

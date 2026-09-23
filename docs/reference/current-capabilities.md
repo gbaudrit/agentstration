@@ -267,12 +267,14 @@ Current limitations are deliberate: credentials are not stored on provider resou
 
 ### Model provider and profile APIs
 
-Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and dynamic model discovery. Model Profile resolution exposes provider/model/adapter capability levels, their effective intersection, and profile-option incompatibilities before execution. Runtime and agent-tool compatibility remains an execution-resolution concern. Aspire starts the AEP extensions and supplies their initial seed URLs, but relies on configured local inference servers and remains outside the provider source of truth:
+Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and explicit model discovery. Discovery reconciles governed provider-owned `Model` resources; GET requests read the retained inventory without contacting the provider. Model Profile resolution exposes provider/model/adapter capability levels, their effective intersection, and profile-option incompatibilities before execution. Runtime and agent-tool compatibility remains an execution-resolution concern. Aspire starts the AEP extensions and supplies their initial seed URLs, but relies on configured local inference servers and remains outside the provider source of truth:
 
 ```powershell
 Invoke-RestMethod http://localhost:5100/api/modelproviders
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/status
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/models
+Invoke-RestMethod -Method Post http://localhost:5100/api/modelproviders/ollama-local/models/refresh
+Invoke-RestMethod http://localhost:5100/api/models
 Invoke-RestMethod -Method Post http://localhost:5100/api/modelproviders/ollama-local/test
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/usages
 Invoke-RestMethod http://localhost:5100/api/modelproviders/llama-cpp-local/status

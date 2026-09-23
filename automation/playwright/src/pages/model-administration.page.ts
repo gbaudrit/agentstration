@@ -46,6 +46,15 @@ export class ModelAdministrationPage {
     return this.page.getByTestId(TestIds.resourceAdministration.runtimeProfileEditor);
   }
 
+  public async refreshProviderModels(consoleUrl: string, providerName: string): Promise<void> {
+    const response = await this.page.request.post(
+      `${consoleUrl}/api/modelproviders/${encodeURIComponent(providerName)}/models/refresh`,
+    );
+    if (!response.ok()) {
+      throw new Error(`Model discovery refresh returned HTTP ${response.status()}.`);
+    }
+  }
+
   public async createProfile(consoleUrl: string, definition: ModelAdministrationDefinition): Promise<Locator> {
     await this.open(consoleUrl, '/modelprofiles/new', TestIds.resourceAdministration.modelProfileEditor);
     await this.waitForInteractive(TestIds.modelAdministration.profileForm);

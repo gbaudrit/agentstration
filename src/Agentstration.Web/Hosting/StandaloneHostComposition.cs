@@ -138,6 +138,7 @@ internal static class StandaloneHostCompositionExtensions
             sourceRegistryTransportOptions: sourceRegistryTransportOptions);
         builder.Services.AddAgentstrationModelProviders(builder.Configuration, useManagedProfileResolver);
         builder.Services.AddSingleton<ModelProviderManagementService>();
+        builder.Services.AddSingleton<ModelDiscoveryService>();
         builder.Services.AddSingleton<IParameterUsageProvider, ModelProviderParameterUsageProvider>();
         builder.Services.AddSingleton<SourceProviderManagementService>();
         builder.Services.AddSingleton<IModelProviderConfigurationStore>(provider => provider.GetRequiredService<ModelProviderManagementService>());

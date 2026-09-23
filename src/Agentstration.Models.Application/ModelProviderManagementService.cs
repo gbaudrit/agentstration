@@ -104,12 +104,11 @@ public sealed class ModelProviderManagementService(
 
     public async Task<IReadOnlyList<DiscoveredModel>> ListModelsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
-        var provider = await GetConfigurationRequiredAsync(@namespace, name, cancellationToken);
-        var discovery = FindDiscovery(provider.AdapterType) ?? throw new ModelProviderUnavailableException(name, "No discovery adapter is registered in this host.");
-        var health = await discovery.GetHealthAsync(provider, cancellationToken);
-        if (!string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase)) throw new ModelProviderUnavailableException(name, health.Details);
-        try { return await discovery.ListModelsAsync(provider, cancellationToken); }
-        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested) { throw new ModelProviderUnavailableException(name, exception.Message); }
+        var provider = await GetAsync(@namespace, name, cancellationToken)
+            ?? throw new ModelProviderResourceNotFoundException(name);
+        return (await ListModelResourcesAsync(provider.Value, cancellationToken))
+            .Select(value => ModelDiscoveryService.ToDiscoveredModel(value.Value))
+            .ToArray();
     }
 
     public Task<ModelProviderView> GetStatusAsync(string name, CancellationToken cancellationToken) => GetViewRequiredAsync(name, cancellationToken);
@@ -136,6 +135,11 @@ public sealed class ModelProviderManagementService(
         var scopeRef = existing.Value.ScopeRef ?? throw new ModelProviderValidationException("The model provider has no ownership scope.");
         await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
+            foreach (var model in await ListModelResourcesAsync(existing.Value, token))
+                await store.DeleteExactAsync(
+                    ScopedResourceAddress.Create(scopeRef, model.Value.Namespace, ModelResourceKinds.Model, model.Value.Name),
+                    model.ETag,
+                    token);
             await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, @namespace, ModelResourceKinds.ModelProvider, name), ifMatch, token);
             return true;
         }, cancellationToken);
@@ -147,12 +151,37 @@ public sealed class ModelProviderManagementService(
         if (discovery is null) return new(provider, new("unknown", "No discovery adapter is registered in this host."), [], timeProvider.GetUtcNow());
         var health = await discovery.GetHealthAsync(provider, cancellationToken);
         IReadOnlyList<DiscoveredModel> models = [];
-        if (includeModels && string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase))
-        {
-            try { models = await discovery.ListModelsAsync(provider, cancellationToken); }
-            catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested) { health = new("unavailable", exception.Message); }
-        }
+        if (includeModels)
+            models = (await ListModelResourcesAsync(provider, cancellationToken))
+                .Select(value => ModelDiscoveryService.ToDiscoveredModel(value.Value))
+                .ToArray();
         return new(provider, health, models, timeProvider.GetUtcNow());
+    }
+
+    private async Task<IReadOnlyList<StoredResource<ModelResource>>> ListModelResourcesAsync(
+        ModelProviderResource provider,
+        CancellationToken cancellationToken)
+    {
+        var scopeRef = provider.ScopeRef
+            ?? throw new ModelProviderValidationException("The model provider has no ownership scope.");
+        return (await store.ListExactAsync<ModelResource>(scopeRef, ModelResourceKinds.Model, 0, ModelDiscoveryService.MaximumModels, cancellationToken))
+            .Where(value => value.Value.Namespace == provider.Namespace
+                && value.Value.Definition.ProviderUid == provider.Uid)
+            .OrderBy(value => value.Value.Definition.ExternalId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private async Task<IReadOnlyList<StoredResource<ModelResource>>> ListModelResourcesAsync(
+        ModelProviderConfiguration provider,
+        CancellationToken cancellationToken)
+    {
+        var scopeRef = provider.ScopeRef
+            ?? throw new ModelProviderConfigurationException("The model provider has no ownership scope.");
+        return (await store.ListExactAsync<ModelResource>(scopeRef, ModelResourceKinds.Model, 0, ModelDiscoveryService.MaximumModels, cancellationToken))
+            .Where(value => value.Value.Namespace == provider.Namespace
+                && value.Value.Definition.ProviderUid == provider.Uid)
+            .OrderBy(value => value.Value.Definition.ExternalId, StringComparer.Ordinal)
+            .ToArray();
     }
 
     public async Task<ModelProviderConfiguration> GetConfigurationRequiredAsync(string name, CancellationToken cancellationToken)
