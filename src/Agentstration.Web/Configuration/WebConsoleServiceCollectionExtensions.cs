@@ -28,6 +28,7 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddScoped<IResourceSearchProvider, ConsoleResourceSearchProvider>();
         services.AddAgentstrationFlowDesigner();
         services.AddScoped<PlatformDashboardService>();
+        services.AddScoped<IPlatformStatusProvider>(provider => provider.GetRequiredService<PlatformDashboardService>());
         services.AddScoped<IFlowDesignerBackend, FlowDesignerBackend>();
         services.AddScoped<IFlowDesignerResourceProvider, FlowDesignerResourceProvider>();
 

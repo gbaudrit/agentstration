@@ -85,6 +85,7 @@ public partial class MainLayout
     private bool themeReady;
     private int selectedCommandIndex;
     private IReadOnlyList<CommandItem> resourceCommands = [];
+    private Task? platformStatusRefresh;
     private CancellationTokenSource? resourceSearchCancellation;
     private readonly CancellationTokenSource lifetimeCancellation = new();
     private IReadOnlyList<CommandItem> Commands => CommandDefinitions.Where(command => CanNavigate(command.RequiredPermissions)).Select(command => new CommandItem(
@@ -119,9 +120,10 @@ public partial class MainLayout
         Navigation.Changed += StateHasChanged;
         Preferences.Changed += StateHasChanged;
         Notifications.Changed += StateHasChanged;
-        PlatformStatus.Changed += StateHasChanged;
+        PlatformStatus.Changed += OnPlatformStatusChanged;
         ContextState.Changed += OnContextChanged;
         NavigationManager.LocationChanged += OnLocationChanged;
+        platformStatusRefresh = PlatformStatus.RefreshAsync(lifetimeCancellation.Token);
         await Task.WhenAll(
             ContextState.LoadAsync(lifetimeCancellation.Token),
             Preferences.LoadAsync(lifetimeCancellation.Token));
@@ -235,6 +237,7 @@ public partial class MainLayout
     private static string ShortIdentifier(string value) => value.Length <= 48 ? value : $"…{value[^47..]}";
     private bool CanNavigate(IReadOnlyList<string>? permissions) => permissions is null || permissions.All(ContextState.HasPermission);
     private string T(string key) => string.IsNullOrEmpty(key) ? string.Empty : Localizer[key];
+    private string PlatformStatusLabel => T($"PlatformStatus.{PlatformStatus.Kind}");
     private string F(string key, params object[] arguments) => Localizer[key, arguments];
     private static string WorkspaceLabel(ConsoleContextSnapshot context, ConsoleWorkspaceOption workspace) =>
         context.Workspaces.Select(value => value.TenantId).Distinct().Skip(1).Any()
@@ -249,16 +252,22 @@ public partial class MainLayout
         catch (InvalidOperationException) { }
     });
     private void OnContextChanged() => _ = InvokeAsync(StateHasChanged);
+    private void OnPlatformStatusChanged() => _ = InvokeAsync(StateHasChanged);
 
     public async ValueTask DisposeAsync()
     {
         Navigation.Changed -= StateHasChanged;
         Preferences.Changed -= StateHasChanged;
         Notifications.Changed -= StateHasChanged;
-        PlatformStatus.Changed -= StateHasChanged;
+        PlatformStatus.Changed -= OnPlatformStatusChanged;
         ContextState.Changed -= OnContextChanged;
         NavigationManager.LocationChanged -= OnLocationChanged;
         lifetimeCancellation.Cancel();
+        if (platformStatusRefresh is not null)
+        {
+            try { await platformStatusRefresh; }
+            catch (OperationCanceledException) { }
+        }
         resourceSearchCancellation?.Cancel();
         resourceSearchCancellation?.Dispose();
         lifetimeCancellation.Dispose();
