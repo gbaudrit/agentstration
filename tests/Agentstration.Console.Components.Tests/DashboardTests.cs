@@ -90,7 +90,7 @@ public sealed class DashboardTests
     }
 
     [TestMethod]
-    public async Task DashboardDoesNotClaimHealthWithoutActiveDeployments()
+    public async Task DashboardTreatsNoActiveDeploymentsAsHealthy()
     {
         var fake = new MockApiClient(new FixedTimeProvider(Now));
         var service = new PlatformDashboardService(
@@ -104,7 +104,7 @@ public sealed class DashboardTests
         var snapshot = await service.GetAsync(CancellationToken.None);
 
         Assert.AreEqual("No active deployments", snapshot.Status);
-        Assert.AreEqual(UiStatus.Info, PlatformDashboardService.ToStatus(snapshot.Status));
+        Assert.AreEqual(UiStatus.Success, PlatformDashboardService.ToStatus(snapshot.Status));
     }
 
     [TestMethod]
