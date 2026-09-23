@@ -7,6 +7,103 @@
     font-weight: 650;
 }
 
+.agent-tool-field {
+    min-width: 0;
+}
+
+.agent-tool-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 7px;
+}
+
+.agent-tool-heading .field-label {
+    margin: 0;
+}
+
+.agent-tool-count {
+    display: inline-grid;
+    min-width: 24px;
+    height: 22px;
+    padding: 0 7px;
+    place-items: center;
+    border-radius: 999px;
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-size: .68rem;
+    font-weight: 750;
+}
+
+.agent-tool-list {
+    display: grid;
+    gap: 6px;
+    max-height: 330px;
+    padding: 6px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: color-mix(in srgb,var(--surface-2) 72%,var(--surface));
+}
+
+.form-grid .agent-tool-option {
+    grid-template-columns: 17px minmax(0, 1fr);
+    align-items: center;
+    gap: 3px 11px;
+    min-height: 58px;
+    padding: 9px 10px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: var(--surface);
+    cursor: pointer;
+    transition: border-color var(--transition-fast),background-color var(--transition-fast),box-shadow var(--transition-fast);
+}
+
+.form-grid .agent-tool-option:hover {
+    border-color: color-mix(in srgb,var(--primary) 35%,var(--border));
+    background: color-mix(in srgb,var(--primary-soft) 32%,var(--surface));
+}
+
+.form-grid .agent-tool-option:has(input:checked) {
+    border-color: color-mix(in srgb,var(--primary) 62%,var(--border));
+    background: color-mix(in srgb,var(--primary-soft) 58%,var(--surface));
+    box-shadow: inset 3px 0 var(--primary);
+}
+
+.form-grid .agent-tool-option:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: .62;
+}
+
+.agent-tool-option input {
+    grid-row: 1 / 3;
+}
+
+.agent-tool-option span,
+.agent-tool-option small {
+    grid-column: 2;
+}
+
+.agent-tool-option span {
+    overflow: hidden;
+    font-size: .8rem;
+    font-weight: 700;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.agent-tool-option small {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: .7rem;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .agent-yaml-field .form-code-editor {
     box-sizing: border-box;
     width: 100%;
