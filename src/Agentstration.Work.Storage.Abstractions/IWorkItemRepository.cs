@@ -8,6 +8,7 @@ public enum WorkItemSortDirection { Ascending, Descending }
 
 public sealed record WorkItemQuery(
     WorkspaceId WorkspaceId,
+    Guid OwnerPrincipalId,
     int Skip = 0,
     int Take = 50,
     WorkItemStatus? Status = null,
@@ -36,15 +37,18 @@ public interface IWorkItemRepository
 {
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<StoredWorkItem> CreateAsync(WorkItem workItem, CancellationToken cancellationToken);
-    Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken);
+    Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkItemId id, CancellationToken cancellationToken);
+    Task<StoredWorkItem?> GetForExecutionAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken);
     Task<StoredWorkItem> SaveAsync(WorkItem workItem, long expectedVersion, CancellationToken cancellationToken);
     Task<WorkItemPage> QueryAsync(WorkItemQuery query, CancellationToken cancellationToken);
     Task<IReadOnlyDictionary<WorkTaskId, StoredWorkItem>> ListLatestContinuationsAsync(
         WorkspaceId workspaceId,
+        Guid ownerPrincipalId,
         IReadOnlyCollection<WorkTaskId> taskIds,
         CancellationToken cancellationToken);
     Task<DeletedWorkTask> DeleteTaskAsync(
         WorkspaceId workspaceId,
+        Guid ownerPrincipalId,
         WorkTaskId taskId,
         string expectedETag,
         CancellationToken cancellationToken);

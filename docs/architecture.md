@@ -252,6 +252,8 @@ The execution identifiers are intentionally not interchangeable:
 
 Correlation never transfers ownership. Work stores functional history and results, Flow stores orchestration history, and Runtime stores agent-invocation telemetry. A retry creates a new technical Run while preserving the functional task or conversation correlation when one exists.
 
+Within a Workspace, each durable conversation and WorkItem is owned by the authenticated principal captured from trusted server context. User-facing reads and mutations are scoped by both Workspace and owner, Tasks inherit the owner of their anchor WorkItem, and a conversation-backed WorkItem must retain the conversation owner. This user-data boundary is independent of Management resource scope and Entry visibility; public contracts expose neither an owner override nor an owner query filter. Internal execution and projection lookups remain explicit system paths. See ADR-0135.
+
 ### Declarative agent vertical
 
 ```text

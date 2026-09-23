@@ -50,7 +50,7 @@ public sealed class WorkItemService(
     internal Task<IReadOnlyDictionary<WorkTaskId, StoredWorkItem>> ListLatestContinuationsAsync(
         WorkspaceId workspaceId,
         IReadOnlyCollection<WorkTaskId> taskIds,
-        CancellationToken cancellationToken) => repository.ListLatestContinuationsAsync(workspaceId, taskIds, cancellationToken);
+        CancellationToken cancellationToken) => repository.ListLatestContinuationsAsync(workspaceId, CurrentExecutionScope().PrincipalId, taskIds, cancellationToken);
 
     public Task<StoredWorkItem> SubmitAsync(SubmitWorkItemCommand command, CancellationToken cancellationToken) =>
         SubmitAsync(command, null, cancellationToken);
@@ -63,14 +63,12 @@ public sealed class WorkItemService(
         ArgumentNullException.ThrowIfNull(command);
         using var activity = ActivitySource.StartActivity("work.submit");
         var now = timeProvider.GetUtcNow();
+        var executionScope = CurrentExecutionScope();
         var item = WorkItem.Create(
-            command.Id ?? WorkItemId.New(), command.WorkspaceId, command.Type, command.Instruction, now, command.Title, command.Description,
+            command.Id ?? WorkItemId.New(), command.WorkspaceId, executionScope.PrincipalId, command.Type, command.Instruction, now, command.Title, command.Description,
             command.RequesterIdentity, command.CorrelationId, command.Metadata, command.RequestedAgentId, command.Inputs, command.Attachments, command.Flow);
         activity?.SetTag("work.item.id", item.Id.ToString());
         activity?.SetTag("work.correlation.id", item.CorrelationId.ToString());
-        var executionScope = executionScopeAccessors.Select(accessor => accessor.Current).FirstOrDefault(scope => scope is not null);
-        if (executionScope is null)
-            throw new WorkValidationException("work_execution_scope_required", "Work execution requires an authenticated Workspace scope.");
         await repository.CreateAsync(item, cancellationToken);
 
         var accepted = await executionGateway.RequestExecutionAsync(new WorkExecutionRequest(
@@ -87,8 +85,15 @@ public sealed class WorkItemService(
         return stored;
     }
 
-    public Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken) => repository.GetAsync(workspaceId, id, cancellationToken);
-    public Task<WorkItemPage> QueryAsync(WorkItemQuery query, CancellationToken cancellationToken) => repository.QueryAsync(query, cancellationToken);
+    public Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken) =>
+        repository.GetAsync(workspaceId, CurrentExecutionScope().PrincipalId, id, cancellationToken);
+
+    public Task<WorkItemPage> QueryAsync(WorkItemQuery query, CancellationToken cancellationToken)
+    {
+        if (query.OwnerPrincipalId != CurrentExecutionScope().PrincipalId)
+            throw new WorkValidationException("work_owner_scope_mismatch", "Work queries must use the authenticated principal as owner.");
+        return repository.QueryAsync(query, cancellationToken);
+    }
 
     public async Task<StoredWorkItem> ApplyExecutionEventAsync(WorkExecutionEvent executionEvent, CancellationToken cancellationToken)
     {
@@ -97,7 +102,7 @@ public sealed class WorkItemService(
         activity?.SetTag("work.item.id", executionEvent.WorkItemId.ToString());
         activity?.SetTag("agentstration.workspace.id", executionEvent.WorkspaceId.ToString());
         activity?.SetTag("work.execution.id", executionEvent.ExecutionId.ToString());
-        var stored = await GetRequiredAsync(executionEvent.WorkspaceId, executionEvent.WorkItemId, cancellationToken);
+        var stored = await GetRequiredForExecutionAsync(executionEvent.WorkspaceId, executionEvent.WorkItemId, cancellationToken);
         if (stored.Value.WorkspaceId != executionEvent.WorkspaceId)
             throw new WorkTransitionException("workspace_mismatch", "The runtime event belongs to another workspace.");
         var expectedVersion = stored.Value.Version;
@@ -109,7 +114,7 @@ public sealed class WorkItemService(
         }
         catch (WorkItemConcurrencyException)
         {
-            var latest = await GetRequiredAsync(executionEvent.WorkspaceId, executionEvent.WorkItemId, cancellationToken);
+            var latest = await GetRequiredForExecutionAsync(executionEvent.WorkspaceId, executionEvent.WorkItemId, cancellationToken);
             if (latest.Value.History.Any(value => value.EventId == executionEvent.EventId)) return latest;
             throw;
         }
@@ -186,7 +191,14 @@ public sealed class WorkItemService(
     }
 
     private async Task<StoredWorkItem> GetRequiredAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken) =>
-        await repository.GetAsync(workspaceId, id, cancellationToken) ?? throw new KeyNotFoundException($"Work item '{id}' was not found in workspace '{workspaceId}'.");
+        await repository.GetAsync(workspaceId, CurrentExecutionScope().PrincipalId, id, cancellationToken) ?? throw new KeyNotFoundException($"Work item '{id}' was not found in workspace '{workspaceId}'.");
+
+    private async Task<StoredWorkItem> GetRequiredForExecutionAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken) =>
+        await repository.GetForExecutionAsync(workspaceId, id, cancellationToken) ?? throw new KeyNotFoundException($"Work item '{id}' was not found in workspace '{workspaceId}'.");
+
+    private FlowRunScope CurrentExecutionScope() =>
+        executionScopeAccessors.Select(accessor => accessor.Current).FirstOrDefault(scope => scope is not null)
+        ?? throw new WorkValidationException("work_execution_scope_required", "Work access requires an authenticated Workspace scope.");
 
     private async Task PublishAsync(WorkItem item, CancellationToken cancellationToken)
     {

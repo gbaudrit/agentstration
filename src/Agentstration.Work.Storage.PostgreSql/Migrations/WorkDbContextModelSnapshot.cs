@@ -124,6 +124,11 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                     b.Property<long>("LastActivityAt")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("OwnerPrincipalId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
                     b.Property<string>("Payload")
                         .IsRequired()
                         .HasColumnType("text");
@@ -144,7 +149,7 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("WorkspaceId", "LastActivityAt");
+                    b.HasIndex("WorkspaceId", "OwnerPrincipalId", "LastActivityAt");
 
                     b.ToTable("Interactions", "work");
                 });
@@ -232,6 +237,11 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)");
 
+                    b.Property<string>("OwnerPrincipalId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
                     b.Property<string>("Payload")
                         .IsRequired()
                         .HasColumnType("text");
@@ -286,6 +296,8 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                     b.HasIndex("WorkspaceId", "AnchorTaskId", "UpdatedAt");
 
                     b.HasIndex("WorkspaceId", "InteractionId", "UpdatedAt");
+
+                    b.HasIndex("WorkspaceId", "OwnerPrincipalId", "UpdatedAt");
 
                     b.HasIndex("WorkspaceId", "Status", "UpdatedAt");
 

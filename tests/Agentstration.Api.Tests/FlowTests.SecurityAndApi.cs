@@ -332,7 +332,7 @@ public sealed partial class FlowTests
 
         var workspace = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         var work = factory.Services.GetRequiredService<IWorkItemRepository>();
-        Assert.HasCount(1, (await work.QueryAsync(new WorkItemQuery(new WorkspaceId(workspace.WorkspaceId), Type: "flow-api"), default)).Items);
+        Assert.HasCount(1, (await work.QueryAsync(new WorkItemQuery(new WorkspaceId(workspace.WorkspaceId), workspace.PrincipalId, Type: "flow-api"), default)).Items);
 
         using var conflictingRequest = Request(2);
         using var conflict = await client.SendAsync(conflictingRequest);

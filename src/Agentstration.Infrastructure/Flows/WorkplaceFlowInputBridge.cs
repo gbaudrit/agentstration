@@ -32,7 +32,7 @@ public sealed class WorkplaceFlowInputProjectionSink(
         try
         {
             var workspaceId = run.WorkspaceId;
-            var interaction = await repository.GetInteractionAsync(workspaceId, new(interactionId), cancellationToken);
+            var interaction = await repository.GetInteractionForProjectionAsync(workspaceId, new(interactionId), cancellationToken);
             if (interaction is null) return;
 
             var actionId = new PendingActionId(DeterministicGuid(request.Id));

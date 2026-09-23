@@ -16,6 +16,7 @@ public sealed class WorkItem
     {
         Id = snapshot.Id;
         WorkspaceId = snapshot.WorkspaceId;
+        OwnerPrincipalId = snapshot.OwnerPrincipalId;
         Type = snapshot.Type;
         Title = snapshot.Title;
         Instruction = snapshot.Instruction;
@@ -43,6 +44,7 @@ public sealed class WorkItem
 
     public WorkItemId Id { get; }
     public WorkspaceId WorkspaceId { get; }
+    public Guid OwnerPrincipalId { get; }
     public string Type { get; }
     public string? Title { get; }
     public string Instruction { get; }
@@ -69,6 +71,7 @@ public sealed class WorkItem
     public static WorkItem Create(
         WorkItemId id,
         WorkspaceId workspaceId,
+        Guid ownerPrincipalId,
         string type,
         string instruction,
         DateTimeOffset now,
@@ -84,6 +87,7 @@ public sealed class WorkItem
     {
         if (id.Value == Guid.Empty) throw new WorkValidationException("workitem_id_required", "A work item identifier is required.");
         if (workspaceId.Value == Guid.Empty) throw new WorkValidationException("workspace_id_required", "A workspace identifier is required.");
+        if (ownerPrincipalId == Guid.Empty) throw new WorkValidationException("owner_principal_id_required", "An owner principal identifier is required.");
         if (string.IsNullOrWhiteSpace(type)) throw new WorkValidationException("workitem_type_required", "A work item type is required.");
         if (string.IsNullOrWhiteSpace(instruction)) throw new WorkValidationException("workitem_instruction_required", "A work item instruction is required.");
         if (instruction.Length > 100_000) throw new WorkValidationException("workitem_instruction_too_long", "The work item instruction cannot exceed 100000 characters.");
@@ -93,6 +97,7 @@ public sealed class WorkItem
         return new WorkItem(new WorkItemSnapshot(
             id,
             workspaceId,
+            ownerPrincipalId,
             type.Trim(),
             Normalize(title),
             instruction.Trim(),
@@ -120,7 +125,7 @@ public sealed class WorkItem
     public static WorkItem Restore(WorkItemSnapshot snapshot) => new(snapshot);
 
     public WorkItemSnapshot ToSnapshot() => new(
-        Id, WorkspaceId, Type, Title, Instruction, Description, Status, CreatedAt, UpdatedAt, RequesterIdentity, CorrelationId,
+        Id, WorkspaceId, OwnerPrincipalId, Type, Title, Instruction, Description, Status, CreatedAt, UpdatedAt, RequesterIdentity, CorrelationId,
         Metadata, RequestedAgentId, Flow, SelectedAgentId, CurrentExecutionId, [.. _inputs], [.. _attachments], [.. _messages],
         [.. _interactions], [.. _history], Result, Error, Version);
 
