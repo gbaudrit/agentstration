@@ -1,8 +1,8 @@
+using Agentstration.Web.Components;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
-using Agentstration.Web.Components;
 
 namespace Agentstration.Console.Components.Tests;
 
