@@ -2,4 +2,7 @@
 .contextual-binding-target > label { display: grid; gap: 6px; }
 .contextual-binding-target > button { justify-self: start; }
 .model-discovery-actions { display: flex; align-items: center; gap: 10px; }
-@media (max-width: 680px) { .model-discovery-actions { align-items: stretch; flex-direction: column; } }
+.model-provider-tabs { margin-bottom: 18px; }
+.model-provider-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 18px; }
+@media (max-width: 960px) { .model-provider-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) { .model-discovery-actions { align-items: stretch; flex-direction: column; } .model-provider-summary { grid-template-columns: 1fr; } }

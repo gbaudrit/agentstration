@@ -19,6 +19,16 @@ else
 {
     @if (error is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>@T("ProviderError")</strong><span>@error.Message</span></div> }
     @if (usages.Count > 0) { <div class="form-alert form-alert-warning">@T("ProviderReferencedBy", ProfileCount(usages.Count))</div> }
+    @if (!IsNew)
+    {
+        <nav class="section-tabs model-provider-tabs" role="tablist" aria-label="@T("ModelProvider")">
+            <button id="model-provider-overview-tab" type="button" role="tab" aria-selected="@(activeTab == ProviderTab.Overview ? "true" : "false")" aria-controls="model-provider-tab-panel" class="@(activeTab == ProviderTab.Overview ? "active" : null)" @onclick="() => activeTab = ProviderTab.Overview">@T("Tab.Overview")</button>
+            <button id="model-provider-configuration-tab" type="button" role="tab" aria-selected="@(activeTab == ProviderTab.Configuration ? "true" : "false")" aria-controls="model-provider-tab-panel" class="@(activeTab == ProviderTab.Configuration ? "active" : null)" @onclick="() => activeTab = ProviderTab.Configuration">@T("Tab.Configuration")</button>
+        </nav>
+    }
+    <div id="model-provider-tab-panel" role="tabpanel" aria-labelledby="@(activeTab == ProviderTab.Configuration ? "model-provider-configuration-tab" : "model-provider-overview-tab")">
+    @if (IsNew || activeTab == ProviderTab.Configuration)
+    {
     <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-provider-editor" class="resource-form" data-testid="model-provider-form" data-interactive="@(interactive ? "true" : "false")" data-resource-etag="@etag">
         <DataAnnotationsValidator /><ValidationSummary />
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ProviderResource")</h2></div>@if (status is not null) { <StatusBadge Text="@StatusLabel(status.Status)" Status="@ModelManagementUi.Status(status.Status)" /> }</div><div class="form-grid">
@@ -54,9 +64,16 @@ else
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Connection")</p><h2>@T("ExtensionOwnedEndpoint")</h2><p>@T("ConnectionHelp")</p></div>@if (!IsNew) { <button class="button-secondary" type="button" @onclick="TestAsync" disabled="@testing" data-testid="model-provider-test">@(testing ? T("Testing") : T("TestConnection"))</button> }</div>@if (SelectedExtension is { } selected) { <dl class="resource-details"><dt>@T("AepEndpoint")</dt><dd><code>@selected.Endpoint</code></dd><dt>@T("ExtensionId")</dt><dd><code>@(selected.Extension?.Id ?? T("NotObserved"))</code></dd><dt>@T("Source")</dt><dd>@selected.DiscoverySource</dd></dl> }@if (status is not null) { <p class="@(status.Status == "available" ? "inline-info" : "inline-warning")" data-testid="model-provider-status" data-checked-at="@status.CheckedAt.ToString("O")">@T("LastTest", status.CheckedAt.ToLocalTime().ToString("g")) : @StatusLabel(status.Status)@if (!string.IsNullOrWhiteSpace(status.Details)) { <span> — @status.Details</span> }</p> }</section>
         <div class="form-actions"><a class="button-secondary" href="/modelproviders">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving" data-testid="model-provider-save">@(saving ? T("Saving") : IsNew ? T("CreateProviderAction") : T("SaveChanges"))</button></div>
     </EditForm>
+    }
 
-    @if (!IsNew)
+    @if (!IsNew && activeTab == ProviderTab.Overview)
     {
+        <section class="metric-grid model-provider-summary" aria-label="@T("ProviderSummary")">
+            <MetricCard Label="@T("Status")" Value="@(status is null ? T("Status.Unknown") : StatusLabel(status.Status))" Detail="@(status is null ? T("NotObserved") : T("LastTest", status.CheckedAt.ToLocalTime().ToString("g")))" Status="@(status is null ? UiStatus.Neutral : ModelManagementUi.Status(status.Status))" />
+            <MetricCard Label="@T("AvailableModels")" Value="@ModelCount(models.Count)" Detail="@T("Discovery")" Status="@(models.Count > 0 ? UiStatus.Success : UiStatus.Neutral)" />
+            <MetricCard Label="@T("ModelProfileUsages")" Value="@ProfileCount(usages.Count)" Detail="@T("UsagesHelp")" Status="@(usages.Count > 0 ? UiStatus.Info : UiStatus.Neutral)" />
+            <MetricCard Label="@T("ModelProviderContribution")" Value="@model.ContributionId" Detail="@model.ExtensionId" Status="UiStatus.Info" />
+        </section>
         <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">@T("Discovery")</p><h2>@T("AvailableModels")</h2></div><div class="model-discovery-actions"><span>@ModelCount(models.Count)</span><button class="button-secondary" type="button" @onclick="RefreshModelsAsync" disabled="@refreshing" data-testid="model-provider-refresh">@(refreshing ? T("RefreshingModels") : T("RefreshModels"))</button></div></div>
             @if (modelsError is not null) { <div class="form-alert form-alert-warning">@modelsError</div> }
             @if (discoveryResult is not null) { <div class="form-alert form-alert-success" role="status" data-testid="model-discovery-result">@DiscoverySummary(discoveryResult)</div> }
@@ -65,6 +82,7 @@ else
         </section>
         @if (usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>@T("ModelProfileUsages")</h2><span>@usages.Count</span></div><ul class="resource-links">@foreach (var usage in usages) { <li><a href="@ProfileUrl(usage)"><strong>@usage.DisplayName</strong><code>@usage.Name</code></a></li> }</ul></section> }
     }
+    </div>
 }
 
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" TestId="model-provider-delete-dialog" />
@@ -91,6 +109,7 @@ else
     private ResourceScopeRef? selectedScope;
     private bool interactive;
     private bool persisted;
+    private ProviderTab activeTab;
     private bool IsNew => !persisted;
     private ExtensionResponse? SelectedExtension => model is null ? null : extensions.SingleOrDefault(value => ExtensionKey(value) == model.ExtensionId);
     private IReadOnlyList<ExtensionContributionResponse> Contributions => SelectedExtension?.Contributions.Where(value => value.Kind == "model-provider").ToArray() ?? [];
@@ -265,5 +284,6 @@ else
     }
     private static string DetailsUrl(ResourceNamespace @namespace, string name) => $"/modelproviders/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}";
     private static string ExtensionKey(ExtensionResponse extension) => $"{extension.RegistrationNamespace}:{extension.RegistrationName}";
+    private enum ProviderTab { Overview, Configuration }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

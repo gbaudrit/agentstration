@@ -132,7 +132,7 @@ public sealed class ModelDetailsTests
         await rendered.Find("[data-testid='edit-model-override']").ClickAsync(new());
         var tools = rendered.FindAll(".model-feature-editor-grid > article")
             .Single(element => string.Equals(element.QuerySelector("h4")?.TextContent.Trim(), "Tools", StringComparison.Ordinal));
-        Assert.AreEqual(3, tools.QuerySelectorAll(".model-override-control strong").Count(value => string.Equals(value.TextContent.Trim(), "Not specified", StringComparison.Ordinal)));
+        Assert.AreEqual(3, tools.QuerySelectorAll(".model-discovery-state").Count(value => string.Equals(value.TextContent.Trim(), "Not specified", StringComparison.Ordinal)));
         await tools.QuerySelectorAll("select")[1].ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = ModelOverrideOperation.Add.ToString() });
 
         tools = rendered.FindAll(".model-feature-editor-grid > article")

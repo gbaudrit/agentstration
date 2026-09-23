@@ -48,8 +48,14 @@ public sealed class ModelProviderNavigationTests
             Assert.AreEqual(
                 "/models/ollama-local.qwen3-deadbeef?namespace=shared.models",
                 rendered.Find("[data-testid='open-model-details']").GetAttribute("href"));
+            CollectionAssert.AreEqual(new[] { "Overview", "Configuration" }, rendered.FindAll("[role='tab']").Select(item => item.TextContent.Trim()).ToArray());
+            Assert.IsFalse(rendered.Markup.Contains("data-testid=\"model-provider-form\"", StringComparison.Ordinal));
         });
 
+        rendered.Find("#model-provider-configuration-tab").Click();
+        Assert.IsNotNull(rendered.Find("[data-testid='model-provider-form']"));
+        Assert.IsFalse(rendered.Markup.Contains("data-testid=\"model-provider-refresh\"", StringComparison.Ordinal));
+        rendered.Find("#model-provider-overview-tab").Click();
         rendered.Find("[data-testid='model-provider-refresh']").Click();
 
         rendered.WaitForAssertion(() =>

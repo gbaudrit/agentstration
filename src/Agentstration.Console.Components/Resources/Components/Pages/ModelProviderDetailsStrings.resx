@@ -5,6 +5,10 @@
   <data name="CreateProvider"><value>Create model provider</value></data>
   <data name="ModelProvider"><value>Model provider</value></data>
   <data name="Description"><value>Bind an AEP extension contribution to a governed Model Provider resource.</value></data>
+  <data name="Tab.Overview"><value>Overview</value></data>
+  <data name="Tab.Configuration"><value>Configuration</value></data>
+  <data name="ProviderSummary"><value>Model provider summary</value></data>
+  <data name="UsagesHelp"><value>Profiles currently bound to this provider</value></data>
   <data name="Delete"><value>Delete</value></data>
   <data name="CreateModelProfile"><value>Create model profile</value></data>
   <data name="Back"><value>Back</value></data>

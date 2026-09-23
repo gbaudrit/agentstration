@@ -5,6 +5,10 @@
   <data name="CreateProvider"><value>Créer un fournisseur de modèles</value></data>
   <data name="ModelProvider"><value>Fournisseur de modèles</value></data>
   <data name="Description"><value>Liez une contribution d’extension AEP à une ressource gouvernée de fournisseur de modèles.</value></data>
+  <data name="Tab.Overview"><value>Vue d’ensemble</value></data>
+  <data name="Tab.Configuration"><value>Configuration</value></data>
+  <data name="ProviderSummary"><value>Synthèse du fournisseur de modèles</value></data>
+  <data name="UsagesHelp"><value>Profils actuellement liés à ce fournisseur</value></data>
   <data name="Delete"><value>Supprimer</value></data>
   <data name="CreateModelProfile"><value>Créer un profil de modèle</value></data>
   <data name="Back"><value>Retour</value></data>
