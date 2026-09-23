@@ -256,6 +256,27 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task ModelProvidersClientRefreshesExactNamespacedProvider()
+    {
+        string? path = null;
+        HttpMethod? method = null;
+        var expected = new ModelDiscoveryDiffResponse(2, 1, 3, 1, 0, 7);
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            path = request.RequestUri!.PathAndQuery;
+            method = request.Method;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(expected) };
+        })) { BaseAddress = new Uri("http://localhost/") };
+
+        var result = await new ModelProvidersApiClient(httpClient).RefreshProviderModelsAsync(
+            new ResourceNamespace("shared.models"), "ollama/local", default);
+
+        Assert.AreEqual(HttpMethod.Post, method);
+        Assert.AreEqual("/api/modelproviders/ollama%2Flocal/models/refresh?resourceNamespace=shared.models", path);
+        Assert.AreEqual(expected, result);
+    }
+
+    [TestMethod]
     public async Task ModelsClientReadsExactNamespacedResourceAndPreservesEtag()
     {
         var resource = new ModelResource

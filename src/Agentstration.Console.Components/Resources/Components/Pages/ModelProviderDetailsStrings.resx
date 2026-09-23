@@ -38,10 +38,16 @@
   <data name="SaveChanges"><value>Save changes</value></data>
   <data name="Discovery"><value>Discovery</value></data>
   <data name="AvailableModels"><value>Available models</value></data>
+  <data name="RefreshModels"><value>Refresh models</value></data>
+  <data name="RefreshingModels"><value>Refreshing…</value></data>
+  <data name="DiscoverySummary"><value>{0} created · {1} updated · {2} unchanged · {3} missing · {4} reappeared · {5} total</value></data>
+  <data name="InitialDiscoveryComplete"><value>Initial model discovery complete</value></data>
+  <data name="InitialDiscoveryFailed"><value>Provider created; initial discovery failed</value></data>
+  <data name="DiscoveryRefreshed"><value>Model discovery refreshed</value></data>
   <data name="ModelCount.One"><value>{0} model</value></data>
   <data name="ModelCount.Many"><value>{0} models</value></data>
   <data name="NoModelsDiscovered"><value>No models discovered</value></data>
-  <data name="NoModelsMessage"><value>Test the endpoint and verify that the provider has a model available.</value></data>
+  <data name="NoModelsMessage"><value>Refresh discovery and verify that the provider has an installed model available.</value></data>
   <data name="Model"><value>Model</value></data>
   <data name="Actions"><value>Actions</value></data>
   <data name="CreateProfileForModel"><value>Create profile</value></data>
