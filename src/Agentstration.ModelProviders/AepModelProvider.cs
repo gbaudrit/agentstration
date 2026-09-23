@@ -36,7 +36,8 @@ public sealed class AepModelProvider(
             client.CreateModelProvider(provider.ContributionId),
             deployment.ModelName,
             nativeOptions is null ? null : Map(nativeOptions),
-            token => IssueBoundValuesAsync(provider, deployment, client, null, token));
+            token => IssueBoundValuesAsync(provider, deployment, client, null, token),
+            deployment.EffectiveSpecification is null ? null : Map(deployment.EffectiveSpecification));
     }
 
     private async Task<AepBoundValuesLease> IssueBoundValuesAsync(
@@ -502,11 +503,60 @@ public sealed class AepModelProvider(
         }
     };
 
+    private static AepModelSpecification Map(ModelSpecification specification) => new()
+    {
+        Input = specification.Input?.Select(Map).ToArray(),
+        Output = specification.Output?.Select(Map).ToArray(),
+        Features = new AepModelFeatureSpecifications
+        {
+            Streaming = specification.Features.Streaming is { } streaming
+                ? new AepModelStreamingFeatureSpecification { Support = Map(streaming.Support) } : null,
+            Tools = specification.Features.Tools is { } tools
+                ? new AepModelToolsFeatureSpecification
+                {
+                    Support = Map(tools.Support),
+                    Modes = tools.Modes.ToDictionary(value => Map(value.Key), _ => new AepModelToolModeSpecification())
+                } : null,
+            StructuredOutput = specification.Features.StructuredOutput is { } structured
+                ? new AepModelStructuredOutputFeatureSpecification
+                {
+                    Support = Map(structured.Support),
+                    Formats = structured.Formats.ToDictionary(
+                        value => Map(value.Key),
+                        value => new AepModelStructuredOutputFormatSpecification
+                        {
+                            SupportsStrict = value.Value.SupportsStrict
+                        })
+                } : null,
+            Reasoning = specification.Features.Reasoning is { } reasoning
+                ? new AepModelReasoningFeatureSpecification
+                {
+                    Support = Map(reasoning.Support),
+                    Efforts = reasoning.Efforts.ToDictionary(
+                        value => Map(value.Key),
+                        _ => new AepModelReasoningEffortSpecification())
+                } : null
+        },
+        Limits = new AepModelLimits
+        {
+            ContextTokens = specification.Limits.ContextTokens,
+            MaxOutputTokens = specification.Limits.MaxOutputTokens
+        }
+    };
+
     private static ModelContentType Map(AepModelContentType value) => value switch
     {
         AepModelContentType.Text => ModelContentType.Text,
         AepModelContentType.Image => ModelContentType.Image,
         AepModelContentType.Audio => ModelContentType.Audio,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static AepModelContentType Map(ModelContentType value) => value switch
+    {
+        ModelContentType.Text => AepModelContentType.Text,
+        ModelContentType.Image => AepModelContentType.Image,
+        ModelContentType.Audio => AepModelContentType.Audio,
         _ => throw new ArgumentOutOfRangeException(nameof(value))
     };
 
@@ -520,10 +570,27 @@ public sealed class AepModelProvider(
         _ => throw new ArgumentOutOfRangeException(nameof(value))
     };
 
+    private static AepModelFeatureSupport Map(ModelFeatureSupport value) => value switch
+    {
+        ModelFeatureSupport.Unknown => AepModelFeatureSupport.Unknown,
+        ModelFeatureSupport.Unsupported => AepModelFeatureSupport.Unsupported,
+        ModelFeatureSupport.Native => AepModelFeatureSupport.Native,
+        ModelFeatureSupport.Emulated => AepModelFeatureSupport.Emulated,
+        ModelFeatureSupport.Partial => AepModelFeatureSupport.Partial,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
     private static ModelToolMode Map(AepModelToolMode value) => value switch
     {
         AepModelToolMode.Function => ModelToolMode.Function,
         AepModelToolMode.Parallel => ModelToolMode.Parallel,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static AepModelToolMode Map(ModelToolMode value) => value switch
+    {
+        ModelToolMode.Function => AepModelToolMode.Function,
+        ModelToolMode.Parallel => AepModelToolMode.Parallel,
         _ => throw new ArgumentOutOfRangeException(nameof(value))
     };
 
@@ -534,12 +601,28 @@ public sealed class AepModelProvider(
         _ => throw new ArgumentOutOfRangeException(nameof(value))
     };
 
+    private static AepModelStructuredOutputFormat Map(ModelStructuredOutputFormat value) => value switch
+    {
+        ModelStructuredOutputFormat.JsonObject => AepModelStructuredOutputFormat.JsonObject,
+        ModelStructuredOutputFormat.JsonSchema => AepModelStructuredOutputFormat.JsonSchema,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
     private static Agentstration.Models.ReasoningEffort Map(AepModelReasoningEffort value) => value switch
     {
         AepModelReasoningEffort.Minimal => Agentstration.Models.ReasoningEffort.Minimal,
         AepModelReasoningEffort.Low => Agentstration.Models.ReasoningEffort.Low,
         AepModelReasoningEffort.Medium => Agentstration.Models.ReasoningEffort.Medium,
         AepModelReasoningEffort.High => Agentstration.Models.ReasoningEffort.High,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static AepModelReasoningEffort Map(Agentstration.Models.ReasoningEffort value) => value switch
+    {
+        Agentstration.Models.ReasoningEffort.Minimal => AepModelReasoningEffort.Minimal,
+        Agentstration.Models.ReasoningEffort.Low => AepModelReasoningEffort.Low,
+        Agentstration.Models.ReasoningEffort.Medium => AepModelReasoningEffort.Medium,
+        Agentstration.Models.ReasoningEffort.High => AepModelReasoningEffort.High,
         _ => throw new ArgumentOutOfRangeException(nameof(value))
     };
 }

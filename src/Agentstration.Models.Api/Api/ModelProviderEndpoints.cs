@@ -98,15 +98,19 @@ internal sealed class TestModelProviderEndpoint : IModelManagementEndpoint
 internal sealed class ListProviderModelsEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}/models", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelDiscoveryService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelsApiHttp.ExecuteAsync(async () =>
         {
-            var models = await service.ListProviderModelsAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken);
-            return Results.Ok(new ValueResponse<AvailableModelResponse>(models.Select(stored =>
-            {
-                var model = ModelDiscoveryService.ToDiscoveredModel(stored.Value);
-                return new AvailableModelResponse(model.Name, model.DisplayName, model.Status, model.Specification, model.Identity);
-            }).ToArray()));
+            var models = await service.ListModelsAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken);
+            return Results.Ok(new ValueResponse<AvailableModelResponse>(models.Select(model =>
+                new AvailableModelResponse(
+                    model.Name,
+                    model.DisplayName,
+                    model.Status,
+                    model.Specification,
+                    model.Identity,
+                    model.ObservedSpecification,
+                    model.SpecificationOverride)).ToArray()));
         });
 }
 

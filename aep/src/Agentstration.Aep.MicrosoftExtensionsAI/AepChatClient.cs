@@ -10,7 +10,8 @@ public sealed class AepChatClient(
     AepModelProviderClient provider,
     string model,
     AepVersionedOptions? nativeOptions = null,
-    Func<CancellationToken, Task<AepBoundValuesLease>>? boundValues = null) : IChatClient
+    Func<CancellationToken, Task<AepBoundValuesLease>>? boundValues = null,
+    AepModelSpecification? effectiveSpecification = null) : IChatClient
 {
     public async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
@@ -101,7 +102,8 @@ public sealed class AepChatClient(
                 NativeOptions = nativeOptions,
                 AdditionalOptions = additional
             },
-            tools);
+            tools,
+            EffectiveSpecification: effectiveSpecification);
     }
 
     private static JsonElement? MapResponseFormat(ChatResponseFormat? format, bool strict)

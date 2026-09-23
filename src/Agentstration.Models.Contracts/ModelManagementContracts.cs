@@ -28,7 +28,9 @@ public sealed record AvailableModelResponse(
     string DisplayName,
     string Status,
     ModelSpecification Specification,
-    ModelIdentity? Identity = null);
+    ModelIdentity? Identity = null,
+    ModelSpecification? ObservedSpecification = null,
+    ModelSpecificationOverride? SpecificationOverride = null);
 
 public sealed record ModelDiscoveryDiffResponse(
     int Created,
@@ -64,7 +66,12 @@ public sealed record CreateModelProfileRequest(
 public sealed record PutModelProfileRequest(ModelProfileProperties Properties);
 
 public sealed record ModelProviderReferenceResponse(string ResourceId, string Name, string? DisplayName = null, string? ContributionId = null, string? Status = null, string Namespace = "default");
-public sealed record ModelReferenceResponse(string Name, string? Status = null, ModelSpecification? Specification = null);
+public sealed record ModelReferenceResponse(
+    string Name,
+    string? Status = null,
+    ModelSpecification? Specification = null,
+    ModelSpecification? ObservedSpecification = null,
+    ModelSpecificationOverride? SpecificationOverride = null);
 
 public sealed record ModelProfileSummaryPropertiesResponse(
     string DisplayName,

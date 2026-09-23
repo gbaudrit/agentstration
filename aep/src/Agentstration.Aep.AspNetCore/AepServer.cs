@@ -516,6 +516,7 @@ public static class AepServerExtensions
         if (provider is null) return Error(StatusCodes.Status404NotFound, "provider_unavailable", $"Model provider '{providerId}' is not registered.");
         try
         {
+            ValidateEffectiveSpecification(request.EffectiveSpecification);
             ValidateNativeOptions(providerId, request.Options?.NativeOptions, options.Value.OptionSets);
             ValidateBoundValues(providerId, request.BoundValues, options.Value.ValueRequirements.ToArray());
             return Results.Json(await provider.ChatAsync(request, cancellationToken), AepProtocol.JsonOptions);
@@ -540,6 +541,7 @@ public static class AepServerExtensions
         }
         try
         {
+            ValidateEffectiveSpecification(request.EffectiveSpecification);
             ValidateNativeOptions(providerId, request.Options?.NativeOptions, options.Value.OptionSets);
             ValidateBoundValues(providerId, request.BoundValues, options.Value.ValueRequirements.ToArray());
         }
@@ -564,6 +566,12 @@ public static class AepServerExtensions
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    private static void ValidateEffectiveSpecification(AepModelSpecification? specification)
+    {
+        if (AepModelObservationValidator.FindSpecificationIssue(specification) is { } issue)
+            throw new AepServerException("effective_model_specification_invalid", issue, StatusCodes.Status422UnprocessableEntity);
     }
 
     private static IAepModelProvider? Find(IEnumerable<IAepModelProvider> providers, string id) =>

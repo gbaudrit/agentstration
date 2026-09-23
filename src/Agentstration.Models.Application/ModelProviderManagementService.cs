@@ -107,7 +107,9 @@ public sealed class ModelProviderManagementService(
         var provider = await GetAsync(@namespace, name, cancellationToken)
             ?? throw new ModelProviderResourceNotFoundException(name);
         return (await ListModelResourcesAsync(provider.Value, cancellationToken))
-            .Select(value => ModelDiscoveryService.ToDiscoveredModel(value.Value))
+            .Select(value => ModelDiscoveryService.ToDiscoveredModel(
+                value.Value,
+                provider.Value.Definition.SpecificationOverrides.GetValueOrDefault(value.Value.Definition.ExternalId)))
             .ToArray();
     }
 
@@ -153,7 +155,9 @@ public sealed class ModelProviderManagementService(
         IReadOnlyList<DiscoveredModel> models = [];
         if (includeModels)
             models = (await ListModelResourcesAsync(provider, cancellationToken))
-                .Select(value => ModelDiscoveryService.ToDiscoveredModel(value.Value))
+                .Select(value => ModelDiscoveryService.ToDiscoveredModel(
+                    value.Value,
+                    provider.SpecificationOverrides.GetValueOrDefault(value.Value.Definition.ExternalId)))
                 .ToArray();
         return new(provider, health, models, timeProvider.GetUtcNow());
     }
@@ -225,6 +229,8 @@ public sealed class ModelProviderManagementService(
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.ContributionId);
         if (definition.ValueBindings is null)
             throw new ModelProviderValidationException("Value Bindings must be an array.");
+        if (definition.SpecificationOverrides is null)
+            throw new ModelProviderValidationException("Specification overrides must be an object.");
         var extensionAddress = definition.Extension.Resolve(ownerNamespace, ExtensionKinds.ExtensionRegistration);
         var extension = await references.ResolveAsync<ExtensionRegistrationResource>(definition.Extension, ownerNamespace,
             ExtensionKinds.ExtensionRegistration, ownerScopeRef, cancellationToken);
@@ -234,13 +240,74 @@ public sealed class ModelProviderManagementService(
             throw new ModelProviderValidationException("The AEP model-provider adapter is not registered in this host.");
         await ValidateValueBindingsAsync(ownerNamespace, ownerName, ownerScopeRef, definition, extension.Value,
             plannedParameters, cancellationToken);
+        await ValidateSpecificationOverridesAsync(
+            ownerNamespace, ownerName, ownerScopeRef, definition.SpecificationOverrides, cancellationToken);
         return definition with
         {
             DisplayName = definition.DisplayName.Trim(),
             ContributionId = definition.ContributionId.Trim(),
-            ValueBindings = definition.ValueBindings.ToArray()
+            ValueBindings = definition.ValueBindings.ToArray(),
+            SpecificationOverrides = new Dictionary<string, ModelSpecificationOverride>(
+                definition.SpecificationOverrides,
+                StringComparer.Ordinal)
         };
     }
+
+    private async Task ValidateSpecificationOverridesAsync(
+        ResourceNamespace ownerNamespace,
+        string ownerName,
+        ResourceScopeRef ownerScopeRef,
+        IReadOnlyDictionary<string, ModelSpecificationOverride> overrides,
+        CancellationToken cancellationToken)
+    {
+        if (overrides.Count > ModelDiscoveryService.MaximumModels)
+            throw new ModelProviderValidationException(
+                $"A Model Provider cannot define more than {ModelDiscoveryService.MaximumModels} specification overrides.");
+
+        var models = (await store.ListExactAsync<ModelResource>(
+                ownerScopeRef,
+                ModelResourceKinds.Model,
+                0,
+                ModelDiscoveryService.MaximumModels,
+                cancellationToken))
+            .Where(value => value.Value.Namespace == ownerNamespace
+                && value.Value.Definition.Provider.Name == ownerName)
+            .ToDictionary(value => value.Value.Definition.ExternalId, StringComparer.Ordinal);
+
+        foreach (var (externalId, specificationOverride) in overrides)
+        {
+            if (string.IsNullOrWhiteSpace(externalId) || externalId.Length > 256)
+                throw new ModelProviderValidationException(
+                    "A specification override key must be an exact discovered model identifier containing between 1 and 256 characters.");
+            if (specificationOverride is null)
+                throw new ModelProviderValidationException($"Specification override for model '{externalId}' cannot be null.");
+            if (!models.TryGetValue(externalId, out var model))
+                throw new ModelProviderValidationException(
+                    $"Specification override target '{externalId}' is not a discovered Model owned by this Model Provider.");
+            if (IsEmpty(specificationOverride))
+                throw new ModelProviderValidationException(
+                    $"Specification override for model '{externalId}' must contain at least one explicit value.");
+            try
+            {
+                _ = EffectiveModelSpecificationResolver.Resolve(model.Value.Definition.Specification, specificationOverride);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new ModelProviderValidationException(
+                    $"Specification override for model '{externalId}' is invalid: {exception.Message}");
+            }
+        }
+    }
+
+    private static bool IsEmpty(ModelSpecificationOverride value) =>
+        value.Input is null
+        && value.Output is null
+        && value.Features.Streaming is null
+        && value.Features.Tools is null
+        && value.Features.StructuredOutput is null
+        && value.Features.Reasoning is null
+        && value.Limits.ContextTokens is null
+        && value.Limits.MaxOutputTokens is null;
 
     private async Task ValidateValueBindingsAsync(
         ResourceNamespace ownerNamespace,
@@ -344,7 +411,8 @@ public sealed class ModelProviderManagementService(
             ExtensionScopeRef = extension.Value.ScopeRef,
             AuthenticationMode = extension.Value.Definition.AuthenticationMode,
             Credential = extension.Value.Definition.Credential,
-            ValueBindings = resource.Definition.ValueBindings
+            ValueBindings = resource.Definition.ValueBindings,
+            SpecificationOverrides = resource.Definition.SpecificationOverrides
         };
     }
 

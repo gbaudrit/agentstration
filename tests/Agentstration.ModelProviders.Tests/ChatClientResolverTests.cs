@@ -81,6 +81,37 @@ public sealed class ChatClientResolverTests
     }
 
     [TestMethod]
+    public async Task ResolverUsesGovernedEffectiveModelSpecificationForRuntimeCapabilities()
+    {
+        using var chatClient = new StubChatClient();
+        var resolver = new ChatClientResolver(
+            new StubProfileStore(),
+            new StubDeploymentStore(effectiveSpecification: new ModelSpecification
+            {
+                Features = new ModelFeatureSpecifications
+                {
+                    Tools = new() { Support = ModelFeatureSupport.Unsupported },
+                    StructuredOutput = new() { Support = ModelFeatureSupport.Native }
+                }
+            }),
+            new StubProviderStore(),
+            new ModelProviderResolver([new RecordingProvider(chatClient)]),
+            new GenAiObservabilityOptions { Enabled = false },
+            NullLoggerFactory.Instance,
+            NullLogger<ChatClientResolver>.Instance,
+            [new RecordingCapabilitiesResolver()]);
+
+        using var resolved = await resolver.ResolveAsync(ProfileId);
+        var metadata = resolved.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
+
+        Assert.IsNotNull(metadata);
+        Assert.AreEqual(CapabilitySupport.Unsupported, metadata.ModelCapabilities?.Tools.Support);
+        Assert.AreEqual(CapabilitySupport.Native, metadata.ModelCapabilities?.StructuredOutput.Support);
+        Assert.AreEqual(CapabilitySupport.Unsupported, metadata.ProviderCapabilities?.StructuredOutput.Support);
+        Assert.AreEqual(CapabilitySupport.Unsupported, metadata.AdapterCapabilities?.StructuredOutput.Support);
+    }
+
+    [TestMethod]
     public async Task UnknownProfileIsExplicit()
     {
         var store = new StubProfileStore(configured: false);
@@ -172,7 +203,10 @@ public sealed class ChatClientResolverTests
         }
     }
 
-    private sealed class StubDeploymentStore(bool configured = true, ResourceNamespace? providerNamespace = null) : IModelDeploymentStore
+    private sealed class StubDeploymentStore(
+        bool configured = true,
+        ResourceNamespace? providerNamespace = null,
+        ModelSpecification? effectiveSpecification = null) : IModelDeploymentStore
     {
         public ResourceNamespace? RequestedNamespace { get; private set; }
 
@@ -189,7 +223,8 @@ public sealed class ChatClientResolverTests
                     Name = ProfileId,
                     ProviderName = ProviderId,
                     ProviderNamespace = providerNamespace ?? ResourceNamespace.Default,
-                    ModelName = "qwen3:1.7b"
+                    ModelName = "qwen3:1.7b",
+                    EffectiveSpecification = effectiveSpecification
                 })
                 : ValueTask.FromException<ModelDeploymentConfiguration>(new ModelDeploymentNotFoundException(name));
         }
