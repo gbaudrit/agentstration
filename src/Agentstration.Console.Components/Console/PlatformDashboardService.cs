@@ -4,6 +4,7 @@ using Agentstration.Models.Contracts;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Triggers;
 using Agentstration.Web.Components.Models;
+using Agentstration.Web.Components.State;
 using Agentstration.Work.Contracts;
 
 namespace Agentstration.Web.Console;
@@ -14,8 +15,22 @@ public sealed class PlatformDashboardService(
     IWorkApiClient work,
     IFlowApiClient flow,
     IModelProvidersClient modelProviders,
-    ILogger<PlatformDashboardService> logger)
+    ILogger<PlatformDashboardService> logger) : IPlatformStatusProvider, IDisposable
 {
+    private readonly CancellationTokenSource lifetime = new();
+    private readonly object loadLock = new();
+    private PlatformDashboardLoad? sharedLoad;
+    private int disposed;
+
+    public PlatformDashboardLoad StartShared()
+    {
+        lock (loadLock)
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
+            return sharedLoad ??= Start(lifetime.Token);
+        }
+    }
+
     public PlatformDashboardLoad Start(CancellationToken cancellationToken)
     {
         var agentsTask = LoadAsync("Agents", management.GetAgentsAsync, Array.Empty<AgentSummary>(), cancellationToken);
@@ -64,7 +79,21 @@ public sealed class PlatformDashboardService(
             snapshotTask);
     }
 
-    public Task<PlatformSnapshot> GetAsync(CancellationToken cancellationToken) => Start(cancellationToken).Snapshot;
+    public Task<PlatformSnapshot> GetAsync(CancellationToken cancellationToken) =>
+        StartShared().Snapshot.WaitAsync(cancellationToken);
+
+    public async Task<PlatformStatusResult> GetStatusAsync(CancellationToken cancellationToken)
+    {
+        var snapshot = await GetAsync(cancellationToken);
+        return new(ToStatus(snapshot.Status), snapshot.Status switch
+        {
+            "Operational" => PlatformStatusKind.Operational,
+            "Attention required" => PlatformStatusKind.AttentionRequired,
+            "Partially unavailable" => PlatformStatusKind.PartiallyUnavailable,
+            "No active deployments" => PlatformStatusKind.NoActiveDeployments,
+            _ => PlatformStatusKind.Unavailable
+        });
+    }
 
     private static async Task<DashboardMetric> ToMetricAsync<T>(Task<SourceLoad<T>> sourceTask, Func<T, DashboardMetric> project)
     {
@@ -174,7 +203,7 @@ public sealed class PlatformDashboardService(
         "operational" or "healthy" or "ready" or "active" or "running" or "completed" => UiStatus.Success,
         "attention required" or "degraded" or "waiting" or "waitingforinput" or "waitingforchild" or "needsinput" or "actionrequired" or "paused" or "queued" or "draft" => UiStatus.Warning,
         "partially unavailable" or "failed" or "error" or "unavailable" or "cancelled" or "canceled" => UiStatus.Danger,
-        "no active deployments" => UiStatus.Info,
+        "no active deployments" => UiStatus.Success,
         _ => UiStatus.Neutral
     };
 
@@ -240,5 +269,14 @@ public sealed class PlatformDashboardService(
             Available ? availableDetail : Error ?? "Source temporarily unavailable",
             Available ? UiStatus.Success : UiStatus.Danger,
             url);
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref disposed, 1) != 0)
+            return;
+
+        lifetime.Cancel();
+        lifetime.Dispose();
     }
 }

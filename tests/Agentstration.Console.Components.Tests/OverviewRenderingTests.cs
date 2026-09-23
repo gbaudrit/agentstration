@@ -3,7 +3,6 @@ using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Models;
-using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -31,7 +30,6 @@ public sealed class OverviewRenderingTests
             new StubModelProvidersClient(),
             NullLogger<PlatformDashboardService>.Instance));
         context.Services.AddSingleton<IAgentstrationEventStream>(eventStream);
-        context.Services.AddSingleton(new PlatformStatusState());
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Home>();
@@ -87,7 +85,6 @@ public sealed class OverviewRenderingTests
             new StubModelProvidersClient(),
             NullLogger<PlatformDashboardService>.Instance));
         context.Services.AddSingleton<IAgentstrationEventStream>(new ControlledEventStream());
-        context.Services.AddSingleton(new PlatformStatusState());
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Home>();

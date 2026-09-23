@@ -35,7 +35,7 @@
             }
         </nav>
         <a class="sidebar-footer" href="/" aria-label="@T("OpenPlatformHealth")">
-            <HealthIndicator Label="@T("Platform")" StatusText="@PlatformStatus.Label" Status="@PlatformStatus.Status" />
+            <HealthIndicator Label="@T("Platform")" StatusText="@PlatformStatusLabel" Status="@PlatformStatus.Status" />
             @if (PlatformStatus.Status is UiStatus.Warning or UiStatus.Danger) { <small>@T("RequiresAttention")</small> }
         </a>
     </aside>
