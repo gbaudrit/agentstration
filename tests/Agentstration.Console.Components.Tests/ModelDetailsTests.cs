@@ -94,10 +94,11 @@ public sealed class ModelDetailsTests
 
         await rendered.Find("[data-testid='edit-model-override']").ClickAsync(new());
         var editorText = rendered.Find("[data-testid='model-override-editor']").TextContent;
-        StringAssert.Contains(editorText, "Declared by provider — Unknown");
-        StringAssert.Contains(editorText, "Declared by provider — Available");
-        StringAssert.Contains(editorText, "Declare as supported");
-        StringAssert.Contains(editorText, "Declare as available");
+        StringAssert.Contains(editorText, "Discovery:");
+        StringAssert.Contains(editorText, "Not specified");
+        StringAssert.Contains(editorText, "Not overridden");
+        StringAssert.Contains(editorText, "Supported");
+        StringAssert.Contains(editorText, "Available");
         Assert.IsFalse(rendered.FindAll("[data-testid='model-override-editor'] option")
             .Any(option => string.Equals(option.TextContent.Trim(), "Inherit", StringComparison.Ordinal)));
         await rendered.Find("[data-testid='model-override-context-tokens']").ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "64000" });
@@ -112,6 +113,35 @@ public sealed class ModelDetailsTests
             Assert.AreEqual("Foundry", properties.DisplayName);
             StringAssert.Contains(rendered.Find("[data-testid='model-override-message']").TextContent, "saved");
         });
+    }
+
+    [TestMethod]
+    public async Task AvailableDetailAutomaticallyEnablesUnknownParentSupport()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        var providers = new FakeProvidersClient(includeEffectiveModel: true, includeOverride: false, toolsUnknown: true);
+        context.Services.AddSingleton<IModelsClient>(new FakeModelsClient(ModelObservationState.Available, toolsUnknown: true));
+        context.Services.AddSingleton<IModelProvidersClient>(providers);
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/models/{FakeModelsClient.ResourceName}?namespace=shared.models");
+        var rendered = context.Render<ModelDetails>(parameters => parameters.Add(component => component.Name, FakeModelsClient.ResourceName));
+
+        await rendered.Find("[data-testid='edit-model-override']").ClickAsync(new());
+        var tools = rendered.FindAll(".model-feature-editor-grid > article")
+            .Single(element => string.Equals(element.QuerySelector("h4")?.TextContent.Trim(), "Tools", StringComparison.Ordinal));
+        await tools.QuerySelectorAll("select")[1].ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = ModelOverrideOperation.Add.ToString() });
+
+        tools = rendered.FindAll(".model-feature-editor-grid > article")
+            .Single(element => string.Equals(element.QuerySelector("h4")?.TextContent.Trim(), "Tools", StringComparison.Ordinal));
+        Assert.AreEqual(ModelFeatureSupport.Native.ToString(), tools.QuerySelectorAll("select")[0].GetAttribute("value"));
+        StringAssert.Contains(rendered.Find("[data-testid='model-override-interaction-message']").TextContent, "automatically marked as supported");
+
+        await rendered.Find("[data-testid='save-model-override']").ClickAsync(new());
+
+        var saved = providers.UpdatedRequest!.Properties.SpecificationOverrides["gpt-5"].Features.Tools!;
+        Assert.AreEqual(ModelFeatureSupport.Native, saved.Support);
+        Assert.IsTrue(saved.Modes!.Add.ContainsKey(ModelToolMode.Function));
     }
 
     [TestMethod]
@@ -172,13 +202,15 @@ public sealed class ModelDetailsTests
         Assert.AreEqual("Surcharge du fournisseur", localizer["ProviderOverride"].Value);
         Assert.AreEqual("Observé · lecture seule", localizer["ObservedReadOnly"].Value);
         Assert.AreEqual("Copier le YAML", localizer["CopyYaml"].Value);
-        Assert.AreEqual("Prise en charge", localizer["SupportOverride"].Value);
-        Assert.AreEqual("Déclaré par le fournisseur — Inconnu", localizer["ProviderDeclaredSupport", "Inconnu"].Value);
-        Assert.AreEqual("Déclarer comme pris en charge", localizer["OverrideSupport.Native"].Value);
-        Assert.AreEqual("Déclarer comme disponible", localizer["Operation.Add"].Value);
+        Assert.AreEqual("Découverte :", localizer["Discovery"].Value);
+        Assert.AreEqual("Surcharge", localizer["Override"].Value);
+        Assert.AreEqual("Non surchargé", localizer["NotOverridden"].Value);
+        Assert.AreEqual("Non spécifié", localizer["DiscoverySupport.Unknown"].Value);
+        Assert.AreEqual("Pris en charge", localizer["OverrideSupport.Native"].Value);
+        Assert.AreEqual("Disponible", localizer["Operation.Add"].Value);
     }
 
-    private sealed class FakeModelsClient(ModelObservationState state) : IModelsClient
+    private sealed class FakeModelsClient(ModelObservationState state, bool toolsUnknown = false) : IModelsClient
     {
         public const string ResourceName = "foundry.gpt-5-1234567890abcdef";
         public ResourceNamespace RequestedNamespace { get; private set; }
@@ -204,7 +236,7 @@ public sealed class ModelDetailsTests
                     ExternalId = "gpt-5",
                     ProviderStatus = state == ModelObservationState.Available ? "available" : "unavailable",
                     Identity = new ModelIdentity { Publisher = "OpenAI", Model = "GPT-5", Version = "2026-09" },
-                    Specification = ObservedSpecification(),
+                    Specification = ObservedSpecification(toolsUnknown),
                     Observation = new ModelObservation
                     {
                         State = state,
@@ -217,7 +249,7 @@ public sealed class ModelDetailsTests
         }
     }
 
-    private sealed class FakeProvidersClient(bool includeEffectiveModel, bool includeOverride = true) : IModelProvidersClient
+    private sealed class FakeProvidersClient(bool includeEffectiveModel, bool includeOverride = true, bool toolsUnknown = false) : IModelProvidersClient
     {
         private ModelProviderResource provider = CreateProvider(includeOverride);
         private string etag = "\"provider-etag\"";
@@ -236,9 +268,9 @@ public sealed class ModelDetailsTests
                 "gpt-5",
                 "GPT-5",
                 "available",
-                EffectiveModelSpecificationResolver.Resolve(ObservedSpecification(), @override),
+                EffectiveModelSpecificationResolver.Resolve(ObservedSpecification(toolsUnknown), @override),
                 new ModelIdentity { Publisher = "OpenAI", Model = "GPT-5", Version = "2026-09" },
-                ObservedSpecification(),
+                ObservedSpecification(toolsUnknown),
                 @override,
                 FakeModelsClient.ResourceName)]);
         }
@@ -296,14 +328,16 @@ public sealed class ModelDetailsTests
         }
     }
 
-    private static ModelSpecification ObservedSpecification() => new()
+    private static ModelSpecification ObservedSpecification(bool toolsUnknown = false) => new()
     {
         Input = [ModelContentType.Text, ModelContentType.Image],
         Output = [ModelContentType.Text],
         Features = new ModelFeatureSpecifications
         {
             Streaming = new ModelStreamingFeatureSpecification { Support = ModelFeatureSupport.Unknown },
-            Tools = new ModelToolsFeatureSpecification { Support = ModelFeatureSupport.Native, Modes = new Dictionary<ModelToolMode, ModelToolModeSpecification> { [ModelToolMode.Function] = new() } },
+            Tools = toolsUnknown
+                ? new ModelToolsFeatureSpecification { Support = ModelFeatureSupport.Unknown }
+                : new ModelToolsFeatureSpecification { Support = ModelFeatureSupport.Native, Modes = new Dictionary<ModelToolMode, ModelToolModeSpecification> { [ModelToolMode.Function] = new() } },
             StructuredOutput = new ModelStructuredOutputFeatureSpecification { Support = ModelFeatureSupport.Partial, Formats = new Dictionary<ModelStructuredOutputFormat, ModelStructuredOutputFormatSpecification> { [ModelStructuredOutputFormat.JsonSchema] = new() { SupportsStrict = false } } },
             Reasoning = new ModelReasoningFeatureSpecification { Support = ModelFeatureSupport.Native, Efforts = new Dictionary<ReasoningEffort, ModelReasoningEffortSpecification> { [ReasoningEffort.High] = new() } }
         },
