@@ -73,7 +73,8 @@ public sealed class ModelDiscoveryService(
         EffectiveModelSpecificationResolver.Resolve(resource.Definition.Specification, specificationOverride),
         resource.Definition.Identity,
         resource.Definition.Specification,
-        specificationOverride);
+        specificationOverride,
+        resource.Name);
 
     public async Task<ModelDiscoveryDiff> RefreshAsync(
         ResourceNamespace providerNamespace,

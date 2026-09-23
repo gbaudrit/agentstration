@@ -36,6 +36,11 @@ public interface IModelProvidersClient
     Task<ModelProviderStatusResponse> TestProviderAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => TestProviderAsync(providerName, cancellationToken);
 }
 
+public interface IModelsClient
+{
+    Task<ResourceSnapshot<ModelResource>> GetModelAsync(ResourceNamespace @namespace, string modelName, CancellationToken cancellationToken);
+}
+
 public interface IExtensionsClient
 {
     Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken);
@@ -326,6 +331,26 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
     private static string ChildPath(ResourceNamespace @namespace, string providerName, string child) => $"api/modelproviders/{Escape(providerName)}/{child}?resourceNamespace={Escape(@namespace.Value)}";
 
     private static string Escape(string value) => Uri.EscapeDataString(value);
+}
+
+public sealed class ModelsApiClient(HttpClient httpClient) : IModelsClient
+{
+    public async Task<ResourceSnapshot<ModelResource>> GetModelAsync(
+        ResourceNamespace @namespace,
+        string modelName,
+        CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(
+            $"api/models/{Uri.EscapeDataString(modelName)}?resourceNamespace={Uri.EscapeDataString(@namespace.Value)}",
+            cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        var value = await response.Content.ReadFromJsonAsync<ModelResource>(cancellationToken)
+            ?? throw new AgentstrationApiException("Agentstration API returned an empty model.", Guid.NewGuid().ToString("N"));
+        var etag = response.Headers.ETag?.ToString();
+        if (string.IsNullOrWhiteSpace(etag))
+            throw new AgentstrationApiException("Agentstration API did not return the model ETag.", Guid.NewGuid().ToString("N"));
+        return new ResourceSnapshot<ModelResource>(value, etag);
+    }
 }
 
 public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfilesClient

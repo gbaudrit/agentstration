@@ -1,0 +1,20 @@
+.model-detail-tabs { margin-bottom: 18px; }
+.model-detail-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 18px; }
+.model-observation-warning { margin-bottom: 18px; }
+.model-identity-grid { grid-template-columns: max-content minmax(0, 1fr); }
+.model-capability-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.model-capability-card, .model-limit-card { padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.model-capability-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.model-capability-card dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 7px 12px; margin: 0; font-size: .75rem; }
+.model-capability-card dt { color: var(--muted); }
+.model-capability-card dd { margin: 0; font-weight: 650; }
+.model-capability-card p { margin: 12px 0 0; color: var(--muted); font-size: .72rem; }
+.model-capability-card p span { margin-right: 6px; color: var(--text); font-weight: 650; }
+.model-limit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.model-limit-card { display: grid; gap: 6px; }
+.model-limit-card span, .model-limit-card small { color: var(--muted); }
+.model-limit-card strong { font-size: 1.3rem; }
+.model-yaml-actions { display: flex; align-items: center; gap: 8px; }
+.model-yaml-source { width: 100%; min-height: 36rem; resize: vertical; }
+@media (max-width: 960px) { .model-detail-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) { .model-detail-metrics, .model-capability-grid, .model-limit-grid { grid-template-columns: 1fr; } .model-yaml-actions { align-items: stretch; flex-direction: column; } }

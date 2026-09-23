@@ -110,7 +110,8 @@ public sealed record DiscoveredModel(
     ModelSpecification Specification,
     ModelIdentity? Identity = null,
     ModelSpecification? ObservedSpecification = null,
-    ModelSpecificationOverride? SpecificationOverride = null);
+    ModelSpecificationOverride? SpecificationOverride = null,
+    string? ResourceName = null);
 
 public sealed record ModelProviderHealth(string Status, string? Details = null);
 

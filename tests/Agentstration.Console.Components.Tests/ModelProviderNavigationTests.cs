@@ -44,6 +44,9 @@ public sealed class ModelProviderNavigationTests
             Assert.AreEqual(
                 "/modelprofiles/new?namespace=shared.models&provider=ollama%2Flocal&providerNamespace=shared.models&model=qwen3",
                 discoveredModelLink.GetAttribute("href"));
+            Assert.AreEqual(
+                "/models/ollama-local.qwen3-deadbeef?namespace=shared.models",
+                rendered.Find("[data-testid='open-model-details']").GetAttribute("href"));
         });
     }
 
@@ -321,7 +324,7 @@ public sealed class ModelProviderNavigationTests
             RequestedModelNamespace = @namespace;
             RequestedModelProvider = providerName;
             return Task.FromResult<IReadOnlyList<AvailableModelResponse>>([
-                new("qwen3", "Qwen 3", "available", new ModelSpecification())
+                new("qwen3", "Qwen 3", "available", new ModelSpecification(), ResourceName: "ollama-local.qwen3-deadbeef")
             ]);
         }
 

@@ -206,6 +206,8 @@ docker compose -f deploy/compose/ollama.yml up --build
 
 The normal `Managed` mode resolves the provider, extension registration, endpoint, and model from the persisted Model Profile and Model Provider selected on each agent. It is the default for direct Web and Aspire launches; concrete provider names are never host execution modes. The seeded `ollama-local`, `llama-cpp-local`, and `localai-local` providers reference extension registrations whose URLs are AEP endpoints, never native inference-server URLs.
 
+The Model Provider inventory links every retained observation to a responsive Model detail page. Its default overview presents provider identity, reconciliation freshness, modalities, feature support, known limits and explicit observed-versus-effective provenance. The secondary YAML tab copies the deterministic canonical persisted `Model` resource; computed effective values are deliberately not written into that document. Missing and failed observations remain readable, and these GET-driven views never trigger provider discovery.
+
 Use the deterministic offline mode explicitly for tests or fallback diagnostics:
 
 ```powershell

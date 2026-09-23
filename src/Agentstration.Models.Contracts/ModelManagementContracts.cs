@@ -30,7 +30,8 @@ public sealed record AvailableModelResponse(
     ModelSpecification Specification,
     ModelIdentity? Identity = null,
     ModelSpecification? ObservedSpecification = null,
-    ModelSpecificationOverride? SpecificationOverride = null);
+    ModelSpecificationOverride? SpecificationOverride = null,
+    string? ResourceName = null);
 
 public sealed record ModelDiscoveryDiffResponse(
     int Created,
