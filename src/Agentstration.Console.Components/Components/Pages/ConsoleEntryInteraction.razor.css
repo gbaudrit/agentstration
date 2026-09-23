@@ -1,2 +1,2 @@
-.console-entry-interaction { width:100%; max-width:80rem; margin:0 auto; }
+.console-entry-interaction { width:100%; }
 .console-entry-terminal-error { display:grid; gap:.25rem; margin-bottom:1rem; padding:1rem; border:1px solid var(--danger-border, #dc2626); border-radius:.75rem; background:var(--danger-surface, rgba(220,38,38,.08)); }

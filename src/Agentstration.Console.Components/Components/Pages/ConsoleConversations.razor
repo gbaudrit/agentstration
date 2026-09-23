@@ -41,15 +41,17 @@ else
                         <strong>@conversation.Title</strong>
                         <span>@conversation.Entry.DisplayName</span>
                     </span>
-                    <span class="conversation-state">
-                        <StatusBadge Text="@StatusLabel(conversation.Interaction.Status)" Status="@Status(conversation.Interaction.Status)" />
-                        @if (conversation.Interaction.PendingActionId is not null)
-                        {
-                            <small class="conversation-pending">@T("NeedsInput")</small>
-                        }
+                    <span class="conversation-meta">
+                        <span class="conversation-state">
+                            <StatusBadge Text="@StatusLabel(conversation.Interaction.Status)" Status="@Status(conversation.Interaction.Status)" />
+                            @if (conversation.Interaction.PendingActionId is not null)
+                            {
+                                <small class="conversation-pending">@T("NeedsInput")</small>
+                            }
+                        </span>
+                        <time datetime="@conversation.Interaction.LastActivityAt.ToString("O")">@conversation.Interaction.LastActivityAt.ToLocalTime().ToString("g")</time>
+                        <span class="conversation-open" aria-hidden="true">→</span>
                     </span>
-                    <time datetime="@conversation.Interaction.LastActivityAt.ToString("O")">@conversation.Interaction.LastActivityAt.ToLocalTime().ToString("g")</time>
-                    <span class="conversation-open" aria-hidden="true">→</span>
                 </a>
             }
         </div>
