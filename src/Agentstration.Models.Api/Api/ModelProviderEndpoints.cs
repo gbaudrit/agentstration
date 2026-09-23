@@ -110,7 +110,8 @@ internal sealed class ListProviderModelsEndpoint : IModelManagementEndpoint
                     model.Specification,
                     model.Identity,
                     model.ObservedSpecification,
-                    model.SpecificationOverride)).ToArray()));
+                    model.SpecificationOverride,
+                    model.ResourceName)).ToArray()));
         });
 }
 

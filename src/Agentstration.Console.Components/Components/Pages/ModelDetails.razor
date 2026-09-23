@@ -1,0 +1,181 @@
+@page "/models/{Name}"
+@implements IDisposable
+@inject IModelsClient ModelsClient
+@inject IModelProvidersClient ProvidersClient
+@inject IJSRuntime JavaScript
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelDetailsStrings> Localizer
+
+<PageTitle>@(model?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
+
+@if (loading)
+{
+    <LoadingState Message="@T("Loading")" />
+}
+else if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId" />
+}
+else if (model is not null)
+{
+    <ResourceHeader ResourceType="@T("Model")" Domain="model" Icon="◈" Name="@model.Definition.DisplayName" Description="@T("ReadOnlyDescription")" StatusText="@ObservationLabel" Status="@ObservationTone" TestId="resource-model-details">
+        <Metadata><span><code>@model.Namespace.Value/@model.Name</code></span><span><code>@model.Definition.ExternalId</code></span></Metadata>
+        <Actions><a class="button-secondary" href="@ProviderUrl">@T("OpenProvider")</a><a class="button-secondary" href="/modelproviders">@T("BackToProviders")</a></Actions>
+    </ResourceHeader>
+
+    <nav class="section-tabs model-detail-tabs" role="tablist" aria-label="@T("ModelDetails")">
+        <button id="model-overview-tab" type="button" role="tab" aria-selected="@(activeTab == PageTab.Overview ? "true" : "false")" aria-controls="model-tab-panel" class="@(activeTab == PageTab.Overview ? "active" : null)" @onclick="() => activeTab = PageTab.Overview">@T("Tab.Overview")</button>
+        <button id="model-yaml-tab" type="button" role="tab" aria-selected="@(activeTab == PageTab.Yaml ? "true" : "false")" aria-controls="model-tab-panel" class="@(activeTab == PageTab.Yaml ? "active" : null)" @onclick="() => activeTab = PageTab.Yaml">@T("Tab.Yaml")</button>
+    </nav>
+
+    <main id="model-tab-panel" role="tabpanel" aria-labelledby="@(activeTab == PageTab.Overview ? "model-overview-tab" : "model-yaml-tab")" tabindex="0">
+        @if (activeTab == PageTab.Overview)
+        {
+            @if (model.Definition.Observation.State != ModelObservationState.Available)
+            {
+                <div class="form-alert form-alert-warning model-observation-warning" role="status">
+                    <strong>@T("ObservationUnavailable")</strong><span>@ObservationExplanation</span>
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(diagnosticsWarning))
+            {
+                <div class="form-alert form-alert-warning" role="status"><strong>@T("EffectiveDiagnosticsUnavailable")</strong><span>@diagnosticsWarning</span></div>
+            }
+
+            <section class="metric-grid model-detail-metrics" aria-label="@T("ModelSummary")">
+                <MetricCard Label="@T("Availability")" Value="@ObservationLabel" Detail="@model.Definition.ProviderStatus" HelpText="@T("AvailabilityHelp")" Status="@ObservationTone" />
+                <MetricCard Label="@T("LastObserved")" Value="@model.Definition.Observation.LastObservedAt.ToLocalTime().ToString("g")" Detail="@T("LastAttempted", model.Definition.Observation.LastAttemptedAt.ToLocalTime().ToString("g"))" HelpText="@T("FreshnessHelp")" Status="@ObservationTone" />
+                <MetricCard Label="@T("InputModalities")" Value="@Modalities(EffectiveSpecification.Input)" Detail="@ProvenanceLabel(HasInputOverride)" HelpText="@T("InputHelp")" Status="UiStatus.Info" />
+                <MetricCard Label="@T("OutputModalities")" Value="@Modalities(EffectiveSpecification.Output)" Detail="@ProvenanceLabel(HasOutputOverride)" HelpText="@T("OutputHelp")" Status="UiStatus.Info" />
+            </section>
+
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ModelIdentity")</h2></div><StatusBadge Text="@T("ObservedReadOnly")" Status="UiStatus.Neutral" /></div>
+                <dl class="resource-details model-identity-grid">
+                    <dt>@T("Provider")</dt><dd><a class="text-button" href="@ProviderUrl"><code>@ProviderAddress</code></a></dd>
+                    <dt>@T("ExternalId")</dt><dd><code>@model.Definition.ExternalId</code></dd>
+                    <dt>@T("Publisher")</dt><dd>@Text(model.Definition.Identity?.Publisher)</dd>
+                    <dt>@T("ModelFamily")</dt><dd>@Text(model.Definition.Identity?.Model)</dd>
+                    <dt>@T("Version")</dt><dd>@Text(model.Definition.Identity?.Version)</dd>
+                    <dt>@T("ResourceGeneration")</dt><dd>@model.Generation</dd>
+                </dl>
+            </section>
+
+            <section class="panel form-section" data-testid="model-capabilities">
+                <div class="panel-header"><div><p class="eyebrow">@T("EffectiveSpecification")</p><h2>@T("Capabilities")</h2><p>@T("CapabilitiesHelp")</p></div>@if (effective?.SpecificationOverride is not null) { <StatusBadge Text="@T("OverrideApplied")" Status="UiStatus.Info" /> }</div>
+                <div class="model-capability-grid">
+                    @Capability(T("Streaming"), ObservedSpecification.Features.Streaming?.Support, EffectiveSpecification.Features.Streaming?.Support, HasStreamingOverride)
+                    @Capability(T("Tools"), ObservedSpecification.Features.Tools?.Support, EffectiveSpecification.Features.Tools?.Support, HasToolsOverride, ToolDetails)
+                    @Capability(T("StructuredOutput"), ObservedSpecification.Features.StructuredOutput?.Support, EffectiveSpecification.Features.StructuredOutput?.Support, HasStructuredOutputOverride, StructuredOutputDetails)
+                    @Capability(T("Reasoning"), ObservedSpecification.Features.Reasoning?.Support, EffectiveSpecification.Features.Reasoning?.Support, HasReasoningOverride, ReasoningDetails)
+                </div>
+            </section>
+
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">@T("Capacity")</p><h2>@T("KnownLimits")</h2><p>@T("LimitsHelp")</p></div></div>
+                <div class="model-limit-grid">
+                    @Limit(T("ContextTokens"), ObservedSpecification.Limits.ContextTokens, EffectiveSpecification.Limits.ContextTokens, HasContextLimitOverride)
+                    @Limit(T("MaxOutputTokens"), ObservedSpecification.Limits.MaxOutputTokens, EffectiveSpecification.Limits.MaxOutputTokens, HasOutputLimitOverride)
+                </div>
+            </section>
+
+            <section class="panel form-section model-observation-details">
+                <div class="panel-header"><div><p class="eyebrow">@T("Reconciliation")</p><h2>@T("ObservationHistory")</h2></div></div>
+                <dl class="resource-details">
+                    <dt>@T("FirstObserved")</dt><dd>@model.Definition.Observation.FirstObservedAt.ToLocalTime().ToString("F")</dd>
+                    <dt>@T("LastObserved")</dt><dd>@model.Definition.Observation.LastObservedAt.ToLocalTime().ToString("F")</dd>
+                    <dt>@T("LastAttemptedLabel")</dt><dd>@model.Definition.Observation.LastAttemptedAt.ToLocalTime().ToString("F")</dd>
+                    @if (!string.IsNullOrWhiteSpace(model.Definition.Observation.ErrorCode)) { <dt>@T("ErrorCode")</dt><dd><code>@model.Definition.Observation.ErrorCode</code></dd> }
+                    @if (!string.IsNullOrWhiteSpace(model.Definition.Observation.ErrorMessage)) { <dt>@T("ErrorMessage")</dt><dd>@model.Definition.Observation.ErrorMessage</dd> }
+                </dl>
+            </section>
+        }
+        else
+        {
+            <section class="panel model-yaml-panel" data-testid="model-yaml">
+                <div class="panel-header"><div><p class="eyebrow">@T("CanonicalResource")</p><h2>@T("ModelYaml")</h2><p>@T("YamlHelp")</p></div><div class="model-yaml-actions"><StatusBadge Text="@T("ObservedReadOnly")" Status="UiStatus.Neutral" /><button class="button-secondary" type="button" @onclick="CopyYamlAsync" data-testid="copy-model-yaml">@(copied ? T("Copied") : T("CopyYaml"))</button></div></div>
+                <textarea class="form-code-editor runner-json model-yaml-source" rows="34" readonly aria-label="@T("ModelYaml")">@ModelYaml</textarea>
+            </section>
+        }
+    </main>
+}
+
+@code {
+    [Parameter] public string Name { get; set; } = string.Empty;
+    [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private ModelResource? model;
+    private AvailableModelResponse? effective;
+    private AgentstrationApiException? error;
+    private string? diagnosticsWarning;
+    private bool loading = true;
+    private bool copied;
+    private PageTab activeTab;
+    private ResourceNamespace ModelNamespace => ResourceNamespace.Parse(Namespace);
+    private ModelSpecification ObservedSpecification => model!.Definition.Specification;
+    private ModelSpecification EffectiveSpecification => effective?.Specification ?? ObservedSpecification;
+    private string ModelYaml => model is null ? string.Empty : ResourceManifestSerializer.ToYaml(model);
+    private ResourceAddress ProviderAddress => model!.Definition.Provider.Resolve(model.Namespace, ModelResourceKinds.ModelProvider);
+    private string ProviderUrl => $"/modelproviders/{Uri.EscapeDataString(ProviderAddress.Name)}?namespace={Uri.EscapeDataString(ProviderAddress.Namespace.Value)}";
+    private string ObservationLabel => T($"Observation.{model?.Definition.Observation.State}");
+    private UiStatus ObservationTone => model?.Definition.Observation.State switch { ModelObservationState.Available => UiStatus.Success, ModelObservationState.Missing => UiStatus.Warning, ModelObservationState.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
+    private string ObservationExplanation => model?.Definition.Observation.State switch { ModelObservationState.Missing => T("MissingExplanation"), ModelObservationState.Failed => T("FailedExplanation"), _ => string.Empty };
+    private bool HasInputOverride => effective?.SpecificationOverride?.Input is not null;
+    private bool HasOutputOverride => effective?.SpecificationOverride?.Output is not null;
+    private bool HasStreamingOverride => effective?.SpecificationOverride?.Features.Streaming is not null;
+    private bool HasToolsOverride => effective?.SpecificationOverride?.Features.Tools is not null;
+    private bool HasStructuredOutputOverride => effective?.SpecificationOverride?.Features.StructuredOutput is not null;
+    private bool HasReasoningOverride => effective?.SpecificationOverride?.Features.Reasoning is not null;
+    private bool HasContextLimitOverride => effective?.SpecificationOverride?.Limits.ContextTokens is not null;
+    private bool HasOutputLimitOverride => effective?.SpecificationOverride?.Limits.MaxOutputTokens is not null;
+    private string ToolDetails => Join(EffectiveSpecification.Features.Tools?.Modes.Keys.Select(value => T($"ToolMode.{value}")));
+    private string StructuredOutputDetails => Join(EffectiveSpecification.Features.StructuredOutput?.Formats.Keys.Select(value => T($"OutputFormat.{value}")));
+    private string ReasoningDetails => Join(EffectiveSpecification.Features.Reasoning?.Efforts.Keys.Select(value => T($"ReasoningEffort.{value}")));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        error = null;
+        diagnosticsWarning = null;
+        copied = false;
+        try
+        {
+            model = (await ModelsClient.GetModelAsync(ModelNamespace, Name, cancellation.Token)).Value;
+            try
+            {
+                var provider = ProviderAddress;
+                var inventory = await ProvidersClient.GetProviderModelsAsync(provider.Namespace, provider.Name, cancellation.Token);
+                effective = inventory.SingleOrDefault(value => string.Equals(value.ResourceName, model.Name, StringComparison.Ordinal))
+                    ?? inventory.SingleOrDefault(value => string.Equals(value.Name, model.Definition.ExternalId, StringComparison.Ordinal));
+                if (effective is null) diagnosticsWarning = T("EffectiveModelNotFound");
+            }
+            catch (AgentstrationApiException exception) { diagnosticsWarning = exception.Message; }
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+
+    private async Task CopyYamlAsync()
+    {
+        await JavaScript.InvokeVoidAsync("navigator.clipboard.writeText", ModelYaml);
+        copied = true;
+    }
+
+    private RenderFragment Capability(string label, ModelFeatureSupport? observed, ModelFeatureSupport? current, bool overridden, string? details = null) => @<article class="model-capability-card">
+            <div class="model-capability-heading"><strong>@label</strong><StatusBadge Text="@SupportLabel(current)" Status="@SupportTone(current)" /></div>
+            <dl><dt>@T("Observed")</dt><dd>@SupportLabel(observed)</dd><dt>@T("Effective")</dt><dd>@SupportLabel(current)</dd><dt>@T("Provenance")</dt><dd>@ProvenanceLabel(overridden)</dd></dl>
+            @if (!string.IsNullOrWhiteSpace(details)) { <p><span>@T("Details")</span> @details</p> }
+        </article>;
+
+    private RenderFragment Limit(string label, long? observed, long? current, bool overridden) => @<article class="model-limit-card"><span>@label</span><strong>@Number(current)</strong><small>@T("ObservedValue", Number(observed)) · @ProvenanceLabel(overridden)</small></article>;
+
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string SupportLabel(ModelFeatureSupport? support) => support is null ? T("Support.Omitted") : T($"Support.{support}");
+    private static UiStatus SupportTone(ModelFeatureSupport? support) => support switch { ModelFeatureSupport.Native => UiStatus.Success, ModelFeatureSupport.Emulated => UiStatus.Info, ModelFeatureSupport.Partial => UiStatus.Warning, ModelFeatureSupport.Unsupported => UiStatus.Neutral, _ => UiStatus.Warning };
+    private string ProvenanceLabel(bool overridden) => overridden ? T("ProviderOverride") : T("ProviderObservation");
+    private string Modalities(IReadOnlyList<ModelContentType>? values) => values is null ? T("Unknown") : values.Count == 0 ? T("None") : string.Join(", ", values.Select(value => T($"Modality.{value}")));
+    private string Text(string? value) => string.IsNullOrWhiteSpace(value) ? T("NotObserved") : value;
+    private string Number(long? value) => value?.ToString("N0") ?? T("Unknown");
+    private string Join(IEnumerable<string>? values) => values is null || !values.Any() ? T("NoDetails") : string.Join(", ", values);
+    private enum PageTab { Overview, Yaml }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

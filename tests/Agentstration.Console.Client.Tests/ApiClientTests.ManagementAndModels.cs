@@ -256,6 +256,49 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task ModelsClientReadsExactNamespacedResourceAndPreservesEtag()
+    {
+        var resource = new ModelResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ModelResourceKinds.Model,
+            Metadata = new ResourceMetadata { Name = "foundry.gpt-5-deadbeef", Namespace = new("shared.models") },
+            Generation = 2,
+            Definition = new ModelProperties
+            {
+                DisplayName = "GPT-5",
+                Provider = new ResourceReference("foundry", @namespace: new("shared.models")),
+                ProviderUid = Guid.NewGuid(),
+                ExternalId = "gpt-5",
+                ProviderStatus = "available",
+                Specification = new ModelSpecification(),
+                Observation = new ModelObservation
+                {
+                    FirstObservedAt = DateTimeOffset.UnixEpoch,
+                    LastObservedAt = DateTimeOffset.UnixEpoch,
+                    LastAttemptedAt = DateTimeOffset.UnixEpoch
+                }
+            }
+        };
+        string? requestedPath = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requestedPath = request.RequestUri!.PathAndQuery;
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(resource) };
+            response.Headers.ETag = new EntityTagHeaderValue("\"model-v2\"");
+            return response;
+        })) { BaseAddress = new Uri("http://localhost/") };
+
+        var snapshot = await new ModelsApiClient(httpClient).GetModelAsync(resource.Namespace, resource.Name, default);
+
+        Assert.AreEqual("/api/models/foundry.gpt-5-deadbeef?resourceNamespace=shared.models", requestedPath);
+        Assert.AreEqual("\"model-v2\"", snapshot.ETag);
+        Assert.AreEqual("gpt-5", snapshot.Value.Definition.ExternalId);
+        Assert.AreEqual("/models/foundry.gpt-5-deadbeef?namespace=shared.models", ConsoleResourceUrls.Model(
+            ResourceAddress.Create(resource.Namespace, resource.Kind, resource.Name)));
+    }
+
+    [TestMethod]
     public async Task SourceProvidersClientPreservesNamespaceAndETag()
     {
         var scopeRef = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));

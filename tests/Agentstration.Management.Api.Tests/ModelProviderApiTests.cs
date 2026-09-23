@@ -81,6 +81,8 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         Assert.AreEqual("shared/model", model.Definition.ExternalId);
         Assert.AreEqual(ModelObservationState.Available, model.Definition.Observation.State);
         Assert.AreEqual(8192, model.Definition.Specification.Limits.ContextTokens);
+        var providerInventory = await client.GetFromJsonAsync<ValueResponse<AvailableModelResponse>>("/api/modelproviders/ollama-local/models");
+        Assert.AreEqual(model.Name, providerInventory!.Value.Single().ResourceName);
 
         var unchanged = await RefreshAsync(client);
         Assert.AreEqual(new ModelDiscoveryDiffResponse(0, 0, 1, 0, 0, 1), unchanged);
