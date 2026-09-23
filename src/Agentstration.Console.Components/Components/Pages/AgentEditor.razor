@@ -101,12 +101,18 @@ else
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("References")</p><h2>@T("ToolsAndTags")</h2></div></div>
             <div class="form-grid">
-                <div><span class="field-label">@T("GovernedTools")</span>
+                <div class="agent-tool-field">
+                    <div class="agent-tool-heading"><span class="field-label">@T("GovernedTools")</span>@if (catalogTools.Count > 0) { <span class="agent-tool-count">@catalogTools.Count</span> }</div>
                     @if (catalogTools.Count == 0) { <small>@T("NoDiscoveredTools")</small> }
-                    @foreach (var tool in catalogTools)
+                    else
                     {
-                        var assigned = IsToolAssigned(tool.Metadata.Name); var usable = tool.Definition.Enabled && tool.Definition.Discovery?.Available == true;
-                        <label><input type="checkbox" checked="@assigned" disabled="@(!usable && !assigned)" @onchange="args => ToggleTool(tool.Metadata.Name, (bool)args.Value!)" /> <span>@tool.Definition.DisplayName</span><small>@(tool.Definition.Provider?.Name ?? "—") · @(usable ? T("Available") : assigned ? T("AssignedUnavailable") : T("NotUsable"))</small></label>
+                        <div class="agent-tool-list">
+                            @foreach (var tool in catalogTools)
+                            {
+                                var assigned = IsToolAssigned(tool.Metadata.Name); var usable = tool.Definition.Enabled && tool.Definition.Discovery?.Available == true;
+                                <label class="agent-tool-option"><input type="checkbox" checked="@assigned" disabled="@(!usable && !assigned)" @onchange="args => ToggleTool(tool.Metadata.Name, (bool)args.Value!)" /><span>@tool.Definition.DisplayName</span><small>@(tool.Definition.Provider?.Name ?? "—") · @(usable ? T("Available") : assigned ? T("AssignedUnavailable") : T("NotUsable"))</small></label>
+                            }
+                        </div>
                     }
                 </div>
                 <label><span>@T("Tags")</span><InputTextArea @bind-Value="model.Tags" rows="7" /><small>@T("TagsHelp")</small></label>

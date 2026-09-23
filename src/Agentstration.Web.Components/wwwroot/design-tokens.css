@@ -94,6 +94,20 @@
 }
 
 /* Shared form controls ---------------------------------------------------- */
+.app-shell :where(input[type="checkbox"],input[type="radio"]) {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  min-width: 17px;
+  min-height: 17px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--primary);
+}
+.app-shell :where(input[type="checkbox"],input[type="radio"]):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
 .app-shell :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]),select,textarea) {
   min-height: var(--field-height);
   padding: 9px 12px;
