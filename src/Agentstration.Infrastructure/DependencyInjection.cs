@@ -260,6 +260,7 @@ public static class DependencyInjection
         services.AddSingleton<SourceRegistryDiscoveryService>();
         services.AddSingleton<ISourceVerificationEvidenceProvider>(services => services.GetRequiredService<SourceRegistryTrustEvaluationService>());
         services.AddSingleton<ToolManagementService>();
+        services.AddSingleton<ToolCategoryService>();
         services.AddSingleton<ToolDefinitionService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
