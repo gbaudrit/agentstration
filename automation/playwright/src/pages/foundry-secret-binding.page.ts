@@ -47,8 +47,10 @@ export class FoundrySecretBindingPage {
     const vaultOption = vault.locator('option:not([value=""])').first();
     await vaultOption.waitFor({ state: 'attached' });
     await vault.selectOption(await vaultOption.getAttribute('value') ?? '');
-    await dialog.getByTestId('contextual-secret-value').fill(value);
-    await dialog.getByTestId('contextual-secret-create').click();
+    await fillAndCommit(dialog.getByTestId('contextual-secret-value'), value);
+    const create = dialog.getByTestId('contextual-secret-create');
+    await expect(create).toBeEnabled();
+    await create.click();
     await dialog.waitFor({ state: 'detached' });
     if ((await this.page.locator('body').textContent())?.includes(value)) throw new Error('The Secret value was rendered in browser-visible text.');
     return name;
