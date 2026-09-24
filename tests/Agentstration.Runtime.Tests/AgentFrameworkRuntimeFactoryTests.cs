@@ -342,6 +342,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 WorkspaceId = workspaceId,
                 PrincipalId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
                 ExecutionId = "run-direct",
+                FlowStepId = "agent-step",
                 CorrelationId = "correlation-direct",
                 PersistArguments = true
             }), default);
@@ -350,6 +351,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         var invocation = pipeline.Contexts.Single();
         Assert.AreEqual(workspaceId, invocation.WorkspaceId);
         Assert.AreEqual("run-direct", invocation.RunId);
+        Assert.AreEqual("agent-step", invocation.FlowStepId);
         Assert.AreEqual("revision-direct", invocation.AgentRevisionId);
         Assert.AreEqual("correlation-direct", invocation.CorrelationId);
         Assert.AreEqual(true, invocation.PersistArguments);

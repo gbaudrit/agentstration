@@ -60,7 +60,13 @@ public sealed partial class FlowRunService
                         : await ResolveJsonAsync(agent.InputMapping.Value, context, runToken);
                     try
                     {
-                        agentResult = await agents.ExecuteAsync(new FlowTargetReference(FlowTargetKind.Agent, agentId, Namespace: agent.Agent.Namespace ?? stored.Value.FlowId.Namespace), resolvedInput, stored.Value.CorrelationId!, runToken);
+                        agentResult = await agents.ExecuteAsync(new FlowAgentExecutionRequest(
+                            stored.Value.Scope,
+                            stored.Value.Id,
+                            step.Name,
+                            new FlowTargetReference(FlowTargetKind.Agent, agentId, Namespace: agent.Agent.Namespace ?? stored.Value.FlowId.Namespace),
+                            resolvedInput,
+                            stored.Value.CorrelationId!), runToken);
                         output = agentResult.Output.Clone(); eventName = "completed";
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)

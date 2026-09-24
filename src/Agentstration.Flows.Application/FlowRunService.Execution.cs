@@ -80,7 +80,13 @@ public sealed partial class FlowRunService
             }
 
             stored = await StartStepAsync(stored, "Agent", runToken);
-            var execution = await agents.ExecuteAsync(target with { Namespace = target.Namespace ?? stored.Value.FlowId.Namespace }, stored.Value.Input, stored.Value.CorrelationId!, runToken);
+            var execution = await agents.ExecuteAsync(new FlowAgentExecutionRequest(
+                stored.Value.Scope,
+                stored.Value.Id,
+                "Agent",
+                target with { Namespace = target.Namespace ?? stored.Value.FlowId.Namespace },
+                stored.Value.Input,
+                stored.Value.CorrelationId!), runToken);
             stored = await FinishAgentStepAsync(stored, execution, runToken);
             stored = await CompleteSimpleStepAsync(stored, "Output", execution.Output, null, runToken);
             var completedAt = timeProvider.GetUtcNow();
