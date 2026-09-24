@@ -7,7 +7,6 @@ using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity;
 using Agentstration.Infrastructure.Declarative;
-using Agentstration.Infrastructure.Notifications;
 using Agentstration.Models;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
@@ -227,8 +226,7 @@ public sealed class ModelProfileBootstrapResourceHandler(
 public sealed class AgentBootstrapResourceHandler(
     AgentManagementService service,
     ModelProfileManagementService modelProfiles,
-    RuntimeProfileManagementService runtimeProfiles,
-    InternalMcpToolProjectionService internalTools) : IBootstrapResourceHandler
+    RuntimeProfileManagementService runtimeProfiles) : IBootstrapResourceHandler
 {
     public string Kind => AgentResourceKinds.Agent;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
@@ -264,10 +262,6 @@ public sealed class AgentBootstrapResourceHandler(
         var value = WorkspaceBootstrapResource.Parse<AgentResource>(resource);
         if (await service.GetAgentAsync(value.Namespace, value.Name, cancellationToken) is not null)
             return BootstrapResourceApplyResult.Skipped;
-        await internalTools.EnsureAsync(
-            ResourceScopeRef.Workspace(WorkspaceBootstrapResource.Workspace(operation).Value),
-            ResourceNamespace.Default,
-            cancellationToken);
         _ = await service.PutAgentAsync(value, null, true, cancellationToken);
         return BootstrapResourceApplyResult.Created;
     }

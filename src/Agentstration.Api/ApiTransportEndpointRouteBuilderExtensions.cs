@@ -28,7 +28,8 @@ public static class ApiTransportEndpointRouteBuilderExtensions
             app.MapAgentstrationOpenApi();
 
         app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
-        app.MapGet("/health/ready", (IAgentstrationStorageInitializer storage) => storage.IsReady
+        app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
+        app.MapGet("/health/ready", (IInstanceInitializationCoordinator initialization) => initialization.IsReady
             ? Results.Ok(new { status = "ready" })
             : Results.StatusCode(StatusCodes.Status503ServiceUnavailable)).AllowAnonymous();
         app.MapIdentityApi();

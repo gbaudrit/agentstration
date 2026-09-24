@@ -99,69 +99,66 @@ public sealed class InternalMcpToolProjectionService(
         if (workspaceScope.Kind != ResourceScopeKind.Workspace)
             throw new ToolResourceValidationException("Internal MCP Tools require a Workspace scope.");
         var providerKey = new ResourceKey(ToolResourceKinds.ToolProvider, AgentstrationToolProvider.Name, @namespace);
-        if (await store.GetAsync<ToolProviderResource>(providerKey, cancellationToken) is { } provider)
-        {
-            if (provider.Value.Definition.Mcp?.Internal != true || provider.Value.ScopeRef != workspaceScope)
-                throw new ToolResourceValidationException("The reserved Agentstration ToolProvider identity is already in use.");
-        }
-        else
-            await store.PutAsync(Provider(workspaceScope, @namespace), null, true, cancellationToken);
+        var provider = await store.GetExactAsync<ToolProviderResource>(providerKey.AtScope(workspaceScope), cancellationToken)
+            ?? await CreateOrReadAsync(Provider(workspaceScope, @namespace), workspaceScope, cancellationToken);
+        if (provider.Value.Definition.Mcp?.Internal != true || provider.Value.ScopeRef != workspaceScope)
+            throw new ToolResourceValidationException("The reserved Agentstration ToolProvider identity is already in use.");
 
         var now = timeProvider.GetUtcNow();
         foreach (var definition in definitions.Select(value => value.Definition))
         {
             var name = AgentstrationToolProvider.ToolResourceName(definition.Name);
             var key = new ResourceKey(ToolResourceKinds.Tool, name, @namespace);
-            var existing = await store.GetAsync<ToolResource>(key, cancellationToken);
-            if (existing is not null)
+            var existing = await store.GetExactAsync<ToolResource>(key.AtScope(workspaceScope), cancellationToken);
+            if (existing is null)
             {
-                if (existing.Value.Definition.ExternalId != definition.Name
-                    || existing.Value.Definition.Provider?.Name != AgentstrationToolProvider.Name
-                    || existing.Value.ScopeRef != workspaceScope)
-                    throw new ToolResourceValidationException($"The reserved internal Tool identity '{name}' is already in use.");
-                if (existing.Value.Definition.Description != definition.Description
-                    || !ToolDefinitionService.SameSchema(existing.Value.Definition.Schema?.Input, definition.InputSchema)
-                    || !ToolDefinitionService.SameSchema(existing.Value.Definition.Schema?.Output, definition.OutputSchema))
+                existing = await CreateOrReadAsync(new ToolResource
                 {
-                    await store.PutAsync(existing.Value with
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = ToolResourceKinds.Tool,
+                    Metadata = new ResourceMetadata { Name = name, Namespace = @namespace },
+                    ScopeRef = workspaceScope,
+                    Generation = 1,
+                    Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
+                    Definition = new ToolResourceProperties
                     {
-                        Generation = checked(existing.Value.Generation + 1),
-                        Definition = existing.Value.Definition with
+                        DisplayName = definition.DisplayName,
+                        Description = definition.Description,
+                        Enabled = true,
+                        RequiresApproval = definition.RequiresApproval,
+                        Provider = new ResourceReference(AgentstrationToolProvider.Name, workspaceScope, @namespace),
+                        ExternalId = definition.Name,
+                        Discovery = new ToolDiscoveryState { Available = true, FirstSeenAt = now, LastSeenAt = now },
+                        Schema = new ToolSchema { Input = definition.InputSchema.Clone(), Output = definition.OutputSchema?.Clone() },
+                        Metadata = new Dictionary<string, JsonElement>
                         {
-                            Description = definition.Description,
-                            Schema = new ToolSchema { Input = definition.InputSchema.Clone(), Output = definition.OutputSchema?.Clone() }
+                            ["agentstration.implementation"] = JsonSerializer.SerializeToElement("internal")
                         }
-                    }, existing.ETag, false, cancellationToken);
-                }
-                continue;
-            }
-            await store.PutAsync(new ToolResource
-            {
-                ApiVersion = ResourceApiVersions.CoreV1,
-                Kind = ToolResourceKinds.Tool,
-                Metadata = new ResourceMetadata { Name = name, Namespace = @namespace },
-                ScopeRef = workspaceScope,
-                Generation = 1,
-                Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
-                Definition = new ToolResourceProperties
-                {
-                    DisplayName = definition.DisplayName,
-                    Description = definition.Description,
-                    Enabled = true,
-                    RequiresApproval = definition.RequiresApproval,
-                    Provider = new ResourceReference(AgentstrationToolProvider.Name, workspaceScope, @namespace),
-                    ExternalId = definition.Name,
-                    Discovery = new ToolDiscoveryState { Available = true, FirstSeenAt = now, LastSeenAt = now },
-                    Schema = new ToolSchema { Input = definition.InputSchema.Clone(), Output = definition.OutputSchema?.Clone() },
-                    Metadata = new Dictionary<string, JsonElement>
-                    {
-                        ["agentstration.implementation"] = JsonSerializer.SerializeToElement("internal")
                     }
-                }
-            }, null, true, cancellationToken);
+                }, workspaceScope, cancellationToken);
 
-            if (definition.InitialCategory is { } category)
-                await EnsureInitialCategoryAsync(category, name, workspaceScope, @namespace, cancellationToken);
+                if (definition.InitialCategory is { } category)
+                    await EnsureInitialCategoryAsync(category, name, workspaceScope, @namespace, cancellationToken);
+            }
+
+            if (existing.Value.Definition.ExternalId != definition.Name
+                || existing.Value.Definition.Provider?.Name != AgentstrationToolProvider.Name
+                || existing.Value.ScopeRef != workspaceScope)
+                throw new ToolResourceValidationException($"The reserved internal Tool identity '{name}' is already in use.");
+            if (existing.Value.Definition.Description != definition.Description
+                || !ToolDefinitionService.SameSchema(existing.Value.Definition.Schema?.Input, definition.InputSchema)
+                || !ToolDefinitionService.SameSchema(existing.Value.Definition.Schema?.Output, definition.OutputSchema))
+            {
+                await store.PutExactAsync(workspaceScope, existing.Value with
+                {
+                    Generation = checked(existing.Value.Generation + 1),
+                    Definition = existing.Value.Definition with
+                    {
+                        Description = definition.Description,
+                        Schema = new ToolSchema { Input = definition.InputSchema.Clone(), Output = definition.OutputSchema?.Clone() }
+                    }
+                }, existing.ETag, false, cancellationToken);
+            }
         }
     }
 
@@ -173,8 +170,8 @@ public sealed class InternalMcpToolProjectionService(
         CancellationToken cancellationToken)
     {
         var key = new ResourceKey(ToolResourceKinds.ToolCategory, category.Name, @namespace);
-        if (await store.GetAsync<ToolCategoryResource>(key, cancellationToken) is not null) return;
-        await store.PutAsync(new ToolCategoryResource
+        if (await store.GetExactAsync<ToolCategoryResource>(key.AtScope(scope), cancellationToken) is not null) return;
+        _ = await CreateOrReadAsync(new ToolCategoryResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ToolResourceKinds.ToolCategory,
@@ -188,7 +185,26 @@ public sealed class InternalMcpToolProjectionService(
                 Description = category.Description,
                 Tools = [new ResourceReference(toolName, scope, @namespace)]
             }
-        }, null, true, cancellationToken);
+        }, scope, cancellationToken);
+    }
+
+    private async Task<StoredResource<T>> CreateOrReadAsync<T>(T resource, ResourceScopeRef scope, CancellationToken cancellationToken)
+        where T : Resource
+    {
+        try
+        {
+            return await store.PutExactAsync(scope, resource, null, true, cancellationToken);
+        }
+        catch (ResourceConcurrencyException)
+        {
+            var existing = await store.GetExactAsync<T>(ScopedResourceAddress.Create(
+                scope,
+                resource.Namespace,
+                resource.Kind,
+                resource.Name), cancellationToken);
+            if (existing is null) throw;
+            return existing;
+        }
     }
 
     private static ToolProviderResource Provider(ResourceScopeRef scope, ResourceNamespace @namespace) => new()

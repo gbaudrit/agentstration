@@ -1,6 +1,4 @@
 using Agentstration.Api.Contracts;
-using Agentstration.Identity.Contracts;
-using Agentstration.Infrastructure.Notifications;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Tools;
@@ -28,10 +26,9 @@ internal static class ToolProviderEndpoints
         tools.MapPut("/{toolName}/enabled", SetEnabledAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     }
 
-    private static Task<IResult> ListProvidersAsync(ToolManagementService service, InternalMcpToolProjectionService internalTools, ICurrentRequestContext context, CancellationToken cancellationToken) =>
+    private static Task<IResult> ListProvidersAsync(ToolManagementService service, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
-            await internalTools.EnsureAsync(ResourceScopeRef.Workspace(context.Current.WorkspaceId), ResourceNamespace.Default, cancellationToken);
             return Results.Ok(new ValueResponse<ToolProviderResource>((await service.ListProvidersAsync(cancellationToken)).Select(value => value.Value).ToArray()));
         });
 
@@ -88,10 +85,9 @@ internal static class ToolProviderEndpoints
             return Results.Ok(new ValueResponse<ToolResource>(tools.Where(value => value.Value.Definition.Provider?.Name == providerId).Select(value => value.Value).ToArray()));
         });
 
-    private static Task<IResult> ListToolsAsync(bool? enabled, bool? available, ToolManagementService service, InternalMcpToolProjectionService internalTools, ICurrentRequestContext context, CancellationToken cancellationToken) =>
+    private static Task<IResult> ListToolsAsync(bool? enabled, bool? available, ToolManagementService service, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
-            await internalTools.EnsureAsync(ResourceScopeRef.Workspace(context.Current.WorkspaceId), ResourceNamespace.Default, cancellationToken);
             var values = (await service.ListToolsAsync(cancellationToken)).Select(value => value.Value);
             if (enabled.HasValue) values = values.Where(value => value.Definition.Enabled == enabled.Value);
             if (available.HasValue) values = values.Where(value => value.Definition.Discovery?.Available == available.Value);

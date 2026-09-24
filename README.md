@@ -212,7 +212,7 @@ Copy-Item deploy/compose/.env.postgresql.example deploy/compose/.env.postgresql
 docker compose --env-file deploy/compose/.env.postgresql -f deploy/compose/ollama.yml -f deploy/compose/postgresql.yml up --build
 ```
 
-Replace `ollama.yml` with `base.yml`, `llama-cpp.yml`, or `localai.yml` to select another PostgreSQL-backed variant. PostgreSQL stores relational module data in seven schemas but leaves secrets, Data Protection keys, Pack archives, and Work artifacts on the existing file stores. Changing provider does not migrate SQLite data and does not enable multi-instance operation. Readiness is exposed at `/health/ready`; `/health` remains liveness.
+Replace `ollama.yml` with `base.yml`, `llama-cpp.yml`, or `localai.yml` to select another PostgreSQL-backed variant. PostgreSQL stores relational module data in seven schemas but leaves secrets, Data Protection keys, Pack archives, and Work artifacts on the existing file stores. Changing provider does not migrate SQLite data. Startup bootstrap is coordinated through a durable fenced initialization lease, but this does not by itself make every runtime subsystem safe for horizontally scaled operation. Readiness is exposed at `/health/ready`; `/health` remains liveness.
 
 For Aspire, set `Agentstration:Storage:Provider=PostgreSql`. Its generated password is persisted in user-secrets and relational data is kept in the worktree-isolated Docker volume `agentstration-<slot>-<instance-id>-postgresql`; file-backed state remains under the slot data directory. See [configuration](docs/getting-started/configuration.md#postgresql-storage-profile) for startup behavior, reset, troubleshooting, and backup guidance.
 
