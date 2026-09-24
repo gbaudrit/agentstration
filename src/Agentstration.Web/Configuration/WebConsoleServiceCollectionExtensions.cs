@@ -26,6 +26,7 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(provider => provider.GetRequiredService<ConsoleRealtimeSession>());
         services.AddScoped<IConsoleContextProvider, ConsoleContextProvider>();
         services.AddScoped<IResourceSearchProvider, ConsoleResourceSearchProvider>();
+        services.AddScoped<ICommandPaletteFallbackProvider, ConsoleEntryCommandFallbackProvider>();
         services.AddAgentstrationFlowDesigner();
         services.AddScoped<PlatformDashboardService>();
         services.AddScoped<IPlatformStatusProvider>(provider => provider.GetRequiredService<PlatformDashboardService>());
@@ -42,6 +43,7 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
         AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi);
         AddClient<EntryAdministrationApiClient, IEntryAdministrationApiClient>(services, configured.WorkApi);
+        AddClient<ConsoleEntryInteractionApiClient, IConsoleEntryInteractionApiClient>(services, configured.WorkApi);
         AddClient(services, EntryAdministrationApiClient.AgentResourceCatalogClient, configured.ManagementApi);
         AddClient(services, EntryAdministrationApiClient.FlowResourceCatalogClient, configured.FlowApi);
         services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(

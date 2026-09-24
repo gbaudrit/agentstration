@@ -35,6 +35,8 @@ It is built on the Microsoft .NET AI stack and currently executes agents through
 - workspace Dashboards that organize published Entries without exposing runtime details;
 - a responsive, conversation-first Workplace that projects agent turns, progress, human input and outcomes;
 - an operations Console for configuration, supervision, run inspection and governance.
+- a generic Console Entry interaction surface that reuses durable conversations, tasks, pending actions, results and artifacts for Console-exposed Entries;
+- a permission-aware Console Conversations view for returning to durable Entry interactions in the selected Workspace;
 - Console Resource Plan review with saved per-agent profile choices, proposed changes, dependency graph, validation, and activity history.
 
 ### Packs and automation

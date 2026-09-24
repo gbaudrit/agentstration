@@ -14,6 +14,7 @@ import { OperationsPage } from './operations.page.js';
 import { ResourceAdministrationPage } from './resource-administration.page.js';
 import { ModelAdministrationPage } from './model-administration.page.js';
 import { DescendantSecretsPage } from './descendant-secrets.page.js';
+import { ConsoleEntryInteractionPage } from './console-entry-interaction.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -30,6 +31,7 @@ export class ProductPages {
   public readonly resourceAdministration: ResourceAdministrationPage;
   public readonly modelAdministration: ModelAdministrationPage;
   public readonly descendantSecrets: DescendantSecretsPage;
+  public readonly consoleEntryInteraction: ConsoleEntryInteractionPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -46,6 +48,7 @@ export class ProductPages {
     this.resourceAdministration = new ResourceAdministrationPage(page);
     this.modelAdministration = new ModelAdministrationPage(page);
     this.descendantSecrets = new DescendantSecretsPage(page);
+    this.consoleEntryInteraction = new ConsoleEntryInteractionPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {
