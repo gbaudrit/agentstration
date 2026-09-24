@@ -48,7 +48,7 @@
                 <nav class="breadcrumb" aria-label="@T("CurrentOrganizationWorkspace")" data-testid="console-breadcrumb"><a href="/settings/organization">@(ContextState.Current?.TenantDisplayName ?? T("OrganizationFallback"))</a><span>/</span><strong>@CurrentSection</strong></nav>
             </div>
             <button class="command-palette-trigger" type="button" @onclick="OpenCommandPalette" aria-keyshortcuts="Control+K" aria-haspopup="dialog" aria-expanded="@commandPaletteOpen" title="@T("OpenCommandPalette")" data-testid="console-command-trigger">
-                <span aria-hidden="true">⌕</span><span>@T("SearchPagesCommands")</span><kbd>Ctrl K</kbd>
+                <UiIcon Name="search" /><span>@T("SearchPagesCommands")</span><kbd>Ctrl K</kbd>
             </button>
             <div class="topbar-actions">
                 @if (ContextState.Current is { } context)
@@ -92,8 +92,10 @@
         <div class="command-palette-backdrop" @onclick="CloseCommandPalette">
             <section class="command-palette" role="dialog" aria-modal="true" aria-label="@T("CommandPalette")" @onclick:stopPropagation="true" data-testid="console-command-palette">
                 <header>
-                    <span aria-hidden="true">⌕</span>
-                    <input @ref="commandInput" value="@commandQuery" @oninput="UpdateCommandQuery" @onkeydown="HandleCommandKeyDown" placeholder="@T("SearchPagesCommands")" aria-label="@T("SearchPagesCommandsAria")" autocomplete="off" data-testid="console-command-input" />
+                    <div class="command-search-box">
+                        <UiIcon Name="search" />
+                        <input @ref="commandInput" value="@commandQuery" @oninput="UpdateCommandQuery" @onkeydown="HandleCommandKeyDown" placeholder="@T("SearchPagesCommands")" aria-label="@T("SearchPagesCommandsAria")" autocomplete="off" data-testid="console-command-input" />
+                    </div>
                     <button class="command-palette-close" type="button" @onclick="CloseCommandPalette" aria-label="@T("CloseCommandPalette")">Esc</button>
                 </header>
                 <div class="command-results" role="listbox" aria-label="@T("MatchingDestinations")" aria-busy="@searchingResources">
@@ -112,7 +114,7 @@
                             var command = DisplayedCommands[index];
                             var commandIndex = index;
                             <button type="button" class="command-result @(selectedCommandIndex == commandIndex ? "selected" : null)" role="option" aria-selected="@(selectedCommandIndex == commandIndex)" data-testid="@(command.IsFallback ? "console-entry-fallback" : null)" @onmouseenter="() => selectedCommandIndex = commandIndex" @onclick="() => ExecuteCommand(command)">
-                                <span class="command-icon" aria-hidden="true">@command.Icon</span><span><strong>@command.Label</strong><small>@command.Category@if (!string.IsNullOrWhiteSpace(command.Detail)) { <span> · @command.Detail</span> }</small></span><kbd>↵</kbd>
+                                <span class="command-icon" data-icon="@command.Icon" aria-hidden="true"><UiIcon Name="@command.Icon" /></span><span><strong>@command.Label</strong><small>@command.Category@if (!string.IsNullOrWhiteSpace(command.Detail)) { <span> · @command.Detail</span> }</small></span><kbd>↵</kbd>
                             </button>
                         }
                     }

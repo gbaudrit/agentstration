@@ -172,6 +172,7 @@ public sealed class ConsoleHostTests
         Assert.IsTrue(authority.Validations > 0);
         var authenticatedHtml = await authenticated.Content.ReadAsStringAsync();
         StringAssert.Contains(authenticatedHtml, "tool-details.css?v=20260918-1");
+        StringAssert.Contains(authenticatedHtml, "design-tokens.css?v=20260924-1");
         StringAssert.Contains(authenticatedHtml, "Agentstration.Console.Web.styles.css");
 
         var logoutHtml = await client.GetStringAsync("/logout");

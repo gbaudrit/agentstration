@@ -12,6 +12,7 @@ import { inspectConsoleAdministration, type InspectConsoleAdministrationInput } 
 import { inspectResourceAdministration, type InspectResourceAdministrationInput } from './inspect-resource-administration.journey.js';
 import { exerciseModelAdministration, type ExerciseModelAdministrationInput } from './exercise-model-administration.journey.js';
 import { exerciseDescendantSecrets, type ExerciseDescendantSecretsInput } from './exercise-descendant-secrets.journey.js';
+import { inspectPlatformHealth, type InspectPlatformHealthInput } from './inspect-platform-health.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -29,4 +30,5 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'inspect-resource-administration': (context, input) => inspectResourceAdministration(context, input as unknown as InspectResourceAdministrationInput),
   'exercise-model-administration': (context, input) => exerciseModelAdministration(context, input as unknown as ExerciseModelAdministrationInput),
   'exercise-descendant-secrets': (context, input) => exerciseDescendantSecrets(context, input as unknown as ExerciseDescendantSecretsInput),
+  'inspect-platform-health': (context, input) => inspectPlatformHealth(context, input as unknown as InspectPlatformHealthInput),
 };

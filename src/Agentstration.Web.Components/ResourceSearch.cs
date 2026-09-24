@@ -17,7 +17,7 @@ public interface IResourceSearchProvider
 public sealed record CommandPaletteFallbackResult(
     string Label,
     string Url,
-    string Icon = "✦",
+    string Icon = "sparkle",
     string? Detail = null);
 
 public interface ICommandPaletteFallbackProvider
