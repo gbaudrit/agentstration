@@ -137,7 +137,7 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
     id: 'agent-editor', host: 'console', source: `${consolePages}/AgentEditor.razor`,
     routes: ['/agents/new', '/agents/{Name}'], fixtureKeys: ['name'], pageObject: 'src/pages/agent-editor.page.ts',
-    journey: 'create-agent', specification: 'tests/create-agent.spec.ts', coverage: 'covered',
+    journey: 'exercise-bootstrap-provenance', specification: 'tests/bootstrap-provenance.spec.ts', coverage: 'covered',
   },
   {
     id: 'new-flow', host: 'console', source: `${consolePages}/NewFlow.razor`, routes: ['/flows/new'], fixtureKeys: [],
@@ -153,8 +153,8 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
     id: 'entry-editor', host: 'console', source: `${consolePages}/EntryEditor.razor`,
     routes: ['/entries/{Name}', '/namespaces/{EntryNamespace}/entries/{Name}'], fixtureKeys: ['name', 'entryNamespace'],
-    pageObject: 'src/pages/entry-editor.page.ts', journey: 'create-entry',
-    specification: 'tests/create-flow-entry.spec.ts', coverage: 'partial', trackingIssue: 411,
+    pageObject: 'src/pages/entry-editor.page.ts', journey: 'exercise-bootstrap-provenance',
+    specification: 'tests/bootstrap-provenance.spec.ts', coverage: 'covered',
   },
 
   coveredOperations('access-denied', `${razorPages}/AccessDenied.cshtml`, ['/access-denied']),
@@ -166,12 +166,22 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   partialResourceAdministration('agents', `${consolePages}/Agents.razor`, ['/agents'], 412),
   coveredFlow('agent-runner', `${consolePages}/AgentRunner.razor`, ['/agents/{Name}/run', '/runs/{RunId}'], ['name', 'runId'], 'inspect-flow-observability'),
   coveredFlow('agent-runs', `${consolePages}/AgentRuns.razor`, ['/agent-runs'], [], 'inspect-flow-observability'),
-  planned('namespaced-agent-details', `${consolePages}/NamespacedAgentDetails.razor`, ['/namespaces/{AgentNamespace}/agents/{Name}'], 413, ['agentNamespace', 'name']),
+  {
+    id: 'namespaced-agent-details', host: 'console', source: `${consolePages}/NamespacedAgentDetails.razor`,
+    routes: ['/namespaces/{AgentNamespace}/agents/{Name}'], fixtureKeys: ['agentNamespace', 'name'],
+    pageObject: 'src/pages/agent-editor.page.ts', journey: 'exercise-bootstrap-provenance',
+    specification: 'tests/bootstrap-provenance.spec.ts', coverage: 'covered',
+  },
   partialResourceAdministration('deployments', `${consolePages}/Deployments.razor`, ['/deployments'], 414),
 
   coveredFlow('flows', `${consolePages}/Flows.razor`, ['/flows']),
   coveredFlow('flow-details', `${consolePages}/FlowDetails.razor`, ['/flows/{FlowId}', '/namespaces/{FlowNamespace}/flows/{FlowId}'], ['flowId', 'flowNamespace']),
-  coveredFlow('flow-designer', `${consolePages}/FlowDesigner.razor`, ['/flows/{FlowId}/designer', '/namespaces/{FlowNamespace}/flows/{FlowId}/designer'], ['flowId', 'flowNamespace']),
+  {
+    id: 'flow-designer', host: 'console', source: `${consolePages}/FlowDesigner.razor`,
+    routes: ['/flows/{FlowId}/designer', '/namespaces/{FlowNamespace}/flows/{FlowId}/designer'], fixtureKeys: ['flowId', 'flowNamespace'],
+    pageObject: 'src/pages/flow-designer.page.ts', journey: 'exercise-bootstrap-provenance',
+    specification: 'tests/bootstrap-provenance.spec.ts', coverage: 'covered',
+  },
   coveredFlow('flow-runs', `${consolePages}/FlowRuns.razor`, ['/flow-runs'], [], 'inspect-flow-observability'),
   coveredFlow('flow-run-details', `${consolePages}/FlowRunDetails.razor`, ['/flow-runs/{RunId}'], ['runId'], 'inspect-flow-observability'),
   coveredFlow('run-events', `${consolePages}/RunEvents.razor`, ['/run-events'], [], 'inspect-flow-observability'),

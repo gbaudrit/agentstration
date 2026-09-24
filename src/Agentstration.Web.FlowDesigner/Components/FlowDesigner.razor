@@ -41,11 +41,11 @@ else
             {
                 <button class="button-secondary" disabled="@(!Editor.CanUndo)" @onclick="Undo">@T("Undo")</button>
                 <button class="button-secondary" disabled="@(!Editor.CanRedo)" @onclick="Redo">@T("Redo")</button>
-                <button class="button-secondary" @onclick="ValidateAsync">@T("Validate")</button>
+                <button class="button-secondary" data-testid="flow-designer-validate" @onclick="ValidateAsync">@T("Validate")</button>
                 <button class="button-secondary" @onclick="OpenRun">@T("RunDraft")</button>
-                <button class="button-primary" disabled="@saving" @onclick="SaveAsync">@T("Save")</button>
+                <button class="button-primary" data-testid="flow-designer-save" disabled="@saving" @onclick="SaveAsync">@T("Save")</button>
                 <label class="publish-version">@T("Version")<input aria-label="@T("PublishVersion")" @bind="publishVersion" /></label>
-                <button class="button-primary" disabled="@publishing" aria-busy="@publishing" @onclick="PublishAsync">@T(publishing ? "Publishing" : "Publish")</button>
+                <button class="button-primary" data-testid="flow-designer-publish" disabled="@publishing" aria-busy="@publishing" @onclick="PublishAsync">@T(publishing ? "Publishing" : "Publish")</button>
             }
         </div>
     </header>

@@ -49,6 +49,12 @@ export const Checkpoints = {
     created: 'pack-project-created',
     built: 'pack-project-built',
   },
+  bootstrapProvenance: {
+    entryEditable: 'bootstrap-entry-editable',
+    flowEditable: 'bootstrap-flow-editable',
+    agentEditable: 'bootstrap-agent-editable',
+    packReadOnly: 'pack-provenance-read-only',
+  },
   workplace: {
     home: 'workplace-home',
     entryReady: 'workplace-entry-ready',
