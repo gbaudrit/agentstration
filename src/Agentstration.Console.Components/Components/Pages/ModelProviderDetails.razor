@@ -23,7 +23,7 @@ else
     {
         <nav class="section-tabs model-provider-tabs" role="tablist" aria-label="@T("ModelProvider")">
             <button id="model-provider-overview-tab" type="button" role="tab" aria-selected="@(activeTab == ProviderTab.Overview ? "true" : "false")" aria-controls="model-provider-tab-panel" class="@(activeTab == ProviderTab.Overview ? "active" : null)" @onclick="() => activeTab = ProviderTab.Overview">@T("Tab.Overview")</button>
-            <button id="model-provider-configuration-tab" type="button" role="tab" aria-selected="@(activeTab == ProviderTab.Configuration ? "true" : "false")" aria-controls="model-provider-tab-panel" class="@(activeTab == ProviderTab.Configuration ? "active" : null)" @onclick="() => activeTab = ProviderTab.Configuration">@T("Tab.Configuration")</button>
+            <button id="model-provider-configuration-tab" type="button" role="tab" aria-selected="@(activeTab == ProviderTab.Configuration ? "true" : "false")" aria-controls="model-provider-tab-panel" class="@(activeTab == ProviderTab.Configuration ? "active" : null)" @onclick="() => activeTab = ProviderTab.Configuration" data-testid="model-provider-configuration-tab">@T("Tab.Configuration")</button>
         </nav>
     }
     <div id="model-provider-tab-panel" role="tabpanel" aria-labelledby="@(activeTab == ProviderTab.Configuration ? "model-provider-configuration-tab" : "model-provider-overview-tab")">

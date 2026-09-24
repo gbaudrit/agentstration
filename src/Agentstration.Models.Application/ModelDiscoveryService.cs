@@ -295,9 +295,9 @@ public sealed class ModelDiscoveryService(
         ModelObservationState state,
         DateTimeOffset transitionTime,
         string? message = null) => new()
-    {
-        ProvisioningState = ProvisioningState.Succeeded,
-        Conditions =
+        {
+            ProvisioningState = ProvisioningState.Succeeded,
+            Conditions =
         [
             new ResourceCondition
             {
@@ -313,7 +313,7 @@ public sealed class ModelDiscoveryService(
                 LastTransitionTime = transitionTime
             }
         ]
-    };
+        };
 
     private static string ResourceName(ModelProviderResource provider, string externalId)
     {

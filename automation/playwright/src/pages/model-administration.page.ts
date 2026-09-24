@@ -26,7 +26,7 @@ export class ModelAdministrationPage {
     await this.page.waitForURL(url => url.pathname === `/modelproviders/${definition.providerName}`);
     const marker = this.page.getByTestId(TestIds.resourceAdministration.modelProviderEditor);
     await marker.waitFor({ state: 'visible' });
-    await this.waitForPersisted(TestIds.modelAdministration.providerForm);
+    await this.openProviderConfiguration();
     const status = this.page.getByTestId(TestIds.modelAdministration.providerStatus);
     const previousCheck = await status.getAttribute('data-checked-at');
     await this.page.getByTestId(TestIds.modelAdministration.providerTest).click();
@@ -57,7 +57,6 @@ export class ModelAdministrationPage {
 
   public async overrideFirstModelContextLimit(consoleUrl: string, providerName: string, contextTokens: number): Promise<void> {
     await this.open(consoleUrl, `/modelproviders/${encodeURIComponent(providerName)}`, TestIds.resourceAdministration.modelProviderEditor);
-    await this.waitForPersisted(TestIds.modelAdministration.providerForm);
     await this.page.getByTestId(TestIds.modelAdministration.openModelDetails).first().click();
     await this.page.getByTestId(TestIds.resourceAdministration.modelDetails).waitFor({ state: 'visible' });
     await this.page.getByTestId(TestIds.modelAdministration.editModelOverride).click();
@@ -121,7 +120,7 @@ export class ModelAdministrationPage {
 
   public async openProvider(consoleUrl: string, name: string): Promise<void> {
     await this.open(consoleUrl, `/modelproviders/${name}`, TestIds.resourceAdministration.modelProviderEditor);
-    await this.waitForPersisted(TestIds.modelAdministration.providerForm);
+    await this.openProviderConfiguration();
   }
 
   public async deleteProvider(): Promise<void> {
@@ -144,6 +143,11 @@ export class ModelAdministrationPage {
   private async waitForPersisted(testId: string): Promise<void> {
     await this.waitForInteractive(testId);
     await expect(this.page.getByTestId(testId)).toHaveAttribute('data-resource-etag', /.+/);
+  }
+
+  private async openProviderConfiguration(): Promise<void> {
+    await this.page.getByTestId(TestIds.modelAdministration.providerConfigurationTab).click();
+    await this.waitForPersisted(TestIds.modelAdministration.providerForm);
   }
 
   private async deleteCurrent(deleteButtonId: string, confirmButtonId: string, listPath: string): Promise<void> {

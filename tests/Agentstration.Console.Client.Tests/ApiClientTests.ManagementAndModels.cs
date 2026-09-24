@@ -266,7 +266,8 @@ public sealed partial class ApiClientTests
             path = request.RequestUri!.PathAndQuery;
             method = request.Method;
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(expected) };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         var result = await new ModelProvidersApiClient(httpClient).RefreshProviderModelsAsync(
             new ResourceNamespace("shared.models"), "ollama/local", default);
@@ -308,7 +309,8 @@ public sealed partial class ApiClientTests
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(resource) };
             response.Headers.ETag = new EntityTagHeaderValue("\"model-v2\"");
             return response;
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         var snapshot = await new ModelsApiClient(httpClient).GetModelAsync(resource.Namespace, resource.Name, default);
 

@@ -90,6 +90,7 @@ export const TestIds = {
   },
   modelAdministration: {
     providerForm: 'model-provider-form',
+    providerConfigurationTab: 'model-provider-configuration-tab',
     providerName: 'model-provider-name',
     providerDisplayName: 'model-provider-display-name',
     providerExtension: 'model-provider-extension',
