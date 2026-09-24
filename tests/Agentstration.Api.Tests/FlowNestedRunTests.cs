@@ -516,13 +516,11 @@ public sealed partial class FlowTests
     private sealed class StructuredAgentExecutor : IFlowAgentExecutor
     {
         public Task<FlowAgentExecutionResult> ExecuteAsync(
-            FlowTargetReference target,
-            JsonElement input,
-            string correlationId,
+            FlowAgentExecutionRequest request,
             CancellationToken cancellationToken) =>
             Task.FromResult(new FlowAgentExecutionResult(
                 JsonSerializer.SerializeToElement(new { article = "analyzed item", confidence = 0.9 }),
-                $"/agents/{target.Id}",
+                $"/agents/{request.Target.Id}",
                 3,
                 "/profiles/default",
                 "Deterministic",
@@ -534,13 +532,11 @@ public sealed partial class FlowTests
     private sealed class EchoAgentExecutor : IFlowAgentExecutor
     {
         public Task<FlowAgentExecutionResult> ExecuteAsync(
-            FlowTargetReference target,
-            JsonElement input,
-            string correlationId,
+            FlowAgentExecutionRequest request,
             CancellationToken cancellationToken) =>
             Task.FromResult(new FlowAgentExecutionResult(
-                input.Clone(),
-                $"/agents/{target.Id}",
+                request.Input.Clone(),
+                $"/agents/{request.Target.Id}",
                 1,
                 "/profiles/default",
                 "Deterministic",
