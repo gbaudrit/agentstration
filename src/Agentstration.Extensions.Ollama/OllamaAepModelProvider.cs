@@ -62,18 +62,70 @@ public sealed class OllamaAepModelProvider(IChatClient chatClient, OllamaApiClie
     public async Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default)
     {
         var models = await apiClient.ListLocalModelsAsync(cancellationToken);
-        return models.Select(model =>
+        var results = new List<AepModelDescriptor>();
+        foreach (var model in models)
         {
             var name = model.Name ?? model.ModelName ?? string.Empty;
-            var metadata = new Dictionary<string, string>(StringComparer.Ordinal);
-            if (!string.IsNullOrWhiteSpace(model.Details?.ParameterSize)) metadata["parameterSize"] = model.Details.ParameterSize;
-            if (!string.IsNullOrWhiteSpace(model.Details?.QuantizationLevel)) metadata["quantization"] = model.Details.QuantizationLevel;
-            return new AepModelDescriptor(
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            IReadOnlyList<string>? observedCapabilities = null;
+            try { observedCapabilities = (await apiClient.ShowModelAsync(name, cancellationToken)).Capabilities; }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (HttpRequestException)
+            {
+                // A partial catalog remains useful when optional per-model inspection is unavailable.
+            }
+            var hasObservation = observedCapabilities is not null;
+            bool Has(string capability) => observedCapabilities?.Contains(capability, StringComparer.OrdinalIgnoreCase) == true;
+            if (hasObservation && !Has("completion")) continue;
+            var completion = Has("completion");
+            var vision = Has("vision");
+            var tools = Has("tools");
+            var reasoning = Has("thinking");
+            results.Add(new AepModelDescriptor(
                 name,
                 name,
-                ["chat", "streaming", "tools", "reasoning", "structuredOutput", "vision"],
-                metadata);
-        }).Where(value => !string.IsNullOrWhiteSpace(value.Id)).ToArray();
+                new AepModelSpecification
+                {
+                    Input = completion
+                        ? vision ? [AepModelContentType.Text, AepModelContentType.Image] : [AepModelContentType.Text]
+                        : null,
+                    Output = completion ? [AepModelContentType.Text] : null,
+                    Features = new AepModelFeatureSpecifications
+                    {
+                        Streaming = new() { Support = completion ? AepModelFeatureSupport.Native : AepModelFeatureSupport.Unknown },
+                        Tools = new()
+                        {
+                            Support = hasObservation
+                                ? tools ? AepModelFeatureSupport.Native : AepModelFeatureSupport.Unsupported
+                                : AepModelFeatureSupport.Unknown,
+                            Modes = tools
+                                ? new Dictionary<AepModelToolMode, AepModelToolModeSpecification>
+                                {
+                                    [AepModelToolMode.Function] = new()
+                                }
+                                : new Dictionary<AepModelToolMode, AepModelToolModeSpecification>()
+                        },
+                        StructuredOutput = new()
+                        {
+                            Support = completion ? AepModelFeatureSupport.Native : AepModelFeatureSupport.Unknown,
+                            Formats = completion
+                                ? new Dictionary<AepModelStructuredOutputFormat, AepModelStructuredOutputFormatSpecification>
+                                {
+                                    [AepModelStructuredOutputFormat.JsonObject] = new()
+                                }
+                                : new Dictionary<AepModelStructuredOutputFormat, AepModelStructuredOutputFormatSpecification>()
+                        },
+                        Reasoning = new()
+                        {
+                            Support = hasObservation
+                                ? reasoning ? AepModelFeatureSupport.Native : AepModelFeatureSupport.Unsupported
+                                : AepModelFeatureSupport.Unknown
+                        }
+                    }
+                },
+                new AepModelIdentity(Model: name)));
+        }
+        return results;
     }
 
     public async Task<AepProviderHealth> GetHealthAsync(CancellationToken cancellationToken = default)

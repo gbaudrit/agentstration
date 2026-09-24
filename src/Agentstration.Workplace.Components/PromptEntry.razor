@@ -32,10 +32,21 @@
     [Parameter, EditorRequired] public required EventCallback<IReadOnlyDictionary<string, JsonElement>> OnSubmit { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? InitialValue { get; set; }
     private string request = string.Empty;
     private string? error;
     private bool submitting;
     private bool interactive;
+    private bool initialValueApplied;
+
+    protected override void OnParametersSet()
+    {
+        if (!initialValueApplied && InitialValue is not null)
+        {
+            request = InitialValue;
+            initialValueApplied = true;
+        }
+    }
 
     protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
 
@@ -47,12 +58,12 @@
     private async Task SubmitAsync()
     {
         if (Disabled || Busy || submitting) return;
-        var field = Definition.Presentation.Fields.FirstOrDefault(value => value.Name == "request");
+        var field = Definition.Presentation.Fields.SingleOrDefault(value => value.Role == EntryFieldRole.PrimaryInput);
         var minimum = field?.Validation?.MinimumLength ?? 1;
         if (request.Trim().Length < minimum) { error = Localizer["MinimumCharacters", minimum]; return; }
         error = null;
         submitting = true;
-        try { await OnSubmit.InvokeAsync(new Dictionary<string, JsonElement> { ["request"] = JsonSerializer.SerializeToElement(request.Trim()) }); }
+        try { await OnSubmit.InvokeAsync(new Dictionary<string, JsonElement> { [field?.Name ?? "request"] = JsonSerializer.SerializeToElement(request.Trim()) }); }
         finally { submitting = false; }
     }
 }

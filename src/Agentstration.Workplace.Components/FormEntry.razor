@@ -15,10 +15,19 @@
     [Parameter, EditorRequired] public required EventCallback<IReadOnlyDictionary<string, JsonElement>> OnSubmit { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public bool Busy { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, JsonElement> InitialValues { get; set; } = new Dictionary<string, JsonElement>();
     private readonly Dictionary<string, JsonElement> values = new(StringComparer.Ordinal);
     private string? error;
     private bool submitting;
     private bool interactive;
+    private bool initialValuesApplied;
+
+    protected override void OnParametersSet()
+    {
+        if (initialValuesApplied) return;
+        foreach (var value in InitialValues) values[value.Key] = value.Value;
+        initialValuesApplied = true;
+    }
 
     protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
     private JsonElement GetValue(EntryFieldDefinition field) => values.TryGetValue(field.Name, out var value) ? value : field.DefaultValue ?? default;

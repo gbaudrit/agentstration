@@ -103,7 +103,32 @@ internal sealed class ListProviderModelsEndpoint : IModelManagementEndpoint
         {
             var models = await service.ListModelsAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken);
             return Results.Ok(new ValueResponse<AvailableModelResponse>(models.Select(model =>
-                new AvailableModelResponse(model.Name, model.DisplayName, model.Status, model.Capabilities, model.Metadata)).ToArray()));
+                new AvailableModelResponse(
+                    model.Name,
+                    model.DisplayName,
+                    model.Status,
+                    model.Specification,
+                    model.Identity,
+                    model.ObservedSpecification,
+                    model.SpecificationOverride,
+                    model.ResourceName)).ToArray()));
+        });
+}
+
+internal sealed class RefreshProviderModelsEndpoint : IModelManagementEndpoint
+{
+    public static void Map(RouteGroupBuilder group) => group.MapPost("/{providerName}/models/refresh", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelDiscoveryService service, CancellationToken cancellationToken) =>
+        ModelsApiHttp.ExecuteAsync(async () =>
+        {
+            var diff = await service.RefreshAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken);
+            return Results.Ok(new ModelDiscoveryDiffResponse(
+                diff.Created,
+                diff.Updated,
+                diff.Unchanged,
+                diff.Missing,
+                diff.Reappeared,
+                diff.Total));
         });
 }
 

@@ -80,7 +80,11 @@ public static class AepServerExtensions
             Results.Json(CreateManifest(options.Value, providers, sourceProviders, migrators), AepProtocol.JsonOptions)));
         protocolEndpoints.Add(endpoints.MapGet(AepProtocol.HealthPath, () => Results.Json(new AepHealth("available"), AepProtocol.JsonOptions)));
         protocolEndpoints.Add(endpoints.MapGet(AepProtocol.ModelProvidersPath, (IEnumerable<IAepModelProvider> providers) =>
-            Results.Json(providers.Select(value => value.Descriptor).ToArray(), AepProtocol.JsonOptions)));
+        {
+            var descriptors = providers.Select(value => value.Descriptor).ToArray();
+            ValidatePublishedModels(descriptors);
+            return Results.Json(descriptors, AepProtocol.JsonOptions);
+        }));
         protocolEndpoints.Add(endpoints.MapGet(AepProtocol.SourceProvidersPath, (IEnumerable<IAepSourceProvider> providers) =>
             Results.Json(providers.Select(value => value.Descriptor).ToArray(), AepProtocol.JsonOptions)));
         protocolEndpoints.Add(endpoints.MapGet(AepProtocol.ConfigurationPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepOptionMigrator> migrators) =>
@@ -185,12 +189,13 @@ public static class AepServerExtensions
     {
         var modelProviders = providers.Select(value => value.Descriptor).ToArray();
         var sources = sourceProviders.Select(value => value.Descriptor).ToArray();
+        ValidatePublishedModels(modelProviders);
         ValidateOptionSets(options.OptionSets, modelProviders, sources, migrators);
         var capabilities = new Dictionary<string, AepCapabilityDescriptor>(options.Capabilities, StringComparer.Ordinal)
         {
             [AepCapabilityNames.Health] = new("1.0", AepProtocol.HealthPath)
         };
-        if (modelProviders.Length > 0) capabilities[AepCapabilityNames.ModelProvider] = new("1.0", AepProtocol.ModelProvidersPath);
+        if (modelProviders.Length > 0) capabilities[AepCapabilityNames.ModelProvider] = new(AepProtocol.ModelProviderCapabilityVersion, AepProtocol.ModelProvidersPath);
         if (sources.Length > 0) capabilities[AepCapabilityNames.SourceProvider] = new("1.0", AepProtocol.SourceProvidersPath);
         if (options.Tools.Count > 0) capabilities[AepCapabilityNames.Tools] = new("1.0");
         if (options.OptionSets.Count > 0) capabilities[AepCapabilityNames.Configuration] = new("1.0", AepProtocol.ConfigurationPath);
@@ -209,6 +214,13 @@ public static class AepServerExtensions
         var errors = AepDescriptorValidator.Validate(descriptor);
         if (errors.Count > 0) throw new InvalidOperationException($"The AEP extension descriptor is invalid: {string.Join(" ", errors)}");
         return descriptor;
+    }
+
+    private static void ValidatePublishedModels(IEnumerable<AepModelProviderDescriptor> providers)
+    {
+        foreach (var provider in providers)
+            if (provider.Models is { } models && AepModelObservationValidator.FindIssue(models) is { } issue)
+                throw new InvalidOperationException($"The AEP model provider descriptor is invalid: {issue}");
     }
 
     private static void ValidateOptionSets(
@@ -485,7 +497,10 @@ public static class AepServerExtensions
         try
         {
             ValidateBoundValues(providerId, request.BoundValues, options.Value.ValueRequirements.ToArray());
-            return Results.Json(await provider.ListModelsAsync(request.BoundValues, cancellationToken), AepProtocol.JsonOptions);
+            var models = await provider.ListModelsAsync(request.BoundValues, cancellationToken);
+            if (AepModelObservationValidator.FindIssue(models) is { } issue)
+                throw new AepServerException("model_observation_invalid", issue, StatusCodes.Status502BadGateway);
+            return Results.Json(models, AepProtocol.JsonOptions);
         }
         catch (AepServerException exception) { return Error(exception.StatusCode, exception.Code, exception.Message); }
     }
@@ -501,6 +516,7 @@ public static class AepServerExtensions
         if (provider is null) return Error(StatusCodes.Status404NotFound, "provider_unavailable", $"Model provider '{providerId}' is not registered.");
         try
         {
+            ValidateEffectiveSpecification(request.EffectiveSpecification);
             ValidateNativeOptions(providerId, request.Options?.NativeOptions, options.Value.OptionSets);
             ValidateBoundValues(providerId, request.BoundValues, options.Value.ValueRequirements.ToArray());
             return Results.Json(await provider.ChatAsync(request, cancellationToken), AepProtocol.JsonOptions);
@@ -525,6 +541,7 @@ public static class AepServerExtensions
         }
         try
         {
+            ValidateEffectiveSpecification(request.EffectiveSpecification);
             ValidateNativeOptions(providerId, request.Options?.NativeOptions, options.Value.OptionSets);
             ValidateBoundValues(providerId, request.BoundValues, options.Value.ValueRequirements.ToArray());
         }
@@ -549,6 +566,12 @@ public static class AepServerExtensions
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    private static void ValidateEffectiveSpecification(AepModelSpecification? specification)
+    {
+        if (AepModelObservationValidator.FindSpecificationIssue(specification) is { } issue)
+            throw new AepServerException("effective_model_specification_invalid", issue, StatusCodes.Status422UnprocessableEntity);
     }
 
     private static IAepModelProvider? Find(IEnumerable<IAepModelProvider> providers, string id) =>

@@ -1,0 +1,356 @@
+@page "/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}"
+@implements IDisposable
+@inject IEntryAdministrationApiClient Entries
+@inject IConsoleEntryInteractionApiClient Interactions
+@inject IWorkOperationsRealtimeClient Realtime
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ConsoleEntryInteractionStrings> Localizer
+
+<PageTitle>@(entry?.DisplayName ?? T("EntryInteraction")) · Agentstration</PageTitle>
+
+@if (loading)
+{
+    <LoadingState Message="@T("Loading")" />
+}
+else if (entry is null)
+{
+    <EmptyState Title="@T("UnavailableTitle")" Message="@T("UnavailableMessage")" />
+}
+else if (entry.Execution?.CanInvoke != true)
+{
+    <EmptyState Title="@T("DisabledTitle")" Message="@AvailabilityMessage" />
+}
+else
+{
+    <PageHeader Eyebrow="@T("ConsoleEntry")" Title="@entry.DisplayName" Description="@(entry.Description ?? T("Description"))">
+        <Actions>
+            <a class="button-secondary" href="/conversations" data-testid="back-to-conversations">← Conversations</a>
+            @if (CanCancel)
+            {
+                <button class="button-danger" type="button" disabled="@busy" @onclick="CancelAsync" data-testid="console-entry-cancel">@T("Cancel")</button>
+            }
+            @if (interaction is not null)
+            {
+                <button class="button-secondary" type="button" disabled="@busy" @onclick="NewRequestAsync" data-testid="console-entry-new-request">@T("NewRequest")</button>
+            }
+        </Actions>
+    </PageHeader>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="form-alert form-alert-danger" role="alert" data-testid="console-entry-error">@error</div>
+    }
+
+    <main class="console-entry-interaction" data-testid="console-entry-interaction" data-entry-name="@EntryName" data-entry-namespace="@EntryNamespace">
+        @if (interaction is null)
+        {
+            <Agentstration.Workplace.Components.PrimaryEntryContainer Busy="busy">
+                <Agentstration.Workplace.Components.EntryRenderer Definition="@ToDefinition(entry)" Role="DashboardItemRole.Primary" InitialValues="initialValues" OnSubmit="SubmitAsync" Disabled="busy" Busy="busy" />
+            </Agentstration.Workplace.Components.PrimaryEntryContainer>
+        }
+        else
+        {
+            @if (activeTask?.Error is { } taskError)
+            {
+                <section class="console-entry-terminal-error" role="alert"><strong>@taskError.Code</strong><span>@taskError.Message</span></section>
+            }
+            <Agentstration.Workplace.Components.InteractionView Messages="messages"
+                             Action="currentAction"
+                             PendingAction="pendingAction"
+                             ActionTimestamp="interaction.LastActivityAt"
+                             Presentation="entry.Presentation"
+                             Status="interaction.Status"
+                             Task="activeTask"
+                             Activities="activities"
+                             Results="results"
+                             Artifacts="artifacts"
+                             Busy="busy"
+                             Error="@error"
+                             OnPendingAction="RespondAsync"
+                             OnMessage="ContinueAsync"
+                             OnNewRequest="NewRequestAsync"
+                             ArtifactContentUrl="ArtifactUrl"
+                             TaskDetailsUrl="TaskUrl" />
+        }
+    </main>
+}
+
+@code {
+    [Parameter] public Guid WorkspaceId { get; set; }
+    [Parameter] public string EntryNamespace { get; set; } = ResourceNamespace.DefaultValue;
+    [Parameter] public string EntryName { get; set; } = string.Empty;
+    [Parameter, SupplyParameterFromQuery(Name = "query")] public string? InitialQuery { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "interaction")] public Guid? InteractionId { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private EntryResponse? entry;
+    private InteractionResponse? interaction;
+    private PendingActionContract? pendingAction;
+    private WorkplaceAction? currentAction;
+    private WorkTaskResponse? activeTask;
+    private IReadOnlyList<ConversationMessage> messages = [];
+    private IReadOnlyList<WorkTaskActivity> activities = [];
+    private IReadOnlyList<WorkTaskResult> results = [];
+    private IReadOnlyList<WorkTaskArtifact> artifacts = [];
+    private IReadOnlyDictionary<string, JsonElement> initialValues = new Dictionary<string, JsonElement>();
+    private bool loading = true;
+    private bool busy;
+    private bool realtimeStarted;
+    private string? loadedKey;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{WorkspaceId:D}/{EntryNamespace}/{EntryName}/{InteractionId}/{InitialQuery}";
+        if (string.Equals(key, loadedKey, StringComparison.Ordinal)) return;
+        loadedKey = key;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        ResetInteraction();
+        try
+        {
+            var @namespace = ResourceNamespace.Parse(EntryNamespace);
+            entry = (await Entries.GetConsoleEntriesAsync(lifetime.Token)).SingleOrDefault(value =>
+                value.WorkspaceId == WorkspaceId
+                && value.Namespace == @namespace
+                && string.Equals(value.Name, EntryName, StringComparison.Ordinal));
+            if (entry is null || entry.Execution?.CanInvoke != true) return;
+
+            if (!realtimeStarted)
+            {
+                realtimeStarted = true;
+                Realtime.Updated += OnRealtimeAsync;
+                await Realtime.StartAsync([WorkspaceId.ToString("D")], lifetime.Token);
+            }
+
+            if (InteractionId is { } interactionId)
+            {
+                await LoadInteractionAsync(interactionId);
+                return;
+            }
+
+            initialValues = InitialValues(entry, InitialQuery);
+            if (InitialQuery is not null && CanSubmitInitialQuery(entry))
+                await SubmitCoreAsync(initialValues, navigateToReplay: true);
+        }
+        catch (AgentstrationApiException exception) when (exception.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound)
+        {
+            entry = null;
+        }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException)
+        {
+            error = T("LoadFailed");
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private Task SubmitAsync(IReadOnlyDictionary<string, JsonElement> values) => SubmitCoreAsync(values, navigateToReplay: true);
+
+    private async Task SubmitCoreAsync(IReadOnlyDictionary<string, JsonElement> values, bool navigateToReplay)
+    {
+        if (entry is null || busy) return;
+        busy = true;
+        error = null;
+        try
+        {
+            var submission = await Entries.SubmitConsoleEntryAsync(WorkspaceId, entry.Namespace, entry.Name, new(values), lifetime.Token);
+            ApplySubmission(submission);
+            if (activeTask is not null) await RefreshTaskAsync(activeTask.Id);
+            if (navigateToReplay)
+                Navigation.NavigateTo($"{ConsoleEntryInteractionNavigation.Build(WorkspaceId, entry.Namespace, entry.Name)}?interaction={interaction!.Id:D}", replace: true);
+        }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException)
+        {
+            error = T("SubmitFailed");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task LoadInteractionAsync(Guid interactionId)
+    {
+        if (entry is null) return;
+        var loaded = await Interactions.GetInteractionAsync(WorkspaceId, interactionId, lifetime.Token);
+        if (loaded.WorkspaceId != WorkspaceId
+            || !string.Equals(loaded.EntryId, entry.Name, StringComparison.Ordinal)
+            || loaded.EntryNamespace != entry.Namespace)
+            throw new AgentstrationApiException("The interaction does not belong to this Entry.", Guid.NewGuid().ToString("N"), System.Net.HttpStatusCode.NotFound);
+
+        interaction = loaded;
+        messages = await Interactions.ListMessagesAsync(WorkspaceId, interactionId, lifetime.Token);
+        pendingAction = await CurrentPendingActionAsync(loaded);
+        currentAction = pendingAction is null ? loaded.ImmediateResult : TaskPendingActionUi.ToAction(pendingAction);
+        if (loaded.TaskId is { } taskId) await RefreshTaskAsync(taskId);
+    }
+
+    private async Task ContinueAsync(string content)
+    {
+        if (interaction is null || busy) return;
+        busy = true;
+        error = null;
+        try
+        {
+            var result = await Interactions.AddMessageAsync(WorkspaceId, interaction.Id, content, lifetime.Token);
+            ApplyContinuation(result.Interaction, result.Action, result.Task);
+            await RefreshInteractionAsync();
+        }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException)
+        {
+            error = T("ContinueFailed");
+        }
+        finally { busy = false; }
+    }
+
+    private async Task RespondAsync(Agentstration.Workplace.Components.PendingActionAnswer answer)
+    {
+        if (interaction is null || busy) return;
+        busy = true;
+        error = null;
+        try
+        {
+            var result = await Interactions.RespondAsync(WorkspaceId, interaction.Id, answer.PendingActionId.Value, answer.ResumeToken, answer.Values, lifetime.Token);
+            ApplyContinuation(result.Interaction, result.NextAction, result.Task);
+            await RefreshInteractionAsync();
+        }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException)
+        {
+            error = T("ResponseFailed");
+        }
+        finally { busy = false; }
+    }
+
+    private async Task CancelAsync()
+    {
+        if (activeTask is null || !CanCancel || busy) return;
+        busy = true;
+        error = null;
+        try
+        {
+            activeTask = await Interactions.CancelTaskAsync(WorkspaceId, activeTask.Id, lifetime.Token);
+            await RefreshInteractionAsync();
+        }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException)
+        {
+            error = T("CancelFailed");
+        }
+        finally { busy = false; }
+    }
+
+    private Task NewRequestAsync()
+    {
+        Navigation.NavigateTo(ConsoleEntryInteractionNavigation.Build(WorkspaceId, ResourceNamespace.Parse(EntryNamespace), EntryName));
+        return Task.CompletedTask;
+    }
+
+    private async Task RefreshInteractionAsync()
+    {
+        if (interaction is not null) await LoadInteractionAsync(interaction.Id);
+    }
+
+    private async Task RefreshTaskAsync(Guid taskId)
+    {
+        activeTask = await Interactions.GetTaskAsync(WorkspaceId, taskId, lifetime.Token);
+        activities = await Interactions.ListActivitiesAsync(WorkspaceId, taskId, lifetime.Token);
+        results = await Interactions.ListResultsAsync(WorkspaceId, taskId, lifetime.Token);
+        artifacts = await Interactions.ListArtifactsAsync(WorkspaceId, taskId, lifetime.Token);
+    }
+
+    private async Task<PendingActionContract?> CurrentPendingActionAsync(InteractionResponse value)
+    {
+        if (value.PendingActionId is null) return null;
+        return (await Interactions.ListPendingActionsAsync(WorkspaceId, value.Id, lifetime.Token))
+            .SingleOrDefault(action => action.Id == value.PendingActionId && action.Status == PendingActionStatus.Pending);
+    }
+
+    private Task OnRealtimeAsync(WorkOperationsRealtimeUpdate update) =>
+        update.RequiresResynchronization || update.InteractionId == interaction?.Id || update.TaskId == activeTask?.Id
+            ? InvokeAsync(async () => { await RefreshInteractionAsync(); StateHasChanged(); })
+            : Task.CompletedTask;
+
+    private void ApplySubmission(EntrySubmissionResponse submission)
+    {
+        interaction = submission.Interaction;
+        messages = submission.Interaction.Messages;
+        currentAction = submission.Action;
+        activeTask = submission.Task;
+    }
+
+    private void ApplyContinuation(InteractionResponse updated, WorkplaceAction action, WorkTaskResponse? task)
+    {
+        interaction = updated;
+        messages = updated.Messages;
+        currentAction = action;
+        activeTask = task;
+    }
+
+    private void ResetInteraction()
+    {
+        interaction = null;
+        pendingAction = null;
+        currentAction = null;
+        activeTask = null;
+        messages = [];
+        activities = [];
+        results = [];
+        artifacts = [];
+        initialValues = new Dictionary<string, JsonElement>();
+    }
+
+    private bool CanCancel => activeTask?.Status is WorkTaskStatus.Pending or WorkTaskStatus.Running or WorkTaskStatus.ActionRequired or WorkTaskStatus.Paused;
+    private string AvailabilityMessage => entry?.Execution?.Availability == EntryExecutionAvailability.Disabled ? T("DisabledMessage") : T("UnavailableTargetMessage");
+    private string ArtifactUrl(WorkTaskArtifact artifact) => Interactions.GetArtifactContentUri(WorkspaceId, artifact.WorkTaskId.Value, artifact.Id.Value).ToString();
+    private string TaskUrl(WorkTaskResponse task) => $"/tasks/{task.Id:D}";
+    private string T(string key) => Localizer[key];
+
+    private static IReadOnlyDictionary<string, JsonElement> InitialValues(EntryResponse value, string? query)
+    {
+        if (query is null) return new Dictionary<string, JsonElement>();
+        var primary = value.Presentation.Fields.SingleOrDefault(field => field.Role == EntryFieldRole.PrimaryInput);
+        return primary is null
+            ? new Dictionary<string, JsonElement>()
+            : new Dictionary<string, JsonElement>(StringComparer.Ordinal) { [primary.Name] = JsonSerializer.SerializeToElement(query) };
+    }
+
+    private static bool CanSubmitInitialQuery(EntryResponse value)
+    {
+        var primary = value.Presentation.Fields.SingleOrDefault(field => field.Role == EntryFieldRole.PrimaryInput);
+        return primary is not null
+            && primary.Type is EntryFieldType.Prompt or EntryFieldType.Text or EntryFieldType.Textarea or EntryFieldType.Conversation
+            && value.Presentation.Fields.All(field => !field.Required || field.Name == primary.Name);
+    }
+
+    private static EntryResource ToDefinition(EntryResponse value) => new()
+    {
+        WorkspaceId = new(value.WorkspaceId),
+        Id = new(value.Id, value.Namespace),
+        Name = value.Name,
+        DisplayName = value.DisplayName,
+        Description = value.Description,
+        Presentation = value.Presentation,
+        Exposure = value.Exposure,
+        ResolvedTarget = value.ResolvedTarget,
+        Behavior = value.Behavior,
+        ApiVersion = value.ApiVersion,
+        Type = value.Type,
+        Version = value.Version,
+        PublishedAt = value.PublishedAt
+    };
+
+    public void Dispose()
+    {
+        Realtime.Updated -= OnRealtimeAsync;
+        lifetime.Cancel();
+        lifetime.Dispose();
+        GC.SuppressFinalize(this);
+    }
+}

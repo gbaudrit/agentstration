@@ -31,7 +31,7 @@ public sealed partial class WorkplaceService
                 throw new WorkValidationException("entry_not_in_workspace", "The Entry is not exposed by a published Dashboard in the selected Workspace.");
         }
         WorkplaceValidation.ValidateSubmission(entry, command.Values);
-        var now = timeProvider.GetUtcNow(); var interaction = new WorkplaceInteraction { Id = InteractionId.New(), WorkspaceId = command.WorkspaceId, EntryId = command.EntryId, EntrySnapshot = entry, StartedAt = now, LastActivityAt = now, InputValues = command.Values.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal), Attachments = command.Attachments ?? [] };
+        var now = timeProvider.GetUtcNow(); var interaction = new WorkplaceInteraction { Id = InteractionId.New(), WorkspaceId = command.WorkspaceId, OwnerPrincipalId = context.PrincipalId, EntryId = command.EntryId, EntrySnapshot = entry, StartedAt = now, LastActivityAt = now, InputValues = command.Values.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal), Attachments = command.Attachments ?? [] };
         await repository.CreateInteractionAsync(interaction, cancellationToken);
         var initialMessage = new ConversationMessage(Guid.NewGuid(), command.WorkspaceId, interaction.Id, null, ConversationRole.User, Instruction(entry, command.Values), now, Attachments: command.Attachments);
         await repository.AddMessageAsync(initialMessage, cancellationToken);
@@ -159,18 +159,19 @@ public sealed partial class WorkplaceService
         return new PendingActionResolution(resolved, submission.Action, submission.Interaction, submission.Task);
     }
 
-    public async Task<WorkplaceInteraction> GetInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken) => await repository.GetInteractionAsync(workspaceId, interactionId, cancellationToken) ?? throw new KeyNotFoundException($"Interaction '{interactionId}' was not found in Workspace '{workspaceId}'.");
+    public async Task<WorkplaceInteraction> GetInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken) => await repository.GetInteractionAsync(workspaceId, context.PrincipalId, interactionId, cancellationToken) ?? throw new KeyNotFoundException($"Interaction '{interactionId}' was not found in Workspace '{workspaceId}'.");
 
-    public Task<IReadOnlyList<WorkplaceInteraction>> ListInteractionsAsync(WorkspaceId workspaceId, int take, CancellationToken cancellationToken) => repository.ListInteractionsAsync(workspaceId, take, cancellationToken);
+    public Task<IReadOnlyList<WorkplaceInteraction>> ListInteractionsAsync(WorkspaceId workspaceId, int take, CancellationToken cancellationToken) => repository.ListInteractionsAsync(workspaceId, context.PrincipalId, take, cancellationToken);
 
-    public Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken) => repository.ListMessagesAsync(workspaceId, interactionId, cancellationToken);
+    public async Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken) { await GetInteractionAsync(workspaceId, interactionId, cancellationToken); return await repository.ListMessagesAsync(workspaceId, interactionId, cancellationToken); }
 
-    public Task<IReadOnlyList<PendingAction>> ListPendingActionsAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken) => repository.ListPendingActionsAsync(workspaceId, interactionId, cancellationToken);
+    public async Task<IReadOnlyList<PendingAction>> ListPendingActionsAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken) { await GetInteractionAsync(workspaceId, interactionId, cancellationToken); return await repository.ListPendingActionsAsync(workspaceId, interactionId, cancellationToken); }
 
-    public Task<IReadOnlyList<PendingAction>> ListPendingActionsForTaskAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken) => repository.ListPendingActionsForTaskAsync(workspaceId, taskId, cancellationToken);
+    public async Task<IReadOnlyList<PendingAction>> ListPendingActionsForTaskAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken) { await GetTaskAsync(workspaceId, taskId, cancellationToken); return await repository.ListPendingActionsForTaskAsync(workspaceId, taskId, cancellationToken); }
 
     public async Task<PendingActionResolution> RespondTaskPendingActionAsync(WorkspaceId workspaceId, WorkTaskId taskId, PendingActionId pendingActionId, IReadOnlyDictionary<string, JsonElement> values, string principalId, CancellationToken cancellationToken)
     {
+        await GetTaskAsync(workspaceId, taskId, cancellationToken);
         var action = await repository.GetPendingActionAsync(workspaceId, pendingActionId, cancellationToken) ?? throw new KeyNotFoundException($"PendingAction '{pendingActionId}' was not found in Workspace '{workspaceId}'.");
         if (action.WorkTaskId != taskId || action.InteractionId is not null) throw new KeyNotFoundException($"PendingAction '{pendingActionId}' does not belong to autonomous Task '{taskId}'.");
         if (action.Status != PendingActionStatus.Pending) throw new WorkTransitionException("pending_action_already_resolved", "The PendingAction is no longer pending.");
@@ -249,7 +250,8 @@ public sealed partial class WorkplaceService
             WorkInputs: [new WorkInput(Structured: JsonSerializer.SerializeToElement(context))],
             InteractionId: interaction.Id.ToString(),
             WorkTaskId: interaction.TaskId.Value.ToString(),
-            TriggerMessageId: message.Id.ToString("D")), cancellationToken);
+            TriggerMessageId: message.Id.ToString("D")), interaction.OwnerPrincipalId, cancellationToken);
+        RequireConsistentOwner(interaction, rootSubmission.WorkItem.Value);
         var task = ToTask(rootSubmission.WorkItem.Value, interaction.TaskId);
         var action = new CreateTaskAction(interaction.TaskId.Value, task.Title, task.Description, $"/tasks/{interaction.TaskId.Value}");
         var processing = interaction with
@@ -297,6 +299,7 @@ public sealed partial class WorkplaceService
                 WorkInputs: inputs,
                 Attachments: attachments,
                 InteractionId: interaction.Id.ToString()),
+            interaction.OwnerPrincipalId,
             async (queued, cancellationToken) =>
             {
                 task = ToTask(queued.Value);
@@ -306,6 +309,7 @@ public sealed partial class WorkplaceService
                 await repository.SaveInteractionAsync(updated, expectedInteractionVersion, cancellationToken);
             },
             token);
+        RequireConsistentOwner(interaction, root.WorkItem.Value);
         task ??= ToTask(root.WorkItem.Value);
         action ??= new CreateTaskAction(task.Id, task.Title, task.Description, $"/tasks/{task.Id}");
         updated ??= interaction with { Status = InteractionStatus.Processing, TaskId = task.Id, PendingActionId = null, ImmediateResult = action, Version = expectedInteractionVersion + 1 };
@@ -346,6 +350,12 @@ public sealed partial class WorkplaceService
 
     private Task PublishInteractionAsync(WorkplaceInteraction interaction, CancellationToken token) =>
         PublishAsync(new InteractionUpdatedEvent(EventId(), interaction.WorkspaceId.Value, Sequence(), interaction.LastActivityAt, interaction.Id.Value, interaction.Status), token);
+
+    private static void RequireConsistentOwner(WorkplaceInteraction interaction, WorkItem workItem)
+    {
+        if (workItem.OwnerPrincipalId != interaction.OwnerPrincipalId)
+            throw new WorkValidationException("work_owner_mismatch", "Conversation work must retain the conversation owner.");
+    }
 
     private async Task<PendingAction> LinkPendingActionAsync(PendingAction action, WorkTask? task, CancellationToken token)
     {

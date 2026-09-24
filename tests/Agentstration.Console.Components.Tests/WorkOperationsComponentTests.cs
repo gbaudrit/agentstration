@@ -148,6 +148,8 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("Fournisseur et modèle", modelProfileEditor["ProviderAndModel"].Value);
         Assert.AreEqual("La modification de ce profil affectera 1 agent.", modelProfileEditor["ChangingProfileAffects", modelProfileEditor["AgentCount.One", 1].Value].Value);
         Assert.AreEqual("Résolution effective", modelProfileEditor["EffectiveResolution"].Value);
+        Assert.AreEqual("Pris en charge", modelProfileEditor["Support.Native"].Value);
+        Assert.AreEqual("Non spécifié", modelProfileEditor["Support.Unknown"].Value);
         Assert.AreEqual("Non pris en charge", modelProfileEditor["Support.Unsupported"].Value);
         Assert.AreEqual("Configuration non valide", modelProfileEditor["Status.InvalidConfiguration"].Value);
         Assert.AreEqual("Profils de modèles", modelProfiles["Title"].Value);
@@ -156,6 +158,8 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("Fournisseurs de modèles", modelProviders["Title"].Value);
         Assert.AreEqual("2 modèles", modelProviders["ModelCount.Many", 2].Value);
         Assert.AreEqual("Créer un profil de modèle", modelProviderDetails["CreateModelProfile"].Value);
+        Assert.AreEqual("Vue d’ensemble", modelProviderDetails["Tab.Overview"].Value);
+        Assert.AreEqual("Configuration", modelProviderDetails["Tab.Configuration"].Value);
         Assert.AreEqual("Point de terminaison détenu par l’extension", modelProviderDetails["ExtensionOwnedEndpoint"].Value);
         Assert.AreEqual("Ce fournisseur est référencé par 1 profil de modèle.", modelProviderDetails["ProviderReferencedBy", modelProviderDetails["ProfileCount.One", 1].Value].Value);
         Assert.AreEqual("Profils d’exécution", runtimeProfiles["Title"].Value);

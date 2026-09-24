@@ -14,7 +14,7 @@ public sealed partial class WorkplaceService
     {
         var anchor = (await workItems.GetAsync(workspaceId, taskId.ToWorkItemId(), cancellationToken))?.Value ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
         RequireWorkspace(anchor, workspaceId);
-        var continuations = await workItems.QueryAsync(new WorkItemQuery(workspaceId, Take: 1, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), cancellationToken);
+        var continuations = await workItems.QueryAsync(new WorkItemQuery(workspaceId, context.PrincipalId, Take: 1, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), cancellationToken);
         return ProjectTask(anchor, LatestExecution(anchor, continuations.Items.Select(value => value.Value).ToArray()), taskId);
     }
 
@@ -25,7 +25,7 @@ public sealed partial class WorkplaceService
     {
         page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
         var query = new WorkItemQuery(
-            workspaceId, Skip: (page - 1) * pageSize, Take: pageSize, Status: status is null ? null : ToItemStatus(status.Value),
+            workspaceId, context.PrincipalId, Skip: (page - 1) * pageSize, Take: pageSize, Status: status is null ? null : ToItemStatus(status.Value),
             SortBy: sort, SortDirection: direction,
             IsContinuation: false, Search: search, HasPendingAction: hasPendingAction, OperationalTasks: true,
             UpdatedFrom: updatedFrom, UpdatedTo: updatedTo);
@@ -69,13 +69,13 @@ public sealed partial class WorkplaceService
 
     public async Task<WorkTask> CancelTaskAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { var current = await GetCurrentExecutionAsync(workspaceId, taskId, token); await workItems.CancelAsync(workspaceId, current.Id, null, token); return await GetTaskAsync(workspaceId, taskId, token); }
 
-    public Task<IReadOnlyList<WorkTaskActivity>> ListActivitiesAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) => repository.ListActivitiesAsync(workspaceId, taskId, token);
+    public async Task<IReadOnlyList<WorkTaskActivity>> ListActivitiesAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { await GetTaskAsync(workspaceId, taskId, token); return await repository.ListActivitiesAsync(workspaceId, taskId, token); }
 
-    public Task<IReadOnlyList<WorkTaskResult>> ListResultsAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) => repository.ListResultsAsync(workspaceId, taskId, token);
+    public async Task<IReadOnlyList<WorkTaskResult>> ListResultsAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { await GetTaskAsync(workspaceId, taskId, token); return await repository.ListResultsAsync(workspaceId, taskId, token); }
 
-    public Task<IReadOnlyList<WorkTaskArtifact>> ListArtifactsAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) => repository.ListArtifactsAsync(workspaceId, taskId, token);
+    public async Task<IReadOnlyList<WorkTaskArtifact>> ListArtifactsAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { await GetTaskAsync(workspaceId, taskId, token); return await repository.ListArtifactsAsync(workspaceId, taskId, token); }
 
-    public async Task<WorkTaskArtifact> GetArtifactAsync(WorkspaceId workspaceId, WorkTaskId taskId, WorkTaskArtifactId artifactId, CancellationToken token) => await repository.GetArtifactAsync(workspaceId, taskId, artifactId, token) ?? throw new KeyNotFoundException($"Artifact '{artifactId}' was not found in Workspace '{workspaceId}'.");
+    public async Task<WorkTaskArtifact> GetArtifactAsync(WorkspaceId workspaceId, WorkTaskId taskId, WorkTaskArtifactId artifactId, CancellationToken token) { await GetTaskAsync(workspaceId, taskId, token); return await repository.GetArtifactAsync(workspaceId, taskId, artifactId, token) ?? throw new KeyNotFoundException($"Artifact '{artifactId}' was not found in Workspace '{workspaceId}'."); }
 
     public static WorkplaceAction CurrentAction(WorkTask task) => task.Status switch { WorkTaskStatus.ActionRequired => new RespondAction("A response is required."), WorkTaskStatus.Failed => new ShowErrorAction(task.Error?.Code ?? "Task failed", task.Error?.Message), WorkTaskStatus.Completed => new ShowResultAction("Result", task.Result?.Contents.FirstOrDefault()?.Text, task.Result?.Contents.FirstOrDefault()?.Structured), _ => new RespondAction("Agentstration is working on your request.") };
 
@@ -83,7 +83,7 @@ public sealed partial class WorkplaceService
     {
         var anchor = (await workItems.GetAsync(workspaceId, taskId.ToWorkItemId(), token))?.Value ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
         RequireWorkspace(anchor, workspaceId);
-        var page = await workItems.QueryAsync(new WorkItemQuery(workspaceId, Take: 1, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), token);
+        var page = await workItems.QueryAsync(new WorkItemQuery(workspaceId, context.PrincipalId, Take: 1, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), token);
         return LatestExecution(anchor, page.Items.Select(value => value.Value).ToArray());
     }
 
@@ -95,6 +95,7 @@ public sealed partial class WorkplaceService
         {
             var page = await workItems.QueryAsync(new WorkItemQuery(
                 workspaceId,
+                context.PrincipalId,
                 Skip: skip,
                 Take: WorkItemQueryPageSize,
                 IsContinuation: false,

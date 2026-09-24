@@ -818,7 +818,14 @@ public sealed class AepVerticalTests
             yield return new([AepContent.FromText("ng")], FinishReason: AepFinishReason.Stop);
         }
         public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<AepModelDescriptor>>([new("test-model", "Test model", ["chat", "streaming", "tools"])]);
+            Task.FromResult<IReadOnlyList<AepModelDescriptor>>([new("test-model", "Test model", new AepModelSpecification
+            {
+                Features = new AepModelFeatureSpecifications
+                {
+                    Streaming = new() { Support = AepModelFeatureSupport.Native },
+                    Tools = new() { Support = AepModelFeatureSupport.Native }
+                }
+            })]);
 
         public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(
             IReadOnlyList<AepBoundValue>? boundValues,

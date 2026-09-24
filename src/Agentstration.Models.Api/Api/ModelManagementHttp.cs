@@ -38,6 +38,7 @@ internal static class ModelsApiHttp
             });
         }
         catch (ModelProviderUnavailableException exception) { return Problem("model-provider-unavailable", "Model provider unavailable", 503, exception.Message); }
+        catch (ModelDiscoveryFailedException exception) { return Problem("model-discovery-failed", "Model discovery failed", 503, exception.Message); }
         catch (ModelProfileValidationException exception)
         {
             return Problem(exception.Code, "Invalid model profile", 422, exception.Message, new Dictionary<string, object?> { ["errors"] = exception.Errors });
@@ -58,6 +59,12 @@ internal static class ModelsApiHttp
         return Results.Json(stored.Value, statusCode: statusCode);
     }
 
+    public static IResult ResourceResult(StoredResource<ModelResource> stored, HttpResponse response, int statusCode)
+    {
+        response.Headers.ETag = stored.ETag;
+        return Results.Json(stored.Value, statusCode: statusCode);
+    }
+
     public static string? IfMatch(HttpRequest request) => request.Headers.IfMatch.FirstOrDefault();
     public static ResourceNamespace Namespace(string? value) => ResourceNamespace.Parse(value);
 
@@ -73,7 +80,9 @@ internal static class ModelsApiHttp
         new ModelReferenceResponse(
             resolution.Profile.Definition.Model.Name,
             resolution.Model?.Status ?? (resolution.Status == "modelUnavailable" ? "unavailable" : "unknown"),
-            resolution.Model?.Capabilities),
+            resolution.Model?.Specification,
+            resolution.Model?.ObservedSpecification,
+            resolution.Model?.SpecificationOverride),
         new EffectiveModelOptionsResponse(
             resolution.Profile.Definition.Generation,
             resolution.Profile.Definition.Reasoning,

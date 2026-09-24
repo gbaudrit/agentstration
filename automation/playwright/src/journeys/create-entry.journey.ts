@@ -18,6 +18,7 @@ export const createEntry: Journey<CreateEntryInput> = async (context, input) => 
   await context.checkpoint({ name: Checkpoints.createEntry.formInitial, page: context.pages.page, target: editor.definitionFields });
   await editor.fillIdentity(input);
   await context.checkpoint({ name: Checkpoints.createEntry.identityComplete, page: context.pages.page, target: editor.identitySection });
+  await editor.configureExposure(input);
   await editor.configureAppearance(input);
   await context.checkpoint({ name: Checkpoints.createEntry.appearanceComplete, page: context.pages.page, target: editor.appearanceSection });
   await editor.configureInteraction(input);

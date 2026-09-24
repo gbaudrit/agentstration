@@ -27,6 +27,8 @@ public sealed class ChatClientResolver(
         var capabilities = capabilityResolver is null
             ? null
             : await capabilityResolver.ResolveCapabilitiesAsync(providerConfiguration, deployment, cancellationToken);
+        if (capabilities is not null && deployment.EffectiveSpecification is not null)
+            capabilities = capabilities with { Model = ModelSpecificationCapabilities.Map(deployment.EffectiveSpecification) };
         if (logger.IsEnabled(LogLevel.Information))
         {
             logger.LogInformation(

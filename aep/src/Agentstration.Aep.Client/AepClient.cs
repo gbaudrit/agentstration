@@ -188,7 +188,10 @@ public sealed class AepClient(
             $"{AepProtocol.ModelProvidersPath}/{Uri.EscapeDataString(providerId)}/models",
             new AepBoundValuesRequest(boundValues),
             cancellationToken);
-        return await ReadAsync<AepModelDescriptor[]>(response, cancellationToken);
+        var models = await ReadAsync<AepModelDescriptor[]>(response, cancellationToken);
+        if (AepModelObservationValidator.FindIssue(models) is { } issue)
+            throw new AepProtocolException("model_observation_invalid", issue, response.StatusCode);
+        return models;
     }
 
     internal async Task<AepProviderHealth> GetHealthAsync(string providerId, CancellationToken cancellationToken)

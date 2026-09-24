@@ -57,7 +57,7 @@ public static class WorkEndpoints
             var actualSkip = Math.Max(0, skip ?? 0);
             var actualTop = Math.Clamp(top ?? 50, 1, 200);
             var query = new WorkItemQuery(
-                CurrentWorkspace(requestContext), actualSkip, actualTop, status, type, requester, agent, createdFrom, createdTo,
+                CurrentWorkspace(requestContext), requestContext.Current.PrincipalId, actualSkip, actualTop, status, type, requester, agent, createdFrom, createdTo,
                 sortBy ?? WorkItemSortField.CreatedAt, sortDirection ?? WorkItemSortDirection.Descending);
             var page = await service.QueryAsync(query, token);
             var next = page.HasMore ? NextLink(query with { Skip = actualSkip + actualTop }) : null;

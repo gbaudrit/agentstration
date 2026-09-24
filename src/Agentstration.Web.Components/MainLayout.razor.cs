@@ -14,13 +14,13 @@ public partial class MainLayout
     private sealed record NavigationItem(string LabelKey, string Url, string Icon, string Domain = "neutral", IReadOnlyList<string>? RequiredPermissions = null);
     private sealed record NavigationGroup(string LabelKey, IReadOnlyList<NavigationItem> Items);
     private sealed record CommandDefinition(string LabelKey, string Url, string Icon, string CategoryKey, string Keywords = "", IReadOnlyList<string>? RequiredPermissions = null);
-    private sealed record CommandItem(string Label, string Url, string Icon, string Category, string Keywords = "", string? Detail = null);
+    private sealed record CommandItem(string Label, string Url, string Icon, string Category, string Keywords = "", string? Detail = null, bool IsFallback = false);
 
     private static readonly NavigationGroup[] NavigationGroups =
     [
         new("", [new("Nav.Overview", "/", "home")]),
         new("Group.Build", [new("Nav.Agents", "/agents", "agent", "agent"), new("Nav.ModelProfiles", "/modelprofiles", "layers", "model"), new("Nav.Flows", "/flows", "workflow", "flow"), new("Nav.Entries", "/entries", "entry", "work"), new("Nav.ResourcePlans", "/resource-plans", "layers", "work", ["resources/read"])]),
-        new("Group.Operate", [new("Nav.Triggers", "/triggers", "clock", "work"), new("Nav.Deployments", "/deployments", "server", "runtime"), new("Nav.Tasks", "/tasks", "tasks", "work")]),
+        new("Group.Operate", [new("Nav.Conversations", "/conversations", "message-circle", "work", ["runs/read"]), new("Nav.Triggers", "/triggers", "clock", "work"), new("Nav.Deployments", "/deployments", "server", "runtime"), new("Nav.Tasks", "/tasks", "tasks", "work")]),
         new("Group.Runs", [new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
         new("Group.Configure", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work"), new("Nav.Packs", "/packs", "package"), new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.SourceProviders", "/sourceproviders", "database", "source"), new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key")]),
         new("Group.System", [new("Nav.ResourceScopes", "/settings/resource-scopes", "layers", RequiredPermissions: ["resources/read"]), new("Nav.Sources", "/settings/sources", "books"), new("Nav.SourceRegistries", "/settings/source-registries", "database"), new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.Cleanup", "/cleanup", "trash", RequiredPermissions: ["resources/delete", "runs/delete"]), new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "upload-cloud"), new("Nav.Profile", "/settings/profile", "user-circle"), new("Nav.Settings", "/settings", "settings")])
@@ -42,6 +42,7 @@ public partial class MainLayout
         new("Nav.AgentRuns", "/agent-runs", "▶", "Group.Runs", "agent execution history exécution historique"),
         new("Nav.FlowRuns", "/flow-runs", "▷", "Group.Runs", "workflow executions flux exécutions"),
         new("Nav.Tasks", "/tasks", "✓", "Group.Operate", "work tasks supervision tâches"),
+        new("Nav.Conversations", "/conversations", "◌", "Group.Operate", "conversation interaction history resume reprendre historique", ["runs/read"]),
         new("Nav.Triggers", "/triggers", "◷", "Group.Operate", "schedule automation planification automatisation"),
         new("Nav.RunEvents", "/run-events", "≋", "Group.Runs", "persisted runtime flow activity événements"),
         new("Nav.ModelProviders", "/modelproviders", "⬡", "Group.Configure", "providers fournisseurs"),
@@ -85,6 +86,8 @@ public partial class MainLayout
     private bool themeReady;
     private int selectedCommandIndex;
     private IReadOnlyList<CommandItem> resourceCommands = [];
+    private Task? platformStatusRefresh;
+    private IReadOnlyList<CommandItem> fallbackCommands = [];
     private CancellationTokenSource? resourceSearchCancellation;
     private readonly CancellationTokenSource lifetimeCancellation = new();
     private IReadOnlyList<CommandItem> Commands => CommandDefinitions.Where(command => CanNavigate(command.RequiredPermissions)).Select(command => new CommandItem(
@@ -100,6 +103,7 @@ public partial class MainLayout
         FilteredCommands.Concat(resourceCommands)
             .DistinctBy(command => command.Url, StringComparer.OrdinalIgnoreCase)
             .Take(12)
+            .Concat(fallbackCommands)
             .ToArray();
 
     private string CurrentSection
@@ -119,9 +123,10 @@ public partial class MainLayout
         Navigation.Changed += StateHasChanged;
         Preferences.Changed += StateHasChanged;
         Notifications.Changed += StateHasChanged;
-        PlatformStatus.Changed += StateHasChanged;
+        PlatformStatus.Changed += OnPlatformStatusChanged;
         ContextState.Changed += OnContextChanged;
         NavigationManager.LocationChanged += OnLocationChanged;
+        platformStatusRefresh = PlatformStatus.RefreshAsync(lifetimeCancellation.Token);
         await Task.WhenAll(
             ContextState.LoadAsync(lifetimeCancellation.Token),
             Preferences.LoadAsync(lifetimeCancellation.Token));
@@ -162,6 +167,7 @@ public partial class MainLayout
         commandPaletteOpen = true;
         commandQuery = string.Empty;
         resourceCommands = [];
+        fallbackCommands = [];
         selectedCommandIndex = 0;
         focusCommandInput = true;
     }
@@ -171,6 +177,7 @@ public partial class MainLayout
         commandPaletteOpen = false;
         commandQuery = string.Empty;
         resourceCommands = [];
+        fallbackCommands = [];
         searchingResources = false;
         resourceSearchCancellation?.Cancel();
         selectedCommandIndex = 0;
@@ -181,6 +188,7 @@ public partial class MainLayout
         commandQuery = args.Value?.ToString() ?? string.Empty;
         selectedCommandIndex = 0;
         resourceCommands = [];
+        fallbackCommands = [];
         resourceSearchCancellation?.Cancel();
         resourceSearchCancellation?.Dispose();
         resourceSearchCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetimeCancellation.Token);
@@ -199,6 +207,18 @@ public partial class MainLayout
                 item.ResourceType,
                 item.SearchText ?? item.Identifier,
                 $"{item.Status} · {ShortIdentifier(item.Identifier)}")).ToArray();
+            if (FilteredCommands.Count == 0 && resourceCommands.Count == 0)
+            {
+                var fallbacks = await CommandFallback.ResolveAsync(commandQuery, cancellationToken);
+                fallbackCommands = fallbacks.Select(fallback => new CommandItem(
+                        F("AskEntry", fallback.Label, commandQuery),
+                        fallback.Url,
+                        fallback.Icon,
+                        T("Entry"),
+                        Detail: fallback.Detail,
+                        IsFallback: true))
+                    .ToArray();
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         finally
@@ -235,6 +255,7 @@ public partial class MainLayout
     private static string ShortIdentifier(string value) => value.Length <= 48 ? value : $"…{value[^47..]}";
     private bool CanNavigate(IReadOnlyList<string>? permissions) => permissions is null || permissions.All(ContextState.HasPermission);
     private string T(string key) => string.IsNullOrEmpty(key) ? string.Empty : Localizer[key];
+    private string PlatformStatusLabel => T($"PlatformStatus.{PlatformStatus.Kind}");
     private string F(string key, params object[] arguments) => Localizer[key, arguments];
     private static string WorkspaceLabel(ConsoleContextSnapshot context, ConsoleWorkspaceOption workspace) =>
         context.Workspaces.Select(value => value.TenantId).Distinct().Skip(1).Any()
@@ -249,16 +270,22 @@ public partial class MainLayout
         catch (InvalidOperationException) { }
     });
     private void OnContextChanged() => _ = InvokeAsync(StateHasChanged);
+    private void OnPlatformStatusChanged() => _ = InvokeAsync(StateHasChanged);
 
     public async ValueTask DisposeAsync()
     {
         Navigation.Changed -= StateHasChanged;
         Preferences.Changed -= StateHasChanged;
         Notifications.Changed -= StateHasChanged;
-        PlatformStatus.Changed -= StateHasChanged;
+        PlatformStatus.Changed -= OnPlatformStatusChanged;
         ContextState.Changed -= OnContextChanged;
         NavigationManager.LocationChanged -= OnLocationChanged;
         lifetimeCancellation.Cancel();
+        if (platformStatusRefresh is not null)
+        {
+            try { await platformStatusRefresh; }
+            catch (OperationCanceledException) { }
+        }
         resourceSearchCancellation?.Cancel();
         resourceSearchCancellation?.Dispose();
         lifetimeCancellation.Dispose();

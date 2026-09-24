@@ -61,6 +61,14 @@ public static class ConsoleResourceUrls
             : $"{path}?namespace={Uri.EscapeDataString(address.Namespace.Value)}";
     }
 
+    public static string Model(ResourceAddress address)
+    {
+        var path = $"/models/{Uri.EscapeDataString(address.Name)}";
+        return address.Namespace.IsDefault
+            ? path
+            : $"{path}?namespace={Uri.EscapeDataString(address.Namespace.Value)}";
+    }
+
     public static string RuntimeProfile(ResourceAddress address)
     {
         var path = $"/runtimeprofiles/{Uri.EscapeDataString(address.Name)}";

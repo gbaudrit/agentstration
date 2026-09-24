@@ -8,6 +8,7 @@ using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Contracts;
+using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -44,6 +45,84 @@ public sealed class ModelProviderNavigationTests
             Assert.AreEqual(
                 "/modelprofiles/new?namespace=shared.models&provider=ollama%2Flocal&providerNamespace=shared.models&model=qwen3",
                 discoveredModelLink.GetAttribute("href"));
+            Assert.AreEqual(
+                "/models/ollama-local.qwen3-deadbeef?namespace=shared.models",
+                rendered.Find("[data-testid='open-model-details']").GetAttribute("href"));
+            CollectionAssert.AreEqual(new[] { "Overview", "Configuration" }, rendered.FindAll("[role='tab']").Select(item => item.TextContent.Trim()).ToArray());
+            Assert.IsFalse(rendered.Markup.Contains("data-testid=\"model-provider-form\"", StringComparison.Ordinal));
+        });
+
+        rendered.Find("#model-provider-configuration-tab").Click();
+        Assert.IsNotNull(rendered.Find("[data-testid='model-provider-form']"));
+        Assert.IsFalse(rendered.Markup.Contains("data-testid=\"model-provider-refresh\"", StringComparison.Ordinal));
+        rendered.Find("#model-provider-overview-tab").Click();
+        rendered.Find("[data-testid='model-provider-refresh']").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(1, context.Services.GetRequiredService<IModelProvidersClient>() is StubModelProvidersClient stub ? stub.RefreshCalls : -1);
+            StringAssert.Contains(rendered.Find("[data-testid='model-discovery-result']").TextContent, "1 updated");
+            Assert.AreEqual(1, rendered.FindAll("[data-testid='open-model-details']").Count);
+        });
+    }
+
+    [TestMethod]
+    public async Task CreatingProviderRunsInitialDiscoveryAndKeepsCreationSuccessful()
+    {
+        using var culture = new TestCultureScope("en-US");
+        ExtensionResponse extension = new(
+            RegistrationName: "ollama-extension", RegistrationNamespace: ResourceNamespace.DefaultValue,
+            Endpoint: new Uri("http://localhost:5260"), Status: "available",
+            Extension: new ExtensionIdentityResponse("ollama.extension", "Ollama", "1.0.0", null),
+            Contributions: [new ExtensionContributionResponse("model-provider", "ollama")],
+            OptionSets: [], Usages: [], Providers: [], Details: null, DiscoverySource: "manual");
+        using var context = CreateContext(out var providers, [extension]);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelproviders/new?extension=ollama-extension&extensionNamespace=default&contributionId=ollama");
+        var rendered = context.Render<ModelProviderDetails>();
+        rendered.WaitForElement("[data-testid='model-provider-name']").Change("ollama-local");
+        rendered.Find("[data-testid='model-provider-display-name']").Change("Ollama local");
+
+        await rendered.Find("[data-testid='model-provider-form']").SubmitAsync();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(1, providers.RefreshCalls);
+            Assert.AreEqual("ollama-local", providers.RefreshedProvider);
+            Assert.IsTrue(context.Services.GetRequiredService<NavigationManager>().Uri.Contains("/modelproviders/ollama-local", StringComparison.Ordinal));
+            Assert.IsTrue(context.Services.GetRequiredService<NotificationState>().Items.Any(item => item.Title == "Initial model discovery complete"));
+            StringAssert.Contains(rendered.Find("[data-testid='model-discovery-result']").TextContent, "2 total");
+            Assert.AreEqual(1, rendered.FindAll("[data-testid='open-model-details']").Count);
+        });
+    }
+
+    [TestMethod]
+    public async Task CreatingProviderKeepsCreationSuccessfulWhenInitialDiscoveryFails()
+    {
+        using var culture = new TestCultureScope("en-US");
+        ExtensionResponse extension = new(
+            RegistrationName: "ollama-extension", RegistrationNamespace: ResourceNamespace.DefaultValue,
+            Endpoint: new Uri("http://localhost:5260"), Status: "available",
+            Extension: new ExtensionIdentityResponse("ollama.extension", "Ollama", "1.0.0", null),
+            Contributions: [new ExtensionContributionResponse("model-provider", "ollama")],
+            OptionSets: [], Usages: [], Providers: [], Details: null, DiscoverySource: "manual");
+        using var context = CreateContext(out var providers, [extension]);
+        providers.FailRefresh = true;
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelproviders/new?extension=ollama-extension&extensionNamespace=default&contributionId=ollama");
+        var rendered = context.Render<ModelProviderDetails>();
+        rendered.WaitForElement("[data-testid='model-provider-name']").Change("ollama-local");
+        rendered.Find("[data-testid='model-provider-display-name']").Change("Ollama local");
+
+        await rendered.Find("[data-testid='model-provider-form']").SubmitAsync();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(1, providers.RefreshCalls);
+            Assert.IsTrue(context.Services.GetRequiredService<NavigationManager>().Uri.Contains("/modelproviders/ollama-local", StringComparison.Ordinal));
+            Assert.IsTrue(context.Services.GetRequiredService<NotificationState>().Items.Any(item =>
+                item.Title.Contains("initial discovery failed", StringComparison.OrdinalIgnoreCase)
+                && item.Status == UiStatus.Warning));
         });
     }
 
@@ -299,6 +378,9 @@ public sealed class ModelProviderNavigationTests
     {
         public ResourceNamespace? RequestedModelNamespace { get; private set; }
         public string? RequestedModelProvider { get; private set; }
+        public int RefreshCalls { get; private set; }
+        public string? RefreshedProvider { get; private set; }
+        public bool FailRefresh { get; set; }
 
         public Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ModelProviderResponse>>([
@@ -321,14 +403,33 @@ public sealed class ModelProviderNavigationTests
             RequestedModelNamespace = @namespace;
             RequestedModelProvider = providerName;
             return Task.FromResult<IReadOnlyList<AvailableModelResponse>>([
-                new("qwen3", "Qwen 3", "available", [], new Dictionary<string, string>())
+                new("qwen3", "Qwen 3", "available", new ModelSpecification(), ResourceName: "ollama-local.qwen3-deadbeef")
             ]);
         }
 
         public Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken) =>
             Task.FromResult(new ModelProviderStatusResponse(providerName, "available", DateTimeOffset.UnixEpoch, null));
 
-        public Task<ResourceSnapshot<ModelProviderResource>> CreateModelProviderAsync(CreateModelProviderRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProviderResource>> CreateModelProviderAsync(CreateModelProviderRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceSnapshot<ModelProviderResource>(new ModelProviderResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ModelResourceKinds.ModelProvider,
+                Metadata = new ResourceMetadata { Name = request.Name, Namespace = ResourceNamespace.Parse(request.Namespace) },
+                ScopeRef = request.ScopeRef,
+                Definition = request.Properties
+            }, "\"provider-created\""));
+        public Task<ModelDiscoveryDiffResponse> RefreshProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken)
+        {
+            RefreshCalls++;
+            RefreshedProvider = providerName;
+            if (FailRefresh)
+            {
+                throw new AgentstrationApiException("Ollama is unavailable.", "ollama-unavailable");
+            }
+
+            return Task.FromResult(new ModelDiscoveryDiffResponse(0, 1, 1, 0, 0, 2));
+        }
         public Task<ResourceSnapshot<ModelProviderResource>> UpdateModelProviderAsync(string providerName, PutModelProviderRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task DeleteModelProviderAsync(string providerName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderStatusResponse> TestProviderAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();

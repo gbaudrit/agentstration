@@ -11,6 +11,7 @@ public static class ModelsApiModule
     {
         var providers = endpoints.MapGroup("/api/modelproviders");
         ListModelProvidersEndpoint.Map(providers);
+        RefreshProviderModelsEndpoint.Map(providers);
         ListProviderModelsEndpoint.Map(providers);
         GetModelProviderStatusEndpoint.Map(providers);
         GetModelProviderUsagesEndpoint.Map(providers);
@@ -19,6 +20,10 @@ public static class ModelsApiModule
         CreateModelProviderEndpoint.Map(providers);
         PutModelProviderEndpoint.Map(providers);
         DeleteModelProviderEndpoint.Map(providers);
+
+        var models = endpoints.MapGroup("/api/models");
+        ListModelsEndpoint.Map(models);
+        GetModelEndpoint.Map(models);
 
         var profiles = endpoints.MapGroup("/api/modelprofiles");
         ListModelProfilesEndpoint.Map(profiles);

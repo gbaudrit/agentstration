@@ -29,17 +29,18 @@ public sealed class StorageConcurrencySmokeTests
             _ = host.CreateClient();
             var repository = host.Services.GetRequiredService<IWorkItemRepository>();
             var workspaceId = new WorkspaceId(Guid.NewGuid());
+            var ownerPrincipalId = Guid.NewGuid();
 
             var stored = await Task.WhenAll(Enumerable.Range(0, 8).Select(async index =>
             {
                 var id = WorkItemId.New();
                 var now = DateTimeOffset.UtcNow;
-                var item = WorkItem.Create(id, workspaceId, "content", $"Smoke {index}", now);
+                var item = WorkItem.Create(id, workspaceId, ownerPrincipalId, "content", $"Smoke {index}", now);
                 var created = await repository.CreateAsync(item, default);
                 var expectedVersion = created.Value.Version;
                 created.Value.AddMessage("update", "smoke", Guid.NewGuid(), now.AddMilliseconds(1));
                 await repository.SaveAsync(created.Value, expectedVersion, default);
-                return await repository.GetAsync(workspaceId, id, default);
+                return await repository.GetAsync(workspaceId, ownerPrincipalId, id, default);
             }));
 
             Assert.HasCount(8, stored);

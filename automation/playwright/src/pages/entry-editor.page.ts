@@ -28,6 +28,8 @@ export interface EntryDefinition {
   progressVisibility: 'Hidden' | 'Compact' | 'Detailed';
   taskDisplay: 'Auto' | 'Hidden' | 'Visible';
   resultsDisplay: 'Auto' | 'Hidden' | 'Visible';
+  exposeConsole?: boolean;
+  consoleFallback?: boolean;
   field: EntryFieldDefinition;
   targetFlow?: string;
   targetAgent?: string;
@@ -62,6 +64,14 @@ export class EntryEditorPage {
       const picker = this.appearanceSection.getByTestId(TestIds.common.iconPicker);
       await picker.locator('input[type="search"]').fill(entry.icon);
       await picker.getByRole('option', { name: entry.icon, exact: true }).click();
+    }
+  }
+
+  public async configureExposure(entry: Pick<EntryDefinition, 'exposeConsole' | 'consoleFallback'>): Promise<void> {
+    const exposeConsole = entry.exposeConsole === true || entry.consoleFallback === true;
+    await this.page.getByTestId(TestIds.entryEditor.exposureConsole).setChecked(exposeConsole);
+    if (exposeConsole) {
+      await this.page.getByTestId(TestIds.entryEditor.consoleFallback).setChecked(entry.consoleFallback === true);
     }
   }
 

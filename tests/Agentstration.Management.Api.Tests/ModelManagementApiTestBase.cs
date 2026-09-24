@@ -29,6 +29,13 @@ public abstract class ModelManagementApiTestBase
             services.AddSingleton<IModelProviderCapabilitiesResolver, DiagnosticModelProvider>();
         }));
 
+    protected static WebApplicationFactory<Program> DiscoveryFactory(IModelProviderDiscovery discovery) => Factory().WithWebHostBuilder(builder =>
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IModelProviderDiscovery>();
+            services.AddSingleton(discovery);
+        }));
+
     protected static Task<RequestContext> GetBootstrapContextAsync(WebApplicationFactory<Program> factory) =>
         factory.Services
             .GetRequiredService<ILocalEnvironmentBootstrapper>()
@@ -44,7 +51,14 @@ public abstract class ModelManagementApiTestBase
 
         public ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default) =>
             ValueTask.FromResult<IReadOnlyList<DiscoveredModel>>([
-                new("local-model", "Local model", "available", ["chat", "streaming", "structuredOutput"], new Dictionary<string, string>())
+                new("local-model", "Local model", "available", new ModelSpecification
+                {
+                    Features = new ModelFeatureSpecifications
+                    {
+                        Streaming = new() { Support = ModelFeatureSupport.Native },
+                        StructuredOutput = new() { Support = ModelFeatureSupport.Native }
+                    }
+                })
             ]);
 
         public ValueTask<ResolvedModelProviderCapabilities> ResolveCapabilitiesAsync(

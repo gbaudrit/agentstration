@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 namespace Agentstration.Web.Console;
 
 public enum WorkOperationsRealtimeState { Offline, Connecting, Live, Reconnecting }
-public sealed record WorkOperationsRealtimeUpdate(Guid? TaskId, bool RequiresResynchronization = false);
+public sealed record WorkOperationsRealtimeUpdate(Guid? TaskId, bool RequiresResynchronization = false, Guid? InteractionId = null);
 
 public interface IWorkOperationsRealtimeClient : IAsyncDisposable
 {
@@ -55,6 +55,8 @@ public sealed class WorkOperationsRealtimeClient(
     {
         if (handlers.Count > 0) return;
         handlers.Add(connection.On<TaskCreatedEvent>("TaskCreated", value => DispatchEventAsync(value.EventId, value.TaskId)));
+        handlers.Add(connection.On<InteractionUpdatedEvent>("InteractionUpdated", value => DispatchEventAsync(value.EventId, null, value.InteractionId)));
+        handlers.Add(connection.On<MessageAddedEvent>("MessageAdded", value => DispatchEventAsync(value.EventId, value.Message.WorkTaskId?.Value, value.Message.InteractionId.Value)));
         handlers.Add(connection.On<TaskStatusChangedEvent>("TaskStatusChanged", value => DispatchEventAsync(value.EventId, value.TaskId)));
         handlers.Add(connection.On<TaskActivityAddedEvent>("TaskActivityAdded", value => DispatchEventAsync(value.EventId, value.Activity.WorkTaskId.Value)));
         handlers.Add(connection.On<TaskResultAddedEvent>("TaskResultAdded", value => DispatchEventAsync(value.EventId, value.Result.WorkTaskId.Value)));
@@ -70,14 +72,14 @@ public sealed class WorkOperationsRealtimeClient(
         foreach (var workspace in workspaces) await connection.InvokeAsync("JoinWorkspace", workspace, cancellationToken);
     }
 
-    private Task DispatchEventAsync(string eventId, Guid? taskId)
+    private Task DispatchEventAsync(string eventId, Guid? taskId, Guid? interactionId = null)
     {
         lock (eventIds)
         {
             if (!eventIds.Add(eventId)) return Task.CompletedTask;
             if (eventIds.Count > 2048) eventIds.Clear();
         }
-        return DispatchAsync(new(taskId));
+        return DispatchAsync(new(taskId, InteractionId: interactionId));
     }
 
     private async Task DispatchAsync(WorkOperationsRealtimeUpdate update)

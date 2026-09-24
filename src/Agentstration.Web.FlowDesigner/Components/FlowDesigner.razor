@@ -159,7 +159,7 @@ else
                         @if (SelectedFlowVersion is not null)
                         {
                             <fieldset class="flow-mapping-editor"><legend>@T("InputMapping")</legend>
-                                <label><input data-testid="flow-pass-transition-output" type="checkbox" disabled="@ReadOnly" checked="@PassesIncomingTransitionOutput(flowCall.InputMapping)" @onchange="UpdateFlowTransitionPassthroughAsync" />@T("PassIncomingTransitionOutput")</label>
+                                <label class="flow-checkbox-field"><input data-testid="flow-pass-transition-output" type="checkbox" disabled="@ReadOnly" checked="@PassesIncomingTransitionOutput(flowCall.InputMapping)" @onchange="UpdateFlowTransitionPassthroughAsync" />@T("PassIncomingTransitionOutput")</label>
                                 <small>@T("PassIncomingTransitionOutputHelp")</small>
                                 @if (!PassesIncomingTransitionOutput(flowCall.InputMapping)
                                     && SelectedFlowVersion.InputSchema is { ValueKind: JsonValueKind.Object } inputSchema

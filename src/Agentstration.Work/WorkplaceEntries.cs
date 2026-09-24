@@ -24,6 +24,7 @@ public sealed record EntryParticipantsPresentation(EntryParticipantVisibility Vi
 public sealed record EntryProgressPresentation(EntryProgressVisibility Visibility = EntryProgressVisibility.Compact);
 public sealed record EntryTaskPresentation(EntryTaskDisplay Display = EntryTaskDisplay.Auto);
 public sealed record EntryResultsPresentation(EntryResultDisplay Display = EntryResultDisplay.Auto);
+public sealed record EntryConsoleExposure(EntryConsoleRole Role = EntryConsoleRole.Standard);
 
 public sealed record EntryExposure
 {
@@ -32,6 +33,7 @@ public sealed record EntryExposure
     public int Version { get; init; } = CurrentVersion;
     public IReadOnlyList<EntryExposureSurface> Surfaces { get; init; } = [EntryExposureSurface.Workplace];
     public IReadOnlyList<EntryWorkplacePlacement> WorkplacePlacements { get; init; } = [EntryWorkplacePlacement.OwningSpace];
+    public EntryConsoleExposure Console { get; init; } = new();
 }
 
 public static class EntryExposurePolicy
