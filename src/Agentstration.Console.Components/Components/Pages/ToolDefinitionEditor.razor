@@ -14,9 +14,8 @@ else
     @if (error is not null) { <ErrorState Message="@error" /> }
     <section class="panel"><div class="panel-header"><h2>@T("Definition")</h2></div>
         <div class="form-grid">
-            <label><span>@T("Name")</span><input @bind="name" disabled="@(!IsNew)" /></label>
+            <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="@IsNew" />
             <label><span>@T("Namespace")</span><input @bind="namespaceValue" disabled="@(!IsNew)" /></label>
-            <label><span>@T("DisplayName")</span><input @bind="displayName" /></label>
             <label class="form-span-2"><span>@T("DefinitionDescription")</span><textarea @bind="description" rows="2"></textarea></label>
             <label><input type="checkbox" @bind="enabled" /> <span>@T("Enabled")</span></label>
             <label><input type="checkbox" @bind="requiresApproval" /> <span>@T("RequiresApproval")</span></label>

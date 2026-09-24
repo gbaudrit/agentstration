@@ -34,9 +34,8 @@ else
         <div class="panel-header"><div><p class="eyebrow">@T("PackIdentity")</p><h2>@T("ProjectMetadata")</h2></div></div>
         <div class="composer-fields">
             <label><span>@T("Publisher")</span><input @bind="publisher" autocomplete="off" spellcheck="false" data-testid="pack-project-publisher" /></label>
-            <label><span>@T("Name")</span><input @bind="name" autocomplete="off" spellcheck="false" data-testid="pack-project-name" /></label>
+            <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" Policy="ResourceNamePolicy.Pack" IsNew="true" DisplayNameTestId="pack-project-display-name" TechnicalNameTestId="pack-project-name" />
             <label><span>@T("Version")</span><input @bind="version" autocomplete="off" spellcheck="false" data-testid="pack-project-version" /></label>
-            <label><span>@T("DisplayName")</span><input @bind="displayName" data-testid="pack-project-display-name" /></label>
             <label><span>@T("Audience")</span><select @bind="audience"><option value="@PackAudience.Universal">@T("Audience.Universal")</option><option value="@PackAudience.Personal">@T("Audience.Personal")</option><option value="@PackAudience.Professional">@T("Audience.Professional")</option></select></label>
             <label><span>@T("Purpose")</span><select @bind="purpose"><option value="@PackPurpose.Standard">@T("Purpose.Standard")</option><option value="@PackPurpose.Sample">@T("Purpose.Sample")</option><option value="@PackPurpose.Template">@T("Purpose.Template")</option></select></label>
             <ResourceScopeFormField ResourceKind="@PackAuthoringKinds.PackProject" @bind-Value="selectedScope" />

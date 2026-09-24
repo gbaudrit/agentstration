@@ -13,20 +13,22 @@
 <form method="post" class="auth-form">
     <input type="hidden" asp-for="ReturnUrl" />
     <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
-    <label asp-for="Input.TenantName">@Auth["TenantName"]</label>
-    <input asp-for="Input.TenantName" autocomplete="off" />
-    <span asp-validation-for="Input.TenantName" class="field-error"></span>
     <label asp-for="Input.TenantDisplayName">@Auth["TenantDisplayName"]</label>
-    <input asp-for="Input.TenantDisplayName" autocomplete="organization" />
+    <input asp-for="Input.TenantDisplayName" autocomplete="organization" autofocus data-resource-display-name data-technical-name-target="Input_TenantName" data-maximum-length="64" />
     <span asp-validation-for="Input.TenantDisplayName" class="field-error"></span>
-    <label asp-for="Input.WorkspaceName">@Auth["WorkspaceName"]</label>
-    <input asp-for="Input.WorkspaceName" autocomplete="off" />
-    <span asp-validation-for="Input.WorkspaceName" class="field-error"></span>
+    <label asp-for="Input.TenantName">@Auth["TenantTechnicalName"]</label>
+    <input asp-for="Input.TenantName" autocomplete="off" data-resource-technical-name />
+    <span asp-validation-for="Input.TenantName" class="field-error"></span>
+    <small>@Auth["TechnicalNameHelp"]</small>
     <label asp-for="Input.WorkspaceDisplayName">@Auth["WorkspaceDisplayName"]</label>
-    <input asp-for="Input.WorkspaceDisplayName" autocomplete="off" />
+    <input asp-for="Input.WorkspaceDisplayName" autocomplete="off" data-resource-display-name data-technical-name-target="Input_WorkspaceName" data-maximum-length="64" />
     <span asp-validation-for="Input.WorkspaceDisplayName" class="field-error"></span>
+    <label asp-for="Input.WorkspaceName">@Auth["WorkspaceTechnicalName"]</label>
+    <input asp-for="Input.WorkspaceName" autocomplete="off" data-resource-technical-name />
+    <span asp-validation-for="Input.WorkspaceName" class="field-error"></span>
+    <small>@Auth["TechnicalNameHelp"]</small>
     <label asp-for="Input.DisplayName">@Auth["DisplayName"]</label>
-    <input asp-for="Input.DisplayName" autocomplete="name" autofocus />
+    <input asp-for="Input.DisplayName" autocomplete="name" />
     <span asp-validation-for="Input.DisplayName" class="field-error"></span>
     <label asp-for="Input.UserName">@Auth["Username"]</label>
     <input asp-for="Input.UserName" autocomplete="username" />
@@ -43,3 +45,5 @@
     <span asp-validation-for="Input.ConfirmPassword" class="field-error"></span>
     <button type="submit" class="primary-action">@Auth["CreateAdministrator"]</button>
 </form>
+
+<script src="~/resource-name-fields.js" asp-append-version="true"></script>

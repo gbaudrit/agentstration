@@ -12,8 +12,7 @@
 @if (usages.Count > 0) { <div class="form-alert form-alert-warning">@T("Referenced", usages.Count)</div> }
 <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="parameter-editor" class="resource-form" data-testid="parameter-form"><DataAnnotationsValidator /><ValidationSummary />
     <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ParameterResource")</h2></div></div><div class="form-grid">
-        <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" data-testid="parameter-name" /></label>
-        <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" data-testid="parameter-display-name" /></label>
+        <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Parameter" IsNew="@IsNew" DisplayNameTestId="parameter-display-name" TechnicalNameTestId="parameter-name" />
         <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" /></label>
         @if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }
         <label><span>@T("ValueType")</span><InputSelect @bind-Value="model.ValueType" data-testid="parameter-value-type">@foreach (var type in Enum.GetValues<ParameterValueType>()) { <option value="@type">@T($"ValueType.{type}")</option> }</InputSelect></label>

@@ -38,7 +38,7 @@ public sealed class PackAgentDefinitionFormTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var rendered = context.Render<PackAgentDefinitionForm>(parameters => parameters.Add(component => component.Source, Source));
 
-        await rendered.FindAll("input")[2].ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "Forked welcome" });
+        await rendered.FindAll("input")[0].ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "Forked welcome" });
 
         Assert.IsTrue(rendered.Instance.TryBuildSource(out var updated, out var error), error);
         Assert.IsTrue(updated.Contains("displayName: Forked welcome", StringComparison.Ordinal));

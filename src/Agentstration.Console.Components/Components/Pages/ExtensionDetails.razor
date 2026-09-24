@@ -60,7 +60,7 @@ else
                 <EditForm Model="form" OnValidSubmit="SaveAsync">
                     <DataAnnotationsValidator /><ValidationSummary />
                     <div class="form-grid">
-                        <label>@T("DisplayName")<InputText @bind-Value="form.DisplayName" /></label>
+                        <ResourceIdentityFields @bind-DisplayName="form.DisplayName" TechnicalName="@registration.Value.Name" IsNew="false" />
                         <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" /></label>
                         <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /></label>
                         <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>

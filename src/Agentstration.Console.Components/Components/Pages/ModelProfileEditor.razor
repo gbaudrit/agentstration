@@ -27,9 +27,8 @@ else
         <DataAnnotationsValidator /><ValidationSummary />
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ProfileResource")</h2></div>@if (resolution is not null) { <StatusBadge Text="@StatusLabel(resolution.Status)" Status="@ModelManagementUi.Status(resolution.Status)" /> }</div>
             <div class="form-grid">
-                <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" data-testid="model-profile-name" /><ValidationMessage For="() => model.Name" /></label>
+                <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="model-profile-display-name" TechnicalNameTestId="model-profile-name" />
                 <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
-                <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" data-testid="model-profile-display-name" /><ValidationMessage For="() => model.DisplayName" /></label>
                 <ResourceScopeFormField ResourceKind="@ModelResourceKinds.ModelProfile" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
                 <label class="form-span-2"><span>@T("DescriptionLabel")</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
             </div>

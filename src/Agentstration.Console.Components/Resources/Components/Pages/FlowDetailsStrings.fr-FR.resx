@@ -22,6 +22,7 @@
   <data name="SucceededRunCount.Many"><value>{0} réussies</value></data>
   <data name="DisplayName"><value>Nom d’affichage</value></data>
   <data name="ResourceName"><value>Nom de la ressource</value></data>
+  <data name="TechnicalName"><value>Nom technique</value></data>
   <data name="Namespace"><value>Espace de noms</value></data>
   <data name="Kind"><value>Type</value></data>
   <data name="Strategy"><value>Stratégie</value></data>

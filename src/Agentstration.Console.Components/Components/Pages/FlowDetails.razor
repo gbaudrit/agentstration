@@ -63,7 +63,7 @@ else
                         </div>
                         <div class="flow-definition-fields">
                             <label><span>@T("DisplayName")</span><input value="@definitionDisplayName" @oninput="args => definitionDisplayName = args.Value?.ToString() ?? string.Empty" disabled="@(!CanEditDefinition)" maxlength="200" data-testid="flow-definition-display-name" /></label>
-                            <label><span>@T("ResourceName")</span><input value="@flow.Id" readonly data-testid="flow-definition-name" /><small>@T("DefinitionIdentityFixedHelp")</small></label>
+                            <label><span>@T("TechnicalName")</span><input value="@flow.Id" readonly data-testid="flow-definition-name" /><small>@T("DefinitionIdentityFixedHelp")</small></label>
                             <label><span>@T("Namespace")</span><input value="@FlowResourceNamespace.Value" readonly data-testid="flow-definition-namespace" /><small>@T("DefinitionIdentityFixedHelp")</small></label>
                             <label><span>@T("Kind")</span><input value="@flow.Definition.Kind" readonly /></label>
                             <label class="flow-definition-description"><span>@T("Description")</span><textarea rows="4" @bind="definitionDescription" @bind:event="oninput" disabled="@(!CanEditDefinition)" data-testid="flow-definition-description"></textarea></label>

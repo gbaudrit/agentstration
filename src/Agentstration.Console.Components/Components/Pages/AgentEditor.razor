@@ -76,9 +76,8 @@ else
         <section class="panel form-section" id="definition" data-testid="agent-identity-section">
             <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ResourceCoordinates")</h2></div>@if (!IsNew) { <StatusBadge Text="@T("Generation", generation)" Status="UiStatus.Info" /> }</div>
             <div class="form-grid">
-                <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" data-testid="agent-name" /><ValidationMessage For="() => model.Name" /></label>
+                <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="agent-display-name" TechnicalNameTestId="agent-name" />
                 <label><span>@T("Handler")</span><InputText @bind-Value="model.Handler" data-testid="agent-handler" /><ValidationMessage For="() => model.Handler" /></label>
-                <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" data-testid="agent-display-name" /><ValidationMessage For="() => model.DisplayName" /></label>
                 <ResourceScopeFormField ResourceKind="@AgentResourceKinds.Agent" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
             </div>
             @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">@T("Uid"): <code>@resourceId</code></p> }

@@ -22,6 +22,7 @@
   <data name="SucceededRunCount.Many"><value>{0} succeeded</value></data>
   <data name="DisplayName"><value>Display name</value></data>
   <data name="ResourceName"><value>Resource name</value></data>
+  <data name="TechnicalName"><value>Technical name</value></data>
   <data name="Namespace"><value>Namespace</value></data>
   <data name="Kind"><value>Kind</value></data>
   <data name="Strategy"><value>Strategy</value></data>
