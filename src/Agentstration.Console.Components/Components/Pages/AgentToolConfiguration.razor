@@ -19,6 +19,22 @@
     }
     else
     {
+        @if (CategoryGroups.Count > 0)
+        {
+            <section class="agent-tool-categories" aria-labelledby="agent-tool-categories-title">
+                <header><div><span class="agent-tool-provider-type">@T("FunctionalSelection")</span><h3 id="agent-tool-categories-title">@T("ToolCategories")</h3><p>@T("ToolCategoriesHelp")</p></div><a class="text-button" href="/tools/categories">@T("ManageCategories") →</a></header>
+                <div class="agent-tool-category-list">
+                    @foreach (var category in CategoryGroups)
+                    {
+                        var state = CategoryState(category);
+                        <button type="button" class="agent-tool-category @(state == "true" ? "selected" : state == "mixed" ? "partial" : null)" role="checkbox" aria-checked="@state" @onclick="() => ToggleCategoryAsync(category)" data-category="@category.Name">
+                            <span class="agent-tool-category-check" aria-hidden="true">@(state == "true" ? "✓" : state == "mixed" ? "−" : "")</span>
+                            <span><strong>@category.DisplayName</strong><small>@T("CategorySelection", CategorySelectedCount(category), category.AssignableTools.Count)</small><small>@ProviderSummary(category)</small></span>
+                        </button>
+                    }
+                </div>
+            </section>
+        }
         <div class="agent-tool-groups">
             @foreach (var group in Groups)
             {
@@ -68,20 +84,48 @@
 @code {
     [Parameter] public IReadOnlyList<ToolResource> Tools { get; set; } = [];
     [Parameter] public IReadOnlyList<ToolProviderResource> Providers { get; set; } = [];
+    [Parameter] public IReadOnlyList<ToolCategoryResource> Categories { get; set; } = [];
     [Parameter] public IReadOnlyList<string> SelectedToolIds { get; set; } = [];
     [Parameter] public EventCallback<IReadOnlyList<string>> SelectedToolIdsChanged { get; set; }
 
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private IReadOnlyList<AgentToolProviderGroup> Groups => AgentToolProviderGroup.Create(Tools, Providers, T("UnknownMcp"));
+    private IReadOnlyList<AgentToolCategoryGroup> CategoryGroups => AgentToolCategoryGroup.Create(Categories, Tools);
     private bool IsAssigned(string id) => SelectedToolIds.Contains(id, StringComparer.Ordinal);
     private int SelectedCount(AgentToolProviderGroup group) => group.Tools.Count(tool => IsAssigned(tool.Metadata.Name));
     private static string ToolStatusClass(bool usable, bool assigned) => usable ? "tool-status available" : assigned ? "tool-status warning" : "tool-status unavailable";
+    private int CategorySelectedCount(AgentToolCategoryGroup category) => category.AssignableTools.Count(tool => IsAssigned(tool.Name));
+    private string CategoryState(AgentToolCategoryGroup category)
+    {
+        var selected = CategorySelectedCount(category);
+        return selected == 0 ? "false" : selected == category.AssignableTools.Count ? "true" : "mixed";
+    }
+    private string ProviderSummary(AgentToolCategoryGroup category) => string.Join(" · ", category.Tools
+        .Select(tool => Providers.FirstOrDefault(provider => provider.Name == tool.Definition.Provider?.Name)?.Definition.DisplayName ?? tool.Definition.Provider?.Name ?? T("UnknownMcp"))
+        .Distinct(StringComparer.CurrentCultureIgnoreCase));
 
     private async Task ToggleAsync(string id, bool selected)
     {
         var values = SelectedToolIds.Distinct(StringComparer.Ordinal).ToList();
         if (selected && !values.Contains(id, StringComparer.Ordinal)) values.Add(id);
         else if (!selected) values.RemoveAll(value => string.Equals(value, id, StringComparison.Ordinal));
+        await SelectedToolIdsChanged.InvokeAsync(values);
+    }
+
+    private async Task ToggleCategoryAsync(AgentToolCategoryGroup category)
+    {
+        var values = SelectedToolIds.Distinct(StringComparer.Ordinal).ToList();
+        var select = category.AssignableTools.Any(tool => !values.Contains(tool.Name, StringComparer.Ordinal));
+        if (select)
+        {
+            foreach (var tool in category.AssignableTools)
+                if (!values.Contains(tool.Name, StringComparer.Ordinal)) values.Add(tool.Name);
+        }
+        else
+        {
+            var members = category.Tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
+            values.RemoveAll(members.Contains);
+        }
         await SelectedToolIdsChanged.InvokeAsync(values);
     }
 

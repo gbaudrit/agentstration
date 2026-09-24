@@ -34,6 +34,49 @@
     gap: 18px;
 }
 
+.agent-tool-categories {
+    display: grid;
+    gap: 14px;
+    margin-bottom: 20px;
+    padding: 16px;
+    border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--primary-soft) 34%, var(--surface));
+}
+
+.agent-tool-categories > header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.agent-tool-categories h3,
+.agent-tool-categories p { margin: 3px 0 0; }
+.agent-tool-categories p { color: var(--muted); font-size: .82rem; }
+.agent-tool-category-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 10px; }
+.agent-tool-category {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 11px;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: var(--surface);
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+}
+.agent-tool-category:hover { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); }
+.agent-tool-category.selected { border-color: var(--primary); background: color-mix(in srgb, var(--primary-soft) 60%, var(--surface)); }
+.agent-tool-category.partial { border-color: color-mix(in srgb, var(--primary) 60%, var(--border)); }
+.agent-tool-category-check { display: grid; width: 20px; height: 20px; place-items: center; border: 1px solid var(--border); border-radius: 5px; color: white; font-weight: 800; }
+.agent-tool-category.selected .agent-tool-category-check,
+.agent-tool-category.partial .agent-tool-category-check { border-color: var(--primary); background: var(--primary); }
+.agent-tool-category > span:last-child { display: grid; min-width: 0; gap: 3px; }
+.agent-tool-category small { overflow: hidden; color: var(--muted); font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
+
 .agent-tool-group {
     overflow: visible;
     border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
@@ -246,7 +289,8 @@
 
 @media (max-width: 700px) {
     .agent-tools-panel > .panel-header,
-    .agent-tool-group > header {
+    .agent-tool-group > header,
+    .agent-tool-categories > header {
         align-items: stretch;
         flex-direction: column;
     }

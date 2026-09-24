@@ -6,6 +6,7 @@
 @inject IAgentRunnerRuntimeClient RuntimeClient
 @inject IRuntimeProfilesClient RuntimeProfilesClient
 @inject IToolsClient ToolsClient
+@inject IToolCategoriesClient ToolCategoriesClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
@@ -68,7 +69,7 @@ else
 
         @if (toolsMode)
         {
-            <AgentToolConfiguration Tools="catalogTools" Providers="catalogProviders" SelectedToolIds="SelectedToolIds" SelectedToolIdsChanged="UpdateSelectedTools" />
+            <AgentToolConfiguration Tools="catalogTools" Providers="catalogProviders" Categories="catalogCategories" SelectedToolIds="SelectedToolIds" SelectedToolIdsChanged="UpdateSelectedTools" />
         }
         else
         {
@@ -136,6 +137,7 @@ else
     private AgentEditorModel? model;
     private IReadOnlyList<ToolResource> catalogTools = [];
     private IReadOnlyList<ToolProviderResource> catalogProviders = [];
+    private IReadOnlyList<ToolCategoryResource> catalogCategories = [];
     private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
     private string? etag;
     private string? resourceId;
@@ -186,10 +188,12 @@ else
         {
             var toolsTask = ToolsClient.GetToolsAsync(cancellationToken: cancellation.Token);
             var providersTask = ToolsClient.GetProvidersAsync(cancellation.Token);
+            var categoriesTask = ToolCategoriesClient.GetCategoriesAsync(cancellation.Token);
             var runtimeProfilesTask = RuntimeProfilesClient.GetRuntimeProfilesAsync(cancellation.Token);
-            await Task.WhenAll(toolsTask, providersTask, runtimeProfilesTask);
+            await Task.WhenAll(toolsTask, providersTask, categoriesTask, runtimeProfilesTask);
             catalogTools = await toolsTask;
             catalogProviders = await providersTask;
+            catalogCategories = await categoriesTask;
             runtimeProfiles = await runtimeProfilesTask;
             if (IsNew)
             {

@@ -63,6 +63,41 @@ public sealed class AgentToolConfigurationTests
             selected?.ToArray());
     }
 
+    [TestMethod]
+    public async Task CategoryRepresentsPartialSelectionAndFlattensBulkActionToToolIds()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        IReadOnlyList<string>? selected = null;
+        var tools = new[]
+        {
+            Tool("notifications.send", "Send notification", "notifications"),
+            Tool("workspace.list", "List workspaces", "workspace")
+        };
+        var category = Category("core-tools", "Core tools", tools.Select(tool => tool.Name).ToArray());
+
+        var rendered = context.Render<AgentToolConfiguration>(parameters => parameters
+            .Add(component => component.Providers, [Provider("notifications", "Notifications MCP"), Provider("workspace", "Workspace MCP")])
+            .Add(component => component.Tools, tools)
+            .Add(component => component.Categories, [category])
+            .Add(component => component.SelectedToolIds, ["notifications.send"])
+            .Add(component => component.SelectedToolIdsChanged, values => selected = values));
+
+        var selector = rendered.Find("[data-category='core-tools']");
+        Assert.AreEqual("mixed", selector.GetAttribute("aria-checked"));
+        await selector.ClickAsync(new());
+        CollectionAssert.AreEquivalent(new[] { "notifications.send", "workspace.list" }, selected?.ToArray());
+
+        var selectedRendered = context.Render<AgentToolConfiguration>(parameters => parameters
+            .Add(component => component.Providers, [Provider("notifications", "Notifications MCP"), Provider("workspace", "Workspace MCP")])
+            .Add(component => component.Tools, tools)
+            .Add(component => component.Categories, [category])
+            .Add(component => component.SelectedToolIds, selected!)
+            .Add(component => component.SelectedToolIdsChanged, values => selected = values));
+        await selectedRendered.Find("[data-category='core-tools']").ClickAsync(new());
+        Assert.HasCount(0, selected!);
+    }
+
     private static ToolProviderResource Provider(string name, string displayName) => new()
     {
         ApiVersion = "agentstration.io/v1",
@@ -93,6 +128,18 @@ public sealed class AgentToolConfigurationTests
                 FirstSeenAt = DateTimeOffset.UnixEpoch,
                 LastSeenAt = DateTimeOffset.UnixEpoch
             }
+        }
+    };
+
+    private static ToolCategoryResource Category(string name, string displayName, IReadOnlyList<string> tools) => new()
+    {
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ToolResourceKinds.ToolCategory,
+        Metadata = new ResourceMetadata { Name = name },
+        Definition = new ToolCategoryProperties
+        {
+            DisplayName = displayName,
+            Tools = tools.Select(tool => new ResourceReference(tool)).ToArray()
         }
     };
 }

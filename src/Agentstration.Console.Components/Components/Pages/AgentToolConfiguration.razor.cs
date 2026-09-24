@@ -31,3 +31,34 @@ internal sealed record AgentToolProviderGroup(
             .ToArray();
     }
 }
+
+internal sealed record AgentToolCategoryGroup(
+    string Name,
+    string DisplayName,
+    IReadOnlyList<ToolResource> Tools,
+    IReadOnlyList<ToolResource> AssignableTools)
+{
+    public static IReadOnlyList<AgentToolCategoryGroup> Create(
+        IReadOnlyList<ToolCategoryResource> categories,
+        IReadOnlyList<ToolResource> tools)
+    {
+        var toolsByName = tools.ToDictionary(tool => tool.Name, StringComparer.Ordinal);
+        return categories.Select(category =>
+        {
+            var members = category.Definition.Tools
+                .Select(reference => toolsByName.GetValueOrDefault(reference.Name))
+                .Where(tool => tool is not null)
+                .Cast<ToolResource>()
+                .DistinctBy(tool => tool.Name, StringComparer.Ordinal)
+                .OrderBy(tool => tool.Definition.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                .ToArray();
+            return new AgentToolCategoryGroup(
+                category.Name,
+                category.Definition.DisplayName,
+                members,
+                members.Where(tool => tool.Definition.Enabled && tool.Definition.Discovery?.Available == true).ToArray());
+        }).Where(category => category.Tools.Count > 0)
+          .OrderBy(category => category.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+          .ToArray();
+    }
+}
