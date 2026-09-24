@@ -86,7 +86,7 @@ export class FoundrySecretBindingPage {
   public async deleteSecretValue(): Promise<void> {
     const section = this.page.locator('.resource-section').filter({ hasText: /Secret Value|Valeur du secret/i }).last();
     await section.getByRole('button', { name: /Delete value|Supprimer la valeur/i }).click();
-    const dialog = this.page.getByRole('dialog');
+    const dialog = this.page.getByRole('alertdialog');
     await dialog.getByRole('button', { name: /Delete value|Supprimer la valeur/i }).click();
     await expect(section).toContainText(/Missing|Manquante/i);
   }
