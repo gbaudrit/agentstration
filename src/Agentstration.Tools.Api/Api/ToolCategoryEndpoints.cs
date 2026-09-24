@@ -11,12 +11,24 @@ internal static class ToolCategoryEndpoints
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/", ListAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        group.MapGet("/{categoryName}", GetAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        group.MapGet("/{categoryName}/members", ListMembersAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        group.MapPost("/", CreateAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        group.MapPut("/{categoryName}", PutAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        group.MapDelete("/{categoryName}", DeleteAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
+        group.MapGet("/", ListAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources)
+            .Produces<ValueResponse<ToolCategoryResource>>()
+            .WithSummary("List ToolCategories");
+        group.MapGet("/{categoryName}", GetAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources)
+            .Produces<ToolCategoryResource>()
+            .WithSummary("Get a ToolCategory");
+        group.MapGet("/{categoryName}/members", ListMembersAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources)
+            .Produces<ValueResponse<ToolCategoryMember>>()
+            .WithSummary("List resolved ToolCategory members");
+        group.MapPost("/", CreateAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources)
+            .Produces<ToolCategoryResource>(StatusCodes.Status201Created)
+            .WithSummary("Create a ToolCategory");
+        group.MapPut("/{categoryName}", PutAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources)
+            .Produces<ToolCategoryResource>()
+            .WithSummary("Update a ToolCategory");
+        group.MapDelete("/{categoryName}", DeleteAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources)
+            .Produces(StatusCodes.Status204NoContent)
+            .WithSummary("Delete a ToolCategory");
     }
 
     private static Task<IResult> ListAsync(
