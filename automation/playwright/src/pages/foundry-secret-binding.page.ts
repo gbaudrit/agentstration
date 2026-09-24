@@ -38,7 +38,7 @@ export class FoundrySecretBindingPage {
 
   public async createSecret(requirementId: string, value: string): Promise<string> {
     const panel = this.requirement(requirementId);
-    await panel.getByTestId('model-provider-binding-kind').selectOption({ label: /Secret|Secret/i });
+    await panel.getByTestId('model-provider-binding-kind').selectOption('Secret');
     await panel.getByTestId('model-provider-binding-create').click();
     const dialog = this.page.getByTestId('contextual-secret-creator');
     await dialog.waitFor({ state: 'visible' });
