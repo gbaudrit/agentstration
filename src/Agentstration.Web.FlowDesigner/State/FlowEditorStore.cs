@@ -170,7 +170,7 @@ public sealed class FlowEditorStore
     public void Load(FlowDesignerLoadResult result, FlowDesignerTarget target)
     {
         undo.Clear(); redo.Clear();
-        State = new FlowEditorState { Resource = result.Resource, Diagram = FlowDesignerDocument.From(result.Resource.Definition), ETag = result.ETag, LocalRevision = result.Resource.DraftRevision ?? 0, SourceText = result.Source, SaveState = FlowSaveState.Saved, Namespace = target.Namespace, PublishedVersion = result.PublishedVersion, IsReadOnly = result.IsReadOnly || target.IsReadOnly };
+        State = new FlowEditorState { Resource = result.Resource, Diagram = FlowDesignerDocument.From(result.Resource.Definition), ETag = result.ETag, LocalRevision = result.Resource.DraftRevision ?? 0, SourceText = result.Source, SaveState = FlowSaveState.Saved, Namespace = target.Namespace, PublishedVersion = result.PublishedVersion, IsReadOnly = result.IsReadOnly };
         Changed();
     }
 

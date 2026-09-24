@@ -363,7 +363,7 @@ else
     private string SaveText => T($"SaveState.{Editor.State.SaveState}");
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private FlowDesignerTarget Target => new(Namespace, ResourceId);
-    private bool ReadOnly => IsReadOnly || Target.IsReadOnly || Editor.State.IsReadOnly;
+    private bool ReadOnly => IsReadOnly || Editor.State.IsReadOnly;
 
     protected override async Task OnParametersSetAsync()
     {

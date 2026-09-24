@@ -204,54 +204,78 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
     }
 
     public Task<FlowDraftResponse> GetDraftAsync(string flowId, CancellationToken cancellationToken) =>
-        ApiResponse.ReadAsync<FlowDraftResponse>(httpClient, $"api/flows/{Uri.EscapeDataString(flowId)}/draft", cancellationToken);
+        GetDraftAsync(ResourceNamespace.Default, flowId, cancellationToken);
+
+    public Task<FlowDraftResponse> GetDraftAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<FlowDraftResponse>(httpClient, $"{FlowPath(@namespace, flowId)}/draft", cancellationToken);
 
     public async Task<FlowDraftResponse> SaveDraftAsync(string flowId, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken)
+        => await SaveDraftAsync(ResourceNamespace.Default, flowId, request, etag, cancellationToken);
+
+    public async Task<FlowDraftResponse> SaveDraftAsync(ResourceNamespace @namespace, string flowId, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Put, $"api/flows/{Uri.EscapeDataString(flowId)}/draft") { Content = JsonContent.Create(request, options: JsonOptions) };
+        using var message = new HttpRequestMessage(HttpMethod.Put, $"{FlowPath(@namespace, flowId)}/draft") { Content = JsonContent.Create(request, options: JsonOptions) };
         message.Headers.TryAddWithoutValidation("If-Match", etag);
         using var response = await httpClient.SendAsync(message, cancellationToken);
         return await ReadDraftAsync(response, cancellationToken);
     }
 
     public async Task<FlowValidationResponse> ValidateDraftAsync(string flowId, CancellationToken cancellationToken)
+        => await ValidateDraftAsync(ResourceNamespace.Default, flowId, cancellationToken);
+
+    public async Task<FlowValidationResponse> ValidateDraftAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsync($"api/flows/{Uri.EscapeDataString(flowId)}/validate", null, cancellationToken);
+        using var response = await httpClient.PostAsync($"{FlowPath(@namespace, flowId)}/validate", null, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<FlowValidationResponse>(JsonOptions, cancellationToken)
             ?? throw new AgentstrationApiException("Flow API returned an empty validation result.", Guid.NewGuid().ToString("N"));
     }
 
     public Task<FlowSourceResponse> GetDraftSourceAsync(string flowId, string format, CancellationToken cancellationToken) =>
-        ApiResponse.ReadAsync<FlowSourceResponse>(httpClient, $"api/flows/{Uri.EscapeDataString(flowId)}/draft/source?format={Uri.EscapeDataString(format)}", cancellationToken);
+        GetDraftSourceAsync(ResourceNamespace.Default, flowId, format, cancellationToken);
+
+    public Task<FlowSourceResponse> GetDraftSourceAsync(ResourceNamespace @namespace, string flowId, string format, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<FlowSourceResponse>(httpClient, $"{FlowPath(@namespace, flowId)}/draft/source?format={Uri.EscapeDataString(format)}", cancellationToken);
 
     public async Task<FlowDraftResponse> ReplaceDraftSourceAsync(string flowId, ReplaceFlowSourceRequest request, string etag, CancellationToken cancellationToken)
+        => await ReplaceDraftSourceAsync(ResourceNamespace.Default, flowId, request, etag, cancellationToken);
+
+    public async Task<FlowDraftResponse> ReplaceDraftSourceAsync(ResourceNamespace @namespace, string flowId, ReplaceFlowSourceRequest request, string etag, CancellationToken cancellationToken)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Put, $"api/flows/{Uri.EscapeDataString(flowId)}/draft/source") { Content = JsonContent.Create(request, options: JsonOptions) };
+        using var message = new HttpRequestMessage(HttpMethod.Put, $"{FlowPath(@namespace, flowId)}/draft/source") { Content = JsonContent.Create(request, options: JsonOptions) };
         message.Headers.TryAddWithoutValidation("If-Match", etag);
         using var response = await httpClient.SendAsync(message, cancellationToken);
         return await ReadDraftAsync(response, cancellationToken);
     }
 
     public async Task<FlowVersionResponse> PublishDraftAsync(string flowId, PublishFlowDraftRequest request, CancellationToken cancellationToken)
+        => await PublishDraftAsync(ResourceNamespace.Default, flowId, request, cancellationToken);
+
+    public async Task<FlowVersionResponse> PublishDraftAsync(ResourceNamespace @namespace, string flowId, PublishFlowDraftRequest request, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsJsonAsync($"api/flows/{Uri.EscapeDataString(flowId)}/publish", request, JsonOptions, cancellationToken);
+        using var response = await httpClient.PostAsJsonAsync($"{FlowPath(@namespace, flowId)}/publish", request, JsonOptions, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<FlowVersionResponse>(JsonOptions, cancellationToken)
             ?? throw new AgentstrationApiException("Flow API returned an empty published version.", Guid.NewGuid().ToString("N"));
     }
 
     public async Task<FlowRun> CreateDraftRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken)
+        => await CreateDraftRunAsync(ResourceNamespace.Default, flowId, request, cancellationToken);
+
+    public async Task<FlowRun> CreateDraftRunAsync(ResourceNamespace @namespace, string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsJsonAsync($"api/flows/{Uri.EscapeDataString(flowId)}/draft/runs", request, JsonOptions, cancellationToken);
+        using var response = await httpClient.PostAsJsonAsync($"{FlowPath(@namespace, flowId)}/draft/runs", request, JsonOptions, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<FlowRun>(JsonOptions, cancellationToken)
             ?? throw new AgentstrationApiException("Flow API returned an empty Draft Run.", Guid.NewGuid().ToString("N"));
     }
 
     public async Task<FlowDraftResponse> CreateDraftFromVersionAsync(string flowId, string version, CancellationToken cancellationToken)
+        => await CreateDraftFromVersionAsync(ResourceNamespace.Default, flowId, version, cancellationToken);
+
+    public async Task<FlowDraftResponse> CreateDraftFromVersionAsync(ResourceNamespace @namespace, string flowId, string version, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsync($"api/flows/{Uri.EscapeDataString(flowId)}/versions/{Uri.EscapeDataString(version)}/draft", null, cancellationToken);
+        using var response = await httpClient.PostAsync($"{FlowPath(@namespace, flowId)}/versions/{Uri.EscapeDataString(version)}/draft", null, cancellationToken);
         return await ReadDraftAsync(response, cancellationToken);
     }
 
