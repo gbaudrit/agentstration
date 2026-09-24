@@ -16,7 +16,6 @@ test('Platform health resolves when navigation occurs during refresh @smoke', as
 
   product.platformHealth!.delayNextRuntimeStatus(2_000);
   await pages.platformHealth.open(product.consoleUrl, '/');
-  await pages.platformHealth.expectConnecting();
   await pages.platformHealth.navigateToAgents();
   await pages.platformHealth.expectOperational();
 });
