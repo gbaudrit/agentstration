@@ -14,6 +14,15 @@ export class ConsoleEntryInteractionPage {
     await this.interaction.waitFor({ state: 'visible' });
   }
 
+  public async resumeFromConversations(message: string): Promise<void> {
+    await this.page.goto(new URL('/conversations', this.page.url()).toString());
+    await this.page.getByTestId(TestIds.console.conversations).waitFor({ state: 'visible' });
+    const conversation = this.page.getByTestId(TestIds.console.conversationRow).filter({ hasText: message });
+    await conversation.waitFor({ state: 'visible' });
+    await conversation.click();
+    await this.interaction.waitFor({ state: 'visible' });
+  }
+
   public userMessage(content: string): Locator {
     return this.page.locator(
       `[data-testid="${TestIds.workplace.conversationMessage}"][data-message-role="user"]`,

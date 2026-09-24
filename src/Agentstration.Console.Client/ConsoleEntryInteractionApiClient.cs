@@ -6,6 +6,7 @@ namespace Agentstration.Web.Console;
 
 public interface IConsoleEntryInteractionApiClient
 {
+    Task<IReadOnlyList<InteractionResponse>> ListInteractionsAsync(Guid workspaceId, int take, CancellationToken cancellationToken);
     Task<InteractionResponse> GetInteractionAsync(Guid workspaceId, Guid interactionId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(Guid workspaceId, Guid interactionId, CancellationToken cancellationToken);
     Task<IReadOnlyList<PendingActionContract>> ListPendingActionsAsync(Guid workspaceId, Guid interactionId, CancellationToken cancellationToken);
@@ -21,6 +22,9 @@ public interface IConsoleEntryInteractionApiClient
 
 public sealed class ConsoleEntryInteractionApiClient(HttpClient httpClient) : IConsoleEntryInteractionApiClient
 {
+    public async Task<IReadOnlyList<InteractionResponse>> ListInteractionsAsync(Guid workspaceId, int take, CancellationToken cancellationToken) =>
+        (await ApiResponse.ReadAsync<InteractionPageResponse>(httpClient, $"{WorkspacePath(workspaceId)}/interactions?take={Math.Clamp(take, 1, 100)}", cancellationToken)).Value;
+
     public Task<InteractionResponse> GetInteractionAsync(Guid workspaceId, Guid interactionId, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<InteractionResponse>(httpClient, $"{WorkspacePath(workspaceId)}/interactions/{interactionId:D}", cancellationToken);
 

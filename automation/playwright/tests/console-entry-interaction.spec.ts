@@ -41,4 +41,9 @@ test('a command fallback opens and executes the generic Console Entry interactio
   await expect(pages.consoleEntryInteraction.interaction).toHaveAttribute('data-entry-name', entry.name);
   await expect(pages.consoleEntryInteraction.userMessage(query)).toBeVisible();
   await expect(pages.consoleEntryInteraction.assistantResponse).toBeVisible();
+
+  await pages.consoleEntryInteraction.resumeFromConversations(query);
+  await expect(pages.consoleEntryInteraction.interaction).toHaveAttribute('data-entry-name', entry.name);
+  await expect(pages.consoleEntryInteraction.userMessage(query)).toBeVisible();
+  await expect(pages.consoleEntryInteraction.assistantResponse).toBeVisible();
 });

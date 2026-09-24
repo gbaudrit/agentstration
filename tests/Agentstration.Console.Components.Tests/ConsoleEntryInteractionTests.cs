@@ -263,6 +263,7 @@ public sealed class ConsoleEntryInteractionTests
         public int CancelCalls { get; private set; }
         public Guid CancelWorkspaceId { get; private set; }
         public Guid CancelTaskId { get; private set; }
+        public Task<IReadOnlyList<InteractionResponse>> ListInteractionsAsync(Guid workspaceId, int take, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<InteractionResponse>>([Interaction]);
         public Task<InteractionResponse> GetInteractionAsync(Guid workspaceId, Guid interactionId, CancellationToken cancellationToken) => Task.FromResult(Interaction);
         public Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(Guid workspaceId, Guid interactionId, CancellationToken cancellationToken) => Task.FromResult(Messages);
         public Task<IReadOnlyList<PendingActionContract>> ListPendingActionsAsync(Guid workspaceId, Guid interactionId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PendingActionContract>>([]);

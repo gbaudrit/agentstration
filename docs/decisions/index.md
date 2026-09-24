@@ -171,3 +171,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 139. [ADR-0139 — Model Providers own exact Model specification overrides](0139-model-providers-own-exact-model-specification-overrides.md)
 140. [ADR-0140 — Console command fallback is a presentation role](0140-console-command-fallback-is-a-presentation-role.md)
 141. [ADR-0141 — Console Entry interactions reuse durable Work](0141-console-entry-interactions-reuse-durable-work.md)
+142. [ADR-0142 — Console conversation browsing projects durable Interactions](0142-console-conversation-browsing-projects-durable-interactions.md)

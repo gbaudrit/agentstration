@@ -15,6 +15,8 @@ export const TestIds = {
     commandInput: 'console-command-input',
     commandFallback: 'console-entry-fallback',
     entryInteraction: 'console-entry-interaction',
+    conversations: 'console-conversations',
+    conversationRow: 'conversation-row',
     notificationsTrigger: 'console-notifications-trigger',
     notificationsPanel: 'console-notifications-panel',
   },
