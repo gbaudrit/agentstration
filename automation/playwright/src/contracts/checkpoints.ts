@@ -74,6 +74,10 @@ export const Checkpoints = {
     profileEditors: 'resource-administration-profile-editors',
     protectedEditors: 'resource-administration-protected-editors',
   },
+  platformHealth: {
+    directRoute: 'platform-health-direct-route',
+    afterNavigation: 'platform-health-after-navigation',
+  },
   descendantSecrets: {
     vaultCreated: 'descendant-secrets-vault-created',
     vaultUnavailable: 'descendant-secrets-vault-unavailable',
