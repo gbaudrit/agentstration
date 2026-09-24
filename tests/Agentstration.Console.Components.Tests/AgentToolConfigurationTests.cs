@@ -74,7 +74,7 @@ public sealed class AgentToolConfigurationTests
             Tool("notifications.send", "Send notification", "notifications"),
             Tool("workspace.list", "List workspaces", "workspace")
         };
-        var category = Category("core-tools", "Core tools", tools.Select(tool => tool.Name).ToArray());
+        var category = Category("base-tools", "Base tools", tools.Select(tool => tool.Name).ToArray());
 
         var rendered = context.Render<AgentToolConfiguration>(parameters => parameters
             .Add(component => component.Providers, [Provider("notifications", "Notifications MCP"), Provider("workspace", "Workspace MCP")])
@@ -83,7 +83,7 @@ public sealed class AgentToolConfigurationTests
             .Add(component => component.SelectedToolIds, ["notifications.send"])
             .Add(component => component.SelectedToolIdsChanged, values => selected = values));
 
-        var selector = rendered.Find("[data-category='core-tools']");
+        var selector = rendered.Find("[data-category='base-tools']");
         Assert.AreEqual("mixed", selector.GetAttribute("aria-checked"));
         await selector.ClickAsync(new());
         CollectionAssert.AreEquivalent(new[] { "notifications.send", "workspace.list" }, selected?.ToArray());
@@ -94,7 +94,7 @@ public sealed class AgentToolConfigurationTests
             .Add(component => component.Categories, [category])
             .Add(component => component.SelectedToolIds, selected!)
             .Add(component => component.SelectedToolIdsChanged, values => selected = values));
-        await selectedRendered.Find("[data-category='core-tools']").ClickAsync(new());
+        await selectedRendered.Find("[data-category='base-tools']").ClickAsync(new());
         Assert.HasCount(0, selected!);
     }
 

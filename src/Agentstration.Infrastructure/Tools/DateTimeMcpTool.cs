@@ -30,7 +30,7 @@ public sealed class DateTimeMcpTool(TimeProvider timeProvider) : IInternalMcpToo
             additionalProperties = false
         }),
         InitialCategory: new(
-            "core-tools",
+            "base-tools",
             "Outils de base",
             "Outils génériques utiles à de nombreux agents."));
 

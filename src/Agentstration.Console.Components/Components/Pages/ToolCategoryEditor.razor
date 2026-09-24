@@ -25,23 +25,31 @@ else
     </section>
 
     <section class="panel form-section">
-        <div class="panel-header"><div><p class="eyebrow">@T("Membership")</p><h2>@T("ChooseTools")</h2><p>@T("MembershipHelp")</p></div><label class="tool-category-search"><span class="sr-only">@T("Search")</span><input @bind="search" @bind:event="oninput" placeholder="@T("SearchPlaceholder")" /></label></div>
+        <div class="panel-header tool-category-members-header"><div><p class="eyebrow">@T("Membership")</p><h2>@T("ChooseTools")</h2><p>@T("MembershipHelp")</p></div><label class="tool-category-search"><span aria-hidden="true"><TablerIcon Name="search" /></span><span class="sr-only">@T("Search")</span><input @bind="search" @bind:event="oninput" placeholder="@T("SearchPlaceholder")" /></label></div>
         <div class="tool-category-members" data-testid="category-members">
             @foreach (var tool in FilteredTools)
             {
-                <label class="tool-category-member" data-provider="@tool.Definition.Provider?.Name">
-                    <input type="checkbox" checked="@selected.Contains(ToolKey(tool))" @onchange="args => Toggle(tool, (bool)args.Value!)" />
-                    <span><strong>@tool.Definition.DisplayName</strong><small><a href="@ToolUrl(tool.Name)" @onclick:stopPropagation="true">@tool.Name</a> · @ProviderLabel(tool)</small>@if (!string.IsNullOrWhiteSpace(tool.Definition.Description)) { <small>@tool.Definition.Description</small> }</span>
-                    <StatusBadge Text="@Availability(tool)" Status="@(Assignable(tool) ? UiStatus.Success : UiStatus.Warning)" />
-                </label>
+                var inputId = ToolInputId(tool.Name);
+                var assigned = selected.Contains(ToolKey(tool));
+                var usable = Assignable(tool);
+                <div class="tool-category-member" data-provider="@tool.Definition.Provider?.Name">
+                    <input id="@inputId" type="checkbox" aria-label="@tool.Definition.DisplayName" checked="@assigned" disabled="@(!usable && !assigned)" @onchange="args => Toggle(tool, (bool)args.Value!)" />
+                    <label class="tool-category-member-icon" for="@inputId" aria-hidden="true"><TablerIcon Name="tool" /></label>
+                    <span class="tool-category-member-copy">
+                        <strong><a href="@ToolUrl(tool.Name)">@tool.Definition.DisplayName</a>@if (!string.IsNullOrWhiteSpace(tool.Definition.Description)) { <HelpTooltip Text="@tool.Definition.Description" /> }</strong>
+                        <small><code>@tool.Name</code><span>·</span>@ProviderLabel(tool)</small>
+                        <label class="tool-category-status @(usable ? "available" : assigned ? "warning" : "unavailable")" for="@inputId"><i></i>@Availability(tool)</label>
+                    </span>
+                </div>
             }
             @foreach (var missing in missingMembers)
             {
-                <label class="tool-category-member unavailable">
-                    <input type="checkbox" checked @onchange="args => ToggleMissing(missing, (bool)args.Value!)" />
-                    <span><strong>@missing.Reference.Name</strong><small>@T("MissingMember")</small></span>
-                    <StatusBadge Text="@T("Missing")" Status="UiStatus.Warning" />
-                </label>
+                var inputId = ToolInputId(missing.Reference.Name);
+                <div class="tool-category-member unavailable">
+                    <input id="@inputId" type="checkbox" checked @onchange="args => ToggleMissing(missing, (bool)args.Value!)" />
+                    <label class="tool-category-member-icon" for="@inputId" aria-hidden="true"><TablerIcon Name="tool" /></label>
+                    <span class="tool-category-member-copy"><strong>@missing.Reference.Name <HelpTooltip Text="@T("MissingMember")" /></strong><label class="tool-category-status warning" for="@inputId"><i></i>@T("Missing")</label></span>
+                </div>
             }
         </div>
     </section>
@@ -142,4 +150,5 @@ else
     private static string ToolKey(ToolResource tool) => $"{tool.ScopeRef?.Value}|{tool.Namespace.Value}|{tool.Name}";
     private static string ReferenceKey(ResourceReference reference) => $"{reference.ScopeRef?.Value}|{(reference.Namespace ?? ResourceNamespace.Default).Value}|{reference.Name}";
     private static string ToolUrl(string name) => $"/tools/{Uri.EscapeDataString(name)}";
+    private static string ToolInputId(string name) => $"category-tool-{Uri.EscapeDataString(name)}";
 }

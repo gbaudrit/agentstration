@@ -49,16 +49,16 @@ public sealed class DateTimeToolTests : ModelManagementApiTestBase
 
         var toolName = AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.DateTimeGet);
         var tool = await store.GetAsync<ToolResource>(new(ToolResourceKinds.Tool, toolName), default);
-        var category = await store.GetAsync<ToolCategoryResource>(new(ToolResourceKinds.ToolCategory, "core-tools"), default);
+        var category = await store.GetAsync<ToolCategoryResource>(new(ToolResourceKinds.ToolCategory, "base-tools"), default);
         Assert.IsNotNull(tool);
         Assert.IsNotNull(category);
         Assert.AreEqual("Outils de base", category.Value.Definition.DisplayName);
         Assert.AreEqual(toolName, category.Value.Definition.Tools.Single().Name);
 
-        await store.DeleteAsync(new(ToolResourceKinds.ToolCategory, "core-tools"), category.ETag, default);
+        await store.DeleteAsync(new(ToolResourceKinds.ToolCategory, "base-tools"), category.ETag, default);
         await projection.EnsureAsync(scope, ResourceNamespace.Default, default);
 
-        Assert.IsNull(await store.GetAsync<ToolCategoryResource>(new(ToolResourceKinds.ToolCategory, "core-tools"), default));
+        Assert.IsNull(await store.GetAsync<ToolCategoryResource>(new(ToolResourceKinds.ToolCategory, "base-tools"), default));
         Assert.IsNotNull(await store.GetAsync<ToolResource>(new(ToolResourceKinds.Tool, toolName), default));
     }
 
