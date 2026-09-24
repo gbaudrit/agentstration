@@ -125,6 +125,8 @@ Every Entry remains owned and executed by exactly one Workspace. Its versioned e
 
 Console-targeted discovery additionally projects whether the exact pinned Flow is executable, disabled, or unavailable, with stable reason codes for localization. Draft-only and unauthorized Entries are omitted. The typed Console client invokes an eligible Entry through its owner-Workspace route with `surface=Console`, and submission rechecks the same readiness decision. The independent Console host now owns its opaque interactive session and will use this contract once downstream delegation is available; discovery does not weaken or bypass the BFF trust boundary.
 
+Console-exposed Entries may declare the `Fallback` Console role. When search has no authorized page, command, or resource match, Console offers every executable fallback Entry as an explicit choice carrying its owner Workspace and the exact typed query. No execution starts until the user selects an action; an absent, non-executable, or unauthorized fallback retains the ordinary empty result.
+
 ```text
 Work  = what needs to be accomplished
 Flow  = how the work is routed and processed

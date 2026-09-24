@@ -141,6 +141,15 @@ public sealed class WorkPlaneTests
             }
         }));
         Assert.AreEqual("entry_workplace_placements_not_allowed", invalidExposure.Code);
+        var invalidConsoleRole = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(draft with
+        {
+            Exposure = new EntryExposure
+            {
+                Surfaces = [EntryExposureSurface.Workplace],
+                Console = new(EntryConsoleRole.Fallback)
+            }
+        }));
+        Assert.AreEqual("entry_console_role_not_allowed", invalidConsoleRole.Code);
         Assert.IsFalse(EntryExposurePolicy.Allows(
             new EntryExposure { Version = EntryExposure.CurrentVersion + 1 },
             EntryExposureSurface.Workplace,

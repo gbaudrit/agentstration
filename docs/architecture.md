@@ -431,6 +431,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 51. **Delivered local Console API delegation increment:** the BFF obtains short-lived RS256 tokens from private identity operations after revalidating an active local session, attaches them only to configured API origins, and selects separate Management, Work, Flow, and Runtime audiences. API requests verify current Principal, scope and permissions. The signing key can rotate with previous public keys retained through the token lifetime. External OIDC delegation awaits #204 and #211. See ADR-0116.
 52. **Delivered Model inspection increment:** the Console reads the canonical retained `Model` resource and its provider-owned effective projection through typed clients, presents a localized friendly overview with property provenance, and serializes only the persisted observation in a copyable read-only YAML tab. Opening the detail route performs no discovery or mutation.
 53. **Delivered Console Model discovery lifecycle increment:** creating a Model Provider in the Console persists the declaration before attempting initial discovery, reports failure without rolling back the resource, and exposes an explicit refresh action with reconciliation counts. Read paths remain side-effect free.
+54. **Delivered Console Entry fallback increment:** Entry exposure may designate the fallback Console presentation role. The command palette keeps authorized page, command, and resource matches ahead of explicit Entry fallbacks, preserves the exact query, and offers every discovered executable fallback Entry for explicit selection. See ADR-0140.
 
 ## ADR catalog
 
@@ -489,6 +490,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0060: Entry owns Workplace execution presentation
 - ADR-0113: Entry exposure separates ownership from presentation
 - ADR-0114: Console Entry discovery projects canonical execution readiness
+- ADR-0140: Console command fallback is a presentation role
 - ADR-0061: llama.cpp AEP provider and effective capability resolution
 - ADR-0062: immutable versioned extension option contracts
 - ADR-0081: Source Providers are bounded AEP contributions

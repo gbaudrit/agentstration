@@ -169,3 +169,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 137. [ADR-0137 — AEP publishes bounded typed Model observations](0137-aep-publishes-bounded-typed-model-observations.md)
 138. [ADR-0138 — Provider discovery reconciles governed Model resources](0138-provider-discovery-reconciles-governed-model-resources.md)
 139. [ADR-0139 — Model Providers own exact Model specification overrides](0139-model-providers-own-exact-model-specification-overrides.md)
+140. [ADR-0140 — Console command fallback is a presentation role](0140-console-command-fallback-is-a-presentation-role.md)
