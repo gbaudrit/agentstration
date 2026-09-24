@@ -70,6 +70,7 @@
                 <EnvironmentSwitcher />
                 <button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="@T("ToggleColorTheme")" data-testid="theme-toggle" title="@(Preferences.Error ?? F("ThemeValue", Preferences.Theme))"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button>
                 <button class="icon-button notification-button" @onclick="Notifications.TogglePanel" aria-label="@T("Notifications")" data-testid="console-notifications-trigger"><span aria-hidden="true">♢</span>@if (Notifications.UnreadCount > 0) { <span class="notification-count">@Notifications.UnreadCount</span> }</button>
+                <a class="icon-button" href="/settings/profile" aria-label="@T("Nav.Profile")" title="@T("Nav.Profile")"><UiIcon Name="user-circle" /></a>
                 <a class="icon-button" href="/account/security" aria-label="@T("AccountSecurity")" title="@T("AccountSecurity")"><UiIcon Name="shield-check" /></a>
                 <a class="icon-button" href="/logout" aria-label="@T("SignOut")" title="@T("SignOut")"><UiIcon Name="log-out" /></a>
             </div>
