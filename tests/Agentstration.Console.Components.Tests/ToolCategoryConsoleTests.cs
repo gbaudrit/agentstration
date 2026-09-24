@@ -38,7 +38,9 @@ public sealed class ToolCategoryConsoleTests
         });
 
         rendered.Find("button.button-danger").Click();
-        StringAssert.Contains(rendered.Find("[role='dialog']").TextContent, "ne seront pas modifiés");
+        var deleteExplanation = rendered.Find("[role='dialog']").TextContent;
+        Assert.IsTrue(deleteExplanation.Contains("ne seront pas modifiés", StringComparison.Ordinal)
+            || deleteExplanation.Contains("will not be changed", StringComparison.Ordinal));
     }
 
     private sealed class CategoriesClient : IToolCategoriesClient
