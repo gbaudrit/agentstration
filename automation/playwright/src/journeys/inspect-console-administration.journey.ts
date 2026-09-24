@@ -2,6 +2,7 @@ import { Checkpoints } from '../contracts/checkpoints.js';
 import { TestIds } from '../contracts/test-ids.js';
 import type { Journey } from './journey.js';
 import { prepareConsoleJourney } from './prepare-console.journey.js';
+import { ExpectedTextByLocale } from '../locales/expected-text.js';
 
 export interface InspectConsoleAdministrationInput {
   tokenName?: string;
@@ -31,6 +32,7 @@ export const inspectConsoleAdministration: Journey<InspectConsoleAdministrationI
   await context.checkpoint({ name: Checkpoints.consoleAdministration.token, page: context.pages.page, target: context.pages.page.getByTestId(TestIds.consoleAdministration.accountPat) });
 
   await administration.open(context.consoleUrl, '/settings', 'settings');
+  await administration.assertNavigationLocale(ExpectedTextByLocale['en-US'].navigation);
+  await context.checkpoint({ name: Checkpoints.consoleAdministration.navigation, page: context.pages.page, target: context.pages.page.getByTestId(TestIds.console.sidebar) });
   await administration.exerciseShellNavigation();
-  await context.checkpoint({ name: Checkpoints.consoleAdministration.navigation, page: context.pages.page, target: context.pages.page.getByTestId(TestIds.console.notificationsPanel) });
 };
