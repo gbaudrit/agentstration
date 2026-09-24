@@ -1,6 +1,6 @@
 apiVersion: agentstration.io/v1
 kind: Flow
-metadata: { name: resource-planning-solution-consolidation }
+metadata: { name: resource-planning-solution-consolidation, namespace: agentstration.resource-planning }
 definition:
   displayName: Resource Planning - solution consolidation
   description: Durable contradiction detection and functional consolidation child Flow.

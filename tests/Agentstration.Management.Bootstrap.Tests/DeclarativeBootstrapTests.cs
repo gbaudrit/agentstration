@@ -14,6 +14,7 @@ using Agentstration.Resources;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Security.AspNetCoreIdentity;
+using Agentstration.Tools;
 using Agentstration.Web.Hosting;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -645,6 +646,11 @@ public sealed class DeclarativeBootstrapTests
                 .GetAsync(new(workspace.Id), new("bootstrap-flow"), default);
             var entry = await scope.ServiceProvider.GetRequiredService<IWorkplaceRepository>()
                 .GetEntryAsync(new(workspace.Id), new("bootstrap-entry"), default);
+            var resourceStore = scope.ServiceProvider.GetRequiredService<IResourceStore>();
+            var internalProvider = await resourceStore.GetAsync<ToolProviderResource>(
+                new(ToolResourceKinds.ToolProvider, AgentstrationToolProvider.Name), default);
+            var planningTool = await resourceStore.GetAsync<ToolResource>(
+                new(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.ResourcePlanCreate)), default);
 
             Assert.IsNotNull(provider);
             Assert.IsNotNull(runtime);
@@ -652,6 +658,8 @@ public sealed class DeclarativeBootstrapTests
             Assert.IsNotNull(agent);
             Assert.IsNotNull(flow);
             Assert.IsNotNull(entry);
+            Assert.IsNotNull(internalProvider);
+            Assert.IsNotNull(planningTool);
             Assert.IsTrue(flow.Value.ActiveVersion is not null);
             Assert.IsFalse(provider.Value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name));
             Assert.IsFalse(runtime.Value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name));

@@ -2,6 +2,7 @@ apiVersion: agentstration.io/v1
 kind: Entry
 metadata:
   name: ask-agentstration
+  namespace: agentstration.assistant
 definition:
   displayName: Ask Agentstration
   description: Product help, evidence-backed diagnostics, and governed agentic resource planning through one stable Assistant.

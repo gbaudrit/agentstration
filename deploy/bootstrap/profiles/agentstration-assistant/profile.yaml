@@ -3,8 +3,8 @@ kind: BootstrapProfile
 metadata:
   name: agentstration-assistant
 definition:
-  displayName: Install Agentstration Assistant
-  description: Installs the official Resource Planning and Assistant Packs into the dedicated Assistant Workspace.
+  displayName: Bootstrap Agentstration Assistant
+  description: Creates the official Resource Planning and Assistant resources in the dedicated Assistant Workspace.
   targetScope: workspace
   bindings:
     - name: assistant-model

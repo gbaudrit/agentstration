@@ -2,6 +2,7 @@ apiVersion: agentstration.io/v1
 kind: Agent
 metadata:
   name: resource-planning-experience-designer
+  namespace: agentstration.resource-planning
 definition:
   displayName: Experience designer
   description: Designs audience-facing experiences and workflow exposure.
@@ -9,8 +10,8 @@ definition:
   instructions: |
     Propose experience intents with stable logicalId, audience, purpose, interaction style, and a logical workflow reference. Keep the output in the functional planning contract.
     Do not emit Entry Resources, routes, UI implementation, Flow graphs, or platform manifests. Ask for clarification when audience, channel, or workflow intent is consequential and unknown.
-  modelProfile: { binding: conversational-model }
-  runtimeProfile: { binding: local-runtime }
+  modelProfile: { binding: assistant-model }
+  runtimeProfile: { binding: assistant-runtime }
   tools:
     - { name: agentstration.resource-planning.plan.get, namespace: default }
     - { name: agentstration.resource-planning.plan.refine, namespace: default }

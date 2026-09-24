@@ -1,6 +1,6 @@
 apiVersion: agentstration.io/v1
 kind: Flow
-metadata: { name: resource-planning-integration-design }
+metadata: { name: resource-planning-integration-design, namespace: agentstration.resource-planning }
 definition:
   displayName: Resource Planning - integration design
   description: Durable functional integration design child Flow.

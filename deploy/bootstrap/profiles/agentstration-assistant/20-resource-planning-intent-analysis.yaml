@@ -1,6 +1,6 @@
 apiVersion: agentstration.io/v1
 kind: Flow
-metadata: { name: resource-planning-intent-analysis }
+metadata: { name: resource-planning-intent-analysis, namespace: agentstration.resource-planning }
 definition:
   displayName: Resource Planning - intent analysis
   description: Durable functional requirement analysis child Flow.

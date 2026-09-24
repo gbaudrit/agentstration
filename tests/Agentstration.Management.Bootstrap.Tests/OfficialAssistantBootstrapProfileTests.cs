@@ -1,4 +1,3 @@
-using Agentstration.Infrastructure.Packs;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Web.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -11,7 +10,7 @@ namespace Agentstration.Management.Tests;
 public sealed class OfficialAssistantBootstrapProfileTests
 {
     [TestMethod]
-    public async Task ProfileDeclaresOrderedLocalPackInstallations()
+    public async Task ProfileDeclaresOrderedOrdinaryAssistantResources()
     {
         var repositoryRoot = FindRepositoryRoot();
         var profilesPath = Path.Combine(repositoryRoot, "deploy", "bootstrap", "profiles");
@@ -26,18 +25,30 @@ public sealed class OfficialAssistantBootstrapProfileTests
 
         Assert.IsTrue(profile.Valid, profile.Error);
         Assert.AreEqual(BootstrapProfileScope.Workspace, profile.Scope);
-        Assert.AreEqual(2, profile.ResourceCount);
+        Assert.AreEqual(22, profile.ResourceCount);
         CollectionAssert.AreEquivalent(
             new[] { "assistant-model", "assistant-runtime" },
             profile.Bindings.Select(value => value.Name).ToArray());
-        var artifactDirectory = Path.Combine(profilesPath, "agentstration-assistant", "artifacts");
-        await using var planningStream = File.OpenRead(Path.Combine(artifactDirectory, "agentstration-resource-planning.zip"));
-        await using var assistantStream = File.OpenRead(Path.Combine(artifactDirectory, "agentstration-assistant.zip"));
-        var reader = new ZipPackArchiveReader();
-        var planning = await reader.ReadAsync(planningStream, "agentstration-resource-planning.zip", default);
-        var assistant = await reader.ReadAsync(assistantStream, "agentstration-assistant.zip", default);
-        Assert.AreEqual("resource-planning", planning.Manifest.Metadata.Name);
-        Assert.AreEqual("assistant", assistant.Manifest.Metadata.Name);
+        var loaded = (await catalog.LoadAsync(["agentstration-assistant"], default)).Single();
+        var resources = loaded.Resources.Select(value => value.Resource).ToArray();
+        Assert.HasCount(22, resources);
+        Assert.AreEqual(0, resources.Count(value => value.Kind == PackBootstrapKinds.PackInstallation));
+        Assert.AreEqual(10, resources.Count(value => value.Kind == "Agent"));
+        Assert.AreEqual(11, resources.Count(value => value.Kind == "Flow"));
+        Assert.AreEqual(1, resources.Count(value => value.Kind == "Entry"));
+        Assert.IsTrue(resources
+            .Where(value => value.Metadata.Name.StartsWith("resource-planning", StringComparison.Ordinal))
+            .All(value => value.Metadata.Namespace.Value == "agentstration.resource-planning"));
+        Assert.IsTrue(resources
+            .Where(value => !value.Metadata.Name.StartsWith("resource-planning", StringComparison.Ordinal))
+            .All(value => value.Metadata.Namespace.Value == "agentstration.assistant"));
+        Assert.IsTrue(resources
+            .Where(value => value.Kind == "Agent")
+            .All(value => value.Definition.GetProperty("modelProfile").GetProperty("binding").GetString() == "assistant-model"));
+        var router = resources.Single(value => value.Kind == "Flow" && value.Metadata.Name == "assistant-router");
+        var planningStep = router.Definition.GetProperty("graph").GetProperty("steps")
+            .EnumerateArray().Single(value => value.TryGetProperty("name", out var name) && name.GetString() == "resource-planning");
+        Assert.AreEqual("agentstration.resource-planning", planningStep.GetProperty("flow").GetProperty("namespace").GetString());
     }
 
     private static string FindRepositoryRoot()

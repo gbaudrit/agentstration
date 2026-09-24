@@ -2,6 +2,7 @@ apiVersion: agentstration.io/v1
 kind: Flow
 metadata:
   name: assistant-fallback
+  namespace: agentstration.assistant
 definition:
   displayName: Agentstration Assistant clarification
   description: Returns a bounded clarification without guessing a capability or platform state.

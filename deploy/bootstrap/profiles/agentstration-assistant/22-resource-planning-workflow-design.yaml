@@ -1,6 +1,6 @@
 apiVersion: agentstration.io/v1
 kind: Flow
-metadata: { name: resource-planning-workflow-design }
+metadata: { name: resource-planning-workflow-design, namespace: agentstration.resource-planning }
 definition:
   displayName: Resource Planning - workflow design
   description: Durable functional workflow design child Flow.

@@ -1,6 +1,6 @@
 apiVersion: agentstration.io/v1
 kind: Flow
-metadata: { name: resource-planning-experience-design }
+metadata: { name: resource-planning-experience-design, namespace: agentstration.resource-planning }
 definition:
   displayName: Resource Planning - experience design
   description: Durable functional experience design child Flow.

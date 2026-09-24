@@ -2,6 +2,7 @@ apiVersion: agentstration.io/v1
 kind: Flow
 metadata:
   name: assistant-router
+  namespace: agentstration.assistant
 definition:
   displayName: Agentstration Assistant router
   description: Routes one stable Assistant Entry to independently replaceable child capabilities.

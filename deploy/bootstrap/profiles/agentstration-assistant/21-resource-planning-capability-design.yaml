@@ -1,6 +1,6 @@
 apiVersion: agentstration.io/v1
 kind: Flow
-metadata: { name: resource-planning-capability-design }
+metadata: { name: resource-planning-capability-design, namespace: agentstration.resource-planning }
 definition:
   displayName: Resource Planning - capability design
   description: Durable functional capability design child Flow.

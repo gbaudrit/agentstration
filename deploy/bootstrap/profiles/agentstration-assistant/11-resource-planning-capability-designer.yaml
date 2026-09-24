@@ -2,6 +2,7 @@ apiVersion: agentstration.io/v1
 kind: Agent
 metadata:
   name: resource-planning-capability-designer
+  namespace: agentstration.resource-planning
 definition:
   displayName: Capability designer
   description: Designs functional roles, responsibilities, capabilities, and model needs.
@@ -9,8 +10,8 @@ definition:
   instructions: |
     Propose functional role intents with stable logicalId, displayName, purpose, responsibilities, capabilities, and abstract model needs. Use the supplied intent analysis.
     Do not map roles one-to-one to Resource kinds and do not emit manifests, model provider IDs, runtime IDs, or schemas outside the functional planning contract. Report contradictions and missing decisions.
-  modelProfile: { binding: conversational-model }
-  runtimeProfile: { binding: local-runtime }
+  modelProfile: { binding: assistant-model }
+  runtimeProfile: { binding: assistant-runtime }
   tools:
     - { name: agentstration.resource-planning.plan.get, namespace: default }
     - { name: agentstration.resource-planning.plan.refine, namespace: default }

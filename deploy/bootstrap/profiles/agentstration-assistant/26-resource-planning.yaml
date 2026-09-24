@@ -1,6 +1,6 @@
 apiVersion: agentstration.io/v1
 kind: Flow
-metadata: { name: resource-planning }
+metadata: { name: resource-planning, namespace: agentstration.resource-planning }
 definition:
   displayName: Functional Resource Planning
   description: Composes durable specialist Flows, then creates and validates a reviewable Resource Plan without applying it.

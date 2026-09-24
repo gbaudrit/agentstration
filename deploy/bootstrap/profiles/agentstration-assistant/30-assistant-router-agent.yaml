@@ -2,6 +2,7 @@ apiVersion: agentstration.io/v1
 kind: Agent
 metadata:
   name: assistant-router
+  namespace: agentstration.assistant
   tags:
     agentstration.io/capability: assistant-routing
 definition:

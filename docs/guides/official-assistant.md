@@ -7,18 +7,16 @@ The official Assistant is installed in a dedicated Workspace and exposed through
 1. Apply the tenant-scoped `agentstration-assistant-workspace` bootstrap profile to the intended Tenant. This creates the `agentstration-assistant` Workspace without adding members or changing a user's default Workspace.
 2. Grant the intended operators access through the normal Workspace membership and role process.
 3. In that Workspace, apply the workspace-scoped `agentstration-assistant` profile. Bind `assistant-model` to a compatible ModelProfile and `assistant-runtime` to a local RuntimeProfile.
-4. Verify that both official Packs are installed and that the active `ask-agentstration` Entry is discoverable from Console and the Workplace owning-space surface.
+4. Verify that the active `ask-agentstration` Entry is discoverable from Console and the Workplace owning-space surface.
 
-The profile installs Resource Planning first and the Assistant second. Reapplying the same versions is idempotent. Installation is local-first: the profile reads the committed Pack archives and does not require a remote catalog.
+The profile creates the Resource Planning Agents and Flows first, followed by the Assistant Agents, Flows, and Entry. The resources use the stable `agentstration.resource-planning` and `agentstration.assistant` namespaces and remain ordinary editable Workspace resources. Reapplying the profile is idempotent under Bootstrap create/skip semantics and requires no remote catalog.
 
-## Upgrade and reseed
+The Resource Planning Flow can also be invoked directly as `agentstration.resource-planning/resource-planning`; the Assistant router calls that same Flow for explicit planning requests.
 
-Build updated archives with `pwsh scripts/packs/build-official-assistant-packs.ps1`, increment each changed Pack version, and review the archive diff before committing it. The bootstrap handler intentionally reports a version mismatch as a conflict instead of silently replacing managed resources. Upgrade through the Pack management workflow, where the proposed resource changes can be previewed and reviewed. Reapply the profile afterward to confirm the target versions are present.
+## Reseed and customization
 
-For a clean reseed, uninstall the two Packs through Pack management, then reapply the workspace profile. Remove the Assistant Pack before Resource Planning because the Assistant has the consumer-side cross-Pack reference.
+Bootstrap does not reconcile or overwrite existing resources. For a clean alpha reseed, remove the Assistant Entry and Flows, then its Agents, followed by the Resource Planning Flows and Agents, and reapply the profile. Existing durable Work and Flow Run history remains subject to the normal resource deletion guards.
 
-## Customize or disable
+The created resources are not Pack-managed and may be customized through their normal management surfaces. Reapplying the profile skips existing addresses and does not revert those changes. Disable presentation access by unpublishing or replacing the Entry; this does not remove the underlying Assistant or Resource Planning resources.
 
-Do not edit Pack-managed resources in place. Fork the Pack through Pack management, give the fork a distinct identity and namespace, then change the Entry, routing, prompts, or bindings there. Disable presentation access by unpublishing or replacing the Entry; disabling a presentation consumer does not alter Assistant ownership.
-
-To remove the official capability, uninstall `agentstration/assistant`, then `agentstration/resource-planning`. The dedicated Workspace can remain for audit history or be removed later through the normal governed Workspace lifecycle. Membership, role, and default-Workspace changes remain explicit operator actions throughout.
+Official Pack distribution is deferred to #560 and #561. This alpha Bootstrap path does not provide Pack provenance, Pack update, Pack uninstall, or automatic adoption by those future Packs.

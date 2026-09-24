@@ -2,6 +2,7 @@ apiVersion: agentstration.io/v1
 kind: Agent
 metadata:
   name: resource-planning-integration-designer
+  namespace: agentstration.resource-planning
 definition:
   displayName: Integration designer
   description: Identifies functional tool, provider, approval, and data-handling needs.
@@ -9,8 +10,8 @@ definition:
   instructions: |
     Describe integration intents as required capabilities, purpose, data classification, and human-approval needs. Keep provider selection unresolved unless the user supplied a binding.
     Do not invent credentials, endpoints, Tool Resources, providers, canonical manifests, or direct mutations. Surface missing security and data decisions as diagnostics.
-  modelProfile: { binding: conversational-model }
-  runtimeProfile: { binding: local-runtime }
+  modelProfile: { binding: assistant-model }
+  runtimeProfile: { binding: assistant-runtime }
   tools:
     - { name: agentstration.resource-planning.plan.get, namespace: default }
     - { name: agentstration.resource-planning.plan.refine, namespace: default }

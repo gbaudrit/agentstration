@@ -2,6 +2,7 @@ apiVersion: agentstration.io/v1
 kind: Flow
 metadata:
   name: assistant-diagnostics
+  namespace: agentstration.assistant
 definition:
   displayName: Agentstration Diagnostics
   description: Produces evidence-backed diagnostics for the current Workspace without mutation.

@@ -2,6 +2,7 @@ apiVersion: agentstration.io/v1
 kind: Flow
 metadata:
   name: assistant-help
+  namespace: agentstration.assistant
 definition:
   displayName: Agentstration Help and Documentation
   description: Produces evidence-backed product help from the bundled documentation boundary.
