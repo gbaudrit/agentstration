@@ -193,20 +193,20 @@ public sealed class InstanceInitializationCoordinatorTests
         string? owner,
         DateTimeOffset? leaseExpiresAt,
         DateTimeOffset now) => new()
-    {
-        ApiVersion = ResourceApiVersions.CoreV1,
-        Kind = BootstrapKinds.InstanceInitialization,
-        Metadata = new ResourceMetadata { Name = InstanceInitializationCoordinator.ResourceName },
-        ScopeRef = ResourceScopeRef.Instance,
-        Generation = 1,
-        Definition = new InstanceInitializationProperties
         {
-            Status = status,
-            TargetVersion = targetVersion,
-            FencingToken = fencingToken,
-            OwnerInstanceId = owner,
-            LeaseExpiresAt = leaseExpiresAt,
-            UpdatedAt = now
-        }
-    };
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = BootstrapKinds.InstanceInitialization,
+            Metadata = new ResourceMetadata { Name = InstanceInitializationCoordinator.ResourceName },
+            ScopeRef = ResourceScopeRef.Instance,
+            Generation = 1,
+            Definition = new InstanceInitializationProperties
+            {
+                Status = status,
+                TargetVersion = targetVersion,
+                FencingToken = fencingToken,
+                OwnerInstanceId = owner,
+                LeaseExpiresAt = leaseExpiresAt,
+                UpdatedAt = now
+            }
+        };
 }
