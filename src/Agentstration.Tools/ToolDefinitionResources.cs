@@ -92,7 +92,13 @@ public sealed record InternalMcpToolDefinition(
     string? Description,
     JsonElement InputSchema,
     JsonElement? OutputSchema = null,
-    bool RequiresApproval = false);
+    bool RequiresApproval = false,
+    InitialToolCategory? InitialCategory = null);
+
+public sealed record InitialToolCategory(
+    string Name,
+    string DisplayName,
+    string? Description = null);
 
 public sealed record InternalMcpToolInvocation(
     Guid TenantId,
@@ -120,6 +126,7 @@ public static class AgentstrationInternalTools
 {
     public const string AssistantDocumentationSearch = "assistant.documentation.search";
     public const string AssistantDiagnosticsInspect = "assistant.diagnostics.inspect";
+    public const string DateTimeGet = "datetime.get";
     public const string NotificationCreate = "work.notification.create";
     public const string ResourcePlanCreate = "resource-planning.plan.create";
     public const string ResourcePlanGet = "resource-planning.plan.get";

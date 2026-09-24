@@ -59,7 +59,8 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         await using var factory = Factory();
         var context = await GetBootstrapContextAsync(factory);
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
-        var handler = factory.Services.GetRequiredService<IInternalMcpToolHandler>();
+        var handler = factory.Services.GetServices<IInternalMcpToolHandler>()
+            .Single(value => value.Definition.Name == AgentstrationInternalTools.NotificationCreate);
         foreach (var invalid in new[] { "", "relative/path", "https://example.com", "//example.com", "/path\\segment" })
         {
             var failure = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(async () => await handler.ExecuteAsync(new(
@@ -121,7 +122,8 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         Assert.HasCount(1, notifications);
         Assert.AreEqual("daily-news-2026-09-10", notifications[0].DeliveryKey);
         Assert.AreEqual(context.WorkspaceId, notifications[0].WorkspaceId.Value);
-        var handler = factory.Services.GetRequiredService<IInternalMcpToolHandler>();
+        var handler = factory.Services.GetServices<IInternalMcpToolHandler>()
+            .Single(value => value.Definition.Name == AgentstrationInternalTools.NotificationCreate);
         var spoof = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(async () => await handler.ExecuteAsync(new(
             context.TenantId,
             new WorkspaceId(context.WorkspaceId),

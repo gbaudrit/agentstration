@@ -16,6 +16,7 @@ using Agentstration.Infrastructure.Packs;
 using Agentstration.Infrastructure.ResourcePlanning;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Sources;
+using Agentstration.Infrastructure.Tools;
 using Agentstration.Infrastructure.Triggers;
 using Agentstration.Infrastructure.Work;
 using Agentstration.ModelProviders;
@@ -261,6 +262,7 @@ public static class DependencyInjection
         services.AddSingleton<SourceRegistryDiscoveryService>();
         services.AddSingleton<ISourceVerificationEvidenceProvider>(services => services.GetRequiredService<SourceRegistryTrustEvaluationService>());
         services.AddSingleton<ToolManagementService>();
+        services.AddSingleton<ToolCategoryService>();
         services.AddSingleton<ToolDefinitionService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
@@ -344,6 +346,7 @@ public static class DependencyInjection
             Path.Combine(provider.GetRequiredService<IHostEnvironment>().ContentRootPath, "docs")));
         AddInternalTool<AssistantDocumentationMcpTool>(services);
         AddInternalTool<AssistantDiagnosticsMcpTool>(services);
+        AddInternalTool<DateTimeMcpTool>(services);
         AddInternalTool<ResourcePlanCreateMcpTool>(services);
         AddInternalTool<ResourcePlanGetMcpTool>(services);
         AddInternalTool<ResourcePlanRefineMcpTool>(services);

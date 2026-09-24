@@ -1,3 +1,4 @@
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Tools;
 
@@ -72,6 +73,41 @@ public sealed class ToolManagementTests
         };
 
         Assert.Throws<ToolResourceValidationException>(() => ToolManagementService.ValidateProvider(resource));
+    }
+
+    [TestMethod]
+    public void ToolCategoryHasCanonicalJsonAndYamlSerialization()
+    {
+        var resource = new ToolCategoryResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolCategory,
+            Metadata = new ResourceMetadata { Name = "knowledge-tools" },
+            Definition = new ToolCategoryProperties
+            {
+                DisplayName = "Knowledge tools",
+                Description = "Cross-provider authoring helpers.",
+                Tools =
+                [
+                    new ResourceReference("search.documents"),
+                    new ResourceReference("summarize", @namespace: new ResourceNamespace("team-a"))
+                ]
+            }
+        };
+
+        var json = ResourceManifestSerializer.ToJson(resource);
+        var yaml = ResourceManifestSerializer.ToYaml(resource);
+        var fromJson = ResourceManifestSerializer.FromJson<ToolCategoryResource>(json);
+        var fromYaml = ResourceManifestSerializer.FromYaml<ToolCategoryResource>(yaml);
+
+        Assert.AreEqual(ToolResourceKinds.ToolCategory, fromJson.Kind);
+        Assert.AreEqual(resource.Definition.DisplayName, fromJson.Definition.DisplayName);
+        Assert.AreEqual(resource.Definition.Description, fromYaml.Definition.Description);
+        CollectionAssert.AreEqual(
+            resource.Definition.Tools.Select(value => value.Name).ToArray(),
+            fromYaml.Definition.Tools.Select(value => value.Name).ToArray());
+        StringAssert.Contains(yaml, "kind: ToolCategory");
+        StringAssert.Contains(yaml, "displayName: Knowledge tools");
     }
 
     private static ToolResource Tool(ToolResourceProperties properties) => new()

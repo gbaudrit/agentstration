@@ -12,7 +12,7 @@ namespace Agentstration.Web.Tests;
 public sealed class ToolProviderEditorTests
 {
     [TestMethod]
-    public void SectionLinksRetainTheProviderRouteBeforeApplyingTheFragment()
+    public void ProviderSectionsAreRenderedAsExclusiveTabs()
     {
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -23,17 +23,23 @@ public sealed class ToolProviderEditorTests
 
         rendered.WaitForAssertion(() =>
         {
-            var links = rendered.FindAll("nav.resource-tabs a");
-            Assert.HasCount(3, links);
-            CollectionAssert.AreEqual(
-                new[]
-                {
-                    "/tools/providers/microsoft-learn#overview",
-                    "/tools/providers/microsoft-learn#tools",
-                    "/tools/providers/microsoft-learn#connection"
-                },
-                links.Select(link => link.GetAttribute("href")).ToArray());
+            Assert.HasCount(3, rendered.FindAll("nav.resource-tabs button"));
+            Assert.HasCount(1, rendered.FindAll("[data-testid='provider-overview-panel']"));
+            Assert.IsEmpty(rendered.FindAll("[data-testid='provider-tools-panel']"));
+            Assert.IsEmpty(rendered.FindAll("[data-testid='provider-connection-panel']"));
         });
+
+        rendered.Find("[data-testid='provider-tools-tab']").Click();
+
+        Assert.IsEmpty(rendered.FindAll("[data-testid='provider-overview-panel']"));
+        Assert.HasCount(1, rendered.FindAll("[data-testid='provider-tools-panel']"));
+        Assert.IsEmpty(rendered.FindAll("[data-testid='provider-connection-panel']"));
+
+        rendered.Find("[data-testid='provider-connection-tab']").Click();
+
+        Assert.IsEmpty(rendered.FindAll("[data-testid='provider-overview-panel']"));
+        Assert.IsEmpty(rendered.FindAll("[data-testid='provider-tools-panel']"));
+        Assert.HasCount(1, rendered.FindAll("[data-testid='provider-connection-panel']"));
     }
 
     private sealed class ProviderClient : IToolsClient
