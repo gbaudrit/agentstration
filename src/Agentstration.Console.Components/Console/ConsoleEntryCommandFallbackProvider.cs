@@ -22,7 +22,7 @@ public sealed class ConsoleEntryCommandFallbackProvider(
                 .Select(entry => new CommandPaletteFallbackResult(
                     entry.DisplayName,
                     ConsoleEntryInteractionNavigation.Build(entry.WorkspaceId, entry.Namespace, entry.Name, query),
-                    "✦",
+                    "sparkle",
                     entry.Description))
                 .ToArray();
         }

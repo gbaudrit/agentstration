@@ -12,6 +12,12 @@ test('Console account, preferences, organization, and shell mutations are operab
   await expect(page.getByTestId(TestIds.console.notificationsPanel)).toBeVisible();
 });
 
+test('Console command palette aligns semantic icons with its search field @smoke', async ({ page, product }) => {
+  const pages = new ProductPages(page);
+  await authenticateConsole({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
+  await pages.consoleAdministration.openAndAssertCommandPalette();
+});
+
 test('all Console administration routes render deterministic states @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   const context = { ...product, pages, checkpoint: ignoreCheckpoints };

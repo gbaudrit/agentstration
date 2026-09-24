@@ -10,6 +10,23 @@ namespace Agentstration.Console.Components.Tests;
 public sealed class CommandPaletteFallbackTests
 {
     [TestMethod]
+    public async Task PaletteUsesSemanticIconsForSearchDestinationsAndCommands()
+    {
+        using var context = CreateContext([], []);
+        var rendered = context.Render<MainLayout>(parameters => parameters.Add(value => value.Body, (RenderFragment)(_ => { })));
+
+        await rendered.Find("[data-testid='console-command-trigger']").ClickAsync(new());
+
+        Assert.IsNotNull(rendered.Find(".command-search-box .ui-icon"));
+        Assert.AreEqual("home", rendered.WaitForElement(".command-result .command-icon").GetAttribute("data-icon"));
+
+        await rendered.Find("[data-testid='console-command-input']").InputAsync(new ChangeEventArgs { Value = "nouveau agent" });
+
+        rendered.WaitForAssertion(() =>
+            Assert.AreEqual("plus", rendered.Find(".command-result .command-icon").GetAttribute("data-icon")));
+    }
+
+    [TestMethod]
     public async Task ExistingPageMatchTakesPriorityOverEntryFallback()
     {
         using var context = CreateContext([], [new("Assistant", "/entry-interactions/fallback")]);
@@ -26,7 +43,7 @@ public sealed class CommandPaletteFallbackTests
     [TestMethod]
     public async Task ExistingResourceMatchTakesPriorityOverEntryFallback()
     {
-        var resource = new ResourceSearchResult("Ollama", "Model provider", "default/models/ollama", "/modelproviders/ollama", "Ready", "⬡");
+        var resource = new ResourceSearchResult("Ollama", "Model provider", "default/models/ollama", "/modelproviders/ollama", "Ready", "cpu");
         using var context = CreateContext([resource], [new("Assistant", "/entry-interactions/fallback")]);
         var fallback = context.Services.GetRequiredService<StubFallbackProvider>();
         var rendered = context.Render<MainLayout>(parameters => parameters.Add(value => value.Body, (RenderFragment)(_ => { })));
