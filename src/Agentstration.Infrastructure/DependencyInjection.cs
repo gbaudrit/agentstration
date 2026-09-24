@@ -16,6 +16,7 @@ using Agentstration.Infrastructure.ResourcePlanning;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Sources;
 using Agentstration.Infrastructure.Triggers;
+using Agentstration.Infrastructure.Tools;
 using Agentstration.Infrastructure.Work;
 using Agentstration.ModelProviders;
 using Agentstration.Packs;
@@ -340,6 +341,7 @@ public static class DependencyInjection
         services.AddSingleton<WorkNotificationMcpToolDefinitionProvider>();
         services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<WorkNotificationMcpToolDefinitionProvider>());
         services.AddSingleton<WorkNotificationMcpTool>();
+        AddInternalTool<DateTimeMcpTool>(services);
         AddInternalTool<ResourcePlanCreateMcpTool>(services);
         AddInternalTool<ResourcePlanGetMcpTool>(services);
         AddInternalTool<ResourcePlanRefineMcpTool>(services);

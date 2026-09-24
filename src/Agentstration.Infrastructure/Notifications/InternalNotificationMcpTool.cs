@@ -159,7 +159,36 @@ public sealed class InternalMcpToolProjectionService(
                     }
                 }
             }, null, true, cancellationToken);
+
+            if (definition.InitialCategory is { } category)
+                await EnsureInitialCategoryAsync(category, name, workspaceScope, @namespace, cancellationToken);
         }
+    }
+
+    private async Task EnsureInitialCategoryAsync(
+        InitialToolCategory category,
+        string toolName,
+        ResourceScopeRef scope,
+        ResourceNamespace @namespace,
+        CancellationToken cancellationToken)
+    {
+        var key = new ResourceKey(ToolResourceKinds.ToolCategory, category.Name, @namespace);
+        if (await store.GetAsync<ToolCategoryResource>(key, cancellationToken) is not null) return;
+        await store.PutAsync(new ToolCategoryResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolCategory,
+            Metadata = new ResourceMetadata { Name = category.Name, Namespace = @namespace },
+            ScopeRef = scope,
+            Generation = 1,
+            Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
+            Definition = new ToolCategoryProperties
+            {
+                DisplayName = category.DisplayName,
+                Description = category.Description,
+                Tools = [new ResourceReference(toolName, scope, @namespace)]
+            }
+        }, null, true, cancellationToken);
     }
 
     private static ToolProviderResource Provider(ResourceScopeRef scope, ResourceNamespace @namespace) => new()
