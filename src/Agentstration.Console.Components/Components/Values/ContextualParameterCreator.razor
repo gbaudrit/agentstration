@@ -13,8 +13,7 @@
             <EditForm Model="model" OnValidSubmit="CreateAsync" FormName="contextual-parameter-creator-form">
                 <DataAnnotationsValidator /><ValidationSummary />
                 <div class="form-grid">
-                    <label><span>@T("Name")</span><InputText @bind-Value="model.Name" data-testid="contextual-parameter-name" /></label>
-                    <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" data-testid="contextual-parameter-display-name" /></label>
+                    <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Parameter" IsNew="true" DisplayNameTestId="contextual-parameter-display-name" TechnicalNameTestId="contextual-parameter-name" />
                     <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" /></label>
                     <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="Context.ScopeRef" /></label>
                     <label><span>@T("ValueType")</span><InputSelect @bind-Value="model.ValueType" data-testid="contextual-parameter-value-type">@foreach (var type in Enum.GetValues<ParameterValueType>()) { <option value="@type">@T($"ValueType.{type}")</option> }</InputSelect></label>

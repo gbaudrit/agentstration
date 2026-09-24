@@ -17,8 +17,7 @@ else
         <section class="panel workspace-create-panel" data-testid="workspace-create-form" data-interactive="@(interactive ? "true" : "false")">
             <div class="panel-header"><h2>@T("CreateWorkspace")</h2></div>
             <div class="workspace-create-form">
-                <label><span>@T("DisplayName")</span><input value="@displayName" @oninput="DisplayNameChanged" data-testid="workspace-display-name" /></label>
-                <label><span>@T("TechnicalName")</span><input value="@technicalName" @oninput="TechnicalNameChanged" placeholder="support" data-testid="workspace-technical-name" /></label>
+                <ResourceIdentityFields @key="identityVersion" @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" Policy="ResourceNamePolicy.Workspace" IsNew="true" DisplayNameTestId="workspace-display-name" TechnicalNameTestId="workspace-technical-name" />
                 <button class="button-primary" @onclick="CreateAsync" disabled="@(!CanSubmit)" data-testid="workspace-create">@(busy ? T("Creating") : T("CreateWorkspace"))</button>
             </div>
             @if (!string.IsNullOrWhiteSpace(operationError)) { <p class="inline-warning" role="alert">@operationError</p> }
@@ -38,7 +37,7 @@ else
     private string? operationError;
     private bool loading = true;
     private bool busy;
-    private bool technicalNameEdited;
+    private int identityVersion;
     private bool interactive;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private bool CanCreate => ContextState.HasPermission(AuthorizationPermissions.WorkspacesWrite);
@@ -73,24 +72,11 @@ else
         {
             await Client.CreateWorkspaceAsync(technicalName, displayName, default);
             displayName = technicalName = string.Empty;
-            technicalNameEdited = false;
+            identityVersion++;
             await ReloadAsync();
             await ContextState.LoadAsync(default);
         }
         catch (Exception exception) { operationError = exception.Message; }
         finally { busy = false; }
     }
-    private void DisplayNameChanged(ChangeEventArgs args)
-    {
-        displayName = args.Value?.ToString() ?? string.Empty;
-        if (!technicalNameEdited) technicalName = Slug(displayName);
-    }
-    private void TechnicalNameChanged(ChangeEventArgs args)
-    {
-        technicalNameEdited = true;
-        technicalName = args.Value?.ToString() ?? string.Empty;
-    }
-    private static string Slug(string value) => string.Join('-', value.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries))
-        .Where(character => char.IsAsciiLetterOrDigit(character) || character == '-')
-        .Aggregate(string.Empty, (current, character) => current + character);
 }

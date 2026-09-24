@@ -1,0 +1,93 @@
+@using System.Linq.Expressions
+@using Agentstration.Web.Components.Naming
+@using Microsoft.AspNetCore.Components.Forms
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> Localizer
+
+<label>
+    <span>@Localizer["DisplayName"]</span>
+    @if (DisplayNameExpression is null || CurrentEditContext is null)
+    {
+        <input value="@currentDisplayName" @oninput="DisplayNameInput" autofocus="@IsNew" data-testid="@DisplayNameTestId" />
+    }
+    else
+    {
+        <InputText Value="@currentDisplayName" ValueChanged="DisplayNameInput" ValueExpression="@DisplayNameExpression" autofocus="@IsNew" data-testid="@DisplayNameTestId" />
+        <ValidationMessage For="@DisplayNameExpression" />
+    }
+    @if (!string.IsNullOrWhiteSpace(DisplayNameHelp)) { <small>@DisplayNameHelp</small> }
+</label>
+<label>
+    <span>@Localizer["TechnicalName"]</span>
+    @if (TechnicalNameExpression is null || CurrentEditContext is null)
+    {
+        <input value="@currentTechnicalName" @oninput="TechnicalNameInput" readonly="@(!IsNew)" disabled="@(!IsNew)" data-testid="@TechnicalNameTestId" />
+    }
+    else
+    {
+        <InputText Value="@currentTechnicalName" ValueChanged="TechnicalNameInput" ValueExpression="@TechnicalNameExpression" readonly="@(!IsNew)" disabled="@(!IsNew)" data-testid="@TechnicalNameTestId" />
+        <ValidationMessage For="@TechnicalNameExpression" />
+    }
+    <small>@(TechnicalNameHelp ?? Localizer["TechnicalNameHelp"])</small>
+</label>
+
+@code {
+    [Parameter, EditorRequired] public string DisplayName { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> DisplayNameChanged { get; set; }
+    [Parameter] public Expression<Func<string>>? DisplayNameExpression { get; set; }
+    [Parameter, EditorRequired] public string TechnicalName { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> TechnicalNameChanged { get; set; }
+    [Parameter] public Expression<Func<string>>? TechnicalNameExpression { get; set; }
+    [Parameter] public ResourceNamePolicy Policy { get; set; } = ResourceNamePolicy.Generic;
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public string? DisplayNameHelp { get; set; }
+    [Parameter] public string? TechnicalNameHelp { get; set; }
+    [Parameter] public string? DisplayNameTestId { get; set; }
+    [Parameter] public string? TechnicalNameTestId { get; set; }
+    [CascadingParameter] private EditContext? CurrentEditContext { get; set; }
+
+    private string currentDisplayName = string.Empty;
+    private string currentTechnicalName = string.Empty;
+    private bool automatic;
+    private bool initialized;
+    private bool notifyInitialTechnicalName;
+
+    protected override void OnParametersSet()
+    {
+        if (!initialized)
+        {
+            initialized = true;
+            automatic = IsNew && string.IsNullOrEmpty(TechnicalName);
+            notifyInitialTechnicalName = automatic && !string.IsNullOrWhiteSpace(DisplayName);
+        }
+
+        currentDisplayName = DisplayName;
+        currentTechnicalName = notifyInitialTechnicalName ? ResourceNameDerivation.Derive(DisplayName, Policy) : TechnicalName;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!notifyInitialTechnicalName) return;
+        notifyInitialTechnicalName = false;
+        await TechnicalNameChanged.InvokeAsync(currentTechnicalName);
+    }
+
+    private async Task DisplayNameInput(string value)
+    {
+        currentDisplayName = value;
+        await DisplayNameChanged.InvokeAsync(value);
+        if (!automatic) return;
+        currentTechnicalName = ResourceNameDerivation.Derive(value, Policy);
+        await TechnicalNameChanged.InvokeAsync(currentTechnicalName);
+    }
+
+    private Task DisplayNameInput(ChangeEventArgs args) => DisplayNameInput(args.Value?.ToString() ?? string.Empty);
+
+    private async Task TechnicalNameInput(string value)
+    {
+        automatic = false;
+        currentTechnicalName = value;
+        await TechnicalNameChanged.InvokeAsync(value);
+    }
+
+    private Task TechnicalNameInput(ChangeEventArgs args) => TechnicalNameInput(args.Value?.ToString() ?? string.Empty);
+}

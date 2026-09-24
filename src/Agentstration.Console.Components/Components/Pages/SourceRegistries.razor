@@ -85,8 +85,7 @@ else
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("Registration")</h2><p>@T(official ? "OfficialRegistrationHelp" : "RegistrationHelp")</p></div>@if (view is not null) { <StatusBadge Text="@ObservedStatus(view.Observed.Definition.Status)" Status="@ObservedTone(view.Observed.Definition.Status)" /> }</div>
             <div class="form-grid">
-                <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
-                <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
+                <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.SourceRegistry" IsNew="@IsNew" />
                 <label class="form-wide"><span>@T("IndexUrl")</span><InputText @bind-Value="model.IndexUrl" type="url" /><ValidationMessage For="() => model.IndexUrl" /></label>
                 <label class="switch-field"><InputCheckbox @bind-Value="model.Enabled" /><span>@T("Enabled")</span></label>
                 <label><span>@T("TrustPolicy")</span><InputSelect @bind-Value="model.TrustPolicy"><option value="@SourceRegistryTrustPolicy.Untrusted">@TrustPolicy(SourceRegistryTrustPolicy.Untrusted)</option><option value="@SourceRegistryTrustPolicy.Trusted">@TrustPolicy(SourceRegistryTrustPolicy.Trusted)</option><option value="@SourceRegistryTrustPolicy.Authoritative">@TrustPolicy(SourceRegistryTrustPolicy.Authoritative)</option></InputSelect></label>

@@ -32,9 +32,9 @@ else
             <div class="panel-header"><div><p class="eyebrow">@T("ProjectDefinition")</p><h2>@T("ManifestMetadata")</h2></div><StatusBadge Text="@T($"ProjectState.{project.Value.Definition.State}")" Status="@ProjectTone" /></div>
             <div class="studio-grid">
                 <label>@T("Publisher")<input value="@project.Value.Definition.Publisher" disabled /></label>
-                <label>@T("Name")<input value="@project.Value.Definition.PackName" disabled /></label>
-                <label>@T("Version")<input @bind="version" @bind:after="MarkDirty" /></label>
                 <label>@T("DisplayName")<input @bind="displayName" @bind:after="MarkDirty" /></label>
+                <label>@T("TechnicalName")<input value="@project.Value.Definition.PackName" readonly /></label>
+                <label>@T("Version")<input @bind="version" @bind:after="MarkDirty" /></label>
             </div>
             <label class="studio-field">@T("Description")<textarea rows="4" @bind="description" @bind:after="MarkDirty"></textarea></label>
             <div class="studio-grid">

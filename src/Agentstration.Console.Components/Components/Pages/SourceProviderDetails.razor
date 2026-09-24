@@ -26,9 +26,8 @@ else
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ProviderResource")</h2></div>@if (status is not null) { <StatusBadge Text="@StatusLabel(status.Status)" Status="@ModelManagementUi.Status(status.Status)" /> }</div>
             <div class="form-grid">
-                <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" data-testid="source-provider-name" /><ValidationMessage For="() => model.Name" /></label>
+                <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="source-provider-display-name" TechnicalNameTestId="source-provider-name" />
                 <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
-                <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" data-testid="source-provider-display-name" /><ValidationMessage For="() => model.DisplayName" /></label>
                 <ResourceScopeFormField ResourceKind="@SourceResourceKinds.SourceProvider" Value="selectedScope" ValueChanged="ScopeChangedAsync" Disabled="@(!IsNew)" />
                 <label><span>@T("ExtensionRegistration")</span><select value="@model.ExtensionId" @onchange="ExtensionChanged" data-testid="source-provider-extension"><option value="">@T("SelectExtension")</option>@foreach (var extension in EligibleExtensions) { <option value="@ExtensionKey(extension)">@extension.RegistrationNamespace/@extension.RegistrationName — @(extension.Extension?.Name ?? extension.RegistrationName)</option> }</select><ValidationMessage For="() => model.ExtensionId" /></label>
                 <label><span>@T("Contribution")</span><select @bind="model.ContributionId" data-testid="source-provider-contribution"><option value="">@T("SelectContribution")</option>@foreach (var contribution in Contributions) { <option value="@contribution.Id">@contribution.Id</option> }</select><ValidationMessage For="() => model.ContributionId" /></label>

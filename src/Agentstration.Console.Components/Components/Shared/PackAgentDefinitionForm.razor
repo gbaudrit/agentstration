@@ -6,9 +6,9 @@
     <section class="panel form-section">
         <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h3>@T("AgentResource")</h3></div>@if (ReadOnly) { <StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" /> }</div>
         <div class="form-grid">
-            <label><span>@T("Name")</span><input value="@name" disabled /></label>
-            <label><span>@T("Handler")</span><input @bind="handler" disabled="@ReadOnly" /></label>
             <label><span>@T("DisplayName")</span><input @bind="displayName" disabled="@ReadOnly" /></label>
+            <label><span>@T("TechnicalName")</span><input value="@name" readonly disabled /></label>
+            <label><span>@T("Handler")</span><input @bind="handler" disabled="@ReadOnly" /></label>
             <label class="form-span-2"><span>@T("Description")</span><textarea rows="3" @bind="description" disabled="@ReadOnly"></textarea></label>
             <label class="form-span-2"><span>@T("Instructions")</span><textarea rows="9" @bind="instructions" disabled="@ReadOnly"></textarea></label>
         </div>

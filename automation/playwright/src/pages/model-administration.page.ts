@@ -146,7 +146,13 @@ export class ModelAdministrationPage {
   }
 
   private async openProviderConfiguration(): Promise<void> {
-    await this.page.getByTestId(TestIds.modelAdministration.providerConfigurationTab).click();
+    const configurationTab = this.page.getByTestId(TestIds.modelAdministration.providerConfigurationTab);
+    const form = this.page.getByTestId(TestIds.modelAdministration.providerForm);
+    await expect(async () => {
+      await configurationTab.click();
+      await expect(configurationTab).toHaveAttribute('aria-selected', 'true');
+      await expect(form).toBeVisible();
+    }).toPass();
     await this.waitForPersisted(TestIds.modelAdministration.providerForm);
   }
 

@@ -37,8 +37,7 @@ else
                     <span class="workspace-state-badge @(selected.Published is null ? "is-draft" : "is-published")">@(selected.Published is null ? T("Draft") : T("Published"))</span>
                 </div>
                 <div class="form-grid workspace-settings-fields">
-                    <label><span>@T("Name")</span><input @bind="name" disabled="@(!creating)" autocomplete="off" /><small>@T("DashboardNameHelp")</small></label>
-                    <label><span>@T("DisplayName")</span><input @bind="displayName" autocomplete="off" /><small>@T("DashboardDisplayNameHelp")</small></label>
+                    <ResourceIdentityFields @key="identityVersion" @bind-DisplayName="displayName" @bind-TechnicalName="name" Policy="ResourceNamePolicy.Dashboard" IsNew="@creating" DisplayNameHelp="@T("DashboardDisplayNameHelp")" TechnicalNameHelp="@T("DashboardNameHelp")" />
                     <div class="dashboard-icon-field">
                         <strong>@T("DashboardIcon")</strong>
                         <small>@T("DashboardIconHelp")</small>
@@ -128,6 +127,7 @@ else
 
     protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
     private string workspaceId = "", dashboardName = "", name = "", displayName = "", description = "", icon = DashboardIconDefaults.Grid, message = "";
+    private int identityVersion;
     private IReadOnlyList<WorkplaceWorkspaceResponse> workspaces = [];
     private IReadOnlyList<WorkplaceDashboardDraftResponse> dashboards = [];
     private IReadOnlyList<EntryResponse> entries = [];
@@ -167,12 +167,12 @@ else
         selected = dashboards.FirstOrDefault(value => value.Value.IsDefault) ?? dashboards.FirstOrDefault();
         if (selected is not null) Select(selected); else NewDashboard();
     }
-    private void Select(WorkplaceDashboardDraftResponse value) { selected = value; creating = false; dashboardName = name = value.Value.Name; displayName = value.Value.DisplayName; description = value.Value.Description ?? ""; icon = value.Value.Icon ?? ""; isDefault = value.Value.IsDefault; composition = value.Value.Entries.ToList(); }
+    private void Select(WorkplaceDashboardDraftResponse value) { selected = value; creating = false; dashboardName = name = value.Value.Name; displayName = value.Value.DisplayName; description = value.Value.Description ?? ""; icon = value.Value.Icon ?? ""; isDefault = value.Value.IsDefault; composition = value.Value.Entries.ToList(); identityVersion++; }
     private void NewDashboard()
     {
         var workspace = SelectedWorkspace();
         if (workspace is null) { ShowWorkspaceSelectionError(); return; }
-        creating = true; dashboardName = name = ""; displayName = ""; description = ""; isDefault = dashboards.Count == 0; icon = isDefault ? DashboardIconDefaults.Home : DashboardIconDefaults.Grid; composition = [];
+        creating = true; dashboardName = name = ""; displayName = ""; description = ""; isDefault = dashboards.Count == 0; icon = isDefault ? DashboardIconDefaults.Home : DashboardIconDefaults.Grid; composition = []; identityVersion++;
         selected = new(new WorkplaceDashboardDraft { Id = new("new"), WorkspaceId = new(workspace.Id), Name = "new", DisplayName = T("NewDashboard"), Icon = icon, IsDefault = isDefault }, null);
     }
     private void ToggleEntry(EntryResponse entry, ChangeEventArgs args) { var id = EntryId(entry); if (args.Value is true && composition.All(value => value.EntryResourceId != id)) composition.Add(new DashboardEntryReference { EntryResourceId = id, Role = DashboardItemRole.Standard, Order = composition.Count(value => value.Role == DashboardItemRole.Standard) * 10 }); else if (args.Value is not true) composition.RemoveAll(value => value.EntryResourceId == id); NormalizeOrdersByRole(); }

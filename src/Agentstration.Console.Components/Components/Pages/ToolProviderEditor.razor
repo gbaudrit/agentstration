@@ -19,7 +19,7 @@ else
     @if (IsNew || activeTab == ProviderTab.Overview)
     {
     <section class="panel form-section tool-provider-section" id="overview" data-testid="provider-overview-panel"><div class="panel-header tool-provider-section-header"><div class="tool-provider-section-heading"><span class="tool-provider-section-icon"><UiIcon Name="server" /></span><div><p class="eyebrow">@T("OverviewEyebrow")</p><h2>@T("Overview")</h2><p>@T("OverviewHelp")</p></div></div>@if (!IsNew) { <StatusBadge Text="@StatusLabel(provider?.Definition.Discovery.Status)" Status="@ProviderStatus(provider?.Definition.Discovery.Status)" /> }</div><div class="form-grid tool-provider-form-grid">
-        <label><span>@T("Name")</span><input @bind="name" disabled="@(!IsNew)" /></label><label><span>@T("DisplayName")</span><input @bind="displayName" /></label>
+        <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="@IsNew" />
         <label><span>@T("ProviderType")</span><select @bind="providerType" disabled="@(!IsNew)"><option value="Mcp">MCP</option><option value="Aep">AEP</option></select></label>
         <ResourceScopeFormField ResourceKind="@ToolResourceKinds.ToolProvider" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
         <label class="provider-enabled-toggle form-span-2"><input type="checkbox" @bind="enabled" /><span class="provider-toggle-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span></label>

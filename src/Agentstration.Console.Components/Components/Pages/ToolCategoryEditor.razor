@@ -17,8 +17,7 @@ else
     <section class="panel form-section">
         <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("Details")</h2></div>@if (!IsNew) { <StatusBadge Text="@T("MemberCount", selected.Count)" Status="UiStatus.Info" /> }</div>
         <div class="form-grid">
-            <label><span>@T("TechnicalName")</span><input @bind="name" disabled="@(!IsNew)" data-testid="category-name" /></label>
-            <label><span>@T("DisplayName")</span><input @bind="displayName" data-testid="category-display-name" /></label>
+            <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="@IsNew" DisplayNameTestId="category-display-name" TechnicalNameTestId="category-name" />
             <label class="form-span-2"><span>@T("CategoryDescription")</span><textarea @bind="description" rows="3"></textarea></label>
             <ResourceScopeFormField ResourceKind="@ToolResourceKinds.ToolCategory" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
         </div>

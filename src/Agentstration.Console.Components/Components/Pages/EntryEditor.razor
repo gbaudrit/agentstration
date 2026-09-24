@@ -116,8 +116,7 @@ else
             <section class="panel form-section" data-testid="entry-identity-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("General")</p><h2>@T("Identity")</h2></div></div>
                 <div class="form-grid">
-                    <label><span>@T("Name")</span><input @bind="resourceName" disabled="@(!IsNew)" data-testid="entry-name" /></label>
-                    <label><span>@T("DisplayName")</span><input @bind="displayName" data-testid="entry-display-name" /></label>
+                    <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="resourceName" Policy="ResourceNamePolicy.Entry" IsNew="@IsNew" DisplayNameTestId="entry-display-name" TechnicalNameTestId="entry-name" />
                     <ResourceScopeFormField ResourceKind="@EntryResourceKinds.Entry" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
                     <label class="form-span-2"><span>@T("Description")</span><textarea @bind="description" rows="2" data-testid="entry-description"></textarea></label>
                 </div>

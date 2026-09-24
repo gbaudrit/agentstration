@@ -44,6 +44,29 @@ public sealed class ContextualValueCreatorTests
     }
 
     [TestMethod]
+    public void ParameterCreatorSubmitsDerivedNameAndDisplayNameThroughExistingContract()
+    {
+        using var context = new BunitContext();
+        var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var client = new ParameterClient(scope);
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IParametersClient>(client);
+
+        var rendered = context.Render<ContextualParameterCreator>(parameters => parameters
+            .Add(component => component.IsOpen, true)
+            .Add(component => component.Context, new(scope, string.Empty, "Retry Count", ValueType: ParameterValueType.WholeNumber)));
+
+        rendered.Find("[data-testid='contextual-parameter-value']").Change("12");
+        rendered.Find("form").Submit();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("retry-count", client.Request?.Name);
+            Assert.AreEqual("Retry Count", client.Request?.Properties.DisplayName);
+        });
+    }
+
+    [TestMethod]
     public void ParameterCreatorRendersAndPersistsTypedAllowedValues()
     {
         var cases = new[]
