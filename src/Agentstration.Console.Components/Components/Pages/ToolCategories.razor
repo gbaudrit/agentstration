@@ -1,0 +1,34 @@
+@page "/tools/categories"
+@inject IToolCategoriesClient Categories
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ToolCategoriesStrings> Localizer
+
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-tool-categories">
+    <Actions><a class="button-primary" href="/tools/categories/new">@T("Create")</a></Actions>
+</PageHeader>
+<ResourceTabs Label="@T("SectionsLabel")"><a href="/tools">@T("Catalog")</a><a class="active" href="/tools/categories">@T("Categories")</a><a href="/tools/definitions">@T("Definitions")</a><a href="/tools/providers">@T("Providers")</a></ResourceTabs>
+
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else if (error is not null) { <ErrorState Message="@error" /> }
+else if (categories.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
+else
+{
+    <DataGrid TItem="ToolCategoryResource" Items="categories">
+        <Header><tr><th>@T("Category")</th><th>@T("DescriptionColumn")</th><th>@T("Members")</th><th></th></tr></Header>
+        <Row Context="category"><tr data-testid="tool-category-row"><td><span class="resource-name-with-scope"><strong>@category.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="category.ScopeRef" Compact /></span><code>@category.Name</code></td><td>@(category.Definition.Description ?? "—")</td><td>@category.Definition.Tools.Count</td><td><a class="text-button" href="@CategoryUrl(category.Name)">@T("Manage")</a></td></tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private IReadOnlyList<ToolCategoryResource> categories = [];
+    private bool loading = true;
+    private string? error;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    protected override async Task OnInitializedAsync()
+    {
+        try { categories = await Categories.GetCategoriesAsync(); }
+        catch (Exception exception) { error = exception.Message; }
+        finally { loading = false; }
+    }
+    private static string CategoryUrl(string name) => $"/tools/categories/{Uri.EscapeDataString(name)}";
+}

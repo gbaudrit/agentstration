@@ -1,0 +1,145 @@
+@page "/tools/categories/new"
+@page "/tools/categories/{Name}"
+@inject IToolCategoriesClient Categories
+@inject IToolsClient Tools
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ToolCategoriesStrings> Localizer
+
+<PageTitle>@(IsNew ? T("Create") : displayName) · Agentstration</PageTitle>
+<PageHeader Title="@(IsNew ? T("Create") : displayName)" Description="@T("EditorDescription")" TestId="resource-tool-category-editor">
+    <Actions><a class="button-secondary" href="/tools/categories">@T("Back")</a>@if (!IsNew) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
+</PageHeader>
+
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else
+{
+    @if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")">@message</div> }
+    <section class="panel form-section">
+        <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("Details")</h2></div>@if (!IsNew) { <StatusBadge Text="@T("MemberCount", selected.Count)" Status="UiStatus.Info" /> }</div>
+        <div class="form-grid">
+            <label><span>@T("TechnicalName")</span><input @bind="name" disabled="@(!IsNew)" data-testid="category-name" /></label>
+            <label><span>@T("DisplayName")</span><input @bind="displayName" data-testid="category-display-name" /></label>
+            <label class="form-span-2"><span>@T("CategoryDescription")</span><textarea @bind="description" rows="3"></textarea></label>
+            <ResourceScopeFormField ResourceKind="@ToolResourceKinds.ToolCategory" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
+        </div>
+    </section>
+
+    <section class="panel form-section">
+        <div class="panel-header"><div><p class="eyebrow">@T("Membership")</p><h2>@T("ChooseTools")</h2><p>@T("MembershipHelp")</p></div><label class="tool-category-search"><span class="sr-only">@T("Search")</span><input @bind="search" @bind:event="oninput" placeholder="@T("SearchPlaceholder")" /></label></div>
+        <div class="tool-category-members" data-testid="category-members">
+            @foreach (var tool in FilteredTools)
+            {
+                <label class="tool-category-member" data-provider="@tool.Definition.Provider?.Name">
+                    <input type="checkbox" checked="@selected.Contains(ToolKey(tool))" @onchange="args => Toggle(tool, (bool)args.Value!)" />
+                    <span><strong>@tool.Definition.DisplayName</strong><small><a href="@ToolUrl(tool.Name)" @onclick:stopPropagation="true">@tool.Name</a> · @ProviderLabel(tool)</small>@if (!string.IsNullOrWhiteSpace(tool.Definition.Description)) { <small>@tool.Definition.Description</small> }</span>
+                    <StatusBadge Text="@Availability(tool)" Status="@(Assignable(tool) ? UiStatus.Success : UiStatus.Warning)" />
+                </label>
+            }
+            @foreach (var missing in missingMembers)
+            {
+                <label class="tool-category-member unavailable">
+                    <input type="checkbox" checked @onchange="args => ToggleMissing(missing, (bool)args.Value!)" />
+                    <span><strong>@missing.Reference.Name</strong><small>@T("MissingMember")</small></span>
+                    <StatusBadge Text="@T("Missing")" Status="UiStatus.Warning" />
+                </label>
+            }
+        </div>
+    </section>
+    <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy">@(busy ? T("Saving") : T("Save"))</button></div>
+}
+
+@if (confirmDelete)
+{
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-category-title">
+        <h2 id="delete-category-title">@T("DeleteTitle")</h2><p>@T("DeleteExplanation")</p>
+        <div class="form-actions"><button class="button-secondary" @onclick="() => confirmDelete = false">@T("Cancel")</button><button class="button-danger" @onclick="DeleteAsync" disabled="@busy">@T("ConfirmDelete")</button></div>
+    </section>
+}
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private bool loading = true, busy, failed, confirmDelete;
+    private string name = "", displayName = "", description = "", search = "";
+    private string? etag, message;
+    private ResourceScopeRef? selectedScope;
+    private IReadOnlyList<ToolResource> tools = [];
+    private IReadOnlyList<ToolProviderResource> providers = [];
+    private IReadOnlyList<ToolCategoryMember> missingMembers = [];
+    private readonly HashSet<string> selected = new(StringComparer.Ordinal);
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private IEnumerable<ToolResource> FilteredTools => tools.Where(tool => string.IsNullOrWhiteSpace(search)
+        || tool.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+        || tool.Definition.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase)
+        || ProviderLabel(tool).Contains(search, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        try
+        {
+            var toolsTask = Tools.GetToolsAsync();
+            var providersTask = Tools.GetProvidersAsync(default);
+            await Task.WhenAll(toolsTask, providersTask);
+            tools = await toolsTask;
+            providers = await providersTask;
+            if (!IsNew)
+            {
+                var categoryTask = Categories.GetCategoryAsync(Name!);
+                var membersTask = Categories.GetMembersAsync(Name!);
+                await Task.WhenAll(categoryTask, membersTask);
+                var snapshot = await categoryTask;
+                var members = await membersTask;
+                name = snapshot.Value.Name;
+                displayName = snapshot.Value.Definition.DisplayName;
+                description = snapshot.Value.Definition.Description ?? "";
+                selectedScope = snapshot.Value.ScopeRef;
+                etag = snapshot.ETag;
+                selected.Clear();
+                foreach (var reference in snapshot.Value.Definition.Tools) selected.Add(ReferenceKey(reference));
+                missingMembers = members.Where(member => member.Tool is null).ToArray();
+            }
+        }
+        catch (Exception exception) { failed = true; message = exception.Message; }
+        finally { loading = false; }
+    }
+
+    private void Toggle(ToolResource tool, bool value) { if (value) selected.Add(ToolKey(tool)); else selected.Remove(ToolKey(tool)); }
+    private void ToggleMissing(ToolCategoryMember member, bool value) { if (value) selected.Add(ReferenceKey(member.Reference)); else selected.Remove(ReferenceKey(member.Reference)); }
+    private async Task SaveAsync()
+    {
+        busy = true; failed = false; message = null;
+        try
+        {
+            var properties = new ToolCategoryProperties { DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Tools = References() };
+            if (IsNew)
+            {
+                var saved = await Categories.CreateCategoryAsync(new(name.Trim(), properties, ScopeRef: selectedScope));
+                Navigation.NavigateTo($"/tools/categories/{Uri.EscapeDataString(saved.Value.Name)}");
+            }
+            else
+            {
+                var saved = await Categories.UpdateCategoryAsync(Name!, new(properties), etag!);
+                etag = saved.ETag;
+                message = T("Saved");
+            }
+        }
+        catch (Exception exception) { failed = true; message = exception.Message; }
+        finally { busy = false; }
+    }
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        try { await Categories.DeleteCategoryAsync(Name!, etag!); Navigation.NavigateTo("/tools/categories"); }
+        catch (Exception exception) { confirmDelete = false; failed = true; message = exception.Message; }
+        finally { busy = false; }
+    }
+    private IReadOnlyList<ResourceReference> References() => tools.Where(tool => selected.Contains(ToolKey(tool)))
+        .Select(tool => new ResourceReference(tool.Name, tool.ScopeRef, tool.Namespace)).Concat(missingMembers.Where(member => selected.Contains(ReferenceKey(member.Reference))).Select(member => member.Reference)).ToArray();
+    private string ProviderLabel(ToolResource tool) => providers.FirstOrDefault(provider => provider.Name == tool.Definition.Provider?.Name)?.Definition.DisplayName ?? tool.Definition.Provider?.Name ?? T("NoProvider");
+    private string Availability(ToolResource tool) => T(Assignable(tool) ? "Available" : "Unavailable");
+    private static bool Assignable(ToolResource tool) => tool.Definition.Enabled && tool.Definition.Discovery?.Available == true;
+    private static string ToolKey(ToolResource tool) => $"{tool.ScopeRef?.Value}|{tool.Namespace.Value}|{tool.Name}";
+    private static string ReferenceKey(ResourceReference reference) => $"{reference.ScopeRef?.Value}|{(reference.Namespace ?? ResourceNamespace.Default).Value}|{reference.Name}";
+    private static string ToolUrl(string name) => $"/tools/{Uri.EscapeDataString(name)}";
+}

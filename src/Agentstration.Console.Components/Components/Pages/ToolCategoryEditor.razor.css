@@ -1,0 +1,8 @@
+.tool-category-search { min-width: min(22rem, 100%); }
+.tool-category-search input { width: 100%; }
+.tool-category-members { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr)); }
+.tool-category-member { align-items: center; background: var(--surface-subtle); border: 1px solid var(--border); border-radius: .75rem; cursor: pointer; display: grid; gap: .75rem; grid-template-columns: auto 1fr auto; padding: .9rem; }
+.tool-category-member > span { display: grid; gap: .2rem; min-width: 0; }
+.tool-category-member small { color: var(--text-muted); overflow-wrap: anywhere; }
+.tool-category-member.unavailable { border-style: dashed; }
+@media (max-width: 640px) { .tool-category-member { grid-template-columns: auto 1fr; } .tool-category-member ::deep .status-badge { grid-column: 2; justify-self: start; } }

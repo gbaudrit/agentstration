@@ -15,4 +15,5 @@
   <data name="Nav.SourceRegistries" xml:space="preserve"><value>Source registries</value></data>
   <data name="Command.DiscoverSources" xml:space="preserve"><value>Discover Sources</value></data>
   <data name="Nav.Conversations" xml:space="preserve"><value>Conversations</value></data>
+  <data name="Command.CreateToolCategory" xml:space="preserve"><value>Create Tool category</value></data>
 </root>
