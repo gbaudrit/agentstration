@@ -14,6 +14,7 @@ using Agentstration.Resources;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Security.AspNetCoreIdentity;
+using Agentstration.Tools;
 using Agentstration.Web.Hosting;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -511,6 +512,53 @@ public sealed class DeclarativeBootstrapTests
     }
 
     [TestMethod]
+    public async Task TenantProfileProvisionsDedicatedWorkspaceIdempotentlyWithoutImplicitMemberships()
+    {
+        using var directory = new TemporaryDirectory();
+        var initial = Directory.CreateDirectory(Path.Combine(directory.Path, "initial"));
+        var assistant = Directory.CreateDirectory(Path.Combine(directory.Path, "assistant-workspace"));
+        await File.WriteAllTextAsync(Path.Combine(initial.FullName, "00-platform-admin.yaml"), PlatformAdministrator());
+        await File.WriteAllTextAsync(Path.Combine(initial.FullName, "10-tenant.yaml"), Tenant("dev", "Development"));
+        await File.WriteAllTextAsync(Path.Combine(initial.FullName, "20-workspace.yaml"), Workspace("default", "Default workspace", "dev"));
+        await File.WriteAllTextAsync(Path.Combine(initial.FullName, "30-default-context.yaml"), DefaultContext("bootstrap-admin", "dev", "default"));
+        await File.WriteAllTextAsync(Path.Combine(assistant.FullName, "profile.yaml"), Profile("assistant-workspace", "tenant"));
+        await File.WriteAllTextAsync(Path.Combine(assistant.FullName, "10-workspace.yaml"), $$"""
+            apiVersion: {{ResourceApiVersions.CoreV1}}
+            kind: Workspace
+            metadata:
+              name: {{OfficialWorkspaceIdentities.AgentstrationAssistant}}
+            definition:
+              displayName: {{OfficialWorkspaceIdentities.AgentstrationAssistantDisplayName}}
+            """);
+        await using var factory = Factory(initial.FullName, InitialPassword);
+        using var client = factory.CreateClient();
+        (await client.GetAsync("/health")).EnsureSuccessStatusCode();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var identities = scope.ServiceProvider.GetRequiredService<IIdentityStore>();
+        var tenant = await identities.FindTenantByNameAsync("dev", default);
+        Assert.IsNotNull(tenant);
+        var account = await scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>().FindByNameAsync("bootstrap-admin");
+        Assert.IsNotNull(account);
+        var principal = await scope.ServiceProvider.GetRequiredService<IPrincipalResolver>().ResolveLocalAsync(account.Id, default);
+        Assert.IsNotNull(principal);
+        var management = scope.ServiceProvider.GetRequiredService<BootstrapProfileManagementService>();
+        var selection = new BootstrapProfileSelection(["assistant-workspace"], new(tenant.Id));
+
+        var preview = await management.PreviewAsync(selection, principal.Id, default);
+        Assert.AreEqual(BootstrapResourceDisposition.Create, preview.Resources.Single().Disposition);
+        _ = await management.ApplyAsync(selection, preview.Digest, principal.Id, default);
+
+        var workspace = await identities.FindWorkspaceByNameAsync(tenant.Id, OfficialWorkspaceIdentities.AgentstrationAssistant, default);
+        Assert.IsNotNull(workspace);
+        Assert.AreEqual(OfficialWorkspaceIdentities.AgentstrationAssistantDisplayName, workspace.DisplayName);
+        Assert.HasCount(0, await identities.ListWorkspaceMembersAsync(workspace.Id, default));
+
+        var repeated = await management.PreviewAsync(selection, principal.Id, default);
+        Assert.AreEqual(BootstrapResourceDisposition.Skip, repeated.Resources.Single().Disposition);
+    }
+
+    [TestMethod]
     public async Task WorkspaceResourcesCanBeAppliedDirectlyAndRemainIndependentFromPacks()
     {
         using var directory = new TemporaryDirectory();
@@ -598,6 +646,11 @@ public sealed class DeclarativeBootstrapTests
                 .GetAsync(new(workspace.Id), new("bootstrap-flow"), default);
             var entry = await scope.ServiceProvider.GetRequiredService<IWorkplaceRepository>()
                 .GetEntryAsync(new(workspace.Id), new("bootstrap-entry"), default);
+            var resourceStore = scope.ServiceProvider.GetRequiredService<IResourceStore>();
+            var internalProvider = await resourceStore.GetAsync<ToolProviderResource>(
+                new(ToolResourceKinds.ToolProvider, AgentstrationToolProvider.Name), default);
+            var planningTool = await resourceStore.GetAsync<ToolResource>(
+                new(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.ResourcePlanCreate)), default);
 
             Assert.IsNotNull(provider);
             Assert.IsNotNull(runtime);
@@ -605,6 +658,8 @@ public sealed class DeclarativeBootstrapTests
             Assert.IsNotNull(agent);
             Assert.IsNotNull(flow);
             Assert.IsNotNull(entry);
+            Assert.IsNotNull(internalProvider);
+            Assert.IsNotNull(planningTool);
             Assert.IsTrue(flow.Value.ActiveVersion is not null);
             Assert.IsFalse(provider.Value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name));
             Assert.IsFalse(runtime.Value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name));

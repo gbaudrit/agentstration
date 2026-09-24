@@ -22,6 +22,7 @@ using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Secrets;
 using Agentstration.Work;
+using Agentstration.Work.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -858,6 +859,9 @@ public sealed class PackTests
         Assert.AreEqual(HttpStatusCode.OK, forkEntryResponse.StatusCode, await forkEntryResponse.Content.ReadAsStringAsync());
         using var forkEntryDraftResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/management/entries/who-am-i");
         Assert.AreEqual(HttpStatusCode.OK, forkEntryDraftResponse.StatusCode, await forkEntryDraftResponse.Content.ReadAsStringAsync());
+        var forkEntryDraft = await forkEntryDraftResponse.Content.ReadFromJsonAsync<EntryDraftResponse>();
+        Assert.IsNotNull(forkEntryDraft);
+        Assert.IsTrue(forkEntryDraft.ManagedByPack);
         using var forkEntryDependenciesResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/management/entries/who-am-i/dependencies");
         Assert.AreEqual(HttpStatusCode.OK, forkEntryDependenciesResponse.StatusCode, await forkEntryDependenciesResponse.Content.ReadAsStringAsync());
         using var forkEntry = JsonDocument.Parse(await forkEntryResponse.Content.ReadAsStreamAsync());

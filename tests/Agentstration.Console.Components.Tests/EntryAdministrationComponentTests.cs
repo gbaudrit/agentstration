@@ -218,7 +218,7 @@ public sealed class EntryAdministrationComponentTests
     public async Task NamespacedPackEntryUsesItsNamespaceAndIsReadOnly()
     {
         using var context = CreateContext();
-        var client = new FakeEntryAdministrationApiClient();
+        var client = new FakeEntryAdministrationApiClient { EntryManagedByPack = true };
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
         var @namespace = new Agentstration.Resources.ResourceNamespace("agentstration.daily-life-assistant");
         var rendered = context.Render<EntryEditor>(parameters => parameters
@@ -243,6 +243,30 @@ public sealed class EntryAdministrationComponentTests
         Assert.AreEqual("workspaces?entry=main&entryNamespace=agentstration.daily-life-assistant", workplaceLink.GetAttribute("href")?.TrimStart('/'));
         await rendered.Find("[data-testid='entry-tab-usage']").ClickAsync(new());
         Assert.AreEqual(@namespace, client.RequestedDependencyNamespace);
+    }
+
+    [TestMethod]
+    public async Task NamespacedBootstrapEntryCanEnableConsoleFallback()
+    {
+        using var context = CreateContext();
+        var client = new FakeEntryAdministrationApiClient();
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+        var rendered = context.Render<EntryEditor>(parameters => parameters
+            .Add(value => value.Name, "ask-agentstration")
+            .Add(value => value.EntryNamespace, "agentstration.assistant"));
+
+        await rendered.Find("[data-testid='entry-tab-definition']").ClickAsync(new());
+
+        Assert.IsFalse(rendered.Find("[data-testid='entry-definition-fields']").HasAttribute("disabled"));
+        Assert.IsTrue(rendered.Markup.Contains("can be edited and published independently", StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Markup.Contains("managed by its namespaced Pack source", StringComparison.Ordinal));
+        await rendered.Find("[data-testid='exposure-console']").ChangeAsync(new ChangeEventArgs { Value = true });
+        await rendered.Find("[data-testid='console-fallback']").ChangeAsync(new ChangeEventArgs { Value = true });
+        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Save draft", StringComparison.Ordinal)).ClickAsync(new());
+
+        Assert.IsNotNull(client.SavedEntry);
+        Assert.AreEqual(new Agentstration.Resources.ResourceNamespace("agentstration.assistant"), client.SavedNamespace);
+        Assert.AreEqual(EntryConsoleRole.Fallback, client.SavedEntry.Exposure.Console.Role);
     }
 
     [TestMethod]
@@ -443,6 +467,7 @@ public sealed class EntryAdministrationComponentTests
         public List<string> RequestedDashboardWorkspaceNames { get; } = [];
         public bool HasDashboard { get; init; } = true;
         public bool HasWorkspace { get; set; } = true;
+        public bool EntryManagedByPack { get; init; }
 
         public Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken) => Task.FromResult(EntryDrafts);
         public Task<EntryDraftResponse> GetEntryAsync(string name, CancellationToken cancellationToken)
@@ -467,7 +492,7 @@ public sealed class EntryAdministrationComponentTests
                 Binding = new EntryBinding(EntryBindingKind.Flow, FlowResourceId),
                 PublishedBinding = new EntryBinding(EntryBindingKind.Flow, FlowResourceId)
             };
-            return Task.FromResult(new EntryDraftResponse(draft, published));
+            return Task.FromResult(new EntryDraftResponse(draft, published, EntryManagedByPack));
         }
         public Task<EntryDraft> SaveEntryAsync(EntryDraft draft, CancellationToken cancellationToken) { SavedEntry = draft with { Revision = 2, UpdatedAt = Now }; return Task.FromResult(SavedEntry); }
         public Task<EntryDraft> SaveEntryAsync(Agentstration.Resources.ResourceNamespace @namespace, EntryDraft draft, CancellationToken cancellationToken) { SavedNamespace = @namespace; return SaveEntryAsync(draft, cancellationToken); }

@@ -85,4 +85,77 @@ public static partial class FlowEndpoints
         response.Headers.ETag = stored.ETag;
         return Results.Ok(new FlowDraftResponse(stored.Value, stored.ETag));
     });
+
+    private static Task<IResult> GetNamespacedDraftAsync(string @namespace, string id, HttpResponse response, FlowDraftService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var flowId = NamespacedFlowId(@namespace, id);
+        var stored = await service.GetAsync(CurrentWorkspace(requestContext), flowId, token) ?? throw new FlowNotFoundException(flowId);
+        response.Headers.ETag = stored.ETag;
+        return Results.Ok(new FlowDraftResponse(stored.Value, stored.ETag));
+    });
+
+    private static Task<IResult> SaveNamespacedDraftAsync(string @namespace, string id, UpdateFlowDraftRequest body, HttpRequest request, HttpResponse response, FlowDraftService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var stored = await service.SaveAsync(CurrentWorkspace(requestContext), NamespacedFlowId(@namespace, id), new UpdateFlowDraftCommand(body.DisplayName, body.Description, body.Tags, body.Definition, body.UpdatedBy), RequiredIfMatch(request), token);
+        response.Headers.ETag = stored.ETag;
+        return Results.Ok(new FlowDraftResponse(stored.Value, stored.ETag));
+    });
+
+    private static Task<IResult> ValidateNamespacedDraftAsync(string @namespace, string id, FlowDraftService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var validation = await service.ValidateAsync(CurrentWorkspace(requestContext), NamespacedFlowId(@namespace, id), token);
+        return Results.Ok(new FlowValidationResponse(validation.IsValid, validation.Issues));
+    });
+
+    private static Task<IResult> GetNamespacedDraftSourceAsync(string @namespace, string id, string? format, FlowDraftService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var actualFormat = string.Equals(format, "json", StringComparison.OrdinalIgnoreCase) ? "json" : "yaml";
+        var workspaceId = CurrentWorkspace(requestContext);
+        var flowId = NamespacedFlowId(@namespace, id);
+        var draft = await service.GetAsync(workspaceId, flowId, token) ?? throw new FlowNotFoundException(flowId);
+        return Results.Ok(new FlowSourceResponse(await service.GetSourceAsync(workspaceId, flowId, actualFormat, token), actualFormat, draft.Value.Revision));
+    });
+
+    private static Task<IResult> ReplaceNamespacedDraftSourceAsync(string @namespace, string id, ReplaceFlowSourceRequest body, HttpRequest request, HttpResponse response, FlowDraftService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var workspaceId = CurrentWorkspace(requestContext);
+        var flowId = NamespacedFlowId(@namespace, id);
+        var current = await service.GetAsync(workspaceId, flowId, token) ?? throw new FlowNotFoundException(flowId);
+        var definition = service.ParseSource(body.Source, body.Format);
+        var stored = await service.SaveAsync(workspaceId, flowId, new UpdateFlowDraftCommand(current.Value.DisplayName, current.Value.Description, current.Value.Tags, definition, body.UpdatedBy), RequiredIfMatch(request), token);
+        response.Headers.ETag = stored.ETag;
+        return Results.Ok(new FlowDraftResponse(stored.Value, stored.ETag));
+    });
+
+    private static Task<IResult> PublishNamespacedDraftAsync(string @namespace, string id, PublishFlowDraftRequest body, HttpResponse response, FlowDraftService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var flowId = NamespacedFlowId(@namespace, id);
+        var stored = await service.PublishAsync(CurrentWorkspace(requestContext), flowId, body.Version, body.ReleaseNotes, body.Activate, token);
+        response.Headers.ETag = stored.ETag;
+        response.Headers.Location = $"/api/namespaces/{flowId.Namespace.Value}/flows/{id}/versions/{body.Version}";
+        return Results.Json(ToVersion(stored.Value), statusCode: StatusCodes.Status201Created);
+    });
+
+    private static Task<IResult> CreateNamespacedDraftRunAsync(string @namespace, string id, CreateFlowRunRequest body, HttpContext context, HttpResponse response, FlowDraftService drafts, FlowRunService runs, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var workspaceId = CurrentWorkspace(requestContext);
+        var flowId = NamespacedFlowId(@namespace, id);
+        var draft = await drafts.GetAsync(workspaceId, flowId, token) ?? throw new FlowNotFoundException(flowId);
+        var validation = await drafts.ValidateAsync(workspaceId, flowId, token);
+        if (!validation.IsValid) throw new FlowValidationException("flow_validation_failed", "The Flow Draft contains validation errors and cannot run.");
+        var scope = CurrentScope(requestContext);
+        var startedBy = context.Features.Get<ResolvedPrincipalFeature>()?.DisplayName ?? scope.PrincipalId.ToString("D");
+        var stored = await runs.CreateDraftAsync(draft.Value, body.Trigger, startedBy, body.CorrelationId, body.Input, scope, token);
+        response.Headers.Location = $"/api/flowRuns/{stored.Value.Id}";
+        return Results.Accepted($"/api/flowRuns/{stored.Value.Id}", stored.Value);
+    });
+
+    private static Task<IResult> CreateNamespacedDraftFromVersionAsync(string @namespace, string id, string version, HttpResponse response, FlowDraftService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var stored = await service.CreateFromVersionAsync(CurrentWorkspace(requestContext), NamespacedFlowId(@namespace, id), version, "local-user", token);
+        response.Headers.ETag = stored.ETag;
+        return Results.Ok(new FlowDraftResponse(stored.Value, stored.ETag));
+    });
+
+    private static FlowId NamespacedFlowId(string @namespace, string id) => new(id, ResourceNamespace.Parse(@namespace));
 }

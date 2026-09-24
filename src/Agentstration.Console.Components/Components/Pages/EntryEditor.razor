@@ -35,7 +35,7 @@ else
 
     @if (!EntryResourceNamespace.IsDefault)
     {
-        <p class="muted">@T("NamespacedEntryHelp")</p>
+        <p class="muted">@T(IsPackOwned ? "PackManagedEntryHelp" : "NamespacedEntryHelp")</p>
     }
 
     <div class="entry-tabs">
@@ -320,9 +320,9 @@ else
     private static readonly EntryTab[] NamespacedTabs = [EntryTab.Overview, EntryTab.Definition, EntryTab.Preview, EntryTab.Usage, EntryTab.Versions, EntryTab.Yaml];
     private bool IsNew => string.Equals(Name, "new", StringComparison.OrdinalIgnoreCase);
     private ResourceNamespace EntryResourceNamespace => string.IsNullOrWhiteSpace(EntryNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(EntryNamespace);
-    private bool IsPackOwned => !EntryResourceNamespace.IsDefault;
+    private bool IsPackOwned => managedByPack;
     private IReadOnlyList<EntryTab> AvailableTabs => EntryResourceNamespace.IsDefault ? Tabs : NamespacedTabs;
-    private bool loading = true, busy, hasError;
+    private bool loading = true, busy, hasError, managedByPack;
     private bool interactive;
     private long draftRevision = 1;
     private string resourceName = "", displayName = "", description = "", placeholder = "Ask Agentstration", icon = "", resourceId = "", message = "";
@@ -365,7 +365,7 @@ else
     {
         if (!IsNew)
         {
-            var response = await Client.GetEntryAsync(EntryResourceNamespace, Name, default); var draft = response.Value; published = response.Published; rawPublish = published is not null; publishedBinding = draft.PublishedBinding; draftRevision = draft.Revision;
+            var response = await Client.GetEntryAsync(EntryResourceNamespace, Name, default); var draft = response.Value; published = response.Published; managedByPack = response.ManagedByPack; rawPublish = published is not null; publishedBinding = draft.PublishedBinding; draftRevision = draft.Revision;
             resourceName = draft.Name; displayName = draft.DisplayName; description = draft.Description ?? ""; placeholder = draft.Presentation.Placeholder ?? ""; icon = draft.Presentation.Icon ?? ""; presentationKind = draft.Presentation.Kind; participantsVisibility = draft.Presentation.Participants.Visibility; progressVisibility = draft.Presentation.Progress.Visibility; taskDisplay = draft.Presentation.Task.Display; resultDisplay = draft.Presentation.Results.Display; bindingKind = draft.Binding.Kind; resourceId = draft.Binding.ResourceId; taskMode = draft.Behavior.TaskCreationMode; allowConversation = draft.Behavior.AllowConversation; streamResponse = draft.Behavior.StreamResponse; allowAttachments = draft.Presentation.AllowAttachments; allowVoiceInput = draft.Presentation.AllowVoiceInput;
             exposeWorkplace = draft.Exposure.Surfaces.Contains(EntryExposureSurface.Workplace); exposeConsole = draft.Exposure.Surfaces.Contains(EntryExposureSurface.Console); exposeOwningSpace = draft.Exposure.WorkplacePlacements.Contains(EntryWorkplacePlacement.OwningSpace); exposeTenantHome = draft.Exposure.WorkplacePlacements.Contains(EntryWorkplacePlacement.TenantHome); consoleFallback = draft.Exposure.Console.Role == EntryConsoleRole.Fallback;
             fields.Clear(); fields.AddRange(draft.Presentation.Fields.Select(value => new EditorField { Name = value.Name, Label = value.Label ?? "", Description = value.Description ?? "", Placeholder = value.Placeholder ?? "", Type = value.Type, Required = value.Required, Primary = value.Role == EntryFieldRole.PrimaryInput, Options = string.Join(", ", value.Options.Select(option => $"{option.Value}:{option.Label}")), DefaultValue = value.DefaultValue, Validation = value.Validation }));

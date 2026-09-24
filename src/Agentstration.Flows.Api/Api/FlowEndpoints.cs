@@ -42,6 +42,14 @@ public static partial class FlowEndpoints
         namespaced.MapDelete("/{id}", DeleteNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
         namespaced.MapGet("/{id}/versions", ListNamespacedVersionsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         namespaced.MapGet("/{id}/versions/{version}", GetNamespacedVersionAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        namespaced.MapGet("/{id}/draft", GetNamespacedDraftAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        namespaced.MapPut("/{id}/draft", SaveNamespacedDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        namespaced.MapPost("/{id}/validate", ValidateNamespacedDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        namespaced.MapGet("/{id}/draft/source", GetNamespacedDraftSourceAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        namespaced.MapPut("/{id}/draft/source", ReplaceNamespacedDraftSourceAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        namespaced.MapPost("/{id}/publish", PublishNamespacedDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        namespaced.MapPost("/{id}/draft/runs", CreateNamespacedDraftRunAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
+        namespaced.MapPost("/{id}/versions/{version}/draft", CreateNamespacedDraftFromVersionAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         namespaced.MapPost("/{id}/runs", CreateNamespacedRunAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         namespaced.MapGet("/{id}/runs", ListNamespacedFlowRunsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         var runs = endpoints.MapGroup("/api/flowRuns").RequireAuthorization(AgentstrationPolicies.Authenticated);
