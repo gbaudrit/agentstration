@@ -21,6 +21,12 @@ export interface ExpectedText {
     createEntry: string;
     publishPinnedVersion: string;
   };
+  platformHealth: {
+    label: string;
+    connecting: string;
+    operational: string;
+    partiallyUnavailable: string;
+  };
 }
 
 export const ExpectedTextByLocale = {
@@ -44,6 +50,12 @@ export const ExpectedTextByLocale = {
       createEntry: 'Create entry',
       publishPinnedVersion: 'Publish pinned version',
     },
+    platformHealth: {
+      label: 'Platform',
+      connecting: 'Connecting',
+      operational: 'Operational',
+      partiallyUnavailable: 'Partially unavailable',
+    },
   },
   'fr-FR': {
     navigation: {
@@ -64,6 +76,12 @@ export const ExpectedTextByLocale = {
     entryEditor: {
       createEntry: 'Créer une entrée',
       publishPinnedVersion: 'Publier la version épinglée',
+    },
+    platformHealth: {
+      label: 'Plateforme',
+      connecting: 'Connexion en cours',
+      operational: 'Opérationnelle',
+      partiallyUnavailable: 'Partiellement indisponible',
     },
   },
 } as const satisfies Record<SupportedTestLocale, ExpectedText>;
