@@ -170,3 +170,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 138. [ADR-0138 — Provider discovery reconciles governed Model resources](0138-provider-discovery-reconciles-governed-model-resources.md)
 139. [ADR-0139 — Model Providers own exact Model specification overrides](0139-model-providers-own-exact-model-specification-overrides.md)
 140. [ADR-0140 — Console command fallback is a presentation role](0140-console-command-fallback-is-a-presentation-role.md)
+141. [ADR-0141 — Console Entry interactions reuse durable Work](0141-console-entry-interactions-reuse-durable-work.md)

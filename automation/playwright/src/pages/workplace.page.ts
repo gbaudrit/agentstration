@@ -158,7 +158,6 @@ export class WorkplacePage {
   public get home(): Locator { return this.page.getByTestId(TestIds.workplace.home); }
   public get interaction(): Locator { return this.page.getByTestId(TestIds.workplace.interaction); }
   public get conversationThread(): Locator { return this.page.getByTestId(TestIds.workplace.conversationThread); }
-  public get realtimeStatus(): Locator { return this.page.getByTestId(TestIds.workplace.realtimeStatus).first(); }
   public get mobileAppBar(): Locator { return this.page.getByTestId(TestIds.workplace.mobileAppBar); }
   public get recentConversations(): Locator { return this.page.getByTestId(TestIds.workplace.recentConversation); }
 

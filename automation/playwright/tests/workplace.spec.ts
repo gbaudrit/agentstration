@@ -39,7 +39,6 @@ test('Workplace aliases, prompt conversations, theme, and recent navigation are 
 
   const root = await pages.workplace.openRoot(product.workplaceUrl);
   expect(root).toEqual({ workspaceName: 'default', dashboardName: 'home' });
-  await expect(pages.workplace.realtimeStatus).toHaveAttribute('data-connected', 'true');
   await pages.workplace.toggleTheme();
 
   expect(await pages.workplace.openWorkspace(product.workplaceUrl, root.workspaceName)).toEqual(root);

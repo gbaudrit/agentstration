@@ -432,6 +432,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 52. **Delivered Model inspection increment:** the Console reads the canonical retained `Model` resource and its provider-owned effective projection through typed clients, presents a localized friendly overview with property provenance, and serializes only the persisted observation in a copyable read-only YAML tab. Opening the detail route performs no discovery or mutation.
 53. **Delivered Console Model discovery lifecycle increment:** creating a Model Provider in the Console persists the declaration before attempting initial discovery, reports failure without rolling back the resource, and exposes an explicit refresh action with reconciliation counts. Read paths remain side-effect free.
 54. **Delivered Console Entry fallback increment:** Entry exposure may designate the fallback Console presentation role. The command palette keeps authorized page, command, and resource matches ahead of explicit Entry fallbacks, preserves the exact query, and offers every discovered executable fallback Entry for explicit selection. See ADR-0140.
+55. **Delivered generic Console Entry interaction increment:** the owner-Workspace route reuses canonical discovery, the shared Entry renderer, durable Interaction/Task state, continuation and pending-action contracts, cancellation, artifacts, realtime refresh, and replay. An initial palette query is submitted only when the Entry contract is unambiguous and otherwise remains a prefilled value. See ADR-0141.
 
 ## ADR catalog
 
@@ -491,6 +492,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0113: Entry exposure separates ownership from presentation
 - ADR-0114: Console Entry discovery projects canonical execution readiness
 - ADR-0140: Console command fallback is a presentation role
+- ADR-0141: Console Entry interactions reuse durable Work
 - ADR-0061: llama.cpp AEP provider and effective capability resolution
 - ADR-0062: immutable versioned extension option contracts
 - ADR-0081: Source Providers are bounded AEP contributions
