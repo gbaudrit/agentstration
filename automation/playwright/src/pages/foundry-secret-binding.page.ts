@@ -43,6 +43,10 @@ export class FoundrySecretBindingPage {
     const dialog = this.page.getByTestId('contextual-secret-creator');
     await dialog.waitFor({ state: 'visible' });
     const name = await dialog.getByTestId('contextual-secret-name').inputValue();
+    const vault = dialog.getByTestId('contextual-secret-vault');
+    const vaultOption = vault.locator('option:not([value=""])').first();
+    await vaultOption.waitFor({ state: 'attached' });
+    await vault.selectOption(await vaultOption.getAttribute('value') ?? '');
     await dialog.getByTestId('contextual-secret-value').fill(value);
     await dialog.getByTestId('contextual-secret-create').click();
     await dialog.waitFor({ state: 'detached' });
