@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.Work;
@@ -12,7 +10,6 @@ public sealed partial class WorkplaceService
 {
     public sealed record DeliverNotificationCommand(
         WorkspaceId WorkspaceId,
-        string DeliveryKey,
         string Title,
         string Message,
         string? ActionUrl = null,
@@ -34,15 +31,12 @@ public sealed partial class WorkplaceService
     public async Task<NotificationDelivery> DeliverNotificationAsync(DeliverNotificationCommand command, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(command);
-        var deliveryKey = Required(command.DeliveryKey, nameof(command.DeliveryKey), 256);
         var title = Required(command.Title, nameof(command.Title), 200);
         var message = Required(command.Message, nameof(command.Message), 4_000);
         if (command.ActionUrl is { Length: > 2_048 }) throw new WorkValidationException("notification_action_url_too_long", "Notification actionUrl cannot exceed 2048 characters.");
         if (command.ActionUrl is { } actionUrl && (actionUrl.Length == 0 || actionUrl[0] != '/' || actionUrl.StartsWith("//", StringComparison.Ordinal) || actionUrl.Contains('\\')))
             throw new WorkValidationException("notification_action_url_invalid", "Notification actionUrl must be a local absolute path.");
-        var id = NotificationId(command.WorkspaceId, deliveryKey);
-        var existing = await repository.GetNotificationAsync(command.WorkspaceId, id, token);
-        if (existing is not null) return new(existing, true);
+        var id = WorkNotificationId.New();
 
         var notification = new WorkNotification
         {
@@ -53,7 +47,6 @@ public sealed partial class WorkplaceService
             Message = message,
             CreatedAt = timeProvider.GetUtcNow(),
             ActionUrl = command.ActionUrl,
-            DeliveryKey = deliveryKey,
             CorrelationId = command.CorrelationId,
             SourceRunId = command.SourceRunId,
             SourceStepId = command.SourceStepId,
@@ -65,7 +58,7 @@ public sealed partial class WorkplaceService
         }
         catch (Exception) when (!token.IsCancellationRequested)
         {
-            existing = await repository.GetNotificationAsync(command.WorkspaceId, id, token);
+            var existing = await repository.GetNotificationAsync(command.WorkspaceId, id, token);
             if (existing is not null) return new(existing, true);
             throw;
         }
@@ -93,10 +86,5 @@ public sealed partial class WorkplaceService
         return value;
     }
 
-    private static WorkNotificationId NotificationId(WorkspaceId workspaceId, string deliveryKey)
-    {
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"{workspaceId.Value:D}\n{deliveryKey}"));
-        return new(new Guid(hash.AsSpan(0, 16)));
-    }
 }
 

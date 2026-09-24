@@ -63,7 +63,6 @@ public sealed record WorkNotification
     public InteractionId? InteractionId { get; init; }
     public PendingActionId? PendingActionId { get; init; }
     public string? ActionUrl { get; init; }
-    public string? DeliveryKey { get; init; }
     public string? CorrelationId { get; init; }
     public string? SourceRunId { get; init; }
     public string? SourceStepId { get; init; }

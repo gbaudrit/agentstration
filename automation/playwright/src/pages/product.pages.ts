@@ -17,6 +17,7 @@ import { DescendantSecretsPage } from './descendant-secrets.page.js';
 import { ConsoleEntryInteractionPage } from './console-entry-interaction.page.js';
 import { PlatformHealthPage } from './platform-health.page.js';
 import { ResourceNamingPage } from './resource-naming.page.js';
+import { FoundrySecretBindingPage } from './foundry-secret-binding.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -36,6 +37,7 @@ export class ProductPages {
   public readonly consoleEntryInteraction: ConsoleEntryInteractionPage;
   public readonly platformHealth: PlatformHealthPage;
   public readonly resourceNaming: ResourceNamingPage;
+  public readonly foundrySecretBinding: FoundrySecretBindingPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -55,6 +57,7 @@ export class ProductPages {
     this.consoleEntryInteraction = new ConsoleEntryInteractionPage(page);
     this.platformHealth = new PlatformHealthPage(page);
     this.resourceNaming = new ResourceNamingPage(page);
+    this.foundrySecretBinding = new FoundrySecretBindingPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

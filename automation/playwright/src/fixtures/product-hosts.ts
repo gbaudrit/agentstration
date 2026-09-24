@@ -45,11 +45,12 @@ export async function startProductHosts(): Promise<ProductHosts> {
   const dataDirectory = path.join(workDirectory, 'data');
   await fs.mkdir(dataDirectory, { recursive: true });
 
-  const [consolePort, workplacePort, extensionPort, gitExtensionPort] = await Promise.all([freePort(), freePort(), freePort(), freePort()]);
+  const [consolePort, workplacePort, extensionPort, gitExtensionPort, foundryExtensionPort] = await Promise.all([freePort(), freePort(), freePort(), freePort(), freePort()]);
   const consoleUrl = `http://127.0.0.1:${consolePort}`;
   const workplaceUrl = `http://127.0.0.1:${workplacePort}`;
   const extensionUrl = `http://127.0.0.1:${extensionPort}`;
   const gitExtensionUrl = `http://127.0.0.1:${gitExtensionPort}`;
+  const foundryExtensionUrl = `http://127.0.0.1:${foundryExtensionPort}`;
   const bootstrapPath = path.join(repositoryRoot, 'deploy', 'bootstrap', 'profiles');
   const runtimeProxy = await startControlledRuntimeProxy(consoleUrl);
 
@@ -66,15 +67,22 @@ export async function startProductHosts(): Promise<ProductHosts> {
     Logging__EventLog__LogLevel__Default: 'None',
     GitSourceProvider__AllowLocalRepositories: 'true',
   });
+  const foundryExtension = runDotnet('src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj', path.join(workDirectory, 'foundry-extension.log'), {
+    ASPNETCORE_ENVIRONMENT: 'Development',
+    ASPNETCORE_URLS: foundryExtensionUrl,
+    Logging__EventLog__LogLevel__Default: 'None',
+  });
 
   try {
     await Promise.all([
       waitUntilHealthy(`${extensionUrl}/health`, modelExtension),
       waitUntilHealthy(`${gitExtensionUrl}/health`, gitExtension),
+      waitUntilHealthy(`${foundryExtensionUrl}/health`, foundryExtension),
     ]);
   } catch (error) {
     await stopProcess(modelExtension);
     await stopProcess(gitExtension);
+    await stopProcess(foundryExtension);
     await fakeOllama.stop();
     await runtimeProxy.stop();
     throw error;
@@ -106,6 +114,8 @@ export async function startProductHosts(): Promise<ProductHosts> {
     `--Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint=${extensionUrl}`,
     '--Agentstration:Extensions:Agentstration.Extensions.Git:RegistrationName=git-extension',
     `--Agentstration:Extensions:Agentstration.Extensions.Git:Endpoint=${gitExtensionUrl}`,
+    '--Agentstration:Extensions:Agentstration.Extensions.Foundry:RegistrationName=foundry-extension',
+    `--Agentstration:Extensions:Agentstration.Extensions.Foundry:Endpoint=${foundryExtensionUrl}`,
   ]);
 
   let workplaceHost: ManagedProcess | undefined;
@@ -124,6 +134,7 @@ export async function startProductHosts(): Promise<ProductHosts> {
     await stopProcess(consoleHost);
     await stopProcess(modelExtension);
     await stopProcess(gitExtension);
+    await stopProcess(foundryExtension);
     await fakeOllama.stop();
     await runtimeProxy.stop();
     throw error;
@@ -138,6 +149,7 @@ export async function startProductHosts(): Promise<ProductHosts> {
       await stopProcess(consoleHost);
       await stopProcess(modelExtension);
       await stopProcess(gitExtension);
+      await stopProcess(foundryExtension);
       await fakeOllama.stop();
       await runtimeProxy.stop();
     },
