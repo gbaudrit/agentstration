@@ -12,18 +12,17 @@ public sealed class WorkNotificationMcpToolDefinitionProvider : IInternalMcpTool
     public InternalMcpToolDefinition Definition { get; } = new(
         AgentstrationInternalTools.NotificationCreate,
         "Create in-product notification",
-        "Creates a durable in-product notification for the current Workspace. Use it to notify the user about a relevant event or result. A stable delivery key prevents duplicate notifications on retries. Optional actions can target only local Agentstration paths, not external URLs.",
+        "Creates a durable in-product notification for the current Workspace. Use it to notify the user about a relevant event or result. Agentstration generates a unique notification identity for every creation. Optional actions can target only local Agentstration paths, not external URLs.",
         JsonSerializer.SerializeToElement(new
         {
             type = "object",
             properties = new
             {
-                deliveryKey = new { type = "string", maxLength = 256, pattern = @"\S", description = "Stable idempotency key for one logical notification in this Workspace. Reuse the same key when retrying that notification." },
                 title = new { type = "string", maxLength = 200, pattern = @"\S", description = "Short user-visible notification heading." },
                 message = new { type = "string", maxLength = 4000, pattern = @"\S", description = "User-visible notification body." },
                 actionUrl = new { type = "string", maxLength = 2048, pattern = @"^/(?!/)[^\\]*$", description = "Optional local absolute Agentstration path beginning with one slash. External URLs and backslashes are not supported." }
             },
-            required = new[] { "deliveryKey", "title", "message" },
+            required = new[] { "title", "message" },
             additionalProperties = false
         }),
         JsonSerializer.SerializeToElement(new
@@ -32,11 +31,9 @@ public sealed class WorkNotificationMcpToolDefinitionProvider : IInternalMcpTool
             properties = new
             {
                 notificationId = new { type = "string" },
-                deliveryKey = new { type = "string" },
-                createdAt = new { type = "string" },
-                recovered = new { type = "boolean" }
+                createdAt = new { type = "string" }
             },
-            required = new[] { "notificationId", "deliveryKey", "createdAt", "recovered" },
+            required = new[] { "notificationId", "createdAt" },
             additionalProperties = false
         }));
 }
@@ -51,7 +48,7 @@ public sealed class WorkNotificationMcpTool(
     {
         if (invocation.Arguments.ValueKind != JsonValueKind.Object)
             throw new ToolDefinitionInvocationException("notification_arguments_invalid", "Notification arguments must be a JSON object.");
-        var allowed = new HashSet<string>(["deliveryKey", "title", "message", "actionUrl"], StringComparer.Ordinal);
+        var allowed = new HashSet<string>(["title", "message", "actionUrl"], StringComparer.Ordinal);
         var unknown = invocation.Arguments.EnumerateObject().Select(value => value.Name).FirstOrDefault(value => !allowed.Contains(value));
         if (unknown is not null)
             throw new ToolDefinitionInvocationException("notification_argument_unknown", $"Notification argument '{unknown}' is not declared by the Tool schema.");
@@ -60,7 +57,6 @@ public sealed class WorkNotificationMcpTool(
         {
             delivery = await workplace.DeliverNotificationAsync(new WorkplaceService.DeliverNotificationCommand(
                 invocation.WorkspaceId,
-                Required(invocation.Arguments, "deliveryKey"),
                 Required(invocation.Arguments, "title"),
                 Required(invocation.Arguments, "message"),
                 Optional(invocation.Arguments, "actionUrl"),
@@ -76,9 +72,7 @@ public sealed class WorkNotificationMcpTool(
         return JsonSerializer.SerializeToElement(new
         {
             notificationId = delivery.Notification.Id.Value,
-            deliveryKey = delivery.Notification.DeliveryKey,
-            createdAt = delivery.Notification.CreatedAt,
-            recovered = delivery.Recovered
+            createdAt = delivery.Notification.CreatedAt
         });
     }
 

@@ -2,7 +2,7 @@
 
 This sample keeps delivery as an ordinary Flow rather than an engine-specific notification step or a `NotificationChannel` resource.
 
-- `flows/notification-delivery.yaml` maps a stable delivery contract to the atomic internal MCP Tool `work.notification.create`.
+- `flows/notification-delivery.yaml` maps the functional delivery contract to the atomic internal MCP Tool `work.notification.create`; Agentstration generates each notification identity.
 - `flows/news-alert-parent.yaml` calls that delivery Flow through the generic Flow card.
 - `tooldefinitions/notification-send.yaml` optionally publishes the delivery Flow as `notification.send` for Agents and external MCP clients.
 

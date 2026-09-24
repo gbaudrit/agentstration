@@ -17,20 +17,17 @@ definition:
     inputSchema:
       type: object
       properties:
-        deliveryKey: { type: string, maxLength: 256, pattern: '\S', description: 'Stable idempotency key for one logical notification in this Workspace; reuse it on retries.' }
         title: { type: string, maxLength: 200, pattern: '\S', description: 'Short user-visible notification heading.' }
         message: { type: string, maxLength: 4000, pattern: '\S', description: 'User-visible notification body.' }
         actionUrl: { type: string, maxLength: 2048, pattern: '^/(?!/)[^\\]*$', description: 'Optional local absolute Agentstration path; external URLs and backslashes are not supported.' }
       additionalProperties: false
-      required: [deliveryKey, title, message]
+      required: [title, message]
     outputSchema:
       type: object
       properties:
         notificationId: { type: string }
-        deliveryKey: { type: string }
         createdAt: { type: string }
-        recovered: { type: boolean }
-      required: [notificationId, deliveryKey, createdAt, recovered]
+      required: [notificationId, createdAt]
     steps:
       - type: input
         name: input
@@ -41,7 +38,6 @@ definition:
         tool:
           resourceId: agentstration.work.notification.create
         argumentsMapping:
-          deliveryKey: "${input.deliveryKey}"
           title: "${input.title}"
           message: "${input.message}"
           actionUrl: "${input.actionUrl}"
