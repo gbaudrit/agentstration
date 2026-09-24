@@ -84,6 +84,23 @@ public sealed record ToolResource : Resource
     public ToolResourceProperties Definition { get; init; } = null!;
 }
 
+public sealed record ToolCategoryProperties
+{
+    public required string DisplayName { get; init; }
+    public string? Description { get; init; }
+    public IReadOnlyList<ResourceReference> Tools { get; init; } = [];
+}
+
+public sealed record ToolCategoryResource : Resource
+{
+    public ToolCategoryProperties Definition { get; init; } = null!;
+}
+
+public sealed record ToolCategoryMember(
+    ResourceReference Reference,
+    ToolResource? Tool,
+    string State);
+
 public static class ToolResourceIdentity
 {
     public static string CatalogId(ResourceNamespace @namespace, string name) =>

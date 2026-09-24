@@ -47,6 +47,7 @@ public partial class MainLayout
         new("Nav.RunEvents", "/run-events", "≋", "Group.Runs", "persisted runtime flow activity événements"),
         new("Nav.ModelProviders", "/modelproviders", "⬡", "Group.Configure", "providers fournisseurs"),
         new("Nav.Tools", "/tools", "⌁", "Group.Configure", "tool catalog providers outils fournisseurs MCP AEP"),
+        new("Command.CreateToolCategory", "/tools/categories/new", "+", "Command", "new nouvelle category catégorie tools outils"),
         new("Command.CreateToolProvider", "/tools/providers/new", "+", "Command", "new nouveau MCP AEP provider fournisseur"),
         new("Nav.WorkplaceSetup", "/workspaces", "▦", "Group.Configure", "workspace composition primary entries espace composition"),
         new("Nav.Packs", "/packs", "▣", "Group.Configure", "package distribution install archive resources paquet installation"),

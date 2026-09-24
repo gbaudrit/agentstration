@@ -1,0 +1,213 @@
+@page "/tools/categories/new"
+@page "/tools/categories/{Name}"
+@inject IToolCategoriesClient Categories
+@inject IToolsClient Tools
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ToolCategoriesStrings> Localizer
+
+<PageTitle>@(IsNew ? T("Create") : displayName) · Agentstration</PageTitle>
+<PageHeader Title="@(IsNew ? T("Create") : displayName)" Description="@T("EditorDescription")" TestId="resource-tool-category-editor">
+    <Actions><a class="button-secondary" href="/tools/categories">@T("Back")</a>@if (!IsNew) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
+</PageHeader>
+
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else
+{
+    @if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")">@message</div> }
+    <section class="panel form-section">
+        <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("Details")</h2></div>@if (!IsNew) { <StatusBadge Text="@T("MemberCount", selected.Count)" Status="UiStatus.Info" /> }</div>
+        <div class="form-grid">
+            <label><span>@T("TechnicalName")</span><input @bind="name" disabled="@(!IsNew)" data-testid="category-name" /></label>
+            <label><span>@T("DisplayName")</span><input @bind="displayName" data-testid="category-display-name" /></label>
+            <label class="form-span-2"><span>@T("CategoryDescription")</span><textarea @bind="description" rows="3"></textarea></label>
+            <ResourceScopeFormField ResourceKind="@ToolResourceKinds.ToolCategory" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
+        </div>
+    </section>
+
+    <section class="panel form-section">
+        <div class="panel-header tool-category-members-header"><div><p class="eyebrow">@T("Membership")</p><h2>@T("ChooseTools")</h2><p>@T("MembershipHelp")</p></div><label class="tool-category-search"><span aria-hidden="true"><TablerIcon Name="search" /></span><span class="sr-only">@T("Search")</span><input @bind="search" @bind:event="oninput" placeholder="@T("SearchPlaceholder")" /></label></div>
+        <div class="tool-category-provider-list" data-testid="category-members">
+            @foreach (var group in ProviderGroups)
+            {
+                <section class="tool-category-provider" data-provider="@ProviderKey(group)">
+                    <header class="tool-category-provider-header">
+                        <div class="tool-category-provider-identity">
+                            <span class="tool-category-provider-icon" aria-hidden="true"><TablerIcon Name="server" /></span>
+                            <span><small>@ProviderKind(group)</small><strong>@ProviderDisplayName(group)</strong><code>@ProviderTechnicalName(group)</code></span>
+                        </div>
+                        <div class="tool-category-provider-summary">
+                            <span><strong>@SelectedCount(group)</strong> @T("SelectedOf", group.Tools.Count)</span>
+                            @if (group.Provider is not null) { <a href="@ProviderUrl(group.Provider.Name)">@T("OpenProvider")</a> }
+                        </div>
+                    </header>
+                    @if (group.Tools.Count == 0)
+                    {
+                        <p class="tool-category-provider-empty">@T("NoProviderTools")</p>
+                    }
+                    else
+                    {
+                        <div class="tool-category-members">
+                        @foreach (var tool in group.Tools)
+                        {
+                            var inputId = ToolInputId(tool.Name);
+                            var assigned = selected.Contains(ToolKey(tool));
+                            var usable = Assignable(tool);
+                            <div class="tool-category-member">
+                                <input id="@inputId" type="checkbox" aria-label="@tool.Definition.DisplayName" checked="@assigned" disabled="@(!usable && !assigned)" @onchange="args => Toggle(tool, (bool)args.Value!)" />
+                                <label class="tool-category-member-icon" for="@inputId" aria-hidden="true"><TablerIcon Name="tool" /></label>
+                                <span class="tool-category-member-copy">
+                                    <strong><a href="@ToolUrl(tool.Name)">@tool.Definition.DisplayName</a>@if (!string.IsNullOrWhiteSpace(tool.Definition.Description)) { <HelpTooltip Text="@tool.Definition.Description" /> }</strong>
+                                    <small><code>@tool.Name</code></small>
+                                    <label class="tool-category-status @(usable ? "available" : assigned ? "warning" : "unavailable")" for="@inputId"><i></i>@Availability(tool)</label>
+                                </span>
+                            </div>
+                        }
+                        </div>
+                    }
+                </section>
+            }
+            @if (VisibleMissingMembers.Count > 0)
+            {
+                <section class="tool-category-provider missing-provider">
+                    <header class="tool-category-provider-header"><div class="tool-category-provider-identity"><span class="tool-category-provider-icon" aria-hidden="true"><TablerIcon Name="alert-triangle" /></span><span><small>@T("References")</small><strong>@T("MissingReferences")</strong></span></div></header>
+                    <div class="tool-category-members">
+                    @foreach (var missing in VisibleMissingMembers)
+                    {
+                        var inputId = ToolInputId(missing.Reference.Name);
+                        <div class="tool-category-member unavailable">
+                            <input id="@inputId" type="checkbox" checked @onchange="args => ToggleMissing(missing, (bool)args.Value!)" />
+                            <label class="tool-category-member-icon" for="@inputId" aria-hidden="true"><TablerIcon Name="tool" /></label>
+                            <span class="tool-category-member-copy"><strong>@missing.Reference.Name <HelpTooltip Text="@T("MissingMember")" /></strong><label class="tool-category-status warning" for="@inputId"><i></i>@T("Missing")</label></span>
+                        </div>
+                    }
+                    </div>
+                </section>
+            }
+            @if (!ProviderGroups.Any() && VisibleMissingMembers.Count == 0)
+            {
+                <p class="tool-category-no-results">@T("NoSearchResults")</p>
+            }
+        </div>
+    </section>
+    <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy">@(busy ? T("Saving") : T("Save"))</button></div>
+}
+
+@if (confirmDelete)
+{
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-category-title">
+        <h2 id="delete-category-title">@T("DeleteTitle")</h2><p>@T("DeleteExplanation")</p>
+        <div class="form-actions"><button class="button-secondary" @onclick="() => confirmDelete = false">@T("Cancel")</button><button class="button-danger" @onclick="DeleteAsync" disabled="@busy">@T("ConfirmDelete")</button></div>
+    </section>
+}
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private bool loading = true, busy, failed, confirmDelete;
+    private string name = "", displayName = "", description = "", search = "";
+    private string? etag, message;
+    private ResourceScopeRef? selectedScope;
+    private IReadOnlyList<ToolResource> tools = [];
+    private IReadOnlyList<ToolProviderResource> providers = [];
+    private IReadOnlyList<ToolCategoryMember> missingMembers = [];
+    private readonly HashSet<string> selected = new(StringComparer.Ordinal);
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private IEnumerable<ToolResource> FilteredTools => tools.Where(tool => string.IsNullOrWhiteSpace(search)
+        || tool.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+        || tool.Definition.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase)
+        || ProviderLabel(tool).Contains(search, StringComparison.OrdinalIgnoreCase));
+    private IReadOnlyList<ToolCategoryMember> VisibleMissingMembers => missingMembers.Where(member => string.IsNullOrWhiteSpace(search)
+        || member.Reference.Name.Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
+    private IReadOnlyList<ProviderToolGroup> ProviderGroups => BuildProviderGroups();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        try
+        {
+            var toolsTask = Tools.GetToolsAsync();
+            var providersTask = Tools.GetProvidersAsync(default);
+            await Task.WhenAll(toolsTask, providersTask);
+            tools = await toolsTask;
+            providers = await providersTask;
+            if (!IsNew)
+            {
+                var categoryTask = Categories.GetCategoryAsync(Name!);
+                var membersTask = Categories.GetMembersAsync(Name!);
+                await Task.WhenAll(categoryTask, membersTask);
+                var snapshot = await categoryTask;
+                var members = await membersTask;
+                name = snapshot.Value.Name;
+                displayName = snapshot.Value.Definition.DisplayName;
+                description = snapshot.Value.Definition.Description ?? "";
+                selectedScope = snapshot.Value.ScopeRef;
+                etag = snapshot.ETag;
+                selected.Clear();
+                foreach (var reference in snapshot.Value.Definition.Tools) selected.Add(ReferenceKey(reference));
+                missingMembers = members.Where(member => member.Tool is null).ToArray();
+            }
+        }
+        catch (Exception exception) { failed = true; message = exception.Message; }
+        finally { loading = false; }
+    }
+
+    private void Toggle(ToolResource tool, bool value) { if (value) selected.Add(ToolKey(tool)); else selected.Remove(ToolKey(tool)); }
+    private void ToggleMissing(ToolCategoryMember member, bool value) { if (value) selected.Add(ReferenceKey(member.Reference)); else selected.Remove(ReferenceKey(member.Reference)); }
+    private async Task SaveAsync()
+    {
+        busy = true; failed = false; message = null;
+        try
+        {
+            var properties = new ToolCategoryProperties { DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Tools = References() };
+            if (IsNew)
+            {
+                var saved = await Categories.CreateCategoryAsync(new(name.Trim(), properties, ScopeRef: selectedScope));
+                Navigation.NavigateTo($"/tools/categories/{Uri.EscapeDataString(saved.Value.Name)}");
+            }
+            else
+            {
+                var saved = await Categories.UpdateCategoryAsync(Name!, new(properties), etag!);
+                etag = saved.ETag;
+                message = T("Saved");
+            }
+        }
+        catch (Exception exception) { failed = true; message = exception.Message; }
+        finally { busy = false; }
+    }
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        try { await Categories.DeleteCategoryAsync(Name!, etag!); Navigation.NavigateTo("/tools/categories"); }
+        catch (Exception exception) { confirmDelete = false; failed = true; message = exception.Message; }
+        finally { busy = false; }
+    }
+    private IReadOnlyList<ResourceReference> References() => tools.Where(tool => selected.Contains(ToolKey(tool)))
+        .Select(tool => new ResourceReference(tool.Name, tool.ScopeRef, tool.Namespace)).Concat(missingMembers.Where(member => selected.Contains(ReferenceKey(member.Reference))).Select(member => member.Reference)).ToArray();
+    private string ProviderLabel(ToolResource tool) => providers.FirstOrDefault(provider => provider.Name == tool.Definition.Provider?.Name)?.Definition.DisplayName ?? tool.Definition.Provider?.Name ?? T("NoProvider");
+    private IReadOnlyList<ProviderToolGroup> BuildProviderGroups()
+    {
+        var visibleTools = FilteredTools.ToArray();
+        var groups = providers
+            .OrderBy(provider => provider.Definition.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+            .Select(provider => new ProviderToolGroup(provider, visibleTools.Where(tool => tool.Definition.Provider?.Name == provider.Name).OrderBy(tool => tool.Definition.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToArray()))
+            .Where(group => string.IsNullOrWhiteSpace(search) || group.Tools.Count > 0)
+            .ToList();
+        var providerNames = providers.Select(provider => provider.Name).ToHashSet(StringComparer.Ordinal);
+        var unassigned = visibleTools.Where(tool => tool.Definition.Provider is null || !providerNames.Contains(tool.Definition.Provider.Name)).OrderBy(tool => tool.Definition.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        if (unassigned.Length > 0) groups.Add(new ProviderToolGroup(null, unassigned));
+        return groups;
+    }
+    private int SelectedCount(ProviderToolGroup group) => group.Tools.Count(tool => selected.Contains(ToolKey(tool)));
+    private string ProviderDisplayName(ProviderToolGroup group) => group.Provider?.Definition.DisplayName ?? T("NoProvider");
+    private string ProviderTechnicalName(ProviderToolGroup group) => group.Provider?.Name ?? T("UnassignedTools");
+    private string ProviderKind(ProviderToolGroup group) => group.Provider?.Definition.ProviderType.ToString().ToUpperInvariant() ?? T("OtherTools");
+    private static string ProviderKey(ProviderToolGroup group) => group.Provider?.Name ?? "unassigned";
+    private string Availability(ToolResource tool) => T(Assignable(tool) ? "Available" : "Unavailable");
+    private static bool Assignable(ToolResource tool) => tool.Definition.Enabled && tool.Definition.Discovery?.Available == true;
+    private static string ToolKey(ToolResource tool) => $"{tool.ScopeRef?.Value}|{tool.Namespace.Value}|{tool.Name}";
+    private static string ReferenceKey(ResourceReference reference) => $"{reference.ScopeRef?.Value}|{(reference.Namespace ?? ResourceNamespace.Default).Value}|{reference.Name}";
+    private static string ToolUrl(string name) => $"/tools/{Uri.EscapeDataString(name)}";
+    private static string ProviderUrl(string name) => $"/tools/providers/{Uri.EscapeDataString(name)}";
+    private static string ToolInputId(string name) => $"category-tool-{Uri.EscapeDataString(name)}";
+    private sealed record ProviderToolGroup(ToolProviderResource? Provider, IReadOnlyList<ToolResource> Tools);
+}
