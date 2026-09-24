@@ -2,6 +2,9 @@ using Agentstration.Agents;
 using Agentstration.Application.Work;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
+using Agentstration.Packs;
+using Agentstration.Packs.Contracts;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Web.Security;
 using Agentstration.Work;
@@ -12,34 +15,41 @@ namespace Agentstration.Web;
 
 public static partial class WorkplaceEndpoints
 {
-    private static async Task<IResult> ListEntryDraftsAsync(EntryAdministrationService service, WorkplaceService workplace, CancellationToken token)
+    private static async Task<IResult> ListEntryDraftsAsync(EntryAdministrationService service, WorkplaceService workplace, PackManagementService packs, CancellationToken token)
     {
+        var installedPacks = await packs.ListAsync(token);
         var values = new List<EntryDraftResponse>();
         foreach (var draft in await service.ListAsync(token))
         {
             EntryResource? published = null;
             try { published = await workplace.GetEntryAsync(draft.Id, token); } catch (KeyNotFoundException) { }
-            values.Add(new EntryDraftResponse(draft, published));
+            values.Add(new EntryDraftResponse(draft, published, IsManagedByPack(draft.Id, installedPacks)));
         }
         return Results.Ok(values);
     }
 
-    private static Task<IResult> GetEntryDraftAsync(string entryName, EntryAdministrationService service, WorkplaceService workplace, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> GetEntryDraftAsync(string entryName, EntryAdministrationService service, WorkplaceService workplace, PackManagementService packs, CancellationToken token) => ExecuteAsync(async () =>
     {
         var draft = await service.GetAsync(EntryResourceId(entryName), token);
         EntryResource? published = null;
         try { published = await workplace.GetEntryAsync(draft.Id, token); } catch (KeyNotFoundException) { }
-        return Results.Ok(new EntryDraftResponse(draft, published));
+        return Results.Ok(new EntryDraftResponse(draft, published, IsManagedByPack(draft.Id, await packs.ListAsync(token))));
     });
 
-    private static Task<IResult> GetNamespacedEntryDraftAsync(string @namespace, string entryName, EntryAdministrationService service, WorkplaceService workplace, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> GetNamespacedEntryDraftAsync(string @namespace, string entryName, EntryAdministrationService service, WorkplaceService workplace, PackManagementService packs, CancellationToken token) => ExecuteAsync(async () =>
     {
         var id = NamespacedEntryId(@namespace, entryName);
         var draft = await service.GetAsync(id, token);
         EntryResource? published = null;
         try { published = await workplace.GetEntryAsync(id, token); } catch (KeyNotFoundException) { }
-        return Results.Ok(new EntryDraftResponse(draft, published));
+        return Results.Ok(new EntryDraftResponse(draft, published, IsManagedByPack(id, await packs.ListAsync(token))));
     });
+
+    private static bool IsManagedByPack(EntryId id, IReadOnlyList<StoredResource<InstalledPackResource>> packs) =>
+        packs.Any(pack => pack.Value.Definition.ManagedResources.Any(resource =>
+            string.Equals(resource.Kind, EntryResourceKinds.Entry, StringComparison.Ordinal)
+            && resource.Namespace == id.Namespace
+            && string.Equals(resource.Name, id.Value, StringComparison.Ordinal)));
 
     private static Task<IResult> PutEntryDraftAsync(string entryName, EntryDraft draft, EntryAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
     {
