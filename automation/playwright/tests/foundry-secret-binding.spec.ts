@@ -4,7 +4,7 @@ import { ProductPages } from '../src/pages/product.pages.js';
 import { test } from '../src/fixtures/test.js';
 
 const definition: ExerciseFoundrySecretBindingInput = {
-  workspaceName: 'playwright-campaign',
+  workspaceName: 'default',
   providerName: 'playwright-foundry',
   providerDisplayName: 'Playwright Foundry',
   secretValue: 'browser-fixture-secret-value',
