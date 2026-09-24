@@ -120,12 +120,39 @@ export class ConsoleAdministrationPage {
     await expect.poll(() => sidebarToggle.getAttribute('aria-expanded')).not.toBe(expanded);
     await sidebarToggle.click();
     await expect.poll(() => sidebarToggle.getAttribute('aria-expanded')).toBe(expanded);
-    await this.page.getByTestId(TestIds.console.commandTrigger).click();
-    await this.page.getByTestId(TestIds.console.commandPalette).waitFor({ state: 'visible' });
-    await this.page.getByTestId(TestIds.console.commandPalette).getByRole('option').first().waitFor({ state: 'visible' });
-    await this.page.keyboard.press('Escape');
-    await this.page.getByTestId(TestIds.console.commandPalette).waitFor({ state: 'detached' });
+    await this.openAndAssertCommandPalette();
     await this.page.getByTestId(TestIds.console.notificationsTrigger).click();
     await this.page.getByTestId(TestIds.console.notificationsPanel).waitFor({ state: 'visible' });
+  }
+
+  public async openAndAssertCommandPalette(): Promise<void> {
+    await this.page.getByTestId(TestIds.console.commandTrigger).click();
+    const palette = this.page.getByTestId(TestIds.console.commandPalette);
+    await palette.waitFor({ state: 'visible' });
+    const searchBox = palette.locator('.command-search-box');
+    const searchInput = palette.getByTestId(TestIds.console.commandInput);
+    const firstOption = palette.getByRole('option').first();
+    await expect(searchBox.locator('.ui-icon')).toBeVisible();
+    await expect(firstOption.locator('.command-icon')).toHaveAttribute('data-icon', 'home');
+    const [paletteBounds, searchBounds, inputBounds, optionBounds, inputStyle] = await Promise.all([
+      palette.boundingBox(),
+      searchBox.boundingBox(),
+      searchInput.boundingBox(),
+      firstOption.boundingBox(),
+      searchInput.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { borderLeftWidth: style.borderLeftWidth, boxShadow: style.boxShadow };
+      }),
+    ]);
+    expect(paletteBounds).not.toBeNull();
+    expect(searchBounds).not.toBeNull();
+    expect(inputBounds).not.toBeNull();
+    expect(optionBounds).not.toBeNull();
+    expect(paletteBounds!.width).toBeGreaterThan(620);
+    expect(Math.abs(searchBounds!.x - optionBounds!.x)).toBeLessThanOrEqual(1);
+    expect(inputBounds!.x + inputBounds!.width).toBeLessThanOrEqual(searchBounds!.x + searchBounds!.width);
+    expect(inputStyle).toEqual({ borderLeftWidth: '0px', boxShadow: 'none' });
+    await this.page.keyboard.press('Escape');
+    await this.page.getByTestId(TestIds.console.commandPalette).waitFor({ state: 'detached' });
   }
 }
