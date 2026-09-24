@@ -7,7 +7,7 @@ namespace Agentstration.Aep.Abstractions;
 
 public static class AepProtocol
 {
-    public const string Version = "2026-09-18";
+    public const string Version = "2026-09-22";
     public const string DiscoveryPath = "/.well-known/aep";
     public const string LegacyDiscoveryPath = "/.well-known/agentstration";
     public const string HealthPath = "/aep/health";
@@ -18,6 +18,7 @@ public static class AepProtocol
     public const string ValueRequirementsCapabilityVersion = "1.0";
     public const string BoundValuesCapabilityVersion = "1.0";
     public const string SecretAccessVersion = "1.0";
+    public const string ModelProviderCapabilityVersion = "2.0";
     public const string SecretAccessPath = "/api/aep/secrets/redeem";
 
     public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();
@@ -600,8 +601,149 @@ public sealed record AepModelProviderCapabilities(
 public sealed record AepModelDescriptor(
     string Id,
     string DisplayName,
-    IReadOnlyList<string>? Capabilities = null,
-    IReadOnlyDictionary<string, string>? Metadata = null);
+    AepModelSpecification? Specification = null,
+    AepModelIdentity? Identity = null);
+
+public sealed record AepModelIdentity(
+    string? Publisher = null,
+    string? Model = null,
+    string? Version = null);
+
+public enum AepModelContentType { Text, Image, Audio }
+public enum AepModelFeatureSupport { Unknown, Unsupported, Native, Emulated, Partial }
+public enum AepModelToolMode { Function, Parallel }
+public enum AepModelStructuredOutputFormat { JsonObject, JsonSchema }
+public enum AepModelReasoningEffort { None, Minimal, Low, Medium, High }
+
+public record AepModelFeatureSpecification
+{
+    public AepModelFeatureSupport Support { get; init; } = AepModelFeatureSupport.Unknown;
+}
+
+public sealed record AepModelStreamingFeatureSpecification : AepModelFeatureSpecification;
+public sealed record AepModelToolModeSpecification;
+
+public sealed record AepModelToolsFeatureSpecification : AepModelFeatureSpecification
+{
+    public IReadOnlyDictionary<AepModelToolMode, AepModelToolModeSpecification> Modes { get; init; }
+        = new Dictionary<AepModelToolMode, AepModelToolModeSpecification>();
+}
+
+public sealed record AepModelStructuredOutputFormatSpecification
+{
+    public bool? SupportsStrict { get; init; }
+}
+
+public sealed record AepModelStructuredOutputFeatureSpecification : AepModelFeatureSpecification
+{
+    public IReadOnlyDictionary<AepModelStructuredOutputFormat, AepModelStructuredOutputFormatSpecification> Formats { get; init; }
+        = new Dictionary<AepModelStructuredOutputFormat, AepModelStructuredOutputFormatSpecification>();
+}
+
+public sealed record AepModelReasoningEffortSpecification;
+
+public sealed record AepModelReasoningFeatureSpecification : AepModelFeatureSpecification
+{
+    public IReadOnlyDictionary<AepModelReasoningEffort, AepModelReasoningEffortSpecification> Efforts { get; init; }
+        = new Dictionary<AepModelReasoningEffort, AepModelReasoningEffortSpecification>();
+}
+
+public sealed record AepModelFeatureSpecifications
+{
+    public AepModelStreamingFeatureSpecification? Streaming { get; init; }
+    public AepModelToolsFeatureSpecification? Tools { get; init; }
+    public AepModelStructuredOutputFeatureSpecification? StructuredOutput { get; init; }
+    public AepModelReasoningFeatureSpecification? Reasoning { get; init; }
+}
+
+public sealed record AepModelLimits
+{
+    public long? ContextTokens { get; init; }
+    public long? MaxOutputTokens { get; init; }
+}
+
+public sealed record AepModelSpecification
+{
+    public IReadOnlyList<AepModelContentType>? Input { get; init; }
+    public IReadOnlyList<AepModelContentType>? Output { get; init; }
+    public AepModelFeatureSpecifications Features { get; init; } = new();
+    public AepModelLimits Limits { get; init; } = new();
+}
+
+public static class AepModelObservationValidator
+{
+    public const int MaximumModels = 1_000;
+    public const int MaximumIdentifierLength = 256;
+    public const int MaximumDisplayNameLength = 256;
+    public const int MaximumIdentityPartLength = 128;
+    public const long MaximumTokenLimit = 10_000_000_000;
+
+    public static string? FindIssue(IReadOnlyList<AepModelDescriptor> models)
+    {
+        ArgumentNullException.ThrowIfNull(models);
+        if (models.Count > MaximumModels) return "The model observation exceeds the model count limit.";
+        if (models.Any(model => model is null)) return "A model observation entry is required.";
+        if (models.Select(model => model.Id).Distinct(StringComparer.Ordinal).Count() != models.Count)
+            return "Model observation identifiers must be unique.";
+        foreach (var model in models)
+        {
+            if (!IsSafeRequired(model.Id, MaximumIdentifierLength)) return "A model observation identifier is invalid.";
+            if (!IsSafeRequired(model.DisplayName, MaximumDisplayNameLength)) return "A model observation display name is invalid.";
+            if (!IsSafeOptional(model.Identity?.Publisher, MaximumIdentityPartLength)
+                || !IsSafeOptional(model.Identity?.Model, MaximumIdentityPartLength)
+                || !IsSafeOptional(model.Identity?.Version, MaximumIdentityPartLength))
+                return "A model observation identity is invalid.";
+            if (FindSpecificationIssue(model.Specification) is { } issue) return issue;
+        }
+        return null;
+    }
+
+    public static string? FindSpecificationIssue(AepModelSpecification? specification)
+    {
+        if (specification is null) return null;
+        if (specification.Features is null || specification.Limits is null)
+            return "Model observation features and limits are required objects.";
+        if (!IsDistinctAndBounded(specification.Input) || !IsDistinctAndBounded(specification.Output))
+            return "Model observation content types must be unique and bounded.";
+        if (specification.Limits.ContextTokens is <= 0 or > MaximumTokenLimit
+            || specification.Limits.MaxOutputTokens is <= 0 or > MaximumTokenLimit)
+            return "Model observation limits must be positive and bounded.";
+        if (!IsSupport(specification.Features.Streaming)
+            || !IsSupport(specification.Features.Tools)
+            || !IsSupport(specification.Features.StructuredOutput)
+            || !IsSupport(specification.Features.Reasoning))
+            return "A model observation feature support value is invalid.";
+        if (!IsBounded(specification.Features.Tools?.Modes)
+            || !IsBounded(specification.Features.StructuredOutput?.Formats)
+            || !IsBounded(specification.Features.Reasoning?.Efforts))
+            return "Model observation feature details exceed their limit.";
+        if (HasDetailsWhenUnsupported(specification.Features.Tools?.Support, specification.Features.Tools?.Modes?.Count)
+            || HasDetailsWhenUnsupported(specification.Features.StructuredOutput?.Support, specification.Features.StructuredOutput?.Formats?.Count)
+            || HasDetailsWhenUnsupported(specification.Features.Reasoning?.Support, specification.Features.Reasoning?.Efforts?.Count))
+            return "An unsupported model feature cannot publish supported details.";
+        return null;
+    }
+
+    private static bool IsSafeRequired(string? value, int maximum) =>
+        value is { Length: > 0 } && value.Length <= maximum && value == value.Trim() && !value.Any(char.IsControl);
+
+    private static bool IsSafeOptional(string? value, int maximum) =>
+        value is null || IsSafeRequired(value, maximum);
+
+    private static bool IsDistinctAndBounded<T>(IReadOnlyList<T>? values) where T : struct, Enum =>
+        values is null || values.Count <= 16 && values.Count == values.Distinct().Count()
+            && values.All(Enum.IsDefined);
+
+    private static bool IsBounded<TKey, TValue>(IReadOnlyDictionary<TKey, TValue>? values)
+        where TKey : struct, Enum where TValue : class =>
+        values is null || values.Count <= 16 && values.All(value => Enum.IsDefined(value.Key) && value.Value is not null);
+
+    private static bool IsSupport(AepModelFeatureSpecification? feature) =>
+        feature is null || Enum.IsDefined(feature.Support);
+
+    private static bool HasDetailsWhenUnsupported(AepModelFeatureSupport? support, int? count) =>
+        support == AepModelFeatureSupport.Unsupported && count > 0;
+}
 
 public sealed record AepProviderHealth(string Status, string? Details = null);
 
@@ -647,7 +789,8 @@ public sealed record AepChatRequest(
     AepModelOptions? Options = null,
     IReadOnlyList<AepToolDefinition>? Tools = null,
     IReadOnlyDictionary<string, JsonElement>? Metadata = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepBoundValue>? BoundValues = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepBoundValue>? BoundValues = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AepModelSpecification? EffectiveSpecification = null);
 
 public sealed record AepUsage(long? InputTokens = null, long? OutputTokens = null, long? TotalTokens = null);
 

@@ -67,6 +67,7 @@ public static class ConsoleHostServiceCollectionExtensions
         AddClient<IdentityAdministrationApiClient, IIdentityAdministrationApiClient>(services, configured.ManagementApi);
         AddClient<HttpUserPreferencesClient, IUserPreferencesClient>(services, configured.ManagementApi, resilient: false);
         AddClient<ModelProvidersApiClient, IModelProvidersClient>(services, configured.ManagementApi);
+        AddClient<ModelsApiClient, IModelsClient>(services, configured.ManagementApi);
         AddClient<ExtensionsApiClient, IExtensionsClient>(services, configured.ManagementApi);
         AddClient<SourceConsoleApiClient, ISourceConsoleApiClient>(services, configured.ManagementApi);
         AddClient<SourceProvidersApiClient, ISourceProvidersClient>(services, configured.ManagementApi);

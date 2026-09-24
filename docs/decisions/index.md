@@ -165,3 +165,7 @@ Use **Proposed** when implementation or repository evidence does not establish a
 133. [ADR-0133 — Foundry provider Secret binding covers discovery](0133-foundry-provider-secret-binding-covers-discovery.md)
 134. [ADR-0134 — Foundry connections are provider-owned AEP values](0134-foundry-connections-are-provider-owned-aep-values.md)
 135. [ADR-0135 — Work conversations and tasks are principal-owned](0135-work-conversations-and-tasks-are-principal-owned.md)
+136. [ADR-0136 — Model specifications are typed and resolved deterministically](0136-model-specifications-are-typed-and-resolved-deterministically.md)
+137. [ADR-0137 — AEP publishes bounded typed Model observations](0137-aep-publishes-bounded-typed-model-observations.md)
+138. [ADR-0138 — Provider discovery reconciles governed Model resources](0138-provider-discovery-reconciles-governed-model-resources.md)
+139. [ADR-0139 — Model Providers own exact Model specification overrides](0139-model-providers-own-exact-model-specification-overrides.md)

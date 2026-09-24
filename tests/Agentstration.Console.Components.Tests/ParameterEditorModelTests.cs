@@ -53,4 +53,54 @@ public sealed class ParameterEditorModelTests
         Assert.AreEqual(secretScope, bindings[1].Secret!.ScopeRef);
         Assert.AreEqual("api-key", bindings[1].Secret!.Address.Name);
     }
+
+    [TestMethod]
+    public void ModelProviderEditorRoundTripPreservesSpecificationOverrides()
+    {
+        var resource = new ModelProviderResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ModelResourceKinds.ModelProvider,
+            Metadata = new ResourceMetadata { Name = "provider", Namespace = ResourceNamespace.Default },
+            Definition = new ModelProviderProperties
+            {
+                DisplayName = "Provider",
+                Extension = new ResourceReference("extension"),
+                ContributionId = "provider",
+                SpecificationOverrides = new Dictionary<string, ModelSpecificationOverride>(StringComparer.Ordinal)
+                {
+                    ["exact-model"] = new() { Limits = new ModelLimitOverrides { ContextTokens = 8_192 } }
+                }
+            }
+        };
+
+        var properties = ModelProviderEditorModel.FromResource(resource).ToProperties();
+
+        Assert.AreEqual(8_192, properties.SpecificationOverrides["exact-model"].Limits.ContextTokens);
+    }
+
+    [TestMethod]
+    public void ModelSpecificationOverrideEditorRoundTripsTypedOperations()
+    {
+        var editor = new ModelSpecificationOverrideEditorModel
+        {
+            ToolsSupport = ModelFeatureSupport.Native,
+            ContextTokens = 32_000
+        };
+        editor.Input[ModelContentType.Image] = ModelOverrideOperation.Add;
+        editor.Output[ModelContentType.Audio] = ModelOverrideOperation.Remove;
+        editor.ToolModes[ModelToolMode.Parallel] = ModelOverrideOperation.Add;
+        editor.OutputFormats[ModelStructuredOutputFormat.JsonSchema] = ModelOverrideOperation.Add;
+        editor.OutputFormatStrict[ModelStructuredOutputFormat.JsonSchema] = true;
+        editor.ReasoningEfforts[ReasoningEffort.High] = ModelOverrideOperation.Remove;
+
+        var roundTrip = ModelSpecificationOverrideEditorModel.From(editor.ToOverride());
+
+        Assert.AreEqual(ModelOverrideOperation.Add, roundTrip.Input[ModelContentType.Image]);
+        Assert.AreEqual(ModelOverrideOperation.Remove, roundTrip.Output[ModelContentType.Audio]);
+        Assert.AreEqual(ModelOverrideOperation.Add, roundTrip.ToolModes[ModelToolMode.Parallel]);
+        Assert.AreEqual(true, roundTrip.OutputFormatStrict[ModelStructuredOutputFormat.JsonSchema]);
+        Assert.AreEqual(ModelOverrideOperation.Remove, roundTrip.ReasoningEfforts[ReasoningEffort.High]);
+        Assert.AreEqual(32_000, roundTrip.ContextTokens);
+    }
 }

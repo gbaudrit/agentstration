@@ -5,6 +5,10 @@
   <data name="CreateProvider"><value>Créer un fournisseur de modèles</value></data>
   <data name="ModelProvider"><value>Fournisseur de modèles</value></data>
   <data name="Description"><value>Liez une contribution d’extension AEP à une ressource gouvernée de fournisseur de modèles.</value></data>
+  <data name="Tab.Overview"><value>Vue d’ensemble</value></data>
+  <data name="Tab.Configuration"><value>Configuration</value></data>
+  <data name="ProviderSummary"><value>Synthèse du fournisseur de modèles</value></data>
+  <data name="UsagesHelp"><value>Profils actuellement liés à ce fournisseur</value></data>
   <data name="Delete"><value>Supprimer</value></data>
   <data name="CreateModelProfile"><value>Créer un profil de modèle</value></data>
   <data name="Back"><value>Retour</value></data>
@@ -38,10 +42,16 @@
   <data name="SaveChanges"><value>Enregistrer les modifications</value></data>
   <data name="Discovery"><value>Découverte</value></data>
   <data name="AvailableModels"><value>Modèles disponibles</value></data>
+  <data name="RefreshModels"><value>Actualiser les modèles</value></data>
+  <data name="RefreshingModels"><value>Actualisation…</value></data>
+  <data name="DiscoverySummary"><value>{0} créé(s) · {1} mis à jour · {2} inchangé(s) · {3} absent(s) · {4} réapparu(s) · {5} au total</value></data>
+  <data name="InitialDiscoveryComplete"><value>Découverte initiale des modèles terminée</value></data>
+  <data name="InitialDiscoveryFailed"><value>Fournisseur créé ; échec de la découverte initiale</value></data>
+  <data name="DiscoveryRefreshed"><value>Découverte des modèles actualisée</value></data>
   <data name="ModelCount.One"><value>{0} modèle</value></data>
   <data name="ModelCount.Many"><value>{0} modèles</value></data>
   <data name="NoModelsDiscovered"><value>Aucun modèle découvert</value></data>
-  <data name="NoModelsMessage"><value>Testez le point de terminaison et vérifiez qu’un modèle est disponible chez le fournisseur.</value></data>
+  <data name="NoModelsMessage"><value>Actualisez la découverte et vérifiez qu’un modèle installé est disponible chez le fournisseur.</value></data>
   <data name="Model"><value>Modèle</value></data>
   <data name="Actions"><value>Actions</value></data>
   <data name="CreateProfileForModel"><value>Créer un profil</value></data>
@@ -63,4 +73,6 @@
   <data name="Status.Failed"><value>Échec</value></data>
   <data name="Status.Unknown"><value>Inconnu</value></data>
 <data name="ConfigurationValues"><value>Valeurs de configuration</value></data><data name="ValueBindings"><value>Liaisons de valeurs</value></data><data name="ValueBindingsHelp"><value>Liez chaque exigence AEP à une ressource de portée exacte. Les valeurs sont revérifiées par le serveur à l’enregistrement et à l’utilisation.</value></data><data name="Required"><value>Obligatoire</value></data><data name="Optional"><value>Facultatif</value></data><data name="Protection.Standard"><value>Standard</value></data><data name="Protection.Secured"><value>Sécurisée</value></data><data name="ExpectedType"><value>Type attendu</value></data><data name="ExpectedFormat"><value>Format</value></data><data name="ValueSource"><value>Source de valeur</value></data><data name="Source.Parameter"><value>Paramètre</value></data><data name="Source.Secret"><value>Secret</value></data><data name="ExactResource"><value>Ressource de portée exacte</value></data><data name="SelectValueSource"><value>Sélectionner une ressource</value></data><data name="CreateParameter"><value>Créer un paramètre</value></data><data name="CreateSecret"><value>Créer un secret</value></data><data name="UnavailableSelection"><value>Indisponible — {0}/{1}/{2}</value></data><data name="RequiredBindingMissing"><value>Cette valeur obligatoire doit être liée avant d’enregistrer le fournisseur.</value></data><data name="SecretValueHidden"><value>La valeur du secret reste en écriture seule et n’est jamais chargée dans la Console.</value></data>
+  <data name="Input"><value>Entrées</value></data>
+  <data name="Output"><value>Sorties</value></data>
 </root>

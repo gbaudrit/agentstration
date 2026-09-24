@@ -206,6 +206,8 @@ docker compose -f deploy/compose/ollama.yml up --build
 
 The normal `Managed` mode resolves the provider, extension registration, endpoint, and model from the persisted Model Profile and Model Provider selected on each agent. It is the default for direct Web and Aspire launches; concrete provider names are never host execution modes. The seeded `ollama-local`, `llama-cpp-local`, and `localai-local` providers reference extension registrations whose URLs are AEP endpoints, never native inference-server URLs.
 
+The Model Provider inventory links every retained observation to a responsive Model detail page. Creating a provider from the Console persists the declaration and immediately attempts initial model discovery; failure leaves the declaration available for correction or retry. Provider details expose an explicit refresh action with created, updated, unchanged, missing, reappeared, and total counts. The Model detail overview presents provider identity, reconciliation freshness, modalities, feature support, known limits and explicit observed-versus-effective provenance. The secondary YAML tab copies the deterministic canonical persisted `Model` resource; computed effective values are deliberately not written into that document. Missing and failed observations remain readable, and these GET-driven views never trigger provider discovery.
+
 Use the deterministic offline mode explicitly for tests or fallback diagnostics:
 
 ```powershell
@@ -267,12 +269,14 @@ Current limitations are deliberate: credentials are not stored on provider resou
 
 ### Model provider and profile APIs
 
-Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and dynamic model discovery. Model Profile resolution exposes provider/model/adapter capability levels, their effective intersection, and profile-option incompatibilities before execution. Runtime and agent-tool compatibility remains an execution-resolution concern. Aspire starts the AEP extensions and supplies their initial seed URLs, but relies on configured local inference servers and remains outside the provider source of truth:
+Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and explicit model discovery. Discovery reconciles governed provider-owned `Model` resources; GET requests read the retained inventory without contacting the provider. A provider can retain bounded per-model `specificationOverrides` keyed by exact external model identifier. Provider inventory and Model Profile resolution expose observed, override, and effective model specifications separately. The effective model capability level is intersected with provider, adapter, and runtime support, so an override cannot elevate explicit unsupported support or bypass Tool governance. Model Profile resolution exposes those capability levels and profile-option incompatibilities before execution. Runtime and agent-tool compatibility remains an execution-resolution concern. Aspire starts the AEP extensions and supplies their initial seed URLs, but relies on configured local inference servers and remains outside the provider source of truth:
 
 ```powershell
 Invoke-RestMethod http://localhost:5100/api/modelproviders
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/status
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/models
+Invoke-RestMethod -Method Post http://localhost:5100/api/modelproviders/ollama-local/models/refresh
+Invoke-RestMethod http://localhost:5100/api/models
 Invoke-RestMethod -Method Post http://localhost:5100/api/modelproviders/ollama-local/test
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/usages
 Invoke-RestMethod http://localhost:5100/api/modelproviders/llama-cpp-local/status
@@ -281,7 +285,7 @@ Invoke-RestMethod http://localhost:5100/api/modelproviders/localai-local/status
 Invoke-RestMethod http://localhost:5100/api/modelproviders/localai-local/models
 ```
 
-Create or edit Ollama, llama.cpp, and LocalAI extension registrations from the Blazor console at `/extensions`, then bind their model-provider contributions at `/modelproviders`. Extension URLs must be absolute HTTP(S) AEP endpoints without embedded credentials, query strings, or fragments. Saving a provider does not require its native inference server to be online; health and installed models remain observed state. LocalAI discovery requires `/v1/models/capabilities` and filters non-chat models. Deleting a provider is rejected while a model profile references its exact resource ID.
+Create or edit Ollama, llama.cpp, and LocalAI extension registrations from the Blazor console at `/extensions`, then bind their model-provider contributions at `/modelproviders`. Extension URLs must be absolute HTTP(S) AEP endpoints without embedded credentials, query strings, or fragments. Console creation attempts discovery after the provider is durably saved, while the detail page can refresh it later. The native inference server therefore does not have to be online to retain the provider declaration; a failed initial attempt is surfaced as a warning. LocalAI discovery requires `/v1/models/capabilities` and filters non-chat models. Deleting a provider is rejected while a model profile references its exact resource ID.
 
 Model profiles are durable Management Plane resources with ETag concurrency and usage protection:
 

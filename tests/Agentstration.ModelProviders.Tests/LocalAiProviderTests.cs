@@ -125,10 +125,13 @@ public sealed class LocalAiProviderTests
         var model = (await new LocalAiAepModelProvider(client).ListModelsAsync()).Single();
 
         Assert.AreEqual("chat-model", model.Id);
-        CollectionAssert.AreEquivalent(new[] { "chat", "streaming", "tools", "reasoning" }, model.Capabilities!.ToArray());
-        Assert.AreEqual("text,image", model.Metadata?["inputModalities"]);
-        CollectionAssert.DoesNotContain(model.Capabilities!.ToArray(), "vision");
-        CollectionAssert.DoesNotContain(model.Capabilities!.ToArray(), "structuredOutput");
+        CollectionAssert.AreEquivalent(
+            new[] { AepModelContentType.Text, AepModelContentType.Image },
+            model.Specification!.Input!.ToArray());
+        Assert.AreEqual(AepModelFeatureSupport.Native, model.Specification.Features.Streaming!.Support);
+        Assert.AreEqual(AepModelFeatureSupport.Native, model.Specification.Features.Tools!.Support);
+        Assert.AreEqual(AepModelFeatureSupport.Native, model.Specification.Features.Reasoning!.Support);
+        Assert.AreEqual(AepModelFeatureSupport.Unsupported, model.Specification.Features.StructuredOutput!.Support);
     }
 
     [TestMethod]

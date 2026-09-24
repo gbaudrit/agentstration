@@ -160,6 +160,7 @@
     <Project Path="tests/Agentstration.SourceProviders.Git.Tests/Agentstration.SourceProviders.Git.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Models/">
+    <Project Path="tests/Agentstration.Models.Tests/Agentstration.Models.Tests.csproj" />
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Resources/">

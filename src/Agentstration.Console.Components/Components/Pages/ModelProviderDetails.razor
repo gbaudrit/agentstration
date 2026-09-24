@@ -19,6 +19,16 @@ else
 {
     @if (error is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>@T("ProviderError")</strong><span>@error.Message</span></div> }
     @if (usages.Count > 0) { <div class="form-alert form-alert-warning">@T("ProviderReferencedBy", ProfileCount(usages.Count))</div> }
+    @if (!IsNew)
+    {
+        <nav class="section-tabs model-provider-tabs" role="tablist" aria-label="@T("ModelProvider")">
+            <button id="model-provider-overview-tab" type="button" role="tab" aria-selected="@(activeTab == ProviderTab.Overview ? "true" : "false")" aria-controls="model-provider-tab-panel" class="@(activeTab == ProviderTab.Overview ? "active" : null)" @onclick="() => activeTab = ProviderTab.Overview">@T("Tab.Overview")</button>
+            <button id="model-provider-configuration-tab" type="button" role="tab" aria-selected="@(activeTab == ProviderTab.Configuration ? "true" : "false")" aria-controls="model-provider-tab-panel" class="@(activeTab == ProviderTab.Configuration ? "active" : null)" @onclick="() => activeTab = ProviderTab.Configuration" data-testid="model-provider-configuration-tab">@T("Tab.Configuration")</button>
+        </nav>
+    }
+    <div id="model-provider-tab-panel" role="tabpanel" aria-labelledby="@(activeTab == ProviderTab.Configuration ? "model-provider-configuration-tab" : "model-provider-overview-tab")">
+    @if (IsNew || activeTab == ProviderTab.Configuration)
+    {
     <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-provider-editor" class="resource-form" data-testid="model-provider-form" data-interactive="@(interactive ? "true" : "false")" data-resource-etag="@etag">
         <DataAnnotationsValidator /><ValidationSummary />
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ProviderResource")</h2></div>@if (status is not null) { <StatusBadge Text="@StatusLabel(status.Status)" Status="@ModelManagementUi.Status(status.Status)" /> }</div><div class="form-grid">
@@ -54,16 +64,25 @@ else
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Connection")</p><h2>@T("ExtensionOwnedEndpoint")</h2><p>@T("ConnectionHelp")</p></div>@if (!IsNew) { <button class="button-secondary" type="button" @onclick="TestAsync" disabled="@testing" data-testid="model-provider-test">@(testing ? T("Testing") : T("TestConnection"))</button> }</div>@if (SelectedExtension is { } selected) { <dl class="resource-details"><dt>@T("AepEndpoint")</dt><dd><code>@selected.Endpoint</code></dd><dt>@T("ExtensionId")</dt><dd><code>@(selected.Extension?.Id ?? T("NotObserved"))</code></dd><dt>@T("Source")</dt><dd>@selected.DiscoverySource</dd></dl> }@if (status is not null) { <p class="@(status.Status == "available" ? "inline-info" : "inline-warning")" data-testid="model-provider-status" data-checked-at="@status.CheckedAt.ToString("O")">@T("LastTest", status.CheckedAt.ToLocalTime().ToString("g")) : @StatusLabel(status.Status)@if (!string.IsNullOrWhiteSpace(status.Details)) { <span> — @status.Details</span> }</p> }</section>
         <div class="form-actions"><a class="button-secondary" href="/modelproviders">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving" data-testid="model-provider-save">@(saving ? T("Saving") : IsNew ? T("CreateProviderAction") : T("SaveChanges"))</button></div>
     </EditForm>
+    }
 
-    @if (!IsNew)
+    @if (!IsNew && activeTab == ProviderTab.Overview)
     {
-        <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">@T("Discovery")</p><h2>@T("AvailableModels")</h2></div><span>@ModelCount(models.Count)</span></div>
+        <section class="metric-grid model-provider-summary" aria-label="@T("ProviderSummary")">
+            <MetricCard Label="@T("Status")" Value="@(status is null ? T("Status.Unknown") : StatusLabel(status.Status))" Detail="@(status is null ? T("NotObserved") : T("LastTest", status.CheckedAt.ToLocalTime().ToString("g")))" Status="@(status is null ? UiStatus.Neutral : ModelManagementUi.Status(status.Status))" />
+            <MetricCard Label="@T("AvailableModels")" Value="@ModelCount(models.Count)" Detail="@T("Discovery")" Status="@(models.Count > 0 ? UiStatus.Success : UiStatus.Neutral)" />
+            <MetricCard Label="@T("ModelProfileUsages")" Value="@ProfileCount(usages.Count)" Detail="@T("UsagesHelp")" Status="@(usages.Count > 0 ? UiStatus.Info : UiStatus.Neutral)" />
+            <MetricCard Label="@T("ModelProviderContribution")" Value="@model.ContributionId" Detail="@model.ExtensionId" Status="UiStatus.Info" />
+        </section>
+        <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">@T("Discovery")</p><h2>@T("AvailableModels")</h2></div><div class="model-discovery-actions"><span>@ModelCount(models.Count)</span><button class="button-secondary" type="button" @onclick="RefreshModelsAsync" disabled="@refreshing" data-testid="model-provider-refresh">@(refreshing ? T("RefreshingModels") : T("RefreshModels"))</button></div></div>
             @if (modelsError is not null) { <div class="form-alert form-alert-warning">@modelsError</div> }
-            else if (models.Count == 0) { <EmptyState Title="@T("NoModelsDiscovered")" Message="@T("NoModelsMessage")" /> }
-            else { <DataGrid TItem="AvailableModelResponse" Items="models"><Header><tr><th>@T("Model")</th><th>@T("Status")</th><th>@T("Capabilities")</th><th>@T("Parameters")</th><th>@T("Quantization")</th><th>@T("Actions")</th></tr></Header><Row Context="item"><tr><td><strong>@item.DisplayName</strong><br /><code>@item.Name</code></td><td><StatusBadge Text="@StatusLabel(item.Status)" Status="@ModelManagementUi.Status(item.Status)" /></td><td>@(item.Capabilities.Count == 0 ? T("NotReported") : string.Join(" · ", item.Capabilities))</td><td>@Metadata(item, "parameterSize")</td><td>@Metadata(item, "quantization")</td><td>@if (string.Equals(item.Status, "available", StringComparison.OrdinalIgnoreCase)) { <a class="text-button" href="@CreateModelProfileUrl(item.Name)" data-testid="create-profile-for-model">@T("CreateProfileForModel")</a> }</td></tr></Row></DataGrid> }
+            @if (discoveryResult is not null) { <div class="form-alert form-alert-success" role="status" data-testid="model-discovery-result">@DiscoverySummary(discoveryResult)</div> }
+            @if (models.Count == 0) { <EmptyState Title="@T("NoModelsDiscovered")" Message="@T("NoModelsMessage")" /> }
+            else { <DataGrid TItem="AvailableModelResponse" Items="models"><Header><tr><th>@T("Model")</th><th>@T("Status")</th><th>@T("Capabilities")</th><th>@T("Input")</th><th>@T("Output")</th><th>@T("Actions")</th></tr></Header><Row Context="item"><tr><td>@if (!string.IsNullOrWhiteSpace(item.ResourceName)) { <a class="text-button model-details-link" href="@ModelDetailsUrl(item)" data-testid="open-model-details"><strong>@item.DisplayName</strong></a> } else { <strong>@item.DisplayName</strong> }<br /><code>@item.Name</code></td><td><StatusBadge Text="@StatusLabel(item.Status)" Status="@ModelManagementUi.Status(item.Status)" /></td><td>@Features(item)</td><td>@ContentTypes(item.Specification.Input)</td><td>@ContentTypes(item.Specification.Output)</td><td>@if (string.Equals(item.Status, "available", StringComparison.OrdinalIgnoreCase)) { <a class="text-button" href="@CreateModelProfileUrl(item.Name)" data-testid="create-profile-for-model">@T("CreateProfileForModel")</a> }</td></tr></Row></DataGrid> }
         </section>
         @if (usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>@T("ModelProfileUsages")</h2><span>@usages.Count</span></div><ul class="resource-links">@foreach (var usage in usages) { <li><a href="@ProfileUrl(usage)"><strong>@usage.DisplayName</strong><code>@usage.Name</code></a></li> }</ul></section> }
     }
+    </div>
 }
 
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" TestId="model-provider-delete-dialog" />
@@ -84,12 +103,14 @@ else
     private readonly CancellationTokenSource cancellation = new();
     private ModelProviderEditorModel? model; private IReadOnlyList<ModelProviderUsageResponse> usages = []; private IReadOnlyList<AvailableModelResponse> models = []; private IReadOnlyList<ExtensionResponse> extensions = [];
     private IReadOnlyList<ParameterResource> parameters = []; private IReadOnlyList<SecretResponse> secrets = [];
-    private ModelProviderStatusResponse? status; private AgentstrationApiException? error; private string? modelsError; private string? etag; private bool saving; private bool testing; private bool confirmDelete;
+    private ModelProviderStatusResponse? status; private ModelDiscoveryDiffResponse? discoveryResult; private AgentstrationApiException? error; private string? modelsError; private string? etag; private bool saving; private bool testing; private bool refreshing; private bool confirmDelete;
     private ModelProviderValueBindingEditorModel? creationBinding;
     private ContextualValueCreationContext? creationContext;
     private ResourceScopeRef? selectedScope;
     private bool interactive;
-    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private bool persisted;
+    private ProviderTab activeTab;
+    private bool IsNew => !persisted;
     private ExtensionResponse? SelectedExtension => model is null ? null : extensions.SingleOrDefault(value => ExtensionKey(value) == model.ExtensionId);
     private IReadOnlyList<ExtensionContributionResponse> Contributions => SelectedExtension?.Contributions.Where(value => value.Kind == "model-provider").ToArray() ?? [];
     private IReadOnlyList<ExtensionValueRequirementResponse> Requirements => (SelectedExtension?.ValueRequirements ?? [])
@@ -97,14 +118,48 @@ else
     private IReadOnlyList<ParameterResource> AvailableParameters => parameters.Where(CanUse).ToArray();
     private IReadOnlyList<SecretResponse> AvailableSecrets => secrets.Where(value => value.ValueConfigured && CanUse(value.Resource)).ToArray();
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
-    protected override Task OnParametersSetAsync() => LoadAsync();
+    protected override Task OnParametersSetAsync()
+    {
+        persisted = !string.IsNullOrWhiteSpace(Name);
+        return LoadAsync();
+    }
     protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
     private async Task LoadAsync() { error = null; modelsError = null; try { extensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token); parameters = await ParametersClient.GetParametersAsync(cancellation.Token); secrets = await SecretsClient.GetSecretsAsync(cancellation.Token); if (IsNew) { var extensionNamespace = SuggestedExtensionNamespace ?? SelectedNamespace.Value; model = new ModelProviderEditorModel { Namespace = SelectedNamespace.Value, ExtensionId = string.IsNullOrWhiteSpace(SuggestedExtension) ? string.Empty : $"{extensionNamespace}:{SuggestedExtension}", ContributionId = SuggestedContributionId ?? string.Empty, DisplayName = SuggestedDisplayName ?? string.Empty }; SyncBindings(); return; } var snapshot = await Client.GetModelProviderAsync(SelectedNamespace, Name!, cancellation.Token); model = ModelProviderEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag; usages = (await Client.GetModelProviderUsagesAsync(SelectedNamespace, Name!, cancellation.Token)).Value; SyncBindings(); await LoadObservedAsync(); } catch (AgentstrationApiException exception) { error = exception; model ??= new ModelProviderEditorModel { Namespace = SelectedNamespace.Value }; } }
     private void ExtensionChanged(ChangeEventArgs args) { if (model is null) return; model.ExtensionId = args.Value?.ToString() ?? string.Empty; if (!Contributions.Any(value => value.Id == model.ContributionId)) model.ContributionId = Contributions.Count == 1 ? Contributions[0].Id : string.Empty; SyncBindings(); }
     private void ContributionChanged(ChangeEventArgs args) { if (model is null) return; model.ContributionId = args.Value?.ToString() ?? string.Empty; SyncBindings(); }
-    private async Task LoadObservedAsync() { if (model is null) return; var @namespace = ResourceNamespace.Parse(model.Namespace); try { status = await Client.GetProviderStatusAsync(@namespace, model.Name, cancellation.Token); if (status.Status == "available") models = await Client.GetProviderModelsAsync(@namespace, model.Name, cancellation.Token); else models = []; } catch (AgentstrationApiException exception) { modelsError = exception.Message; models = []; } }
-    private async Task SaveAsync() { if (model is null || saving) return; saving = true; error = null; try { var wasNew = IsNew; var @namespace = ResourceNamespace.Parse(model.Namespace); var snapshot = wasNew ? await Client.CreateModelProviderAsync(model.ToCreateRequest() with { ScopeRef = selectedScope }, cancellation.Token) : await Client.UpdateModelProviderAsync(@namespace, model.Name, model.ToPutRequest(), etag!, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), wasNew ? T("CreatedNotification") : T("UpdatedNotification"), snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success)); if (wasNew) { Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name)); } else { model = ModelProviderEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag; await LoadObservedAsync(); } } catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); } catch (AgentstrationApiException exception) { error = exception; } finally { saving = false; } }
+    private async Task LoadObservedAsync() { if (model is null) return; var @namespace = ResourceNamespace.Parse(model.Namespace); try { status = await Client.GetProviderStatusAsync(@namespace, model.Name, cancellation.Token); models = await Client.GetProviderModelsAsync(@namespace, model.Name, cancellation.Token); } catch (AgentstrationApiException exception) { modelsError = exception.Message; models = []; } }
+    private async Task SaveAsync() { if (model is null || saving) return; saving = true; error = null; try { var wasNew = IsNew; var @namespace = ResourceNamespace.Parse(model.Namespace); var snapshot = wasNew ? await Client.CreateModelProviderAsync(model.ToCreateRequest() with { ScopeRef = selectedScope }, cancellation.Token) : await Client.UpdateModelProviderAsync(@namespace, model.Name, model.ToPutRequest(), etag!, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), wasNew ? T("CreatedNotification") : T("UpdatedNotification"), snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success)); model = ModelProviderEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag; if (wasNew) { discoveryResult = await DiscoverAfterCreationAsync(snapshot.Value); await LoadObservedAsync(); Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name)); model = ModelProviderEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag; persisted = true; } else { await LoadObservedAsync(); } } catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); } catch (AgentstrationApiException exception) { error = exception; } finally { saving = false; } }
     private async Task TestAsync() { if (model is null || testing) return; testing = true; error = null; try { status = await Client.TestProviderAsync(ResourceNamespace.Parse(model.Namespace), model.Name, cancellation.Token); await LoadObservedAsync(); } catch (AgentstrationApiException exception) { error = exception; } finally { testing = false; } }
+    private async Task<ModelDiscoveryDiffResponse?> DiscoverAfterCreationAsync(ModelProviderResource created)
+    {
+        try
+        {
+            var result = await Client.RefreshProviderModelsAsync(created.Namespace, created.Name, cancellation.Token);
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("InitialDiscoveryComplete"), DiscoverySummary(result), DateTimeOffset.Now, UiStatus.Success));
+            return result;
+        }
+        catch (AgentstrationApiException exception)
+        {
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("InitialDiscoveryFailed"), exception.Message, DateTimeOffset.Now, UiStatus.Warning));
+            return null;
+        }
+    }
+    private async Task RefreshModelsAsync()
+    {
+        if (model is null || refreshing) return;
+        refreshing = true;
+        modelsError = null;
+        discoveryResult = null;
+        try
+        {
+            discoveryResult = await Client.RefreshProviderModelsAsync(ResourceNamespace.Parse(model.Namespace), model.Name, cancellation.Token);
+            await LoadObservedAsync();
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("DiscoveryRefreshed"), DiscoverySummary(discoveryResult), DateTimeOffset.Now, UiStatus.Success));
+        }
+        catch (AgentstrationApiException exception) { modelsError = exception.Message; }
+        finally { refreshing = false; }
+    }
+    private string DiscoverySummary(ModelDiscoveryDiffResponse result) => T("DiscoverySummary", result.Created, result.Updated, result.Unchanged, result.Missing, result.Reappeared, result.Total);
     private void RequestDelete() { if (usages.Count == 0) confirmDelete = true; else error = new AgentstrationApiException(T("ProviderUsedBy", ProfileCount(usages.Count)), Guid.NewGuid().ToString("N")); }
     private async Task DeleteAsync() { if (model is null || etag is null) return; confirmDelete = false; try { await Client.DeleteModelProviderAsync(ResourceNamespace.Parse(model.Namespace), model.Name, etag, cancellation.Token); Navigation.NavigateTo("/modelproviders"); } catch (AgentstrationApiException exception) { error = exception; } }
     private void SyncBindings()
@@ -203,10 +258,32 @@ else
         return policy.Grants.Any(grant => grant.ScopeRef == consumer
             || grant.IncludeDescendants && grant.ScopeRef.Kind < consumer.Kind);
     }
-    private string Metadata(AvailableModelResponse item, string key) => item.Metadata.TryGetValue(key, out var value) ? value : T("NotReported");
+    private string ContentTypes(IReadOnlyList<ModelContentType>? values) => values is null || values.Count == 0
+        ? T("NotReported")
+        : string.Join(" · ", values.Select(value => value.ToString()));
+    private string Features(AvailableModelResponse item)
+    {
+        var features = new List<string>();
+        if (IsSupported(item.Specification.Features.Streaming?.Support)) features.Add("Streaming");
+        if (IsSupported(item.Specification.Features.Tools?.Support)) features.Add("Tools");
+        if (IsSupported(item.Specification.Features.StructuredOutput?.Support)) features.Add("Structured output");
+        if (IsSupported(item.Specification.Features.Reasoning?.Support)) features.Add("Reasoning");
+        return features.Count == 0 ? T("NotReported") : string.Join(" · ", features);
+    }
+    private static bool IsSupported(ModelFeatureSupport? support) => support is
+        ModelFeatureSupport.Native or ModelFeatureSupport.Emulated or ModelFeatureSupport.Partial;
     private static string ProfileUrl(ModelProviderUsageResponse usage) => $"/modelprofiles/{Uri.EscapeDataString(usage.Name)}";
-    private string CreateModelProfileUrl(string? modelName = null) => $"/modelprofiles/new?namespace={Uri.EscapeDataString(SelectedNamespace.Value)}&provider={Uri.EscapeDataString(Name!)}&providerNamespace={Uri.EscapeDataString(SelectedNamespace.Value)}" + (modelName is null ? string.Empty : $"&model={Uri.EscapeDataString(modelName)}");
+    private string ModelDetailsUrl(AvailableModelResponse item) => ConsoleResourceUrls.Model(
+        ResourceAddress.Create(ResourceNamespace.Parse(model?.Namespace), ModelResourceKinds.Model, item.ResourceName!));
+    private string CreateModelProfileUrl(string? modelName = null)
+    {
+        var providerNamespace = ResourceNamespace.Parse(model?.Namespace ?? Namespace).Value;
+        var providerName = model?.Name ?? Name ?? string.Empty;
+        return $"/modelprofiles/new?namespace={Uri.EscapeDataString(providerNamespace)}&provider={Uri.EscapeDataString(providerName)}&providerNamespace={Uri.EscapeDataString(providerNamespace)}"
+            + (modelName is null ? string.Empty : $"&model={Uri.EscapeDataString(modelName)}");
+    }
     private static string DetailsUrl(ResourceNamespace @namespace, string name) => $"/modelproviders/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}";
     private static string ExtensionKey(ExtensionResponse extension) => $"{extension.RegistrationNamespace}:{extension.RegistrationName}";
+    private enum ProviderTab { Overview, Configuration }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

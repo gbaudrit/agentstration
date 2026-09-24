@@ -105,10 +105,11 @@
   <data name="DeclarativeResource"><value>Ressource déclarative</value></data>
   <data name="ReadOnly"><value>Lecture seule</value></data>
   <data name="DeclarativeDefinitionUnavailable"><value>La définition déclarative est indisponible tant que la configuration n’est pas structurellement valide.</value></data>
-  <data name="Support.Native"><value>Natif</value></data>
-  <data name="Support.Emulated"><value>Émulé</value></data>
-  <data name="Support.Partial"><value>Partiel</value></data>
+  <data name="Support.Native"><value>Pris en charge</value></data>
+  <data name="Support.Emulated"><value>Pris en charge par émulation</value></data>
+  <data name="Support.Partial"><value>Partiellement pris en charge</value></data>
   <data name="Support.Unsupported"><value>Non pris en charge</value></data>
+  <data name="Support.Unknown"><value>Non spécifié</value></data>
   <data name="Status.Available"><value>Disponible</value></data>
   <data name="Status.Ready"><value>Prêt</value></data>
   <data name="Status.Succeeded"><value>Réussi</value></data>

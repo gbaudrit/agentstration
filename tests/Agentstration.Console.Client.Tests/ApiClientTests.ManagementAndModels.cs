@@ -232,7 +232,14 @@ public sealed partial class ApiClientTests
     public async Task ModelProvidersClientMapsProviderAndDynamicModels()
     {
         var provider = new ModelProviderResponse("provider-id", "ollama-local", new ModelProviderPropertiesResponse("Ollama local", "aep", "ollama", "ollama-extension", "default", "aspire", "available", "Ollama extension", 1));
-        var model = new AvailableModelResponse("qwen3:4b", "Qwen 3 4B", "available", ["chat"], new Dictionary<string, string> { ["parameterSize"] = "4B" });
+        var model = new AvailableModelResponse("qwen3:4b", "Qwen 3 4B", "available", new ModelSpecification
+        {
+            Input = [ModelContentType.Text],
+            Features = new ModelFeatureSpecifications
+            {
+                Streaming = new() { Support = ModelFeatureSupport.Native }
+            }
+        }, new ModelIdentity { Model = "qwen3", Version = "4b" });
         using var httpClient = new HttpClient(new StubHandler(request => request.RequestUri!.AbsolutePath.EndsWith("/models", StringComparison.Ordinal)
             ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new ValueResponse<AvailableModelResponse>([model])) }
             : new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new ValueResponse<ModelProviderResponse>([provider])) }))
@@ -244,7 +251,74 @@ public sealed partial class ApiClientTests
 
         Assert.AreEqual("aspire", providers[0].Properties.RegistrationSource);
         Assert.AreEqual("qwen3:4b", models[0].Name);
-        Assert.AreEqual("4B", models[0].Metadata["parameterSize"]);
+        Assert.AreEqual("4b", models[0].Identity!.Version);
+        CollectionAssert.AreEqual(new[] { ModelContentType.Text }, models[0].Specification.Input!.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ModelProvidersClientRefreshesExactNamespacedProvider()
+    {
+        string? path = null;
+        HttpMethod? method = null;
+        var expected = new ModelDiscoveryDiffResponse(2, 1, 3, 1, 0, 7);
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            path = request.RequestUri!.PathAndQuery;
+            method = request.Method;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(expected) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        var result = await new ModelProvidersApiClient(httpClient).RefreshProviderModelsAsync(
+            new ResourceNamespace("shared.models"), "ollama/local", default);
+
+        Assert.AreEqual(HttpMethod.Post, method);
+        Assert.AreEqual("/api/modelproviders/ollama%2Flocal/models/refresh?resourceNamespace=shared.models", path);
+        Assert.AreEqual(expected, result);
+    }
+
+    [TestMethod]
+    public async Task ModelsClientReadsExactNamespacedResourceAndPreservesEtag()
+    {
+        var resource = new ModelResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ModelResourceKinds.Model,
+            Metadata = new ResourceMetadata { Name = "foundry.gpt-5-deadbeef", Namespace = new("shared.models") },
+            Generation = 2,
+            Definition = new ModelProperties
+            {
+                DisplayName = "GPT-5",
+                Provider = new ResourceReference("foundry", @namespace: new("shared.models")),
+                ProviderUid = Guid.NewGuid(),
+                ExternalId = "gpt-5",
+                ProviderStatus = "available",
+                Specification = new ModelSpecification(),
+                Observation = new ModelObservation
+                {
+                    FirstObservedAt = DateTimeOffset.UnixEpoch,
+                    LastObservedAt = DateTimeOffset.UnixEpoch,
+                    LastAttemptedAt = DateTimeOffset.UnixEpoch
+                }
+            }
+        };
+        string? requestedPath = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requestedPath = request.RequestUri!.PathAndQuery;
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(resource) };
+            response.Headers.ETag = new EntityTagHeaderValue("\"model-v2\"");
+            return response;
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        var snapshot = await new ModelsApiClient(httpClient).GetModelAsync(resource.Namespace, resource.Name, default);
+
+        Assert.AreEqual("/api/models/foundry.gpt-5-deadbeef?resourceNamespace=shared.models", requestedPath);
+        Assert.AreEqual("\"model-v2\"", snapshot.ETag);
+        Assert.AreEqual("gpt-5", snapshot.Value.Definition.ExternalId);
+        Assert.AreEqual("/models/foundry.gpt-5-deadbeef?namespace=shared.models", ConsoleResourceUrls.Model(
+            ResourceAddress.Create(resource.Namespace, resource.Kind, resource.Name)));
     }
 
     [TestMethod]
