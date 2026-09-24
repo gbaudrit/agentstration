@@ -16,6 +16,7 @@ import { ModelAdministrationPage } from './model-administration.page.js';
 import { DescendantSecretsPage } from './descendant-secrets.page.js';
 import { ConsoleEntryInteractionPage } from './console-entry-interaction.page.js';
 import { PlatformHealthPage } from './platform-health.page.js';
+import { ResourceNamingPage } from './resource-naming.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -34,6 +35,7 @@ export class ProductPages {
   public readonly descendantSecrets: DescendantSecretsPage;
   public readonly consoleEntryInteraction: ConsoleEntryInteractionPage;
   public readonly platformHealth: PlatformHealthPage;
+  public readonly resourceNaming: ResourceNamingPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -52,6 +54,7 @@ export class ProductPages {
     this.descendantSecrets = new DescendantSecretsPage(page);
     this.consoleEntryInteraction = new ConsoleEntryInteractionPage(page);
     this.platformHealth = new PlatformHealthPage(page);
+    this.resourceNaming = new ResourceNamingPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

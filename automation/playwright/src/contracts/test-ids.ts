@@ -231,6 +231,13 @@ export const TestIds = {
     publish: 'entry-publish',
     message: 'entry-message',
   },
+  parameterEditor: {
+    form: 'parameter-form',
+    displayName: 'parameter-display-name',
+    technicalName: 'parameter-name',
+    value: 'parameter-value',
+    save: 'parameter-save',
+  },
   organizationWorkspaces: {
     createForm: 'workspace-create-form',
     displayName: 'workspace-display-name',
