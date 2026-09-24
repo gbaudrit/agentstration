@@ -32,14 +32,15 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
     {
         var definition = new WorkNotificationMcpToolDefinitionProvider().Definition;
         StringAssert.Contains(definition.Description!, "notify the user");
-        StringAssert.Contains(definition.Description!, "retries");
+        StringAssert.Contains(definition.Description!, "unique notification identity");
         StringAssert.Contains(definition.Description!, "local Agentstration paths");
         var schema = definition.InputSchema;
         Assert.IsFalse(schema.GetProperty("additionalProperties").GetBoolean());
-        CollectionAssert.AreEquivalent(new[] { "deliveryKey", "title", "message" },
+        CollectionAssert.AreEquivalent(new[] { "title", "message" },
             schema.GetProperty("required").EnumerateArray().Select(value => value.GetString()).ToArray());
         var properties = schema.GetProperty("properties");
-        foreach (var (name, maximum) in new[] { ("deliveryKey", 256), ("title", 200), ("message", 4000) })
+        Assert.IsFalse(properties.TryGetProperty("deliveryKey", out _));
+        foreach (var (name, maximum) in new[] { ("title", 200), ("message", 4000) })
         {
             var property = properties.GetProperty(name);
             Assert.AreEqual(maximum, property.GetProperty("maxLength").GetInt32());
@@ -47,7 +48,6 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             Assert.IsFalse(Regex.IsMatch(" \t ", property.GetProperty("pattern").GetString()!));
             Assert.IsFalse(string.IsNullOrWhiteSpace(property.GetProperty("description").GetString()));
         }
-        StringAssert.Contains(properties.GetProperty("deliveryKey").GetProperty("description").GetString()!, "idempotency");
         var action = properties.GetProperty("actionUrl");
         Assert.AreEqual(2048, action.GetProperty("maxLength").GetInt32());
         StringAssert.Contains(action.GetProperty("description").GetString()!, "local absolute");
@@ -55,6 +55,11 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         Assert.IsTrue(Regex.IsMatch("/workplace/notifications", pattern));
         foreach (var invalid in new[] { "", "relative/path", "https://example.com", "//example.com", "/path\\segment" })
             Assert.IsFalse(Regex.IsMatch(invalid, pattern), invalid);
+        var output = definition.OutputSchema!.Value;
+        Assert.IsFalse(output.GetProperty("properties").TryGetProperty("deliveryKey", out _));
+        Assert.IsFalse(output.GetProperty("properties").TryGetProperty("recovered", out _));
+        CollectionAssert.AreEquivalent(new[] { "notificationId", "createdAt" },
+            output.GetProperty("required").EnumerateArray().Select(value => value.GetString()).ToArray());
 
         await using var factory = Factory();
         var context = await GetBootstrapContextAsync(factory);
@@ -65,7 +70,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         {
             var failure = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(async () => await handler.ExecuteAsync(new(
                 context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId, "contract-call", null,
-                JsonSerializer.SerializeToElement(new { deliveryKey = "key", title = "Title", message = "Message", actionUrl = invalid }),
+                JsonSerializer.SerializeToElement(new { title = "Title", message = "Message", actionUrl = invalid }),
                 ToolDefinitionCallerKind.Agent), default));
             Assert.AreEqual("notification_action_url_invalid", failure.Code);
         }
@@ -87,12 +92,12 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         Assert.AreEqual("notification-delivery", definition.Definition.Flow.Name);
         Assert.IsTrue(definition.Definition.Flow.UseActiveVersion);
         Assert.IsTrue(ToolDefinitionService.SameSchema(definition.Definition.InputSchema, delivery.Definition.Graph.InputSchema));
-        StringAssert.Contains(definition.Definition.Description!, "retries");
+        StringAssert.Contains(definition.Definition.Description!, "distinct notification identity");
         Assert.IsTrue(definition.Definition.InputSchema.GetProperty("properties").GetProperty("actionUrl").TryGetProperty("pattern", out _));
     }
 
     [TestMethod]
-    public async Task InternalNotificationToolIsPublishedAndExplicitDeliveryKeyIsIdempotent()
+    public async Task InternalNotificationToolGeneratesDistinctNotificationIdentitiesForRepeatedPayloads()
     {
         await using var factory = Factory();
         var context = await GetBootstrapContextAsync(factory);
@@ -109,7 +114,6 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         Assert.IsTrue(tool.JsonSchema.GetProperty("properties").GetProperty("actionUrl").TryGetProperty("pattern", out _));
         var arguments = new AIFunctionArguments(new Dictionary<string, object?>
         {
-            ["deliveryKey"] = "daily-news-2026-09-10",
             ["title"] = "Daily news",
             ["message"] = "A new article is ready."
         });
@@ -119,9 +123,9 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
 
         var notifications = await factory.Services.GetRequiredService<IWorkplaceRepository>()
             .ListNotificationsAsync(new WorkspaceId(context.WorkspaceId), null, default);
-        Assert.HasCount(1, notifications);
-        Assert.AreEqual("daily-news-2026-09-10", notifications[0].DeliveryKey);
-        Assert.AreEqual(context.WorkspaceId, notifications[0].WorkspaceId.Value);
+        Assert.HasCount(2, notifications);
+        Assert.AreNotEqual(notifications[0].Id, notifications[1].Id);
+        Assert.IsTrue(notifications.All(value => value.WorkspaceId.Value == context.WorkspaceId));
         var handler = factory.Services.GetServices<IInternalMcpToolHandler>()
             .Single(value => value.Definition.Name == AgentstrationInternalTools.NotificationCreate);
         var spoof = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(async () => await handler.ExecuteAsync(new(
@@ -130,7 +134,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             context.PrincipalId,
             "spoof-call",
             null,
-            JsonSerializer.SerializeToElement(new { deliveryKey = "spoof", title = "Spoof", message = "Spoof", workspaceId = Guid.NewGuid() }),
+            JsonSerializer.SerializeToElement(new { title = "Spoof", message = "Spoof", workspaceId = Guid.NewGuid() }),
             ToolDefinitionCallerKind.Mcp), default));
         Assert.AreEqual("notification_argument_unknown", spoof.Code);
         var projected = await factory.Services.GetRequiredService<IResourceStore>().GetAsync<ToolResource>(
@@ -202,7 +206,6 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         await definitions.PutAsync(NotificationToolDefinition("news.alert", "news-parent", scope, schemas), null, true, default);
         var arguments = JsonSerializer.SerializeToElement(new
         {
-            deliveryKey = "article-42",
             title = "News detected",
             message = "Article 42 requires review.",
             actionUrl = "/tasks/article-42"
@@ -306,7 +309,6 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
                 Tool = new(toolResourceId ?? AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.NotificationCreate)),
                 ArgumentsMapping = JsonSerializer.SerializeToElement(new
                 {
-                    deliveryKey = "${input.deliveryKey}",
                     title = "${input.title}",
                     message = "${input.message}",
                     actionUrl = "${input.actionUrl}"
@@ -342,12 +344,11 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             type = "object",
             properties = new
             {
-                deliveryKey = new { type = "string" },
                 title = new { type = "string" },
                 message = new { type = "string" },
                 actionUrl = new { type = "string" }
             },
-            required = new[] { "deliveryKey", "title", "message" }
+            required = new[] { "title", "message" }
         });
         var output = JsonSerializer.SerializeToElement(new
         {
@@ -355,11 +356,9 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             properties = new
             {
                 notificationId = new { type = "string" },
-                deliveryKey = new { type = "string" },
-                createdAt = new { type = "string" },
-                recovered = new { type = "boolean" }
+                createdAt = new { type = "string" }
             },
-            required = new[] { "notificationId", "deliveryKey", "createdAt", "recovered" }
+            required = new[] { "notificationId", "createdAt" }
         });
         return (input, output);
     }
