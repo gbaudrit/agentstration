@@ -93,4 +93,11 @@ export const Checkpoints = {
     updated: 'model-administration-updated',
     deleted: 'model-administration-deleted',
   },
+  resourceNaming: {
+    agentIdentity: 'resource-naming-agent-identity',
+    parameterDerived: 'resource-naming-parameter-derived',
+    parameterPersisted: 'resource-naming-parameter-persisted',
+    immutable: 'resource-naming-immutable',
+    conflict: 'resource-naming-conflict',
+  },
 } as const;
