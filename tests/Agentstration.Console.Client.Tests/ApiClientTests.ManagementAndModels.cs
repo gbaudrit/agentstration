@@ -162,17 +162,17 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
-    public async Task ManagementClientGetsAgentFromItsNamespace()
+    public async Task ManagementClientGetsAndUpdatesAgentInItsNamespace()
     {
         var @namespace = new ResourceNamespace("agentstration.who-am-i");
         var resource = CreateAgentResource("who-am-i-judge") with
         {
             Metadata = CreateAgentResource("who-am-i-judge").Metadata with { Namespace = @namespace }
         };
-        Uri? requested = null;
+        var requests = new List<(HttpMethod Method, Uri Uri)>();
         using var httpClient = new HttpClient(new StubHandler(request =>
         {
-            requested = request.RequestUri;
+            requests.Add((request.Method, request.RequestUri!));
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(resource) };
             response.Headers.ETag = new EntityTagHeaderValue("\"stored\"");
             return response;
@@ -181,8 +181,11 @@ public sealed partial class ApiClientTests
         var client = new ManagementApiClient(httpClient);
 
         var actual = await client.GetAgentAsync(@namespace, resource.Metadata.Name, CancellationToken.None);
+        await client.PutAgentAsync(ToRequest(resource), "\"stored\"", createOnly: false, CancellationToken.None);
 
-        Assert.AreEqual("/api/namespaces/agentstration.who-am-i/agents/who-am-i-judge", requested!.AbsolutePath);
+        Assert.HasCount(2, requests);
+        Assert.IsTrue(requests.All(request => request.Uri.AbsolutePath == "/api/namespaces/agentstration.who-am-i/agents/who-am-i-judge"));
+        CollectionAssert.AreEqual(new[] { HttpMethod.Get, HttpMethod.Put }, requests.Select(request => request.Method).ToArray());
         Assert.AreEqual(@namespace, actual.Value.Namespace);
     }
 

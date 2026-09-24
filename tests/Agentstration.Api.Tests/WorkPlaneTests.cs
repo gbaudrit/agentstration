@@ -875,6 +875,10 @@ public sealed class WorkPlaneTests
 
         Assert.AreEqual(HttpStatusCode.OK, (await client.PutAsJsonAsync("/api/management/entries/delete-default", defaultDraft)).StatusCode);
         Assert.AreEqual(HttpStatusCode.OK, (await client.PutAsJsonAsync("/api/namespaces/team-a/management/entries/delete-namespaced", namespacedDraft)).StatusCode);
+        var namespacedResponse = await client.GetFromJsonAsync<EntryDraftResponse>("/api/namespaces/team-a/management/entries/delete-namespaced");
+        Assert.IsNotNull(namespacedResponse);
+        Assert.IsFalse(namespacedResponse.ManagedByPack);
+        Assert.AreEqual(HttpStatusCode.OK, (await client.PostAsync("/api/namespaces/team-a/management/entries/delete-namespaced/validate", null)).StatusCode);
         Assert.AreEqual(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/management/entries/delete-default")).StatusCode);
         Assert.AreEqual(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/namespaces/team-a/management/entries/delete-namespaced")).StatusCode);
 

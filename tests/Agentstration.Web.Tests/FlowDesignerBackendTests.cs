@@ -52,21 +52,21 @@ public sealed class FlowDesignerBackendTests
         Assert.AreEqual(flowId, actual.Resource.FlowId);
         CollectionAssert.AreEqual(new[]
         {
-            "GET /api/flows/universal-router/draft",
             "GET /api/flows/universal-router",
+            "GET /api/flows/universal-router/draft",
             "POST /api/flows/universal-router/versions/1.0.0/draft",
             "GET /api/flows/universal-router/draft/source"
         }, requests);
     }
 
     [TestMethod]
-    public async Task LoadsNamespacedPublishedGraphWithoutDraftCallsAndRejectsMutations()
+    public async Task LoadsPackManagedNamespacedPublishedGraphWithoutDraftCalls()
     {
         var now = new DateTimeOffset(2026, 8, 15, 12, 0, 0, TimeSpan.Zero);
         var @namespace = new ResourceNamespace("pack.sample");
         var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] };
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent-id"));
-        var flow = new FlowResponse("sample", "Pack sample", null, "1.2.0", true, "1.2.0", definition, new Dictionary<string, string>(), now, now) { Namespace = @namespace };
+        var flow = new FlowResponse("sample", "Pack sample", null, "1.2.0", true, "1.2.0", definition, new Dictionary<string, string> { ["agentstration.io/pack.name"] = "sample-pack" }, now, now) { Namespace = @namespace };
         var version = new FlowVersionResponse("sample", "1.2.0", null, definition, new Dictionary<string, string>(), now, graph) { Namespace = @namespace };
         var requests = new List<string>();
         using var httpClient = new HttpClient(new StubHandler(request =>
@@ -94,7 +94,60 @@ public sealed class FlowDesignerBackendTests
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => backend.PublishAsync(target, new("1.3.0"), default));
         using var input = JsonDocument.Parse("{}");
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => backend.RunDraftAsync(target, new(input.RootElement.Clone()), default));
-        Assert.HasCount(2, requests);
+        Assert.HasCount(6, requests);
+        Assert.IsTrue(requests.Skip(2).All(request => request == "GET /api/namespaces/pack.sample/flows/sample"));
+    }
+
+    [TestMethod]
+    public async Task MaterializesEditableNamespacedBootstrapDraft()
+    {
+        var now = new DateTimeOffset(2026, 9, 24, 12, 0, 0, TimeSpan.Zero);
+        var @namespace = new ResourceNamespace("agentstration.assistant");
+        var flowId = new FlowId("assistant-diagnostics", @namespace);
+        var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] };
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant-diagnostics"));
+        var flow = new FlowResponse(flowId.Value, "Assistant diagnostics", null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string>(), now, now) { Namespace = @namespace };
+        var draft = new FlowDraftResponse(new FlowDraft
+        {
+            WorkspaceId = TestWorkspaceId,
+            Id = "draft-assistant-diagnostics",
+            FlowId = flowId,
+            DisplayName = flow.Name,
+            Definition = graph,
+            CreatedAt = now,
+            UpdatedAt = now
+        }, "\"draft-etag\"");
+        var requests = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add($"{request.Method} {request.RequestUri!.AbsolutePath}");
+            if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath.EndsWith("/draft", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.NotFound) { Content = JsonContent.Create(new { title = "flow_draft_not_found", status = 404 }) };
+            if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath.EndsWith("/draft/source", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new FlowSourceResponse("entryStep: input", "yaml", 1)) };
+            if (request.Method == HttpMethod.Get)
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) };
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(draft) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        var backend = new FlowDesignerBackend(new FlowApiClient(httpClient));
+        var target = new FlowDesignerTarget(@namespace, flowId.Value);
+        var actual = await backend.LoadAsync(target, default);
+        await backend.SaveDraftAsync(target, new(flow.Name, null, null, graph), draft.ETag, default);
+
+        Assert.IsNull(actual.PublishedVersion);
+        Assert.AreEqual(flowId, actual.Resource.FlowId);
+        Assert.AreEqual("\"draft-etag\"", actual.ETag);
+        CollectionAssert.AreEqual(new[]
+        {
+            "GET /api/namespaces/agentstration.assistant/flows/assistant-diagnostics",
+            "GET /api/namespaces/agentstration.assistant/flows/assistant-diagnostics/draft",
+            "POST /api/namespaces/agentstration.assistant/flows/assistant-diagnostics/versions/1.0.0/draft",
+            "GET /api/namespaces/agentstration.assistant/flows/assistant-diagnostics/draft/source",
+            "GET /api/namespaces/agentstration.assistant/flows/assistant-diagnostics",
+            "PUT /api/namespaces/agentstration.assistant/flows/assistant-diagnostics/draft"
+        }, requests);
     }
 
     [TestMethod]
@@ -103,7 +156,7 @@ public sealed class FlowDesignerBackendTests
         var now = new DateTimeOffset(2026, 8, 15, 12, 0, 0, TimeSpan.Zero);
         var @namespace = new ResourceNamespace("pack.legacy");
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent-id"));
-        var flow = new FlowResponse("legacy", "Legacy", null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string>(), now, now) { Namespace = @namespace };
+        var flow = new FlowResponse("legacy", "Legacy", null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string> { ["agentstration.io/pack.name"] = "legacy-pack" }, now, now) { Namespace = @namespace };
         var version = new FlowVersionResponse("legacy", "1.0.0", null, definition, new Dictionary<string, string>(), now) { Namespace = @namespace };
         using var httpClient = new HttpClient(new StubHandler(request => request.RequestUri!.AbsolutePath.EndsWith("/versions/1.0.0", StringComparison.Ordinal)
             ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(version) }

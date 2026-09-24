@@ -72,6 +72,9 @@ public interface IBootstrapResourceHandler
 {
     string Kind { get; }
     BootstrapProfileScope Scope { get; }
+    bool SupportsProfileScope(BootstrapProfileScope profileScope) =>
+        Scope == profileScope
+        || (profileScope == BootstrapProfileScope.Workspace && Scope == BootstrapProfileScope.Tenant);
     Task<BootstrapResourcePlanResult> PlanAsync(BootstrapResourceDocument resource, BootstrapResourceOperationContext operation, BootstrapPlanningContext planning, CancellationToken cancellationToken);
     Task<BootstrapResourceApplyResult> ApplyAsync(BootstrapResourceDocument resource, BootstrapResourceOperationContext operation, CancellationToken cancellationToken);
 }

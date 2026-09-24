@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: agentstration-assistant-workspace
+definition:
+  displayName: Agentstration Assistant workspace
+  description: Provisions the dedicated Workspace that owns the official Agentstration Assistant for the selected Tenant.
+  targetScope: tenant

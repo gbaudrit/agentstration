@@ -136,6 +136,36 @@ public sealed partial class FlowTests
         Assert.AreEqual(before!.ETag, after!.ETag);
     }
 
+    [TestMethod]
+    public async Task CreatesMissingDraftFromNamespacedPublishedVersion()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var @namespace = new ResourceNamespace("agentstration.assistant");
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [new InputFlowStepDefinition { Name = "input" }],
+            Transitions = []
+        };
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
+            "assistant-diagnostics",
+            "Bootstrap diagnostics",
+            "1.0.0",
+            true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant-diagnostics")),
+            Graph: graph,
+            DisplayName: "Assistant diagnostics"), @namespace, default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
+        var drafts = new FlowDraftService(fixture.Repository, fixture.Service, new AlwaysValidFlowValidator(), TimeProvider.System);
+
+        var draft = await drafts.CreateFromVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", "local-user", default);
+
+        Assert.AreEqual(new FlowId("assistant-diagnostics", @namespace), draft.Value.FlowId);
+        Assert.AreEqual("Assistant diagnostics", draft.Value.DisplayName);
+        Assert.AreEqual("input", draft.Value.Definition.EntryStep);
+        Assert.AreEqual(1L, draft.Value.Revision);
+    }
+
     private sealed class AlwaysValidFlowValidator : IFlowDefinitionValidator
     {
         public ValueTask<FlowValidationResult> ValidateAsync(FlowGraphDefinition definition, FlowValidationContext context, CancellationToken cancellationToken) =>

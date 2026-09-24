@@ -84,7 +84,25 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
     {
         var published = await repository.GetVersionAsync(workspaceId, flowId, version, cancellationToken) ?? throw new FlowValidationException("flow_version_not_found", $"Flow version '{version}' was not found.");
         if (published.Value.Graph is null) throw new FlowValidationException("flow_version_graph_missing", "This legacy Flow version has no editable graph definition.");
-        var current = await RequiredAsync(workspaceId, flowId, cancellationToken);
+        var current = await repository.GetDraftAsync(workspaceId, flowId, cancellationToken);
+        if (current is null)
+        {
+            var flow = await repository.GetAsync(workspaceId, flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
+            var now = timeProvider.GetUtcNow();
+            return await repository.CreateDraftAsync(new FlowDraft
+            {
+                WorkspaceId = workspaceId,
+                Id = $"{flowId.Value}-draft",
+                FlowId = flowId,
+                DisplayName = flow.Value.DisplayName ?? flow.Value.Name,
+                Description = published.Value.Description,
+                Tags = Copy(published.Value.Metadata),
+                Definition = published.Value.Graph,
+                CreatedAt = now,
+                UpdatedAt = now,
+                UpdatedBy = updatedBy
+            }, cancellationToken);
+        }
         var updated = current.Value with { Definition = published.Value.Graph, Revision = current.Value.Revision + 1, UpdatedAt = timeProvider.GetUtcNow(), UpdatedBy = updatedBy };
         return await repository.UpdateDraftAsync(updated, current.ETag, cancellationToken);
     }

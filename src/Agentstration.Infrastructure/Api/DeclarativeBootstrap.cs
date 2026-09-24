@@ -81,7 +81,7 @@ public sealed class DeclarativeBootstrapService(
                         BootstrapResourceDisposition.Invalid, $"Unknown bootstrap resource kind '{resource.Kind}'."));
                     continue;
                 }
-                if (!IsCompatibleScope(handler.Scope, profile.Summary.Scope))
+                if (!handler.SupportsProfileScope(profile.Summary.Scope))
                 {
                     resources.Add(new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name,
                         BootstrapResourceDisposition.Invalid, $"Resource scope '{handler.Scope}' does not match profile scope '{profile.Summary.Scope}'."));
@@ -110,10 +110,6 @@ public sealed class DeclarativeBootstrapService(
             resources,
             loadedSelection.SourceProvenance);
     }
-
-    private static bool IsCompatibleScope(BootstrapProfileScope resourceScope, BootstrapProfileScope profileScope) =>
-        resourceScope == profileScope
-        || (profileScope == BootstrapProfileScope.Workspace && resourceScope == BootstrapProfileScope.Tenant);
 
     public async Task<BootstrapExecutionResult> ExecuteAsync(
         BootstrapProfileSelection selection,

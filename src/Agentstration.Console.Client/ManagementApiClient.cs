@@ -94,7 +94,7 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
 
     public async Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Put, AgentPath(request.Metadata.Name))
+        using var message = new HttpRequestMessage(HttpMethod.Put, AgentPath(request.Metadata.Namespace, request.Metadata.Name))
         {
             Content = JsonContent.Create(request)
         };
