@@ -13,6 +13,7 @@
   <data name="AgentSections"><value>Agent sections</value></data>
   <data name="Overview"><value>Overview</value></data>
   <data name="Definition"><value>Definition</value></data>
+  <data name="Tools"><value>Tools</value></data>
   <data name="Deployments"><value>Deployments</value></data>
   <data name="Runs"><value>Runs</value></data>
   <data name="Metrics"><value>Metrics</value></data>
@@ -47,6 +48,15 @@
   <data name="References"><value>References</value></data>
   <data name="ToolsAndTags"><value>Tools and tags</value></data>
   <data name="GovernedTools"><value>Governed tools</value></data>
+  <data name="ToolConfiguration"><value>Tool configuration</value></data>
+  <data name="ToolConfigurationHelp"><value>Select the governed tools available to this agent. Tools are grouped by their MCP source.</value></data>
+  <data name="ManageMcpTools"><value>Manage MCP / tools</value></data>
+  <data name="OpenToolCatalog"><value>Open MCP / tools</value></data>
+  <data name="McpProvider"><value>MCP</value></data>
+  <data name="OpenMcp"><value>Open MCP</value></data>
+  <data name="UnknownMcp"><value>Unknown MCP</value></data>
+  <data name="SelectedTools"><value>Selected: {0}</value></data>
+  <data name="ToolCount"><value>{0} tools</value></data>
   <data name="NoDiscoveredTools"><value>No discovered tools are available. Configure them under Tools.</value></data>
   <data name="Available"><value>Available</value></data>
   <data name="AssignedUnavailable"><value>Assigned but unavailable or disabled</value></data>

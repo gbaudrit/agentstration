@@ -31,7 +31,7 @@ else
             <Metadata><span><code>@model.Name</code></span><span>@T("Generation", generation)</span></Metadata>
             <Actions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }<button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">@T("ReconcileDeployment")</button></Actions>
         </ResourceHeader>
-        <ResourceTabs Label="@T("AgentSections")"><button type="button" class="@(!sourceMode ? "active" : null)" @onclick="ShowDefinition">@T("Definition")</button><span>@T("Deployments")</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">@T("Runs")</a> } else { <span>@T("Runs")</span> }<span>@T("Metrics")</span><span>@T("Events")</span><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
+        <ResourceTabs Label="@T("AgentSections")"><button type="button" class="@(!sourceMode && !toolsMode ? "active" : null)" @onclick="ShowDefinition">@T("Definition")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><span>@T("Deployments")</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">@T("Runs")</a> } else { <span>@T("Runs")</span> }<span>@T("Metrics")</span><span>@T("Events")</span><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
         <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
             <Actions>@if (!IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">@T("ApplyGeneration")</button> }</Actions>
         </StateComparison>
@@ -48,7 +48,7 @@ else
 
     @if (IsNew)
     {
-        <ResourceTabs Label="@T("AgentEditorMode")"><button type="button" class="@(!sourceMode ? "active" : null)" @onclick="ShowDefinition">@T("Form")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
+        <ResourceTabs Label="@T("AgentEditorMode")"><button type="button" class="@(!sourceMode && !toolsMode ? "active" : null)" @onclick="ShowDefinition">@T("Form")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
     }
 
     @if (sourceMode)
@@ -66,6 +66,12 @@ else
         <DataAnnotationsValidator />
         <ValidationSummary />
 
+        @if (toolsMode)
+        {
+            <AgentToolConfiguration Tools="catalogTools" Providers="catalogProviders" SelectedToolIds="SelectedToolIds" SelectedToolIdsChanged="UpdateSelectedTools" />
+        }
+        else
+        {
         <section class="panel form-section" id="definition" data-testid="agent-identity-section">
             <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ResourceCoordinates")</h2></div>@if (!IsNew) { <StatusBadge Text="@T("Generation", generation)" Status="UiStatus.Info" /> }</div>
             <div class="form-grid">
@@ -99,25 +105,12 @@ else
         }
 
         <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("References")</p><h2>@T("ToolsAndTags")</h2></div></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("References")</p><h2>@T("Tags")</h2></div></div>
             <div class="form-grid">
-                <div class="agent-tool-field">
-                    <div class="agent-tool-heading"><span class="field-label">@T("GovernedTools")</span>@if (catalogTools.Count > 0) { <span class="agent-tool-count">@catalogTools.Count</span> }</div>
-                    @if (catalogTools.Count == 0) { <small>@T("NoDiscoveredTools")</small> }
-                    else
-                    {
-                        <div class="agent-tool-list">
-                            @foreach (var tool in catalogTools)
-                            {
-                                var assigned = IsToolAssigned(tool.Metadata.Name); var usable = tool.Definition.Enabled && tool.Definition.Discovery?.Available == true;
-                                <label class="agent-tool-option"><input type="checkbox" checked="@assigned" disabled="@(!usable && !assigned)" @onchange="args => ToggleTool(tool.Metadata.Name, (bool)args.Value!)" /><span>@tool.Definition.DisplayName</span><small>@(tool.Definition.Provider?.Name ?? "—") · @(usable ? T("Available") : assigned ? T("AssignedUnavailable") : T("NotUsable"))</small></label>
-                            }
-                        </div>
-                    }
-                </div>
-                <label><span>@T("Tags")</span><InputTextArea @bind-Value="model.Tags" rows="7" /><small>@T("TagsHelp")</small></label>
+                <label class="form-span-2"><span>@T("Tags")</span><InputTextArea @bind-Value="model.Tags" rows="7" /><small>@T("TagsHelp")</small></label>
             </div>
         </section>
+        }
 
         @if (IsNew)
         {
@@ -142,6 +135,7 @@ else
     private readonly CancellationTokenSource cancellation = new();
     private AgentEditorModel? model;
     private IReadOnlyList<ToolResource> catalogTools = [];
+    private IReadOnlyList<ToolProviderResource> catalogProviders = [];
     private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
     private string? etag;
     private string? resourceId;
@@ -160,6 +154,7 @@ else
     private bool isDirty;
     private bool applyRuntimeOnSubmit = true;
     private bool sourceMode;
+    private bool toolsMode;
     private bool interactive;
     private ResourceScopeRef? selectedScope;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
@@ -189,8 +184,13 @@ else
         errorMessage = null;
         try
         {
-            catalogTools = await ToolsClient.GetToolsAsync(cancellationToken: cancellation.Token);
-            runtimeProfiles = await RuntimeProfilesClient.GetRuntimeProfilesAsync(cancellation.Token);
+            var toolsTask = ToolsClient.GetToolsAsync(cancellationToken: cancellation.Token);
+            var providersTask = ToolsClient.GetProvidersAsync(cancellation.Token);
+            var runtimeProfilesTask = RuntimeProfilesClient.GetRuntimeProfilesAsync(cancellation.Token);
+            await Task.WhenAll(toolsTask, providersTask, runtimeProfilesTask);
+            catalogTools = await toolsTask;
+            catalogProviders = await providersTask;
+            runtimeProfiles = await runtimeProfilesTask;
             if (IsNew)
             {
                 model = new AgentEditorModel { Namespace = AgentResourceNamespace.Value };
@@ -244,14 +244,15 @@ else
     }
 
     private void MarkDirty(EventArgs _) => isDirty = true;
-    private void ShowDefinition() => sourceMode = false;
+    private void ShowDefinition() => (sourceMode, toolsMode) = (false, false);
+    private void ShowTools() => (sourceMode, toolsMode) = (false, true);
     private void ShowSource()
     {
         if (model is null) return;
         rawError = null;
         try { rawYaml = ResourceManifestSerializer.ToYaml(model.ToRequest()); }
         catch (Exception exception) { rawError = exception.Message; }
-        sourceMode = true;
+        (sourceMode, toolsMode) = (true, false);
     }
 
     private bool ApplyRawYaml()
@@ -285,13 +286,15 @@ else
         await SaveAsync(applyRuntime: false);
         if (!IsNew) ShowSource();
     }
-    private bool IsToolAssigned(string id) => model?.ToolNames.Split(['\r','\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Contains(id, StringComparer.Ordinal) == true;
-    private void ToggleTool(string id, bool selected)
+    private IReadOnlyList<string> SelectedToolIds => model?.ToolNames.Split(['\r','\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
+    private Task UpdateSelectedTools(IReadOnlyList<string> values)
     {
-        if (model is null) return;
-        var values = model.ToolNames.Split(['\r','\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-        if (selected && !values.Contains(id, StringComparer.Ordinal)) values.Add(id); else if (!selected) values.RemoveAll(value => value == id);
-        model.ToolNames = string.Join(Environment.NewLine, values); isDirty = true;
+        if (model is not null)
+        {
+            model.ToolNames = string.Join(Environment.NewLine, values);
+            isDirty = true;
+        }
+        return Task.CompletedTask;
     }
     private Task DiscardAsync() => OnParametersSetAsync();
 

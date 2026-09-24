@@ -13,6 +13,7 @@
   <data name="AgentSections"><value>Sections de l’agent</value></data>
   <data name="Overview"><value>Vue d’ensemble</value></data>
   <data name="Definition"><value>Définition</value></data>
+  <data name="Tools"><value>Outils</value></data>
   <data name="Deployments"><value>Déploiements</value></data>
   <data name="Runs"><value>Exécutions</value></data>
   <data name="Metrics"><value>Métriques</value></data>
@@ -47,6 +48,15 @@
   <data name="References"><value>Références</value></data>
   <data name="ToolsAndTags"><value>Outils et étiquettes</value></data>
   <data name="GovernedTools"><value>Outils gouvernés</value></data>
+  <data name="ToolConfiguration"><value>Configuration des outils</value></data>
+  <data name="ToolConfigurationHelp"><value>Sélectionnez les outils gouvernés accessibles à cet agent. Les outils sont regroupés par source MCP.</value></data>
+  <data name="ManageMcpTools"><value>Gérer MCP / outils</value></data>
+  <data name="OpenToolCatalog"><value>Ouvrir MCP / outils</value></data>
+  <data name="McpProvider"><value>MCP</value></data>
+  <data name="OpenMcp"><value>Ouvrir le MCP</value></data>
+  <data name="UnknownMcp"><value>MCP inconnu</value></data>
+  <data name="SelectedTools"><value>Sélection : {0}</value></data>
+  <data name="ToolCount"><value>{0} outil(s)</value></data>
   <data name="NoDiscoveredTools"><value>Aucun outil découvert n’est disponible. Configurez-les dans Outils.</value></data>
   <data name="Available"><value>Disponible</value></data>
   <data name="AssignedUnavailable"><value>Assigné mais indisponible ou désactivé</value></data>
