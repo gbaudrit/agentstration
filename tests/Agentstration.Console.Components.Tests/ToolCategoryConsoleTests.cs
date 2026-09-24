@@ -24,8 +24,17 @@ public sealed class ToolCategoryConsoleTests
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Find("[data-testid='category-members']").TextContent, "Operations MCP");
+            StringAssert.Contains(rendered.Find("[data-testid='category-members']").TextContent, "Documentation MCP");
             StringAssert.Contains(rendered.Find("[data-testid='category-members']").TextContent, "removed.tool");
-            Assert.AreEqual("/tools/operations.run", rendered.Find(".tool-category-member a").GetAttribute("href"));
+            Assert.AreEqual("/tools/operations.run", rendered.Find("[data-provider='operations'] .tool-category-member a").GetAttribute("href"));
+            var providerBlocks = rendered.FindAll(".tool-category-provider[data-provider]");
+            Assert.HasCount(2, providerBlocks);
+            var operationsBlock = providerBlocks.Single(block => block.GetAttribute("data-provider") == "operations");
+            var documentationBlock = providerBlocks.Single(block => block.GetAttribute("data-provider") == "documentation");
+            StringAssert.Contains(operationsBlock.TextContent, "Run operation");
+            Assert.IsFalse(operationsBlock.TextContent.Contains("Search documentation", StringComparison.Ordinal));
+            StringAssert.Contains(documentationBlock.TextContent, "Search documentation");
+            Assert.IsFalse(documentationBlock.TextContent.Contains("Run operation", StringComparison.Ordinal));
         });
 
         rendered.Find("button.button-danger").Click();
@@ -71,8 +80,24 @@ public sealed class ToolCategoryConsoleTests
                 Discovery = new() { Available = true, FirstSeenAt = DateTimeOffset.UnixEpoch, LastSeenAt = DateTimeOffset.UnixEpoch }
             }
         };
-        public Task<IReadOnlyList<ToolResource>> GetToolsAsync(string? provider = null, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ToolResource>>([Tool]);
-        public Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ToolProviderResource>>([new ToolProviderResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider, Metadata = new ResourceMetadata { Name = "operations" }, Definition = new ToolProviderProperties { DisplayName = "Operations MCP", ProviderType = ToolProviderType.Mcp } }]);
+        private static readonly ToolResource DocumentationTool = new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.Tool,
+            Metadata = new ResourceMetadata { Name = "documentation.search" },
+            Definition = new ToolResourceProperties
+            {
+                DisplayName = "Search documentation",
+                Provider = new("documentation"),
+                Enabled = true,
+                Discovery = new() { Available = true, FirstSeenAt = DateTimeOffset.UnixEpoch, LastSeenAt = DateTimeOffset.UnixEpoch }
+            }
+        };
+        public Task<IReadOnlyList<ToolResource>> GetToolsAsync(string? provider = null, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ToolResource>>([Tool, DocumentationTool]);
+        public Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ToolProviderResource>>([
+            new ToolProviderResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider, Metadata = new ResourceMetadata { Name = "operations" }, Definition = new ToolProviderProperties { DisplayName = "Operations MCP", ProviderType = ToolProviderType.Mcp } },
+            new ToolProviderResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider, Metadata = new ResourceMetadata { Name = "documentation" }, Definition = new ToolProviderProperties { DisplayName = "Documentation MCP", ProviderType = ToolProviderType.Mcp } }
+        ]);
         public Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ToolProviderResource>> CreateProviderAsync(CreateToolProviderRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ToolProviderResource>> UpdateProviderAsync(string name, PutToolProviderRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
