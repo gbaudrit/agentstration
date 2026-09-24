@@ -67,5 +67,11 @@ public sealed class AgentExecutionCoordinator(
         SelectedAgentRoute selected,
         string input,
         CancellationToken cancellationToken) =>
-        runtimes.ExecuteAsync(selected.DeploymentId, new AgentExecutionRequest(input), cancellationToken);
+        ExecuteSelectedAsync(selected, new AgentExecutionRequest(input), cancellationToken);
+
+    public Task<AgentExecutionResult> ExecuteSelectedAsync(
+        SelectedAgentRoute selected,
+        AgentExecutionRequest request,
+        CancellationToken cancellationToken) =>
+        runtimes.ExecuteAsync(selected.DeploymentId, request, cancellationToken);
 }
