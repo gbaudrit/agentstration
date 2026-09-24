@@ -129,6 +129,7 @@ else
 
 @code {
     [Parameter] public string? Name { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "namespace")] public string? AgentNamespace { get; set; }
 
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string ModelStatusLabel(string? status) => Localizer[$"Status.{status?.ToLowerInvariant() switch { "available" => "Available", "ready" => "Ready", "succeeded" => "Succeeded", "starting" => "Starting", "providerunavailable" => "ProviderUnavailable", "modelunavailable" => "ModelUnavailable", "unavailable" => "Unavailable", "invalidconfiguration" => "InvalidConfiguration", "incompatible" => "Incompatible", "failed" => "Failed", _ => "Unknown" }}"];
@@ -160,8 +161,10 @@ else
     private bool interactive;
     private ResourceScopeRef? selectedScope;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
-    private ResourceNamespace AgentResourceNamespace => ResourceNamespace.Default;
-    private string OverviewUrl => $"/agents/{Uri.EscapeDataString(Name ?? string.Empty)}";
+    private ResourceNamespace AgentResourceNamespace => string.IsNullOrWhiteSpace(AgentNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(AgentNamespace);
+    private string OverviewUrl => AgentResourceNamespace.IsDefault
+        ? $"/agents/{Uri.EscapeDataString(Name ?? string.Empty)}"
+        : $"/agents/{Uri.EscapeDataString(Name ?? string.Empty)}?namespace={Uri.EscapeDataString(AgentResourceNamespace.Value)}";
     private string RunUrl => $"{OverviewUrl}/run";
     private bool IsStateSynchronized => !isDirty && readiness?.Ready == true && readiness.Generation == generation;
     private long? ActiveGeneration => readiness?.Ready == true ? readiness.Generation : null;
@@ -208,6 +211,11 @@ else
             else
             {
                 var snapshot = await Client.GetAgentAsync(AgentResourceNamespace, Name!, cancellation.Token);
+                if (!AgentResourceNamespace.IsDefault && IsPackManaged(snapshot.Value))
+                {
+                    Navigation.NavigateTo($"/namespaces/{Uri.EscapeDataString(AgentResourceNamespace.Value)}/agents/{Uri.EscapeDataString(Name!)}", replace: true);
+                    return;
+                }
                 model = AgentEditorModel.FromResource(snapshot.Value);
                 selectedScope = snapshot.Value.ScopeRef;
                 etag = snapshot.ETag;
@@ -268,7 +276,7 @@ else
             var request = ResourceManifestSerializer.FromYaml<AgentResourceRequest>(rawYaml);
             if (!string.Equals(request.ApiVersion, ResourceApiVersions.CoreV1, StringComparison.Ordinal)) throw new ArgumentException(T("ApiVersionRequired", ResourceApiVersions.CoreV1));
             if (!string.Equals(request.Kind, AgentResourceKinds.Agent, StringComparison.Ordinal)) throw new ArgumentException(T("KindRequired", AgentResourceKinds.Agent));
-            if (!request.Metadata.Namespace.IsDefault) throw new ArgumentException(T("PackAgentReadOnly"));
+            if (request.Metadata.Namespace != AgentResourceNamespace) throw new ArgumentException(T("AgentNamespaceImmutable"));
             if (!IsNew && !string.Equals(request.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException(T("AgentNameImmutable"));
             model = AgentEditorModel.FromRequest(request);
             _ = model.ToRequest();
@@ -303,6 +311,9 @@ else
     private Task DiscardAsync() => OnParametersSetAsync();
 
     private static string ResourceName(string name) => name;
+    private static bool IsPackManaged(AgentResource value) =>
+        value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Publisher)
+        && value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name);
     private static string ProfileUrl(AgentModelResponse value)
     {
         return ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(value.Declared.ModelProfile.Namespace), ModelResourceKinds.ModelProfile, value.Declared.ModelProfile.ResourceId));
