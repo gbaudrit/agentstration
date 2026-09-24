@@ -100,4 +100,9 @@ export const Checkpoints = {
     immutable: 'resource-naming-immutable',
     conflict: 'resource-naming-conflict',
   },
+  foundrySecretBinding: {
+    providerCreated: 'foundry-secret-binding-provider-created',
+    secretBound: 'foundry-secret-binding-secret-bound',
+    secretUnavailable: 'foundry-secret-binding-secret-unavailable',
+  },
 } as const;

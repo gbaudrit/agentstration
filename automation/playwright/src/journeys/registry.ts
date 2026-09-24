@@ -14,6 +14,7 @@ import { exerciseModelAdministration, type ExerciseModelAdministrationInput } fr
 import { exerciseDescendantSecrets, type ExerciseDescendantSecretsInput } from './exercise-descendant-secrets.journey.js';
 import { inspectPlatformHealth, type InspectPlatformHealthInput } from './inspect-platform-health.journey.js';
 import { exerciseResourceNaming, type ExerciseResourceNamingInput } from './exercise-resource-naming.journey.js';
+import { exerciseFoundrySecretBinding, type ExerciseFoundrySecretBindingInput } from './exercise-foundry-secret-binding.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -33,4 +34,5 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'exercise-descendant-secrets': (context, input) => exerciseDescendantSecrets(context, input as unknown as ExerciseDescendantSecretsInput),
   'inspect-platform-health': (context, input) => inspectPlatformHealth(context, input as unknown as InspectPlatformHealthInput),
   'exercise-resource-naming': (context, input) => exerciseResourceNaming(context, input as unknown as ExerciseResourceNamingInput),
+  'exercise-foundry-secret-binding': (context, input) => exerciseFoundrySecretBinding(context, input as unknown as ExerciseFoundrySecretBindingInput),
 };

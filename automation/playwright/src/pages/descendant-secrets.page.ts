@@ -45,6 +45,18 @@ export class DescendantSecretsPage {
     await this.saveNew('vaults', name);
   }
 
+  public async initializeVault(): Promise<void> {
+    await this.page.locator('.resource-form[data-interactive="true"]').waitFor({ state: 'visible' });
+    const initialize = this.page.locator('.resource-form .form-section .button-primary');
+    await initialize.waitFor({ state: 'visible' });
+    await initialize.click();
+    const confirmation = this.page.getByRole('alertdialog');
+    await confirmation.waitFor({ state: 'visible' });
+    await confirmation.locator('.button-danger').click();
+    await confirmation.waitFor({ state: 'detached' });
+    await initialize.waitFor({ state: 'detached' });
+  }
+
   public async createSecret(name: string, displayName: string, vaultName: string, vaultScopeRef: string): Promise<void> {
     const displayNameInput = this.page.getByTestId(TestIds.secretGrants.secretDisplayName);
     await displayNameInput.fill(displayName);
