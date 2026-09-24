@@ -72,6 +72,12 @@ public static partial class WorkplaceEndpoints
         return Results.Ok(new EntryValidationResponse(result.IsValid, result.Issues.Select(value => new EntryValidationIssueContract(value.Code, value.Message)).ToArray()));
     });
 
+    private static Task<IResult> ValidateNamespacedEntryDraftAsync(string @namespace, string entryName, EntryAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var result = await service.ValidateAsync(NamespacedEntryId(@namespace, entryName), token);
+        return Results.Ok(new EntryValidationResponse(result.IsValid, result.Issues.Select(value => new EntryValidationIssueContract(value.Code, value.Message)).ToArray()));
+    });
+
     private static Task<IResult> PublishEntryDraftAsync(string entryName, EntryAdministrationService service, CancellationToken token) =>
         ExecuteAsync(async () => Results.Ok(await service.PublishAsync(EntryResourceId(entryName), token)));
 

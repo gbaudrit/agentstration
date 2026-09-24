@@ -258,6 +258,8 @@ public sealed class EntryAdministrationComponentTests
         await rendered.Find("[data-testid='entry-tab-definition']").ClickAsync(new());
 
         Assert.IsFalse(rendered.Find("[data-testid='entry-definition-fields']").HasAttribute("disabled"));
+        Assert.IsTrue(rendered.Markup.Contains("can be edited and published independently", StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Markup.Contains("managed by its namespaced Pack source", StringComparison.Ordinal));
         await rendered.Find("[data-testid='exposure-console']").ChangeAsync(new ChangeEventArgs { Value = true });
         await rendered.Find("[data-testid='console-fallback']").ChangeAsync(new ChangeEventArgs { Value = true });
         await rendered.FindAll("button").Single(value => value.TextContent.Contains("Save draft", StringComparison.Ordinal)).ClickAsync(new());

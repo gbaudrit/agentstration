@@ -35,7 +35,7 @@ else
 
     @if (!EntryResourceNamespace.IsDefault)
     {
-        <p class="muted">@T("NamespacedEntryHelp")</p>
+        <p class="muted">@T(IsPackOwned ? "PackManagedEntryHelp" : "NamespacedEntryHelp")</p>
     }
 
     <div class="entry-tabs">
