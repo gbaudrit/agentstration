@@ -88,6 +88,7 @@ public sealed class AgentFrameworkRuntimeFactory(
             WorkspaceId = scope?.WorkspaceId,
             PrincipalId = scope?.PrincipalId,
             RunId = scope?.ExecutionId,
+            FlowStepId = scope?.FlowStepId,
             AgentId = definition.AgentKey,
             AgentVersion = definition.AgentVersion,
             AgentGeneration = generation ?? scope?.AgentGeneration,

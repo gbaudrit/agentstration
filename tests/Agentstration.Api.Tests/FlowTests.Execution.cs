@@ -33,6 +33,70 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task DirectAndWorkflowAgentStepsCarryTheOwningFlowExecutionContext()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
+            "scoped-direct", null, "1.0.0", true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"))), default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
+        var executor = new RecordingFlowAgentExecutor();
+        var expressions = new FlowExpressionParser();
+        var runs = new FlowRunService(
+            fixture.Repository,
+            new TestFlowRunQueue(),
+            new TestCancellationRegistry(),
+            executor,
+            new UnsupportedFlowOrchestrationEngine(),
+            expressions,
+            expressions,
+            new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(),
+            TimeProvider.System);
+        using var directInput = JsonDocument.Parse("""{"prompt":"Use the Tool"}""");
+        var direct = await runs.CreateAsync(
+            created.Value.Id, null, "local", FlowRunTrigger.Manual, "tester",
+            "direct-scope-correlation", directInput.RootElement, TestScope, default);
+
+        await runs.ExecuteAsync(new(direct.Value.Id, TestScope), default);
+
+        var directRequest = executor.Requests.Single();
+        Assert.AreEqual(TestScope, directRequest.Scope);
+        Assert.AreEqual(direct.Value.Id, directRequest.RunId);
+        Assert.AreEqual("Agent", directRequest.StepName);
+        Assert.AreEqual("direct-scope-correlation", directRequest.CorrelationId);
+
+        var now = TimeProvider.System.GetUtcNow();
+        var draft = new FlowDraft
+        {
+            WorkspaceId = TestScope.WorkspaceId,
+            Id = "scoped-workflow-draft",
+            FlowId = new("scoped-workflow"),
+            DisplayName = "Scoped workflow",
+            Definition = new FlowGraphDefinition
+            {
+                EntryStep = "specialist",
+                Steps = [new AgentFlowStepDefinition { Name = "specialist", Agent = new("assistant") }],
+                Transitions = []
+            },
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        using var workflowInput = JsonDocument.Parse("""{"prompt":"Use the Tool from a workflow"}""");
+        var workflow = await runs.CreateDraftAsync(
+            draft, FlowRunTrigger.Manual, "tester", "workflow-scope-correlation",
+            workflowInput.RootElement, TestScope, default);
+
+        await runs.ExecuteAsync(new(workflow.Value.Id, TestScope), default);
+
+        var workflowRequest = executor.Requests.Last();
+        Assert.AreEqual(TestScope, workflowRequest.Scope);
+        Assert.AreEqual(workflow.Value.Id, workflowRequest.RunId);
+        Assert.AreEqual("specialist", workflowRequest.StepName);
+        Assert.AreEqual("workflow-scope-correlation", workflowRequest.CorrelationId);
+    }
+
+    [TestMethod]
     public async Task OrchestrationFlowUsesNeutralEngineAndPersistsParticipantProgress()
     {
         await using var fixture = await FlowFixture.CreateAsync();
@@ -213,6 +277,27 @@ public sealed partial class FlowTests
         {
             Request = request;
             return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement("sent"));
+        }
+    }
+
+    private sealed class RecordingFlowAgentExecutor : IFlowAgentExecutor
+    {
+        public List<FlowAgentExecutionRequest> Requests { get; } = [];
+
+        public Task<FlowAgentExecutionResult> ExecuteAsync(
+            FlowAgentExecutionRequest request,
+            CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+            return Task.FromResult(new FlowAgentExecutionResult(
+                JsonSerializer.SerializeToElement("done"),
+                request.Target.Id,
+                1,
+                "default",
+                "Test",
+                null,
+                [],
+                []));
         }
     }
 
