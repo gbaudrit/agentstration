@@ -177,11 +177,21 @@ public sealed class AepClient(
         return await ReadAsync<AepChatResponse>(response, cancellationToken);
     }
 
-    internal async Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(string providerId, CancellationToken cancellationToken)
+    internal async Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(
+        string providerId,
+        IReadOnlyList<AepBoundValue>? boundValues,
+        CancellationToken cancellationToken)
     {
         _ = await DiscoverAsync(cancellationToken);
-        using var response = await SendAsync(HttpMethod.Get, $"{AepProtocol.ModelProvidersPath}/{Uri.EscapeDataString(providerId)}/models", null, cancellationToken);
-        return await ReadAsync<AepModelDescriptor[]>(response, cancellationToken);
+        using var response = await SendAsync(
+            HttpMethod.Post,
+            $"{AepProtocol.ModelProvidersPath}/{Uri.EscapeDataString(providerId)}/models",
+            new AepBoundValuesRequest(boundValues),
+            cancellationToken);
+        var models = await ReadAsync<AepModelDescriptor[]>(response, cancellationToken);
+        if (AepModelObservationValidator.FindIssue(models) is { } issue)
+            throw new AepProtocolException("model_observation_invalid", issue, response.StatusCode);
+        return models;
     }
 
     internal async Task<AepProviderHealth> GetHealthAsync(string providerId, CancellationToken cancellationToken)
@@ -229,6 +239,7 @@ public sealed class AepClient(
                 yield return update;
                 if (update.FinishReason is not null) yield break;
             }
+            throw new AepProtocolException("invalid_response", "The extension streaming response ended without a finish reason.", response.StatusCode);
         }
     }
 
@@ -292,8 +303,8 @@ public sealed class AepClient(
         try { error = await response.Content.ReadFromJsonAsync<AepErrorResponse>(AepProtocol.JsonOptions, cancellationToken); }
         catch (JsonException) { }
         throw new AepProtocolException(
-            error?.Error.Code ?? "extension_request_failed",
-            error?.Error.Message ?? $"The AEP extension returned HTTP {(int)response.StatusCode}.",
+            error?.Error?.Code ?? "extension_request_failed",
+            error?.Error?.Message ?? $"The AEP extension returned HTTP {(int)response.StatusCode}.",
             response.StatusCode);
     }
 }
@@ -304,7 +315,12 @@ public sealed class AepModelProviderClient(AepClient client, string providerId)
         client.GetHealthAsync(providerId, cancellationToken);
 
     public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>
-        client.ListModelsAsync(providerId, cancellationToken);
+        client.ListModelsAsync(providerId, null, cancellationToken);
+
+    public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(
+        IReadOnlyList<AepBoundValue> boundValues,
+        CancellationToken cancellationToken = default) =>
+        client.ListModelsAsync(providerId, boundValues, cancellationToken);
 
     public Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken = default) =>
         client.ChatAsync(providerId, request, cancellationToken);

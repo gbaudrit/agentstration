@@ -23,7 +23,7 @@ public sealed record EntryResponse(Guid WorkspaceId, string Id, string Name, str
     public EntryExecutionResponse? Execution { get; init; }
 }
 public sealed record EntryExecutionResponse(bool CanInvoke, EntryExecutionAvailability Availability, string? ReasonCode);
-public sealed record EntryDraftResponse(EntryDraft Value, EntryResource? Published);
+public sealed record EntryDraftResponse(EntryDraft Value, EntryResource? Published, bool ManagedByPack = false);
 public sealed record EntryValidationResponse(bool IsValid, IReadOnlyList<EntryValidationIssueContract> Issues);
 public sealed record EntryValidationIssueContract(string Code, string Message);
 public sealed record EntryDependencyResponse(string ResourceId, string ResourceType, string Relationship);

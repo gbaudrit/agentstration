@@ -30,8 +30,10 @@
     [Parameter] public long Revision { get; set; }
     [Parameter] public long FitRevision { get; set; }
     [Parameter] public bool IsReadOnly { get; set; }
+    [Parameter] public string? EntryStep { get; set; }
     [Parameter] public EventCallback<string?> SelectedStepChanged { get; set; }
     [Parameter] public EventCallback<MoveStepCommand> StepMoved { get; set; }
+    [Parameter] public EventCallback<string> StepRemoved { get; set; }
     [Parameter] public EventCallback<FlowTransitionDefinition> TransitionCreated { get; set; }
     [Parameter] public EventCallback<string> TransitionRemoved { get; set; }
 
@@ -41,6 +43,10 @@
         diagram.ContainerChanged += OnContainerChanged;
         diagram.ZoomChanged += OnZoomChanged;
         diagram.SelectionChanged += OnSelectionChanged;
+        diagram.Options.Constraints.ShouldDeleteNode = node => ValueTask.FromResult(
+            !IsReadOnly && StepRemoved.HasDelegate && node is FlowDiagramNode flowNode && flowNode.Source.Name != EntryStep);
+        diagram.Options.Constraints.ShouldDeleteLink = _ => ValueTask.FromResult(!IsReadOnly);
+        diagram.Nodes.Removed += OnNodeRemoved;
         diagram.Links.Added += OnLinkAdded;
         diagram.Links.Removed += OnLinkRemoved;
     }
@@ -145,6 +151,15 @@
             _ = StepMoved.InvokeAsync(new MoveStepCommand(node.Source.Name, new(node.Position.X, node.Position.Y)));
     }
 
+    private void OnNodeRemoved(NodeModel model)
+    {
+        if (model is not FlowDiagramNode node) return;
+        node.Moved -= OnNodeMoved;
+        node.SizeChanged -= OnDiagramMetricsChanged;
+        if (rebuilding || IsReadOnly) return;
+        _ = StepRemoved.InvokeAsync(node.Source.Name);
+    }
+
     private void OnLinkAdded(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
     {
         if (rebuilding || IsReadOnly) return;
@@ -163,8 +178,11 @@
 
     private void OnLinkRemoved(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
     {
-        if (!rebuilding && !IsReadOnly)
-            _ = TransitionRemoved.InvokeAsync(link.Id);
+        if (rebuilding || IsReadOnly) return;
+        // Removing a node also removes its links. The step command owns those transitions.
+        if (link.Source.Model is PortModel source && source.Parent is FlowDiagramNode from && !diagram.Nodes.Contains(from)) return;
+        if (link.Target.Model is PortModel target && target.Parent is FlowDiagramNode to && !diagram.Nodes.Contains(to)) return;
+        _ = TransitionRemoved.InvokeAsync(link.Id);
     }
 
     public void Dispose()
@@ -172,6 +190,7 @@
         diagram.ContainerChanged -= OnContainerChanged;
         diagram.ZoomChanged -= OnZoomChanged;
         diagram.SelectionChanged -= OnSelectionChanged;
+        diagram.Nodes.Removed -= OnNodeRemoved;
         diagram.Links.Added -= OnLinkAdded;
         diagram.Links.Removed -= OnLinkRemoved;
         foreach (var node in diagram.Nodes.OfType<FlowDiagramNode>())

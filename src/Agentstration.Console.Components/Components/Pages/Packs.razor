@@ -209,6 +209,13 @@ else
                                                     <option value="@BindingValue(runtimeProfile.Name, ResourceNamespace.Parse(runtimeProfile.Namespace))">@runtimeProfile.Properties.DisplayName — @runtimeProfile.Namespace/@runtimeProfile.Name · @runtimeProfile.Properties.RuntimeType</option>
                                                 }
                                             }
+                                            else if (binding.TargetKind == PackBindingTargetKind.Parameter)
+                                            {
+                                                @foreach (var parameter in parameters)
+                                                {
+                                                    <option value="@BindingValue(parameter.Name, parameter.Namespace, parameter.ScopeRef)">@parameter.Definition.DisplayName — @parameter.ScopeRef · @parameter.Namespace/@parameter.Name</option>
+                                                }
+                                            }
                                             else
                                             {
                                                 @foreach (var secret in secrets)
@@ -266,9 +273,8 @@ else
                 @if (forkNotice is not null) { <p class="pack-success" role="status">@forkNotice</p> }
                 <div class="form-grid pack-fork-grid">
                     <label><span>@T("Publisher")</span><input @bind="forkPublisher" autocomplete="off" spellcheck="false" /></label>
-                    <label><span>@T("Name")</span><input @bind="forkName" autocomplete="off" spellcheck="false" /></label>
+                    <ResourceIdentityFields @bind-DisplayName="forkDisplayName" @bind-TechnicalName="forkName" Policy="ResourceNamePolicy.Pack" IsNew="true" />
                     <label><span>@T("Version")</span><input @bind="forkVersion" autocomplete="off" spellcheck="false" /></label>
-                    <label><span>@T("DisplayName")</span><input @bind="forkDisplayName" /></label>
                     <label class="form-span-2"><span>@T("Description")</span><textarea rows="3" @bind="forkDescription"></textarea></label>
                 </div>
                 @if (forkError is not null) { <p class="error-panel" role="alert">@forkError</p> }

@@ -50,4 +50,5 @@
   <data name="Cancel"><value>Annuler</value></data>
   <data name="Delete"><value>Supprimer</value></data>
   <data name="Edit"><value>Modifier →</value></data>
+  <data name="Categories" xml:space="preserve"><value>Catégories</value></data>
 </root>

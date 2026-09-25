@@ -102,7 +102,13 @@ public sealed class SqliteResourceStore(
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
-        try { await EnsureInstanceScopeAsync(context, cancellationToken); }
+        try
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT OR IGNORE INTO ResourceScopes (Ref, Kind, TargetKey, ParentScopeId)
+                VALUES ({ResourceScopeRef.Instance.Value}, {"instance"}, {ResourceScopeRef.Instance.TargetKey}, NULL)
+                """, cancellationToken);
+        }
         catch (System.Data.Common.DbException exception)
         {
             throw new InvalidOperationException("The Management database schema is incompatible with explicit resource scopes. Delete the pre-release database and reseed the instance.", exception);
@@ -544,18 +550,6 @@ public sealed class SqliteResourceStore(
             parentId = parent.ParentScopeId;
         }
         return [.. result];
-    }
-
-    private static async Task EnsureInstanceScopeAsync(ResourceManagementDbContext context, CancellationToken cancellationToken)
-    {
-        if (await context.ResourceScopes.AnyAsync(value => value.Ref == ResourceScopeRef.Instance.Value, cancellationToken)) return;
-        context.ResourceScopes.Add(new ResourceScopeRow
-        {
-            Ref = ResourceScopeRef.Instance.Value,
-            Kind = "instance",
-            TargetKey = ResourceScopeRef.Instance.TargetKey
-        });
-        await context.SaveChangesAsync(cancellationToken);
     }
 
     private static ResourceScope Map(ResourceScopeRow row) => new(

@@ -292,6 +292,7 @@ public static class OpenApiConfiguration
         if (value.StartsWith("/api/model", StringComparison.Ordinal)
             || value.StartsWith("/api/runtimeprofiles", StringComparison.Ordinal)) return "Model management";
         if (value.StartsWith("/api/extensions", StringComparison.Ordinal)) return "Extensions";
+        if (value.StartsWith("/api/parameters", StringComparison.Ordinal)) return "Parameters";
         if (value.StartsWith("/api/vaults", StringComparison.Ordinal)
             || value.StartsWith("/api/secrets", StringComparison.Ordinal)) return "Secrets";
         if (value.StartsWith("/api/toolproviders", StringComparison.Ordinal)

@@ -11,6 +11,7 @@ using Agentstration.Infrastructure.Agents;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourcePlanning;
 using Agentstration.Runtime.Abstractions;
@@ -137,6 +138,8 @@ internal static class StandaloneHostCompositionExtensions
             sourceRegistryTransportOptions: sourceRegistryTransportOptions);
         builder.Services.AddAgentstrationModelProviders(builder.Configuration, useManagedProfileResolver);
         builder.Services.AddSingleton<ModelProviderManagementService>();
+        builder.Services.AddSingleton<ModelDiscoveryService>();
+        builder.Services.AddSingleton<IParameterUsageProvider, ModelProviderParameterUsageProvider>();
         builder.Services.AddSingleton<SourceProviderManagementService>();
         builder.Services.AddSingleton<IModelProviderConfigurationStore>(provider => provider.GetRequiredService<ModelProviderManagementService>());
         builder.Services.AddSingleton<ModelProfileManagementService>();
@@ -147,9 +150,7 @@ internal static class StandaloneHostCompositionExtensions
         builder.Services.AddSingleton<ExtensionRegistrationManagementService>();
         builder.Services.AddSingleton<AepEnrollmentSettingsService>();
         builder.Services.AddSingleton<AepEnrollmentService>();
-        builder.Services.AddSingleton<IResourceReferenceResolver, ResourceReferenceResolver>();
-        builder.Services.AddSingleton<ResourceScopeOperationService>();
-        builder.Services.AddSingleton<IResourceScopeOperations>(provider => provider.GetRequiredService<ResourceScopeOperationService>());
+        builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
         builder.Services.AddSingleton<ResourceScopeInventoryService>();
         builder.Services.AddSingleton<ExtensionManagementService>();
         builder.Services.AddSingleton<ExtensionInventoryService>();
@@ -158,7 +159,6 @@ internal static class StandaloneHostCompositionExtensions
             .Get<AepEnrollmentPolicyOptions>() ?? new());
         builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
         builder.Services.AddSingleton<IAepEnrollmentAnnouncementProvisioner>(provider => provider.GetRequiredService<ExtensionSourceDiscoveryService>());
-        builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
         builder.Services.AddAgentstrationApi(builder.Configuration, builder.Environment);
         if (!apiOnlyTesting)
         {
@@ -261,29 +261,35 @@ internal static class StandaloneHostCompositionExtensions
             {
                 await app.Services.GetRequiredService<IAgentstrationStorageInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-                await app.Services.GetRequiredService<SourceRegistryManagementService>().EnsureOfficialAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<LocalIdentityDatabaseInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
-                if (string.Equals(composition.Authentication.Mode, ApiAuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
-                    bootstrapContext = await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<WorkItemService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<WorkplaceService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<ResourcePlanService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-                if (app.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
-                    await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
-                await app.Services.ApplyDeclarativeBootstrapAsync(app.Lifetime.ApplicationStopping);
-                if (app.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
-                    await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
+
+                await app.Services.GetRequiredService<IInstanceInitializationCoordinator>().RunAsync(async token =>
+                {
+                    await app.Services.GetRequiredService<SourceRegistryManagementService>().EnsureOfficialAsync(token);
+                    if (string.Equals(composition.Authentication.Mode, ApiAuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
+                        bootstrapContext = await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(token);
+                    await app.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(token);
+                    if (app.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
+                        await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(token);
+                    await app.Services.ApplyDeclarativeBootstrapAsync(token);
+                    if (app.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
+                        await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(token);
+                    await app.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(token);
+                    if (bootstrapContext is not null)
+                        await WorkspaceStartupData.InitializeAsync(
+                            app.Services,
+                            bootstrapContext,
+                            includeInteractiveDemo: !app.Environment.IsEnvironment("Testing"),
+                            token);
+                }, app.Lifetime.ApplicationStopping);
             }
 
-            if (bootstrapContext is not null)
-                await WorkspaceStartupData.InitializeAsync(
-                    app.Services,
-                    bootstrapContext,
-                    includeInteractiveDemo: !app.Environment.IsEnvironment("Testing"),
-                    app.Lifetime.ApplicationStopping);
         }
         catch
         {

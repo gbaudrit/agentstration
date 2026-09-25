@@ -16,7 +16,7 @@ public sealed record BootstrapResourceNameReference
 public sealed record WorkspaceBootstrapDefinition
 {
     public string DisplayName { get; init; } = string.Empty;
-    public BootstrapResourceNameReference TenantRef { get; init; } = new();
+    public BootstrapResourceNameReference? TenantRef { get; init; }
 }
 
 public sealed record LocalAccountBootstrapReference
@@ -79,12 +79,15 @@ public sealed class TenantBootstrapResourceHandler(
 
 public sealed class WorkspaceBootstrapResourceHandler(
     IIdentityStore store,
-    TimeProvider timeProvider) : IBootstrapResourceHandler
+    TimeProvider timeProvider,
+    IWorkspaceProvisioner workspaceProvisioner) : IBootstrapResourceHandler
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public string Kind => IdentityBootstrapKinds.Workspace;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
+    public bool SupportsProfileScope(BootstrapProfileScope profileScope) =>
+        profileScope is BootstrapProfileScope.Instance or BootstrapProfileScope.Tenant;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
         BootstrapResourceDocument resource,
@@ -92,7 +95,7 @@ public sealed class WorkspaceBootstrapResourceHandler(
         BootstrapPlanningContext planning,
         CancellationToken cancellationToken)
     {
-        var (name, _, tenantName) = Read(resource);
+        var (name, _, tenantName) = await ReadAsync(resource, operation, cancellationToken);
         var tenant = await store.FindTenantByNameAsync(tenantName, cancellationToken);
         if (tenant is null)
         {
@@ -112,27 +115,50 @@ public sealed class WorkspaceBootstrapResourceHandler(
         BootstrapResourceOperationContext operation,
         CancellationToken cancellationToken)
     {
-        var (name, displayName, tenantName) = Read(resource);
+        var (name, displayName, tenantName) = await ReadAsync(resource, operation, cancellationToken);
         var tenant = await store.FindTenantByNameAsync(tenantName, cancellationToken)
             ?? throw new InvalidOperationException($"Workspace '{name}' references missing Tenant '{tenantName}'.");
         if (await store.FindWorkspaceByNameAsync(tenant.Id, name, cancellationToken) is not null)
             return BootstrapResourceApplyResult.Skipped;
 
-        await store.AddWorkspaceAsync(
-            new Workspace(Guid.NewGuid(), tenant.Id, name, displayName, WorkspaceStatus.Active, timeProvider.GetUtcNow()),
-            cancellationToken);
+        var workspace = new Workspace(Guid.NewGuid(), tenant.Id, name, displayName, WorkspaceStatus.Initializing, timeProvider.GetUtcNow());
+        await store.AddWorkspaceAsync(workspace, cancellationToken);
+        await workspaceProvisioner.ProvisionAsync(workspace, cancellationToken);
         return BootstrapResourceApplyResult.Created;
     }
 
-    private static (string Name, string DisplayName, string TenantName) Read(BootstrapResourceDocument resource)
+    private async Task<(string Name, string DisplayName, string TenantName)> ReadAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        CancellationToken cancellationToken)
     {
         var name = IdentityBootstrapValidation.Name(resource.Metadata.Name, "Workspace");
         var definition = resource.Definition.Deserialize<WorkspaceBootstrapDefinition>(JsonOptions)
             ?? throw new InvalidOperationException("Workspace definition is required.");
+        var tenantName = definition.TenantRef is null
+            ? await TargetTenantNameAsync(operation, cancellationToken)
+            : IdentityBootstrapValidation.Name(definition.TenantRef.Name, "Tenant");
+        if (operation.ProfileScope == BootstrapProfileScope.Tenant)
+        {
+            var targetTenantName = await TargetTenantNameAsync(operation, cancellationToken);
+            if (!string.Equals(tenantName, targetTenantName, StringComparison.Ordinal))
+                throw new InvalidOperationException($"Workspace '{name}' tenantRef '{tenantName}' does not match the target Tenant '{targetTenantName}'.");
+        }
         return (
             name,
             IdentityBootstrapValidation.DisplayName(definition.DisplayName, "Workspace"),
-            IdentityBootstrapValidation.Name(definition.TenantRef.Name, "Tenant"));
+            tenantName);
+    }
+
+    private async Task<string> TargetTenantNameAsync(
+        BootstrapResourceOperationContext operation,
+        CancellationToken cancellationToken)
+    {
+        if (operation.ProfileScope != BootstrapProfileScope.Tenant || operation.Target?.TenantId is not Guid tenantId)
+            throw new InvalidOperationException("Workspace definition.tenantRef is required outside a Tenant-scoped Bootstrap profile.");
+        var tenant = await store.GetTenantAsync(tenantId, cancellationToken)
+            ?? throw new InvalidOperationException($"Workspace target Tenant '{tenantId}' was not found.");
+        return tenant.Name;
     }
 }
 

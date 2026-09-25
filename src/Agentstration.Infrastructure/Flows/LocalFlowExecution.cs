@@ -106,8 +106,11 @@ public sealed class ManagedFlowAgentExecutor(
     IAgentResourceQueries agentQueries,
     AgentManagementService agents) : IFlowAgentExecutor
 {
-    public async Task<FlowAgentExecutionResult> ExecuteAsync(FlowTargetReference target, JsonElement input, string correlationId, CancellationToken cancellationToken)
+    public async Task<FlowAgentExecutionResult> ExecuteAsync(FlowAgentExecutionRequest request, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(request);
+        var target = request.Target;
+        var input = request.Input;
         if (target.Kind != FlowTargetKind.Agent)
             throw new FlowValidationException("flow_target_kind_unsupported", "Flow Runs currently execute explicit Agent targets.");
 
@@ -126,7 +129,23 @@ public sealed class ManagedFlowAgentExecutor(
             ?? throw new InvalidOperationException("The selected agent deployment no longer exists.");
         var revision = await store.GetAsync<AgentRevision>(new ResourceKey(AgentResourceKinds.AgentRevision, deployment.Value.RevisionName, targetNamespace), cancellationToken)
             ?? throw new InvalidOperationException("The selected agent revision no longer exists.");
-        var result = await execution.ExecuteSelectedAsync(selected, prompt, cancellationToken);
+        var result = await execution.ExecuteSelectedAsync(
+            selected,
+            new AgentExecutionRequest(
+                prompt,
+                request.RunId,
+                ToolExecution: new ToolExecutionScope
+                {
+                    OwnerKind = ToolExecutionOwnerKind.FlowRun,
+                    TenantId = request.Scope.TenantId,
+                    WorkspaceId = request.Scope.WorkspaceId,
+                    PrincipalId = request.Scope.PrincipalId,
+                    ExecutionId = request.RunId,
+                    FlowStepId = request.StepName,
+                    CorrelationId = request.CorrelationId,
+                    AgentGeneration = revision.Value.AgentVersion
+                }),
+            cancellationToken);
         return new FlowAgentExecutionResult(
             JsonSerializer.SerializeToElement(result.Output),
             revision.Value.AgentName,
@@ -135,7 +154,7 @@ public sealed class ManagedFlowAgentExecutor(
             result.ProviderType,
             result.Usage is null ? null : new FlowStepRunUsage(result.Usage.InputTokens, result.Usage.OutputTokens),
             revision.Value.Definition.EffectiveToolNames.ToArray(),
-            [$"Runtime deployment {deployment.Value.Uid} executed for correlation {correlationId}.", $"Model: {result.ModelName ?? "unspecified"}."]);
+            [$"Runtime deployment {deployment.Value.Uid} executed for correlation {request.CorrelationId}.", $"Model: {result.ModelName ?? "unspecified"}."]);
     }
 
     private static string ResourceName(string id) => id;
@@ -171,8 +190,8 @@ public sealed class ManagedFlowOrchestrationEngine(
 
 public sealed class ManagementFlowResourceReferenceResolver(IResourceStore store, IFlowRepository flows) : IFlowResourceReferenceResolver
 {
-    public async Task<bool> ExistsAsync(string resourceId, CancellationToken cancellationToken) =>
-        await store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, resourceId), cancellationToken) is not null;
+    public async Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken) =>
+        await store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, resourceId, @namespace ?? ResourceNamespace.Default), cancellationToken) is not null;
 
     public async Task<ResolvedFlowCall?> ResolveFlowAsync(
         WorkspaceId workspaceId,

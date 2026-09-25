@@ -54,7 +54,7 @@ public sealed class FlowToolStepTests
 
     private sealed class ToolResolver(JsonElement schema) : IFlowResourceReferenceResolver
     {
-        public Task<bool> ExistsAsync(string resourceId, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken) => Task.FromResult(true);
 
         public Task<ResolvedFlowTool?> ResolveToolAsync(
             WorkspaceId workspaceId,

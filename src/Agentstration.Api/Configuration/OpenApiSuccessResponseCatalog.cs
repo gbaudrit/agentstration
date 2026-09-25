@@ -7,6 +7,8 @@ using Agentstration.Flows.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
+using Agentstration.Parameters;
+using Agentstration.Parameters.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
@@ -321,11 +323,16 @@ internal static class OpenApiSuccessResponseCatalog
         if (path.StartsWith("/api/modelproviders", StringComparison.OrdinalIgnoreCase))
         {
             if (path == "/api/modelproviders") return method == "POST" ? Json<ModelProviderResource>(201, "Create a model provider") : Json<ValueResponse<ModelProviderResponse>>(200, "List model providers");
+            if (path.EndsWith("/models/refresh", StringComparison.OrdinalIgnoreCase)) return Json<ModelDiscoveryDiffResponse>(200, "Refresh a Model Provider inventory");
             if (path.EndsWith("/models", StringComparison.OrdinalIgnoreCase)) return Json<ValueResponse<AvailableModelResponse>>(200, "List provider models");
             if (path.EndsWith("/status", StringComparison.OrdinalIgnoreCase) || path.EndsWith("/test", StringComparison.OrdinalIgnoreCase)) return Json<ModelProviderStatusResponse>(200, "Get model provider status");
             if (path.EndsWith("/usages", StringComparison.OrdinalIgnoreCase)) return Json<ModelProviderUsagesResponse>(200, "List model provider usages");
             return Json<ModelProviderResource>(200, method == "PUT" ? "Update a model provider" : "Get a model provider");
         }
+        if (path.StartsWith("/api/models", StringComparison.OrdinalIgnoreCase))
+            return path == "/api/models"
+                ? Json<ValueResponse<ModelResource>>(200, "List discovered Models")
+                : Json<ModelResource>(200, "Get a discovered Model");
         if (path.StartsWith("/api/sourceproviders", StringComparison.OrdinalIgnoreCase))
         {
             if (path == "/api/sourceproviders") return method == "POST" ? Json<SourceProviderResource>(201, "Create a Source Provider") : Json<ValueResponse<SourceProviderSummaryResponse>>(200, "List Source Providers");
@@ -376,6 +383,16 @@ internal static class OpenApiSuccessResponseCatalog
             if (path == "/api/vaults") return method == "POST" ? Json<VaultResource>(201, "Create a Vault") : Json<IReadOnlyList<VaultResponse>>(200, "List Vaults");
             if (path.EndsWith("/initialize", StringComparison.OrdinalIgnoreCase)) return Json<VaultInitializationResponse>(200, "Initialize a Vault");
             return Json<VaultResponse>(200, "Get or update a Vault");
+        }
+        if (path.StartsWith("/api/parameters", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path.EndsWith("/usages", StringComparison.OrdinalIgnoreCase))
+                return Json<ParameterUsagesResponse>(200, "List Parameter usages");
+            if (path == "/api/parameters")
+                return method == "POST"
+                    ? Json<ParameterResource>(201, "Create a Parameter")
+                    : Json<IReadOnlyList<ParameterResource>>(200, "List Parameters");
+            return Json<ParameterResource>(200, method == "PUT" ? "Update a Parameter" : "Get a Parameter");
         }
         if (path.StartsWith("/api/secrets", StringComparison.OrdinalIgnoreCase))
         {
@@ -471,6 +488,7 @@ internal static class OpenApiSuccessResponseCatalog
         || path.StartsWith("/api/toolproviders", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/tools", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/toolexecutionhooks", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/api/parameters", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/vaults", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/secrets", StringComparison.OrdinalIgnoreCase);
 

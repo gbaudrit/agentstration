@@ -4,10 +4,7 @@ using Agentstration.Resources;
 
 namespace Agentstration.Web.FlowDesigner.Backend;
 
-public sealed record FlowDesignerTarget(ResourceNamespace Namespace, string ResourceId)
-{
-    public bool IsReadOnly => !Namespace.IsDefault;
-}
+public sealed record FlowDesignerTarget(ResourceNamespace Namespace, string ResourceId);
 
 public sealed record FlowDesignerResource(FlowId FlowId, string DisplayName, string? Description, IReadOnlyDictionary<string, string> Tags, FlowGraphDefinition Definition, long? DraftRevision = null);
 
@@ -19,6 +16,12 @@ public sealed record FlowDesignerLoadResult(FlowDesignerResource Resource, strin
         new(response.Value.FlowId, response.Value.DisplayName, response.Value.Description, response.Value.Tags, response.Value.Definition, response.Value.Revision),
         source,
         response.ETag);
+}
+
+public sealed class FlowDesignerVersionAlreadyPublishedException(string version, Exception innerException)
+    : Exception($"Flow version '{version}' is already published.", innerException)
+{
+    public string Version { get; } = version;
 }
 
 public interface IFlowDesignerBackend

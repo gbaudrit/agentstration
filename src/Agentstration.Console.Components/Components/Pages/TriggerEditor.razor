@@ -36,8 +36,7 @@ else
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("TriggerResource")</h2></div>@if (!IsNew) { <StatusBadge Text="@(existing!.Value.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(existing.Value.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /> }</div>
             <div class="form-grid">
-                <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /><small>@T("ImmutableNameHelp")</small></label>
-                <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
+                <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Trigger" IsNew="@IsNew" TechnicalNameHelp="@T("ImmutableNameHelp")" />
                 <ResourceScopeFormField ResourceKind="@TriggerResourceKinds.Trigger" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
                 <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
             </div>

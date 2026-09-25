@@ -81,7 +81,7 @@ public sealed class DeclarativeBootstrapService(
                         BootstrapResourceDisposition.Invalid, $"Unknown bootstrap resource kind '{resource.Kind}'."));
                     continue;
                 }
-                if (!IsCompatibleScope(handler.Scope, profile.Summary.Scope))
+                if (!handler.SupportsProfileScope(profile.Summary.Scope))
                 {
                     resources.Add(new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name,
                         BootstrapResourceDisposition.Invalid, $"Resource scope '{handler.Scope}' does not match profile scope '{profile.Summary.Scope}'."));
@@ -110,10 +110,6 @@ public sealed class DeclarativeBootstrapService(
             resources,
             loadedSelection.SourceProvenance);
     }
-
-    private static bool IsCompatibleScope(BootstrapProfileScope resourceScope, BootstrapProfileScope profileScope) =>
-        resourceScope == profileScope
-        || (profileScope == BootstrapProfileScope.Workspace && resourceScope == BootstrapProfileScope.Tenant);
 
     public async Task<BootstrapExecutionResult> ExecuteAsync(
         BootstrapProfileSelection selection,
@@ -288,6 +284,25 @@ public sealed class DeclarativeBootstrapService(
                     && string.Equals(binding.Name, bindingName, StringComparison.Ordinal));
                 if (selection is null)
                     throw new DeclarativeBootstrapException($"Bootstrap resource '{location}' references unresolved optional binding '{bindingName}'.");
+                var declaration = profile.Summary.Bindings.Single(binding => string.Equals(binding.Name, bindingName, StringComparison.Ordinal));
+                if (declaration.TargetKind is BootstrapBindingTargetKind.Parameter or BootstrapBindingTargetKind.Secret)
+                {
+                    if (selection.Target.ScopeRef is not { } scopeRef || scopeRef == default)
+                        throw new DeclarativeBootstrapException($"Bootstrap binding '{profile.Summary.Name}/{bindingName}' requires an exact scoped target.");
+                    var kind = declaration.TargetKind == BootstrapBindingTargetKind.Parameter
+                        ? "Parameter"
+                        : "Secret";
+                    return new JsonObject
+                    {
+                        ["address"] = new JsonObject
+                        {
+                            ["namespace"] = (selection.Target.Namespace ?? ResourceNamespace.Default).Value,
+                            ["kind"] = kind,
+                            ["name"] = selection.Target.Name
+                        },
+                        ["scopeRef"] = scopeRef.Value
+                    };
+                }
                 return JsonSerializer.SerializeToNode(selection.Target, JsonOptions);
             }
             foreach (var property in value.ToArray())

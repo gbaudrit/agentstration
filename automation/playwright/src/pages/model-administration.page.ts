@@ -26,7 +26,7 @@ export class ModelAdministrationPage {
     await this.page.waitForURL(url => url.pathname === `/modelproviders/${definition.providerName}`);
     const marker = this.page.getByTestId(TestIds.resourceAdministration.modelProviderEditor);
     await marker.waitFor({ state: 'visible' });
-    await this.waitForPersisted(TestIds.modelAdministration.providerForm);
+    await this.openProviderConfiguration();
     const status = this.page.getByTestId(TestIds.modelAdministration.providerStatus);
     const previousCheck = await status.getAttribute('data-checked-at');
     await this.page.getByTestId(TestIds.modelAdministration.providerTest).click();
@@ -44,6 +44,25 @@ export class ModelAdministrationPage {
     await this.page.waitForURL(url => url.pathname === `/runtimeprofiles/${definition.runtimeName}`);
     await this.waitForPersisted(TestIds.modelAdministration.runtimeForm);
     return this.page.getByTestId(TestIds.resourceAdministration.runtimeProfileEditor);
+  }
+
+  public async refreshProviderModels(consoleUrl: string, providerName: string): Promise<void> {
+    const response = await this.page.request.post(
+      `${consoleUrl}/api/modelproviders/${encodeURIComponent(providerName)}/models/refresh`,
+    );
+    if (!response.ok()) {
+      throw new Error(`Model discovery refresh returned HTTP ${response.status()}.`);
+    }
+  }
+
+  public async overrideFirstModelContextLimit(consoleUrl: string, providerName: string, contextTokens: number): Promise<void> {
+    await this.open(consoleUrl, `/modelproviders/${encodeURIComponent(providerName)}`, TestIds.resourceAdministration.modelProviderEditor);
+    await this.page.getByTestId(TestIds.modelAdministration.openModelDetails).first().click();
+    await this.page.getByTestId(TestIds.resourceAdministration.modelDetails).waitFor({ state: 'visible' });
+    await this.page.getByTestId(TestIds.modelAdministration.editModelOverride).click();
+    await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.modelOverrideContextTokens), contextTokens.toString());
+    await this.page.getByTestId(TestIds.modelAdministration.saveModelOverride).click();
+    await this.page.getByTestId(TestIds.modelAdministration.modelOverrideMessage).waitFor({ state: 'visible' });
   }
 
   public async createProfile(consoleUrl: string, definition: ModelAdministrationDefinition): Promise<Locator> {
@@ -101,7 +120,7 @@ export class ModelAdministrationPage {
 
   public async openProvider(consoleUrl: string, name: string): Promise<void> {
     await this.open(consoleUrl, `/modelproviders/${name}`, TestIds.resourceAdministration.modelProviderEditor);
-    await this.waitForPersisted(TestIds.modelAdministration.providerForm);
+    await this.openProviderConfiguration();
   }
 
   public async deleteProvider(): Promise<void> {
@@ -124,6 +143,17 @@ export class ModelAdministrationPage {
   private async waitForPersisted(testId: string): Promise<void> {
     await this.waitForInteractive(testId);
     await expect(this.page.getByTestId(testId)).toHaveAttribute('data-resource-etag', /.+/);
+  }
+
+  private async openProviderConfiguration(): Promise<void> {
+    const configurationTab = this.page.getByTestId(TestIds.modelAdministration.providerConfigurationTab);
+    const form = this.page.getByTestId(TestIds.modelAdministration.providerForm);
+    await expect(async () => {
+      await configurationTab.click();
+      await expect(configurationTab).toHaveAttribute('aria-selected', 'true');
+      await expect(form).toBeVisible();
+    }).toPass();
+    await this.waitForPersisted(TestIds.modelAdministration.providerForm);
   }
 
   private async deleteCurrent(deleteButtonId: string, confirmButtonId: string, listPath: string): Promise<void> {

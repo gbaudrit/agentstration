@@ -7,6 +7,7 @@ namespace Agentstration.Application.Work;
 public interface IWorkplaceContext
 {
     WorkspaceId WorkspaceId { get; }
+    Guid PrincipalId { get; }
 }
 
 public interface IEntryTargetResolver
@@ -155,7 +156,11 @@ public sealed class EntryAdministrationService(
                 .Select(dashboard => dashboard.Name));
         if ((exposedBy.Count > 0 || draftedBy.Count > 0) && !removeDashboardReferences)
             throw new WorkValidationException("entry_in_use", $"Entry '{id}' is referenced by a Workplace Dashboard.");
-        var interactions = await repository.ListEntryInteractionsAsync(workspaceId, id, cancellationToken);
+        var interactions = await repository.ListEntryInteractionsForAdministrationAsync(workspaceId, id, cancellationToken);
+        if (interactions.Any(value => value.OwnerPrincipalId != context.PrincipalId))
+            throw new WorkValidationException(
+                "entry_has_foreign_owned_interactions",
+                $"Entry '{id}' has conversations owned by another principal and cannot be deleted without an explicit ownership override.");
         var busy = interactions.Where(value => value.Status is InteractionStatus.Processing or InteractionStatus.WaitingForUser).ToArray();
         if (busy.Length > 0 && !closeInteractions)
             throw new WorkValidationException("entry_interactions_active", $"Entry '{id}' has {busy.Length} active interaction(s) and cannot be deleted.");
@@ -207,7 +212,7 @@ public sealed class EntryAdministrationService(
                     }, action.Version, cancellationToken);
                 }
 
-                var current = await repository.GetInteractionAsync(workspaceId, interaction.Id, cancellationToken);
+                var current = await repository.GetInteractionForProjectionAsync(workspaceId, interaction.Id, cancellationToken);
                 if (current is null || current.Status == InteractionStatus.Closed) continue;
                 await repository.SaveInteractionAsync(current with
                 {

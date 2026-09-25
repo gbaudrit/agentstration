@@ -31,7 +31,8 @@ public sealed class RootFlowSubmissionTests
         Assert.AreEqual(first.FlowRun.Run.Id, second.FlowRun.Run.Id);
         Assert.IsFalse(first.Recovered);
         Assert.IsTrue(second.Recovered);
-        Assert.HasCount(1, (await fixture.Repository.QueryAsync(new WorkItemQuery(Scope.WorkspaceId), default)).Items);
+        Assert.HasCount(1, (await fixture.Repository.QueryAsync(new WorkItemQuery(Scope.WorkspaceId, Scope.PrincipalId), default)).Items);
+        Assert.AreEqual(Scope.PrincipalId, first.WorkItem.Value.OwnerPrincipalId);
         Assert.HasCount(1, fixture.Runs.RunIds.Distinct(StringComparer.Ordinal));
         Assert.IsNull(first.FlowRun.Run.ParentFlowRunId);
         Assert.IsNull(first.FlowRun.Run.RootFlowRunId);

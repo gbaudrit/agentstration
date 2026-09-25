@@ -9,6 +9,7 @@ using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Triggers;
 using Agentstration.Web.Components.Models;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -89,7 +90,7 @@ public sealed class DashboardTests
     }
 
     [TestMethod]
-    public async Task DashboardDoesNotClaimHealthWithoutActiveDeployments()
+    public async Task DashboardTreatsNoActiveDeploymentsAsHealthy()
     {
         var fake = new MockApiClient(new FixedTimeProvider(Now));
         var service = new PlatformDashboardService(
@@ -103,7 +104,7 @@ public sealed class DashboardTests
         var snapshot = await service.GetAsync(CancellationToken.None);
 
         Assert.AreEqual("No active deployments", snapshot.Status);
-        Assert.AreEqual(UiStatus.Info, PlatformDashboardService.ToStatus(snapshot.Status));
+        Assert.AreEqual(UiStatus.Success, PlatformDashboardService.ToStatus(snapshot.Status));
     }
 
     [TestMethod]
@@ -136,6 +137,33 @@ public sealed class DashboardTests
         Assert.AreEqual("approval-flow", attention.Name);
         Assert.AreEqual("Input required", attention.Status);
         Assert.AreEqual("/flow-runs/flowrun-waiting", attention.Url);
+    }
+
+    [TestMethod]
+    public async Task PageWaitCancellationDoesNotCancelSharedPlatformStatusLoad()
+    {
+        var fake = new MockApiClient(new FixedTimeProvider(Now));
+        var work = new ControlledWorkClient();
+        using var service = new PlatformDashboardService(
+            new StubManagementClient([], [], []),
+            fake,
+            work,
+            fake,
+            new StubModelProvidersClient([]),
+            NullLogger<PlatformDashboardService>.Instance);
+        var sharedLoad = service.StartShared();
+        using var pageCancellation = new CancellationTokenSource();
+        var pageWait = service.GetAsync(pageCancellation.Token);
+
+        pageCancellation.Cancel();
+        await Assert.ThrowsExactlyAsync<TaskCanceledException>(async () => await pageWait);
+        Assert.IsFalse(sharedLoad.Snapshot.IsCompleted);
+
+        work.Complete(new(0, 0, 0, 0, 0));
+        var status = await ((IPlatformStatusProvider)service).GetStatusAsync(CancellationToken.None);
+
+        Assert.AreEqual(PlatformStatusKind.NoActiveDeployments, status.Kind);
+        Assert.AreEqual(UiStatus.Success, status.Status);
     }
 
     [TestMethod]
@@ -247,6 +275,24 @@ public sealed class DashboardTests
         public Task<WorkTaskOperationsDetailResponse> GetTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Agentstration.Flows.FlowRun> GetTaskFlowRunAsync(Guid taskId, string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<PendingActionContract> RespondTaskPendingActionAsync(Guid taskId, Guid actionId, IReadOnlyDictionary<string, System.Text.Json.JsonElement> values, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task PauseTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task ResumeTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task CancelTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class ControlledWorkClient : IWorkApiClient
+    {
+        private readonly TaskCompletionSource<WorkTaskOperationsCountersResponse> completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void Complete(WorkTaskOperationsCountersResponse counters) => completion.SetResult(counters);
+        public Task<WorkTaskOperationsCountersResponse> GetTaskSummaryAsync(string? workspaceId, CancellationToken cancellationToken) => completion.Task.WaitAsync(cancellationToken);
+        public Task<IReadOnlyList<WorkSummary>> GetWorkItemsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<WorkTaskOperationsPageResponse> GetTasksAsync(string? workspaceId, WorkTaskStatus? status, string? search, bool? hasPendingAction, int page, int pageSize, string sort, string direction, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<WorkTaskOperationsDetailResponse> GetTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<FlowRun> GetTaskFlowRunAsync(Guid taskId, string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<PendingActionContract> RespondTaskPendingActionAsync(Guid taskId, Guid actionId, IReadOnlyDictionary<string, JsonElement> values, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task PauseTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task ResumeTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();

@@ -7,6 +7,7 @@ using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Agents;
 using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.Assistant;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.Events;
 using Agentstration.Infrastructure.Flows;
@@ -15,10 +16,12 @@ using Agentstration.Infrastructure.Packs;
 using Agentstration.Infrastructure.ResourcePlanning;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Sources;
+using Agentstration.Infrastructure.Tools;
 using Agentstration.Infrastructure.Triggers;
 using Agentstration.Infrastructure.Work;
 using Agentstration.ModelProviders;
 using Agentstration.Packs;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Storage.PostgreSql;
 using Agentstration.ResourceManagement.Storage.Sqlite;
@@ -74,6 +77,9 @@ public static class DependencyInjection
         services.TryAddSingleton<ICurrentRequestContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton<IRequestContextScopeFactory>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton<ITriggerExecutionContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
+        services.TryAddSingleton<IResourceReferenceResolver, ResourceReferenceResolver>();
+        services.TryAddSingleton<ResourceScopeOperationService>();
+        services.TryAddSingleton<IResourceScopeOperations>(provider => provider.GetRequiredService<ResourceScopeOperationService>());
         services.TryAddSingleton(new GenAiObservabilityOptions());
         services.TryAddTransient<GenAiHttpPayloadCaptureHandler>();
         services.AddSingleton<IManagementEventPublisher, InProcessManagementEventPublisher>();
@@ -93,6 +99,11 @@ public static class DependencyInjection
         storageOptions ??= new AgentstrationStorageOptions();
         var storageProvider = storageOptions.GetProvider();
         services.AddSingleton(storageOptions);
+        services.AddSingleton<InstanceInitializationOptions>();
+        services.AddSingleton<IInstanceInitializationCoordinator, InstanceInitializationCoordinator>();
+        services.AddSingleton<WorkspacePlatformResourceProvisioner>();
+        services.AddSingleton<IWorkspacePlatformResourceProvisioner>(provider => provider.GetRequiredService<WorkspacePlatformResourceProvisioner>());
+        services.AddSingleton<IWorkspaceProvisioner>(provider => provider.GetRequiredService<WorkspacePlatformResourceProvisioner>());
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
             services.AddSingleton<IAgentstrationStorageInitializer, PostgreSqlStorageInitializer>();
         else
@@ -126,6 +137,8 @@ public static class DependencyInjection
             provider.GetRequiredService<IMasterKeyProvider>()));
         services.AddSingleton<ISecretVaultProvider, SharedKeyFileSecretVaultProvider>();
         services.AddSingleton<DescendantResourceUseAuthorizer>();
+        services.AddSingleton<ParameterManagementService>();
+        services.AddSingleton<IParameterResolver>(provider => provider.GetRequiredService<ParameterManagementService>());
         services.AddSingleton<SecretManagementService>();
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
         services.AddSingleton<ISecretAccessAuthorizer>(provider => provider.GetRequiredService<SecretManagementService>());
@@ -149,6 +162,7 @@ public static class DependencyInjection
         services.AddScoped<IBootstrapResourceHandler, WorkspaceBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, PrincipalDefaultContextBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, PackInstallationBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, ParameterBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ModelProviderBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, RuntimeProfileBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ModelProfileBootstrapResourceHandler>();
@@ -185,6 +199,7 @@ public static class DependencyInjection
         services.AddSingleton<IPackArchiveReader, ZipPackArchiveReader>();
         services.AddSingleton<IPackArtifactStore>(_ => new FileSystemPackArtifactStore(Path.Combine(dataDirectory, "pack-artifacts")));
         services.AddSingleton<IPackResourceHandler, ModelProviderPackResourceHandler>();
+        services.AddSingleton<IPackResourceHandler, ParameterPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, RuntimeProfilePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, ModelProfilePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, AgentPackResourceHandler>();
@@ -255,6 +270,7 @@ public static class DependencyInjection
         services.AddSingleton<SourceRegistryDiscoveryService>();
         services.AddSingleton<ISourceVerificationEvidenceProvider>(services => services.GetRequiredService<SourceRegistryTrustEvaluationService>());
         services.AddSingleton<ToolManagementService>();
+        services.AddSingleton<ToolCategoryService>();
         services.AddSingleton<ToolDefinitionService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
@@ -334,6 +350,11 @@ public static class DependencyInjection
         services.AddSingleton<WorkNotificationMcpToolDefinitionProvider>();
         services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<WorkNotificationMcpToolDefinitionProvider>());
         services.AddSingleton<WorkNotificationMcpTool>();
+        services.AddSingleton(provider => new AssistantDocumentationCatalog(
+            Path.Combine(provider.GetService<IHostEnvironment>()?.ContentRootPath ?? dataDirectory, "docs")));
+        AddInternalTool<AssistantDocumentationMcpTool>(services);
+        AddInternalTool<AssistantDiagnosticsMcpTool>(services);
+        AddInternalTool<DateTimeMcpTool>(services);
         AddInternalTool<ResourcePlanCreateMcpTool>(services);
         AddInternalTool<ResourcePlanGetMcpTool>(services);
         AddInternalTool<ResourcePlanRefineMcpTool>(services);

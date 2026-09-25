@@ -63,6 +63,12 @@ public static class WorkplaceValidation
             throw new WorkValidationException("entry_workplace_placement_required", "A Workplace-exposed Entry requires at least one Workplace placement.");
         if (!exposesWorkplace && exposure.WorkplacePlacements.Count > 0)
             throw new WorkValidationException("entry_workplace_placements_not_allowed", "An Entry that is not exposed to Workplace cannot declare Workplace placements.");
+        ArgumentNullException.ThrowIfNull(exposure.Console);
+        if (!Enum.IsDefined(exposure.Console.Role))
+            throw new WorkValidationException("entry_console_role_invalid", "The Entry Console role is not supported.");
+        if (!exposure.Surfaces.Contains(EntryExposureSurface.Console)
+            && exposure.Console.Role != EntryConsoleRole.Standard)
+            throw new WorkValidationException("entry_console_role_not_allowed", "An Entry that is not exposed to Console cannot declare a Console role.");
     }
 
     private static void ValidatePresentation(EntryPresentation presentation)

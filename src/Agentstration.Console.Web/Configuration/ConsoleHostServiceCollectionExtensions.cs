@@ -41,6 +41,7 @@ public static class ConsoleHostServiceCollectionExtensions
         services.AddScoped<IResourceSearchProvider, ConsoleResourceSearchProvider>();
         services.AddAgentstrationFlowDesigner();
         services.AddScoped<PlatformDashboardService>();
+        services.AddScoped<IPlatformStatusProvider>(provider => provider.GetRequiredService<PlatformDashboardService>());
         services.AddScoped<IFlowDesignerBackend, FlowDesignerBackend>();
         services.AddScoped<IFlowDesignerResourceProvider, FlowDesignerResourceProvider>();
 
@@ -66,6 +67,7 @@ public static class ConsoleHostServiceCollectionExtensions
         AddClient<IdentityAdministrationApiClient, IIdentityAdministrationApiClient>(services, configured.ManagementApi);
         AddClient<HttpUserPreferencesClient, IUserPreferencesClient>(services, configured.ManagementApi, resilient: false);
         AddClient<ModelProvidersApiClient, IModelProvidersClient>(services, configured.ManagementApi);
+        AddClient<ModelsApiClient, IModelsClient>(services, configured.ManagementApi);
         AddClient<ExtensionsApiClient, IExtensionsClient>(services, configured.ManagementApi);
         AddClient<SourceConsoleApiClient, ISourceConsoleApiClient>(services, configured.ManagementApi);
         AddClient<SourceProvidersApiClient, ISourceProvidersClient>(services, configured.ManagementApi);
@@ -78,8 +80,10 @@ public static class ConsoleHostServiceCollectionExtensions
         AddClient<TriggerApiClient, ITriggerApiClient>(services, configured.ManagementApi);
         AddClient<ResourcePlansApiClient, IResourcePlansApiClient>(services, configured.ManagementApi);
         AddClient<ToolsApiClient, IToolsClient>(services, configured.ManagementApi);
+        AddClient<ToolCategoriesApiClient, IToolCategoriesClient>(services, configured.ManagementApi);
         AddClient<ToolDefinitionsApiClient, IToolDefinitionsClient>(services, configured.ManagementApi);
         AddClient<SecretsApiClient, ISecretsClient>(services, configured.ManagementApi, resilient: false);
+        AddClient<ParametersApiClient, IParametersClient>(services, configured.ManagementApi, resilient: false);
         services.AddTransient<BffWorkloadSigningHandler>();
         Configure(
             services.AddHttpClient<IBffWorkloadTrustClient, BffWorkloadTrustClient>()

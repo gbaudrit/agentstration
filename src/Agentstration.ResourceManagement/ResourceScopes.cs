@@ -54,13 +54,13 @@ public static class ResourceScopePolicy
 
     public static IReadOnlySet<ResourceScopeKind> AllowedScopes(string kind) => kind switch
     {
-        "ModelProvider" or "ModelProfile" or "RuntimeProfile" => TenantOnly,
+        "Model" or "ModelProvider" or "ModelProfile" or "RuntimeProfile" => TenantOnly,
         "SourceProvider" => InstanceTenantWorkspace,
         "SourceRegistryRegistration" or "SourceRegistryObservedState" or "SourceRegistryRefreshRecord" => InstanceOnly,
         "Source" or "SourceVersion" or "SourceConfiguration" or "SourceObservedState" or "SourceImportRecord"
             or "SourceChannelSnapshot" or "SourceChannelObservedState" or "SourceChannelRefreshRecord" => InstanceTenantWorkspace,
-        "Vault" or "Secret" => InstanceTenantWorkspace,
-        "ToolProvider" or "Tool" or "ToolDefinition" or "ToolExecutionHook" => WorkspaceOnly,
+        "Vault" or "Secret" or "Parameter" => InstanceTenantWorkspace,
+        "ToolProvider" or "Tool" or "ToolCategory" or "ToolDefinition" or "ToolExecutionHook" => WorkspaceOnly,
         "Agent" or "AgentRevision" or "AgentDeployment" or "Trigger" => WorkspaceOnly,
         "InstalledPack" or "ExtensionRegistration" => InstanceTenantWorkspace,
         "PackProject" or "PackProjectBuild" => WorkspaceOnly,

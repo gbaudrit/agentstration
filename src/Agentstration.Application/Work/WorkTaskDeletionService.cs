@@ -4,7 +4,7 @@ using Agentstration.Work.Storage.Abstractions;
 
 namespace Agentstration.Application.Work;
 
-public sealed class WorkTaskDeletionService(IWorkItemRepository repository, IArtifactStore artifacts)
+public sealed class WorkTaskDeletionService(IWorkItemRepository repository, IArtifactStore artifacts, IWorkplaceContext context)
 {
     public async Task DeleteAsync(
         WorkspaceId workspaceId,
@@ -13,7 +13,7 @@ public sealed class WorkTaskDeletionService(IWorkItemRepository repository, IArt
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expectedETag);
-        var deleted = await repository.DeleteTaskAsync(workspaceId, taskId, expectedETag, cancellationToken);
+        var deleted = await repository.DeleteTaskAsync(workspaceId, context.PrincipalId, taskId, expectedETag, cancellationToken);
         foreach (var artifact in deleted.Artifacts)
             await artifacts.DeleteAsync(workspaceId, artifact, cancellationToken);
     }

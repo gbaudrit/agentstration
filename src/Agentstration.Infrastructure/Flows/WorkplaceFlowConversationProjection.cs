@@ -33,7 +33,7 @@ public sealed class WorkplaceFlowConversationProjectionSink(
             var stored = await flows.GetRunAsync(runEvent.WorkspaceId, runEvent.RunId, cancellationToken);
             if (stored is null || !Guid.TryParse(stored.Value.InteractionId, out var interactionGuid)) return;
             var interactionId = new InteractionId(interactionGuid);
-            var interaction = await workplace.GetInteractionAsync(runEvent.WorkspaceId, interactionId, cancellationToken);
+            var interaction = await workplace.GetInteractionForProjectionAsync(runEvent.WorkspaceId, interactionId, cancellationToken);
             if (interaction is null) return;
 
             var events = await flows.ListRunEventsAsync(runEvent.WorkspaceId, runEvent.RunId, 0, cancellationToken);

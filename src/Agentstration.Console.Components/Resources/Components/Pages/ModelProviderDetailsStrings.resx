@@ -5,6 +5,10 @@
   <data name="CreateProvider"><value>Create model provider</value></data>
   <data name="ModelProvider"><value>Model provider</value></data>
   <data name="Description"><value>Bind an AEP extension contribution to a governed Model Provider resource.</value></data>
+  <data name="Tab.Overview"><value>Overview</value></data>
+  <data name="Tab.Configuration"><value>Configuration</value></data>
+  <data name="ProviderSummary"><value>Model provider summary</value></data>
+  <data name="UsagesHelp"><value>Profiles currently bound to this provider</value></data>
   <data name="Delete"><value>Delete</value></data>
   <data name="CreateModelProfile"><value>Create model profile</value></data>
   <data name="Back"><value>Back</value></data>
@@ -38,11 +42,19 @@
   <data name="SaveChanges"><value>Save changes</value></data>
   <data name="Discovery"><value>Discovery</value></data>
   <data name="AvailableModels"><value>Available models</value></data>
+  <data name="RefreshModels"><value>Refresh models</value></data>
+  <data name="RefreshingModels"><value>Refreshing…</value></data>
+  <data name="DiscoverySummary"><value>{0} created · {1} updated · {2} unchanged · {3} missing · {4} reappeared · {5} total</value></data>
+  <data name="InitialDiscoveryComplete"><value>Initial model discovery complete</value></data>
+  <data name="InitialDiscoveryFailed"><value>Provider created; initial discovery failed</value></data>
+  <data name="DiscoveryRefreshed"><value>Model discovery refreshed</value></data>
   <data name="ModelCount.One"><value>{0} model</value></data>
   <data name="ModelCount.Many"><value>{0} models</value></data>
   <data name="NoModelsDiscovered"><value>No models discovered</value></data>
-  <data name="NoModelsMessage"><value>Test the endpoint and verify that the provider has a model available.</value></data>
+  <data name="NoModelsMessage"><value>Refresh discovery and verify that the provider has an installed model available.</value></data>
   <data name="Model"><value>Model</value></data>
+  <data name="Actions"><value>Actions</value></data>
+  <data name="CreateProfileForModel"><value>Create profile</value></data>
   <data name="Status"><value>Status</value></data>
   <data name="Capabilities"><value>Capabilities</value></data>
   <data name="Parameters"><value>Parameters</value></data>
@@ -60,4 +72,7 @@
   <data name="Status.Unavailable"><value>Unavailable</value></data>
   <data name="Status.Failed"><value>Failed</value></data>
   <data name="Status.Unknown"><value>Unknown</value></data>
+<data name="ConfigurationValues"><value>Configuration values</value></data><data name="ValueBindings"><value>Value Bindings</value></data><data name="ValueBindingsHelp"><value>Bind each AEP requirement to an exact scoped resource. Values are revalidated by the server when saved and used.</value></data><data name="Required"><value>Required</value></data><data name="Optional"><value>Optional</value></data><data name="Protection.Standard"><value>Standard</value></data><data name="Protection.Secured"><value>Secured</value></data><data name="ExpectedType"><value>Expected type</value></data><data name="ExpectedFormat"><value>Format</value></data><data name="ValueSource"><value>Value source</value></data><data name="Source.Parameter"><value>Parameter</value></data><data name="Source.Secret"><value>Secret</value></data><data name="ExactResource"><value>Exact scoped resource</value></data><data name="SelectValueSource"><value>Select a resource</value></data><data name="CreateParameter"><value>Create a Parameter</value></data><data name="CreateSecret"><value>Create a Secret</value></data><data name="UnavailableSelection"><value>Unavailable — {0}/{1}/{2}</value></data><data name="RequiredBindingMissing"><value>This required value needs a binding before the provider can be saved.</value></data><data name="SecretValueHidden"><value>The Secret value remains write-only and is never loaded into the Console.</value></data>
+  <data name="Input"><value>Input</value></data>
+  <data name="Output"><value>Output</value></data>
 </root>

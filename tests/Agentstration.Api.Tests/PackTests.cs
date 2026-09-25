@@ -12,6 +12,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Models;
 using Agentstration.Packs;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
@@ -21,6 +22,7 @@ using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Secrets;
 using Agentstration.Work;
+using Agentstration.Work.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -430,6 +432,72 @@ public sealed class PackTests
     }
 
     [TestMethod]
+    public async Task ParameterBindingRequiresAndPreservesAnExactScope()
+    {
+        await using var fixture = await PackFixture.CreateAsync();
+        _ = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, new ParameterResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ParameterResourceKinds.Parameter,
+            Metadata = new ResourceMetadata { Name = "temperature" },
+            Definition = new ParameterProperties
+            {
+                DisplayName = "Temperature",
+                ValueType = ParameterValueType.DecimalNumber,
+                Value = JsonSerializer.SerializeToElement(0.2)
+            }
+        }, null, true, default);
+        var handler = new FakeHandler("Consumer", 10, []);
+        var service = new PackManagementService(fixture.Store, [handler], TimeProvider.System);
+        var document = new PackResourceDocument(
+            "resources/consumer.json",
+            ResourceApiVersions.CoreV1,
+            "Consumer",
+            "consumer",
+            JsonSerializer.SerializeToElement(new
+            {
+                apiVersion = ResourceApiVersions.CoreV1,
+                kind = "Consumer",
+                metadata = new { name = "consumer" },
+                definition = new
+                {
+                    temperature = new { binding = "temperature", referenceKind = "parameter" }
+                }
+            }));
+        var archive = new PackArchive(
+            new PackManifest
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = PackKinds.Pack,
+                Metadata = new PackMetadata { Publisher = "agentstration", Name = "parameter-pack", Version = "1.0.0" },
+                Definition = new PackDefinition
+                {
+                    Resources = [document.Path],
+                    Bindings = [new PackBindingRequirement { Name = "temperature", TargetKind = PackBindingTargetKind.Parameter }]
+                }
+            },
+            [document],
+            "parameter.pack.zip");
+
+        var missingScope = await Assert.ThrowsExactlyAsync<PackValidationException>(() => service.InstallAsync(
+            archive,
+            [new PackBindingSelection("temperature", new("temperature"))],
+            default));
+        Assert.AreEqual("pack_binding_scope_required", missingScope.Code);
+
+        _ = await service.InstallAsync(
+            archive,
+            [new PackBindingSelection("temperature", new("temperature", ResourceScopeRef.Instance))],
+            default);
+
+        Assert.IsNotNull(handler.LastInstalledManifest);
+        var reference = handler.LastInstalledManifest.Value.GetProperty("definition").GetProperty("temperature");
+        Assert.AreEqual("temperature", reference.GetProperty("address").GetProperty("name").GetString());
+        Assert.AreEqual(ParameterResourceKinds.Parameter, reference.GetProperty("address").GetProperty("kind").GetString());
+        Assert.AreEqual(ResourceScopeRef.Instance.Value, reference.GetProperty("scopeRef").GetString());
+    }
+
+    [TestMethod]
     public async Task RuntimeProfileBindingControlsThePackAgentsLocalDeployment()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
@@ -791,6 +859,9 @@ public sealed class PackTests
         Assert.AreEqual(HttpStatusCode.OK, forkEntryResponse.StatusCode, await forkEntryResponse.Content.ReadAsStringAsync());
         using var forkEntryDraftResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/management/entries/who-am-i");
         Assert.AreEqual(HttpStatusCode.OK, forkEntryDraftResponse.StatusCode, await forkEntryDraftResponse.Content.ReadAsStringAsync());
+        var forkEntryDraft = await forkEntryDraftResponse.Content.ReadFromJsonAsync<EntryDraftResponse>();
+        Assert.IsNotNull(forkEntryDraft);
+        Assert.IsTrue(forkEntryDraft.ManagedByPack);
         using var forkEntryDependenciesResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/management/entries/who-am-i/dependencies");
         Assert.AreEqual(HttpStatusCode.OK, forkEntryDependenciesResponse.StatusCode, await forkEntryDependenciesResponse.Content.ReadAsStringAsync());
         using var forkEntry = JsonDocument.Parse(await forkEntryResponse.Content.ReadAsStreamAsync());

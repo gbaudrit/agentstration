@@ -49,6 +49,12 @@ export const Checkpoints = {
     created: 'pack-project-created',
     built: 'pack-project-built',
   },
+  bootstrapProvenance: {
+    entryEditable: 'bootstrap-entry-editable',
+    flowEditable: 'bootstrap-flow-editable',
+    agentEditable: 'bootstrap-agent-editable',
+    packReadOnly: 'pack-provenance-read-only',
+  },
   workplace: {
     home: 'workplace-home',
     entryReady: 'workplace-entry-ready',
@@ -74,6 +80,10 @@ export const Checkpoints = {
     profileEditors: 'resource-administration-profile-editors',
     protectedEditors: 'resource-administration-protected-editors',
   },
+  platformHealth: {
+    directRoute: 'platform-health-direct-route',
+    afterNavigation: 'platform-health-after-navigation',
+  },
   descendantSecrets: {
     vaultCreated: 'descendant-secrets-vault-created',
     vaultUnavailable: 'descendant-secrets-vault-unavailable',
@@ -88,5 +98,17 @@ export const Checkpoints = {
     profile: 'model-administration-profile',
     updated: 'model-administration-updated',
     deleted: 'model-administration-deleted',
+  },
+  resourceNaming: {
+    agentIdentity: 'resource-naming-agent-identity',
+    parameterDerived: 'resource-naming-parameter-derived',
+    parameterPersisted: 'resource-naming-parameter-persisted',
+    immutable: 'resource-naming-immutable',
+    conflict: 'resource-naming-conflict',
+  },
+  foundrySecretBinding: {
+    providerCreated: 'foundry-secret-binding-provider-created',
+    secretBound: 'foundry-secret-binding-secret-bound',
+    secretUnavailable: 'foundry-secret-binding-secret-unavailable',
   },
 } as const;

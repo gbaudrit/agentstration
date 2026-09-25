@@ -1,0 +1,6 @@
+apiVersion: agentstration.io/v1
+kind: Workspace
+metadata:
+  name: agentstration-assistant
+definition:
+  displayName: Agentstration Assistant

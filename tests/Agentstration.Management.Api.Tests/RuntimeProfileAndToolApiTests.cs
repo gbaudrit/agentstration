@@ -28,6 +28,28 @@ namespace Agentstration.Management.Tests;
 public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
+    public async Task ToolCatalogReadsDoNotWriteControlPlaneResources()
+    {
+        await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        var scope = ResourceScopeRef.Workspace(requestContext.WorkspaceId);
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        var before = await store.ListExactInventoryAsync(scope, 0, 1000, default);
+        using var client = factory.CreateClient();
+
+        using var tools = await client.GetAsync("/api/tools");
+        using var providers = await client.GetAsync("/api/toolproviders");
+
+        Assert.AreEqual(HttpStatusCode.OK, tools.StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, providers.StatusCode);
+        var after = await store.ListExactInventoryAsync(scope, 0, 1000, default);
+        CollectionAssert.AreEqual(
+            before.Select(value => $"{value.Kind}/{value.Namespace}/{value.Name}/{value.UpdatedAt:O}").ToArray(),
+            after.Select(value => $"{value.Kind}/{value.Namespace}/{value.Name}/{value.UpdatedAt:O}").ToArray());
+    }
+
+    [TestMethod]
     public async Task PlannedAgentDeletionUsesItsExactWorkspaceScope()
     {
         await using var factory = Factory();
@@ -368,6 +390,126 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         using var deleted = await client.SendAsync(delete);
         Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
     }
+
+    [TestMethod]
+    public async Task ToolCategoryCrudPersistsCanonicalReferencesWithoutMutatingTools()
+    {
+        await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        var toolService = factory.Services.GetRequiredService<ToolManagementService>();
+        var tool = await toolService.PutToolAsync(ManualTool("category-search"), null, true, default);
+        using var client = factory.CreateClient();
+        var properties = new ToolCategoryProperties
+        {
+            DisplayName = "Search tools",
+            Description = "Tools used to search governed content.",
+            Tools = [new ResourceReference(tool.Value.Name)]
+        };
+
+        using var createdResponse = await client.PostAsJsonAsync(
+            "/api/toolcategories",
+            new CreateToolCategoryRequest("search-tools", properties));
+
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
+        Assert.IsNotNull(createdResponse.Headers.ETag);
+        var created = await createdResponse.Content.ReadFromJsonAsync<ToolCategoryResource>();
+        Assert.IsNotNull(created);
+        Assert.AreNotEqual(Guid.Empty, created.Uid);
+        Assert.AreEqual(ToolResourceKinds.ToolCategory, created.Kind);
+        Assert.AreEqual(1, created.Generation);
+        Assert.AreEqual(tool.Value.Name, created.Definition.Tools.Single().Name);
+
+        using var update = new HttpRequestMessage(HttpMethod.Put, "/api/toolcategories/search-tools")
+        {
+            Content = JsonContent.Create(new PutToolCategoryRequest(properties with { DisplayName = "Knowledge search" }))
+        };
+        update.Headers.IfMatch.Add(createdResponse.Headers.ETag);
+        using var updatedResponse = await client.SendAsync(update);
+        Assert.AreEqual(HttpStatusCode.OK, updatedResponse.StatusCode);
+        var updated = await updatedResponse.Content.ReadFromJsonAsync<ToolCategoryResource>();
+        Assert.IsNotNull(updated);
+        Assert.AreEqual(created.Uid, updated.Uid);
+        Assert.AreEqual(created.Name, updated.Name);
+        Assert.AreEqual(2, updated.Generation);
+
+        using var duplicate = await client.PostAsJsonAsync(
+            "/api/toolcategories",
+            new CreateToolCategoryRequest("duplicates", properties with
+            {
+                Tools = [new ResourceReference(tool.Value.Name), new ResourceReference(tool.Value.Name)]
+            }));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, duplicate.StatusCode);
+
+        using var delete = new HttpRequestMessage(HttpMethod.Delete, "/api/toolcategories/search-tools");
+        delete.Headers.IfMatch.Add(updatedResponse.Headers.ETag!);
+        using var deleted = await client.SendAsync(delete);
+        Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
+        Assert.IsNotNull(await toolService.GetToolAsync(tool.Value.Name, default));
+    }
+
+    [TestMethod]
+    public async Task ToolCategoryPreservesPreviouslyStoredMissingMembersAndSurfacesTheirState()
+    {
+        await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        var toolService = factory.Services.GetRequiredService<ToolManagementService>();
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        var tool = await toolService.PutToolAsync(ManualTool("category-transient"), null, true, default);
+        using var client = factory.CreateClient();
+        var properties = new ToolCategoryProperties
+        {
+            DisplayName = "Transient tools",
+            Tools = [new ResourceReference(tool.Value.Name)]
+        };
+        using var createdResponse = await client.PostAsJsonAsync(
+            "/api/toolcategories",
+            new CreateToolCategoryRequest("transient-tools", properties));
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
+        var category = await createdResponse.Content.ReadFromJsonAsync<ToolCategoryResource>();
+        Assert.IsNotNull(category);
+
+        var toolScope = tool.Value.ScopeRef ?? throw new AssertFailedException("Created Tool has no scope.");
+        await store.DeleteExactAsync(
+            ScopedResourceAddress.Create(toolScope, tool.Value.Namespace, ToolResourceKinds.Tool, tool.Value.Name),
+            tool.ETag,
+            default);
+
+        var members = await client.GetFromJsonAsync<ValueResponse<ToolCategoryMember>>(
+            "/api/toolcategories/transient-tools/members");
+        Assert.IsNotNull(members);
+        Assert.AreEqual("missing", members.Value.Single().State);
+        Assert.IsNull(members.Value.Single().Tool);
+
+        using var preserve = new HttpRequestMessage(HttpMethod.Put, "/api/toolcategories/transient-tools")
+        {
+            Content = JsonContent.Create(new PutToolCategoryRequest(properties with { DisplayName = "Still transient" }))
+        };
+        preserve.Headers.IfMatch.Add(createdResponse.Headers.ETag!);
+        using var preserved = await client.SendAsync(preserve);
+        Assert.AreEqual(HttpStatusCode.OK, preserved.StatusCode);
+
+        using var unknown = await client.PostAsJsonAsync(
+            "/api/toolcategories",
+            new CreateToolCategoryRequest("unknown-tools", properties with
+            {
+                Tools = [new ResourceReference("does-not-exist")]
+            }));
+        Assert.AreEqual(HttpStatusCode.NotFound, unknown.StatusCode);
+    }
+
+    private static ToolResource ManualTool(string name) => new()
+    {
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ToolResourceKinds.Tool,
+        Metadata = new ResourceMetadata { Name = name },
+        Definition = new ToolResourceProperties
+        {
+            DisplayName = name,
+            ToolType = new ToolTypeReference("tests", "manual")
+        }
+    };
 
 }
 

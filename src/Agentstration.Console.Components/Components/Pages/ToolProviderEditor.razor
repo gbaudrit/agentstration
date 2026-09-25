@@ -5,30 +5,45 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolProviderEditorStrings> Localizer
 
 <PageTitle>@(IsNew ? T("AddProvider") : displayName) · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("AddProvider") : displayName)" Description="@T("Description")" TestId="resource-tool-provider-editor"><Actions><a class="button-secondary" href="/tools/providers">@T("Back")</a>@if (!IsNew) { <button class="button-secondary" @onclick="TestAsync" disabled="@busy">@T("TestConnection")</button><button class="button-primary" @onclick="RefreshAsync" disabled="@busy">@T("RefreshDiscovery")</button> }</Actions></PageHeader>
+<PageHeader Title="@(IsNew ? T("AddProvider") : displayName)" Description="@T("Description")" TestId="resource-tool-provider-editor"><Actions><a class="button-secondary" href="/tools/providers">@T("Back")</a>@if (!IsNew) { <button class="button-secondary" @onclick="TestAsync" disabled="@busy"><UiIcon Name="activity" />@T("TestConnection")</button><button class="button-primary" @onclick="RefreshAsync" disabled="@busy"><UiIcon Name="refresh" />@T("RefreshDiscovery")</button> }</Actions></PageHeader>
 
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else
 {
     @if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")">@message</div> }
-    @if (!IsNew) { <ResourceTabs Label="@T("SectionsLabel")"><a class="active" href="@SectionUrl("overview")">@T("Overview")</a><a href="@SectionUrl("tools")">@T("Tools")</a><a href="@SectionUrl("connection")">@T("Connection")</a></ResourceTabs> }
-    <section class="panel form-section" id="overview"><div class="panel-header"><h2>@T("Overview")</h2></div><div class="form-grid">
-        <label><span>@T("Name")</span><input @bind="name" disabled="@(!IsNew)" /></label><label><span>@T("DisplayName")</span><input @bind="displayName" /></label>
+    @if (!IsNew)
+    {
+        <ResourceTabs Label="@T("SectionsLabel")"><button type="button" class="@(activeTab == ProviderTab.Overview ? "active" : null)" @onclick="() => activeTab = ProviderTab.Overview" data-testid="provider-overview-tab">@T("Overview")</button><button type="button" class="@(activeTab == ProviderTab.Tools ? "active" : null)" @onclick="() => activeTab = ProviderTab.Tools" data-testid="provider-tools-tab">@T("Tools")<span class="provider-tab-count">@tools.Count</span></button><button type="button" class="@(activeTab == ProviderTab.Connection ? "active" : null)" @onclick="() => activeTab = ProviderTab.Connection" data-testid="provider-connection-tab">@T("Connection")</button></ResourceTabs>
+    }
+
+    @if (IsNew || activeTab == ProviderTab.Overview)
+    {
+    <section class="panel form-section tool-provider-section" id="overview" data-testid="provider-overview-panel"><div class="panel-header tool-provider-section-header"><div class="tool-provider-section-heading"><span class="tool-provider-section-icon"><UiIcon Name="server" /></span><div><p class="eyebrow">@T("OverviewEyebrow")</p><h2>@T("Overview")</h2><p>@T("OverviewHelp")</p></div></div>@if (!IsNew) { <StatusBadge Text="@StatusLabel(provider?.Definition.Discovery.Status)" Status="@ProviderStatus(provider?.Definition.Discovery.Status)" /> }</div><div class="form-grid tool-provider-form-grid">
+        <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="@IsNew" />
         <label><span>@T("ProviderType")</span><select @bind="providerType" disabled="@(!IsNew)"><option value="Mcp">MCP</option><option value="Aep">AEP</option></select></label>
         <ResourceScopeFormField ResourceKind="@ToolResourceKinds.ToolProvider" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
-        <label><span>@T("Enabled")</span><input type="checkbox" @bind="enabled" /></label>
-        @if (!IsNew) { <div><span class="field-label">@T("Status")</span><p>@StatusLabel(provider?.Definition.Discovery.Status)</p></div><div><span class="field-label">@T("LastDiscovery")</span><p>@(provider?.Definition.Discovery.LastDiscoveryAt?.ToString("g") ?? T("Never"))</p></div> }
+        <label class="provider-enabled-toggle form-span-2"><input type="checkbox" @bind="enabled" /><span class="provider-toggle-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span></label>
+        @if (!IsNew) { <div class="provider-observation form-span-2"><div><span class="provider-observation-icon"><UiIcon Name="activity" /></span><span><small>@T("Status")</small><strong>@StatusLabel(provider?.Definition.Discovery.Status)</strong></span></div><div><span class="provider-observation-icon"><UiIcon Name="clock" /></span><span><small>@T("LastDiscovery")</small><strong>@(provider?.Definition.Discovery.LastDiscoveryAt?.ToString("g") ?? T("Never"))</strong></span></div></div> }
     </div></section>
-    <section class="panel form-section" id="connection"><div class="panel-header"><h2>@T("Connection")</h2></div><div class="form-grid">
+    }
+
+    @if (IsNew || activeTab == ProviderTab.Connection)
+    {
+    <section class="panel form-section tool-provider-section" id="connection" data-testid="provider-connection-panel"><div class="panel-header tool-provider-section-header"><div class="tool-provider-section-heading"><span class="tool-provider-section-icon"><UiIcon Name="settings" /></span><div><p class="eyebrow">@T("ConnectionEyebrow")</p><h2>@T("Connection")</h2><p>@T("ConnectionHelp")</p></div></div></div><div class="form-grid tool-provider-form-grid">
         @if (providerType == ToolProviderType.Aep) { <label class="form-span-2"><span>@T("AepExtensionId")</span><input @bind="extensionId" /></label> }
         else { <label><span>@T("Transport")</span><select @bind="transport"><option value="Stdio">STDIO</option><option value="StreamableHttp">Streamable HTTP</option></select></label>
             @if (transport == McpToolProviderTransport.Stdio) { <label><span>@T("Command")</span><input @bind="command" placeholder="npx" /></label><label class="form-span-2"><span>@T("Arguments")</span><textarea @bind="arguments" rows="4"></textarea></label><label><span>@T("WorkingDirectory")</span><input @bind="workingDirectory" /></label><label><span>@T("EnvironmentReferences")</span><textarea @bind="environmentReferences" rows="4" placeholder="TOKEN=Secrets:Mcp:Token"></textarea><small>@T("EnvironmentReferencesHelp")</small></label> }
             else { <label class="form-span-2"><span>@T("Endpoint")</span><input @bind="endpoint" placeholder="https://server.example/mcp" /></label> }
         }
     </div></section>
-    <div class="form-actions"><button class="button-primary" @onclick="SaveAsync" disabled="@busy">@(busy ? T("Saving") : T("SaveProvider"))</button></div>
+    }
 
-    @if (!IsNew) { <section class="panel" id="tools"><div class="panel-header"><div><h2>@T("Tools")</h2><p>@T("ToolsDiscovered", ToolCount(tools.Count))</p></div></div>
+    @if (IsNew || activeTab != ProviderTab.Tools)
+    {
+        <div class="form-actions tool-provider-actions"><button class="button-primary" @onclick="SaveAsync" disabled="@busy"><UiIcon Name="check" />@(busy ? T("Saving") : T("SaveProvider"))</button></div>
+    }
+
+    @if (!IsNew && activeTab == ProviderTab.Tools) { <section class="panel tool-provider-section" id="tools" data-testid="provider-tools-panel"><div class="panel-header tool-provider-section-header"><div class="tool-provider-section-heading"><span class="tool-provider-section-icon"><UiIcon Name="wrench" /></span><div><p class="eyebrow">@T("ToolsEyebrow")</p><h2>@T("Tools")</h2><p>@T("ToolsDiscovered", ToolCount(tools.Count))</p></div></div></div>
         @if (tools.Count == 0) { <EmptyState Title="@T("NoToolsTitle")" Message="@T("NoToolsMessage")" /> }
         else { <DataGrid TItem="ToolResource" Items="tools"><Header><tr><th>@T("Name")</th><th>@T("Status")</th><th>@T("Enabled")</th><th></th></tr></Header><Row Context="tool"><tr><td><span class="resource-name-with-scope"><strong>@tool.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span><code>@tool.Definition.ExternalId</code></td><td>@AvailabilityLabel(tool.Definition.Discovery?.Available == true)</td><td><input type="checkbox" checked="@tool.Definition.Enabled" @onchange="args => EnableAsync(tool, (bool)args.Value!)" /></td><td><a class="text-button" href="@($"/tools/{Uri.EscapeDataString(tool.Name)}")">@T("Inspect")</a></td></tr></Row></DataGrid> }
     </section> }
@@ -50,6 +65,8 @@ else
     private async Task TestAsync(){busy=true;try{var result=await Client.TestAsync(Name!,default);failed=false;message=T("ConnectionSucceeded",ToolCount(result.ToolCount));}catch(Exception ex){failed=true;message=ex.Message;}finally{busy=false;}}
     private async Task RefreshAsync(){busy=true;try{var diff=await Client.RefreshAsync(Name!,default);tools=await Client.GetToolsAsync(Name!);failed=false;message=T("DiscoverySummary",diff.Unchanged,diff.New,diff.Changed,diff.Unavailable);}catch(Exception ex){failed=true;message=ex.Message;}finally{busy=false;}}
     private async Task EnableAsync(ToolResource tool,bool value){await Client.SetEnabledAsync(tool.Name,value,null,default);tools=await Client.GetToolsAsync(Name!);}
-    private string SectionUrl(string section) => $"/tools/providers/{Uri.EscapeDataString(Name!)}#{section}";
     private static string? Null(string value)=>string.IsNullOrWhiteSpace(value)?null:value.Trim(); private static string[] Lines(string value)=>value.Split(['\r','\n'],StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries); private static IReadOnlyDictionary<string,string> Pairs(string value)=>Lines(value).Select(line=>line.Split('=',2)).Where(x=>x.Length==2).ToDictionary(x=>x[0].Trim(),x=>x[1].Trim(),StringComparer.Ordinal);
+    private static UiStatus ProviderStatus(string? status) => status switch { "connected" => UiStatus.Success, "error" => UiStatus.Danger, _ => UiStatus.Neutral };
+    private ProviderTab activeTab;
+    private enum ProviderTab { Overview, Tools, Connection }
 }

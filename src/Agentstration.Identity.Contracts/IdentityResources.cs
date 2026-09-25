@@ -1,12 +1,18 @@
 namespace Agentstration.Identity.Contracts;
 
 public enum TenantStatus { Active, Disabled }
-public enum WorkspaceStatus { Active, Disabled }
+public enum WorkspaceStatus { Active = 0, Disabled = 1, Initializing = 2 }
 public enum PrincipalStatus { Active, Disabled }
 public enum PrincipalKind { Human, Workload }
 public enum MembershipStatus { Active, Suspended }
 public enum PrincipalType { User, Group, ServicePrincipal }
 public enum ThemePreference { System, Light, Dark }
+
+public static class OfficialWorkspaceIdentities
+{
+    public const string AgentstrationAssistant = "agentstration-assistant";
+    public const string AgentstrationAssistantDisplayName = "Agentstration Assistant";
+}
 
 public sealed record Tenant(
     Guid Id,
@@ -226,6 +232,11 @@ public interface ILocalEnvironmentBootstrapper
     Task<RequestContext> EnsureInitializedAsync(CancellationToken cancellationToken);
 }
 
+public interface IWorkspaceProvisioner
+{
+    Task ProvisionAsync(Workspace workspace, CancellationToken cancellationToken);
+}
+
 public interface IAuthorizationService
 {
     Task<IReadOnlySet<string>> GetPermissionsAsync(RequestContext context, CancellationToken cancellationToken);
@@ -244,6 +255,7 @@ public interface IIdentityStore
     Task<Workspace?> GetWorkspaceAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken);
     Task<IReadOnlyList<Workspace>> ListWorkspacesAsync(Guid tenantId, CancellationToken cancellationToken);
     Task AddWorkspaceAsync(Workspace workspace, CancellationToken cancellationToken);
+    Task UpdateWorkspaceAsync(Workspace workspace, CancellationToken cancellationToken);
     Task<Principal?> GetPrincipalAsync(Guid principalId, CancellationToken cancellationToken);
     Task AddPrincipalAsync(Principal principal, CancellationToken cancellationToken);
     Task UpdatePrincipalAsync(Principal principal, CancellationToken cancellationToken);

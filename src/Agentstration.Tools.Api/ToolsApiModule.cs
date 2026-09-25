@@ -19,6 +19,7 @@ public static class ToolsApiModule
     public static IEndpointRouteBuilder MapToolsApi(this IEndpointRouteBuilder endpoints)
     {
         ToolProviderEndpoints.Map(endpoints);
+        ToolCategoryEndpoints.Map(endpoints.MapGroup("/api/toolcategories"));
         ToolDefinitionEndpoints.Map(endpoints.MapGroup("/api/tooldefinitions"));
         ToolExecutionHookEndpoints.Map(endpoints.MapGroup("/api/toolexecutionhooks"));
         Agentstration.Web.ToolGovernanceAuditEndpoints.MapAgentstrationToolGovernanceAuditApi(endpoints);

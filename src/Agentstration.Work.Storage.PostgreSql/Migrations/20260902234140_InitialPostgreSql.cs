@@ -68,6 +68,7 @@ public partial class InitialPostgreSql : Migration
             {
                 Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                 WorkspaceId = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                OwnerPrincipalId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                 EntryId = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
                 Status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                 LastActivityAt = table.Column<long>(type: "bigint", nullable: false),
@@ -106,6 +107,7 @@ public partial class InitialPostgreSql : Migration
             {
                 Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                 WorkspaceId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                OwnerPrincipalId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                 Type = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                 Status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                 RequesterIdentity = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
@@ -242,10 +244,10 @@ public partial class InitialPostgreSql : Migration
             columns: new[] { "WorkspaceId", "Name" });
 
         migrationBuilder.CreateIndex(
-            name: "IX_Interactions_WorkspaceId_LastActivityAt",
+            name: "IX_Interactions_WorkspaceId_OwnerPrincipalId_LastActivityAt",
             schema: "work",
             table: "Interactions",
-            columns: new[] { "WorkspaceId", "LastActivityAt" });
+            columns: new[] { "WorkspaceId", "OwnerPrincipalId", "LastActivityAt" });
 
         migrationBuilder.CreateIndex(
             name: "IX_PendingActions_InteractionId_CreatedAt",
@@ -313,6 +315,12 @@ public partial class InitialPostgreSql : Migration
             schema: "work",
             table: "WorkItems",
             columns: new[] { "WorkspaceId", "InteractionId", "UpdatedAt" });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_WorkItems_WorkspaceId_OwnerPrincipalId_UpdatedAt",
+            schema: "work",
+            table: "WorkItems",
+            columns: new[] { "WorkspaceId", "OwnerPrincipalId", "UpdatedAt" });
 
         migrationBuilder.CreateIndex(
             name: "IX_WorkItems_WorkspaceId_Status_UpdatedAt",

@@ -94,6 +94,20 @@
 }
 
 /* Shared form controls ---------------------------------------------------- */
+.app-shell :where(input[type="checkbox"],input[type="radio"]) {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  min-width: 17px;
+  min-height: 17px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--primary);
+}
+.app-shell :where(input[type="checkbox"],input[type="radio"]):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
 .app-shell :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]),select,textarea) {
   min-height: var(--field-height);
   padding: 9px 12px;
@@ -187,20 +201,25 @@
 .context-workspace-static { display:flex; align-items:center; width:168px; max-width:100%; height:36px; overflow:hidden; padding:0 var(--space-3); border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface-2); color:var(--muted); font-size:var(--font-size-sm); text-overflow:ellipsis; white-space:nowrap; }
 .breadcrumb strong { color: var(--text); font-weight: 650; }
 .command-palette-trigger { display: flex; justify-self:center; align-items: center; gap: var(--space-2); width: min(100%,520px); min-width: 0; height: 38px; padding: 0 var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); color: var(--muted); cursor: pointer; }
-.command-palette-trigger > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.command-palette-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .command-palette-trigger kbd { margin-left: auto; padding: 2px 6px; border: 1px solid var(--color-border-strong); border-radius: 4px; background: var(--surface); color: var(--muted); font: var(--font-size-xs) var(--font-family-mono); }
 .command-palette-backdrop { position: fixed; z-index: 30; inset: 0; display: grid; align-items: start; justify-items: center; padding: min(14vh,120px) var(--space-4) var(--space-4); background: rgb(4 9 16 / 58%); backdrop-filter: blur(3px); }
-.command-palette { width: min(620px,100%); overflow: hidden; border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); background: var(--color-surface-elevated); color: var(--text); box-shadow: 0 24px 80px rgb(0 0 0 / 32%); }
-.command-palette > header { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); }
-.command-palette > header input { width: 100%; padding: var(--space-2) 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 1rem; }
+.command-palette { width: min(680px,100%); overflow: hidden; border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); background: var(--color-surface-elevated); color: var(--text); box-shadow: 0 24px 80px rgb(0 0 0 / 32%); }
+.command-palette > header { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: var(--space-2); padding: var(--space-3); border-bottom: 1px solid var(--border); }
+.command-search-box { display: flex; align-items: center; gap: var(--space-2); min-width: 0; height: 44px; padding: 0 var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); color: var(--muted); }
+.command-search-box:focus-within { border-color: var(--color-action-primary); outline: 2px solid color-mix(in srgb,var(--color-action-primary) 18%,transparent); outline-offset: 0; }
+.app-shell .command-search-box > input,
+.app-shell .command-search-box > input:hover:not(:disabled):not([readonly]),
+.app-shell .command-search-box > input:focus-visible { flex: 1 1 auto; width: auto; min-width: 0; min-height: 0; height: 100%; padding: 0; border: 0; border-radius: 0; outline: 0; background: transparent; box-shadow: none; color: var(--text); font-size: 1rem; }
 .command-palette-close { padding: 4px 7px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--muted); cursor: pointer; font: var(--font-size-xs) var(--font-family-mono); }
-.command-results { max-height: min(55vh,440px); padding: var(--space-2); overflow-y: auto; }
+.command-results { max-height: min(55vh,440px); padding: var(--space-2) var(--space-3); overflow-y: auto; }
 .command-result { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: var(--space-3); width: 100%; padding: 10px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text); text-align: left; cursor: pointer; }
 .command-result:hover,.command-result.selected { background: var(--primary-soft); }
 .command-result strong,.command-result small { display: block; }
 .command-result small { margin-top: 3px; color: var(--muted); font-size: var(--font-size-xs); }
 .command-result kbd { color: var(--muted); font: var(--font-size-xs) var(--font-family-mono); }
 .command-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--primary); }
+.command-icon .ui-icon { width: 18px; height: 18px; }
 .command-empty { margin: 0; padding: var(--space-8); color: var(--muted); text-align: center; }
 .command-searching { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: var(--space-2) var(--space-3); color: var(--muted); font-size: var(--font-size-xs); }
 .command-search-spinner { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }

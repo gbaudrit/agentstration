@@ -26,8 +26,10 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(provider => provider.GetRequiredService<ConsoleRealtimeSession>());
         services.AddScoped<IConsoleContextProvider, ConsoleContextProvider>();
         services.AddScoped<IResourceSearchProvider, ConsoleResourceSearchProvider>();
+        services.AddScoped<ICommandPaletteFallbackProvider, ConsoleEntryCommandFallbackProvider>();
         services.AddAgentstrationFlowDesigner();
         services.AddScoped<PlatformDashboardService>();
+        services.AddScoped<IPlatformStatusProvider>(provider => provider.GetRequiredService<PlatformDashboardService>());
         services.AddScoped<IFlowDesignerBackend, FlowDesignerBackend>();
         services.AddScoped<IFlowDesignerResourceProvider, FlowDesignerResourceProvider>();
 
@@ -41,6 +43,7 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
         AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi);
         AddClient<EntryAdministrationApiClient, IEntryAdministrationApiClient>(services, configured.WorkApi);
+        AddClient<ConsoleEntryInteractionApiClient, IConsoleEntryInteractionApiClient>(services, configured.WorkApi);
         AddClient(services, EntryAdministrationApiClient.AgentResourceCatalogClient, configured.ManagementApi);
         AddClient(services, EntryAdministrationApiClient.FlowResourceCatalogClient, configured.FlowApi);
         services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(
@@ -53,6 +56,7 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<IdentityAdministrationApiClient, IIdentityAdministrationApiClient>(services, configured.ManagementApi);
         AddClient<HttpUserPreferencesClient, IUserPreferencesClient>(services, configured.ManagementApi);
         AddClient<ModelProvidersApiClient, IModelProvidersClient>(services, configured.ManagementApi);
+        AddClient<ModelsApiClient, IModelsClient>(services, configured.ManagementApi);
         AddClient<ExtensionsApiClient, IExtensionsClient>(services, configured.ManagementApi);
         AddClient<SourceConsoleApiClient, ISourceConsoleApiClient>(services, configured.ManagementApi);
         AddClient<SourceProvidersApiClient, ISourceProvidersClient>(services, configured.ManagementApi);
@@ -65,8 +69,10 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<TriggerApiClient, ITriggerApiClient>(services, configured.ManagementApi);
         AddClient<ResourcePlansApiClient, IResourcePlansApiClient>(services, configured.ManagementApi);
         AddClient<ToolsApiClient, IToolsClient>(services, configured.ManagementApi);
+        AddClient<ToolCategoriesApiClient, IToolCategoriesClient>(services, configured.ManagementApi);
         AddClient<ToolDefinitionsApiClient, IToolDefinitionsClient>(services, configured.ManagementApi);
         AddSensitiveClient<SecretsApiClient, ISecretsClient>(services, configured.ManagementApi);
+        AddClient<ParametersApiClient, IParametersClient>(services, configured.ManagementApi);
         AddClient<ResourceScopeInventoryApiClient, IResourceScopeInventoryClient>(services, configured.ManagementApi);
         AddClient<ManagementApiClient, IAgentRunnerManagementClient>(services, configured.ManagementApi);
         AddClient<RuntimeApiClient, IAgentRunnerRuntimeClient>(services, configured.RuntimeApi);

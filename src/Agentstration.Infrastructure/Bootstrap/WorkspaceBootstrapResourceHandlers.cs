@@ -8,6 +8,7 @@ using Agentstration.Flows.Application;
 using Agentstration.Identity;
 using Agentstration.Infrastructure.Declarative;
 using Agentstration.Models;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -32,9 +33,10 @@ internal static class WorkspaceBootstrapResource
         BootstrapPlanningContext planning,
         string kind,
         string name,
-        ResourceNamespace @namespace)
+        ResourceNamespace @namespace,
+        BootstrapResourceDocument? resource = null)
     {
-        planning.Register(kind, name, PlanningParent(@namespace));
+        planning.Register(kind, name, PlanningParent(@namespace), resource);
         return new(BootstrapResourceDisposition.Create);
     }
 
@@ -62,9 +64,24 @@ public sealed class ModelProviderBootstrapResourceHandler(ModelProviderManagemen
         CancellationToken cancellationToken)
     {
         var value = WorkspaceBootstrapResource.Parse<ModelProviderResource>(resource);
-        if (await service.GetAsync(value.Namespace, value.Name, cancellationToken) is not null)
+        var scopeRef = value.ScopeRef ?? TargetScope(operation);
+        value = value with { ScopeRef = scopeRef };
+        if (await service.GetExactAsync(scopeRef, value.Namespace, value.Name, cancellationToken) is not null)
             return new(BootstrapResourceDisposition.Skip);
-        await service.ValidateForCreateAsync(value, cancellationToken);
+        var plannedParameters = new Dictionary<ScopedResourceAddress, JsonElement>();
+        foreach (var binding in value.Definition.ValueBindings.Where(candidate =>
+                     candidate.Kind == ModelProviderValueBindingKind.Parameter))
+        {
+            var parameter = binding.Parameter!;
+            if (!planning.TryGetDocument(ParameterResourceKinds.Parameter, parameter.Address.Name,
+                    WorkspaceBootstrapResource.PlanningParent(parameter.Address.Namespace), out var planned))
+                continue;
+            var plannedParameter = WorkspaceBootstrapResource.Parse<ParameterResource>(planned);
+            var plannedScope = plannedParameter.ScopeRef ?? TargetScope(operation);
+            plannedParameters[ScopedResourceAddress.Create(plannedScope, plannedParameter.Namespace,
+                ParameterResourceKinds.Parameter, plannedParameter.Name)] = plannedParameter.Definition.Value;
+        }
+        await service.ValidateForCreateAsync(value, plannedParameters, cancellationToken);
         return WorkspaceBootstrapResource.Created(planning, Kind, value.Name, value.Namespace);
     }
 
@@ -74,11 +91,56 @@ public sealed class ModelProviderBootstrapResourceHandler(ModelProviderManagemen
         CancellationToken cancellationToken)
     {
         var value = WorkspaceBootstrapResource.Parse<ModelProviderResource>(resource);
-        if (await service.GetAsync(value.Namespace, value.Name, cancellationToken) is not null)
+        var scopeRef = value.ScopeRef ?? TargetScope(operation);
+        value = value with { ScopeRef = scopeRef };
+        if (await service.GetExactAsync(scopeRef, value.Namespace, value.Name, cancellationToken) is not null)
             return BootstrapResourceApplyResult.Skipped;
         _ = await service.CreateAsync(value, cancellationToken);
         return BootstrapResourceApplyResult.Created;
     }
+
+    private static ResourceScopeRef TargetScope(BootstrapResourceOperationContext operation) =>
+        ResourceScopeRef.Tenant(operation.Target?.TenantId
+            ?? throw new InvalidOperationException("A Model Provider bootstrap resource requires an explicit Tenant target."));
+}
+
+public sealed class ParameterBootstrapResourceHandler(ParameterManagementService service) : IBootstrapResourceHandler
+{
+    public string Kind => ParameterResourceKinds.Parameter;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Tenant;
+
+    public async Task<BootstrapResourcePlanResult> PlanAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        BootstrapPlanningContext planning,
+        CancellationToken cancellationToken)
+    {
+        var value = WorkspaceBootstrapResource.Parse<ParameterResource>(resource);
+        var scopeRef = value.ScopeRef ?? TargetScope(operation);
+        value = value with { ScopeRef = scopeRef };
+        if (await service.GetExactAsync(scopeRef, value.Name, cancellationToken) is not null)
+            return new(BootstrapResourceDisposition.Skip);
+        await service.ValidateForCreateAsync(value, cancellationToken);
+        return WorkspaceBootstrapResource.Created(planning, Kind, value.Name, value.Namespace, resource);
+    }
+
+    public async Task<BootstrapResourceApplyResult> ApplyAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        CancellationToken cancellationToken)
+    {
+        var value = WorkspaceBootstrapResource.Parse<ParameterResource>(resource);
+        var scopeRef = value.ScopeRef ?? TargetScope(operation);
+        value = value with { ScopeRef = scopeRef };
+        if (await service.GetExactAsync(scopeRef, value.Name, cancellationToken) is not null)
+            return BootstrapResourceApplyResult.Skipped;
+        _ = await service.CreateAsync(value, cancellationToken);
+        return BootstrapResourceApplyResult.Created;
+    }
+
+    private static ResourceScopeRef TargetScope(BootstrapResourceOperationContext operation) =>
+        ResourceScopeRef.Tenant(operation.Target?.TenantId
+            ?? throw new InvalidOperationException("A Parameter bootstrap resource requires an explicit Tenant target."));
 }
 
 public sealed class RuntimeProfileBootstrapResourceHandler(RuntimeProfileManagementService service) : IBootstrapResourceHandler

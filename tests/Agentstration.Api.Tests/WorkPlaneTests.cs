@@ -6,6 +6,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Application.Work;
 using Agentstration.Flows;
+using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Resources;
 using Agentstration.Work;
@@ -27,6 +28,7 @@ public sealed class WorkPlaneTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
     private static readonly WorkspaceId WorkplaceId = new(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+    private static readonly Guid OwnerPrincipalId = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
     [TestMethod]
     public void WorkItemCreationValidatesRequiredData()
@@ -36,9 +38,11 @@ public sealed class WorkPlaneTests
         Assert.AreEqual(WorkItemStatus.Pending, item.Status);
         Assert.AreEqual(1, item.Version);
         Assert.AreEqual("WorkItemSubmitted", item.History.Single().Type);
-        Assert.Throws<WorkValidationException>(() => WorkItem.Create(WorkItemId.New(), WorkplaceId, "", "instruction", Now));
-        Assert.Throws<WorkValidationException>(() => WorkItem.Create(WorkItemId.New(), WorkplaceId, "analysis", "", Now));
-        Assert.Throws<WorkValidationException>(() => WorkItem.Create(new WorkItemId(Guid.Empty), WorkplaceId, "analysis", "instruction", Now));
+        Assert.AreEqual(OwnerPrincipalId, item.OwnerPrincipalId);
+        Assert.Throws<WorkValidationException>(() => WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "", "instruction", Now));
+        Assert.Throws<WorkValidationException>(() => WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "analysis", "", Now));
+        Assert.Throws<WorkValidationException>(() => WorkItem.Create(new WorkItemId(Guid.Empty), WorkplaceId, OwnerPrincipalId, "analysis", "instruction", Now));
+        Assert.Throws<WorkValidationException>(() => WorkItem.Create(WorkItemId.New(), WorkplaceId, Guid.Empty, "analysis", "instruction", Now));
     }
 
     [TestMethod]
@@ -137,6 +141,15 @@ public sealed class WorkPlaneTests
             }
         }));
         Assert.AreEqual("entry_workplace_placements_not_allowed", invalidExposure.Code);
+        var invalidConsoleRole = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(draft with
+        {
+            Exposure = new EntryExposure
+            {
+                Surfaces = [EntryExposureSurface.Workplace],
+                Console = new(EntryConsoleRole.Fallback)
+            }
+        }));
+        Assert.AreEqual("entry_console_role_not_allowed", invalidConsoleRole.Code);
         Assert.IsFalse(EntryExposurePolicy.Allows(
             new EntryExposure { Version = EntryExposure.CurrentVersion + 1 },
             EntryExposureSurface.Workplace,
@@ -367,7 +380,7 @@ public sealed class WorkPlaneTests
         Assert.AreEqual(WorkItemStatus.Completed, completed.Value.Status);
         Assert.AreEqual("Analysis complete", completed.Value.Result!.Contents.Single().Text);
         Assert.AreEqual(completed.Value.Version, duplicate.Value.Version);
-        Assert.AreEqual(WorkItemStatus.Completed, (await fixture.Repository.GetAsync(WorkplaceId, created.Value.Id, default))!.Value.Status);
+        Assert.AreEqual(WorkItemStatus.Completed, (await fixture.Repository.GetAsync(WorkplaceId, OwnerPrincipalId, created.Value.Id, default))!.Value.Status);
     }
 
     [TestMethod]
@@ -379,12 +392,12 @@ public sealed class WorkPlaneTests
         await fixture.Repository.CreateAsync(first, default);
         await fixture.Repository.CreateAsync(second, default);
 
-        var page = await fixture.Repository.QueryAsync(new WorkItemQuery(WorkplaceId, Take: 1, Type: "analysis"), default);
+        var page = await fixture.Repository.QueryAsync(new WorkItemQuery(WorkplaceId, OwnerPrincipalId, Take: 1, Type: "analysis"), default);
         Assert.AreEqual(1, page.Items.Count);
         Assert.AreEqual("analysis", page.Items.Single().Value.Type);
 
-        var copyA = (await fixture.Repository.GetAsync(WorkplaceId, first.Id, default))!.Value;
-        var copyB = (await fixture.Repository.GetAsync(WorkplaceId, first.Id, default))!.Value;
+        var copyA = (await fixture.Repository.GetAsync(WorkplaceId, OwnerPrincipalId, first.Id, default))!.Value;
+        var copyB = (await fixture.Repository.GetAsync(WorkplaceId, OwnerPrincipalId, first.Id, default))!.Value;
         copyA.AddMessage("first update", "a", Guid.NewGuid(), Now.AddMinutes(1));
         await fixture.Repository.SaveAsync(copyA, 1, default);
         copyB.AddMessage("stale update", "b", Guid.NewGuid(), Now.AddMinutes(2));
@@ -399,7 +412,7 @@ public sealed class WorkPlaneTests
         var anchors = new List<WorkItem>();
         for (var index = 0; index < 205; index++)
         {
-            var anchor = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry", $"Root {index}", Now.AddSeconds(index),
+            var anchor = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "entry", $"Root {index}", Now.AddSeconds(index),
                 metadata: new Dictionary<string, string>
                 {
                     ["origin"] = "trigger",
@@ -412,7 +425,7 @@ public sealed class WorkPlaneTests
         var firstTaskId = WorkTaskId.FromWorkItem(anchors[0].Id);
         for (var index = 0; index < 210; index++)
         {
-            var continuation = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry-continuation", $"Continuation {index}", Now.AddMinutes(10).AddSeconds(index),
+            var continuation = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "entry-continuation", $"Continuation {index}", Now.AddMinutes(10).AddSeconds(index),
                 metadata: new Dictionary<string, string>
                 {
                     ["origin"] = "trigger",
@@ -421,7 +434,7 @@ public sealed class WorkPlaneTests
                 });
             await fixture.Repository.CreateAsync(continuation, default);
         }
-        var latest = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry-continuation", "Latest continuation", Now.AddHours(1),
+        var latest = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "entry-continuation", "Latest continuation", Now.AddHours(1),
             metadata: new Dictionary<string, string>
             {
                 ["origin"] = "trigger",
@@ -433,7 +446,7 @@ public sealed class WorkPlaneTests
         latest.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, latest.Id, executionId, Now.AddHours(1).AddSeconds(2), "agent"));
         await fixture.Repository.CreateAsync(latest, default);
         var secondTaskId = WorkTaskId.FromWorkItem(anchors[1].Id);
-        var olderContinuation = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry-continuation", "Older continuation", Now,
+        var olderContinuation = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "entry-continuation", "Older continuation", Now,
             metadata: new Dictionary<string, string>
             {
                 ["origin"] = "trigger",
@@ -462,13 +475,75 @@ public sealed class WorkPlaneTests
         await using var fixture = await WorkFixture.CreateAsync();
         var id = WorkItemId.New();
         var otherWorkspaceId = new WorkspaceId(Guid.NewGuid());
-        await fixture.Repository.CreateAsync(WorkItem.Create(id, WorkplaceId, "analysis", "First", Now), default);
-        await fixture.Repository.CreateAsync(WorkItem.Create(id, otherWorkspaceId, "question", "Second", Now), default);
+        await fixture.Repository.CreateAsync(WorkItem.Create(id, WorkplaceId, OwnerPrincipalId, "analysis", "First", Now), default);
+        await fixture.Repository.CreateAsync(WorkItem.Create(id, otherWorkspaceId, OwnerPrincipalId, "question", "Second", Now), default);
 
-        Assert.AreEqual("analysis", (await fixture.Repository.GetAsync(WorkplaceId, id, default))?.Value.Type);
-        Assert.AreEqual("question", (await fixture.Repository.GetAsync(otherWorkspaceId, id, default))?.Value.Type);
-        Assert.HasCount(1, (await fixture.Repository.QueryAsync(new WorkItemQuery(WorkplaceId), default)).Items);
-        Assert.HasCount(1, (await fixture.Repository.QueryAsync(new WorkItemQuery(otherWorkspaceId), default)).Items);
+        Assert.AreEqual("analysis", (await fixture.Repository.GetAsync(WorkplaceId, OwnerPrincipalId, id, default))?.Value.Type);
+        Assert.AreEqual("question", (await fixture.Repository.GetAsync(otherWorkspaceId, OwnerPrincipalId, id, default))?.Value.Type);
+        Assert.HasCount(1, (await fixture.Repository.QueryAsync(new WorkItemQuery(WorkplaceId, OwnerPrincipalId), default)).Items);
+        Assert.HasCount(1, (await fixture.Repository.QueryAsync(new WorkItemQuery(otherWorkspaceId, OwnerPrincipalId), default)).Items);
+    }
+
+    [TestMethod]
+    public async Task OwnerScopedStorageIsolatesConversationsAndWorkItemsWithinOneWorkspace()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var otherPrincipalId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+        var firstInteraction = new WorkplaceInteraction
+        {
+            Id = InteractionId.New(),
+            WorkspaceId = WorkplaceId,
+            OwnerPrincipalId = OwnerPrincipalId,
+            EntryId = new("private-conversation"),
+            StartedAt = Now,
+            LastActivityAt = Now
+        };
+        var secondInteraction = firstInteraction with
+        {
+            Id = InteractionId.New(),
+            OwnerPrincipalId = otherPrincipalId,
+            LastActivityAt = Now.AddSeconds(1)
+        };
+        await fixture.Workplace.CreateInteractionAsync(firstInteraction, default);
+        await fixture.Workplace.CreateInteractionAsync(secondInteraction, default);
+
+        Assert.AreEqual(OwnerPrincipalId, (await fixture.Workplace.GetInteractionAsync(WorkplaceId, OwnerPrincipalId, firstInteraction.Id, default))!.OwnerPrincipalId);
+        Assert.IsNull(await fixture.Workplace.GetInteractionAsync(WorkplaceId, otherPrincipalId, firstInteraction.Id, default));
+        Assert.HasCount(1, await fixture.Workplace.ListInteractionsAsync(WorkplaceId, OwnerPrincipalId, 20, default));
+        Assert.HasCount(1, await fixture.Workplace.ListInteractionsAsync(WorkplaceId, otherPrincipalId, 20, default));
+
+        var firstWorkItem = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "analysis", "First private work", Now);
+        var secondWorkItem = WorkItem.Create(WorkItemId.New(), WorkplaceId, otherPrincipalId, "analysis", "Second private work", Now.AddSeconds(1));
+        await fixture.Repository.CreateAsync(firstWorkItem, default);
+        await fixture.Repository.CreateAsync(secondWorkItem, default);
+
+        Assert.IsNull(await fixture.Repository.GetAsync(WorkplaceId, otherPrincipalId, firstWorkItem.Id, default));
+        Assert.HasCount(1, (await fixture.Repository.QueryAsync(new WorkItemQuery(WorkplaceId, OwnerPrincipalId), default)).Items);
+        Assert.HasCount(1, (await fixture.Repository.QueryAsync(new WorkItemQuery(WorkplaceId, otherPrincipalId), default)).Items);
+
+        var otherPrincipalWorkplace = new WorkplaceService(
+            fixture.Workplace,
+            fixture.Service,
+            TimeProvider.System,
+            [],
+            [],
+            new WorkplaceContextStub(otherPrincipalId),
+            new EntryExecutionResolverStub());
+        await Assert.ThrowsExactlyAsync<KeyNotFoundException>(() =>
+            otherPrincipalWorkplace.GetInteractionAsync(WorkplaceId, firstInteraction.Id, default));
+        await Assert.ThrowsExactlyAsync<KeyNotFoundException>(() =>
+            otherPrincipalWorkplace.AddMessageAsync(WorkplaceId, firstInteraction.Id, "Not mine", default));
+
+        var otherPrincipalDeletion = new WorkTaskDeletionService(
+            fixture.Repository,
+            new RecordingArtifactStore(),
+            new WorkplaceContextStub(otherPrincipalId));
+        await Assert.ThrowsExactlyAsync<KeyNotFoundException>(() =>
+            otherPrincipalDeletion.DeleteAsync(
+                WorkplaceId,
+                WorkTaskId.FromWorkItem(firstWorkItem.Id),
+                "\"1\"",
+                default));
     }
 
     [TestMethod]
@@ -478,7 +553,7 @@ public sealed class WorkPlaneTests
         var itemId = WorkItemId.New();
         var taskId = WorkTaskId.FromWorkItem(itemId);
         var interactionId = InteractionId.New();
-        var item = WorkItem.Create(itemId, WorkplaceId, "entry", "Completed task", Now, metadata: new Dictionary<string, string>
+        var item = WorkItem.Create(itemId, WorkplaceId, OwnerPrincipalId, "entry", "Completed task", Now, metadata: new Dictionary<string, string>
         {
             ["origin"] = "trigger",
             ["workplace.workspaceId"] = WorkplaceId.ToString()
@@ -488,7 +563,7 @@ public sealed class WorkPlaneTests
         item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, itemId, executionId, Now.AddSeconds(2), "agent"));
         item.ApplyRuntimeEvent(new WorkExecutionCompleted(Guid.NewGuid(), WorkplaceId, itemId, executionId, Now.AddSeconds(3), Result("Done")));
         await fixture.Repository.CreateAsync(item, default);
-        var continuation = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry-continuation", "Completed continuation", Now.AddSeconds(4), metadata: new Dictionary<string, string>
+        var continuation = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "entry-continuation", "Completed continuation", Now.AddSeconds(4), metadata: new Dictionary<string, string>
         {
             ["origin"] = "trigger",
             ["workplace.workspaceId"] = WorkplaceId.ToString(),
@@ -503,6 +578,7 @@ public sealed class WorkPlaneTests
         {
             Id = interactionId,
             WorkspaceId = WorkplaceId,
+            OwnerPrincipalId = OwnerPrincipalId,
             EntryId = new("entry"),
             Status = InteractionStatus.Idle,
             StartedAt = Now,
@@ -515,15 +591,15 @@ public sealed class WorkPlaneTests
         await fixture.Workplace.AddArtifactAsync(new(WorkTaskArtifactId.New(), WorkplaceId, taskId, "flow-run-1", "result.txt", "text/plain", 4, "artifact-key", Now.AddSeconds(3)), default);
 
         var artifactStore = new RecordingArtifactStore();
-        await new WorkTaskDeletionService(fixture.Repository, artifactStore).DeleteAsync(WorkplaceId, taskId, stored.ETag, default);
+        await new WorkTaskDeletionService(fixture.Repository, artifactStore, new WorkplaceContextStub()).DeleteAsync(WorkplaceId, taskId, stored.ETag, default);
 
-        Assert.IsNull(await fixture.Repository.GetAsync(WorkplaceId, itemId, default));
-        Assert.IsNull(await fixture.Repository.GetAsync(WorkplaceId, continuation.Id, default));
+        Assert.IsNull(await fixture.Repository.GetAsync(WorkplaceId, OwnerPrincipalId, itemId, default));
+        Assert.IsNull(await fixture.Repository.GetAsync(WorkplaceId, OwnerPrincipalId, continuation.Id, default));
         Assert.HasCount(0, await fixture.Workplace.ListActivitiesAsync(WorkplaceId, taskId, default));
         Assert.HasCount(0, await fixture.Workplace.ListResultsAsync(WorkplaceId, taskId, default));
         Assert.HasCount(0, await fixture.Workplace.ListArtifactsAsync(WorkplaceId, taskId, default));
         Assert.AreEqual("artifact-key", artifactStore.Deleted.Single().StorageKey);
-        var interaction = await fixture.Workplace.GetInteractionAsync(WorkplaceId, interactionId, default);
+        var interaction = await fixture.Workplace.GetInteractionAsync(WorkplaceId, OwnerPrincipalId, interactionId, default);
         Assert.IsNull(interaction!.TaskId);
         Assert.IsNull(interaction.LastFlowRunId);
     }
@@ -532,7 +608,7 @@ public sealed class WorkPlaneTests
     public async Task TaskDeletionRejectsNonTerminalAndCrossWorkspaceTasks()
     {
         await using var fixture = await WorkFixture.CreateAsync();
-        var item = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry", "Pending task", Now, metadata: new Dictionary<string, string>
+        var item = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "entry", "Pending task", Now, metadata: new Dictionary<string, string>
         {
             ["origin"] = "trigger",
             ["workplace.workspaceId"] = WorkplaceId.ToString()
@@ -541,11 +617,11 @@ public sealed class WorkPlaneTests
         var taskId = WorkTaskId.FromWorkItem(item.Id);
 
         var conflict = await Assert.ThrowsExactlyAsync<WorkTransitionException>(() =>
-            fixture.Repository.DeleteTaskAsync(WorkplaceId, taskId, stored.ETag, default));
+            fixture.Repository.DeleteTaskAsync(WorkplaceId, OwnerPrincipalId, taskId, stored.ETag, default));
         Assert.AreEqual("task_not_terminal", conflict.Code);
         await Assert.ThrowsExactlyAsync<KeyNotFoundException>(() =>
-            fixture.Repository.DeleteTaskAsync(new WorkspaceId(Guid.NewGuid()), taskId, stored.ETag, default));
-        Assert.IsNotNull(await fixture.Repository.GetAsync(WorkplaceId, item.Id, default));
+            fixture.Repository.DeleteTaskAsync(new WorkspaceId(Guid.NewGuid()), OwnerPrincipalId, taskId, stored.ETag, default));
+        Assert.IsNotNull(await fixture.Repository.GetAsync(WorkplaceId, OwnerPrincipalId, item.Id, default));
     }
 
     [TestMethod]
@@ -581,6 +657,7 @@ public sealed class WorkPlaneTests
         var item = WorkItem.Create(
             itemId,
             WorkplaceId,
+            OwnerPrincipalId,
             "entry",
             "Build a comparison",
             Now,
@@ -689,6 +766,7 @@ public sealed class WorkPlaneTests
         {
             Id = InteractionId.New(),
             WorkspaceId = WorkplaceId,
+            OwnerPrincipalId = OwnerPrincipalId,
             EntryId = draft.Id,
             EntrySnapshot = published,
             Status = InteractionStatus.Active,
@@ -704,13 +782,40 @@ public sealed class WorkPlaneTests
         Assert.IsNull(await fixture.Workplace.GetEntryAsync(WorkplaceId, draft.Id, default));
         Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, draft.Id, default));
         Assert.HasCount(0, (await fixture.Workplace.GetDashboardAsync(WorkplaceId, new("home"), default))!.Entries);
-        var retained = await fixture.Workplace.GetInteractionAsync(WorkplaceId, interaction.Id, default);
+        var retained = await fixture.Workplace.GetInteractionForProjectionAsync(WorkplaceId, interaction.Id, default);
         Assert.AreEqual(InteractionStatus.Closed, retained!.Status);
         Assert.AreEqual("entry_uninstalled", retained.ClosedReason);
         Assert.IsNotNull(retained.EntrySnapshot);
         Assert.AreEqual(published.Id, retained.EntrySnapshot.Id);
         Assert.AreEqual(published.Version, retained.EntrySnapshot.Version);
         Assert.AreEqual(published.ResolvedTarget, retained.EntrySnapshot.ResolvedTarget);
+    }
+
+    [TestMethod]
+    public async Task EntryRemovalCannotMutateAnotherPrincipalsConversation()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var draft = Entry(new EntryId("shared-entry"));
+        var otherPrincipalId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+        await fixture.Workplace.UpsertEntryDraftAsync(draft, default);
+        await fixture.Workplace.CreateInteractionAsync(new WorkplaceInteraction
+        {
+            Id = InteractionId.New(),
+            WorkspaceId = WorkplaceId,
+            OwnerPrincipalId = otherPrincipalId,
+            EntryId = draft.Id,
+            Status = InteractionStatus.Active,
+            StartedAt = Now,
+            LastActivityAt = Now
+        }, default);
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub(), new EntryExecutionResolverStub());
+        var service = new EntryAdministrationService(fixture.Workplace, new EntryTargetResolverStub(), workplace, TimeProvider.System, new WorkplaceContextStub());
+
+        var conflict = await Assert.ThrowsExactlyAsync<WorkValidationException>(() =>
+            service.DeleteAsync(WorkplaceId, draft.Id, removeDashboardReferences: true, closeInteractions: true, default));
+
+        Assert.AreEqual("entry_has_foreign_owned_interactions", conflict.Code);
+        Assert.IsNotNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, draft.Id, default));
     }
 
     [TestMethod]
@@ -723,7 +828,7 @@ public sealed class WorkPlaneTests
         var taskId = WorkTaskId.FromWorkItem(itemId);
         var executionId = WorkExecutionId.New();
         var interactionId = InteractionId.New();
-        var item = WorkItem.Create(itemId, WorkplaceId, "entry", "Work in progress", Now, metadata: new Dictionary<string, string>
+        var item = WorkItem.Create(itemId, WorkplaceId, OwnerPrincipalId, "entry", "Work in progress", Now, metadata: new Dictionary<string, string>
         {
             ["workplace.workspaceId"] = WorkplaceId.Value.ToString("D"),
             ["workplace.entryId"] = draft.Id.Value,
@@ -737,6 +842,7 @@ public sealed class WorkPlaneTests
         {
             Id = interactionId,
             WorkspaceId = WorkplaceId,
+            OwnerPrincipalId = OwnerPrincipalId,
             EntryId = draft.Id,
             Status = InteractionStatus.Processing,
             StartedAt = Now,
@@ -752,8 +858,8 @@ public sealed class WorkPlaneTests
 
         await service.DeleteAsync(WorkplaceId, draft.Id, removeDashboardReferences: true, closeInteractions: true, default);
 
-        Assert.AreEqual(WorkItemStatus.Cancelled, (await fixture.Repository.GetAsync(WorkplaceId, itemId, default))!.Value.Status);
-        Assert.AreEqual(InteractionStatus.Closed, (await fixture.Workplace.GetInteractionAsync(WorkplaceId, interactionId, default))!.Status);
+        Assert.AreEqual(WorkItemStatus.Cancelled, (await fixture.Repository.GetAsync(WorkplaceId, OwnerPrincipalId, itemId, default))!.Value.Status);
+        Assert.AreEqual(InteractionStatus.Closed, (await fixture.Workplace.GetInteractionAsync(WorkplaceId, OwnerPrincipalId, interactionId, default))!.Status);
         Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, draft.Id, default));
     }
 
@@ -769,6 +875,10 @@ public sealed class WorkPlaneTests
 
         Assert.AreEqual(HttpStatusCode.OK, (await client.PutAsJsonAsync("/api/management/entries/delete-default", defaultDraft)).StatusCode);
         Assert.AreEqual(HttpStatusCode.OK, (await client.PutAsJsonAsync("/api/namespaces/team-a/management/entries/delete-namespaced", namespacedDraft)).StatusCode);
+        var namespacedResponse = await client.GetFromJsonAsync<EntryDraftResponse>("/api/namespaces/team-a/management/entries/delete-namespaced");
+        Assert.IsNotNull(namespacedResponse);
+        Assert.IsFalse(namespacedResponse.ManagedByPack);
+        Assert.AreEqual(HttpStatusCode.OK, (await client.PostAsync("/api/namespaces/team-a/management/entries/delete-namespaced/validate", null)).StatusCode);
         Assert.AreEqual(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/management/entries/delete-default")).StatusCode);
         Assert.AreEqual(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/namespaces/team-a/management/entries/delete-namespaced")).StatusCode);
 
@@ -783,8 +893,9 @@ public sealed class WorkPlaneTests
         using var client = factory.CreateClient();
         var workspace = (await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces"))!.Single();
         var workspaceId = new WorkspaceId(workspace.Id);
+        var requestContext = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         var repository = factory.Services.GetRequiredService<IWorkItemRepository>();
-        var item = WorkItem.Create(WorkItemId.New(), workspaceId, "trigger", "Task to delete", Now, metadata: new Dictionary<string, string>
+        var item = WorkItem.Create(WorkItemId.New(), workspaceId, requestContext.PrincipalId, "trigger", "Task to delete", Now, metadata: new Dictionary<string, string>
         {
             ["origin"] = "trigger",
             ["workplace.workspaceId"] = workspaceId.ToString()
@@ -805,7 +916,7 @@ public sealed class WorkPlaneTests
         using var deleted = await client.SendAsync(request);
 
         Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
-        Assert.IsNull(await repository.GetAsync(workspaceId, item.Id, default));
+        Assert.IsNull(await repository.GetAsync(workspaceId, requestContext.PrincipalId, item.Id, default));
     }
 
     [TestMethod]
@@ -846,6 +957,10 @@ public sealed class WorkPlaneTests
         var created = await createdResponse.Content.ReadFromJsonAsync<WorkItemResponse>();
         Assert.IsNotNull(created);
         Assert.AreEqual(WorkItemStatus.Queued, created.Status);
+        Assert.IsNull(typeof(CreateWorkItemRequest).GetProperty("OwnerPrincipalId"));
+        var current = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+        var stored = await factory.Services.GetRequiredService<IWorkItemRepository>().GetAsync(new(current.WorkspaceId), current.PrincipalId, new(created.Id), default);
+        Assert.AreEqual(current.PrincipalId, stored!.Value.OwnerPrincipalId);
 
         using var get = await client.GetAsync($"/api/work/workitems/{created.Id}");
         Assert.AreEqual(HttpStatusCode.OK, get.StatusCode);
@@ -910,6 +1025,15 @@ public sealed class WorkPlaneTests
         var submitted = await submittedResponse.Content.ReadFromJsonAsync<EntrySubmissionResponse>();
         Assert.IsNotNull(submitted?.Task);
         Assert.IsInstanceOfType<CreateTaskAction>(submitted.Action);
+        Assert.IsNull(typeof(CreateInteractionRequest).GetProperty("OwnerPrincipalId"));
+        var current = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+        var workplaceRepository = factory.Services.GetRequiredService<IWorkplaceRepository>();
+        var workItemRepository = factory.Services.GetRequiredService<IWorkItemRepository>();
+        var storedInteraction = await workplaceRepository.GetInteractionAsync(new(workspace.Id), current.PrincipalId, new(submitted.Interaction.Id), default);
+        var storedWorkItem = await workItemRepository.GetAsync(new(workspace.Id), current.PrincipalId, new(submitted.Task.Id), default);
+        Assert.AreEqual(current.PrincipalId, storedInteraction!.OwnerPrincipalId);
+        Assert.AreEqual(current.PrincipalId, storedWorkItem!.Value.OwnerPrincipalId);
+        Assert.AreEqual(storedInteraction.OwnerPrincipalId, storedWorkItem.Value.OwnerPrincipalId);
         var initialMessages = await client.GetFromJsonAsync<ConversationMessage[]>($"/api/workspaces/{workspaceRoute}/interactions/{submitted.Interaction.Id}/messages") ?? [];
         Assert.IsFalse(initialMessages.Any(value => value.Content == "I’ve started the work and will keep this conversation updated."));
         Assert.IsFalse(initialMessages.Any(value => value.Content == "I’ll prepare a standard report and highlight the main changes."));
@@ -930,7 +1054,7 @@ public sealed class WorkPlaneTests
     }
 
     private static WorkItem CreatePending(string type = "analysis", string? requester = "requester-1") =>
-        WorkItem.Create(WorkItemId.New(), WorkplaceId, type, "Perform the requested work", Now, requesterIdentity: requester);
+        WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, type, "Perform the requested work", Now, requesterIdentity: requester);
 
     private static WorkItem Running()
     {
@@ -988,9 +1112,10 @@ public sealed class WorkPlaneTests
         public FlowRunScope Current => Scope;
     }
 
-    private sealed class WorkplaceContextStub : IWorkplaceContext
+    private sealed class WorkplaceContextStub(Guid? principalId = null) : IWorkplaceContext
     {
         public WorkspaceId WorkspaceId => WorkplaceId;
+        public Guid PrincipalId => principalId ?? OwnerPrincipalId;
     }
 
     private sealed class RecordingArtifactStore : IArtifactStore

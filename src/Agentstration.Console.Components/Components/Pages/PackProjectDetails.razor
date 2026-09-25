@@ -32,9 +32,9 @@ else
             <div class="panel-header"><div><p class="eyebrow">@T("ProjectDefinition")</p><h2>@T("ManifestMetadata")</h2></div><StatusBadge Text="@T($"ProjectState.{project.Value.Definition.State}")" Status="@ProjectTone" /></div>
             <div class="studio-grid">
                 <label>@T("Publisher")<input value="@project.Value.Definition.Publisher" disabled /></label>
-                <label>@T("Name")<input value="@project.Value.Definition.PackName" disabled /></label>
-                <label>@T("Version")<input @bind="version" @bind:after="MarkDirty" /></label>
                 <label>@T("DisplayName")<input @bind="displayName" @bind:after="MarkDirty" /></label>
+                <label>@T("TechnicalName")<input value="@project.Value.Definition.PackName" readonly /></label>
+                <label>@T("Version")<input @bind="version" @bind:after="MarkDirty" /></label>
             </div>
             <label class="studio-field">@T("Description")<textarea rows="4" @bind="description" @bind:after="MarkDirty"></textarea></label>
             <div class="studio-grid">
@@ -83,7 +83,7 @@ else
         <aside class="panel studio-install">
             <div class="panel-header"><div><p class="eyebrow">@T("LocalDeployment")</p><h2>@T("CurrentWorkspace")</h2></div></div>
             <strong>@(ContextState.Current?.WorkspaceDisplayName ?? T("CurrentWorkspace"))</strong>
-            @if (preview is not null) { <p class="studio-namespace"><span>@T("Namespace")</span><code>@preview.Namespace</code></p> }
+            @if (preview is not null) { <p class="studio-namespace"><span>@T("Namespace")</span><code data-testid="pack-project-namespace">@preview.Namespace</code></p> }
             <p class="studio-hint">@T("StoredBuildHelp")</p>
             @if (selectedBuild is null)
             {
@@ -134,6 +134,13 @@ else
                                             <option value="@BindingValue(extension.Name, extension.Namespace)">@extension.Definition.DisplayName — @extension.Namespace/@extension.Name</option>
                                         }
                                     }
+                                    else if (binding.TargetKind == PackBindingTargetKind.Parameter)
+                                    {
+                                        @foreach (var parameter in parameters)
+                                        {
+                                            <option value="@BindingValue(parameter)">@parameter.Definition.DisplayName — @parameter.ScopeRef/@parameter.Namespace/@parameter.Name</option>
+                                        }
+                                    }
                                     else
                                     {
                                         @foreach (var secret in secrets)
@@ -152,7 +159,7 @@ else
                     <p class="studio-warning">@T("ModifiedResourcesPreserved")</p>
                 }
             }
-            <button class="button-primary" disabled="@(selectedBuild is null || busy || !CanInstall)" @onclick="InstallAsync">@(installing ? T("Installing") : T("InstallLocally"))</button>
+            <button class="button-primary" data-testid="pack-project-install" disabled="@(selectedBuild is null || busy || !CanInstall)" @onclick="InstallAsync">@(installing ? T("Installing") : T("InstallLocally"))</button>
         </aside>
     </section>
 
@@ -238,6 +245,7 @@ else
     private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
     private IReadOnlyList<ExtensionRegistrationResource> extensionRegistrations = [];
     private IReadOnlyList<SecretResponse> secrets = [];
+    private IReadOnlyList<ParameterResource> parameters = [];
     private readonly Dictionary<string, string> bindingSelections = new(StringComparer.Ordinal);
     private AgentstrationApiException? error;
     private string version = string.Empty;
@@ -402,7 +410,7 @@ else
         foreach (var binding in preview.Bindings)
         {
             if (binding.TargetAvailable && binding.Target is not null)
-                bindingSelections[binding.Name] = BindingValue(binding.Target.Name, binding.Target.Namespace ?? ResourceNamespace.Default);
+                bindingSelections[binding.Name] = BindingValue(binding.Target.Name, binding.Target.Namespace ?? ResourceNamespace.Default, binding.Target.ScopeRef);
         }
         if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ModelProfile))
             modelProfiles = await Services.GetRequiredService<IModelProfilesClient>().GetModelProfilesAsync(null, null, null, cancellation.Token);
@@ -414,19 +422,27 @@ else
             extensionRegistrations = await Services.GetRequiredService<IExtensionsClient>().GetRegistrationsAsync(cancellation.Token);
         if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.Secret))
             secrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(cancellation.Token);
+        if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.Parameter))
+            parameters = await Services.GetRequiredService<IParametersClient>().GetParametersAsync(cancellation.Token);
     }
     private string? SelectedBinding(string name) => bindingSelections.GetValueOrDefault(name);
     private void BindingChanged(string name, ChangeEventArgs args) => bindingSelections[name] = args.Value?.ToString() ?? string.Empty;
-    private static string BindingValue(string name, ResourceNamespace @namespace) => $"{@namespace.Value}:{name}";
+    private static string BindingValue(string name, ResourceNamespace @namespace, ResourceScopeRef? scopeRef = null) =>
+        scopeRef is null ? $"{@namespace.Value}:{name}" : $"{scopeRef.Value.Value}|{@namespace.Value}:{name}";
+    private static string BindingValue(ParameterResource resource) => BindingValue(resource.Name, resource.Namespace, resource.ScopeRef);
     private ResourceReference ParseBindingTarget(string value)
     {
+        ResourceScopeRef? scopeRef = null;
+        var scoped = value.Split('|', 2);
+        if (scoped.Length == 2) { scopeRef = ResourceScopeRef.Parse(scoped[0]); value = scoped[1]; }
         var parts = value.Split(':', 2);
         if (parts.Length != 2) throw new InvalidOperationException(T("InvalidPackBinding"));
-        return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
+        return new(parts[1], scopeRef, ResourceNamespace.Parse(parts[0]));
     }
     private string BindingKindLabel(PackBindingTargetKind kind) => kind switch
     {
         PackBindingTargetKind.Secret => T("Binding.Secret"),
+        PackBindingTargetKind.Parameter => T("Binding.Parameter"),
         PackBindingTargetKind.ModelProvider => T("Binding.ModelProvider"),
         PackBindingTargetKind.RuntimeProfile => T("Binding.RuntimeProfile"),
         PackBindingTargetKind.ExtensionRegistration => T("Binding.ExtensionRegistration"),

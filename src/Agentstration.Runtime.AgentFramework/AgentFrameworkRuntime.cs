@@ -88,6 +88,7 @@ public sealed class AgentFrameworkRuntimeFactory(
             WorkspaceId = scope?.WorkspaceId,
             PrincipalId = scope?.PrincipalId,
             RunId = scope?.ExecutionId,
+            FlowStepId = scope?.FlowStepId,
             AgentId = definition.AgentKey,
             AgentVersion = definition.AgentVersion,
             AgentGeneration = generation ?? scope?.AgentGeneration,
@@ -170,7 +171,7 @@ public sealed class AgentFrameworkRuntimeFactory(
             var chatOptions = AgentFrameworkChatOptionsMapper.Map(model, request.Options);
             var runOptions = new ChatClientAgentRunOptions(chatOptions);
             var response = await agent.RunAsync(request.Input, options: runOptions, cancellationToken: cancellationToken);
-            return new AgentExecutionResult(response.Text, request.SessionId, model?.ContributionId, model?.ModelName, effective);
+            return new AgentExecutionResult(response.Text, request.SessionId, model?.ContributionId, model?.ModelName, effective, MapUsage(response.Usage));
         }
 
         public async IAsyncEnumerable<AgentExecutionEvent> ExecuteEventsAsync(
@@ -185,6 +186,9 @@ public sealed class AgentFrameworkRuntimeFactory(
             var mappedTools = tools.Select(tool => MapTool(tool, toolExecution, ToolContext(definition, RevisionId, null, request.ToolExecution))).ToList();
             var agent = AgentFrameworkRuntimeFactory.Observe(new ChatClientAgent(chatClient, instructions: instructions, name: AgentId, description: description, tools: mappedTools), observabilityEnabled);
             var chatOptions = AgentFrameworkChatOptionsMapper.Map(model, request.Options);
+            var streaming = ResolveStreamingMode(
+                request.Execution?.Streaming ?? request.Options?.Streaming ?? RuntimeStreamingMode.Automatic,
+                model);
             var effective = new ModelExecutionOptions(
                 chatOptions.Temperature,
                 chatOptions.MaxOutputTokens,
@@ -192,7 +196,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                 chatOptions.TopK,
                 checked((int?)chatOptions.Seed),
                 chatOptions.StopSequences?.ToArray(),
-                request.Execution?.Streaming ?? request.Options?.Streaming ?? RuntimeStreamingMode.Automatic);
+                streaming);
             ValidateCompatibility(model, effective);
             var output = new StringBuilder();
             if (effective.Streaming == RuntimeStreamingMode.Disabled)
@@ -202,7 +206,9 @@ public sealed class AgentFrameworkRuntimeFactory(
                     options: new ChatClientAgentRunOptions(chatOptions),
                     cancellationToken: cancellationToken);
                 if (!string.IsNullOrEmpty(response.Text)) yield return new ContentDelta(response.Text);
-                yield return new ExecutionCompleted(new AgentExecutionResult(response.Text, request.SessionId, model?.ContributionId, model?.ModelName, effective));
+                var usage = MapUsage(response.Usage);
+                if (usage is not null) yield return new UsageUpdated(usage);
+                yield return new ExecutionCompleted(new AgentExecutionResult(response.Text, request.SessionId, model?.ContributionId, model?.ModelName, effective, usage));
                 yield break;
             }
             await using var updates = agent.RunStreamingAsync(
@@ -235,6 +241,20 @@ public sealed class AgentFrameworkRuntimeFactory(
             yield return new ExecutionCompleted(new AgentExecutionResult(output.ToString(), request.SessionId, model?.ContributionId, model?.ModelName, effective));
         }
 
+        private static AgentExecutionUsage? MapUsage(UsageDetails? usage)
+        {
+            if (usage is null) return null;
+            var inputTokens = ToTokenCount(usage.InputTokenCount);
+            var outputTokens = ToTokenCount(usage.OutputTokenCount);
+            return inputTokens is null && outputTokens is null ? null : new(inputTokens, outputTokens);
+        }
+
+        private static int? ToTokenCount(long? count)
+        {
+            if (count is null || count < 0) return null;
+            return (int)Math.Min(count.Value, int.MaxValue);
+        }
+
         private void ValidateCompatibility(ModelChatClientMetadata? model, ModelExecutionOptions execution)
         {
             if (model?.ProviderCapabilities is null || model.ModelCapabilities is null || model.AdapterCapabilities is null) return;
@@ -252,6 +272,20 @@ public sealed class AgentFrameworkRuntimeFactory(
                 model.ModelName,
                 RuntimeType,
                 tools.Count > 0);
+        }
+
+        private RuntimeStreamingMode ResolveStreamingMode(RuntimeStreamingMode requested, ModelChatClientMetadata? model)
+        {
+            if (requested != RuntimeStreamingMode.Automatic
+                || model?.ProviderCapabilities is null || model.ModelCapabilities is null || model.AdapterCapabilities is null)
+                return requested;
+            var capabilities = EffectiveCapabilityResolver.Intersect(
+                model.ProviderCapabilities,
+                model.ModelCapabilities,
+                Capabilities,
+                model.AdapterCapabilities);
+            return capabilities.Streaming.Support == CapabilitySupport.Unsupported
+                ? RuntimeStreamingMode.Disabled : RuntimeStreamingMode.Enabled;
         }
 
     }

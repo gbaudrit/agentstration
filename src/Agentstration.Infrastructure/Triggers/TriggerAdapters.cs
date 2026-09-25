@@ -105,17 +105,17 @@ public sealed class WorkspaceTriggerExecutionAuthorizer(
         scopes.Push(new RequestContext(executionScope.PrincipalId, executionScope.TenantId, executionScope.WorkspaceId));
 }
 
-public sealed class TriggerWorkSubmitter(RootFlowSubmissionService rootFlows, IWorkItemRepository repository) : ITriggerWorkSubmitter
+public sealed class TriggerWorkSubmitter(RootFlowSubmissionService rootFlows, IWorkItemRepository repository, IWorkExecutionScopeAccessor executionScopeAccessor) : ITriggerWorkSubmitter
 {
     public async Task<TriggerSubmission?> GetExistingAsync(Guid workspaceId, Guid occurrenceId, CancellationToken cancellationToken)
     {
-        var existing = await repository.GetAsync(new WorkspaceId(workspaceId), new WorkItemId(occurrenceId), cancellationToken);
+        var existing = await repository.GetAsync(new WorkspaceId(workspaceId), CurrentPrincipalId(), new WorkItemId(occurrenceId), cancellationToken);
         return existing is null ? null : new(existing.Value.Id.ToString());
     }
 
     public async Task<bool> HasActiveWorkAsync(Guid workspaceId, Guid triggerUid, CancellationToken cancellationToken)
     {
-        var page = await repository.QueryAsync(new WorkItemQuery(new WorkspaceId(workspaceId), Take: 200, Type: "trigger"), cancellationToken);
+        var page = await repository.QueryAsync(new WorkItemQuery(new WorkspaceId(workspaceId), CurrentPrincipalId(), Take: 200, Type: "trigger"), cancellationToken);
         return page.Items.Any(item => item.Value.Metadata.TryGetValue("triggerUid", out var value)
             && string.Equals(value, triggerUid.ToString("N"), StringComparison.Ordinal)
             && item.Value.Status is WorkItemStatus.Pending or WorkItemStatus.Queued or WorkItemStatus.Running or WorkItemStatus.WaitingForInput or WorkItemStatus.WaitingForApproval or WorkItemStatus.Paused);
@@ -165,4 +165,7 @@ public sealed class TriggerWorkSubmitter(RootFlowSubmissionService rootFlows, IW
             WorkItemId: new WorkItemId(occurrence.Id)), cancellationToken);
         return new(submission.WorkItem.Value.Id.ToString());
     }
+
+    private Guid CurrentPrincipalId() => executionScopeAccessor.Current?.PrincipalId
+        ?? throw new TriggerExecutionException("trigger_execution_scope_required", "Trigger work access requires an authenticated execution scope.");
 }

@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Agentstration.Aep.Abstractions;
 using Agentstration.Extensions.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
@@ -19,6 +21,17 @@ public sealed record ExtensionProviderBinding(
     string Namespace,
     string ContributionId);
 
+public sealed record ExtensionValueRequirement(
+    string ContributionKind,
+    string ContributionId,
+    string Id,
+    bool Required,
+    string ValueType,
+    string Protection,
+    string? Description,
+    string? Format = null,
+    IReadOnlyList<JsonElement>? AllowedValues = null);
+
 public sealed record ExtensionView(
     string RegistrationName,
     string RegistrationNamespace,
@@ -34,7 +47,8 @@ public sealed record ExtensionView(
     bool RegistrationEnabled,
     AepEnrollmentMode EnrollmentMode,
     ResourceScopeRef? RegistrationScopeRef,
-    string RegistrationDisplayName);
+    string RegistrationDisplayName,
+    IReadOnlyList<ExtensionValueRequirement> ValueRequirements);
 
 public sealed class ExtensionManagementService(
     IModelProviderConfigurationStore providers,
@@ -92,10 +106,29 @@ public sealed class ExtensionManagementService(
                 resource.Definition.Enabled,
                 resource.Definition.EnrollmentMode,
                 resource.ScopeRef,
-                resource.Definition.DisplayName));
+                resource.Definition.DisplayName,
+                (inspection.ValueRequirements ?? []).Select(MapRequirement).ToArray()));
         }
         return views;
     }
+
+    private static ExtensionValueRequirement MapRequirement(AepValueRequirement requirement) => new(
+        requirement.ContributionKind,
+        requirement.ContributionId,
+        requirement.Id,
+        requirement.Required,
+        requirement.Type switch
+        {
+            AepValueType.Text => "string",
+            AepValueType.WholeNumber => "integer",
+            AepValueType.DecimalNumber => "number",
+            AepValueType.Logical => "boolean",
+            _ => "unknown"
+        },
+        requirement.Protection.ToString().ToLowerInvariant(),
+        requirement.Description,
+        requirement.Format,
+        requirement.AllowedValues?.Select(value => value.Clone()).ToArray());
 
     private static bool References(ModelProviderConfiguration provider, ExtensionRegistrationResource registration)
     {

@@ -28,6 +28,8 @@ export interface EntryDefinition {
   progressVisibility: 'Hidden' | 'Compact' | 'Detailed';
   taskDisplay: 'Auto' | 'Hidden' | 'Visible';
   resultsDisplay: 'Auto' | 'Hidden' | 'Visible';
+  exposeConsole?: boolean;
+  consoleFallback?: boolean;
   field: EntryFieldDefinition;
   targetFlow?: string;
   targetAgent?: string;
@@ -49,6 +51,17 @@ export class EntryEditorPage {
     ).waitFor({ state: 'visible' });
   }
 
+  public async open(consoleUrl: string, namespace: string, name: string): Promise<void> {
+    const response = await this.page.goto(`${consoleUrl}/namespaces/${encodeURIComponent(namespace)}/entries/${encodeURIComponent(name)}?view=definition`, { waitUntil: 'domcontentloaded' });
+    if (!response?.ok()) throw new Error(`Entry page returned HTTP ${response?.status() ?? 'no response'}.`);
+    await this.definitionFields.waitFor({ state: 'visible' });
+  }
+
+  public async saveDraft(): Promise<void> {
+    await this.page.getByTestId(TestIds.entryEditor.saveDraft).click();
+    await expect(this.status).toHaveAttribute('data-state', 'draft');
+  }
+
   public async fillIdentity(entry: Pick<EntryDefinition, 'name' | 'displayName' | 'description'>): Promise<void> {
     await fillAndCommit(this.page.getByTestId(TestIds.entryEditor.name), entry.name);
     await fillAndCommit(this.page.getByTestId(TestIds.entryEditor.displayName), entry.displayName);
@@ -62,6 +75,14 @@ export class EntryEditorPage {
       const picker = this.appearanceSection.getByTestId(TestIds.common.iconPicker);
       await picker.locator('input[type="search"]').fill(entry.icon);
       await picker.getByRole('option', { name: entry.icon, exact: true }).click();
+    }
+  }
+
+  public async configureExposure(entry: Pick<EntryDefinition, 'exposeConsole' | 'consoleFallback'>): Promise<void> {
+    const exposeConsole = entry.exposeConsole === true || entry.consoleFallback === true;
+    await this.page.getByTestId(TestIds.entryEditor.exposureConsole).setChecked(exposeConsole);
+    if (exposeConsole) {
+      await this.page.getByTestId(TestIds.entryEditor.consoleFallback).setChecked(entry.consoleFallback === true);
     }
   }
 

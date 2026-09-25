@@ -70,6 +70,8 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
     public async Task<StoredFlowVersion> PublishAsync(WorkspaceId workspaceId, FlowId flowId, string version, string? releaseNotes, bool activate, CancellationToken cancellationToken)
     {
         var draft = await RequiredAsync(workspaceId, flowId, cancellationToken);
+        if (await repository.GetVersionAsync(workspaceId, flowId, version, cancellationToken) is not null)
+            throw new FlowValidationException("flow_version_already_published", $"Flow version '{version}' has already been published. Choose a new version.");
         var validation = await validator.ValidateAsync(draft.Value.Definition, new FlowValidationContext(true, workspaceId, flowId), cancellationToken);
         if (!validation.IsValid) throw new FlowValidationException("flow_validation_failed", "The Flow Draft contains validation errors and cannot be published.");
         var definition = await repository.GetAsync(workspaceId, flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
@@ -82,7 +84,25 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
     {
         var published = await repository.GetVersionAsync(workspaceId, flowId, version, cancellationToken) ?? throw new FlowValidationException("flow_version_not_found", $"Flow version '{version}' was not found.");
         if (published.Value.Graph is null) throw new FlowValidationException("flow_version_graph_missing", "This legacy Flow version has no editable graph definition.");
-        var current = await RequiredAsync(workspaceId, flowId, cancellationToken);
+        var current = await repository.GetDraftAsync(workspaceId, flowId, cancellationToken);
+        if (current is null)
+        {
+            var flow = await repository.GetAsync(workspaceId, flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
+            var now = timeProvider.GetUtcNow();
+            return await repository.CreateDraftAsync(new FlowDraft
+            {
+                WorkspaceId = workspaceId,
+                Id = $"{flowId.Value}-draft",
+                FlowId = flowId,
+                DisplayName = flow.Value.DisplayName ?? flow.Value.Name,
+                Description = published.Value.Description,
+                Tags = Copy(published.Value.Metadata),
+                Definition = published.Value.Graph,
+                CreatedAt = now,
+                UpdatedAt = now,
+                UpdatedBy = updatedBy
+            }, cancellationToken);
+        }
         var updated = current.Value with { Definition = published.Value.Graph, Revision = current.Value.Revision + 1, UpdatedAt = timeProvider.GetUtcNow(), UpdatedBy = updatedBy };
         return await repository.UpdateDraftAsync(updated, current.ETag, cancellationToken);
     }
@@ -183,7 +203,7 @@ public static class FlowDraftTemplates
         };
     }
 
-    private static FlowGraphDefinition Empty() => new() { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input", DisplayName = "Input" }, new OutputFlowStepDefinition { Name = "output", DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${input}") }], Transitions = [new("input-output", "input", "completed", "output")], Designer = new() { NodePositions = Positions("input", "output") } };
+    private static FlowGraphDefinition Empty() => new() { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input", DisplayName = "Input" }, new OutputFlowStepDefinition { Name = "output", DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") }], Transitions = [new("input-output", "input", "completed", "output")], Designer = new() { NodePositions = Positions("input", "output") } };
     private static FlowGraphDefinition Sequential() => Empty();
     private static FlowGraphDefinition Conditional() => AgentRouting();
     private static IReadOnlyDictionary<string, FlowNodePosition> Positions(params string[] names) => names.Select((name, index) => new KeyValuePair<string, FlowNodePosition>(name, new(index < names.Length - 1 ? index * 210 : 630, index == names.Length - 1 ? 190 : 40))).ToDictionary();

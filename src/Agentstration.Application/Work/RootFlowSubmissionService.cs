@@ -91,10 +91,30 @@ public sealed class RootFlowSubmissionService(
     public const string ActiveReferenceMetadata = "flowInvocation.resolvedFromActiveReference";
 
     public Task<RootFlowSubmission> SubmitAsync(SubmitRootFlowCommand command, CancellationToken cancellationToken) =>
-        SubmitAsync(command, null, cancellationToken);
+        SubmitCoreAsync(command, null, null, cancellationToken);
 
-    internal async Task<RootFlowSubmission> SubmitAsync(
+    internal Task<RootFlowSubmission> SubmitAsync(
         SubmitRootFlowCommand command,
+        Func<StoredWorkItem, CancellationToken, Task>? beforeExecutionConfirmed,
+        CancellationToken cancellationToken) =>
+        SubmitCoreAsync(command, null, beforeExecutionConfirmed, cancellationToken);
+
+    internal Task<RootFlowSubmission> SubmitAsync(
+        SubmitRootFlowCommand command,
+        Guid expectedOwnerPrincipalId,
+        CancellationToken cancellationToken) =>
+        SubmitCoreAsync(command, expectedOwnerPrincipalId, null, cancellationToken);
+
+    internal Task<RootFlowSubmission> SubmitAsync(
+        SubmitRootFlowCommand command,
+        Guid expectedOwnerPrincipalId,
+        Func<StoredWorkItem, CancellationToken, Task>? beforeExecutionConfirmed,
+        CancellationToken cancellationToken) =>
+        SubmitCoreAsync(command, expectedOwnerPrincipalId, beforeExecutionConfirmed, cancellationToken);
+
+    private async Task<RootFlowSubmission> SubmitCoreAsync(
+        SubmitRootFlowCommand command,
+        Guid? expectedOwnerPrincipalId,
         Func<StoredWorkItem, CancellationToken, Task>? beforeExecutionConfirmed,
         CancellationToken cancellationToken)
     {
@@ -105,6 +125,8 @@ public sealed class RootFlowSubmissionService(
             ?? throw new WorkValidationException("work_execution_scope_required", "Root Flow submission requires an authenticated Workspace scope.");
         if (scope.WorkspaceId != command.WorkspaceId)
             throw new WorkValidationException("flow_invocation_scope_mismatch", "The root Flow invocation and execution scope must belong to the same Workspace.");
+        if (expectedOwnerPrincipalId is not null && scope.PrincipalId != expectedOwnerPrincipalId.Value)
+            throw new WorkValidationException("work_owner_mismatch", "Conversation work must retain the conversation owner.");
         await authorizer.AuthorizeAsync(scope, cancellationToken);
 
         var workItemId = command.WorkItemId ?? (string.IsNullOrWhiteSpace(command.IdempotencyKey)
@@ -112,7 +134,7 @@ public sealed class RootFlowSubmissionService(
             : DeterministicWorkItemId(scope, command.Origin, command.IdempotencyKey));
         var runId = $"flowrun-root-{workItemId.Value:N}";
         var inputHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(command.Input.GetRawText()))).ToLowerInvariant();
-        var existing = await repository.GetAsync(command.WorkspaceId, workItemId, cancellationToken);
+        var existing = await repository.GetAsync(command.WorkspaceId, scope.PrincipalId, workItemId, cancellationToken);
         if (existing is not null)
         {
             ValidateExisting(existing.Value, command, runId, inputHash);
@@ -159,7 +181,7 @@ public sealed class RootFlowSubmissionService(
         }
         catch (WorkItemConcurrencyException)
         {
-            var recovered = await repository.GetAsync(command.WorkspaceId, workItemId, cancellationToken);
+            var recovered = await repository.GetAsync(command.WorkspaceId, scope.PrincipalId, workItemId, cancellationToken);
             if (recovered is null) throw;
             stored = recovered;
             ValidateExisting(stored.Value, command, runId, inputHash);

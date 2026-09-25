@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import fs from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
-import { createServer, type Server } from 'node:http';
+import { createServer, request as createRequest, type Server } from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
@@ -13,7 +13,13 @@ export interface ProductAddresses {
 }
 
 export interface ProductHosts extends ProductAddresses {
+  platformHealth?: PlatformHealthTestControl;
   stop(): Promise<void>;
+}
+
+export interface PlatformHealthTestControl {
+  delayNextRuntimeStatus(milliseconds: number): void;
+  setRuntimeUnavailable(unavailable: boolean): void;
 }
 
 interface ManagedProcess {
@@ -26,6 +32,11 @@ interface FakeOllama {
   stop(): Promise<void>;
 }
 
+interface ControlledRuntimeProxy extends PlatformHealthTestControl {
+  url: string;
+  stop(): Promise<void>;
+}
+
 const startupTimeoutMilliseconds = 180_000;
 
 export async function startProductHosts(): Promise<ProductHosts> {
@@ -34,12 +45,14 @@ export async function startProductHosts(): Promise<ProductHosts> {
   const dataDirectory = path.join(workDirectory, 'data');
   await fs.mkdir(dataDirectory, { recursive: true });
 
-  const [consolePort, workplacePort, extensionPort, gitExtensionPort] = await Promise.all([freePort(), freePort(), freePort(), freePort()]);
+  const [consolePort, workplacePort, extensionPort, gitExtensionPort, foundryExtensionPort] = await Promise.all([freePort(), freePort(), freePort(), freePort(), freePort()]);
   const consoleUrl = `http://127.0.0.1:${consolePort}`;
   const workplaceUrl = `http://127.0.0.1:${workplacePort}`;
   const extensionUrl = `http://127.0.0.1:${extensionPort}`;
   const gitExtensionUrl = `http://127.0.0.1:${gitExtensionPort}`;
+  const foundryExtensionUrl = `http://127.0.0.1:${foundryExtensionPort}`;
   const bootstrapPath = path.join(repositoryRoot, 'deploy', 'bootstrap', 'profiles');
+  const runtimeProxy = await startControlledRuntimeProxy(consoleUrl);
 
   const fakeOllama = await startFakeOllama();
   const modelExtension = runDotnet('src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj', path.join(workDirectory, 'model-extension.log'), {
@@ -54,16 +67,24 @@ export async function startProductHosts(): Promise<ProductHosts> {
     Logging__EventLog__LogLevel__Default: 'None',
     GitSourceProvider__AllowLocalRepositories: 'true',
   });
+  const foundryExtension = runDotnet('src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj', path.join(workDirectory, 'foundry-extension.log'), {
+    ASPNETCORE_ENVIRONMENT: 'Development',
+    ASPNETCORE_URLS: foundryExtensionUrl,
+    Logging__EventLog__LogLevel__Default: 'None',
+  });
 
   try {
     await Promise.all([
       waitUntilHealthy(`${extensionUrl}/health`, modelExtension),
       waitUntilHealthy(`${gitExtensionUrl}/health`, gitExtension),
+      waitUntilHealthy(`${foundryExtensionUrl}/health`, foundryExtension),
     ]);
   } catch (error) {
     await stopProcess(modelExtension);
     await stopProcess(gitExtension);
+    await stopProcess(foundryExtension);
     await fakeOllama.stop();
+    await runtimeProxy.stop();
     throw error;
   }
 
@@ -83,7 +104,7 @@ export async function startProductHosts(): Promise<ProductHosts> {
     Agentstration__Bootstrap__InitialBootstrapEnabled: 'true',
     Agentstration__Bootstrap__InitialProfiles__0: 'development',
     Agentstration__ManagementApi__BaseAddress: `${consoleUrl}/`,
-    Agentstration__RuntimeApi__BaseAddress: `${consoleUrl}/`,
+    Agentstration__RuntimeApi__BaseAddress: `${runtimeProxy.url}/`,
     Agentstration__WorkApi__BaseAddress: `${consoleUrl}/`,
     Agentstration__FlowApi__BaseAddress: `${consoleUrl}/`,
     Agentstration__WorkplaceBaseUrl: `${workplaceUrl}/`,
@@ -93,6 +114,8 @@ export async function startProductHosts(): Promise<ProductHosts> {
     `--Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint=${extensionUrl}`,
     '--Agentstration:Extensions:Agentstration.Extensions.Git:RegistrationName=git-extension',
     `--Agentstration:Extensions:Agentstration.Extensions.Git:Endpoint=${gitExtensionUrl}`,
+    '--Agentstration:Extensions:Agentstration.Extensions.Foundry:RegistrationName=foundry-extension',
+    `--Agentstration:Extensions:Agentstration.Extensions.Foundry:Endpoint=${foundryExtensionUrl}`,
   ]);
 
   let workplaceHost: ManagedProcess | undefined;
@@ -111,20 +134,71 @@ export async function startProductHosts(): Promise<ProductHosts> {
     await stopProcess(consoleHost);
     await stopProcess(modelExtension);
     await stopProcess(gitExtension);
+    await stopProcess(foundryExtension);
     await fakeOllama.stop();
+    await runtimeProxy.stop();
     throw error;
   }
 
   return {
     consoleUrl,
     workplaceUrl,
+    platformHealth: runtimeProxy,
     async stop() {
       await stopProcess(workplaceHost);
       await stopProcess(consoleHost);
       await stopProcess(modelExtension);
       await stopProcess(gitExtension);
+      await stopProcess(foundryExtension);
       await fakeOllama.stop();
+      await runtimeProxy.stop();
     },
+  };
+}
+
+async function startControlledRuntimeProxy(targetBaseUrl: string): Promise<ControlledRuntimeProxy> {
+  let nextDelayMilliseconds = 0;
+  let unavailable = false;
+  const server = createServer(async (incoming, outgoing) => {
+    const requestUrl = incoming.url ?? '/';
+    const isRuntimeStatusRequest = new URL(requestUrl, targetBaseUrl).pathname === '/api/runtime/runs';
+    if (isRuntimeStatusRequest && unavailable) {
+      outgoing.statusCode = 503;
+      outgoing.setHeader('Content-Type', 'application/problem+json');
+      outgoing.end(JSON.stringify({ title: 'Runtime API unavailable in browser fixture', status: 503 }));
+      return;
+    }
+    if (isRuntimeStatusRequest && nextDelayMilliseconds > 0) {
+      const delay = nextDelayMilliseconds;
+      nextDelayMilliseconds = 0;
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+
+    const target = new URL(requestUrl, targetBaseUrl);
+    const headers = { ...incoming.headers, host: target.host };
+    const forwarded = createRequest(target, { method: incoming.method, headers }, response => {
+      outgoing.writeHead(response.statusCode ?? 502, response.headers);
+      response.pipe(outgoing);
+    });
+    forwarded.on('error', error => {
+      if (outgoing.headersSent) outgoing.destroy(error);
+      else {
+        outgoing.statusCode = 502;
+        outgoing.end('Runtime proxy unavailable.');
+      }
+    });
+    incoming.pipe(forwarded);
+  });
+  const port = await listenOnLoopback(server);
+  return {
+    url: `http://127.0.0.1:${port}`,
+    delayNextRuntimeStatus(milliseconds) {
+      nextDelayMilliseconds = Math.max(0, milliseconds);
+    },
+    setRuntimeUnavailable(value) {
+      unavailable = value;
+    },
+    stop: async () => await closeServer(server),
   };
 }
 

@@ -1,0 +1,20 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata: { name: resource-planning-experience-design, namespace: agentstration.resource-planning }
+definition:
+  displayName: Resource Planning - experience design
+  description: Durable functional experience design child Flow.
+  version: 1.0.0
+  enabled: true
+  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-experience-designer, namespace: agentstration.resource-planning } }
+  graph:
+    entryStep: input
+    steps:
+      - { type: input, name: input, displayName: Workflow and audience evidence }
+      - { type: agent, name: design, displayName: Design experiences, agent: { resourceId: resource-planning-experience-designer, namespace: agentstration.resource-planning }, inputMapping: "${input}" }
+      - { type: output, name: output, displayName: Experience intents, outputMapping: "${steps.design.output}" }
+    transitions:
+      - { id: input-to-design, fromStep: input, event: completed, toStep: design }
+      - { id: design-to-output, fromStep: design, event: completed, toStep: output }
+  publish: true
+  activate: true

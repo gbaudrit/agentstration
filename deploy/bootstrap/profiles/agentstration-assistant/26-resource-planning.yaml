@@ -1,0 +1,111 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata: { name: resource-planning, namespace: agentstration.resource-planning }
+definition:
+  displayName: Functional Resource Planning
+  description: Composes durable specialist Flows, then creates and validates a reviewable Resource Plan without applying it.
+  version: 1.0.0
+  enabled: true
+  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-solution-consolidator, namespace: agentstration.resource-planning } }
+  graph:
+    entryStep: input
+    inputSchema:
+      type: object
+      properties:
+        goal: { type: string }
+        context: { type: string }
+      required: [goal]
+      additionalProperties: false
+    steps:
+      - { type: input, name: input, displayName: Natural-language goal }
+      - type: flow
+        name: analyze-intent
+        displayName: Analyze requirements
+        flow: { resourceId: resource-planning-intent-analysis, namespace: agentstration.resource-planning, versionStrategy: active }
+        inputMapping: { goal: "${input.goal}", context: "${input.context}" }
+      - type: flow
+        name: design-capabilities
+        displayName: Design roles and capabilities
+        flow: { resourceId: resource-planning-capability-design, namespace: agentstration.resource-planning, versionStrategy: active }
+        inputMapping: { goal: "${input.goal}", intent: "${steps.analyze-intent.output}" }
+      - type: flow
+        name: design-workflows
+        displayName: Design workflows
+        flow: { resourceId: resource-planning-workflow-design, namespace: agentstration.resource-planning, versionStrategy: active }
+        inputMapping: { goal: "${input.goal}", intent: "${steps.analyze-intent.output}", capabilities: "${steps.design-capabilities.output}" }
+      - type: flow
+        name: design-integrations
+        displayName: Design integrations
+        flow: { resourceId: resource-planning-integration-design, namespace: agentstration.resource-planning, versionStrategy: active }
+        inputMapping: { goal: "${input.goal}", intent: "${steps.analyze-intent.output}", capabilities: "${steps.design-capabilities.output}" }
+      - type: flow
+        name: design-experiences
+        displayName: Design experiences
+        flow: { resourceId: resource-planning-experience-design, namespace: agentstration.resource-planning, versionStrategy: active }
+        inputMapping: { goal: "${input.goal}", workflows: "${steps.design-workflows.output}", audiences: "${steps.analyze-intent.output}" }
+      - type: flow
+        name: consolidate
+        displayName: Consolidate and review
+        flow: { resourceId: resource-planning-solution-consolidation, namespace: agentstration.resource-planning, versionStrategy: active }
+        inputMapping:
+          goal: "${input.goal}"
+          intent: "${steps.analyze-intent.output}"
+          capabilities: "${steps.design-capabilities.output}"
+          workflows: "${steps.design-workflows.output}"
+          integrations: "${steps.design-integrations.output}"
+          experiences: "${steps.design-experiences.output}"
+      - type: condition
+        name: ready
+        displayName: Review planning readiness
+        mode: Simple
+        left: "${steps.consolidate.output.readiness}"
+        operator: equals
+        right: ready
+      - type: output
+        name: clarification
+        displayName: Clarification required
+        outputMapping: { status: blocked, diagnostics: "${steps.consolidate.output.diagnostics}", draft: "${steps.consolidate.output.plan}" }
+      - type: tool
+        name: create-plan
+        displayName: Create governed Resource Plan
+        tool: { resourceId: agentstration.resource-planning.plan.create }
+        argumentsMapping:
+          title: "${steps.consolidate.output.title}"
+          goal: "${steps.consolidate.output.goal}"
+          description: "${steps.consolidate.output.description}"
+          plan: "${steps.consolidate.output.plan}"
+      - type: tool
+        name: submit-plan
+        displayName: Submit reviewed plan
+        tool: { resourceId: agentstration.resource-planning.plan.submit }
+        argumentsMapping: { planId: "${steps.create-plan.output.plan.id.value}", expectedETag: "${steps.create-plan.output.etag}" }
+      - type: tool
+        name: materialize-plan
+        displayName: Identify the profile and Tool choices required for review
+        tool: { resourceId: agentstration.resource-planning.plan.materialize }
+        argumentsMapping: { planId: "${steps.create-plan.output.plan.id.value}" }
+      - type: output
+        name: output
+        displayName: Plan ready for binding selection and review
+        outputMapping:
+          status: ready-for-review
+          plan: "${steps.submit-plan.output.plan}"
+          materialization: "${steps.materialize-plan.output}"
+    transitions:
+      - { id: input-to-intent, fromStep: input, event: completed, toStep: analyze-intent }
+      - { id: intent-to-capabilities, fromStep: analyze-intent, event: completed, toStep: design-capabilities }
+      - { id: capabilities-to-workflows, fromStep: design-capabilities, event: completed, toStep: design-workflows }
+      - { id: workflows-to-integrations, fromStep: design-workflows, event: completed, toStep: design-integrations }
+      - { id: integrations-to-experiences, fromStep: design-integrations, event: completed, toStep: design-experiences }
+      - { id: experiences-to-consolidate, fromStep: design-experiences, event: completed, toStep: consolidate }
+      - { id: consolidate-to-ready, fromStep: consolidate, event: completed, toStep: ready }
+      - { id: blocked-to-clarification, fromStep: ready, event: "false", toStep: clarification }
+      - { id: ready-to-create, fromStep: ready, event: "true", toStep: create-plan }
+      - { id: create-to-submit, fromStep: create-plan, event: completed, toStep: submit-plan }
+      - { id: submit-to-materialize, fromStep: submit-plan, event: completed, toStep: materialize-plan }
+      - { id: materialize-to-output, fromStep: materialize-plan, event: completed, toStep: output }
+    outputSchema:
+      type: object
+      additionalProperties: true
+  publish: true
+  activate: true

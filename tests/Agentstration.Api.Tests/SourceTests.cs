@@ -671,7 +671,11 @@ public sealed class SourceTests
     {
         await using var fixture = await Fixture.CreateAsync();
         using var system = fixture.Context.PushSystem();
-        fixture.Inspector.SecretRequirements = [new("credential", true), new("proxy-auth", false)];
+        fixture.Inspector.ValueRequirements =
+        [
+            new(AepContributionKinds.SourceProvider, "git", "credential", true, Protection: AepValueProtection.Secured),
+            new(AepContributionKinds.SourceProvider, "git", "proxy-auth", false)
+        ];
         await fixture.CreateSourceProviderAsync();
         var imported = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: true), default);
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
@@ -1860,7 +1864,7 @@ public sealed class SourceTests
         public string Status { get; set; } = "available";
         public bool IncludeContribution { get; set; } = true;
         public string SchemaDigest { get; set; } = "sha256:test";
-        public IReadOnlyList<AepSecretRequirement>? SecretRequirements { get; set; }
+        public IReadOnlyList<AepValueRequirement>? ValueRequirements { get; set; }
         public bool CanHandle(string providerType) => true;
         public bool CanInspectEndpoint(Uri endpoint) => true;
         public ValueTask<ExtensionInspection> InspectAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default) =>
@@ -1874,7 +1878,7 @@ public sealed class SourceTests
                 IncludeContribution ? [new("source-provider", "git")] : [],
                 [new("git/source-channel", "source-provider", "git", ExtensionOptionScopes.SourceChannel, "1.0", [new("1.0", SchemaDigest, Schema, false)])],
                 Status == "available" ? null : "The extension is unavailable.",
-                SecretRequirements));
+                ValueRequirements: ValueRequirements));
     }
 
     private sealed class FakeSourceProviderMaterializer : ISourceProviderMaterializer

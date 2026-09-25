@@ -29,7 +29,15 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
         await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
             services.RemoveAll<IExtensionInspector>();
-            services.AddSingleton<IExtensionInspector>(new ConfiguredEndpointInspector([new AepSecretRequirement("credential", true)]));
+            services.AddSingleton<IExtensionInspector>(new ConfiguredEndpointInspector(
+            [
+                new AepValueRequirement(
+                    AepContributionKinds.ModelProvider,
+                    "ollama",
+                    "credential",
+                    true,
+                    Protection: AepValueProtection.Secured)
+            ]));
         }));
         var context = await GetBootstrapContextAsync(factory);
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
@@ -443,15 +451,18 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
     {
         await using var factory = DiagnosticFactory();
         using var client = factory.CreateClient();
+        var providerProperties = new ModelProviderProperties
+        {
+            DisplayName = "Diagnostic provider",
+            Extension = new ResourceReference("ollama-extension"),
+            ContributionId = "diagnostic"
+        };
         using var providerResponse = await client.PostAsJsonAsync("/api/modelproviders", new CreateModelProviderRequest(
             "diagnostic-local",
-            new ModelProviderProperties
-            {
-                DisplayName = "Diagnostic provider",
-                Extension = new ResourceReference("ollama-extension"),
-                ContributionId = "diagnostic"
-            }));
+            providerProperties));
         Assert.AreEqual(HttpStatusCode.Created, providerResponse.StatusCode);
+        using var refreshResponse = await client.PostAsync("/api/modelproviders/diagnostic-local/models/refresh", null);
+        Assert.AreEqual(HttpStatusCode.OK, refreshResponse.StatusCode);
         using var profileResponse = await client.PostAsJsonAsync("/api/modelprofiles", new CreateModelProfileRequest(
             "incompatible-profile",
             new ModelProfileProperties
@@ -478,6 +489,36 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
         Assert.AreEqual("native", capabilities.Single(capability => capability.Name == "Structured output").EffectiveSupport);
         Assert.IsTrue(incompatibilities.Any(issue => issue.Capability == "reasoning"));
         Assert.IsFalse(incompatibilities.Any(issue => issue.Capability == "structuredOutput"));
+
+        var providerEtag = providerResponse.Headers.ETag?.ToString()
+            ?? throw new InvalidOperationException("The provider ETag was missing.");
+        using var overrideRequest = new HttpRequestMessage(HttpMethod.Put, "/api/modelproviders/diagnostic-local")
+        {
+            Content = JsonContent.Create(new PutModelProviderRequest(providerProperties with
+            {
+                SpecificationOverrides = new Dictionary<string, ModelSpecificationOverride>
+                {
+                    ["local-model"] = new()
+                    {
+                        Features = new ModelFeatureOverrides
+                        {
+                            Tools = new() { Support = ModelFeatureSupport.Native }
+                        }
+                    }
+                }
+            }))
+        };
+        overrideRequest.Headers.IfMatch.ParseAdd(providerEtag);
+        using var overrideResponse = await client.SendAsync(overrideRequest);
+        Assert.AreEqual(HttpStatusCode.OK, overrideResponse.StatusCode);
+
+        resolution = await client.GetFromJsonAsync<ModelProfileResolutionResponse>(
+            "/api/modelprofiles/incompatible-profile/resolution");
+        tools = resolution!.Capabilities!.Single(capability => capability.Name == "Tools");
+        Assert.AreEqual("native", tools.ModelSupport);
+        Assert.AreEqual("native", tools.EffectiveSupport);
+        Assert.IsNull(resolution.Model.ObservedSpecification?.Features.Tools);
+        Assert.AreEqual(ModelFeatureSupport.Native, resolution.Model.SpecificationOverride?.Features.Tools?.Support);
     }
 
 }

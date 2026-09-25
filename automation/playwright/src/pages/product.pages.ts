@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { AgentEditorPage } from './agent-editor.page.js';
 import { FlowEditorPage } from './flow-editor.page.js';
+import { FlowDesignerPage } from './flow-designer.page.js';
 import { EntryEditorPage } from './entry-editor.page.js';
 import { LoginPage } from './login.page.js';
 import { OrganizationWorkspacesPage } from './organization-workspaces.page.js';
@@ -14,10 +15,15 @@ import { OperationsPage } from './operations.page.js';
 import { ResourceAdministrationPage } from './resource-administration.page.js';
 import { ModelAdministrationPage } from './model-administration.page.js';
 import { DescendantSecretsPage } from './descendant-secrets.page.js';
+import { ConsoleEntryInteractionPage } from './console-entry-interaction.page.js';
+import { PlatformHealthPage } from './platform-health.page.js';
+import { ResourceNamingPage } from './resource-naming.page.js';
+import { FoundrySecretBindingPage } from './foundry-secret-binding.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
   public readonly flowEditor: FlowEditorPage;
+  public readonly flowDesigner: FlowDesignerPage;
   public readonly entryEditor: EntryEditorPage;
   public readonly login: LoginPage;
   public readonly organizationWorkspaces: OrganizationWorkspacesPage;
@@ -30,10 +36,15 @@ export class ProductPages {
   public readonly resourceAdministration: ResourceAdministrationPage;
   public readonly modelAdministration: ModelAdministrationPage;
   public readonly descendantSecrets: DescendantSecretsPage;
+  public readonly consoleEntryInteraction: ConsoleEntryInteractionPage;
+  public readonly platformHealth: PlatformHealthPage;
+  public readonly resourceNaming: ResourceNamingPage;
+  public readonly foundrySecretBinding: FoundrySecretBindingPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
     this.flowEditor = new FlowEditorPage(page);
+    this.flowDesigner = new FlowDesignerPage(page);
     this.entryEditor = new EntryEditorPage(page);
     this.login = new LoginPage(page);
     this.organizationWorkspaces = new OrganizationWorkspacesPage(page);
@@ -46,6 +57,10 @@ export class ProductPages {
     this.resourceAdministration = new ResourceAdministrationPage(page);
     this.modelAdministration = new ModelAdministrationPage(page);
     this.descendantSecrets = new DescendantSecretsPage(page);
+    this.consoleEntryInteraction = new ConsoleEntryInteractionPage(page);
+    this.platformHealth = new PlatformHealthPage(page);
+    this.resourceNaming = new ResourceNamingPage(page);
+    this.foundrySecretBinding = new FoundrySecretBindingPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

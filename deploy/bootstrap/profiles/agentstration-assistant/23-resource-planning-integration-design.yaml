@@ -1,0 +1,20 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata: { name: resource-planning-integration-design, namespace: agentstration.resource-planning }
+definition:
+  displayName: Resource Planning - integration design
+  description: Durable functional integration design child Flow.
+  version: 1.0.0
+  enabled: true
+  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-integration-designer, namespace: agentstration.resource-planning } }
+  graph:
+    entryStep: input
+    steps:
+      - { type: input, name: input, displayName: Solution evidence }
+      - { type: agent, name: design, displayName: Design integrations, agent: { resourceId: resource-planning-integration-designer, namespace: agentstration.resource-planning }, inputMapping: "${input}" }
+      - { type: output, name: output, displayName: Integration intents, outputMapping: "${steps.design.output}" }
+    transitions:
+      - { id: input-to-design, fromStep: input, event: completed, toStep: design }
+      - { id: design-to-output, fromStep: design, event: completed, toStep: output }
+  publish: true
+  activate: true

@@ -35,6 +35,8 @@ It is built on the Microsoft .NET AI stack and currently executes agents through
 - workspace Dashboards that organize published Entries without exposing runtime details;
 - a responsive, conversation-first Workplace that projects agent turns, progress, human input and outcomes;
 - an operations Console for configuration, supervision, run inspection and governance.
+- a generic Console Entry interaction surface that reuses durable conversations, tasks, pending actions, results and artifacts for Console-exposed Entries;
+- a permission-aware Console Conversations view for returning to durable Entry interactions in the selected Workspace;
 - Console Resource Plan review with saved per-agent profile choices, proposed changes, dependency graph, validation, and activity history.
 
 ### Packs and automation
@@ -210,11 +212,11 @@ Copy-Item deploy/compose/.env.postgresql.example deploy/compose/.env.postgresql
 docker compose --env-file deploy/compose/.env.postgresql -f deploy/compose/ollama.yml -f deploy/compose/postgresql.yml up --build
 ```
 
-Replace `ollama.yml` with `base.yml`, `llama-cpp.yml`, or `localai.yml` to select another PostgreSQL-backed variant. PostgreSQL stores relational module data in seven schemas but leaves secrets, Data Protection keys, Pack archives, and Work artifacts on the existing file stores. Changing provider does not migrate SQLite data and does not enable multi-instance operation. Readiness is exposed at `/health/ready`; `/health` remains liveness.
+Replace `ollama.yml` with `base.yml`, `llama-cpp.yml`, or `localai.yml` to select another PostgreSQL-backed variant. PostgreSQL stores relational module data in seven schemas but leaves secrets, Data Protection keys, Pack archives, and Work artifacts on the existing file stores. Changing provider does not migrate SQLite data. Startup bootstrap is coordinated through a durable fenced initialization lease, but this does not by itself make every runtime subsystem safe for horizontally scaled operation. Readiness is exposed at `/health/ready`; `/health` remains liveness.
 
 For Aspire, set `Agentstration:Storage:Provider=PostgreSql`. Its generated password is persisted in user-secrets and relational data is kept in the worktree-isolated Docker volume `agentstration-<slot>-<instance-id>-postgresql`; file-backed state remains under the slot data directory. See [configuration](docs/getting-started/configuration.md#postgresql-storage-profile) for startup behavior, reset, troubleshooting, and backup guidance.
 
-Aspire starts Agentstration's AEP extensions against existing inference servers. Provider-specific Compose files isolate Ollama, llama.cpp, and LocalAI, with each topology owning its inference service and model storage. No topology downloads a model implicitly. Follow the [local installation guide](https://docs.agentstration.io/getting-started/local-installation) and [model provider guide](https://docs.agentstration.io/concepts/model-providers) for provider-specific setup.
+Aspire starts Agentstration's local AEP extensions against existing inference servers. The Microsoft Foundry extension is opt-in through `Foundry:Enabled=true` or the optional Compose overlay; each Model Provider supplies its own endpoints and downstream identity through AEP Value Bindings. It supports deployment discovery, text chat, streaming and governed Tool calls. See [Foundry integration](docs/foundry-integration.md). Provider-specific Compose files isolate Ollama, llama.cpp, and LocalAI, with each topology owning its inference service and model storage. No topology downloads a model implicitly. Follow the [local installation guide](https://docs.agentstration.io/getting-started/local-installation) and [model provider guide](https://docs.agentstration.io/concepts/model-providers) for provider-specific setup.
 
 ## Build and test
 

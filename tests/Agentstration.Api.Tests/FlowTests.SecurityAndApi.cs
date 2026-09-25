@@ -332,7 +332,7 @@ public sealed partial class FlowTests
 
         var workspace = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         var work = factory.Services.GetRequiredService<IWorkItemRepository>();
-        Assert.HasCount(1, (await work.QueryAsync(new WorkItemQuery(new WorkspaceId(workspace.WorkspaceId), Type: "flow-api"), default)).Items);
+        Assert.HasCount(1, (await work.QueryAsync(new WorkItemQuery(new WorkspaceId(workspace.WorkspaceId), workspace.PrincipalId, Type: "flow-api"), default)).Items);
 
         using var conflictingRequest = Request(2);
         using var conflict = await client.SendAsync(conflictingRequest);
@@ -541,7 +541,7 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
-    public void FlowRunConsoleUsesDistinctRouteFromApi()
+    public void FlowRoutesRegisterConsoleAndNamespacedDraftEndpoints()
     {
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         var routes = factory.Services.GetServices<EndpointDataSource>()
@@ -555,6 +555,12 @@ public sealed partial class FlowTests
         Assert.Contains("/flow-runs/{RunId}", routes);
         Assert.Contains("/api/flowRuns/{runId}", routes);
         Assert.DoesNotContain("/flowRuns/{runId}", routes);
+        Assert.Contains("/api/namespaces/{namespace}/flows/{id}/draft", routes);
+        Assert.Contains("/api/namespaces/{namespace}/flows/{id}/validate", routes);
+        Assert.Contains("/api/namespaces/{namespace}/flows/{id}/draft/source", routes);
+        Assert.Contains("/api/namespaces/{namespace}/flows/{id}/publish", routes);
+        Assert.Contains("/api/namespaces/{namespace}/flows/{id}/draft/runs", routes);
+        Assert.Contains("/api/namespaces/{namespace}/flows/{id}/versions/{version}/draft", routes);
     }
 
     [TestMethod]

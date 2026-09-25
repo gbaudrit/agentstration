@@ -4,6 +4,7 @@
 @inject IManagementApiClient Client
 @inject IPacksClient PacksClient
 @inject IAgentRunnerRuntimeClient RuntimeClient
+@inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<NamespacedAgentDetailsStrings> Localizer
 
 <PageTitle>@(agent?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
@@ -175,6 +176,9 @@ else if (agent is not null)
             : T("DirectModelReferenceHelp");
     private UiStatus ModelBindingTone => modelBindings.Count > 0 ? UiStatus.Info : ownerPack is null ? UiStatus.Warning : UiStatus.Neutral;
     private bool RuntimeIsPackResource => ownerPack is not null && RuntimeProfileAddress.Namespace == AgentResourceNamespace;
+    private bool IsPackManaged => agent is not null
+        && agent.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Publisher)
+        && agent.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name);
     private string RuntimeBindingStatus => runtimeBindings.Count > 0 ? T("InstallationBinding") : RuntimeIsPackResource ? T("PackResource") : T("DirectReference");
     private string RuntimeBindingDetail => runtimeBindings.Count > 0 ? string.Join(", ", runtimeBindings.Select(binding => $"{binding.Name} → {BindingTarget(binding.Target)}")) : RuntimeProfileAddress.ToString();
     private string RuntimeBindingHelp => runtimeBindings.Count > 0
@@ -199,6 +203,13 @@ else if (agent is not null)
         {
             agent = (await Client.GetAgentAsync(AgentResourceNamespace, Name, cancellation.Token)).Value;
             await Task.WhenAll(LoadPackContextAsync(), LoadReadinessAsync());
+            if (!IsPackManaged)
+            {
+                var editorUrl = $"/agents/{Uri.EscapeDataString(Name)}?namespace={Uri.EscapeDataString(AgentResourceNamespace.Value)}";
+                if (Navigation.Uri != Navigation.ToAbsoluteUri(editorUrl).AbsoluteUri)
+                    Navigation.NavigateTo(editorUrl, replace: true);
+                return;
+            }
             if (string.Equals(View, "definition", StringComparison.OrdinalIgnoreCase)) activeTab = PageTab.Definition;
         }
         catch (AgentstrationApiException exception) { error = exception; }

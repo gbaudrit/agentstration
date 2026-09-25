@@ -24,8 +24,7 @@
                     <span class="flow-create-section-number">01</span>
                 </div>
                 <div class="form-grid flow-identity-grid">
-                    <label><span>@T("TechnicalName")</span><InputText @bind-Value="model.Name" data-testid="flow-name" /><small>@T("TechnicalNameHelp")</small><ValidationMessage For="@(() => model.Name)" /></label>
-                    <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" data-testid="flow-display-name" /><small>@T("DisplayNameHelp")</small><ValidationMessage For="@(() => model.DisplayName)" /></label>
+                    <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Flow" IsNew="true" DisplayNameHelp="@T("DisplayNameHelp")" TechnicalNameHelp="@T("TechnicalNameHelp")" DisplayNameTestId="flow-display-name" TechnicalNameTestId="flow-name" />
                     <label><span>@T("InitialVersion")</span><InputText @bind-Value="orchestration.Version" data-testid="flow-version" /><small>@T("InitialVersionHelp")</small></label>
                     <ResourceScopeFormField ResourceKind="@FlowResourceKinds.Flow" @bind-Value="selectedScope" />
                     <label class="flow-form-span-all"><span>@T("Field.Description")</span><InputTextArea @bind-Value="model.Description" rows="3" data-testid="flow-description" /><small>@T("DescriptionHelp")</small></label>
@@ -188,7 +187,7 @@
 
     private sealed class NewFlowModel
     {
-        [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } = "multi-agent-review";
+        [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } = string.Empty;
         [System.ComponentModel.DataAnnotations.Required] public string DisplayName { get; set; } = "Multi-agent review";
         public string? Description { get; set; } = "Coordinates agents to produce a reviewed result.";
         public string Kind { get; set; } = "Workflow";

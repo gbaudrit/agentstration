@@ -156,13 +156,29 @@ public interface IFlowApiClient
     IAsyncEnumerable<FlowRun> ObserveFlowRunAsync(string runId, CancellationToken cancellationToken);
     Task<FlowDraftResponse> CreateDraftAsync(CreateFlowDraftRequest request, CancellationToken cancellationToken);
     Task<FlowDraftResponse> GetDraftAsync(string flowId, CancellationToken cancellationToken);
+    Task<FlowDraftResponse> GetDraftAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetDraftAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
     Task<FlowDraftResponse> SaveDraftAsync(string flowId, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken);
+    Task<FlowDraftResponse> SaveDraftAsync(ResourceNamespace @namespace, string flowId, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? SaveDraftAsync(flowId, request, etag, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
     Task<FlowValidationResponse> ValidateDraftAsync(string flowId, CancellationToken cancellationToken);
+    Task<FlowValidationResponse> ValidateDraftAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? ValidateDraftAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
     Task<FlowSourceResponse> GetDraftSourceAsync(string flowId, string format, CancellationToken cancellationToken);
+    Task<FlowSourceResponse> GetDraftSourceAsync(ResourceNamespace @namespace, string flowId, string format, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetDraftSourceAsync(flowId, format, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
     Task<FlowDraftResponse> ReplaceDraftSourceAsync(string flowId, ReplaceFlowSourceRequest request, string etag, CancellationToken cancellationToken);
+    Task<FlowDraftResponse> ReplaceDraftSourceAsync(ResourceNamespace @namespace, string flowId, ReplaceFlowSourceRequest request, string etag, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? ReplaceDraftSourceAsync(flowId, request, etag, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
     Task<FlowVersionResponse> PublishDraftAsync(string flowId, PublishFlowDraftRequest request, CancellationToken cancellationToken);
+    Task<FlowVersionResponse> PublishDraftAsync(ResourceNamespace @namespace, string flowId, PublishFlowDraftRequest request, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? PublishDraftAsync(flowId, request, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
     Task<FlowRun> CreateDraftRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken);
+    Task<FlowRun> CreateDraftRunAsync(ResourceNamespace @namespace, string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? CreateDraftRunAsync(flowId, request, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
     Task<FlowDraftResponse> CreateDraftFromVersionAsync(string flowId, string version, CancellationToken cancellationToken);
+    Task<FlowDraftResponse> CreateDraftFromVersionAsync(ResourceNamespace @namespace, string flowId, string version, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? CreateDraftFromVersionAsync(flowId, version, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
 }
 
 public sealed record FlowResourceSnapshot(FlowResponse Value, string ETag);

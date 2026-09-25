@@ -41,36 +41,47 @@ else
             {
                 <button class="button-secondary" disabled="@(!Editor.CanUndo)" @onclick="Undo">@T("Undo")</button>
                 <button class="button-secondary" disabled="@(!Editor.CanRedo)" @onclick="Redo">@T("Redo")</button>
-                <button class="button-secondary" @onclick="ValidateAsync">@T("Validate")</button>
+                <button class="button-secondary" data-testid="flow-designer-validate" @onclick="ValidateAsync">@T("Validate")</button>
                 <button class="button-secondary" @onclick="OpenRun">@T("RunDraft")</button>
-                <button class="button-primary" disabled="@saving" @onclick="SaveAsync">@T("Save")</button>
+                <button class="button-primary" data-testid="flow-designer-save" disabled="@saving" @onclick="SaveAsync">@T("Save")</button>
                 <label class="publish-version">@T("Version")<input aria-label="@T("PublishVersion")" @bind="publishVersion" /></label>
-                <button class="button-primary" @onclick="PublishAsync">@T("Publish")</button>
+                <button class="button-primary" data-testid="flow-designer-publish" disabled="@publishing" aria-busy="@publishing" @onclick="PublishAsync">@T(publishing ? "Publishing" : "Publish")</button>
             }
         </div>
     </header>
 
-    @if (error is not null) { <p class="error-panel designer-error">@error</p> }
+    @if (error is not null)
+    {
+        <div class="designer-feedback" role="alert">
+            <span class="designer-feedback-icon" aria-hidden="true">!</span>
+            <div><strong>@T("ActionFailed")</strong><p>@error</p></div>
+            <button aria-label="@T("DismissError")" @onclick="() => error = null">×</button>
+        </div>
+    }
 
     <section class="flow-editor-shell @Editor.State.Mode.ToString().ToLowerInvariant()">
         @if (Editor.State.Mode is FlowEditorMode.Designer or FlowEditorMode.Split)
         {
             <aside class="step-palette">
-                <h2>@T("Steps")</h2>
-                @foreach (var entry in Palette)
-                {
-                    <button disabled="@ReadOnly" @onclick="() => AddStepAsync(entry.Type)"><span>@entry.Icon</span> @T($"Step.{entry.Type}")</button>
-                }
-                <hr />
-                <button disabled="@ReadOnly" @onclick="() => LayoutAsync(false)">@T("HorizontalLayout")</button>
-                <button disabled="@ReadOnly" @onclick="() => LayoutAsync(true)">@T("VerticalLayout")</button>
-                <button @onclick="Center">@T("Center")</button>
+                <section class="step-palette-group" aria-labelledby="palette-steps-heading">
+                    <h2 id="palette-steps-heading">@T("Steps")</h2>
+                    @foreach (var entry in Palette)
+                    {
+                        <button disabled="@ReadOnly" @onclick="() => AddStepAsync(entry)"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="@FlowStepIcons.Name(entry)" /></span><span>@T($"Step.{entry}")</span></button>
+                    }
+                </section>
+                <section class="step-palette-group palette-view" aria-labelledby="palette-view-heading">
+                    <h2 id="palette-view-heading">@T("ViewControls")</h2>
+                    <button disabled="@ReadOnly" @onclick="() => LayoutAsync(false)"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="layout-distribute-horizontal" /></span><span>@T("HorizontalLayout")</span></button>
+                    <button disabled="@ReadOnly" @onclick="() => LayoutAsync(true)"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="layout-distribute-vertical" /></span><span>@T("VerticalLayout")</span></button>
+                    <button @onclick="Center"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="focus-centered" /></span><span>@T("Center")</span></button>
+                </section>
             </aside>
 
             <div class="flow-canvas-wrap">
                 <FlowCanvas @ref="canvas" Document="Editor.State.Diagram" Revision="Editor.State.LocalRevision" FitRevision="layoutRevision"
-                            IsReadOnly="ReadOnly" SelectedStepChanged="SelectStepAsync"
-                            StepMoved="MoveStepAsync" TransitionCreated="CreateTransitionAsync"
+                            IsReadOnly="ReadOnly" EntryStep="@Editor.State.Resource.Definition.EntryStep" SelectedStepChanged="SelectStepAsync"
+                            StepMoved="MoveStepAsync" StepRemoved="RemoveStepAsync" TransitionCreated="CreateTransitionAsync"
                             TransitionRemoved="RemoveTransitionAsync" />
             </div>
 
@@ -82,27 +93,59 @@ else
                 }
                 else
                 {
-                    <label>@T("DisplayName")<input disabled="@ReadOnly" value="@(SelectedStep.DisplayName ?? SelectedStep.Name)" @onchange="UpdateDisplayNameAsync" /></label>
-                    <label>@T("TechnicalName")<input value="@SelectedStep.Name" readonly /></label>
-                    <label>@T("Type")<input value="@SelectedStep.Type()" readonly /></label>
+                    <div class="inspector-details-group">
+                        <div class="inspector-details-heading"><h3>@T("StepDetails")</h3><span class="inspector-step-type">@T($"Step.{SelectedStep.Type()}")</span></div>
+                        <label>@T("StepDisplayName")<input disabled="@ReadOnly" value="@(SelectedStep.DisplayName ?? SelectedStep.Name)" @onchange="UpdateDisplayNameAsync" /></label>
+                        <label>@T("StepId")<input value="@SelectedStep.Name" readonly /></label>
+                    </div>
                     @if (SelectedStep is AgentFlowStepDefinition agent)
                     {
-                        <label>@T("Agent")<select disabled="@ReadOnly" value="@agent.Agent.ResourceId" @onchange="UpdateAgentAsync">
-                            <option value="${steps.route-request.output.selectedAgent}">@T("RouterOutput")</option>
-                            @foreach (var item in agents) { <option value="@item.Name">@item.DisplayName</option> }
-                        </select></label>
+                        <div class="inspector-details-group inspector-resource-details">
+                            <h3>@T("CalledResource")</h3>
+                        <div class="inspector-resource-field">
+                            <div class="inspector-resource-heading">
+                                <label for="flow-agent-reference">@T("CalledAgent")</label>
+                                @if (SelectedAgent is { } selectedAgent)
+                                {
+                                    <a class="inspector-resource-link" href="@AgentUrl(selectedAgent)" target="_blank" rel="noopener noreferrer" aria-label="@T("OpenAgentInNewTab")"><UiIcon Name="external-link" />@T("OpenAgent")</a>
+                                }
+                            </div>
+                            <select id="flow-agent-reference" disabled="@ReadOnly" value="@AgentSelectionValue(agent.Agent)" @onchange="UpdateAgentAsync">
+                                <option value="${steps.route-request.output.selectedAgent}">@T("RouterOutput")</option>
+                                @foreach (var item in agents) { <option value="@FlowKey(item.Namespace, item.Name)">@(item.Namespace.IsDefault ? item.DisplayName : $"{item.DisplayName} ({item.Namespace.Value})")</option> }
+                            </select>
+                        </div>
+                        @if (SelectedAgent is { } referencedAgent)
+                        {
+                            <p class="inspector-resource-id">@T("AgentId") <code>@referencedAgent.Name</code></p>
+                        }
+                        </div>
                     }
                     else if (SelectedStep is FlowCallStepDefinition flowCall)
                     {
-                        <label>@T("CalledFlow")
-                            <input disabled="@ReadOnly" list="flow-targets" value="@FlowKey(flowCall.Flow)" @onchange="UpdateFlowTargetAsync" />
+                        <div class="inspector-details-group inspector-resource-details">
+                            <h3>@T("CalledResource")</h3>
+                        <div class="inspector-resource-field">
+                            <div class="inspector-resource-heading">
+                                <label for="flow-call-reference">@T("CalledFlow")</label>
+                                @if (SelectedFlow is { } selectedFlow)
+                                {
+                                    <a class="inspector-resource-link" href="@FlowUrl(selectedFlow)" target="_blank" rel="noopener noreferrer" aria-label="@T("OpenFlowInNewTab")"><UiIcon Name="external-link" />@T("OpenFlow")</a>
+                                }
+                            </div>
+                            <input id="flow-call-reference" disabled="@ReadOnly" list="flow-targets" value="@FlowKey(flowCall.Flow)" @onchange="UpdateFlowTargetAsync" />
                             <datalist id="flow-targets">
                                 @foreach (var item in flows.Where(item => item.Name != ResourceId || item.Namespace != Namespace))
                                 {
                                     <option value="@FlowKey(item.Namespace, item.Name)">@item.DisplayName (@item.Namespace.Value)</option>
                                 }
                             </datalist>
-                        </label>
+                        </div>
+                        @if (SelectedFlow is { } referencedFlow)
+                        {
+                            <p class="inspector-resource-id">@T("FlowId") <code>@referencedFlow.Name</code></p>
+                        }
+                        </div>
                         <label>@T("VersionStrategy")<select disabled="@ReadOnly" value="@flowCall.Flow.VersionStrategy" @onchange="UpdateFlowVersionStrategyAsync">
                             <option value="@FlowCallVersionStrategy.Active">@T("VersionStrategy.Active")</option>
                             <option value="@FlowCallVersionStrategy.Exact">@T("VersionStrategy.Exact")</option>
@@ -116,7 +159,7 @@ else
                         @if (SelectedFlowVersion is not null)
                         {
                             <fieldset class="flow-mapping-editor"><legend>@T("InputMapping")</legend>
-                                <label><input data-testid="flow-pass-transition-output" type="checkbox" disabled="@ReadOnly" checked="@PassesIncomingTransitionOutput(flowCall.InputMapping)" @onchange="UpdateFlowTransitionPassthroughAsync" />@T("PassIncomingTransitionOutput")</label>
+                                <label class="flow-checkbox-field"><input data-testid="flow-pass-transition-output" type="checkbox" disabled="@ReadOnly" checked="@PassesIncomingTransitionOutput(flowCall.InputMapping)" @onchange="UpdateFlowTransitionPassthroughAsync" />@T("PassIncomingTransitionOutput")</label>
                                 <small>@T("PassIncomingTransitionOutputHelp")</small>
                                 @if (!PassesIncomingTransitionOutput(flowCall.InputMapping)
                                     && SelectedFlowVersion.InputSchema is { ValueKind: JsonValueKind.Object } inputSchema
@@ -140,15 +183,37 @@ else
                     }
                     else if (SelectedStep is ToolFlowStepDefinition toolStep)
                     {
-                        <label>@T("CalledTool")
-                            <input disabled="@ReadOnly" list="tool-targets" value="@ToolKey(toolStep.Tool)" @onchange="UpdateToolTargetAsync" />
-                            <datalist id="tool-targets">
-                                @foreach (var item in tools)
+                        <div class="inspector-details-group inspector-resource-details">
+                            <h3>@T("CalledResource")</h3>
+                            <div class="inspector-resource-field">
+                                <div class="inspector-resource-heading"><span>@T("CalledTool")</span></div>
+                                @if (ReadOnly)
                                 {
-                                    <option value="@ToolKey(item.Namespace, item.Name)">@item.DisplayName (@item.Namespace.Value)</option>
+                                    <div class="tool-picker-trigger is-readonly"><UiIcon Name="wrench" /><span>@(SelectedTool?.DisplayName ?? T("CurrentToolUnavailable"))</span></div>
                                 }
-                            </datalist>
-                        </label>
+                                else
+                                {
+                                    <details class="tool-picker" @key="toolPickerRevision" @onkeydown="HandleToolPickerKeyDown">
+                                        <summary class="tool-picker-trigger"><UiIcon Name="wrench" /><span>@(SelectedTool?.DisplayName ?? T("CurrentToolUnavailable"))</span><UiIcon Name="chevron-down" /></summary>
+                                        <div class="tool-picker-menu">
+                                            <div class="tool-picker-search"><UiIcon Name="search" /><input aria-label="@T("SearchTools")" placeholder="@T("SearchTools")" @bind="toolSearch" @bind:event="oninput" /></div>
+                                            <div class="tool-picker-options">
+                                                @foreach (var item in VisibleTools)
+                                                {
+                                                    <button type="button" class="tool-picker-option" aria-pressed="@(ToolKey(item.Namespace, item.Name) == ToolKey(toolStep.Tool) ? "true" : "false")" @onclick="() => SelectToolAsync(item)">
+                                                        <span class="tool-picker-option-icon"><UiIcon Name="wrench" /></span>
+                                                        <span class="tool-picker-option-copy"><strong>@item.DisplayName</strong><small>@item.Namespace.Value / @item.Name</small></span>
+                                                        @if (ToolKey(item.Namespace, item.Name) == ToolKey(toolStep.Tool)) { <UiIcon Name="check" /> }
+                                                    </button>
+                                                }
+                                                @if (!VisibleTools.Any()) { <p class="tool-picker-empty">@T("NoMatchingTools")</p> }
+                                            </div>
+                                        </div>
+                                    </details>
+                                }
+                            </div>
+                            <p class="inspector-resource-id">@T("ToolId") <code>@toolStep.Tool.ResourceId</code></p>
+                        </div>
                         @if (SelectedTool is { } selectedTool)
                         {
                             @if (!selectedTool.Enabled || !selectedTool.Available || selectedTool.RequiresApproval)
@@ -228,7 +293,7 @@ else
 
         @if (Editor.State.Mode is FlowEditorMode.Definition or FlowEditorMode.Split)
         {
-            <FlowSourceEditor Value="sourceText" ValueChanged="SourceChanged" Error="Editor.State.SourceError"
+            <FlowSourceEditor Value="@sourceText" ValueChanged="SourceChanged" Error="@Editor.State.SourceError"
                               IsReadOnly="ReadOnly" ApplyRequested="ApplySourceAsync" />
         }
     </section>
@@ -246,7 +311,7 @@ else
 }
 
 @code {
-    private static readonly (string Type, string Icon)[] Palette = [("input", "●"), ("agent", "◎"), ("flow", "↳"), ("tool", "⌁"), ("router", "◇"), ("condition", "?"), ("transform", "ƒ"), ("output", "□"), ("failure", "!")];
+    private static readonly string[] Palette = ["input", "agent", "flow", "tool", "router", "condition", "transform", "output", "failure"];
     private readonly CancellationTokenSource cancellation = new();
     private CancellationTokenSource? autosave;
     private FlowCanvas? canvas;
@@ -264,15 +329,24 @@ else
     private string runInput = "{\n  \"prompt\": \"How can I optimize this SQL query?\"\n}";
     private string? error;
     private bool saving;
+    private bool publishing;
     private bool showRun;
     private bool loadingAgents;
     private long layoutRevision;
+    private int toolPickerRevision;
+    private string toolSearch = string.Empty;
 
     [Parameter, EditorRequired] public string ResourceId { get; set; } = string.Empty;
     [Parameter] public bool IsReadOnly { get; set; }
     [Parameter] public ResourceNamespace Namespace { get; set; } = ResourceNamespace.Default;
 
     private FlowStepDefinition? SelectedStep => Editor.State.Resource?.Definition.Steps.FirstOrDefault(step => step.Name == Editor.State.Selection.StepName);
+    private FlowDesignerAgent? SelectedAgent => SelectedStep is AgentFlowStepDefinition step
+        ? agents.FirstOrDefault(agent => agent.Name == step.Agent.ResourceId && agent.Namespace == (step.Agent.Namespace ?? Namespace))
+        : null;
+    private FlowDesignerFlow? SelectedFlow => SelectedStep is FlowCallStepDefinition step
+        ? flows.FirstOrDefault(flow => flow.Name == step.Flow.ResourceId && flow.Namespace == (step.Flow.Namespace ?? Namespace))
+        : null;
     private FlowDesignerFlowVersion? SelectedFlowVersion => SelectedStep is FlowCallStepDefinition call
         ? flowVersions.FirstOrDefault(version => version.Version == (call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact
             ? call.Flow.Version
@@ -281,10 +355,15 @@ else
     private FlowDesignerTool? SelectedTool => SelectedStep is ToolFlowStepDefinition tool
         ? tools.FirstOrDefault(item => ToolKey(item.Namespace, item.Name) == ToolKey(tool.Tool))
         : null;
+    private IEnumerable<FlowDesignerTool> VisibleTools => string.IsNullOrWhiteSpace(toolSearch)
+        ? tools
+        : tools.Where(item => item.DisplayName.Contains(toolSearch, StringComparison.CurrentCultureIgnoreCase)
+            || item.Name.Contains(toolSearch, StringComparison.OrdinalIgnoreCase)
+            || item.Namespace.Value.Contains(toolSearch, StringComparison.OrdinalIgnoreCase));
     private string SaveText => T($"SaveState.{Editor.State.SaveState}");
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private FlowDesignerTarget Target => new(Namespace, ResourceId);
-    private bool ReadOnly => IsReadOnly || Target.IsReadOnly || Editor.State.IsReadOnly;
+    private bool ReadOnly => IsReadOnly || Editor.State.IsReadOnly;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -301,6 +380,8 @@ else
             agents = routerAgents = await Resources.GetAgentsAsync(cancellation.Token);
             flows = await Resources.GetFlowsAsync(cancellation.Token);
             tools = await Resources.GetToolsAsync(cancellation.Token);
+            if (!ReadOnly)
+                publishVersion = SuggestedPublishVersion(await Resources.GetFlowVersionsAsync(Namespace, ResourceId, cancellation.Token));
             if (SelectedStep is FlowCallStepDefinition call) await LoadFlowVersionsAsync(call.Flow);
             transitionFrom = loaded.Resource.Definition.EntryStep;
             transitionTo = loaded.Resource.Definition.Steps.Skip(1).FirstOrDefault()?.Name ?? transitionFrom;
@@ -324,6 +405,12 @@ else
     private async Task SelectStepAsync(string? name)
     {
         Editor.SelectStep(name);
+        toolSearch = string.Empty;
+        toolPickerRevision++;
+        if (!ReadOnly && SelectedStep is AgentFlowStepDefinition agent
+            && (string.IsNullOrWhiteSpace(agent.DisplayName) || agent.DisplayName == "Agent")
+            && SelectedAgent is { } selectedAgent)
+            await UpdateSelectedAsync(agent with { DisplayName = selectedAgent.DisplayName });
         if (SelectedStep is FlowCallStepDefinition call) await LoadFlowVersionsAsync(call.Flow);
     }
     private async Task LayoutAsync(bool vertical)
@@ -351,24 +438,62 @@ else
     }
 
     private async Task ValidateAsync() { if (ReadOnly) return; Editor.SetIssues((await Backend.ValidateAsync(Target, cancellation.Token)).Issues); }
-    private async Task PublishAsync() { if (ReadOnly) return; await SaveAsync(); try { var version = await Backend.PublishAsync(Target, new(publishVersion), cancellation.Token); publishVersion = NextVersion(version.Version); await ValidateAsync(); } catch (Exception exception) { error = exception.Message; } }
+    private async Task PublishAsync()
+    {
+        if (ReadOnly || publishing) return;
+        publishing = true;
+        error = null;
+        try
+        {
+            if (Editor.State.SourceError is not null)
+            {
+                error = T("InvalidSourceBeforePublish");
+                return;
+            }
+            await SaveAsync();
+            if (error is not null) return;
+            var version = await Backend.PublishAsync(Target, new(publishVersion), cancellation.Token);
+            publishVersion = NextVersion(version.Version);
+        }
+        catch (FlowDesignerVersionAlreadyPublishedException exception) { error = T("PublishVersionExists", exception.Version); }
+        catch (Exception exception) { error = exception.Message; }
+        finally { publishing = false; }
+    }
     private void OpenRun() { if (ReadOnly) return; showRun = true; error = null; }
     private async Task RunDraftAsync() { if (ReadOnly) return; try { await SaveAsync(); using var json = JsonDocument.Parse(runInput); var run = await Backend.RunDraftAsync(Target, new(json.RootElement.Clone(), Trigger: FlowRunTrigger.Manual), cancellation.Token); Navigation.NavigateTo($"/flow-runs/{run.Id}"); } catch (Exception exception) { error = exception.Message; } }
-    private async Task ApplySourceAsync(string source) { if (ReadOnly) return; try { var saved = await Backend.ReplaceSourceAsync(Target, new(source), Editor.State.ETag!, cancellation.Token); var canonical = await Backend.GetSourceAsync(Target, cancellation.Token); sourceText = canonical.Source; Editor.MarkSaved(saved, canonical.Source); } catch (Exception exception) { sourceText = source; Editor.SetSource(source, exception.Message); } }
+    private async Task ApplySourceAsync(string source)
+    {
+        if (ReadOnly) return;
+        try
+        {
+            Editor.MarkSaving();
+            var saved = await Backend.ReplaceSourceAsync(Target, new(source), Editor.State.ETag!, cancellation.Token);
+            var canonical = await Backend.GetSourceAsync(Target, cancellation.Token);
+            sourceText = canonical.Source;
+            Editor.MarkSaved(saved, canonical.Source);
+        }
+        catch (Exception exception)
+        {
+            sourceText = source;
+            Editor.MarkSaveFailed();
+            Editor.SetSource(source, exception.Message);
+        }
+    }
 
     private async Task AddStepAsync(string type)
     {
         var index = Editor.State.Resource!.Definition.Steps.Count; var name = Unique(type);
+        var defaultAgent = agents.FirstOrDefault();
         FlowStepDefinition step = type switch
         {
             "input" => new InputFlowStepDefinition { Name = name, DisplayName = "Input" },
-            "agent" => new AgentFlowStepDefinition { Name = name, DisplayName = "Agent", Agent = new(agents.FirstOrDefault()?.Name ?? UnconfiguredAgent) },
-            "flow" => new FlowCallStepDefinition { Name = name, DisplayName = "Flow", Flow = DefaultFlowReference(), InputMapping = JsonSerializer.SerializeToElement(new { }) },
+            "agent" => new AgentFlowStepDefinition { Name = name, DisplayName = defaultAgent?.DisplayName ?? T("Step.agent"), Agent = defaultAgent is null ? new(UnconfiguredAgent) : AgentReference(defaultAgent), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
+            "flow" => new FlowCallStepDefinition { Name = name, DisplayName = "Flow", Flow = DefaultFlowReference(), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             "tool" => new ToolFlowStepDefinition { Name = name, DisplayName = T("Step.tool"), Tool = DefaultToolReference(), ArgumentsMapping = JsonSerializer.SerializeToElement(new { }) },
             "router" => new RouterFlowStepDefinition { Name = name, DisplayName = "Router" },
             "condition" => new ConditionFlowStepDefinition { Name = name, DisplayName = "Condition", Left = "${input.prompt}", Right = "" },
             "transform" => new TransformFlowStepDefinition { Name = name, DisplayName = "Transform", Mapping = JsonSerializer.SerializeToElement(new { }) },
-            "output" => new OutputFlowStepDefinition { Name = name, DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${input}") },
+            "output" => new OutputFlowStepDefinition { Name = name, DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             _ => new FailureFlowStepDefinition { Name = name, DisplayName = "Failure" }
         };
         if (step is FlowCallStepDefinition flowCall) await LoadFlowVersionsAsync(flowCall.Flow);
@@ -376,9 +501,25 @@ else
     }
 
     private async Task AddTransitionAsync() { if (!string.IsNullOrWhiteSpace(transitionFrom) && !string.IsNullOrWhiteSpace(transitionTo)) await CreateTransitionAsync(new($"{transitionFrom}-{transitionEvent}-{transitionTo}", transitionFrom, transitionEvent, transitionTo)); }
-    private async Task RemoveSelectedAsync() { if (SelectedStep is not null) { await DispatchAsync(new RemoveStepCommand(SelectedStep.Name)); Editor.SelectStep(null); } }
+    private Task RemoveSelectedAsync() => SelectedStep is { } step ? RemoveStepAsync(step.Name) : Task.CompletedTask;
+    private async Task RemoveStepAsync(string name)
+    {
+        if (ReadOnly || Editor.State.Resource is not { } resource || name == resource.Definition.EntryStep
+            || resource.Definition.Steps.All(step => step.Name != name)) return;
+        await DispatchAsync(new RemoveStepCommand(name));
+        if (Editor.State.Selection.StepName == name) Editor.SelectStep(null);
+    }
     private Task UpdateDisplayNameAsync(ChangeEventArgs e) => UpdateSelectedAsync(SelectedStep! with { DisplayName = Text(e) });
-    private Task UpdateAgentAsync(ChangeEventArgs e) => UpdateSelectedAsync(((AgentFlowStepDefinition)SelectedStep!) with { Agent = new(Text(e)) });
+    private Task UpdateAgentAsync(ChangeEventArgs e)
+    {
+        if (SelectedStep is not AgentFlowStepDefinition step) return Task.CompletedTask;
+        var value = Text(e);
+        if (value == "${steps.route-request.output.selectedAgent}")
+            return UpdateSelectedAsync(step with { Agent = new(value), DisplayName = T("RouterOutput") });
+        if (!TryParseFlowKey(value, out var target)) return Task.CompletedTask;
+        var selected = agents.FirstOrDefault(agent => agent.Name == target.Name && agent.Namespace == target.Namespace);
+        return selected is null ? Task.CompletedTask : UpdateSelectedAsync(step with { Agent = AgentReference(selected), DisplayName = selected.DisplayName });
+    }
     private async Task UpdateFlowTargetAsync(ChangeEventArgs e)
     {
         if (SelectedStep is not FlowCallStepDefinition call || !TryParseFlowKey(Text(e), out var target)) return;
@@ -415,10 +556,19 @@ else
             : JsonSerializer.SerializeToElement(new { });
         return UpdateSelectedAsync(call with { InputMapping = mapping });
     }
-    private Task UpdateToolTargetAsync(ChangeEventArgs e)
+    private Task SelectToolAsync(FlowDesignerTool selected)
     {
-        if (SelectedStep is not ToolFlowStepDefinition tool || !TryParseToolKey(Text(e), out var target)) return Task.CompletedTask;
-        return UpdateSelectedAsync(tool with { Tool = new(target.Name, target.Namespace == Namespace ? null : target.Namespace), ArgumentsMapping = JsonSerializer.SerializeToElement(new { }) });
+        toolSearch = string.Empty;
+        toolPickerRevision++;
+        if (ReadOnly || SelectedStep is not ToolFlowStepDefinition tool || !tools.Contains(selected)) return Task.CompletedTask;
+        if (ToolKey(tool.Tool) == ToolKey(selected.Namespace, selected.Name)) return Task.CompletedTask;
+        return UpdateSelectedAsync(tool with { Tool = new(selected.Name, selected.Namespace == Namespace ? null : selected.Namespace), ArgumentsMapping = JsonSerializer.SerializeToElement(new { }) });
+    }
+    private void HandleToolPickerKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key != "Escape") return;
+        toolSearch = string.Empty;
+        toolPickerRevision++;
     }
     private Task UpdateToolMappingAsync(string propertyName, ChangeEventArgs e)
     {
@@ -446,6 +596,15 @@ else
     private static string UniqueRoute(string prefix, IReadOnlyCollection<FlowRouterCandidate> candidates) { var route = prefix; var i = 1; while (candidates.Any(candidate => candidate.Route == route)) route = $"{prefix}-{++i}"; return route; }
     private static string RouteKey(string value) { var result = new string(value.Trim().ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-'); return string.IsNullOrWhiteSpace(result) ? "route" : result; }
     private string AgentLabel(string name) => routerAgents.Concat(agents).FirstOrDefault(item => item.Name == name)?.DisplayName ?? name;
+    private FlowResourceReference AgentReference(FlowDesignerAgent agent) => new(agent.Name, Namespace: agent.Namespace == Namespace ? null : agent.Namespace);
+    private string AgentSelectionValue(FlowResourceReference reference) => reference.ResourceId.StartsWith("${", StringComparison.Ordinal)
+        ? reference.ResourceId : FlowKey(reference.Namespace ?? Namespace, reference.ResourceId);
+    private static string AgentUrl(FlowDesignerAgent agent) => agent.Namespace.IsDefault
+        ? $"/agents/{Uri.EscapeDataString(agent.Name)}"
+        : $"/namespaces/{Uri.EscapeDataString(agent.Namespace.Value)}/agents/{Uri.EscapeDataString(agent.Name)}";
+    private static string FlowUrl(FlowDesignerFlow flow) => flow.Namespace.IsDefault
+        ? $"/flows/{Uri.EscapeDataString(flow.Name)}"
+        : $"/namespaces/{Uri.EscapeDataString(flow.Namespace.Value)}/flows/{Uri.EscapeDataString(flow.Name)}";
     private FlowCallReference DefaultFlowReference()
     {
         var target = flows.FirstOrDefault(item => item.Name != ResourceId || item.Namespace != Namespace);
@@ -467,7 +626,6 @@ else
     }
     private static string ToolKey(ResourceNamespace @namespace, string name) => $"{@namespace.Value}|{name}";
     private string ToolKey(FlowToolReference reference) => ToolKey(reference.Namespace ?? Namespace, reference.ResourceId);
-    private static bool TryParseToolKey(string value, out (ResourceNamespace Namespace, string Name) target) => TryParseFlowKey(value, out target);
     private string ToolState(FlowDesignerTool tool) => !tool.Enabled
         ? T("ToolDisabled")
         : !tool.Available
@@ -481,7 +639,29 @@ else
         && string.Equals(value.GetString(), "${transition.output}", StringComparison.Ordinal);
     private static string Text(ChangeEventArgs e) => e.Value?.ToString()?.Trim() ?? string.Empty;
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
-    private static string NextVersion(string value) { var parts = value.Split('.'); return parts.Length == 3 && int.TryParse(parts[2], out var patch) ? $"{parts[0]}.{parts[1]}.{patch + 1}" : "1.0.0"; }
+    private static string SuggestedPublishVersion(IReadOnlyList<FlowDesignerFlowVersion> versions)
+    {
+        Version? latest = null;
+        foreach (var published in versions)
+        {
+            var parsed = ParseVersion(published.Version);
+            if (parsed is not null && (latest is null || parsed.CompareTo(latest) > 0)) latest = parsed;
+        }
+        if (latest is null) return "1.0.0";
+        var release = latest.ToString();
+        return versions.Any(published => string.Equals(published.Version, release, StringComparison.Ordinal))
+            ? NextVersion(release)
+            : release;
+    }
+
+    private static Version? ParseVersion(string value) =>
+        Version.TryParse(value.Split('-', 2)[0], out var parsed) && parsed.Build >= 0 && parsed.Revision < 0 ? parsed : null;
+
+    private static string NextVersion(string value)
+    {
+        var parsed = ParseVersion(value);
+        return parsed is null ? "1.0.0" : $"{parsed.Major}.{parsed.Minor}.{parsed.Build + 1}";
+    }
     private const string UnconfiguredAgent = "unconfigured";
     private const string UnconfiguredFlow = "unconfigured";
     private const string UnconfiguredTool = "unconfigured";

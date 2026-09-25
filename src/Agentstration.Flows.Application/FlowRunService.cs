@@ -17,9 +17,17 @@ public sealed record FlowAgentExecutionResult(
     IReadOnlyList<string> Tools,
     IReadOnlyList<string> Logs);
 
+public sealed record FlowAgentExecutionRequest(
+    FlowRunScope Scope,
+    string RunId,
+    string StepName,
+    FlowTargetReference Target,
+    JsonElement Input,
+    string CorrelationId);
+
 public interface IFlowAgentExecutor
 {
-    Task<FlowAgentExecutionResult> ExecuteAsync(FlowTargetReference target, JsonElement input, string correlationId, CancellationToken cancellationToken);
+    Task<FlowAgentExecutionResult> ExecuteAsync(FlowAgentExecutionRequest request, CancellationToken cancellationToken);
 }
 
 public sealed record FlowToolExecutionRequest(

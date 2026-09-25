@@ -35,6 +35,7 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         item.Property(value => value.SelectedAgentId).HasMaxLength(1024);
         item.Property(value => value.Title).HasMaxLength(512);
         item.Property(value => value.WorkspaceId).HasMaxLength(36).IsRequired();
+        item.Property(value => value.OwnerPrincipalId).HasMaxLength(36).IsRequired();
         item.Property(value => value.InteractionId).HasMaxLength(36);
         item.Property(value => value.EntryId).HasMaxLength(512);
         item.Property(value => value.AnchorTaskId).HasMaxLength(36);
@@ -42,6 +43,7 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         item.Property(value => value.CreatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         item.Property(value => value.UpdatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         item.HasIndex(value => new { value.WorkspaceId, value.Status, value.UpdatedAt });
+        item.HasIndex(value => new { value.WorkspaceId, value.OwnerPrincipalId, value.UpdatedAt });
         item.HasIndex(value => new { value.WorkspaceId, value.InteractionId, value.UpdatedAt });
         item.HasIndex(value => new { value.WorkspaceId, value.AnchorTaskId, value.UpdatedAt });
         item.HasIndex(value => new { value.WorkspaceId, value.FlowRunId });
@@ -80,11 +82,12 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         interaction.HasKey(value => value.Id);
         interaction.Property(value => value.Id).HasMaxLength(36);
         interaction.Property(value => value.WorkspaceId).HasMaxLength(512);
+        interaction.Property(value => value.OwnerPrincipalId).HasMaxLength(36).IsRequired();
         interaction.Property(value => value.EntryId).HasMaxLength(512);
         interaction.Property(value => value.Status).HasConversion<string>().HasMaxLength(32);
         interaction.Property(value => value.LastActivityAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         interaction.Property(value => value.Version).IsConcurrencyToken();
-        interaction.HasIndex(value => new { value.WorkspaceId, value.LastActivityAt });
+        interaction.HasIndex(value => new { value.WorkspaceId, value.OwnerPrincipalId, value.LastActivityAt });
 
         ConfigureConversationMessage(modelBuilder.Entity<ConversationMessageDocument>());
         ConfigurePendingAction(modelBuilder.Entity<PendingActionDocument>());
@@ -179,6 +182,7 @@ internal sealed class InteractionDocument
 {
     public required string Id { get; set; }
     public required string WorkspaceId { get; set; }
+    public required string OwnerPrincipalId { get; set; }
     public required string EntryId { get; set; }
     public InteractionStatus Status { get; set; }
     public DateTimeOffset LastActivityAt { get; set; }
@@ -243,6 +247,7 @@ internal sealed class WorkItemDocument
     public string? Title { get; set; }
     public string? Description { get; set; }
     public string? WorkspaceId { get; set; }
+    public required string OwnerPrincipalId { get; set; }
     public string? InteractionId { get; set; }
     public string? EntryId { get; set; }
     public string? AnchorTaskId { get; set; }

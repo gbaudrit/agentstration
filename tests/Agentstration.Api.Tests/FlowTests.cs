@@ -104,15 +104,15 @@ public sealed partial class FlowTests
 
     private sealed class TestAgentExecutor : IFlowAgentExecutor
     {
-        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowTargetReference target, JsonElement input, string correlationId, CancellationToken cancellationToken) =>
-            Task.FromResult(new FlowAgentExecutionResult(JsonSerializer.SerializeToElement("done"), $"/agents/{target.Id}", 3, "/profiles/default", "Deterministic", new FlowStepRunUsage(12, 4), ["lookup"], ["executed"]));
+        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowAgentExecutionRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(new FlowAgentExecutionResult(JsonSerializer.SerializeToElement("done"), $"/agents/{request.Target.Id}", 3, "/profiles/default", "Deterministic", new FlowStepRunUsage(12, 4), ["lookup"], ["executed"]));
     }
 
     private sealed class TrackingAgentExecutor : IFlowAgentExecutor
     {
         public int ExecutionCount { get; private set; }
 
-        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowTargetReference target, JsonElement input, string correlationId, CancellationToken cancellationToken)
+        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowAgentExecutionRequest request, CancellationToken cancellationToken)
         {
             ExecutionCount++;
             return Task.FromResult(new FlowAgentExecutionResult(JsonSerializer.SerializeToElement("done"), "/agents/agent", 1, "/profiles/default", "Test", null, [], []));
@@ -121,7 +121,7 @@ public sealed partial class FlowTests
 
     private sealed class FailingAgentExecutor : IFlowAgentExecutor
     {
-        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowTargetReference target, JsonElement input, string correlationId, CancellationToken cancellationToken) =>
+        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowAgentExecutionRequest request, CancellationToken cancellationToken) =>
             Task.FromException<FlowAgentExecutionResult>(new InvalidOperationException("simulated agent failure"));
     }
 
@@ -182,14 +182,12 @@ public sealed partial class FlowTests
         public int ExecutionCount => executionCount;
 
         public async Task<FlowAgentExecutionResult> ExecuteAsync(
-            FlowTargetReference target,
-            JsonElement input,
-            string correlationId,
+            FlowAgentExecutionRequest request,
             CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref executionCount);
             await Task.Delay(100, cancellationToken);
-            return new(JsonSerializer.SerializeToElement("done"), target.Id, 1, "default", "Test", null, [], []);
+            return new(JsonSerializer.SerializeToElement("done"), request.Target.Id, 1, "default", "Test", null, [], []);
         }
     }
 
@@ -322,6 +320,6 @@ public sealed partial class FlowTests
 
     private sealed class ExistingResourceResolver : IFlowResourceReferenceResolver
     {
-        public Task<bool> ExistsAsync(string resourceId, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken) => Task.FromResult(true);
     }
 }

@@ -24,6 +24,54 @@ public sealed class AepConformanceTests
     private static readonly string WorkloadToken = AepStaticBearerCredentials.Generate("aep-conformance-tests").AccessToken;
 
     [TestMethod]
+    public void TypedPartialModelObservationsRoundTripWithoutInventingSupport()
+    {
+        var expected = new AepModelDescriptor("deployment", "Deployment", new AepModelSpecification
+        {
+            Input = [AepModelContentType.Text, AepModelContentType.Image],
+            Output = [AepModelContentType.Text],
+            Features = new AepModelFeatureSpecifications
+            {
+                Streaming = new() { Support = AepModelFeatureSupport.Native },
+                Tools = new() { Support = AepModelFeatureSupport.Unsupported },
+                Reasoning = new()
+            },
+            Limits = new AepModelLimits { ContextTokens = 128_000 }
+        }, new AepModelIdentity("publisher", "family", "2026-09-22"));
+
+        var json = JsonSerializer.Serialize(expected, AepProtocol.JsonOptions);
+        var actual = JsonSerializer.Deserialize<AepModelDescriptor>(json, AepProtocol.JsonOptions)!;
+
+        Assert.IsNull(AepModelObservationValidator.FindIssue([actual]));
+        Assert.AreEqual(AepModelFeatureSupport.Native, actual.Specification!.Features.Streaming!.Support);
+        Assert.AreEqual(AepModelFeatureSupport.Unsupported, actual.Specification.Features.Tools!.Support);
+        Assert.AreEqual(AepModelFeatureSupport.Unknown, actual.Specification.Features.Reasoning!.Support);
+        Assert.IsFalse(json.Contains("capabilities", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(json.Contains("metadata", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public void ModelObservationValidationBoundsIdentityCollectionsAndLimits()
+    {
+        Assert.IsNotNull(AepModelObservationValidator.FindIssue([
+            new("duplicate", "First"),
+            new("duplicate", "Second")
+        ]));
+        Assert.IsNotNull(AepModelObservationValidator.FindIssue([
+            new("model", "Model", new AepModelSpecification
+            {
+                Input = [AepModelContentType.Text, AepModelContentType.Text]
+            })
+        ]));
+        Assert.IsNotNull(AepModelObservationValidator.FindIssue([
+            new("model", "Model", new AepModelSpecification
+            {
+                Limits = new AepModelLimits { ContextTokens = -1 }
+            })
+        ]));
+    }
+
+    [TestMethod]
     public async Task CanonicalClientDiscoversCapabilitiesAndHealth()
     {
         await using var factory = new WebApplicationFactory<global::Program>();
@@ -37,22 +85,42 @@ public sealed class AepConformanceTests
         Assert.AreEqual(AepProtocol.Version, manifest.ProtocolVersion);
         Assert.AreEqual("sample.hello", manifest.Extension.Id);
         Assert.AreEqual("1.0", capabilities[AepCapabilityNames.Health].Version);
-        Assert.IsNull(manifest.SecretRequirements);
-        Assert.IsFalse(capabilities.ContainsKey(AepCapabilityNames.SecretRequirements));
-        Assert.IsFalse((await httpClient.GetStringAsync(AepProtocol.DiscoveryPath)).Contains("secretRequirements", StringComparison.Ordinal));
+        Assert.IsNull(manifest.ValueRequirements);
+        Assert.IsFalse(capabilities.ContainsKey(AepCapabilityNames.ValueRequirements));
+        Assert.IsFalse((await httpClient.GetStringAsync(AepProtocol.DiscoveryPath)).Contains("valueRequirements", StringComparison.Ordinal));
         Assert.AreEqual("available", health.Status);
     }
 
     [TestMethod]
-    public async Task SecretRequirementsRoundTripThroughVersionedDiscovery()
+    public async Task ValueRequirementsRoundTripThroughVersionedDiscovery()
     {
         await using var factory = new WebApplicationFactory<global::Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IAepModelProvider, TerminalThenTrailingProvider>();
                 services.Configure<AepExtensionOptions>(options =>
                 {
-                    options.SecretRequirements.Add(new("credential", true, "API credential for this extension."));
-                    options.SecretRequirements.Add(new("proxy-auth", false));
-                })));
+                    options.Capabilities[AepCapabilityNames.SecretAccess] = new(AepProtocol.SecretAccessVersion);
+                    options.ValueRequirements.Add(new(
+                        AepContributionKinds.ModelProvider,
+                        "terminal",
+                        "credential",
+                        true,
+                        Protection: AepValueProtection.Secured,
+                        Description: "API credential for this extension."));
+                    options.ValueRequirements.Add(new(
+                        AepContributionKinds.ModelProvider,
+                        "terminal",
+                        "proxy-host",
+                        false,
+                        Format: "hostname",
+                        AllowedValues:
+                        [
+                            JsonSerializer.SerializeToElement("proxy.internal"),
+                            JsonSerializer.SerializeToElement("proxy.backup")
+                        ]));
+                });
+            }));
         using var httpClient = factory.CreateClient();
         var client = new AepClient(httpClient);
 
@@ -61,57 +129,134 @@ public sealed class AepConformanceTests
         var json = await httpClient.GetStringAsync(AepProtocol.DiscoveryPath);
 
         Assert.IsTrue(validation.IsValid);
-        Assert.AreEqual(AepProtocol.SecretRequirementsCapabilityVersion,
-            manifest.Capabilities[AepCapabilityNames.SecretRequirements].Version);
-        Assert.IsNotNull(manifest.SecretRequirements);
-        Assert.HasCount(2, manifest.SecretRequirements);
-        Assert.AreEqual(new AepSecretRequirement("credential", true, "API credential for this extension."), manifest.SecretRequirements[0]);
-        Assert.AreEqual(new AepSecretRequirement("proxy-auth", false), manifest.SecretRequirements[1]);
-        StringAssert.Contains(json, "\"secretRequirements\"");
+        Assert.AreEqual(AepProtocol.ModelProviderCapabilityVersion,
+            manifest.Capabilities[AepCapabilityNames.ModelProvider].Version);
+        Assert.AreEqual(AepProtocol.ValueRequirementsCapabilityVersion,
+            manifest.Capabilities[AepCapabilityNames.ValueRequirements].Version);
+        Assert.AreEqual(AepProtocol.BoundValuesCapabilityVersion,
+            manifest.Capabilities[AepCapabilityNames.BoundValues].Version);
+        Assert.AreEqual(AepProtocol.SecretAccessVersion,
+            manifest.Capabilities[AepCapabilityNames.SecretAccess].Version);
+        Assert.IsNotNull(manifest.ValueRequirements);
+        Assert.HasCount(2, manifest.ValueRequirements);
+        Assert.AreEqual(AepValueProtection.Secured, manifest.ValueRequirements[0].Protection);
+        Assert.AreEqual("hostname", manifest.ValueRequirements[1].Format);
+        Assert.AreEqual("proxy.internal", manifest.ValueRequirements[1].AllowedValues?[0].GetString());
+        StringAssert.Contains(json, "\"valueRequirements\"");
+        Assert.IsFalse(json.Contains("secretRequirements", StringComparison.Ordinal));
         Assert.IsFalse(json.Contains("secretReference", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(json.Contains("scopeRef", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(json.Contains("vault", StringComparison.OrdinalIgnoreCase));
     }
 
     [TestMethod]
-    public void SecretRequirementsRejectInvalidAndDuplicateIdentifiers()
+    public void ValueRequirementsRejectInvalidContributionsAndDuplicateIdentifiers()
     {
         var manifest = new AepManifest(
             AepProtocol.Version,
             new("sample", "Sample", "1.0.0"),
             new Dictionary<string, AepCapabilityDescriptor>
             {
-                [AepCapabilityNames.SecretRequirements] = new(AepProtocol.SecretRequirementsCapabilityVersion)
+                [AepCapabilityNames.ValueRequirements] = new(AepProtocol.ValueRequirementsCapabilityVersion),
+                [AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion),
+                [AepCapabilityNames.SecretAccess] = new(AepProtocol.SecretAccessVersion)
             },
-            new([]),
-            SecretRequirements: [new("credential", true), new("proxy-auth", false)]);
+            new([new("test", "Test", new())]),
+            ValueRequirements:
+            [
+                new(AepContributionKinds.ModelProvider, "test", "credential", true, Protection: AepValueProtection.Secured),
+                new(AepContributionKinds.ModelProvider, "test", "proxy-host", false)
+            ]);
         Assert.IsEmpty(AepDescriptorValidator.Validate(manifest));
+        Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
+        {
+            Capabilities = manifest.Capabilities
+                .Where(value => value.Key != AepCapabilityNames.SecretAccess)
+                .ToDictionary()
+        }).Any(value => value.Contains("aep.secret-access", StringComparison.Ordinal)));
+        Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
+        {
+            Capabilities = new Dictionary<string, AepCapabilityDescriptor>(manifest.Capabilities, StringComparer.Ordinal)
+            {
+                [AepCapabilityNames.SecretAccess] = new("2.0")
+            }
+        }).Any(value => value.Contains("aep.secret-access", StringComparison.Ordinal)));
 
-        var invalid = manifest with { SecretRequirements = [new("credential", true), new("credential", false), new("../key", true)] };
+        var invalid = manifest with
+        {
+            ValueRequirements =
+            [
+                new(AepContributionKinds.ModelProvider, "test", "credential", true),
+                new(AepContributionKinds.ModelProvider, "test", "credential", false),
+                new(AepContributionKinds.ModelProvider, "missing", "../key", true)
+            ]
+        };
         var errors = AepDescriptorValidator.Validate(invalid);
         Assert.IsTrue(errors.Any(value => value.Contains("duplicated", StringComparison.Ordinal)));
         Assert.IsTrue(errors.Any(value => value.Contains("../key", StringComparison.Ordinal)));
         Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
         {
-            SecretRequirements = [new("Credential", true), new(new string('a', 65), false)]
+            ValueRequirements =
+            [
+                new(AepContributionKinds.ModelProvider, "test", "Credential", true),
+                new(AepContributionKinds.ModelProvider, "test", new string('a', 65), false)
+            ]
         }).Count >= 2);
-        Assert.ThrowsExactly<JsonException>(() => JsonSerializer.Deserialize<AepSecretRequirement>(
-            """{"id":"credential"}""", AepProtocol.JsonOptions));
+        Assert.ThrowsExactly<JsonException>(() => JsonSerializer.Deserialize<AepValueRequirement>(
+            """{"contributionKind":"model-provider","contributionId":"test","id":"credential"}""", AepProtocol.JsonOptions));
         Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
         {
             Capabilities = new Dictionary<string, AepCapabilityDescriptor>()
         }).Any(value => value.Contains("capability", StringComparison.Ordinal)));
         Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
         {
-            SecretRequirements = []
+            ValueRequirements = []
         }).Any(value => value.Contains("at least one", StringComparison.Ordinal)));
         Assert.IsTrue(AepDescriptorValidator.Validate(manifest with
         {
             Capabilities = new Dictionary<string, AepCapabilityDescriptor>
             {
-                [AepCapabilityNames.SecretRequirements] = new("2.0")
+                [AepCapabilityNames.ValueRequirements] = new("2.0"),
+                [AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion),
+                [AepCapabilityNames.SecretAccess] = new(AepProtocol.SecretAccessVersion)
             }
         }).Any(value => value.Contains("not supported", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void ValueRequirementsRejectInvalidAllowedValues()
+    {
+        AepManifest Manifest(AepValueRequirement requirement) => new(
+            AepProtocol.Version,
+            new("sample", "Sample", "1.0.0"),
+            new Dictionary<string, AepCapabilityDescriptor>
+            {
+                [AepCapabilityNames.ValueRequirements] = new(AepProtocol.ValueRequirementsCapabilityVersion),
+                [AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion)
+            },
+            new([new("test", "Test", new())]),
+            ValueRequirements: [requirement]);
+
+        var empty = new AepValueRequirement(AepContributionKinds.ModelProvider, "test", "mode", true, AllowedValues: []);
+        var secured = empty with
+        {
+            Protection = AepValueProtection.Secured,
+            AllowedValues = [JsonSerializer.SerializeToElement("ApiKey")]
+        };
+        var wrongType = empty with { AllowedValues = [JsonSerializer.SerializeToElement(42)] };
+        var duplicate = empty with
+        {
+            AllowedValues =
+            [
+                JsonSerializer.SerializeToElement("ApiKey"),
+                JsonSerializer.SerializeToElement("ApiKey")
+            ]
+        };
+
+        Assert.IsTrue(AepDescriptorValidator.Validate(Manifest(empty)).Any(value => value.Contains("at least one", StringComparison.Ordinal)));
+        Assert.IsTrue(AepDescriptorValidator.Validate(Manifest(secured)).Any(value => value.Contains("Secured", StringComparison.Ordinal)));
+        Assert.IsTrue(AepDescriptorValidator.Validate(Manifest(wrongType)).Any(value => value.Contains("declared type", StringComparison.Ordinal)));
+        Assert.IsTrue(AepDescriptorValidator.Validate(Manifest(duplicate)).Any(value => value.Contains("duplicate", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -578,7 +723,7 @@ public sealed class AepConformanceTests
         var sink = new MemoryTraceSink();
         using var handler = new AepTracingHandler(sink) { InnerHandler = new StaticHandler() };
         using var client = new HttpClient(handler);
-        using var request = new HttpRequestMessage(HttpMethod.Post, "http://extension/test?secretCapability=query-handle") { Content = new StringContent("{\"apiKey\":\"secret-value\",\"secretAccess\":[{\"secretCapability\":\"body-handle\"}]}", Encoding.UTF8, "application/json") };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "http://extension/test?secretCapability=query-handle") { Content = new StringContent("{\"apiKey\":\"secret-value\",\"boundValues\":[{\"requirementId\":\"endpoint\",\"inlineValue\":\"private-endpoint\"},{\"secretGrant\":{\"secretCapability\":\"body-handle\"}}]}", Encoding.UTF8, "application/json") };
         request.Headers.Authorization = new("Bearer", "secret-token");
 
         using var response = await client.SendAsync(request);
@@ -587,6 +732,7 @@ public sealed class AepConformanceTests
         Assert.AreEqual("***", sink.Trace!.RequestHeaders["Authorization"]);
         StringAssert.Contains(sink.Trace.RequestBody, "\"apiKey\":\"***\"");
         Assert.IsFalse(sink.Trace.RequestBody!.Contains("secret-value", StringComparison.Ordinal));
+        Assert.IsFalse(sink.Trace.RequestBody.Contains("private-endpoint", StringComparison.Ordinal));
         Assert.IsFalse(sink.Trace.RequestBody.Contains("body-handle", StringComparison.Ordinal));
         Assert.IsFalse(sink.Trace.Url!.ToString().Contains("query-handle", StringComparison.Ordinal));
         Assert.IsFalse(sink.Trace.ResponseBody!.Contains("response-secret", StringComparison.Ordinal));
@@ -622,12 +768,145 @@ public sealed class AepConformanceTests
         Assert.IsFalse(denied.Message.Contains("private-value", StringComparison.Ordinal));
         Assert.IsFalse(denied.Message.Contains("private-secret", StringComparison.Ordinal));
 
+        using var problemHttp = new HttpClient(new SecretAccessResponseHandler(HttpStatusCode.BadRequest,
+            "{\"title\":\"Bad Request\",\"detail\":\"private-detail\"}"));
+        var problem = await Assert.ThrowsExactlyAsync<AepProtocolException>(() =>
+            new AepSecretAccessClient(problemHttp).RedeemAsync(grant));
+        Assert.AreEqual("secret_access_failed", problem.Code);
+        Assert.AreEqual(HttpStatusCode.BadRequest, problem.StatusCode);
+        Assert.IsFalse(problem.Message.Contains("private-detail", StringComparison.Ordinal));
+
+        using var extensionHttp = new HttpClient(new SecretAccessResponseHandler(HttpStatusCode.BadRequest,
+            "{\"title\":\"Bad Request\",\"detail\":\"private-detail\"}"))
+        {
+            BaseAddress = new Uri("https://extension.example/")
+        };
+        var extensionProblem = await Assert.ThrowsExactlyAsync<AepProtocolException>(() =>
+            new AepClient(extensionHttp).GetManifestAsync());
+        Assert.AreEqual("extension_request_failed", extensionProblem.Code);
+        Assert.AreEqual(HttpStatusCode.BadRequest, extensionProblem.StatusCode);
+        Assert.IsFalse(extensionProblem.Message.Contains("private-detail", StringComparison.Ordinal));
+
         using var invalidHttp = new HttpClient(new SecretAccessResponseHandler(HttpStatusCode.OK,
             "{\"version\":\"1.0\",\"secretValueBase64\":\"not-base64\"}"));
         var invalid = await Assert.ThrowsExactlyAsync<AepProtocolException>(() =>
             new AepSecretAccessClient(invalidHttp).RedeemAsync(grant));
         Assert.AreEqual("secret_value_invalid", invalid.Code);
         Assert.IsFalse(invalid.Message.Contains("not-base64", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task ValueResolverUsesOneLogicalLookupForInlineAndSecuredValues()
+    {
+        var grant = new AepSecretAccessGrant(
+            AepProtocol.SecretAccessVersion,
+            new Uri("http://localhost/api/aep/secrets/redeem"),
+            "extension.test",
+            "credential",
+            "run-1",
+            "opaque-handle");
+        var inline = AepBoundValue.Inline("endpoint", JsonSerializer.SerializeToElement("https://example.test"));
+        var secured = AepBoundValue.Secured("credential", grant);
+        using var http = new HttpClient(new SecretAccessResponseHandler(
+            HttpStatusCode.OK,
+            "{\"version\":\"1.0\",\"secretValueBase64\":\"c2VjcmV0\"}"));
+        var resolver = new AepValueResolver([inline, secured], http);
+
+        using var endpoint = await resolver.ResolveAsync("endpoint");
+        using var credential = await resolver.ResolveAsync("credential");
+
+        Assert.AreEqual("https://example.test", endpoint.ReadString());
+        Assert.AreEqual("secret", credential.ReadString());
+        Assert.IsFalse(endpoint.IsSecured);
+        Assert.IsTrue(credential.IsSecured);
+        Assert.AreEqual("[REDACTED]", credential.ToString());
+    }
+
+    [TestMethod]
+    public void BoundValueValidationRejectsWrongProtectionTypeUnknownAndOversizedValues()
+    {
+        var requirements = new AepValueRequirement[]
+        {
+            new(AepContributionKinds.ModelProvider, "test", "credential", true, Protection: AepValueProtection.Secured),
+            new(AepContributionKinds.ModelProvider, "test", "timeout", false, AepValueType.WholeNumber),
+            new(AepContributionKinds.ModelProvider, "test", "mode", false, AllowedValues:
+            [
+                JsonSerializer.SerializeToElement("ApiKey"),
+                JsonSerializer.SerializeToElement("ManagedIdentity")
+            ])
+        };
+        var wrongProtection = AepBoundValue.Inline("credential", JsonSerializer.SerializeToElement("not-secret"));
+        var wrongType = AepBoundValue.Inline("timeout", JsonSerializer.SerializeToElement("ten"));
+        var unknown = AepBoundValue.Inline("other", JsonSerializer.SerializeToElement("value"));
+        var disallowed = AepBoundValue.Inline("mode", JsonSerializer.SerializeToElement("Password"));
+
+        var issues = AepBoundValueValidator.Validate(
+            [wrongProtection, wrongType, unknown, disallowed],
+            requirements,
+            AepContributionKinds.ModelProvider,
+            "test",
+            requireAll: true);
+
+        Assert.IsTrue(issues.Any(value => value.Code == "bound_value_protection_invalid"));
+        Assert.IsTrue(issues.Any(value => value.Code == "bound_value_type_invalid"));
+        Assert.IsTrue(issues.Any(value => value.Code == "bound_value_unknown"));
+        Assert.IsTrue(issues.Any(value => value.Code == "bound_value_not_allowed"));
+    }
+
+    [TestMethod]
+    public void AllowedValuesValidateEveryScalarTypeAndRejectSecretGrants()
+    {
+        var cases = new (AepValueType Type, JsonElement Allowed, JsonElement Rejected)[]
+        {
+            (AepValueType.Text, JsonSerializer.SerializeToElement("ApiKey"), JsonSerializer.SerializeToElement("Password")),
+            (AepValueType.WholeNumber, JsonSerializer.SerializeToElement(4), JsonSerializer.SerializeToElement(5)),
+            (AepValueType.DecimalNumber, JsonSerializer.SerializeToElement(0.25m), JsonSerializer.SerializeToElement(0.5m)),
+            (AepValueType.Logical, JsonSerializer.SerializeToElement(true), JsonSerializer.SerializeToElement(false))
+        };
+
+        foreach (var testCase in cases)
+        {
+            var requirement = new AepValueRequirement(
+                AepContributionKinds.ModelProvider,
+                "test",
+                "choice",
+                true,
+                testCase.Type,
+                AllowedValues: [testCase.Allowed]);
+            Assert.IsEmpty(AepBoundValueValidator.Validate(
+                [AepBoundValue.Inline("choice", testCase.Allowed)],
+                [requirement],
+                AepContributionKinds.ModelProvider,
+                "test",
+                requireAll: true));
+            Assert.IsTrue(AepBoundValueValidator.Validate(
+                [AepBoundValue.Inline("choice", testCase.Rejected)],
+                [requirement],
+                AepContributionKinds.ModelProvider,
+                "test",
+                requireAll: true).Any(value => value.Code == "bound_value_not_allowed"));
+        }
+
+        var constrained = new AepValueRequirement(
+            AepContributionKinds.ModelProvider,
+            "test",
+            "choice",
+            true,
+            AllowedValues: [JsonSerializer.SerializeToElement("ApiKey")]);
+        var grant = new AepSecretAccessGrant(
+            AepProtocol.SecretAccessVersion,
+            new Uri("https://host.test/aep/secret-access"),
+            "extension",
+            "choice",
+            "execution",
+            "opaque");
+
+        Assert.IsTrue(AepBoundValueValidator.Validate(
+            [AepBoundValue.Secured("choice", grant)],
+            [constrained],
+            AepContributionKinds.ModelProvider,
+            "test",
+            requireAll: true).Any(value => value.Code == "bound_value_allowed_values_require_inline"));
     }
 
     [TestMethod]

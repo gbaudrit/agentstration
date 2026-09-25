@@ -179,9 +179,8 @@
         <DataAnnotationsValidator />
         <ValidationSummary />
         <div class="form-grid">
-            <label>@T("Name")<InputText @bind-Value="form.Name" /></label>
+            <ResourceIdentityFields @bind-DisplayName="form.DisplayName" @bind-TechnicalName="form.Name" IsNew="true" />
             <label>@T("Namespace")<InputText @bind-Value="form.Namespace" /></label>
-            <label>@T("DisplayName")<InputText @bind-Value="form.DisplayName" /></label>
             <ResourceScopeFormField ResourceKind="@ExtensionKinds.ExtensionRegistration" RequiredKind="@ResourceScopeKind.Tenant" @bind-Value="selectedScope" />
             <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></label>
             <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /><small>@T("ExpectedExtensionId.Help")</small></label>

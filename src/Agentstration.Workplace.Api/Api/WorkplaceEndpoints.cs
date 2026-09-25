@@ -39,6 +39,7 @@ public static partial class WorkplaceEndpoints
         endpoints.MapGet("/api/namespaces/{namespace}/entries/{entryName}", GetNamespacedEntryAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         endpoints.MapGet("/api/namespaces/{namespace}/management/entries/{entryName}", GetNamespacedEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         endpoints.MapPut("/api/namespaces/{namespace}/management/entries/{entryName}", PutNamespacedEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        endpoints.MapPost("/api/namespaces/{namespace}/management/entries/{entryName}/validate", ValidateNamespacedEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         endpoints.MapPost("/api/namespaces/{namespace}/management/entries/{entryName}/publish", PublishNamespacedEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         endpoints.MapDelete("/api/namespaces/{namespace}/management/entries/{entryName}", DeleteNamespacedEntryAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
         endpoints.MapGet("/api/management/entries/{entryName}/dependencies", GetEntryDependenciesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);

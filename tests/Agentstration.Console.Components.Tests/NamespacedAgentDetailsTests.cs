@@ -8,6 +8,7 @@ using Agentstration.Triggers;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
@@ -16,6 +17,24 @@ namespace Agentstration.Web.Tests;
 [DoNotParallelize]
 public sealed class NamespacedAgentDetailsTests
 {
+    [TestMethod]
+    public void BootstrapAgentRedirectsToTheEditableNamespacedEditor()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = new BunitContext();
+        context.Services.AddSingleton<IManagementApiClient>(new FakeManagementClient(packManaged: false));
+        context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
+        context.Services.AddSingleton<IAgentRunnerRuntimeClient>(new FakeRuntimeClient());
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+
+        _ = context.Render<NamespacedAgentDetails>(parameters => parameters
+            .Add(component => component.AgentNamespace, "agentstration.assistant")
+            .Add(component => component.Name, "assistant-diagnostics"));
+
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        Assert.AreEqual("http://localhost/agents/assistant-diagnostics?namespace=agentstration.assistant", navigation.Uri);
+    }
+
     [TestMethod]
     public async Task PageShowsPackBindingsAndDeploysTheExactNamespacedAgent()
     {
@@ -143,7 +162,7 @@ public sealed class NamespacedAgentDetailsTests
         public Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(string agentName, long generation, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
-    private sealed class FakeManagementClient : IManagementApiClient
+    private sealed class FakeManagementClient(bool packManaged = true) : IManagementApiClient
     {
         public static readonly ResourceNamespace PackNamespace = new("agentstration.daily-life-assistant");
         private static readonly ResourceNamespace ProfileNamespace = new("shared.models");
@@ -161,12 +180,14 @@ public sealed class NamespacedAgentDetailsTests
                 {
                     Name = name,
                     Namespace = @namespace,
-                    Annotations = new Dictionary<string, string>
-                    {
-                        [PackProvenanceAnnotations.Publisher] = "agentstration",
-                        [PackProvenanceAnnotations.Name] = "daily-life-assistant",
-                        [PackProvenanceAnnotations.Version] = "1.0.0"
-                    }
+                    Annotations = packManaged
+                        ? new Dictionary<string, string>
+                        {
+                            [PackProvenanceAnnotations.Publisher] = "agentstration",
+                            [PackProvenanceAnnotations.Name] = "daily-life-assistant",
+                            [PackProvenanceAnnotations.Version] = "1.0.0"
+                        }
+                        : new Dictionary<string, string>()
                 },
                 Generation = 1,
                 Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },

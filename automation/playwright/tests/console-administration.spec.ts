@@ -4,11 +4,18 @@ import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { ProductPages } from '../src/pages/product.pages.js';
 import { expect, test } from '../src/fixtures/test.js';
 import { TestIds } from '../src/contracts/test-ids.js';
+import { ExpectedTextByLocale } from '../src/locales/expected-text.js';
 
 test('Console account, preferences, organization, and shell mutations are operable @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   await inspectConsoleAdministration({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
   await expect(page.getByTestId(TestIds.console.notificationsPanel)).toBeVisible();
+});
+
+test('Console command palette aligns semantic icons with its search field @smoke', async ({ page, product }) => {
+  const pages = new ProductPages(page);
+  await authenticateConsole({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
+  await pages.consoleAdministration.openAndAssertCommandPalette();
 });
 
 test('all Console administration routes render deterministic states @smoke', async ({ page, product }) => {
@@ -36,6 +43,7 @@ test('Console navigation adapts to a mobile viewport @smoke @responsive', async 
   const pages = new ProductPages(page);
   await authenticateConsole({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
   await pages.consoleAdministration.open(product.consoleUrl, '/settings', 'settings');
+  await pages.consoleAdministration.assertNavigationLocale(ExpectedTextByLocale['en-US'].navigation);
   await expect(page.getByTestId(TestIds.console.sidebar)).toBeVisible();
   await expect(page.getByTestId(TestIds.console.sidebarToggle)).toBeVisible();
   await expect(page.getByTestId(TestIds.console.commandTrigger)).toBeHidden();

@@ -1,7 +1,6 @@
 @page "/"
 @implements IDisposable
 @inject PlatformDashboardService Dashboard
-@inject PlatformStatusState PlatformState
 @inject Microsoft.Extensions.Localization.IStringLocalizer<HomeStrings> Localizer
 <PageTitle>@T("PageTitle")</PageTitle>
 <PageHeader Title="@T("PlatformOverview")" Eyebrow="@T("OperationsCenter")">
@@ -38,14 +37,13 @@ else if (load is not null)
 }
 </div>
 @code {
-    private readonly CancellationTokenSource cancellation = new();
     private PlatformDashboardLoad? load;
     private PlatformSnapshot? snapshot;
     private bool disposed;
     private string? error;
     private string? errorId;
 
-    protected override void OnInitialized() => load = Dashboard.Start(cancellation.Token);
+    protected override void OnInitialized() => load = Dashboard.StartShared();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -59,32 +57,25 @@ else if (load is not null)
                 return;
 
             snapshot = refreshed;
-            SetPlatformStatus(refreshed);
             await InvokeAsync(StateHasChanged);
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        catch (OperationCanceledException) when (disposed)
         {
         }
         catch (AgentstrationApiException exception)
         {
             error = exception.Message;
             errorId = exception.ErrorId;
-            PlatformState.Set(UiStatus.Danger, T("Unavailable"));
             if (!disposed)
                 await InvokeAsync(StateHasChanged);
         }
     }
-
-    private void SetPlatformStatus(PlatformSnapshot value) =>
-        PlatformState.Set(PlatformDashboardService.ToStatus(value.Status), T($"Status.{value.Status}"));
 
     private string T(string key) => Localizer[key];
 
     public void Dispose()
     {
         disposed = true;
-        cancellation.Cancel();
-        cancellation.Dispose();
     }
 }
 

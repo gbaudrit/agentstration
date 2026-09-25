@@ -104,7 +104,72 @@ public sealed partial class FlowTests
         Assert.AreEqual("1.0.0", (await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default))!.Value.ActiveVersion);
         await Assert.ThrowsAsync<FlowConcurrencyException>(() => fixture.Service.UpdateAsync(TestScope.WorkspaceId, created.Value.Id,
             new UpdateFlowCommand("Changed", "1.1.0", true, created.Value.Definition), "\"stale\"", default));
-        await Assert.ThrowsAsync<FlowConcurrencyException>(() => fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default));
+        var duplicate = await Assert.ThrowsAsync<FlowValidationException>(() => fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default));
+        Assert.AreEqual("flow_version_already_published", duplicate.Code);
+    }
+
+    [TestMethod]
+    public async Task DuplicateDraftPublicationDoesNotChangeTheFlowDefinition()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand("draft-duplicate", null, "1.0.0", true,
+            new RoutingFlowDefinition(FlowRoutingStrategy.Capabilities, [new FlowTargetReference(FlowTargetKind.Agent, "agent-id")])), default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
+        await fixture.Repository.CreateDraftAsync(new FlowDraft
+        {
+            WorkspaceId = TestScope.WorkspaceId,
+            Id = "draft-duplicate-draft",
+            FlowId = created.Value.Id,
+            DisplayName = "Draft duplicate",
+            Definition = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] },
+            CreatedAt = Now,
+            UpdatedAt = Now
+        }, default);
+        var before = await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default);
+        var drafts = new FlowDraftService(fixture.Repository, fixture.Service, new AlwaysValidFlowValidator(), TimeProvider.System);
+
+        var duplicate = await Assert.ThrowsAsync<FlowValidationException>(() =>
+            drafts.PublishAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", null, true, default));
+
+        Assert.AreEqual("flow_version_already_published", duplicate.Code);
+        var after = await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default);
+        Assert.AreEqual(before!.ETag, after!.ETag);
+    }
+
+    [TestMethod]
+    public async Task CreatesMissingDraftFromNamespacedPublishedVersion()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var @namespace = new ResourceNamespace("agentstration.assistant");
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [new InputFlowStepDefinition { Name = "input" }],
+            Transitions = []
+        };
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
+            "assistant-diagnostics",
+            "Bootstrap diagnostics",
+            "1.0.0",
+            true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant-diagnostics")),
+            Graph: graph,
+            DisplayName: "Assistant diagnostics"), @namespace, default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
+        var drafts = new FlowDraftService(fixture.Repository, fixture.Service, new AlwaysValidFlowValidator(), TimeProvider.System);
+
+        var draft = await drafts.CreateFromVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", "local-user", default);
+
+        Assert.AreEqual(new FlowId("assistant-diagnostics", @namespace), draft.Value.FlowId);
+        Assert.AreEqual("Assistant diagnostics", draft.Value.DisplayName);
+        Assert.AreEqual("input", draft.Value.Definition.EntryStep);
+        Assert.AreEqual(1L, draft.Value.Revision);
+    }
+
+    private sealed class AlwaysValidFlowValidator : IFlowDefinitionValidator
+    {
+        public ValueTask<FlowValidationResult> ValidateAsync(FlowGraphDefinition definition, FlowValidationContext context, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(new FlowValidationResult([]));
     }
 
     [TestMethod]
@@ -151,10 +216,10 @@ public sealed partial class FlowTests
     public void WorkItemCanReferenceAnExactFlowVersionWithoutEmbeddingDefinition()
     {
         var reference = new FlowReference(new FlowId("technical-router"), "1.0.0", false);
-        var item = WorkItem.Create(WorkItemId.New(), TestScope.WorkspaceId, "question", "Help me", Now, flow: reference);
+        var item = WorkItem.Create(WorkItemId.New(), TestScope.WorkspaceId, TestScope.PrincipalId, "question", "Help me", Now, flow: reference);
         var restored = WorkItem.Restore(item.ToSnapshot());
         Assert.AreEqual(reference, restored.Flow);
-        Assert.Throws<FlowValidationException>(() => WorkItem.Create(WorkItemId.New(), TestScope.WorkspaceId, "question", "Help", Now,
+        Assert.Throws<FlowValidationException>(() => WorkItem.Create(WorkItemId.New(), TestScope.WorkspaceId, TestScope.PrincipalId, "question", "Help", Now,
             flow: new FlowReference(new FlowId("technical-router"), "1.0.0", true)));
     }
 
@@ -200,6 +265,7 @@ public sealed partial class FlowTests
         Assert.AreEqual(3L, agent.AgentVersion);
         Assert.AreEqual("Deterministic", agent.Provider);
         Assert.AreEqual(12, agent.Usage!.InputTokens);
+        Assert.AreEqual(4, agent.Usage.OutputTokens);
         Assert.AreEqual("done", completed.Output!.Value.GetString());
         Assert.AreEqual(1, (await runs.ListAsync(created.Value.Id, FlowRunStatus.Succeeded, 0, 20, TestScope, default)).Items.Count);
 

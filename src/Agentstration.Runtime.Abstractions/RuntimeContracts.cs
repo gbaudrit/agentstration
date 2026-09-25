@@ -276,6 +276,7 @@ public sealed record ToolExecutionScope
     public WorkspaceId? WorkspaceId { get; init; }
     public Guid? PrincipalId { get; init; }
     public string? ExecutionId { get; init; }
+    public string? FlowStepId { get; init; }
     public string? CorrelationId { get; init; }
     public long? AgentGeneration { get; init; }
     public bool? PersistArguments { get; init; }

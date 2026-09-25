@@ -30,10 +30,17 @@ public interface IModelProvidersClient
     Task<ModelProviderUsagesResponse> GetModelProviderUsagesAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => GetModelProviderUsagesAsync(providerName, cancellationToken);
     Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(string providerName, CancellationToken cancellationToken);
     Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => GetProviderModelsAsync(providerName, cancellationToken);
+    Task<ModelDiscoveryDiffResponse> RefreshProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) =>
+        Task.FromException<ModelDiscoveryDiffResponse>(new NotSupportedException("This client does not support model discovery refresh."));
     Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken);
     Task<ModelProviderStatusResponse> GetProviderStatusAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => GetProviderStatusAsync(providerName, cancellationToken);
     Task<ModelProviderStatusResponse> TestProviderAsync(string providerName, CancellationToken cancellationToken);
     Task<ModelProviderStatusResponse> TestProviderAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => TestProviderAsync(providerName, cancellationToken);
+}
+
+public interface IModelsClient
+{
+    Task<ResourceSnapshot<ModelResource>> GetModelAsync(ResourceNamespace @namespace, string modelName, CancellationToken cancellationToken);
 }
 
 public interface IExtensionsClient
@@ -292,6 +299,17 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
     public async Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<AvailableModelResponse>>(httpClient, ChildPath(@namespace, providerName, "models"), cancellationToken)).Value;
 
+    public async Task<ModelDiscoveryDiffResponse> RefreshProviderModelsAsync(
+        ResourceNamespace @namespace,
+        string providerName,
+        CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync(ChildPath(@namespace, providerName, "models/refresh"), null, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ModelDiscoveryDiffResponse>(cancellationToken)
+            ?? throw new AgentstrationApiException("Agentstration API returned an empty model discovery result.", Guid.NewGuid().ToString("N"));
+    }
+
     public Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken) =>
         GetProviderStatusAsync(ResourceNamespace.Default, providerName, cancellationToken);
 
@@ -326,6 +344,26 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
     private static string ChildPath(ResourceNamespace @namespace, string providerName, string child) => $"api/modelproviders/{Escape(providerName)}/{child}?resourceNamespace={Escape(@namespace.Value)}";
 
     private static string Escape(string value) => Uri.EscapeDataString(value);
+}
+
+public sealed class ModelsApiClient(HttpClient httpClient) : IModelsClient
+{
+    public async Task<ResourceSnapshot<ModelResource>> GetModelAsync(
+        ResourceNamespace @namespace,
+        string modelName,
+        CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(
+            $"api/models/{Uri.EscapeDataString(modelName)}?resourceNamespace={Uri.EscapeDataString(@namespace.Value)}",
+            cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        var value = await response.Content.ReadFromJsonAsync<ModelResource>(cancellationToken)
+            ?? throw new AgentstrationApiException("Agentstration API returned an empty model.", Guid.NewGuid().ToString("N"));
+        var etag = response.Headers.ETag?.ToString();
+        if (string.IsNullOrWhiteSpace(etag))
+            throw new AgentstrationApiException("Agentstration API did not return the model ETag.", Guid.NewGuid().ToString("N"));
+        return new ResourceSnapshot<ModelResource>(value, etag);
+    }
 }
 
 public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfilesClient

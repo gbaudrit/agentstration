@@ -1,35 +1,65 @@
+@implements IDisposable
+@using Agentstration.Web.Components.State
+@using Microsoft.JSInterop
 @inject IStringLocalizer<FlowDesignerStrings> Localizer
+@inject UserPreferencesState Preferences
+@inject IJSRuntime JSRuntime
 
 <section class="source-editor">
-    <header><h2>@Localizer["YamlDefinition"]</h2><button class="button-secondary" disabled="@IsReadOnly" @onclick="Apply">@Localizer["ApplyValidYaml"]</button></header>
+    <header>
+        <h2>@Localizer["YamlDefinition"]</h2>
+        <button class="button-primary" disabled="@(IsReadOnly || isApplying)" aria-busy="@(isApplying ? "true" : "false")" @onclick="Apply">
+            @if (isApplying) { <span class="source-apply-spinner" aria-hidden="true"></span> }
+            @Localizer[isApplying ? "ApplyingYaml" : "ApplyAndSaveYaml"]
+        </button>
+    </header>
     <StandaloneCodeEditor @ref="editor" Id="flow-source-monaco" ConstructionOptions="Options" OnDidChangeModelContent="Changed" />
-    @if (Error is not null) { <p class="error-panel">@Error</p> }
-    <p class="muted">@Localizer["InvalidSourceHelp"]</p>
+    @if (Error is not null) { <p class="error-panel" role="alert">@Error</p> }
+    @if (!IsReadOnly) { <p class="muted">@Localizer["SourceEditorHelp"]</p> }
 </section>
 
 @code {
     private StandaloneCodeEditor? editor;
-    private string initialValue = string.Empty;
+    private string editorValue = string.Empty;
+    private string? appliedTheme;
+    private bool isApplying;
     [Parameter] public string Value { get; set; } = string.Empty;
     [Parameter] public string? Error { get; set; }
     [Parameter] public bool IsReadOnly { get; set; }
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     [Parameter] public EventCallback<string> ApplyRequested { get; set; }
 
+    private string Theme => Preferences.IsDarkTheme ? "vs-dark" : "vs";
+
+    protected override void OnInitialized() => Preferences.Changed += PreferencesChanged;
+
     protected override async Task OnParametersSetAsync()
     {
-        if (editor is not null && Value != initialValue)
+        if (editor is null)
         {
-            initialValue = Value;
+            editorValue = Value;
+        }
+        else if (Value != editorValue)
+        {
+            editorValue = Value;
             await editor.SetValue(Value);
         }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var theme = Theme;
+        if (editor is null || appliedTheme == theme) return;
+        await Global.SetTheme(JSRuntime, theme);
+        appliedTheme = theme;
     }
 
     private StandaloneEditorConstructionOptions Options(StandaloneCodeEditor _) => new()
     {
         AutomaticLayout = true,
         Language = "yaml",
-        Value = initialValue = Value,
+        Value = Value,
+        Theme = Theme,
         ReadOnly = IsReadOnly,
         Minimap = new EditorMinimapOptions { Enabled = false },
         WordWrap = "on"
@@ -38,13 +68,28 @@
     private async Task Changed(ModelContentChangedEvent _)
     {
         if (IsReadOnly) return;
-        if (editor is not null) await ValueChanged.InvokeAsync(await editor.GetValue());
+        if (editor is null) return;
+        editorValue = await editor.GetValue();
+        await ValueChanged.InvokeAsync(editorValue);
     }
 
     private async Task Apply()
     {
-        if (IsReadOnly) return;
-        var value = editor is null ? Value : await editor.GetValue();
-        await ApplyRequested.InvokeAsync(value);
+        if (IsReadOnly || isApplying) return;
+        isApplying = true;
+        StateHasChanged();
+        try
+        {
+            var value = editor is null ? Value : await editor.GetValue();
+            await ApplyRequested.InvokeAsync(value);
+        }
+        finally
+        {
+            isApplying = false;
+        }
     }
+
+    private void PreferencesChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Preferences.Changed -= PreferencesChanged;
 }

@@ -10,6 +10,7 @@ The main verified settings are:
 | `LlamaCpp:Endpoint` | `http://localhost:8080` | Native llama.cpp server used by the autonomous llama.cpp extension and Aspire. |
 | `LocalAI:Endpoint` | `http://localhost:8081` | Native LocalAI server used by the autonomous LocalAI extension and Aspire. Port 8081 avoids the llama.cpp default on 8080. |
 | `LocalAI:ApiKey` | unset | Optional LocalAI Bearer key. Supply it through environment or secret-backed host configuration; never commit it. |
+| `Foundry:Enabled` | `false` | AppHost-only opt-in to start the Foundry AEP extension; each Model Provider supplies endpoints and authentication through AEP Value Bindings. |
 | `OLLAMA_IMAGE` | `ollama/ollama:0.33.2` | Compose-only Ollama image override. |
 | `LLAMA_CPP_IMAGE` | `ghcr.io/ggml-org/llama.cpp:server-b10830` | Compose-only llama.cpp image override. |
 | `LLAMA_CPP_MODELS_PATH` | `./.models/llama-cpp` | Compose-only host directory containing GGUF models. |
