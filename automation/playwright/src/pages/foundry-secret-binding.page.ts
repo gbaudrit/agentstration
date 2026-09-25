@@ -66,7 +66,7 @@ export class FoundrySecretBindingPage {
   public async saveProvider(name: string): Promise<void> {
     await this.page.getByTestId('model-provider-save').click();
     await this.page.waitForURL(url => url.pathname === `/modelproviders/${name}`);
-    await this.page.getByTestId('model-provider-configuration-tab').click();
+    await this.openConfiguration();
     await this.page.locator(`[data-testid="model-provider-form"][data-interactive="true"]`).waitFor({ state: 'visible' });
   }
 
@@ -74,19 +74,28 @@ export class FoundrySecretBindingPage {
     const response = await this.page.goto(`${consoleUrl}/secrets/${encodeURIComponent(name)}`, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Secret route returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.getByTestId(TestIds.resourceAdministration.secretEditor).waitFor({ state: 'visible' });
+    await this.page.locator('.resource-form[data-interactive="true"]').waitFor({ state: 'visible' });
   }
 
   public async openProvider(consoleUrl: string, name: string): Promise<void> {
     const response = await this.page.goto(`${consoleUrl}/modelproviders/${encodeURIComponent(name)}`, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Provider route returned HTTP ${response?.status() ?? 'no response'}.`);
-    await this.page.getByTestId('model-provider-configuration-tab').click();
+    await this.openConfiguration();
     await this.page.locator(`[data-testid="model-provider-form"][data-interactive="true"]`).waitFor({ state: 'visible' });
+  }
+
+  private async openConfiguration(): Promise<void> {
+    const tab = this.page.locator('[data-testid="model-provider-configuration-tab"][data-interactive="true"]');
+    await tab.waitFor({ state: 'visible' });
+    await tab.click();
+    await expect(tab).toHaveAttribute('aria-selected', 'true');
   }
 
   public async deleteSecretValue(): Promise<void> {
     const section = this.page.locator('.resource-section').filter({ hasText: /Secret Value|Valeur du secret/i }).last();
     await section.getByRole('button', { name: /Delete value|Supprimer la valeur/i }).click();
     const dialog = this.page.getByRole('alertdialog');
+    await dialog.waitFor({ state: 'visible' });
     await dialog.getByRole('button', { name: /Delete value|Supprimer la valeur/i }).click();
     await expect(section).toContainText(/Missing|Manquante/i);
   }
