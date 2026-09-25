@@ -6,7 +6,7 @@ definition:
   description: Composes durable specialist Flows, then creates and validates a reviewable Resource Plan without applying it.
   version: 1.0.0
   enabled: true
-  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-solution-consolidator } }
+  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-solution-consolidator, namespace: agentstration.resource-planning } }
   graph:
     entryStep: input
     inputSchema:
@@ -21,32 +21,32 @@ definition:
       - type: flow
         name: analyze-intent
         displayName: Analyze requirements
-        flow: { resourceId: resource-planning-intent-analysis, versionStrategy: active }
+        flow: { resourceId: resource-planning-intent-analysis, namespace: agentstration.resource-planning, versionStrategy: active }
         inputMapping: { goal: "${input.goal}", context: "${input.context}" }
       - type: flow
         name: design-capabilities
         displayName: Design roles and capabilities
-        flow: { resourceId: resource-planning-capability-design, versionStrategy: active }
+        flow: { resourceId: resource-planning-capability-design, namespace: agentstration.resource-planning, versionStrategy: active }
         inputMapping: { goal: "${input.goal}", intent: "${steps.analyze-intent.output}" }
       - type: flow
         name: design-workflows
         displayName: Design workflows
-        flow: { resourceId: resource-planning-workflow-design, versionStrategy: active }
+        flow: { resourceId: resource-planning-workflow-design, namespace: agentstration.resource-planning, versionStrategy: active }
         inputMapping: { goal: "${input.goal}", intent: "${steps.analyze-intent.output}", capabilities: "${steps.design-capabilities.output}" }
       - type: flow
         name: design-integrations
         displayName: Design integrations
-        flow: { resourceId: resource-planning-integration-design, versionStrategy: active }
+        flow: { resourceId: resource-planning-integration-design, namespace: agentstration.resource-planning, versionStrategy: active }
         inputMapping: { goal: "${input.goal}", intent: "${steps.analyze-intent.output}", capabilities: "${steps.design-capabilities.output}" }
       - type: flow
         name: design-experiences
         displayName: Design experiences
-        flow: { resourceId: resource-planning-experience-design, versionStrategy: active }
+        flow: { resourceId: resource-planning-experience-design, namespace: agentstration.resource-planning, versionStrategy: active }
         inputMapping: { goal: "${input.goal}", workflows: "${steps.design-workflows.output}", audiences: "${steps.analyze-intent.output}" }
       - type: flow
         name: consolidate
         displayName: Consolidate and review
-        flow: { resourceId: resource-planning-solution-consolidation, versionStrategy: active }
+        flow: { resourceId: resource-planning-solution-consolidation, namespace: agentstration.resource-planning, versionStrategy: active }
         inputMapping:
           goal: "${input.goal}"
           intent: "${steps.analyze-intent.output}"

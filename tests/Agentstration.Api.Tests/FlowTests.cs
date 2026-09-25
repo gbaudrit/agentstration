@@ -320,6 +320,6 @@ public sealed partial class FlowTests
 
     private sealed class ExistingResourceResolver : IFlowResourceReferenceResolver
     {
-        public Task<bool> ExistsAsync(string resourceId, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken) => Task.FromResult(true);
     }
 }

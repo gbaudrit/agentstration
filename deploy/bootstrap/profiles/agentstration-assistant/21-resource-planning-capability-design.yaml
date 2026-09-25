@@ -6,12 +6,12 @@ definition:
   description: Durable functional capability design child Flow.
   version: 1.0.0
   enabled: true
-  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-capability-designer } }
+  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-capability-designer, namespace: agentstration.resource-planning } }
   graph:
     entryStep: input
     steps:
       - { type: input, name: input, displayName: Intent evidence }
-      - { type: agent, name: design, displayName: Design capabilities, agent: { resourceId: resource-planning-capability-designer }, inputMapping: "${input}" }
+      - { type: agent, name: design, displayName: Design capabilities, agent: { resourceId: resource-planning-capability-designer, namespace: agentstration.resource-planning }, inputMapping: "${input}" }
       - { type: output, name: output, displayName: Capability intents, outputMapping: "${steps.design.output}" }
     transitions:
       - { id: input-to-design, fromStep: input, event: completed, toStep: design }
