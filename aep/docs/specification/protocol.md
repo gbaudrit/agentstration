@@ -47,7 +47,7 @@ Unknown names are preserved. Each capability evolves through its own version and
 
 The model-provider capability currently uses `/aep/model-providers`. AEP tool contributions may map to MCP servers; MCP remains authoritative for tool schema and invocation.
 
-The model-provider capability is version `2.0`. `POST /aep/model-providers/{providerId}/models` returns bounded model observations. Each descriptor has a provider-local `id`, a `displayName`, an optional safe `identity` (`publisher`, `model`, and `version`) and an optional typed `specification`. The specification directly carries observed `input`, `output`, `features`, and `limits`; it does not contain a generic capabilities dictionary or provider metadata bag.
+The model-provider capability is version `1.0`. `POST /aep/model-providers/{providerId}/models` returns bounded model observations. Each descriptor has a provider-local `id`, a `displayName`, an optional safe `identity` (`publisher`, `model`, and `version`) and an optional typed `specification`. The specification directly carries observed `input`, `output`, `features`, and `limits`; it does not contain a generic capabilities dictionary or provider metadata bag.
 
 Content types are `text`, `image`, and `audio`. Initial features are `streaming`, `tools`, `structuredOutput`, and `reasoning`. Feature support is `unknown`, `unsupported`, `native`, `emulated`, or `partial`. A missing feature or `unknown` support means it was not observed; it must not be interpreted as unsupported. Tool modes, structured-output formats, and reasoning efforts (`none`, `minimal`, `low`, `medium`, and `high`) are typed maps so future properties can be added to each entry. Limits are positive token counts when observed.
 

@@ -11,7 +11,7 @@ Breaking wire changes require a new protocol version. Additive capability names 
 
 `aep.value-requirements` and `aep.bound-values` version `1.0` are part of protocol `2026-09-18`. They replace the former extension-wide Secret requirement declaration and chat-only Secret access field. Requirements are scoped to one contribution and retain stable logical identifiers independent of installation Parameters or Secrets. There is no legacy wire compatibility path.
 
-Protocol `2026-09-22` replaces model-level string capability lists and open metadata with the typed, partial model observation carried by `aep.model-provider` version `2.0`. There is no legacy model descriptor wire shape.
+Protocol `2026-09-22` replaces model-level string capability lists and open metadata with the typed, partial model observation carried by `aep.model-provider`. The capability remains version `1.0` while AEP is pre-stable, and no legacy model descriptor wire shape is retained.
 
 Configuration has an additional compatibility axis. An option-set version is immutable and its schema digest must remain stable. Extensions preserve existing consumers by continuing to publish and execute pinned versions when a newer version becomes preferred. Removing a published option-set version is a breaking change for consumers that still reference it and must be diagnosed before invocation.
 
