@@ -1,0 +1,22 @@
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: analyste-reunion
+  namespace: demo.flows-professionnels
+  tags: { bootstrapProfile: professional-flow-demo, role: analyse-reunion }
+definition:
+  displayName: Analyste de réunion
+  description: Structure des notes de réunion en sujets, décisions et points bloquants.
+  handler: prompt-agent
+  instructions: |
+    Tu analyses des notes de réunion professionnelles rédigées en français.
+    Identifie les sujets importants, les décisions prises, les responsables cités, les échéances et les points bloquants.
+    N'invente aucune décision ni personne. Signale explicitement les informations absentes.
+    Réponds en français avec des sections courtes et stables : Sujets, Décisions, Points bloquants et Faits utiles.
+  modelProfile: { binding: demo-model }
+  runtimeProfile: { binding: demo-runtime }
+  tools: []
+  behaviors: [analyse-structuree, faits-seulement]
+  middleware: []
+  contextProviders: []
+  settings: {}

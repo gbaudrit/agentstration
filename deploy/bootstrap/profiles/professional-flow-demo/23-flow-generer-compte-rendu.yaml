@@ -1,0 +1,55 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: generer-compte-rendu
+  namespace: demo.flows-professionnels
+definition:
+  displayName: Générer un compte-rendu
+  description: Produit un compte-rendu professionnel adapté à une réunion ou un incident.
+  version: 1.0.0
+  enabled: true
+  spec:
+    flowKind: direct
+    target: { kind: agent, id: redacteur-professionnel, namespace: demo.flows-professionnels }
+  graph:
+    entryStep: entree
+    inputSchema:
+      type: object
+      properties:
+        typeContexte: { type: string }
+        contenuSource: { type: string }
+        analyse: { type: string }
+        actions: { type: string }
+        taches: { type: string }
+      required: [typeContexte, contenuSource, analyse, actions, taches]
+      additionalProperties: false
+    steps:
+      - { type: input, name: entree, displayName: Contexte analysé }
+      - type: agent
+        name: rediger
+        displayName: Rédiger le compte-rendu
+        agent: { resourceId: redacteur-professionnel, namespace: demo.flows-professionnels }
+        inputMapping:
+          operation: Compte-rendu
+          typeContexte: "${input.typeContexte}"
+          contenuSource: "${input.contenuSource}"
+          analyse: "${input.analyse}"
+          actions: "${input.actions}"
+          taches: "${input.taches}"
+      - type: output
+        name: resultat
+        displayName: Compte-rendu professionnel
+        outputMapping:
+          compteRendu: "${steps.rediger.output}"
+    transitions:
+      - { id: entree-vers-redaction, fromStep: entree, event: completed, toStep: rediger }
+      - { id: redaction-vers-resultat, fromStep: rediger, event: completed, toStep: resultat }
+    outputSchema:
+      type: object
+      properties:
+        compteRendu: { type: string }
+      required: [compteRendu]
+      additionalProperties: false
+  metadata: { bootstrapProfile: professional-flow-demo, capability: professional-report }
+  publish: true
+  activate: true
