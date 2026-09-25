@@ -263,14 +263,17 @@ public static class IdentityEndpoints
     private static async Task<IResult> SelectWorkspaceAsync(
         SelectWorkspaceRequest request,
         IdentityExperienceService service,
+        HttpContext context,
         HttpRequest httpRequest,
         HttpResponse response,
         CancellationToken cancellationToken)
     {
+        var principalId = context.Features.Get<ResolvedPrincipalFeature>()?.PrincipalId;
+        if (principalId is null) return Results.Forbid();
         try
         {
-            var context = await service.ValidateWorkspaceSelectionAsync(request.WorkspaceId, cancellationToken);
-            response.Cookies.Append(RequestContextMiddleware.WorkspaceCookie, context.WorkspaceId.ToString("D"), new CookieOptions
+            var selected = await service.ValidateWorkspaceSelectionAsync(principalId.Value, request.WorkspaceId, cancellationToken);
+            response.Cookies.Append(RequestContextMiddleware.WorkspaceCookie, selected.WorkspaceId.ToString("D"), new CookieOptions
             {
                 HttpOnly = true,
                 IsEssential = true,
@@ -278,7 +281,7 @@ public static class IdentityEndpoints
                 Secure = httpRequest.IsHttps,
                 MaxAge = TimeSpan.FromDays(30)
             });
-            return Results.Ok(context);
+            return Results.Ok(selected);
         }
         catch (AuthorizationDeniedException exception)
         {

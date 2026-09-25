@@ -6,6 +6,7 @@ using Agentstration.Infrastructure;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -338,6 +339,15 @@ public sealed class IdentityFoundationTests
         Assert.AreEqual(HttpStatusCode.OK, selected.StatusCode);
         var context = await client.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
         Assert.AreEqual(workspace.Id, context?.Context.WorkspaceId);
+
+        using var staleCookieClient = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        staleCookieClient.DefaultRequestHeaders.Add(
+            "Cookie",
+            $"{RequestContextMiddleware.WorkspaceCookie}={Guid.NewGuid():D}");
+        var recovered = await staleCookieClient.PostAsJsonAsync(
+            "/bff/identity/context/workspace",
+            new { workspaceId = workspace.Id });
+        Assert.AreEqual(HttpStatusCode.OK, recovered.StatusCode);
 
         var denied = await client.PostAsJsonAsync("/api/identity/context/workspace", new { workspaceId = Guid.NewGuid() });
         Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
