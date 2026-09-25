@@ -9,6 +9,7 @@ definition:
   exposure:
     version: 1
     surfaces: [console]
+    workplacePlacements: []
   presentation:
     kind: prompt
     placeholder: Collez les notes de la réunion à traiter…

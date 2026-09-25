@@ -111,9 +111,12 @@ public sealed class ProfessionalFlowDemoBootstrapProfileTests
     private static void AssertEntry(BootstrapResourceDocument entry, string expectedFlow)
     {
         var binding = entry.Definition.GetProperty("binding");
+        var exposure = entry.Definition.GetProperty("exposure");
         Assert.AreEqual("flow", binding.GetProperty("kind").GetString());
         Assert.AreEqual(expectedFlow, binding.GetProperty("resourceId").GetString());
         Assert.AreEqual(ResourceNamespace, binding.GetProperty("namespace").GetString());
+        CollectionAssert.AreEqual(new[] { "console" }, exposure.GetProperty("surfaces").EnumerateArray().Select(value => value.GetString()).ToArray());
+        Assert.AreEqual(0, exposure.GetProperty("workplacePlacements").GetArrayLength());
         Assert.IsTrue(entry.Definition.GetProperty("presentation").GetProperty("suggestions").GetArrayLength() > 0);
     }
 
