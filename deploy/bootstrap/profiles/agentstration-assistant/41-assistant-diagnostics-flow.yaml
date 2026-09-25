@@ -8,7 +8,7 @@ definition:
   description: Produces evidence-backed diagnostics for the current Workspace without mutation.
   version: 1.0.0
   enabled: true
-  spec: { flowKind: direct, target: { kind: agent, id: assistant-diagnostics } }
+  spec: { flowKind: direct, target: { kind: agent, id: assistant-diagnostics, namespace: agentstration.assistant } }
   graph:
     entryStep: input
     inputSchema:
@@ -22,7 +22,7 @@ definition:
       - type: agent
         name: diagnose
         displayName: Inspect evidence and diagnose
-        agent: { resourceId: assistant-diagnostics }
+        agent: { resourceId: assistant-diagnostics, namespace: agentstration.assistant }
       - { type: output, name: output, displayName: Diagnostic findings }
     transitions:
       - { id: input-to-diagnose, fromStep: input, event: completed, toStep: diagnose }

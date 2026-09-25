@@ -190,8 +190,8 @@ public sealed class ManagedFlowOrchestrationEngine(
 
 public sealed class ManagementFlowResourceReferenceResolver(IResourceStore store, IFlowRepository flows) : IFlowResourceReferenceResolver
 {
-    public async Task<bool> ExistsAsync(string resourceId, CancellationToken cancellationToken) =>
-        await store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, resourceId), cancellationToken) is not null;
+    public async Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken) =>
+        await store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, resourceId, @namespace ?? ResourceNamespace.Default), cancellationToken) is not null;
 
     public async Task<ResolvedFlowCall?> ResolveFlowAsync(
         WorkspaceId workspaceId,

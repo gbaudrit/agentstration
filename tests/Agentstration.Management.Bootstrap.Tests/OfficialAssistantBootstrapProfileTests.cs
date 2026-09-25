@@ -46,9 +46,14 @@ public sealed class OfficialAssistantBootstrapProfileTests
             .Where(value => value.Kind == "Agent")
             .All(value => value.Definition.GetProperty("modelProfile").GetProperty("binding").GetString() == "assistant-model"));
         var router = resources.Single(value => value.Kind == "Flow" && value.Metadata.Name == "assistant-router");
+        var routerSpec = router.Definition.GetProperty("spec");
+        Assert.AreEqual("agentstration.assistant", routerSpec.GetProperty("destinations")[0].GetProperty("namespace").GetString());
+        Assert.AreEqual("agentstration.assistant", routerSpec.GetProperty("fallback").GetProperty("namespace").GetString());
         var planningStep = router.Definition.GetProperty("graph").GetProperty("steps")
             .EnumerateArray().Single(value => value.TryGetProperty("name", out var name) && name.GetString() == "resource-planning");
         Assert.AreEqual("agentstration.resource-planning", planningStep.GetProperty("flow").GetProperty("namespace").GetString());
+        var entry = resources.Single(value => value.Kind == "Entry" && value.Metadata.Name == "ask-agentstration");
+        Assert.AreEqual("agentstration.assistant", entry.Definition.GetProperty("binding").GetProperty("namespace").GetString());
     }
 
     private static string FindRepositoryRoot()

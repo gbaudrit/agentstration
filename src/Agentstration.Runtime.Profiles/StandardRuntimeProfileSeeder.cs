@@ -9,19 +9,27 @@ public sealed class StandardRuntimeProfileSeeder(
     ICurrentRequestContext requestContext)
 {
     private readonly SemaphoreSlim gate = new(1, 1);
-    private readonly HashSet<Guid> initializedWorkspaces = [];
+    private readonly HashSet<Guid> initializedTenants = [];
 
     public async Task EnsureAsync(CancellationToken cancellationToken)
     {
         if (!requestContext.IsInitialized) return;
-        var workspaceId = requestContext.Current.WorkspaceId;
+        await EnsureAsync(ResourceScopeRef.Tenant(requestContext.Current.TenantId), cancellationToken);
+    }
+
+    public async Task EnsureAsync(ResourceScopeRef tenantScope, CancellationToken cancellationToken)
+    {
+        if (tenantScope.Kind != ResourceScopeKind.Tenant)
+            throw new ArgumentException("The standard RuntimeProfile requires a Tenant scope.", nameof(tenantScope));
+        var tenantId = tenantScope.TargetId
+            ?? throw new ArgumentException("The Tenant scope has no target ID.", nameof(tenantScope));
 
         await gate.WaitAsync(cancellationToken);
         try
         {
-            if (initializedWorkspaces.Contains(workspaceId)) return;
+            if (initializedTenants.Contains(tenantId)) return;
 
-            if (await runtimes.GetAsync("maf-builtin", cancellationToken) is null)
+            if (await runtimes.GetExactAsync(tenantScope, ResourceNamespace.Default, "maf-builtin", cancellationToken) is null)
             {
                 await runtimes.CreateAsync(new RuntimeProfileResource
                 {
@@ -45,11 +53,14 @@ public sealed class StandardRuntimeProfileSeeder(
                             ToolInvocation = RuntimeToolInvocationMode.Automatic,
                             Streaming = StreamingMode.Automatic
                         }
-                    }
+                    },
+                    ScopeRef = tenantScope,
+                    Generation = 1,
+                    Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
                 }, cancellationToken);
             }
 
-            initializedWorkspaces.Add(workspaceId);
+            initializedTenants.Add(tenantId);
         }
         finally
         {

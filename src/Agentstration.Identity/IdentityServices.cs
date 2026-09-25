@@ -97,7 +97,8 @@ public sealed class InitialPrincipalProvisioner(
 
 public sealed class InitialTopologyProvisioner(
     IIdentityStore store,
-    TimeProvider timeProvider) : IInitialTopologyProvisioner
+    TimeProvider timeProvider,
+    IWorkspaceProvisioner workspaceProvisioner) : IInitialTopologyProvisioner
 {
     public async Task<InitialTopologyProvisioningResult> ProvisionAsync(
         InitialTopologyProvisioning request,
@@ -124,8 +125,14 @@ public sealed class InitialTopologyProvisioner(
         var workspace = await store.FindWorkspaceByNameAsync(tenant.Id, workspaceName, cancellationToken);
         if (workspace is null)
         {
-            workspace = new Workspace(Guid.NewGuid(), tenant.Id, workspaceName, workspaceDisplayName, WorkspaceStatus.Active, now);
+            workspace = new Workspace(Guid.NewGuid(), tenant.Id, workspaceName, workspaceDisplayName, WorkspaceStatus.Initializing, now);
             await store.AddWorkspaceAsync(workspace, cancellationToken);
+        }
+
+        if (workspace.Status == WorkspaceStatus.Initializing)
+        {
+            await workspaceProvisioner.ProvisionAsync(workspace, cancellationToken);
+            workspace = workspace with { Status = WorkspaceStatus.Active };
         }
 
         var preferences = await store.GetPrincipalPreferencesAsync(principal.Id, cancellationToken)

@@ -6,12 +6,12 @@ definition:
   description: Durable functional workflow design child Flow.
   version: 1.0.0
   enabled: true
-  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-workflow-designer } }
+  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-workflow-designer, namespace: agentstration.resource-planning } }
   graph:
     entryStep: input
     steps:
       - { type: input, name: input, displayName: Roles and intent }
-      - { type: agent, name: design, displayName: Design workflows, agent: { resourceId: resource-planning-workflow-designer }, inputMapping: "${input}" }
+      - { type: agent, name: design, displayName: Design workflows, agent: { resourceId: resource-planning-workflow-designer, namespace: agentstration.resource-planning }, inputMapping: "${input}" }
       - { type: output, name: output, displayName: Workflow intents, outputMapping: "${steps.design.output}" }
     transitions:
       - { id: input-to-design, fromStep: input, event: completed, toStep: design }

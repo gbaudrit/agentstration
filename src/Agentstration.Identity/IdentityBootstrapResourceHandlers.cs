@@ -79,7 +79,8 @@ public sealed class TenantBootstrapResourceHandler(
 
 public sealed class WorkspaceBootstrapResourceHandler(
     IIdentityStore store,
-    TimeProvider timeProvider) : IBootstrapResourceHandler
+    TimeProvider timeProvider,
+    IWorkspaceProvisioner workspaceProvisioner) : IBootstrapResourceHandler
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -120,9 +121,9 @@ public sealed class WorkspaceBootstrapResourceHandler(
         if (await store.FindWorkspaceByNameAsync(tenant.Id, name, cancellationToken) is not null)
             return BootstrapResourceApplyResult.Skipped;
 
-        await store.AddWorkspaceAsync(
-            new Workspace(Guid.NewGuid(), tenant.Id, name, displayName, WorkspaceStatus.Active, timeProvider.GetUtcNow()),
-            cancellationToken);
+        var workspace = new Workspace(Guid.NewGuid(), tenant.Id, name, displayName, WorkspaceStatus.Initializing, timeProvider.GetUtcNow());
+        await store.AddWorkspaceAsync(workspace, cancellationToken);
+        await workspaceProvisioner.ProvisionAsync(workspace, cancellationToken);
         return BootstrapResourceApplyResult.Created;
     }
 

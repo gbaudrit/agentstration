@@ -28,6 +28,28 @@ namespace Agentstration.Management.Tests;
 public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
+    public async Task ToolCatalogReadsDoNotWriteControlPlaneResources()
+    {
+        await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        var scope = ResourceScopeRef.Workspace(requestContext.WorkspaceId);
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        var before = await store.ListExactInventoryAsync(scope, 0, 1000, default);
+        using var client = factory.CreateClient();
+
+        using var tools = await client.GetAsync("/api/tools");
+        using var providers = await client.GetAsync("/api/toolproviders");
+
+        Assert.AreEqual(HttpStatusCode.OK, tools.StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, providers.StatusCode);
+        var after = await store.ListExactInventoryAsync(scope, 0, 1000, default);
+        CollectionAssert.AreEqual(
+            before.Select(value => $"{value.Kind}/{value.Namespace}/{value.Name}/{value.UpdatedAt:O}").ToArray(),
+            after.Select(value => $"{value.Kind}/{value.Namespace}/{value.Name}/{value.UpdatedAt:O}").ToArray());
+    }
+
+    [TestMethod]
     public async Task PlannedAgentDeletionUsesItsExactWorkspaceScope()
     {
         await using var factory = Factory();
