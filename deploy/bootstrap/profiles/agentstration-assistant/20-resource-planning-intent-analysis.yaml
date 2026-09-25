@@ -6,12 +6,12 @@ definition:
   description: Durable functional requirement analysis child Flow.
   version: 1.0.0
   enabled: true
-  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-intent-analyst } }
+  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-intent-analyst, namespace: agentstration.resource-planning } }
   graph:
     entryStep: input
     steps:
       - { type: input, name: input, displayName: Solution goal }
-      - { type: agent, name: analyze, displayName: Analyze intent, agent: { resourceId: resource-planning-intent-analyst }, inputMapping: "${input}" }
+      - { type: agent, name: analyze, displayName: Analyze intent, agent: { resourceId: resource-planning-intent-analyst, namespace: agentstration.resource-planning }, inputMapping: "${input}" }
       - { type: output, name: output, displayName: Intent analysis, outputMapping: "${steps.analyze.output}" }
     transitions:
       - { id: input-to-analyze, fromStep: input, event: completed, toStep: analyze }

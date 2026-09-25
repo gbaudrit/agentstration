@@ -8,7 +8,7 @@ definition:
   description: Produces evidence-backed product help from the bundled documentation boundary.
   version: 1.0.0
   enabled: true
-  spec: { flowKind: direct, target: { kind: agent, id: assistant-help } }
+  spec: { flowKind: direct, target: { kind: agent, id: assistant-help, namespace: agentstration.assistant } }
   graph:
     entryStep: input
     inputSchema:
@@ -22,7 +22,7 @@ definition:
       - type: agent
         name: answer
         displayName: Search documentation and answer
-        agent: { resourceId: assistant-help }
+        agent: { resourceId: assistant-help, namespace: agentstration.assistant }
       - { type: output, name: output, displayName: Documented answer }
     transitions:
       - { id: input-to-answer, fromStep: input, event: completed, toStep: answer }

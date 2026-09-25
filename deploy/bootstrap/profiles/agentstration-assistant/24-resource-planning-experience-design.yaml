@@ -6,12 +6,12 @@ definition:
   description: Durable functional experience design child Flow.
   version: 1.0.0
   enabled: true
-  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-experience-designer } }
+  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-experience-designer, namespace: agentstration.resource-planning } }
   graph:
     entryStep: input
     steps:
       - { type: input, name: input, displayName: Workflow and audience evidence }
-      - { type: agent, name: design, displayName: Design experiences, agent: { resourceId: resource-planning-experience-designer }, inputMapping: "${input}" }
+      - { type: agent, name: design, displayName: Design experiences, agent: { resourceId: resource-planning-experience-designer, namespace: agentstration.resource-planning }, inputMapping: "${input}" }
       - { type: output, name: output, displayName: Experience intents, outputMapping: "${steps.design.output}" }
     transitions:
       - { id: input-to-design, fromStep: input, event: completed, toStep: design }

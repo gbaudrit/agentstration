@@ -142,7 +142,7 @@ public sealed partial class FlowTests
     {
         public WorkspaceId? WorkspaceId { get; private set; }
         public ResourceNamespace? OwnerNamespace { get; private set; }
-        public Task<bool> ExistsAsync(string resourceId, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken) => Task.FromResult(true);
         public Task<ResolvedFlowCall?> ResolveFlowAsync(WorkspaceId workspaceId, ResourceNamespace ownerNamespace, FlowCallReference reference, CancellationToken cancellationToken)
         {
             WorkspaceId = workspaceId;

@@ -134,10 +134,16 @@ public sealed class IdentityExperienceService(
     }
 
     public async Task<RequestContext> ValidateWorkspaceSelectionAsync(Guid workspaceId, CancellationToken cancellationToken)
+        => await ValidateWorkspaceSelectionAsync(requestContext.Current.PrincipalId, workspaceId, cancellationToken);
+
+    public async Task<RequestContext> ValidateWorkspaceSelectionAsync(
+        Guid principalId,
+        Guid workspaceId,
+        CancellationToken cancellationToken)
     {
         var workspace = await store.GetWorkspaceAsync(workspaceId, cancellationToken)
             ?? throw new AuthorizationDeniedException(AuthorizationPermissions.WorkspacesRead);
-        var context = requestContext.Current with { TenantId = workspace.TenantId, WorkspaceId = workspaceId };
+        var context = new RequestContext(principalId, workspace.TenantId, workspaceId);
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.WorkspacesRead, cancellationToken);
         return context;
     }

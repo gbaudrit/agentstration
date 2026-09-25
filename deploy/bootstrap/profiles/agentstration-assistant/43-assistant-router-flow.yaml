@@ -12,8 +12,8 @@ definition:
     flowKind: routing
     strategy: deterministic
     destinations:
-      - { kind: agent, id: assistant-router }
-    fallback: { kind: agent, id: assistant-fallback }
+      - { kind: agent, id: assistant-router, namespace: agentstration.assistant }
+    fallback: { kind: agent, id: assistant-fallback, namespace: agentstration.assistant }
   graph:
     entryStep: input
     inputSchema:
@@ -31,27 +31,27 @@ definition:
         selectionInstructions: Select help, diagnostics, or resource-planning only when the intent is explicit; otherwise use fallback.
         candidates:
           - route: help
-            agent: { resourceId: assistant-router }
+            agent: { resourceId: assistant-router, namespace: agentstration.assistant }
             description: Product concepts, configuration guidance, and documentation.
             examples: [help, documentation, docs, explain, aide, documentation, expliquer]
           - route: diagnostics
-            agent: { resourceId: assistant-router }
+            agent: { resourceId: assistant-router, namespace: agentstration.assistant }
             description: Evidence-backed troubleshooting of the current installation or execution.
             examples: [diagnostic, troubleshoot, failure, error, health, panne, erreur, pourquoi]
           - route: resource-planning
-            agent: { resourceId: assistant-router }
+            agent: { resourceId: assistant-router, namespace: agentstration.assistant }
             description: Design Agents, Flows, Entries, integrations, and governed resource changes.
             examples: [resource plan, design agents, create flow, architecture, plan de ressources, créer un flow]
-        fallback: { resourceId: assistant-fallback }
+        fallback: { resourceId: assistant-fallback, namespace: agentstration.assistant }
       - type: flow
         name: help
         displayName: Help and documentation
-        flow: { resourceId: assistant-help, versionStrategy: active }
+        flow: { resourceId: assistant-help, namespace: agentstration.assistant, versionStrategy: active }
         inputMapping: "${input}"
       - type: flow
         name: diagnostics
         displayName: Diagnostics
-        flow: { resourceId: assistant-diagnostics, versionStrategy: active }
+        flow: { resourceId: assistant-diagnostics, namespace: agentstration.assistant, versionStrategy: active }
         inputMapping: "${input}"
       - type: flow
         name: resource-planning
@@ -61,7 +61,7 @@ definition:
       - type: flow
         name: fallback
         displayName: Clarification
-        flow: { resourceId: assistant-fallback, versionStrategy: active }
+        flow: { resourceId: assistant-fallback, namespace: agentstration.assistant, versionStrategy: active }
         inputMapping: "${input}"
       - { type: output, name: output, displayName: Assistant response }
       - { type: failure, name: failure, displayName: Capability failure, code: ASSISTANT_CAPABILITY_FAILED, message: The selected Assistant capability could not complete. }
