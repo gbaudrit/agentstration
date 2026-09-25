@@ -102,6 +102,8 @@ public sealed record PlatformSnapshot
 public sealed record DashboardMetric(string Value, string? Detail, UiStatus Status);
 public sealed record PlatformDashboardLoad(
     Task<DashboardMetric> DefinedAgents,
+    Task<DashboardMetric> DefinedFlows,
+    Task<DashboardMetric> Extensions,
     Task<DashboardMetric> ReadyDeployments,
     Task<DashboardMetric> RuntimeRuns,
     Task<DashboardMetric> RunningTasks,

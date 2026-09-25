@@ -22,6 +22,15 @@ public sealed class NotificationState
         Changed?.Invoke();
     }
 
+    public void OpenPanel()
+    {
+        if (IsPanelOpen)
+            return;
+
+        IsPanelOpen = true;
+        Changed?.Invoke();
+    }
+
     public void MarkAllRead()
     {
         for (var index = 0; index < _items.Count; index++) _items[index] = _items[index] with { IsRead = true };

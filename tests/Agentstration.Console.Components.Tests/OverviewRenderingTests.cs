@@ -1,9 +1,11 @@
 using Agentstration.Flows;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Console;
+using Agentstration.Web.Components.State;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Bunit;
@@ -27,8 +29,10 @@ public sealed class OverviewRenderingTests
             api,
             new StubWorkClient(),
             api,
+            new StubExtensionsClient(),
             new StubModelProvidersClient(),
             NullLogger<PlatformDashboardService>.Instance));
+        context.Services.AddSingleton(new NotificationState());
         context.Services.AddSingleton<IAgentstrationEventStream>(eventStream);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
@@ -82,8 +86,10 @@ public sealed class OverviewRenderingTests
             api,
             work,
             api,
+            new StubExtensionsClient(),
             new StubModelProvidersClient(),
             NullLogger<PlatformDashboardService>.Instance));
+        context.Services.AddSingleton(new NotificationState());
         context.Services.AddSingleton<IAgentstrationEventStream>(new ControlledEventStream());
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
@@ -91,12 +97,54 @@ public sealed class OverviewRenderingTests
 
         rendered.WaitForAssertion(() =>
         {
-            var cards = rendered.FindAll(".overview-metric-grid > *");
+            var cards = rendered.FindAll(".overview-metric-grid .metric-card");
             var agents = cards[0];
-            var tasks = cards[4];
+            var tasks = cards[7];
             Assert.IsFalse(agents.ClassList.Contains("metric-card-loading"));
             Assert.IsTrue(tasks.ClassList.Contains("metric-card-loading"));
             Assert.IsTrue(work.IsSummaryPending);
+        });
+    }
+
+    [TestMethod]
+    public void OverviewGroupsMetricsAndRemovesDuplicateSourceNavigation()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        var api = new MockApiClient(TimeProvider.System);
+        var notifications = new NotificationState();
+        notifications.Add(new(Guid.NewGuid(), "Update ready", "A resource changed.", DateTimeOffset.UtcNow, UiStatus.Info));
+        context.Services.AddSingleton(new PlatformDashboardService(
+            api,
+            api,
+            new StubWorkClient(),
+            api,
+            new StubExtensionsClient(2),
+            new StubModelProvidersClient(),
+            NullLogger<PlatformDashboardService>.Instance));
+        context.Services.AddSingleton(notifications);
+        context.Services.AddSingleton<IAgentstrationEventStream>(new ControlledEventStream());
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Home>();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var rows = rendered.FindAll(".overview-metric-row");
+            Assert.HasCount(3, rows);
+            CollectionAssert.AreEqual(
+                new[] { "Defined agents", "Defined flows", "Extensions", "Model providers" },
+                rows[0].QuerySelectorAll(".metric-label").Select(item => item.TextContent.Trim()).ToArray());
+            CollectionAssert.AreEqual(
+                new[] { "Enabled triggers", "Agent runs", "Flow runs", "Tasks running" },
+                rows[1].QuerySelectorAll(".metric-label").Select(item => item.TextContent.Trim()).ToArray());
+            CollectionAssert.AreEqual(
+                new[] { "Ready deployments", "Needs attention", "Notifications" },
+                rows[2].QuerySelectorAll(".metric-label").Select(item => item.TextContent.Trim()).ToArray());
+            Assert.AreEqual("2", rows[0].QuerySelectorAll(".metric-card strong")[2].TextContent.Trim());
+            Assert.AreEqual("1", rows[2].QuerySelectorAll(".metric-card strong")[2].TextContent.Trim());
+            Assert.AreEqual("/#notifications", rows[2].QuerySelectorAll(".metric-card")[2].GetAttribute("href"));
+            Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find(".dashboard-sources"));
         });
     }
 
@@ -154,5 +202,18 @@ public sealed class OverviewRenderingTests
         public Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderStatusResponse> TestProviderAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class StubExtensionsClient(int count = 0) : IExtensionsClient
+    {
+        public Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ExtensionResponse>>([]);
+        public Task<IReadOnlyList<ExtensionInventoryItemResponse>> GetExtensionInventoryAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ExtensionInventoryItemResponse>>(Enumerable.Range(0, count).Select(index => new ExtensionInventoryItemResponse(
+                $"extension-{index}", $"Extension {index}", "default", null, null, $"Extension {index}", $"extension-{index}", "1.0.0", new Uri("http://localhost"), "configured", true, "available", null, null, null, [])).ToArray());
+        public Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ExtensionRegistrationResource>>([]);
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

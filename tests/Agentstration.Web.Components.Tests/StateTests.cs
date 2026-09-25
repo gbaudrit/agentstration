@@ -42,6 +42,20 @@ public sealed class StateTests
     }
 
     [TestMethod]
+    public void NotificationStateOpensPanelIdempotently()
+    {
+        var state = new NotificationState();
+        var changes = 0;
+        state.Changed += () => changes++;
+
+        state.OpenPanel();
+        state.OpenPanel();
+
+        Assert.IsTrue(state.IsPanelOpen);
+        Assert.AreEqual(1, changes);
+    }
+
+    [TestMethod]
     public async Task UserPreferencesStateLoadsAndPersistsSelectedTheme()
     {
         var client = new StubUserPreferencesClient(UserTheme.Light, "en-US");

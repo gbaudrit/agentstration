@@ -125,6 +125,7 @@ public partial class MainLayout
 
     protected override async Task OnInitializedAsync()
     {
+        OpenNotificationPanelFromLocation();
         Navigation.Changed += StateHasChanged;
         Preferences.Changed += StateHasChanged;
         Notifications.Changed += StateHasChanged;
@@ -269,11 +270,17 @@ public partial class MainLayout
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => _ = InvokeAsync(async () =>
     {
+        OpenNotificationPanelFromLocation();
         StateHasChanged();
         try { await JS.InvokeVoidAsync("window.scrollTo", 0, 0); }
         catch (JSDisconnectedException) { }
         catch (InvalidOperationException) { }
     });
+    private void OpenNotificationPanelFromLocation()
+    {
+        if (string.Equals(new Uri(NavigationManager.Uri).Fragment, "#notifications", StringComparison.OrdinalIgnoreCase))
+            Notifications.OpenPanel();
+    }
     private void OnContextChanged() => _ = InvokeAsync(StateHasChanged);
     private void OnPlatformStatusChanged() => _ = InvokeAsync(StateHasChanged);
 

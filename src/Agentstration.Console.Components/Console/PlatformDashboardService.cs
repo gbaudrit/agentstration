@@ -14,6 +14,7 @@ public sealed class PlatformDashboardService(
     IRuntimeApiClient runtime,
     IWorkApiClient work,
     IFlowApiClient flow,
+    IExtensionsClient extensions,
     IModelProvidersClient modelProviders,
     ILogger<PlatformDashboardService> logger) : IPlatformStatusProvider, IDisposable
 {
@@ -38,6 +39,7 @@ public sealed class PlatformDashboardService(
         var runtimeRunsTask = LoadAsync("Agents Run", token => runtime.GetRunsAsync(null, token), Array.Empty<RuntimeRun>(), cancellationToken);
         var workTask = LoadAsync("Work Tasks", token => work.GetTaskSummaryAsync(null, token), new WorkTaskOperationsCountersResponse(0, 0, 0, 0, 0), cancellationToken);
         var flowsTask = LoadAsync("Flows", flow.GetFlowsAsync, Array.Empty<FlowSummary>(), cancellationToken);
+        var extensionsTask = LoadAsync("Extensions", extensions.GetExtensionInventoryAsync, Array.Empty<ExtensionInventoryItemResponse>(), cancellationToken);
         var flowRunsTask = LoadAsync("Flow Runs", token => flow.GetFlowRunsAsync(null, token), Array.Empty<FlowRun>(), cancellationToken);
         var triggersTask = LoadAsync("Triggers", management.GetTriggersAsync, Array.Empty<TriggerResource>(), cancellationToken);
         var providersTask = LoadAsync("Model providers", modelProviders.GetModelProvidersAsync, Array.Empty<ModelProviderResponse>(), cancellationToken);
@@ -45,6 +47,8 @@ public sealed class PlatformDashboardService(
 
         return new(
             ToMetricAsync(agentsTask, agents => new(FormatCount(agents.Count), null, UiStatus.Info)),
+            ToMetricAsync(flowsTask, flows => new(FormatCount(flows.Count), null, UiStatus.Info)),
+            ToMetricAsync(extensionsTask, inventory => new(FormatCount(inventory.Count), null, UiStatus.Info)),
             ToMetricAsync(deploymentsTask, deployments =>
             {
                 var desired = deployments.Where(IsDesiredRunning).ToArray();

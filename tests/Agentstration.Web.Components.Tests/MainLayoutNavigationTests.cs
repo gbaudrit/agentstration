@@ -66,6 +66,18 @@ public sealed class MainLayoutNavigationTests
         Assert.AreEqual(1, rendered.FindAll(".side-nav a[href='/deployments']").Count);
     }
 
+    [TestMethod]
+    public void NotificationFragmentOpensNotificationPanel()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(AllNavigationPermissions);
+        var rendered = RenderLayout(context);
+
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/#notifications");
+
+        rendered.WaitForAssertion(() => Assert.IsNotNull(rendered.Find("[data-testid='console-notifications-panel']")));
+    }
+
     private static readonly IReadOnlySet<string> AllNavigationPermissions = new HashSet<string>(
         ["resources/read", "resources/delete", "runs/read", "runs/delete"],
         StringComparer.Ordinal);

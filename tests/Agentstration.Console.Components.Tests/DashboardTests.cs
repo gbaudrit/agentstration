@@ -46,6 +46,7 @@ public sealed class DashboardTests
             fake,
             new StubWorkClient(new(2, 3, 1, 4, 5)),
             fake,
+            new StubExtensionsClient(),
             providers,
             NullLogger<PlatformDashboardService>.Instance);
 
@@ -76,6 +77,7 @@ public sealed class DashboardTests
             new FailingRuntimeClient(),
             new StubWorkClient(new(2, 0, 0, 0, 0)),
             fake,
+            new StubExtensionsClient(),
             new StubModelProvidersClient([]),
             NullLogger<PlatformDashboardService>.Instance);
 
@@ -98,6 +100,7 @@ public sealed class DashboardTests
             fake,
             new StubWorkClient(new(0, 0, 0, 0, 0)),
             fake,
+            new StubExtensionsClient(),
             new StubModelProvidersClient([]),
             NullLogger<PlatformDashboardService>.Instance);
 
@@ -120,6 +123,7 @@ public sealed class DashboardTests
             fake,
             new StubWorkClient(new(0, 0, 0, 0, 0)),
             fake,
+            new StubExtensionsClient(),
             new StubModelProvidersClient([]),
             NullLogger<PlatformDashboardService>.Instance);
 
@@ -149,6 +153,7 @@ public sealed class DashboardTests
             fake,
             work,
             fake,
+            new StubExtensionsClient(),
             new StubModelProvidersClient([]),
             NullLogger<PlatformDashboardService>.Instance);
         var sharedLoad = service.StartShared();
@@ -265,6 +270,17 @@ public sealed class DashboardTests
         public Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderStatusResponse> TestProviderAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class StubExtensionsClient : IExtensionsClient
+    {
+        public Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ExtensionResponse>>([]);
+        public Task<IReadOnlyList<ExtensionInventoryItemResponse>> GetExtensionInventoryAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ExtensionInventoryItemResponse>>([]);
+        public Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ExtensionRegistrationResource>>([]);
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class StubWorkClient(WorkTaskOperationsCountersResponse counters) : IWorkApiClient
