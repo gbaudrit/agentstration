@@ -54,6 +54,7 @@ public sealed class ModelProviderNavigationTests
 
         rendered.Find("#model-provider-configuration-tab").Click();
         Assert.IsNotNull(rendered.Find("[data-testid='model-provider-form']"));
+        Assert.AreEqual("true", rendered.Find("#model-provider-configuration-tab").GetAttribute("data-interactive"));
         Assert.IsFalse(rendered.Markup.Contains("data-testid=\"model-provider-refresh\"", StringComparison.Ordinal));
         rendered.Find("#model-provider-overview-tab").Click();
         rendered.Find("[data-testid='model-provider-refresh']").Click();
@@ -123,6 +124,34 @@ public sealed class ModelProviderNavigationTests
             Assert.IsTrue(context.Services.GetRequiredService<NotificationState>().Items.Any(item =>
                 item.Title.Contains("initial discovery failed", StringComparison.OrdinalIgnoreCase)
                 && item.Status == UiStatus.Warning));
+        });
+    }
+
+    [TestMethod]
+    public async Task CreatingProviderKeepsUnconfiguredOptionalRequirementEditableAfterNavigation()
+    {
+        using var culture = new TestCultureScope("en-US");
+        ExtensionResponse extension = new(
+            RegistrationName: "typed-extension", RegistrationNamespace: ResourceNamespace.DefaultValue,
+            Endpoint: new Uri("http://localhost:5000"), Status: "available",
+            Extension: new ExtensionIdentityResponse("typed.extension", "Typed extension", "1.0.0", null),
+            Contributions: [new ExtensionContributionResponse("model-provider", "typed")],
+            OptionSets: [], Usages: [], Providers: [], Details: null, DiscoverySource: "manual",
+            ValueRequirements: [new("model-provider", "typed", "apiVersion", false, "string", "standard", "API version")]);
+        using var context = CreateContext(out _, [extension]);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelproviders/new?extension=typed-extension&extensionNamespace=default&contributionId=typed");
+        var rendered = context.Render<ModelProviderDetails>();
+        rendered.WaitForElement("[data-testid='model-provider-name']").Change("typed-provider");
+        rendered.Find("[data-testid='model-provider-display-name']").Change("Typed provider");
+
+        await rendered.Find("[data-testid='model-provider-form']").SubmitAsync();
+        rendered.Find("#model-provider-configuration-tab").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsNotNull(rendered.Find("[data-testid='model-provider-form']"));
+            Assert.IsNotNull(rendered.Find("[data-requirement-id='apiVersion']"));
         });
     }
 
