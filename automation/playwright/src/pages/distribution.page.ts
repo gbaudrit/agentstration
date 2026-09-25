@@ -12,6 +12,8 @@ export interface PackProjectDefinition {
   name: string;
   version: string;
   displayName: string;
+  resourceKind?: string;
+  resourceName?: string;
 }
 
 export class DistributionPage {
@@ -71,7 +73,7 @@ export class DistributionPage {
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectVersion), project.version);
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectDisplayName), project.displayName);
     await expect(this.page.getByTestId(TestIds.distribution.packProjectName)).toHaveValue(project.name);
-    const add = this.page.locator('[data-resource-kind="Flow"][data-resource-name="system-direct-agent-dotnet-expert"]')
+    const add = this.page.locator(`[data-resource-kind="${project.resourceKind ?? 'Flow'}"][data-resource-name="${project.resourceName ?? 'system-direct-agent-dotnet-expert'}"]`)
       .getByTestId(TestIds.distribution.packProjectAddResource);
     await add.waitFor({ state: 'visible' });
     await add.click();
@@ -96,6 +98,12 @@ export class DistributionPage {
   public async buildPackProject(): Promise<void> {
     await this.page.getByTestId(TestIds.distribution.packProjectBuild).click();
     await this.page.locator(`[data-testid="${TestIds.distribution.packProjectStatus}"][data-state="success"]`).waitFor({ state: 'visible' });
+  }
+
+  public async installPackProject(): Promise<string> {
+    await this.page.getByTestId(TestIds.distribution.packProjectInstall).click();
+    await this.page.getByTestId(TestIds.distribution.packProjectStatus).waitFor({ state: 'visible' });
+    return this.page.getByTestId(TestIds.distribution.packProjectNamespace).innerText();
   }
 
   public sourceDetails(publisher: string, name: string): Locator {

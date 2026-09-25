@@ -83,7 +83,7 @@ else
         <aside class="panel studio-install">
             <div class="panel-header"><div><p class="eyebrow">@T("LocalDeployment")</p><h2>@T("CurrentWorkspace")</h2></div></div>
             <strong>@(ContextState.Current?.WorkspaceDisplayName ?? T("CurrentWorkspace"))</strong>
-            @if (preview is not null) { <p class="studio-namespace"><span>@T("Namespace")</span><code>@preview.Namespace</code></p> }
+            @if (preview is not null) { <p class="studio-namespace"><span>@T("Namespace")</span><code data-testid="pack-project-namespace">@preview.Namespace</code></p> }
             <p class="studio-hint">@T("StoredBuildHelp")</p>
             @if (selectedBuild is null)
             {
@@ -159,7 +159,7 @@ else
                     <p class="studio-warning">@T("ModifiedResourcesPreserved")</p>
                 }
             }
-            <button class="button-primary" disabled="@(selectedBuild is null || busy || !CanInstall)" @onclick="InstallAsync">@(installing ? T("Installing") : T("InstallLocally"))</button>
+            <button class="button-primary" data-testid="pack-project-install" disabled="@(selectedBuild is null || busy || !CanInstall)" @onclick="InstallAsync">@(installing ? T("Installing") : T("InstallLocally"))</button>
         </aside>
     </section>
 

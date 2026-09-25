@@ -22,6 +22,16 @@ export class AgentEditorPage {
     await this.page.locator(`[data-testid="${TestIds.agentEditor.form}"][data-interactive="true"]`).waitFor({ state: 'visible' });
   }
 
+  public async open(consoleUrl: string, namespace: string, name: string): Promise<void> {
+    const response = await this.page.goto(`${consoleUrl}/agents/${encodeURIComponent(name)}?namespace=${encodeURIComponent(namespace)}`, { waitUntil: 'domcontentloaded' });
+    if (!response?.ok()) throw new Error(`Agent page returned HTTP ${response?.status() ?? 'no response'}.`);
+    await this.form.waitFor({ state: 'visible' });
+  }
+
+  public async saveDraft(): Promise<void> {
+    await this.page.getByTestId(TestIds.agentEditor.saveDraft).click();
+  }
+
   public async fillIdentity(agent: Pick<AgentDefinition, 'name' | 'displayName' | 'description'>): Promise<void> {
     await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.name), agent.name);
     await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.displayName), agent.displayName);

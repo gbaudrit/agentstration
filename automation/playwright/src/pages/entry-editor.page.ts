@@ -51,6 +51,17 @@ export class EntryEditorPage {
     ).waitFor({ state: 'visible' });
   }
 
+  public async open(consoleUrl: string, namespace: string, name: string): Promise<void> {
+    const response = await this.page.goto(`${consoleUrl}/namespaces/${encodeURIComponent(namespace)}/entries/${encodeURIComponent(name)}?view=definition`, { waitUntil: 'domcontentloaded' });
+    if (!response?.ok()) throw new Error(`Entry page returned HTTP ${response?.status() ?? 'no response'}.`);
+    await this.definitionFields.waitFor({ state: 'visible' });
+  }
+
+  public async saveDraft(): Promise<void> {
+    await this.page.getByTestId(TestIds.entryEditor.saveDraft).click();
+    await expect(this.status).toHaveAttribute('data-state', 'draft');
+  }
+
   public async fillIdentity(entry: Pick<EntryDefinition, 'name' | 'displayName' | 'description'>): Promise<void> {
     await fillAndCommit(this.page.getByTestId(TestIds.entryEditor.name), entry.name);
     await fillAndCommit(this.page.getByTestId(TestIds.entryEditor.displayName), entry.displayName);
