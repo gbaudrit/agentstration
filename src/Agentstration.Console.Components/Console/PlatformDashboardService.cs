@@ -143,17 +143,18 @@ public sealed class PlatformDashboardService(
         var attention = new List<ComponentHealth>();
         attention.AddRange(deploymentAttention);
         if (tasks.Value.ActionRequired > 0)
-            attention.Add(new("tasks-action-required", "Action required", $"{tasks.Value.ActionRequired} awaiting input", UiStatus.Warning));
+            attention.Add(new("tasks-action-required", "Action required", $"{tasks.Value.ActionRequired} awaiting input", UiStatus.Warning, "/tasks?hasPendingAction=true"));
         if (tasks.Value.Failed > 0)
-            attention.Add(new("tasks-failed", "Failed", $"{tasks.Value.Failed} failed tasks", UiStatus.Danger));
+            attention.Add(new("tasks-failed", "Failed", $"{tasks.Value.Failed} failed tasks", UiStatus.Danger, "/tasks?status=Failed"));
         if (failedTriggers > 0)
-            attention.Add(new("triggers-failed", "Failed", $"{failedTriggers} failed triggers", UiStatus.Danger));
+            attention.Add(new("triggers-failed", "Failed", $"{failedTriggers} failed triggers", UiStatus.Danger, "/triggers"));
         attention.AddRange(waitingFlowRuns.Select(ToFlowRunAttention));
         attention.AddRange(unavailableProviders.Select(provider => new ComponentHealth(
             $"provider-{provider.Name}",
             ModelManagementUi.Label(provider.Properties.Status),
             provider.Properties.LastCheckedAt is { } checkedAt ? $"Last checked {checkedAt.LocalDateTime:g}" : "Status unavailable",
-            ModelManagementUi.Status(provider.Properties.Status))));
+            ModelManagementUi.Status(provider.Properties.Status),
+            $"/modelproviders/{Uri.EscapeDataString(provider.Name)}")));
 
         var sources = new[]
         {
@@ -255,7 +256,7 @@ public sealed class PlatformDashboardService(
             ?? (deployment.ObservedRevision is not null && !string.Equals(deployment.ObservedRevision, deployment.Revision, StringComparison.Ordinal)
                 ? $"Observed {deployment.ObservedRevision}; desired {deployment.Revision}"
                 : $"Desired Running; observed {deployment.Status}");
-        return new(deployment.Id, deployment.Status, detail, severity);
+        return new(deployment.Id, deployment.Status, detail, severity, "/deployments");
     }
 
     private static ComponentHealth ToFlowRunAttention(FlowRun run) => new(

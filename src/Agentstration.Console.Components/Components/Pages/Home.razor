@@ -46,7 +46,7 @@ else if (load is not null)
     </div>
     <section class="dashboard-grid">
         <LatestRunEvents />
-        <article class="panel" id="needs-attention"><div class="panel-header"><h2>@T("NeedsAttention")</h2><a href="/deployments">@T("Deployments") →</a></div>@if (snapshot is null) { <LoadingState Message="@T("LoadingAttention")" /> } else if (snapshot.AttentionItems.Count == 0) { <EmptyState Title="@T("NoIssues")" Message="" /> } else { <div class="health-list">@foreach (var component in snapshot.AttentionItems) { if (component.Url is not null) { <a class="attention-item" href="@component.Url"><HealthIndicator Label="@component.Name" StatusText="@component.Detail" Status="@component.Severity" /></a> } else { <HealthIndicator Label="@component.Name" StatusText="@component.Detail" Status="@component.Severity" /> } }</div> }</article>
+        <article class="panel" id="needs-attention" tabindex="-1"><div class="panel-header"><h2>@T("NeedsAttention")</h2></div>@if (snapshot is null) { <LoadingState Message="@T("LoadingAttention")" /> } else if (snapshot.AttentionItems.Count == 0) { <EmptyState Title="@T("NoIssues")" Message="" /> } else { <div class="health-list">@foreach (var component in snapshot.AttentionItems) { <a class="attention-item" href="@component.Url"><HealthIndicator Label="@component.Name" StatusText="@component.Detail" Status="@component.Severity" /><span class="attention-item-arrow" aria-hidden="true">→</span></a> }</div> }</article>
     </section>
 }
 </div>

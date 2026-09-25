@@ -66,6 +66,12 @@ public sealed class DashboardTests
         Assert.AreEqual(10, snapshot.AttentionCount);
         Assert.AreEqual("Attention required", snapshot.Status);
         Assert.IsTrue(snapshot.Sources.All(source => source.Severity == UiStatus.Success));
+        Assert.IsTrue(snapshot.AttentionItems.All(item => !string.IsNullOrWhiteSpace(item.Url)));
+        Assert.AreEqual("/deployments", snapshot.AttentionItems.Single(item => item.Name == "deployment-failed").Url);
+        Assert.AreEqual("/tasks?hasPendingAction=true", snapshot.AttentionItems.Single(item => item.Name == "tasks-action-required").Url);
+        Assert.AreEqual("/tasks?status=Failed", snapshot.AttentionItems.Single(item => item.Name == "tasks-failed").Url);
+        Assert.AreEqual("/triggers", snapshot.AttentionItems.Single(item => item.Name == "triggers-failed").Url);
+        Assert.AreEqual("/modelproviders/unavailable-provider", snapshot.AttentionItems.Single(item => item.Name == "provider-unavailable-provider").Url);
     }
 
     [TestMethod]

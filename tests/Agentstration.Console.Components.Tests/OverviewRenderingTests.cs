@@ -1,8 +1,11 @@
+using Agentstration.Agents;
+using Agentstration.Agents.Contracts;
 using Agentstration.Flows;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
+using Agentstration.Triggers;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Console;
 using Agentstration.Web.Components.State;
@@ -148,6 +151,35 @@ public sealed class OverviewRenderingTests
         });
     }
 
+    [TestMethod]
+    public void AttentionTileAndItemsExposeKeyboardAccessibleNavigation()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        var api = new MockApiClient(TimeProvider.System);
+        context.Services.AddSingleton(new PlatformDashboardService(
+            new StubManagementClientWithAttention(),
+            api,
+            new StubWorkClient(),
+            api,
+            new StubExtensionsClient(),
+            new StubModelProvidersClient(),
+            NullLogger<PlatformDashboardService>.Instance));
+        context.Services.AddSingleton(new NotificationState());
+        context.Services.AddSingleton<IAgentstrationEventStream>(new ControlledEventStream());
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Home>();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("/#needs-attention", rendered.Find("a.metric-card[href='/#needs-attention']").GetAttribute("href"));
+            var attention = rendered.Find("#needs-attention");
+            Assert.AreEqual("-1", attention.GetAttribute("tabindex"));
+            Assert.AreEqual("/deployments", attention.QuerySelector("a.attention-item")?.GetAttribute("href"));
+        });
+    }
+
     private sealed class ControlledEventStream : IAgentstrationEventStream
     {
         private readonly TaskCompletionSource<IReadOnlyList<EventListItem>> completion =
@@ -215,5 +247,18 @@ public sealed class OverviewRenderingTests
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class StubManagementClientWithAttention : IManagementApiClient
+    {
+        public Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<AgentSummary>>([]);
+        public Task<IReadOnlyList<DeploymentSummary>> GetDeploymentsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<DeploymentSummary>>([
+            new("deployment-a", "agent-a", "default", "Failed", "Running", "local", "local", "default", "revision-1", "revision-1", DateTimeOffset.UtcNow, "Runtime unavailable")
+        ]);
+        public Task<IReadOnlyList<TriggerResource>> GetTriggersAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<TriggerResource>>([]);
+        public Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteAgentAsync(string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ManagementSummary> GetSummaryAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }
