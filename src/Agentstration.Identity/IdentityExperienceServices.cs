@@ -34,7 +34,8 @@ public sealed class IdentityAdministrationService(
     IIdentityStore store,
     ICurrentRequestContext requestContext,
     IAuthorizationService authorization,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IWorkspaceProvisioner workspaceProvisioner)
 {
     public async Task<TenantAdministrationView> GetCurrentAsync(CancellationToken cancellationToken)
     {
@@ -73,11 +74,12 @@ public sealed class IdentityAdministrationService(
         if (await store.FindWorkspaceByNameAsync(context.TenantId, name, cancellationToken) is not null)
             throw new ResourceConcurrencyException($"Workspace '{name}' already exists in the current tenant.");
         var now = timeProvider.GetUtcNow();
-        var workspace = new Workspace(Guid.NewGuid(), context.TenantId, name, displayName, WorkspaceStatus.Active, now);
+        var workspace = new Workspace(Guid.NewGuid(), context.TenantId, name, displayName, WorkspaceStatus.Initializing, now);
         await store.AddWorkspaceAsync(workspace, cancellationToken);
         if (!await store.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken))
             await store.AddWorkspaceMembershipAsync(new WorkspaceMembership(Guid.NewGuid(), workspace.Id, context.PrincipalId, MembershipStatus.Active, now), cancellationToken);
-        return workspace;
+        await workspaceProvisioner.ProvisionAsync(workspace, cancellationToken);
+        return workspace with { Status = WorkspaceStatus.Active };
     }
 }
 

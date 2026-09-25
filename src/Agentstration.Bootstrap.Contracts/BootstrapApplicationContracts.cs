@@ -9,6 +9,31 @@ public static class BootstrapKinds
 {
     public const string BootstrapProfile = "BootstrapProfile";
     public const string BootstrapApplication = "BootstrapApplication";
+    public const string InstanceInitialization = "InstanceInitialization";
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<InstanceInitializationStatus>))]
+public enum InstanceInitializationStatus
+{
+    [JsonStringEnumMemberName("initializing")] Initializing,
+    [JsonStringEnumMemberName("ready")] Ready,
+    [JsonStringEnumMemberName("failed")] Failed
+}
+
+public sealed record InstanceInitializationProperties
+{
+    public int TargetVersion { get; init; }
+    public InstanceInitializationStatus Status { get; init; }
+    public string? OwnerInstanceId { get; init; }
+    public DateTimeOffset? LeaseExpiresAt { get; init; }
+    public long FencingToken { get; init; }
+    public DateTimeOffset UpdatedAt { get; init; }
+    public string? LastError { get; init; }
+}
+
+public sealed record InstanceInitializationResource : Resource
+{
+    public InstanceInitializationProperties Definition { get; init; } = new();
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<BootstrapApplicationSource>))]

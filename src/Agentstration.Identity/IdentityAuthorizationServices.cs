@@ -11,7 +11,8 @@ public sealed class PlatformAuthorizationService(IIdentityStore store) : IPlatfo
 public sealed class LocalEnvironmentBootstrapper(
     IIdentityStore store,
     TimeProvider timeProvider,
-    LocalBootstrapOptions options) : ILocalEnvironmentBootstrapper
+    LocalBootstrapOptions options,
+    IWorkspaceProvisioner workspaceProvisioner) : ILocalEnvironmentBootstrapper
 {
     public static readonly Guid OwnerRoleId = new("65c86c44-4c42-4e33-91d4-2d8d13bdd681");
 
@@ -28,7 +29,7 @@ public sealed class LocalEnvironmentBootstrapper(
         var workspace = await store.FindWorkspaceByNameAsync(tenant.Id, options.WorkspaceName, cancellationToken);
         if (workspace is null)
         {
-            workspace = new Workspace(Guid.NewGuid(), tenant.Id, options.WorkspaceName, options.WorkspaceDisplayName, WorkspaceStatus.Active, now);
+            workspace = new Workspace(Guid.NewGuid(), tenant.Id, options.WorkspaceName, options.WorkspaceDisplayName, WorkspaceStatus.Initializing, now);
             await store.AddWorkspaceAsync(workspace, cancellationToken);
         }
 
@@ -61,6 +62,12 @@ public sealed class LocalEnvironmentBootstrapper(
         if (options.GrantPlatformAdministrator
             && !await store.IsPlatformAdministratorAsync(principal.Id, cancellationToken))
             await store.AddPlatformAdministratorAsync(new PlatformAdministrator(principal.Id, now), cancellationToken);
+
+        if (workspace.Status == WorkspaceStatus.Initializing)
+        {
+            await workspaceProvisioner.ProvisionAsync(workspace, cancellationToken);
+            workspace = workspace with { Status = WorkspaceStatus.Active };
+        }
 
         return new RequestContext(principal.Id, tenant.Id, workspace.Id);
     }

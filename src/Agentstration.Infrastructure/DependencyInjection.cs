@@ -77,6 +77,9 @@ public static class DependencyInjection
         services.TryAddSingleton<ICurrentRequestContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton<IRequestContextScopeFactory>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton<ITriggerExecutionContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
+        services.TryAddSingleton<IResourceReferenceResolver, ResourceReferenceResolver>();
+        services.TryAddSingleton<ResourceScopeOperationService>();
+        services.TryAddSingleton<IResourceScopeOperations>(provider => provider.GetRequiredService<ResourceScopeOperationService>());
         services.TryAddSingleton(new GenAiObservabilityOptions());
         services.TryAddTransient<GenAiHttpPayloadCaptureHandler>();
         services.AddSingleton<IManagementEventPublisher, InProcessManagementEventPublisher>();
@@ -96,6 +99,11 @@ public static class DependencyInjection
         storageOptions ??= new AgentstrationStorageOptions();
         var storageProvider = storageOptions.GetProvider();
         services.AddSingleton(storageOptions);
+        services.AddSingleton<InstanceInitializationOptions>();
+        services.AddSingleton<IInstanceInitializationCoordinator, InstanceInitializationCoordinator>();
+        services.AddSingleton<WorkspacePlatformResourceProvisioner>();
+        services.AddSingleton<IWorkspacePlatformResourceProvisioner>(provider => provider.GetRequiredService<WorkspacePlatformResourceProvisioner>());
+        services.AddSingleton<IWorkspaceProvisioner>(provider => provider.GetRequiredService<WorkspacePlatformResourceProvisioner>());
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
             services.AddSingleton<IAgentstrationStorageInitializer, PostgreSqlStorageInitializer>();
         else
@@ -343,7 +351,7 @@ public static class DependencyInjection
         services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<WorkNotificationMcpToolDefinitionProvider>());
         services.AddSingleton<WorkNotificationMcpTool>();
         services.AddSingleton(provider => new AssistantDocumentationCatalog(
-            Path.Combine(provider.GetRequiredService<IHostEnvironment>().ContentRootPath, "docs")));
+            Path.Combine(provider.GetService<IHostEnvironment>()?.ContentRootPath ?? dataDirectory, "docs")));
         AddInternalTool<AssistantDocumentationMcpTool>(services);
         AddInternalTool<AssistantDiagnosticsMcpTool>(services);
         AddInternalTool<DateTimeMcpTool>(services);
