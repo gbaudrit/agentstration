@@ -33,7 +33,7 @@ definition:
         required: true
         order: 0
         role: primaryInput
-  binding: { kind: flow, resourceId: assistant-router }
+  binding: { kind: flow, resourceId: assistant-router, namespace: agentstration.assistant }
   behavior:
     taskCreationMode: automatic
     allowConversation: true

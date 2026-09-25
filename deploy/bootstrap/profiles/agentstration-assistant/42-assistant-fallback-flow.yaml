@@ -8,7 +8,7 @@ definition:
   description: Returns a bounded clarification without guessing a capability or platform state.
   version: 1.0.0
   enabled: true
-  spec: { flowKind: direct, target: { kind: agent, id: assistant-fallback } }
+  spec: { flowKind: direct, target: { kind: agent, id: assistant-fallback, namespace: agentstration.assistant } }
   graph:
     entryStep: input
     inputSchema:
@@ -22,7 +22,7 @@ definition:
       - type: agent
         name: clarify
         displayName: Ask for clarification
-        agent: { resourceId: assistant-fallback }
+        agent: { resourceId: assistant-fallback, namespace: agentstration.assistant }
       - { type: output, name: output, displayName: Clarification }
     transitions:
       - { id: input-to-clarify, fromStep: input, event: completed, toStep: clarify }
