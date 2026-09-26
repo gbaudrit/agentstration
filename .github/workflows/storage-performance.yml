@@ -41,7 +41,7 @@ jobs:
       AGENTSTRATION_STORAGE_BENCHMARK_PROVIDER: ${{ matrix.provider }}
       AGENTSTRATION_STORAGE_BENCHMARK_OPERATIONS: 500
       AGENTSTRATION_STORAGE_BENCHMARK_CONCURRENCY: 16
-      AGENTSTRATION_STORAGE_BENCHMARK_REPORT: ${{ runner.temp }}/storage-benchmark-${{ matrix.provider }}.json
+      AGENTSTRATION_STORAGE_BENCHMARK_REPORT: ${{ github.workspace }}/storage-benchmark-${{ matrix.provider }}.json
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -64,5 +64,5 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: storage-benchmark-${{ matrix.provider }}-full
-          path: ${{ runner.temp }}/storage-benchmark-${{ matrix.provider }}.json
+          path: ${{ env.AGENTSTRATION_STORAGE_BENCHMARK_REPORT }}
           if-no-files-found: error
