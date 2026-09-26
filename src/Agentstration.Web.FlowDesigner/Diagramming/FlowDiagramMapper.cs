@@ -7,10 +7,15 @@ namespace Agentstration.Web.FlowDesigner.Diagramming;
 
 public sealed class FlowDiagramNode : NodeModel
 {
+    public const double RenderedWidth = 220;
+    public const double RenderedHeight = 96;
+
     public FlowDiagramNode(FlowDesignerNode source) : base(source.Name, new Point(source.Position.X, source.Position.Y))
     {
         Source = source;
         Title = source.DisplayName;
+        ControlledSize = true;
+        Size = new Size(RenderedWidth, RenderedHeight);
         Input = AddPort(PortAlignment.Left);
         Output = AddPort(PortAlignment.Right);
     }

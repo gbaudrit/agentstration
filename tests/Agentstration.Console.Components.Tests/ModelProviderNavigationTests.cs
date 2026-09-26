@@ -156,6 +156,35 @@ public sealed class ModelProviderNavigationTests
     }
 
     [TestMethod]
+    public void ProviderDetailsKeepsConfigurationDisabledUntilRouteReloadIsConsistent()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(out var providers);
+        var rendered = context.Render<ModelProviderDetails>(parameters => parameters
+            .Add(component => component.Name, "ollama/local"));
+        rendered.WaitForElement("#model-provider-configuration-tab[data-interactive='true']");
+        providers.DelayUsages();
+
+        rendered.Render(parameters => parameters
+            .Add(component => component.Name, "ollama/reloaded"));
+
+        rendered.WaitForAssertion(() =>
+        {
+            var configuration = rendered.Find("#model-provider-configuration-tab");
+            Assert.AreEqual("false", configuration.GetAttribute("data-interactive"));
+            Assert.IsTrue(configuration.HasAttribute("disabled"));
+        });
+
+        providers.CompleteUsages();
+        rendered.WaitForAssertion(() =>
+        {
+            var configuration = rendered.Find("#model-provider-configuration-tab");
+            Assert.AreEqual("true", configuration.GetAttribute("data-interactive"));
+            Assert.IsFalse(configuration.HasAttribute("disabled"));
+        });
+    }
+
+    [TestMethod]
     public void NewProviderDisplaysCanonicalRequirementTypeAndFormat()
     {
         using var culture = new TestCultureScope("fr-FR");
@@ -410,6 +439,13 @@ public sealed class ModelProviderNavigationTests
         public int RefreshCalls { get; private set; }
         public string? RefreshedProvider { get; private set; }
         public bool FailRefresh { get; set; }
+        private TaskCompletionSource<ModelProviderUsagesResponse>? usagesCompletion;
+
+        public void DelayUsages() =>
+            usagesCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void CompleteUsages() =>
+            usagesCompletion!.SetResult(new ModelProviderUsagesResponse([], 0));
 
         public Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ModelProviderResponse>>([
@@ -422,7 +458,7 @@ public sealed class ModelProviderNavigationTests
             Task.FromResult(new ResourceSnapshot<ModelProviderResource>(ProviderResource(providerName), "\"provider-etag\""));
 
         public Task<ModelProviderUsagesResponse> GetModelProviderUsagesAsync(string providerName, CancellationToken cancellationToken) =>
-            Task.FromResult(new ModelProviderUsagesResponse([], 0));
+            usagesCompletion?.Task ?? Task.FromResult(new ModelProviderUsagesResponse([], 0));
 
         public Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(string providerName, CancellationToken cancellationToken) =>
             GetProviderModelsAsync(ResourceNamespace.Default, providerName, cancellationToken);
