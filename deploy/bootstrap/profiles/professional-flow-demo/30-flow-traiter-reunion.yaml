@@ -1,0 +1,110 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: traiter-reunion
+  namespace: demo.flows-professionnels
+definition:
+  displayName: Traiter une réunion
+  description: Analyse des notes de réunion et compose les capacités communes de compte-rendu, actions, tâches et communication.
+  version: 1.0.0
+  enabled: true
+  spec:
+    flowKind: direct
+    target: { kind: agent, id: analyste-reunion, namespace: demo.flows-professionnels }
+  graph:
+    entryStep: entree
+    inputSchema:
+      type: object
+      properties:
+        notes: { type: string, minLength: 1, maxLength: 16000 }
+      required: [notes]
+      additionalProperties: false
+    steps:
+      - { type: input, name: entree, displayName: Notes de réunion }
+      - type: agent
+        name: analyserReunion
+        displayName: Analyser la réunion
+        agent: { resourceId: analyste-reunion, namespace: demo.flows-professionnels }
+        inputMapping:
+          operation: Analyser la réunion
+          notes: "${input.notes}"
+      - type: flow
+        name: extraireActions
+        displayName: Extraire les actions
+        flow: { resourceId: extraire-actions, namespace: demo.flows-professionnels, versionStrategy: active }
+        inputMapping:
+          contexte: Réunion
+          contenu: "${input.notes}"
+          analyse: "${steps.analyserReunion.output}"
+      - type: flow
+        name: creerTaches
+        displayName: Créer les tâches
+        flow: { resourceId: creer-taches, namespace: demo.flows-professionnels, versionStrategy: active }
+        inputMapping:
+          contexte: Réunion
+          actions: "${steps.extraireActions.output.actions}"
+      - type: flow
+        name: genererCompteRendu
+        displayName: Générer un compte-rendu
+        flow: { resourceId: generer-compte-rendu, namespace: demo.flows-professionnels, versionStrategy: active }
+        inputMapping:
+          typeContexte: Réunion
+          contenuSource: "${input.notes}"
+          analyse: "${steps.analyserReunion.output}"
+          actions: "${steps.extraireActions.output.actions}"
+          taches: "${steps.creerTaches.output.taches}"
+      - type: flow
+        name: preparerCommunication
+        displayName: Préparer une communication
+        flow: { resourceId: preparer-communication, namespace: demo.flows-professionnels, versionStrategy: active }
+        inputMapping:
+          contexte: Réunion projet
+          publicCible: Participants à la réunion
+          objectif: Partager les décisions, les points d'attention et les prochaines actions.
+          informationsImportantes:
+            compteRendu: "${steps.genererCompteRendu.output.compteRendu}"
+            actions: "${steps.extraireActions.output.actions}"
+            taches: "${steps.creerTaches.output.taches}"
+      - type: agent
+        name: synthese
+        displayName: Produire le bilan final
+        agent: { resourceId: redacteur-professionnel, namespace: demo.flows-professionnels }
+        inputMapping:
+          operation: Synthèse finale
+          typeContexte: Réunion
+          titre: Réunion projet — 25 septembre
+          analyse: "${steps.analyserReunion.output}"
+          compteRendu: "${steps.genererCompteRendu.output.compteRendu}"
+          actions: "${steps.extraireActions.output.actions}"
+          taches: "${steps.creerTaches.output.taches}"
+          communication: "${steps.preparerCommunication.output.communication}"
+      - type: output
+        name: resultat
+        displayName: Réunion traitée
+        outputMapping:
+          finalOutput: "${steps.synthese.output}"
+          compteRendu: "${steps.genererCompteRendu.output.compteRendu}"
+          actions: "${steps.extraireActions.output.actions}"
+          taches: "${steps.creerTaches.output.taches}"
+          communication: "${steps.preparerCommunication.output.communication}"
+    transitions:
+      - { id: entree-vers-analyse, fromStep: entree, event: completed, toStep: analyserReunion }
+      - { id: analyse-vers-actions, fromStep: analyserReunion, event: completed, toStep: extraireActions }
+      - { id: actions-vers-taches, fromStep: extraireActions, event: completed, toStep: creerTaches }
+      - { id: taches-vers-compte-rendu, fromStep: creerTaches, event: completed, toStep: genererCompteRendu }
+      - { id: compte-rendu-vers-communication, fromStep: genererCompteRendu, event: completed, toStep: preparerCommunication }
+      - { id: communication-vers-synthese, fromStep: preparerCommunication, event: completed, toStep: synthese }
+      - { id: synthese-vers-resultat, fromStep: synthese, event: completed, toStep: resultat }
+    outputSchema:
+      type: object
+      properties:
+        finalOutput: { type: string }
+        compteRendu: { type: string }
+        actions: { type: string }
+        taches: { type: string }
+        communication: { type: string }
+      required: [finalOutput, compteRendu, actions, taches, communication]
+      additionalProperties: false
+  metadata: { bootstrapProfile: professional-flow-demo, process: meeting }
+  publish: true
+  activate: true

@@ -1,0 +1,51 @@
+apiVersion: agentstration.io/v1
+kind: Entry
+metadata:
+  name: analyser-incident
+  namespace: demo.flows-professionnels
+definition:
+  displayName: Analyser un incident
+  description: Qualifie un incident et produit compte-rendu, actions, tâches préparées et communication utilisateurs.
+  exposure:
+    version: 1
+    surfaces: [console]
+    workplacePlacements: []
+  presentation:
+    kind: prompt
+    placeholder: Décrivez l'incident et les éléments techniques disponibles…
+    icon: briefcase
+    allowAttachments: false
+    allowVoiceInput: false
+    participants: { visibility: hidden }
+    progress: { visibility: compact }
+    task: { display: auto }
+    results: { display: auto }
+    suggestions:
+      - label: Erreurs intermittentes sur les commandes
+        value: |
+          Incident détecté le 25 septembre 2026 à 14 h 07 sur le service de création de commandes. Depuis le déploiement de la version 2.18.0 à 13 h 45, environ 18 % des requêtes POST /orders retournent une erreur HTTP 500. Les consultations de commandes ne sont pas touchées.
+
+          Impact : certains utilisateurs ne peuvent pas finaliser leur commande ; trois clients prioritaires ont ouvert un ticket. Le support a conseillé de réessayer, ce qui fonctionne parfois mais peut créer une forte latence. Aucun doublon confirmé à ce stade.
+
+          Extraits de logs : « Timeout acquiring inventory reservation after 3000 ms » puis « OrderCreationException: reservation unavailable ». Le taux d'erreur augmente lorsque le pool de connexions inventory atteint 40 connexions. La version 2.18.0 a modifié le mécanisme de retry et réduit le délai d'attente de cinq à trois secondes.
+
+          Hypothèse principale : saturation du pool inventory amplifiée par les nouveaux retries. Hypothèse secondaire : latence inhabituelle de la base inventory. Une augmentation temporaire du pool à 60 a ramené les erreurs à 6 %. Le rollback vers 2.17.4 est prêt mais pas encore exécuté.
+
+          Décisions provisoires : priorité P1 ; gel des déploiements sur orders ; Karim analyse les métriques du pool avant 14 h 45 ; Inès vérifie la latence base avant 15 h ; Claire prépare une communication utilisateurs à 14 h 30 ; décision de rollback à 15 h selon les résultats.
+    fields:
+      - name: incident
+        type: prompt
+        label: Description de l'incident
+        description: Faits, symptômes, impact, logs, hypothèses et décisions disponibles.
+        placeholder: Décrivez l'incident…
+        required: true
+        order: 0
+        role: primaryInput
+        validation: { minimumLength: 20, maximumLength: 16000 }
+  binding: { kind: flow, resourceId: traiter-incident, namespace: demo.flows-professionnels }
+  behavior:
+    taskCreationMode: automatic
+    allowConversation: true
+    streamResponse: true
+    conversation: { enabled: true }
+  publish: true
