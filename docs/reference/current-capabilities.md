@@ -392,7 +392,7 @@ The official C# MCP SDK exposes Streamable HTTP at `http://localhost:5100/mcp`. 
 }
 ```
 
-The server endpoint remains available as generic MCP infrastructure, but it currently publishes no built-in platform tools. Governed external MCP and AEP tool providers continue to be discovered and executed through the Tool catalog.
+The authenticated server dynamically publishes enabled Workspace Tool Definitions and bounded internal Tools through `tools/list`. Built-in Tools cross the ordinary governance and audit pipeline, while Flow-backed Tool Definitions use the durable root Flow submission boundary and return operation receipts. The endpoint does not expose generic Management CRUD or an unrestricted Flow launcher. Governed external MCP and AEP tool providers continue to be discovered and executed through the Tool catalog rather than being republished automatically.
 
 ## Runtime and MAF observability
 
