@@ -4,7 +4,7 @@ Several independent versions coexist in Agentstration. They must not be substitu
 
 | Version | Example | What changes it |
 | --- | --- | --- |
-| Product version | `0.2.0-alpha.1` | A product release under Semantic Versioning. |
+| Product version | `0.3.0-alpha.1` | A product release under Semantic Versioning. |
 | HTTP API version | Current unversioned `/api` routes | A breaking HTTP contract change, not every product release. |
 | Resource `apiVersion` | `agentstration.io/v1` | The schema of a declarative Management resource. |
 | Resource revision/generation | Agent generation `3` | A change to one resource instance or immutable snapshot. |

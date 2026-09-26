@@ -18,7 +18,7 @@ public static class AepProtocol
     public const string ValueRequirementsCapabilityVersion = "1.0";
     public const string BoundValuesCapabilityVersion = "1.0";
     public const string SecretAccessVersion = "1.0";
-    public const string ModelProviderCapabilityVersion = "2.0";
+    public const string ModelProviderCapabilityVersion = "1.0";
     public const string SecretAccessPath = "/api/aep/secrets/redeem";
 
     public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();

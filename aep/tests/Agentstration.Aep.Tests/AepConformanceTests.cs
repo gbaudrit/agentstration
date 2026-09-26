@@ -129,7 +129,7 @@ public sealed class AepConformanceTests
         var json = await httpClient.GetStringAsync(AepProtocol.DiscoveryPath);
 
         Assert.IsTrue(validation.IsValid);
-        Assert.AreEqual(AepProtocol.ModelProviderCapabilityVersion,
+        Assert.AreEqual("1.0",
             manifest.Capabilities[AepCapabilityNames.ModelProvider].Version);
         Assert.AreEqual(AepProtocol.ValueRequirementsCapabilityVersion,
             manifest.Capabilities[AepCapabilityNames.ValueRequirements].Version);

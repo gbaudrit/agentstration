@@ -196,7 +196,7 @@ GitHub Actions then repeats restore, Release build, and tests; publishes framewo
 
 `Agentstration.SourceRegistry.Tool` deliberately shares the central product version because it implements the contracts accepted by that Agentstration release. The dedicated `release-source-registry-tool.yml` workflow has two publication paths:
 
-- a relevant push to `main` publishes a development prerelease such as `0.2.0-alpha.1.dev.20260910213045.<run-id>.<attempt>`; the UTC timestamp makes the build recognizable, while the run identity and attempt make concurrent runs and reruns unique;
+- a relevant push to `main` publishes a development prerelease such as `0.3.0-alpha.1.dev.20260910213045.<run-id>.<attempt>`; the UTC timestamp makes the build recognizable, while the run identity and attempt make concurrent runs and reruns unique;
 - the shared immutable `v<version>` tag publishes the exact central version. A suffix such as `-alpha.2` produces an official NuGet prerelease, while a version without a suffix produces a stable package.
 
 Both paths run the focused tests and installed-package smoke test before publication. There is no independent tool tag or version file. Development packages are CI snapshots, not release identities, and consumers must pin their full exact version.
