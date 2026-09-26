@@ -24,6 +24,9 @@ public sealed class FlowDiagramMapperTests
         Assert.AreEqual(2, projection.Nodes.Count);
         Assert.AreEqual(12d, projection.NodesByName["input"].Position.X);
         Assert.AreEqual("Prompt", projection.NodesByName["input"].Title);
+        Assert.IsTrue(projection.NodesByName["input"].ControlledSize);
+        Assert.AreEqual(FlowDiagramNode.RenderedWidth, projection.NodesByName["input"].Size!.Width);
+        Assert.AreEqual(FlowDiagramNode.RenderedHeight, projection.NodesByName["input"].Size!.Height);
         Assert.AreEqual("done", projection.Links.Single().Id);
         Assert.AreSame(projection.NodesByName["input"].Output, ((SinglePortAnchor)projection.Links.Single().Source).Port);
         Assert.AreSame(projection.NodesByName["output"].Input, ((SinglePortAnchor)projection.Links.Single().Target).Port);
