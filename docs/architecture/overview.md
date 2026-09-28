@@ -1,6 +1,6 @@
 # Architecture overview
 
-The `docs/architecture/` section is the canonical Agentstration Technical Architecture Document (DAT). [Architecture documentation conventions](conventions.md) define the ownership boundaries between LikeC4, Markdown, Mermaid, and ADRs, while the [migration inventory](migration-inventory.md) tracks the progressive consolidation of existing sources.
+The `docs/architecture/` section is the canonical Agentstration Technical Architecture Document (DAT). [Architecture documentation conventions](conventions.md) define the ownership boundaries between LikeC4, Markdown, Mermaid, and ADRs, the [interactive architecture](interactive.mdx) publishes the shared structural model, and the [migration inventory](migration-inventory.md) tracks the progressive consolidation of existing sources.
 
 Agentstration is a modular monolith with explicit resource-family, Runtime, Work, and Flow boundaries. The repository contains one authoritative server/API, independently hostable Console and Workplace shells, autonomous AEP extensions, and an Aspire development orchestrator.
 

@@ -1,0 +1,22 @@
+views {
+  view index {
+    title 'Agentstration architecture'
+    description 'Toolchain baseline; the canonical L1 view is completed by issue #605'
+
+    include *
+  }
+
+  view containers of agentstration {
+    title 'Agentstration containers'
+    description 'Toolchain baseline; the canonical L2 view is completed by issue #606'
+
+    include *
+  }
+
+  view serverComponents of agentstration.server {
+    title 'Authoritative server components'
+    description 'Toolchain baseline; selected L3 components are completed by issue #607'
+
+    include *
+  }
+}

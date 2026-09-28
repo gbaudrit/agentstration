@@ -15,10 +15,11 @@ Docusaurus starts its development server at `http://localhost:3000` by default. 
 ```powershell
 cd docs/site
 npm ci
+npm run architecture:validate
 npm run build
 ```
 
-The production build fails on unresolved internal links and invalid Mermaid diagrams. Generated folders (`node_modules`, `.docusaurus`, and `build`) are ignored by Git.
+The production build regenerates the interactive LikeC4 Web Component and fails on an invalid LikeC4 model, unresolved internal links, or invalid Mermaid diagrams. Generated folders (`node_modules`, `.docusaurus`, `static/generated`, and `build`) are ignored by Git.
 
 ## Authoring rules
 

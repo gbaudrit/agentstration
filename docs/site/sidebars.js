@@ -45,6 +45,7 @@ const sidebars = {
       items: [
         'architecture/overview',
         'architecture/conventions',
+        'architecture/interactive',
         'architecture/migration-inventory',
         'architecture/system-context',
         'architecture/containers',

@@ -1,0 +1,19 @@
+model {
+  contributor = person 'Contributor' {
+    description 'Explores and evolves the Agentstration architecture'
+  }
+
+  agentstration = softwareSystem 'Agentstration' {
+    description 'Open-source, self-hosted agent platform built on the Microsoft .NET AI stack'
+
+    server = container 'Authoritative server and API' {
+      description 'Owns authoritative APIs, application services, workers, and local persistence composition'
+
+      platform = component 'Platform responsibilities' {
+        description 'Toolchain placeholder expanded by the dedicated L3 modeling increment'
+      }
+    }
+  }
+
+  contributor -> agentstration 'Uses and evolves'
+}
