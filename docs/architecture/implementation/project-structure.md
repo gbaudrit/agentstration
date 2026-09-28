@@ -13,7 +13,12 @@ src/
   Agentstration.Models/               Model provider and profile resources
   Agentstration.Tools/                Tool resources, definitions, hooks and governance
   Agentstration.Secrets/              Vault and Secret resource model
-  Agentstration.Management.*/         Transitional Identity, Sources, Packs and Extensions modules
+  Agentstration.Identity*/            Identity, authorization, PAT and audit boundaries
+  Agentstration.Extensions*/          Extension registration, inventory and AEP enrollment
+  Agentstration.Packs*/               Pack installation, authoring and composition
+  Agentstration.Sources*/             Source and Source Registry resources and use cases
+  Agentstration.Parameters*/          Scoped nonsecret Parameter resources
+  Agentstration.ResourcePlanning*/    Resource Plan lifecycle and relational storage
   Agentstration.Runtime.*/            Runtime contracts, core, local and MAF adapters
   Agentstration.Tools.SourceRegistry/ Offline Source Version validation and digest .NET tool
   Agentstration.Flows.*/               Flow model, use cases, contracts and SQLite

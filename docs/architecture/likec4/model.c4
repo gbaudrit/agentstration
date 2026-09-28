@@ -19,6 +19,94 @@ model {
 
       transport = component 'API transport' {
         description 'Family-owned REST, MCP, SignalR, OpenAPI, and request-security adapters'
+
+        apiHost = component 'Agentstration.Web API host' {
+          description 'Authoritative executable composition that registers and maps the shared API surface'
+        }
+
+        apiAggregator = component 'Agentstration.Api aggregator' {
+          description 'Lightweight ordered composition of family API modules plus global health and OpenAPI conventions'
+        }
+
+        resourceApis = component 'Resource API modules' {
+          description 'Family transports for governed resource definitions and scope projections'
+
+          agentsApi = component 'Agents.Api' {
+            description 'Agent configuration, revisions, deployments, and provisioning transport'
+          }
+
+          modelsApi = component 'Models.Api' {
+            description 'Model Provider, Model Profile, discovery, and diagnostics transport'
+          }
+
+          parametersApi = component 'Parameters.Api' {
+            description 'Scoped nonsecret Parameter administration transport'
+          }
+
+          resourcesApi = component 'Resources.Api' {
+            description 'Generic resource-scope projection transport'
+          }
+
+          secretsApi = component 'Secrets.Api' {
+            description 'Secret, Vault, capability, and descendant-use administration transport'
+          }
+        }
+
+        platformApis = component 'Platform API modules' {
+          description 'Family transports for identity, distribution, extensions, sources, planning, and scheduling'
+
+          bootstrapApi = component 'Bootstrap.Api' {
+            description 'Composed Bootstrap profile transport'
+          }
+
+          extensionsApi = component 'Extensions.Api' {
+            description 'Extension inventory, registration, and AEP enrollment transport'
+          }
+
+          identityApi = component 'Identity.Api' {
+            description 'Authentication, authorization, accounts, and identity administration transport'
+          }
+
+          packsApi = component 'Packs.Api' {
+            description 'Pack installation, authoring, composition, and Pack-owned Source transport'
+          }
+
+          resourcePlanningApi = component 'ResourcePlanning.Api' {
+            description 'Resource Plan review, validation, materialization, and ChangeSet transport'
+          }
+
+          sourcesApi = component 'Sources.Api' {
+            description 'Source Provider, Source, and Source Registry transport'
+          }
+
+          triggersApi = component 'Triggers.Api' {
+            description 'Trigger configuration, occurrence execution, and history transport'
+          }
+        }
+
+        executionApis = component 'Execution API modules' {
+          description 'Family transports for Flow, Runtime, Tool, Work, and Workplace execution paths'
+
+          flowsApi = component 'Flows.Api' {
+            description 'Flow authoring, publication, execution, history, and realtime transport'
+          }
+
+          runtimeApi = component 'Runtime.Api' {
+            description 'Runtime profiles, readiness, and technical Run transport'
+          }
+
+          toolsApi = component 'Tools.Api' {
+            description 'Tool catalog, providers, hooks, governance audit, and MCP transport'
+          }
+
+          workApi = component 'Work.Api' {
+            description 'Work resource lifecycle and interaction transport'
+          }
+
+          workplaceApi = component 'Workplace.Api' {
+            description 'Workplace administration, task operations, notifications, and realtime transport'
+          }
+        }
       }
 
       identity = component 'Identity and authorization' {
@@ -30,7 +118,7 @@ model {
       }
 
       distribution = component 'Distribution and bootstrap' {
-        description 'Bootstrap profiles, Pack installation, and generic manifest planning delegated to resource owners'
+        description 'API-driven Bootstrap profiles, Pack and Source distribution, plus bounded startup initialization'
       }
 
       work = component 'Work and Workplace application' {
@@ -50,7 +138,7 @@ model {
       }
 
       scheduling = component 'Scheduling and background processing' {
-        description 'Trigger projection, reconciliation, refresh, recovery, and other bounded hosted work'
+        description 'API-driven Trigger administration and run-now commands, plus internal scheduling, reconciliation, refresh, and recovery workers'
       }
     }
 
@@ -62,8 +150,8 @@ model {
       description 'Agentstration.Workplace.Web: independently hostable end-user UI with no authoritative business state'
     }
 
-    managementData = container 'Management data' {
-      description 'Authoritative resource definitions, desired state, extension registrations, and related control-plane records'
+    controlPlaneData = container 'Control-plane data' {
+      description 'Family-owned resources, desired state, resource plans, scheduling projections, and related control-plane records'
     }
 
     identityData = container 'Identity data' {
@@ -107,7 +195,10 @@ model {
   apiConsumer -> agentstration.server 'Invokes governed APIs'
   agentstration.console -> agentstration.server 'Uses Management, Work, Flow, and Runtime APIs'
   agentstration.workplace -> agentstration.server 'Uses Entry, Work, interaction, and realtime APIs'
-  agentstration.server -> agentstration.managementData 'Reads and writes'
+  apiConsumer -> agentstration.server.transport 'Invokes REST, MCP, and realtime APIs'
+  agentstration.console -> agentstration.server.transport 'Uses typed HTTP and realtime clients exclusively'
+  agentstration.workplace -> agentstration.server.transport 'Uses typed HTTP and SignalR clients exclusively'
+  agentstration.server -> agentstration.controlPlaneData 'Reads and writes'
   agentstration.server -> agentstration.identityData 'Reads and writes'
   agentstration.server -> agentstration.workData 'Reads and writes'
   agentstration.server -> agentstration.flowData 'Reads and writes'
@@ -116,11 +207,31 @@ model {
   agentstration.server -> identityProvider 'Uses configured OIDC authentication'
 
   agentstration.server.transport -> agentstration.server.identity 'Authenticates and authorizes requests'
+  agentstration.server.transport -> agentstration.server.distribution 'Delegates Bootstrap, Pack, and Source distribution use cases'
+  agentstration.server.transport -> agentstration.server.scheduling 'Delegates Trigger administration and run-now commands'
   agentstration.server.transport -> agentstration.server.resources 'Delegates resource use cases'
   agentstration.server.transport -> agentstration.server.work 'Delegates Work and interaction use cases'
   agentstration.server.transport -> agentstration.server.flow 'Delegates Flow use cases'
   agentstration.server.transport -> agentstration.server.runtime 'Delegates Runtime use cases'
   agentstration.server.transport -> agentstration.server.tools 'Delegates MCP and Tool use cases'
+  agentstration.server.transport.apiHost -> agentstration.server.transport.apiAggregator 'Registers and maps'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.agentsApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.bootstrapApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.extensionsApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.executionApis.flowsApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.identityApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.modelsApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.packsApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.parametersApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.resourcePlanningApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.resourcesApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.executionApis.runtimeApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.secretsApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.sourcesApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.executionApis.toolsApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.triggersApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.executionApis.workApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.executionApis.workplaceApi 'Composes'
   agentstration.server.distribution -> agentstration.server.resources 'Applies manifests through owning services'
   agentstration.server.distribution -> agentstration.server.flow 'Installs and resolves Flow artifacts'
   agentstration.server.scheduling -> agentstration.server.resources 'Reads governed schedules and refresh policies'
@@ -132,7 +243,7 @@ model {
   agentstration.server.runtime -> agentstration.server.tools 'Invokes assigned agent Tools'
   agentstration.server.tools -> agentstration.server.resources 'Resolves Tool definitions, providers, and policies'
   agentstration.server.identity -> agentstration.identityData 'Reads and writes'
-  agentstration.server.resources -> agentstration.managementData 'Reads and writes'
+  agentstration.server.resources -> agentstration.controlPlaneData 'Reads and writes'
   agentstration.server.work -> agentstration.workData 'Reads and writes'
   agentstration.server.flow -> agentstration.flowData 'Reads and writes'
   agentstration.server.runtime -> agentstration.runtimeData 'Reads and writes'

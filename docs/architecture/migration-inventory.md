@@ -15,9 +15,9 @@ This inventory records the consolidation of the Agentstration DAT under `docs/ar
 | `docs/architecture/project-structure.md` | `architecture/implementation/project-structure.md` | Migrated without treating projects as C4 components |
 | `docs/architecture/dependency-rules.md` | `architecture/implementation/dependency-rules.md` | Migrated; rules remain narrative and test-backed |
 | `docs/architecture/resource-model.md` | `architecture/data/resource-model.md` | Migrated; competing structural flowchart removed |
-| `docs/architecture/persistence.md` | `architecture/data/persistence.md` | Migrated; accuracy reconciliation continues in #610 |
+| `docs/architecture/persistence.md` | `architecture/data/persistence.md` | Migrated and reconciled against the executable storage composition in #611 |
 | `docs/architecture/standalone-mode.md` | `architecture/deployment/standalone.md` | Migrated with direct, Aspire, and Compose distinctions |
-| `docs/architecture/multi-tenancy.md` | `architecture/cross-cutting/tenancy-and-isolation.md` | Migrated; accuracy reconciliation continues in #610 |
+| `docs/architecture/multi-tenancy.md` | `architecture/cross-cutting/tenancy-and-isolation.md` | Migrated and reconciled against current authorization surfaces in #611 |
 
 `docs/architecture/overview.md`, `conventions.md`, `interactive.mdx`, and this inventory remain canonical entry-point pages.
 

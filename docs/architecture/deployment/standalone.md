@@ -7,6 +7,6 @@ $env:AI__Provider = "Deterministic"
 dotnet run --project src/Agentstration.Web
 ```
 
-On startup the Management host seeds local resources and reconciles reconstructible in-process runtime instances. Optional Ollama, Aspire, Docker, remote APIs, and Foundry integrations can extend this mode but are not prerequisites.
+On startup the authoritative server initializes module-owned stores and reconciles reconstructible in-process Runtime instances. Initial Bootstrap is optional. The standard Development launch profiles enable the ordered `development` Bootstrap profile for a fresh local instance and create the documented disposable `admin / admin` fixture; no credential or topology is implicit outside Development.
 
-The direct host, Aspire development orchestration, and provider-specific Compose profiles preserve the same authoritative server boundary. Aspire and Compose may add independent Console, Workplace, AEP extension, inference, or PostgreSQL processes without making them mandatory for direct startup.
+The direct host embeds the Console and remains the all-in-one executable default. Independently hosted Console and Workplace shells consume the authoritative APIs and own no business state. Aspire development orchestration and provider-specific Compose profiles preserve the same server boundary while optionally adding those shells, AEP extensions, inference services, or PostgreSQL. Deterministic AI remains the offline validation and fallback path; provider integrations are optional.

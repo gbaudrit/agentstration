@@ -58,6 +58,7 @@ const sidebars = {
             'architecture/c4/system-context',
             'architecture/c4/containers',
             'architecture/c4/server-components',
+            'architecture/c4/api-composition',
           ],
         },
         {
@@ -96,6 +97,7 @@ const sidebars = {
             'architecture/implementation/project-structure',
             'architecture/implementation/dependency-rules',
             'architecture/implementation/current-state',
+            'architecture/implementation/reconciliation-baseline-2026-09-28',
             'architecture/migration-inventory',
           ],
         },
