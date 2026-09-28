@@ -49,6 +49,7 @@ const sidebars = {
         'architecture/migration-inventory',
         'architecture/system-context',
         'architecture/containers',
+        'architecture/components',
         'architecture/project-structure',
         'architecture/dependency-rules',
         'architecture/resource-model',

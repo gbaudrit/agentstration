@@ -17,8 +17,40 @@ model {
     server = container 'Authoritative server and API' {
       description 'Agentstration.Web: authoritative APIs, application services, workers, embedded standalone Console, and storage composition'
 
-      platform = component 'Platform responsibilities' {
-        description 'Toolchain placeholder expanded by the dedicated L3 modeling increment'
+      transport = component 'API transport' {
+        description 'Family-owned REST, MCP, SignalR, OpenAPI, and request-security adapters'
+      }
+
+      identity = component 'Identity and authorization' {
+        description 'Authentication, Principals, Workspace access, RBAC, PATs, delegation, and security audit'
+      }
+
+      resources = component 'Resource-family services' {
+        description 'Family-owned lifecycle services for Agents, Models, Entries, Triggers, Extensions, Sources, Secrets, and related resources'
+      }
+
+      distribution = component 'Distribution and bootstrap' {
+        description 'Bootstrap profiles, Pack installation, and generic manifest planning delegated to resource owners'
+      }
+
+      work = component 'Work and Workplace application' {
+        description 'Functional Work Item lifecycle, interactions, notifications, projections, and execution submission'
+      }
+
+      flow = component 'Flow engine' {
+        description 'Flow definitions, immutable publications, durable Flow Runs, and provider-neutral graph execution'
+      }
+
+      runtime = component 'Runtime execution' {
+        description 'Durable technical Runs, agent materialization, model resolution, attempts, and normalized events'
+      }
+
+      tools = component 'Tool execution pipeline' {
+        description 'Governed Tool catalog, policy hooks, approvals, MCP publication, and invocation'
+      }
+
+      scheduling = component 'Scheduling and background processing' {
+        description 'Trigger projection, reconciliation, refresh, recovery, and other bounded hosted work'
       }
     }
 
@@ -82,4 +114,30 @@ model {
   agentstration.server -> agentstration.runtimeData 'Reads and writes'
   agentstration.server -> aepExtensions 'Enrolls extensions and invokes AEP contributions'
   agentstration.server -> identityProvider 'Uses configured OIDC authentication'
+
+  agentstration.server.transport -> agentstration.server.identity 'Authenticates and authorizes requests'
+  agentstration.server.transport -> agentstration.server.resources 'Delegates resource use cases'
+  agentstration.server.transport -> agentstration.server.work 'Delegates Work and interaction use cases'
+  agentstration.server.transport -> agentstration.server.flow 'Delegates Flow use cases'
+  agentstration.server.transport -> agentstration.server.runtime 'Delegates Runtime use cases'
+  agentstration.server.transport -> agentstration.server.tools 'Delegates MCP and Tool use cases'
+  agentstration.server.distribution -> agentstration.server.resources 'Applies manifests through owning services'
+  agentstration.server.distribution -> agentstration.server.flow 'Installs and resolves Flow artifacts'
+  agentstration.server.scheduling -> agentstration.server.resources 'Reads governed schedules and refresh policies'
+  agentstration.server.scheduling -> agentstration.server.work 'Submits scheduled execution'
+  agentstration.server.work -> agentstration.server.flow 'Submits pinned Flow references'
+  agentstration.server.flow -> agentstration.server.runtime 'Invokes Agent steps'
+  agentstration.server.flow -> agentstration.server.tools 'Invokes governed Tool steps'
+  agentstration.server.runtime -> agentstration.server.resources 'Resolves immutable Agents and profiles'
+  agentstration.server.runtime -> agentstration.server.tools 'Invokes assigned agent Tools'
+  agentstration.server.tools -> agentstration.server.resources 'Resolves Tool definitions, providers, and policies'
+  agentstration.server.identity -> agentstration.identityData 'Reads and writes'
+  agentstration.server.resources -> agentstration.managementData 'Reads and writes'
+  agentstration.server.work -> agentstration.workData 'Reads and writes'
+  agentstration.server.flow -> agentstration.flowData 'Reads and writes'
+  agentstration.server.runtime -> agentstration.runtimeData 'Reads and writes'
+  agentstration.server.identity -> identityProvider 'Uses configured OIDC authentication'
+  agentstration.server.resources -> aepExtensions 'Enrolls and catalogs contributions'
+  agentstration.server.runtime -> aepExtensions 'Invokes model contributions'
+  agentstration.server.tools -> aepExtensions 'Discovers and invokes Tool contributions'
 }

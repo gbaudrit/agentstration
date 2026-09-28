@@ -20,8 +20,17 @@ views {
 
   view serverComponents of agentstration.server {
     title 'Authoritative server components'
-    description 'Toolchain baseline; selected L3 components are completed by issue #607'
+    description 'Canonical responsibility-oriented C4 L3 view of the authoritative server and API'
 
     include *
+    include agentstration.server.identity -> agentstration.identityData
+    include agentstration.server.resources -> agentstration.managementData
+    include agentstration.server.work -> agentstration.workData
+    include agentstration.server.flow -> agentstration.flowData
+    include agentstration.server.runtime -> agentstration.runtimeData
+    include agentstration.server.identity -> identityProvider
+    include agentstration.server.resources -> aepExtensions
+    include agentstration.server.runtime -> aepExtensions
+    include agentstration.server.tools -> aepExtensions
   }
 }
