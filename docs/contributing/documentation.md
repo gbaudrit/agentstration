@@ -26,6 +26,7 @@ The production build regenerates the interactive LikeC4 Web Component and fails 
 - Link to the source of truth instead of copying a full route/schema or contract.
 - Use Mermaid only when a relationship or execution sequence is clearer as a diagram.
 - Follow the [architecture documentation conventions](../architecture/conventions.md) for DAT, C4, LikeC4, Mermaid, and ADR ownership. Structural C4 views come from the single shared LikeC4 model; Mermaid remains appropriate for dynamic behavior.
+- Use the [architecture documentation reconciliation workflow](github-governance.md#architecture-documentation-reconciliation) for transverse reviews; directly affected documentation still changes with the owning feature or technical work.
 - Mark unavailable behavior as **Planned**, **Experimental**, **Preview**, or **Not implemented yet**.
 - Keep conceptual pages independent of C# class names; put implementation details in Architecture or Reference.
 - Update the sidebar when adding a new top-level page that should be discoverable.

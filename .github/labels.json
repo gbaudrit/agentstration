@@ -20,6 +20,16 @@
     "description": "Architecture, refactoring, performance, testing, security, or technical-debt work."
   },
   {
+    "name": "documentation",
+    "color": "0075CA",
+    "description": "Improvements or additions to documentation."
+  },
+  {
+    "name": "documentation:architecture",
+    "color": "AAAAAA",
+    "description": "Architecture documentation, C4 models, DAT, diagrams, and related maintenance."
+  },
+  {
     "name": "test-scenario-task",
     "color": "C1EC61",
     "description": "Work to add or improve an automated user scenario with explicit setup, actions, and assertions."

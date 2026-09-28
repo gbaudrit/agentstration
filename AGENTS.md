@@ -200,6 +200,15 @@ Prefer in-memory infrastructure for fast application tests. Use integration infr
 - The UX pull request must still add or update tests for behavior changes, repair any existing Playwright tests affected by the change, and run the required browser smoke checks. Deferral applies only to the new reusable UX scenario, not to existing regression checks or the required offline test suites.
 - Keep the parent issue open until the child scenario is merged and its catalog surface is covered, or a maintainer documents an explicit waiver with a reason. Before closing the parent, also verify that every Sub-issue is closed or a maintainer has documented an explicit exception. Do not use an auto-closing issue keyword for the parent in the UX-only pull request.
 
+### Architecture documentation reconciliation
+
+- Create a transverse reconciliation issue when a planned architecture review is due or when accumulated implementation changes make a broad DAT comparison necessary. Do not require every feature issue to perform repository-wide reconciliation.
+- Use the Technical task form and apply exactly one issue type, `technical-task`, plus both `documentation` and `documentation:architecture`. The latter is a specialization for architecture documentation; it is not an architecture-refactoring type. Use `test-scenario-task` only for the separate deferred UX workflow, not as an alternative documentation label.
+- Record the comparison baseline or change range under `Scope`. Inspect implementation and composition changes, the shared LikeC4 model and published L1–L3 views, DAT Markdown, Mermaid dynamic and deployment views, architecture tests, and relevant accepted ADRs.
+- Update documentation artifacts that describe already-decided and implemented behavior. Validate LikeC4 and the complete Docusaurus build, and run or cite focused architecture checks when implementation boundaries are involved.
+- When implementation, DAT, and an accepted ADR disagree, record the discrepancy and surface it for maintainer review. Never rewrite an accepted ADR or silently normalize one source to hide drift.
+- When a significant implemented choice lacks a decision record, report the missing ADR and link the owning feature or technical issue. The reconciliation task may identify or track the gap, but the change that owns the architectural decision must supply the ADR.
+
 ## Validation Commands
 
 Run from the repository root:
@@ -244,6 +253,7 @@ When creating or updating a GitHub issue, treat the forms under `.github/ISSUE_T
 
 - Use `bug.yml` for behavior that contradicts an existing expectation, `feature.yml` for a new user-facing or product capability, and `technical-task.yml` for architecture, refactoring, performance, testing, security, technical debt, technical documentation, or developer-experience work.
 - Use `technical-task.yml` plus `test-scenario-task` for a deferred UX test scenario child. Attach it to the parent as a native Sub-issue, record the parent issue under `Dependencies` for readability, and keep the child blocked until the UX validation and merge described above.
+- Use `technical-task.yml` plus `documentation` and `documentation:architecture` for transverse DAT/C4 reconciliation. Keep architectural redesign in the issue that owns the product change and its ADR; a reconciliation task documents evidence and surfaces drift.
 - Write issue titles and bodies in English. Keep titles outcome-focused and do not add type or priority prefixes such as `[Feature]`, `[Bug]`, or `[P1]`.
 - Preserve the form's section names and order. API-created issues must include the same required sections that the selected form would produce.
 - Apply the form's type label explicitly when creating an issue through the API: `bug` for bug reports, `enhancement` for feature requests, and `technical-task` for technical tasks. Use exactly one of these type labels. Add more specific area or technical labels only when they already exist and are supported by the issue content.

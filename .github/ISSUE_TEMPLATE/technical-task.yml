@@ -7,6 +7,7 @@ body:
       value: |
         Use this form for engineering work whose primary motivation is technical. Use the feature form when the primary outcome is a new user-facing or product capability.
         For a deferred UX test scenario, add the test-scenario-task label, link the parent feature request under Dependencies, and wait for recorded maintainer UX validation and merge before starting the scenario.
+        For transverse architecture-documentation reconciliation, add both documentation and documentation:architecture. Reconciliation records current evidence and drift; it does not make product architecture decisions or replace an ADR.
   - type: dropdown
     id: category
     attributes:
