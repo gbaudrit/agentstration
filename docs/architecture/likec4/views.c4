@@ -1,7 +1,7 @@
 views {
   view index {
-    title 'Agentstration architecture'
-    description 'Toolchain baseline; the canonical L1 view is completed by issue #605'
+    title 'Agentstration system context'
+    description 'Canonical C4 L1 view of the Agentstration boundary, its users, and optional external systems'
 
     include *
   }

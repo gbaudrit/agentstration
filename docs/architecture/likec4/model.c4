@@ -1,6 +1,14 @@
 model {
-  contributor = person 'Contributor' {
-    description 'Explores and evolves the Agentstration architecture'
+  endUser = person 'End user' {
+    description 'Uses published agent experiences through Workplace'
+  }
+
+  operator = person 'Operator or administrator' {
+    description 'Configures resources, governs access, and supervises execution through Console'
+  }
+
+  apiConsumer = person 'API consumer' {
+    description 'Integrates another application or automation with Agentstration APIs'
   }
 
   agentstration = softwareSystem 'Agentstration' {
@@ -15,5 +23,17 @@ model {
     }
   }
 
-  contributor -> agentstration 'Uses and evolves'
+  modelServices = softwareSystem 'Optional AI and model services' {
+    description 'Provider-specific AEP extensions and inference services; deterministic local operation does not require them'
+  }
+
+  identityProvider = softwareSystem 'Optional identity provider' {
+    description 'External OIDC provider used only when external authentication is configured'
+  }
+
+  endUser -> agentstration 'Uses through Workplace'
+  operator -> agentstration 'Administers through Console'
+  apiConsumer -> agentstration 'Integrates through REST, MCP, and realtime APIs'
+  agentstration -> modelServices 'Discovers capabilities and invokes configured services'
+  agentstration -> identityProvider 'Authenticates configured external identities'
 }
