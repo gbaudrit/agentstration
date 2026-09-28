@@ -2,32 +2,19 @@
 
 The `docs/architecture/` section is the canonical Agentstration Technical Architecture Document (DAT). [Architecture documentation conventions](conventions.md) define the ownership boundaries between LikeC4, Markdown, Mermaid, and ADRs, the [interactive architecture](interactive.mdx) publishes the shared structural model, and the [migration inventory](migration-inventory.md) tracks the progressive consolidation of existing sources.
 
-Agentstration is a modular monolith with explicit resource-family, Runtime, Work, and Flow boundaries. The repository contains one authoritative server/API, independently hostable Console and Workplace shells, autonomous AEP extensions, and an Aspire development orchestrator.
+Agentstration is a modular monolith with explicit resource-family, Runtime, Work, and Flow boundaries. The repository contains one authoritative server/API, independently hostable Console and Workplace shells, autonomous AEP extensions, and an Aspire development orchestrator. The shared [interactive C4 model](interactive.mdx) is the sole structural source for L1 through selected L3 views.
 
-> The structural Mermaid overview below is transitional. It remains available until the shared LikeC4 model and its published L1–L3 views replace it without losing valid information.
+The DAT is organized by concern:
 
-```mermaid
-flowchart LR
-    Pack["Pack (distribution)"] --> Management
-    Pack --> Flow
-    Pack --> Work
-    Console[Operations Console] --> Management[Management Plane]
-    Console --> WorkAPI[Work API]
-    Workplace[Workplace] --> WorkAPI
-    WorkAPI --> Work[Work Plane]
-    Work --> Flow[Flow execution]
-    Flow --> Runtime[Runtime]
-    Runtime --> Providers[Model Providers]
-    Management -.-> Runtime
-    Management -.-> Flow
-    Management --> MgmtDb[(Management SQLite)]
-    Work --> WorkDb[(Work SQLite)]
-    Flow --> FlowDb[(Flow SQLite)]
-    Runtime --> RuntimeDb[(Runtime SQLite)]
-```
+- [Context and constraints](context/outcome-and-constraints.md)
+- [System context](c4/system-context.md), [containers](c4/containers.md), and [server components](c4/server-components.md)
+- [Dynamic execution views](runtime/dynamic-views.md), including Work, Flow, Agent, Tool, AEP, and MCP paths
+- [Resource and persistence models](data/resource-model.md)
+- [Standalone deployment](deployment/standalone.md) and [tenancy/isolation](cross-cutting/tenancy-and-isolation.md)
+- [Implementation mapping](implementation/project-structure.md), [dependency rules](implementation/dependency-rules.md), and the [detailed current-state inventory](implementation/current-state.md)
 
 The dominant design rules are local-first operation, provider-neutral application contracts, separate persistence boundaries, reconstructible runtime objects, and shared use cases across REST, Razor, MCP, and workers.
 
 Packs form a distribution layer above these resource owners. Installation delegates each contained manifest to its owning module and records provenance; Packs never enter the execution path. See [Packs](../concepts/packs.md) and [ADR-0037](../decisions/0037-packs-are-management-distribution-artifacts.md).
 
-The original detailed implementation inventory remains available in [Architecture: current implementation](../architecture.md).
+The detailed implementation inventory remains available in [Architecture: current implementation](implementation/current-state.md).

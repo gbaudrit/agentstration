@@ -70,9 +70,9 @@ Each dynamic view states its scenario boundary, distinguishes durable state chan
 
 Deployment views distinguish logical containers from environment-specific placement. They may describe direct standalone startup, Aspire development orchestration, Compose variants, SQLite and PostgreSQL profiles, and optional provider topologies without changing the logical C4 model.
 
-## Target DAT information architecture
+## DAT information architecture
 
-The target tree is introduced progressively rather than created as empty scaffolding:
+The canonical tree is organized by architectural concern:
 
 ```text
 docs/architecture/
@@ -80,13 +80,13 @@ docs/architecture/
   conventions.md              ownership and modeling rules
   migration-inventory.md      source-to-destination migration ledger
   likec4/                     one logical LikeC4 model, split when useful
-  context/                    scope, stakeholders, constraints, quality goals
-  c4/                         narrative pages embedding or linking L1/L2/L3 views
-  runtime/                    dynamic execution scenarios and lifecycles
+  context/                    scope, stakeholders, constraints, and quality goals
+  c4/                        narrative pages embedding or linking L1/L2/L3 views
+  runtime/                   dynamic execution scenarios and lifecycles
   data/                       resource, persistence, ownership, and consistency models
   deployment/                 standalone and environment-specific deployment views
   cross-cutting/              identity, isolation, security, observability, resilience
-  implementation/            project mapping, dependency rules, and current inventory
+  implementation/           project mapping, dependency rules, and current inventory
 ```
 
 ADRs remain under `docs/decisions/` and are linked from the relevant DAT pages. Concept and reference documentation remains in its existing sections unless its content is specifically architectural and is migrated with an explicit destination.

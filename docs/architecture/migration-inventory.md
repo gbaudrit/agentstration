@@ -1,56 +1,57 @@
 # Architecture documentation migration inventory
 
-This inventory is the ledger for progressively consolidating the Agentstration DAT under `docs/architecture/`. A source remains in place until its still-valid content has reached the stated canonical destination and its links have been validated.
+This inventory records the consolidation of the Agentstration DAT under `docs/architecture/`. Former published paths remain as replacement pointers; canonical content is maintained only at the destinations below.
 
-The target paths below express the information architecture defined in [Architecture documentation conventions](conventions.md). They do not require empty directories or placeholder pages to be created before content is ready to move.
+## Former flat architecture pages
 
-## Current architecture section
+| Compatibility path | Canonical destination | Reconciliation status |
+| --- | --- | --- |
+| `docs/architecture/system-context.md` | `architecture/c4/system-context.md` | Migrated; the shared LikeC4 model owns C4 structure |
+| `docs/architecture/containers.md` | `architecture/c4/containers.md` | Migrated after executable, store, and AEP reconciliation |
+| `docs/architecture/components.md` | `architecture/c4/server-components.md` | Migrated with responsibility-to-project mapping |
+| `docs/architecture/dynamic-views.md` | `architecture/runtime/dynamic-views.md` | Migrated with consolidated Mermaid scenarios |
+| `docs/architecture/runtime-execution.md` | `architecture/runtime/agent-execution.md` | Migrated; scenarios remain in the dynamic-view catalog |
+| `docs/architecture/flow-execution.md` | `architecture/runtime/flow-execution.md` | Migrated; scenarios remain in the dynamic-view catalog |
+| `docs/architecture/project-structure.md` | `architecture/implementation/project-structure.md` | Migrated without treating projects as C4 components |
+| `docs/architecture/dependency-rules.md` | `architecture/implementation/dependency-rules.md` | Migrated; rules remain narrative and test-backed |
+| `docs/architecture/resource-model.md` | `architecture/data/resource-model.md` | Migrated; competing structural flowchart removed |
+| `docs/architecture/persistence.md` | `architecture/data/persistence.md` | Migrated; accuracy reconciliation continues in #610 |
+| `docs/architecture/standalone-mode.md` | `architecture/deployment/standalone.md` | Migrated with direct, Aspire, and Compose distinctions |
+| `docs/architecture/multi-tenancy.md` | `architecture/cross-cutting/tenancy-and-isolation.md` | Migrated; accuracy reconciliation continues in #610 |
 
-| Current source | Current role and observed overlap | Canonical destination | Planned reconciliation |
-| --- | --- | --- | --- |
-| `docs/architecture/overview.md` | Architecture landing page with a transitional structural Mermaid overview | `architecture/overview.md` plus `architecture/c4/` views | Keep as the DAT entry point; replace structural Mermaid after L1–L3 publication |
-| `docs/architecture/system-context.md` | Narrative plus a context-like Mermaid diagram | `architecture/c4/system-context.md` | Preserve narrative; replace the competing structural diagram in #605 |
-| `docs/architecture/containers.md` | Short executable inventory that predates the independent Console and current AEP topology | `architecture/c4/containers.md` and deployment pages | Reconcile against executables, composition roots, and ADRs in #606 |
-| `docs/architecture/project-structure.md` | Physical solution inventory with transitional Management naming | `architecture/implementation/project-structure.md` | Reconcile project mapping without turning projects into C4 components |
-| `docs/architecture/dependency-rules.md` | Logical dependency narrative plus a structural Mermaid graph | `architecture/implementation/dependency-rules.md` | Preserve enforced rules; link them to L3 components and architecture tests |
-| `docs/architecture/resource-model.md` | Resource lifecycle narrative plus a structural flowchart | `architecture/data/resource-model.md` | Reconcile with family ownership and decide whether the diagram is structural or behavioral |
-| `docs/architecture/persistence.md` | Store inventory containing removed legacy Content/Memory material | `architecture/data/persistence.md` | Reconcile SQLite/PostgreSQL logical boundaries and remove superseded claims only after comparison |
-| `docs/architecture/runtime-execution.md` | Runtime narrative linking to the consolidated Agent and AEP/MCP scenarios | `architecture/dynamic-views.md` plus runtime narrative | Reconciled in #608; retain the focused narrative as a discoverable entry point |
-| `docs/architecture/flow-execution.md` | Flow narrative linking to the consolidated Work, Flow, and Tool scenarios | `architecture/dynamic-views.md` plus Flow narrative | Reconciled in #608; retain the focused narrative as a discoverable entry point |
-| `docs/architecture/standalone-mode.md` | Local-first deployment narrative | `architecture/deployment/standalone.md` | Reconcile direct, Aspire, and Compose profiles while preserving local defaults |
-| `docs/architecture/multi-tenancy.md` | Cross-cutting isolation narrative with outdated coverage statements | `architecture/cross-cutting/tenancy-and-isolation.md` | Reconcile against current authorization and Workspace-scoping evidence |
+`docs/architecture/overview.md`, `conventions.md`, `interactive.mdx`, and this inventory remain canonical entry-point pages.
 
-## Root-level architecture sources
+## Former root-level architecture pages
 
-| Current source | Current role and observed overlap | Canonical destination | Planned reconciliation |
-| --- | --- | --- | --- |
-| `docs/architecture.md` | Detailed and comparatively current implementation inventory, flows, boundaries, and ADR catalog | Multiple DAT pages, primarily `implementation/`, `runtime/`, and `cross-cutting/` | Split progressively in #609; retain until every section is mapped and compared |
-| `docs/management-plane.md` | Earlier Management Plane boundary and route summary | `architecture/c4/server-components.md` and resource-family/data pages | Reconcile terminology with the Control Plane umbrella and plural family ownership |
-| `docs/runtime-plane.md` | Earlier Runtime boundary and capability summary | `architecture/c4/server-components.md` and `architecture/runtime/` | Preserve reconstructibility and provider boundaries; reconcile current capabilities |
-| `docs/work-plane.md` | Work ownership, lifecycle, API, and earlier local limits | `architecture/c4/server-components.md`, `architecture/runtime/work-execution.md`, and reference pages | Separate stable architecture from API reference and superseded limitations |
-| `docs/resource-model.md` | Concise resource-envelope description overlapping architecture and reference pages | `architecture/data/resource-model.md` with links to resource reference | Preserve invariants once; keep protocol details in Reference |
-| `docs/domain-model.md` | Earlier product-domain narrative | `architecture/data/` or Concepts according to content | Classify each section before migration; do not duplicate conceptual guidance |
-| `docs/flow.md` | Flow kinds, versioning, API, and runtime boundary | `architecture/runtime/` plus Flow concepts/reference | Separate behavioral architecture from user-facing and API material |
-| `docs/standalone.md` | Detailed standalone implementation note | `architecture/deployment/standalone.md` | Merge with the current architecture page after checking launch profiles and stores |
-| `docs/reconciliation.md` | Existing product/runtime reconciliation narrative | Relevant runtime or implementation page | Assess terminology and retain only current architecture behavior |
+| Compatibility path | Canonical destination | Reconciliation status |
+| --- | --- | --- |
+| `docs/architecture.md` | `architecture/implementation/current-state.md` plus focused DAT pages | Detailed inventory moved intact; focused pages link to it rather than copying it |
+| `docs/management-plane.md` | C4 server components, data model, and current-state inventory | Stable ownership retained; route inventory is implementation/reference evidence |
+| `docs/runtime-plane.md` | Agent execution and runtime reconciliation | Reconstructibility and provider boundaries retained |
+| `docs/work-plane.md` | Work execution | Stable ownership and lifecycle retained; obsolete local limitations removed |
+| `docs/resource-model.md` | Data resource model and Resource reference | Envelope and immutability invariants consolidated once |
+| `docs/domain-model.md` | Data model, runtime pages, and Concepts | Durable resource/runtime separation retained without duplicating product concepts |
+| `docs/flow.md` | Flow execution, dynamic views, and Flow concepts | Architecture separated from API and authoring guidance |
+| `docs/standalone.md` | Standalone deployment | Superseded seed-data and storage claims removed |
+| `docs/reconciliation.md` | Runtime reconciliation | Current reconciliation responsibility retained |
 
-## Sources that retain separate ownership
+## Sources with separate ownership
 
 | Source | Ownership after DAT migration |
 | --- | --- |
-| `docs/decisions/` | Remains the ADR history and decision source; DAT pages link to decisions rather than copying them |
-| `docs/concepts/` | Remains user- and contributor-facing conceptual documentation |
-| `docs/reference/` | Remains the precise product, API, configuration, and resource reference |
-| `docs/getting-started/` | Remains task-oriented onboarding and launch guidance |
-| `docs/contributing/` | Remains contributor workflow and governance documentation |
+| `docs/decisions/` | ADR history and decision source; DAT pages link to decisions rather than copying them |
+| `docs/concepts/` | User- and contributor-facing conceptual documentation |
+| `docs/reference/` | Precise product, API, configuration, and resource reference |
+| `docs/getting-started/` | Task-oriented onboarding and launch guidance |
+| `docs/contributing/` | Contributor workflow and governance documentation |
 
 ## Removal gate
 
-A legacy page can be removed or reduced to a replacement pointer only when:
+A compatibility page may be removed only when:
 
 1. every still-valid section has a canonical destination;
 2. obsolete statements have been checked against implementation and ADR evidence;
-3. structural diagrams defer to a published LikeC4 view;
+3. structural diagrams defer to the published LikeC4 view;
 4. dynamic diagrams have been migrated or deliberately retained as Mermaid;
 5. inbound links and Docusaurus navigation have been updated; and
 6. the complete documentation build succeeds.
