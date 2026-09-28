@@ -44,6 +44,8 @@ const sidebars = {
       label: 'Architecture',
       items: [
         'architecture/overview',
+        'architecture/conventions',
+        'architecture/migration-inventory',
         'architecture/system-context',
         'architecture/containers',
         'architecture/project-structure',

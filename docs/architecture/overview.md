@@ -1,6 +1,10 @@
 # Architecture overview
 
-Agentstration is a modular monolith with explicit Management, Runtime, Work, and Flow boundaries. The repository currently produces multiple local hosts from one codebase: an operations Console, an autonomous Work API, an end-user Workplace, and an Aspire AppHost.
+The `docs/architecture/` section is the canonical Agentstration Technical Architecture Document (DAT). [Architecture documentation conventions](conventions.md) define the ownership boundaries between LikeC4, Markdown, Mermaid, and ADRs, while the [migration inventory](migration-inventory.md) tracks the progressive consolidation of existing sources.
+
+Agentstration is a modular monolith with explicit resource-family, Runtime, Work, and Flow boundaries. The repository contains one authoritative server/API, independently hostable Console and Workplace shells, autonomous AEP extensions, and an Aspire development orchestrator.
+
+> The structural Mermaid overview below is transitional. It remains available until the shared LikeC4 model and its published L1–L3 views replace it without losing valid information.
 
 ```mermaid
 flowchart LR
