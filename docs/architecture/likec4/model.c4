@@ -15,16 +15,48 @@ model {
     description 'Open-source, self-hosted agent platform built on the Microsoft .NET AI stack'
 
     server = container 'Authoritative server and API' {
-      description 'Owns authoritative APIs, application services, workers, and local persistence composition'
+      description 'Agentstration.Web: authoritative APIs, application services, workers, embedded standalone Console, and storage composition'
 
       platform = component 'Platform responsibilities' {
         description 'Toolchain placeholder expanded by the dedicated L3 modeling increment'
       }
     }
+
+    console = container 'Operations Console host' {
+      description 'Agentstration.Console.Web: independently hostable Console UI and BFF with no authoritative business state'
+    }
+
+    workplace = container 'Workplace host' {
+      description 'Agentstration.Workplace.Web: independently hostable end-user UI with no authoritative business state'
+    }
+
+    managementData = container 'Management data' {
+      description 'Authoritative resource definitions, desired state, extension registrations, and related control-plane records'
+    }
+
+    identityData = container 'Identity data' {
+      description 'Local credentials, principals, memberships, authorization grants, preferences, and security audit records'
+    }
+
+    workData = container 'Work data' {
+      description 'Functional Work Items, interactions, notifications, events, and results'
+    }
+
+    flowData = container 'Flow data' {
+      description 'Editable Flow definitions, immutable published versions, Flow Runs, and execution events'
+    }
+
+    runtimeData = container 'Runtime data' {
+      description 'Technical Runtime Runs, events, attempts, and execution state'
+    }
   }
 
-  modelServices = softwareSystem 'Optional AI and model services' {
-    description 'Provider-specific AEP extensions and inference services; deterministic local operation does not require them'
+  aepExtensions = softwareSystem 'AEP extensions' {
+    description 'Independently deployable provider and utility adapters enrolled with Agentstration'
+  }
+
+  providerServices = softwareSystem 'Optional provider services' {
+    description 'External inference, source, and tool services used by configured extensions; deterministic local operation does not require them'
   }
 
   identityProvider = softwareSystem 'Optional identity provider' {
@@ -34,6 +66,20 @@ model {
   endUser -> agentstration 'Uses through Workplace'
   operator -> agentstration 'Administers through Console'
   apiConsumer -> agentstration 'Integrates through REST, MCP, and realtime APIs'
-  agentstration -> modelServices 'Discovers capabilities and invokes configured services'
+  agentstration -> aepExtensions 'Discovers capabilities and invokes configured contributions'
+  aepExtensions -> providerServices 'Adapts provider-specific protocols'
   agentstration -> identityProvider 'Authenticates configured external identities'
+
+  endUser -> agentstration.workplace 'Uses'
+  operator -> agentstration.console 'Administers and supervises'
+  apiConsumer -> agentstration.server 'Invokes governed APIs'
+  agentstration.console -> agentstration.server 'Uses Management, Work, Flow, and Runtime APIs'
+  agentstration.workplace -> agentstration.server 'Uses Entry, Work, interaction, and realtime APIs'
+  agentstration.server -> agentstration.managementData 'Reads and writes'
+  agentstration.server -> agentstration.identityData 'Reads and writes'
+  agentstration.server -> agentstration.workData 'Reads and writes'
+  agentstration.server -> agentstration.flowData 'Reads and writes'
+  agentstration.server -> agentstration.runtimeData 'Reads and writes'
+  agentstration.server -> aepExtensions 'Enrolls extensions and invokes AEP contributions'
+  agentstration.server -> identityProvider 'Uses configured OIDC authentication'
 }

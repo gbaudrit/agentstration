@@ -8,9 +8,14 @@ views {
 
   view containers of agentstration {
     title 'Agentstration containers'
-    description 'Toolchain baseline; the canonical L2 view is completed by issue #606'
+    description 'Canonical C4 L2 view of authoritative hosts, client-facing shells, persistent stores, and external integrations'
 
     include *
+    include endUser -> agentstration.workplace
+    include operator -> agentstration.console
+    include apiConsumer -> agentstration.server
+    include agentstration.server -> aepExtensions
+    include agentstration.server -> identityProvider
   }
 
   view serverComponents of agentstration.server {
