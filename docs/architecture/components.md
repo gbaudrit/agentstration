@@ -18,4 +18,6 @@ The mapping is supporting evidence, not the identity of a C4 component. A respon
 
 The principal dependency chain is Work → Flow → Runtime for execution. Flow and Runtime both use the governed Tool execution pipeline; Runtime resolves immutable Agent and profile resources before constructing an executable agent. API transport delegates to these application boundaries instead of implementing business logic. Background processing opens explicit scopes and reuses the same services.
 
+The [dynamic architecture views](dynamic-views.md) show the principal implemented interactions across these responsibilities without duplicating their structural ownership.
+
 Relevant decisions include [ADR-0005](../decisions/0005-shared-application-services.md), [ADR-0008](../decisions/0008-reconstructible-maf-runtime.md), [ADR-0009](../decisions/0009-independent-work-plane.md), [ADR-0010](../decisions/0010-independent-flow-module.md), [ADR-0055](../decisions/0055-agentstration-owns-tool-execution-boundary.md), [ADR-0109](../decisions/0109-control-plane-composes-resource-family-modules.md), and [ADR-0110](../decisions/0110-api-transport-is-composed-from-family-modules.md).

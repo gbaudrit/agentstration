@@ -15,8 +15,8 @@ The target paths below express the information architecture defined in [Architec
 | `docs/architecture/dependency-rules.md` | Logical dependency narrative plus a structural Mermaid graph | `architecture/implementation/dependency-rules.md` | Preserve enforced rules; link them to L3 components and architecture tests |
 | `docs/architecture/resource-model.md` | Resource lifecycle narrative plus a structural flowchart | `architecture/data/resource-model.md` | Reconcile with family ownership and decide whether the diagram is structural or behavioral |
 | `docs/architecture/persistence.md` | Store inventory containing removed legacy Content/Memory material | `architecture/data/persistence.md` | Reconcile SQLite/PostgreSQL logical boundaries and remove superseded claims only after comparison |
-| `docs/architecture/runtime-execution.md` | Runtime sequence diagram and narrative | `architecture/runtime/agent-execution.md` | Consolidate as a Mermaid dynamic view in #608 |
-| `docs/architecture/flow-execution.md` | Flow/Work sequence diagram and narrative | `architecture/runtime/flow-execution.md` | Consolidate as a Mermaid dynamic view in #608 |
+| `docs/architecture/runtime-execution.md` | Runtime narrative linking to the consolidated Agent and AEP/MCP scenarios | `architecture/dynamic-views.md` plus runtime narrative | Reconciled in #608; retain the focused narrative as a discoverable entry point |
+| `docs/architecture/flow-execution.md` | Flow narrative linking to the consolidated Work, Flow, and Tool scenarios | `architecture/dynamic-views.md` plus Flow narrative | Reconciled in #608; retain the focused narrative as a discoverable entry point |
 | `docs/architecture/standalone-mode.md` | Local-first deployment narrative | `architecture/deployment/standalone.md` | Reconcile direct, Aspire, and Compose profiles while preserving local defaults |
 | `docs/architecture/multi-tenancy.md` | Cross-cutting isolation narrative with outdated coverage statements | `architecture/cross-cutting/tenancy-and-isolation.md` | Reconcile against current authorization and Workspace-scoping evidence |
 

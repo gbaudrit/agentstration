@@ -64,7 +64,9 @@ The DAT does not maintain exhaustive C4 L4 diagrams. Focused implementation diag
 
 Structural C4 views come from LikeC4. Every published L1, L2, and selected L3 view has a stable view identifier and participates in the natural L1 → L2 → L3 navigation where a deeper view exists.
 
-Dynamic views use Mermaid for architectural sequences, states, and lifecycles. They reuse the terminology of the shared structural model and link back to the relevant C4 elements, but they do not redeclare structural ownership. A dynamic view stays above method-level tracing and documents an implemented scenario or an explicitly marked planned scenario.
+Dynamic views use Mermaid for architectural sequences, states, and lifecycles. They reuse the responsibility names from the shared structural model and link back to the relevant C4 elements, but they do not redeclare structural ownership. A dynamic view stays above method-level tracing and documents an implemented scenario or an explicitly marked planned scenario.
+
+Each dynamic view states its scenario boundary, distinguishes durable state changes from transient calls, and links to the relevant structural view and accepted ADRs. Alternative paths belong in one reconciled scenario when they share the same architectural boundary. A new diagram must not duplicate an existing scenario merely to present another transport or caller.
 
 Deployment views distinguish logical containers from environment-specific placement. They may describe direct standalone startup, Aspire development orchestration, Compose variants, SQLite and PostgreSQL profiles, and optional provider topologies without changing the logical C4 model.
 

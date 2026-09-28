@@ -50,6 +50,7 @@ const sidebars = {
         'architecture/system-context',
         'architecture/containers',
         'architecture/components',
+        'architecture/dynamic-views',
         'architecture/project-structure',
         'architecture/dependency-rules',
         'architecture/resource-model',
