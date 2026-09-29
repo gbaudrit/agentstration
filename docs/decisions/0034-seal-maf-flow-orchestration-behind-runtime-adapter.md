@@ -1,4 +1,4 @@
-# ADR 0034: Seal MAF Flow orchestration behind the runtime adapter
+# ADR-0034: Seal MAF Flow orchestration behind the runtime adapter
 
 ## Status
 

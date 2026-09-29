@@ -1,4 +1,4 @@
-# ADR-0062: Pack Runtime Profile bindings drive local deployment
+# ADR-0066: Pack Runtime Profile bindings drive local deployment
 
 Status: Accepted — 2026-08-20
 

@@ -3,13 +3,14 @@
   "version": "0.0.0-private",
   "private": true,
   "scripts": {
+    "decisions:validate": "node scripts/validate-adrs.mjs",
     "architecture:validate": "likec4 validate ../architecture/likec4",
     "architecture:generate": "likec4 codegen webcomponent --webcomponent-prefix agentstration-c4 --outfile static/generated/agentstration-likec4.js ../architecture/likec4",
     "architecture:build": "npm run architecture:validate && npm run architecture:generate",
     "architecture:preview": "likec4 start ../architecture/likec4",
-    "prestart": "npm run architecture:build",
+    "prestart": "npm run decisions:validate && npm run architecture:build",
     "start": "docusaurus start",
-    "prebuild": "npm run architecture:build",
+    "prebuild": "npm run decisions:validate && npm run architecture:build",
     "build": "docusaurus build",
     "serve": "docusaurus serve",
     "clear": "docusaurus clear"
@@ -29,6 +30,7 @@
     "node": ">=20.0"
   },
   "devDependencies": {
-    "likec4": "1.59.4"
+    "likec4": "1.59.4",
+    "picomatch": "^4.0.7"
   }
 }

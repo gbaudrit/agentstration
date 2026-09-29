@@ -27,9 +27,9 @@ This page records the first implementation-backed reconciliation of the canonica
 
 [ADR-0002](../../decisions/0002-storage-profiles.md) records the early local-JSON default and PostgreSQL target. It remains historical decision evidence; the current storage baseline is established by the implemented SQLite boundaries and later [ADR-0007](../../decisions/0007-sqlite-control-plane.md) and [ADR-0078](../../decisions/0078-postgresql-is-an-optional-server-storage-profile.md). Reconciliation does not rewrite an accepted ADR to conceal that evolution.
 
-## Unresolved drift
+## Resolved drift
 
-- Duplicate numeric identifiers exist for ADR-0117, ADR-0118, ADR-0119, and ADR-0122. This is tracked by [#612](https://github.com/gbaudrit/agentstration/issues/612). Until it is resolved, DAT links to affected decisions use the full filename and descriptive title rather than relying on the number alone.
+- [#612](https://github.com/gbaudrit/agentstration/issues/612) resolved the duplicate ADR-0117, ADR-0118, ADR-0119, and ADR-0122 identifiers by retaining the earlier decision numbers and renumbering the later Resource Planning and Assistant decisions as ADR-0144 through ADR-0147. The ADR catalog and inbound references are now unambiguous. The current documentation toolchain has no redirect facility, so the old colliding file paths cannot be retained as aliases; the issue records the explicit old-to-new mapping.
 - No other unresolved contradiction was found in the canonical L1, L2, L3, dynamic, persistence, deployment, or authorization pages during this reconciliation.
 
 ## Validation baseline
