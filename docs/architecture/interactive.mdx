@@ -1,0 +1,29 @@
+import LikeC4View from '@site/src/components/LikeC4View';
+
+# Interactive architecture
+
+This page embeds the canonical structural model generated from the LikeC4 sources under `docs/architecture/likec4/`. It supports navigation from the evidence-based C4 L1 System Context to the canonical L2 container view, the responsibility-oriented L3 server view, and focused implementation views such as API transport composition.
+
+Select an element that has a deeper scoped view to navigate through the model. The view browser also exposes every published view without requiring a local LikeC4 installation.
+
+<LikeC4View viewId="index" />
+
+## Local authoring commands
+
+The published Docusaurus site is authoritative. Contributors can run the same validation and build used by CI:
+
+```powershell
+cd docs/site
+npm ci
+npm run architecture:validate
+npm run build
+```
+
+An optional LikeC4-only preview is available for faster authoring:
+
+```powershell
+cd docs/site
+npm run architecture:preview
+```
+
+The preview is a convenience and is never required to read or review the architecture.

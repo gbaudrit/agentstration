@@ -1,11 +1,6 @@
 # Architecture Decision Records
 
-- [ADR-0031: Agentstration-native declarative resource envelope](0031-agentstration-native-resource-envelope.md)
-
 ADRs record durable architectural choices and their consequences. Existing decisions are numbered in chronological order and remain in Git when superseded.
-
-The Resource Planning integration adds [ADR-0117 — Resource Plans are reviewed proposals](0117-resource-plans-are-reviewed-proposals.md).
-Governed application follows [ADR-0120 — Resource ChangeSet application is durable and ordered](0120-resource-change-set-application-is-durable-and-ordered.md).
 
 ## Format
 
@@ -152,6 +147,7 @@ Use **Proposed** when implementation or repository evidence does not establish a
 117. [ADR-0117 — Browser journeys are product-owned reusable automation assets](0117-product-owned-browser-journeys.md)
 118. [ADR-0118 — Browser campaigns use dedicated Workspaces](0118-browser-campaigns-use-dedicated-workspaces.md)
 119. [ADR-0119 — Descendant use grants govern Secrets and Vaults](0119-descendant-use-grants-for-secrets-and-vaults.md)
+120. [ADR-0120 — Resource ChangeSet application is durable and ordered](0120-resource-change-set-application-is-durable-and-ordered.md)
 121. [ADR-0121 — AEP Secret access uses one-use capabilities](0121-aep-secret-access-capabilities.md)
 122. [ADR-0122 — AEP contributions declare protected Value Requirements](0122-aep-value-requirements-and-bound-values.md)
 123. [ADR-0123 — AEP Value Requirements may constrain invariant allowed values](0123-aep-value-requirements-constrain-allowed-values.md)
@@ -173,3 +169,7 @@ Use **Proposed** when implementation or repository evidence does not establish a
 141. [ADR-0141 — Console Entry interactions reuse durable Work](0141-console-entry-interactions-reuse-durable-work.md)
 142. [ADR-0142 — Console conversation browsing projects durable Interactions](0142-console-conversation-browsing-projects-durable-interactions.md)
 143. [ADR-0143 — Instance initialization uses a durable fenced lease](0143-instance-initialization-uses-a-durable-fenced-lease.md)
+144. [ADR-0144 — Resource Plans are reviewed proposals](0144-resource-plans-are-reviewed-proposals.md)
+145. [ADR-0145 — Resource Plan Agent bindings are explicit](0145-resource-plan-agent-bindings-are-explicit.md)
+146. [ADR-0146 — Resource Plan profile choices are durable review drafts](0146-resource-plan-binding-choices-are-durable-review-drafts.md)
+147. [ADR-0147 — The official Assistant is a Workspace-owned composition](0147-official-assistant-is-a-workspace-owned-composition.md)

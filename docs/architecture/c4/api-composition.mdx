@@ -1,0 +1,34 @@
+import LikeC4View from '@site/src/components/LikeC4View';
+
+# API transport composition
+
+This focused implementation view opens the **API transport** component without turning every transport project into a top-level server responsibility. It shows how the authoritative `Agentstration.Web` host registers the lightweight `Agentstration.Api` aggregator, which composes the family-owned API modules in an explicit order.
+
+<LikeC4View viewId="apiComposition" />
+
+The modules own HTTP, MCP, or SignalR translation for their family. They delegate business behavior to the application responsibilities shown in the [server component view](server-components.md); neither the host nor the aggregator owns family business logic.
+
+## Resource API modules
+
+<LikeC4View viewId="resourceApiModules" />
+
+## Platform API modules
+
+<LikeC4View viewId="platformApiModules" />
+
+## Execution API modules
+
+<LikeC4View viewId="executionApiModules" />
+
+| Application responsibility | Family API modules |
+| --- | --- |
+| Identity and authorization | `Identity.Api` |
+| Resource-family services | `Agents.Api`, `Extensions.Api`, `Models.Api`, `Parameters.Api`, `Resources.Api`, `Secrets.Api` |
+| Distribution and bootstrap | `Bootstrap.Api`, `Packs.Api`, `ResourcePlanning.Api`, `Sources.Api` |
+| Scheduling and background processing | `Triggers.Api` for Trigger administration, schedule preview, run-now, and occurrence history; background firing remains an internal worker entry |
+| Work and Workplace application | `Work.Api`, `Workplace.Api` |
+| Flow engine | `Flows.Api` |
+| Runtime execution | `Runtime.Api` |
+| Tool execution pipeline | `Tools.Api` |
+
+Global health and OpenAPI conventions remain in `Agentstration.Api`. Authentication and contextual authorization are applied through the shared server pipeline and family endpoint policies. See [ADR-0110](../../decisions/0110-api-transport-is-composed-from-family-modules.md).

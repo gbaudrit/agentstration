@@ -69,6 +69,23 @@ The UX pull request links the child in its Validation section. It still includes
 
 Keep the parent feature request open until the child scenario merges and the catalog marks its surface `covered`, unless a maintainer documents an explicit reasoned waiver. Before closing the parent, verify that every Sub-issue is closed or a maintainer-approved exception is documented on the parent. The UX-only pull request must not auto-close the parent issue.
 
+### Architecture documentation reconciliation
+
+Architecture documentation uses a transverse reconciliation task when a planned review is due or when accumulated implementation changes warrant a repository-wide comparison. Individual feature and technical issues still update directly affected documentation; they do not each need to audit the entire DAT.
+
+Create the reconciliation with the Technical task form. Apply `technical-task` as its one issue type, then add `documentation` and `documentation:architecture`. `documentation` identifies documentation work generally; `documentation:architecture` specializes it for DAT, C4, architectural diagrams, and related maintenance. This classification is independent from `test-scenario-task`, which is reserved for the deferred UX automation workflow.
+
+The issue records a baseline or change range and inspects:
+
+- executable composition, module/storage boundaries, architecture tests, and other implementation evidence;
+- the shared LikeC4 model and published L1–L3 views;
+- DAT narrative plus Mermaid dynamic and deployment views;
+- links to accepted ADRs and whether the documented consequences still match implementation.
+
+Reconciliation may update documentation to reflect behavior that is both implemented and already decided. It may also report a discrepancy or a missing decision. It must not silently rewrite an accepted ADR, normalize implementation drift as if it were intentional, or invent a product architecture choice. A significant missing choice remains owned by the feature or technical change that introduced or proposes it, and that owning change supplies the ADR.
+
+Validation includes LikeC4 validation and the complete Docusaurus build. Run or cite focused architecture tests when the reconciliation touches or makes claims about enforced project boundaries.
+
 ## AI defect learning
 
 The `ai-defect` label marks a structural, architectural, behavioral, or code-quality defect introduced by an AI-generated or AI-assisted change. It supplements the issue's type and priority labels; it does not replace either.

@@ -1,4 +1,4 @@
-# ADR-0118: Resource Plan Agent bindings are explicit
+# ADR-0145: Resource Plan Agent bindings are explicit
 
 ## Status
 

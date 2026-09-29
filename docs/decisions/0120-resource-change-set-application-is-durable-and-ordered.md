@@ -1,4 +1,4 @@
-# ADR 0120: Resource ChangeSet application is durable and ordered
+# ADR-0120: Resource ChangeSet application is durable and ordered
 
 ## Status
 

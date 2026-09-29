@@ -44,16 +44,63 @@ const sidebars = {
       label: 'Architecture',
       items: [
         'architecture/overview',
-        'architecture/system-context',
-        'architecture/containers',
-        'architecture/project-structure',
-        'architecture/dependency-rules',
-        'architecture/resource-model',
-        'architecture/persistence',
-        'architecture/runtime-execution',
-        'architecture/flow-execution',
-        'architecture/standalone-mode',
-        'architecture/multi-tenancy',
+        'architecture/conventions',
+        'architecture/interactive',
+        {
+          type: 'category',
+          label: 'Context',
+          items: ['architecture/context/outcome-and-constraints'],
+        },
+        {
+          type: 'category',
+          label: 'C4 model',
+          items: [
+            'architecture/c4/system-context',
+            'architecture/c4/containers',
+            'architecture/c4/server-components',
+            'architecture/c4/api-composition',
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Runtime',
+          items: [
+            'architecture/runtime/dynamic-views',
+            'architecture/runtime/work-execution',
+            'architecture/runtime/flow-execution',
+            'architecture/runtime/agent-execution',
+            'architecture/runtime/reconciliation',
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Data',
+          items: [
+            'architecture/data/resource-model',
+            'architecture/data/persistence',
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Deployment',
+          items: ['architecture/deployment/standalone'],
+        },
+        {
+          type: 'category',
+          label: 'Cross-cutting',
+          items: ['architecture/cross-cutting/tenancy-and-isolation'],
+        },
+        {
+          type: 'category',
+          label: 'Implementation',
+          items: [
+            'architecture/implementation/project-structure',
+            'architecture/implementation/dependency-rules',
+            'architecture/implementation/current-state',
+            'architecture/implementation/reconciliation-baseline-2026-09-28',
+            'architecture/migration-inventory',
+          ],
+        },
       ],
     },
     {

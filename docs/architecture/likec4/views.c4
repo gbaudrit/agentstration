@@ -1,0 +1,87 @@
+views {
+  view index {
+    title 'Agentstration system context'
+    description 'Canonical C4 L1 view of the Agentstration boundary, its users, and optional external systems'
+
+    include *
+  }
+
+  view containers of agentstration {
+    title 'Agentstration containers'
+    description 'Canonical C4 L2 view of authoritative hosts, client-facing shells, persistent stores, and external integrations'
+
+    include *
+    include endUser -> agentstration.workplace
+    include operator -> agentstration.console
+    include apiConsumer -> agentstration.server
+    include agentstration.server -> aepExtensions
+    include agentstration.server -> identityProvider
+  }
+
+  view serverComponents of agentstration.server {
+    title 'Authoritative server components'
+    description 'Canonical C4 L3 view: Console, Workplace, and external consumers enter through the API; bounded workers enter application capabilities internally'
+
+    include agentstration.server.transport
+    include agentstration.server.identity
+    include agentstration.server.distribution
+    include agentstration.server.scheduling
+    include agentstration.server.resources
+    include agentstration.server.work
+    include agentstration.server.flow
+    include agentstration.server.runtime
+    include agentstration.server.tools
+    include apiConsumer -> agentstration.server.transport
+    include agentstration.console -> agentstration.server.transport
+    include agentstration.workplace -> agentstration.server.transport
+    include agentstration.server.transport -> agentstration.server.identity
+    include agentstration.server.transport -> agentstration.server.distribution
+    include agentstration.server.transport -> agentstration.server.scheduling
+    include agentstration.server.transport -> agentstration.server.resources
+    include agentstration.server.transport -> agentstration.server.work
+    include agentstration.server.transport -> agentstration.server.flow
+    include agentstration.server.transport -> agentstration.server.runtime
+    include agentstration.server.transport -> agentstration.server.tools
+    include agentstration.server.distribution -> agentstration.server.resources
+    include agentstration.server.distribution -> agentstration.server.flow
+    include agentstration.server.scheduling -> agentstration.server.resources
+    include agentstration.server.scheduling -> agentstration.server.work
+    include agentstration.server.work -> agentstration.server.flow
+    include agentstration.server.flow -> agentstration.server.runtime
+    include agentstration.server.flow -> agentstration.server.tools
+    include agentstration.server.runtime -> agentstration.server.resources
+    include agentstration.server.runtime -> agentstration.server.tools
+    include agentstration.server.tools -> agentstration.server.resources
+  }
+
+  view apiComposition of agentstration.server.transport {
+    title 'API transport composition'
+    description 'Focused implementation view of the authoritative API host, lightweight aggregator, and family-owned transport modules'
+
+    include *
+  }
+
+  view resourceApiModules of agentstration.server.transport.resourceApis {
+    title 'Resource API modules'
+    description 'Family-owned transports for governed resources and scope projections'
+
+    include *
+    include agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.*
+  }
+
+  view platformApiModules of agentstration.server.transport.platformApis {
+    title 'Platform API modules'
+    description 'Family-owned transports for identity, distribution, extensions, sources, planning, and scheduling'
+
+    include *
+    include agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.*
+  }
+
+  view executionApiModules of agentstration.server.transport.executionApis {
+    title 'Execution API modules'
+    description 'Family-owned transports for Flow, Runtime, Tool, Work, and Workplace execution paths'
+
+    include *
+    include agentstration.server.transport.apiAggregator -> agentstration.server.transport.executionApis.*
+  }
+}

@@ -22,6 +22,7 @@ tests/Agentstration.Console.Playwright/test-results/
 tests/Agentstration.Console.Playwright/playwright-report/
 docs/site/build/
 docs/site/.docusaurus/
+docs/site/static/generated/
 automation/playwright/node_modules/
 automation/playwright/test-results/
 automation/playwright/playwright-report/

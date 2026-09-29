@@ -1,4 +1,4 @@
-# ADR-0122: The official Assistant is a Workspace-owned composition
+# ADR-0147: The official Assistant is a Workspace-owned composition
 
 ## Status
 
