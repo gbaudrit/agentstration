@@ -4,6 +4,7 @@ using Agentstration.Extensions.Api;
 using Agentstration.Flows.Api;
 using Agentstration.Identity.Api;
 using Agentstration.Infrastructure;
+using Agentstration.Knowledge.Api;
 using Agentstration.Models.Api;
 using Agentstration.Packs.Api;
 using Agentstration.Parameters.Api;
@@ -33,6 +34,7 @@ public static class ApiTransportEndpointRouteBuilderExtensions
             ? Results.Ok(new { status = "ready" })
             : Results.StatusCode(StatusCodes.Status503ServiceUnavailable)).AllowAnonymous();
         app.MapIdentityApi();
+        app.MapKnowledgeApi();
         app.MapBootstrapApi();
         app.MapAgentsApi();
         app.MapTriggersApi();

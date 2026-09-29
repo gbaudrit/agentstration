@@ -58,6 +58,11 @@
     <Project Path="src/Agentstration.Security.AspNetCoreIdentity.PostgreSql/Agentstration.Security.AspNetCoreIdentity.PostgreSql.csproj" />
     <Project Path="src/Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
   </Folder>
+  <Folder Name="/src/Knowledge/">
+    <Project Path="src/Agentstration.Knowledge.Api/Agentstration.Knowledge.Api.csproj" />
+    <Project Path="src/Agentstration.Knowledge.Contracts/Agentstration.Knowledge.Contracts.csproj" />
+    <Project Path="src/Agentstration.Knowledge/Agentstration.Knowledge.csproj" />
+  </Folder>
   <Folder Name="/src/Models/">
     <Project Path="src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <Project Path="src/Agentstration.Models/Agentstration.Models.csproj" />

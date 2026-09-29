@@ -5,6 +5,8 @@ using Agentstration.Extensions.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
+using Agentstration.Knowledge;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Parameters;
@@ -574,6 +576,7 @@ public sealed class DeclarativeBootstrapTests
         await File.WriteAllTextAsync(Path.Combine(resources.FullName, "30-model-profile.yaml"), ModelProfile());
         await File.WriteAllTextAsync(Path.Combine(resources.FullName, "40-agent.yaml"), Agent());
         await File.WriteAllTextAsync(Path.Combine(resources.FullName, "50-flow.yaml"), Flow());
+        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "55-knowledge-source.yaml"), KnowledgeSource());
         await File.WriteAllTextAsync(Path.Combine(resources.FullName, "60-entry.yaml"), Entry());
         await using var factory = Factory(initial.FullName, InitialPassword, configureOllamaExtension: true);
         using var client = factory.CreateClient();
@@ -616,12 +619,12 @@ public sealed class DeclarativeBootstrapTests
         Assert.IsTrue(
             preview.CanApply,
             string.Join(Environment.NewLine, preview.Resources.Select(resource => $"{resource.Kind}/{resource.Name}: {resource.Message}")));
-        Assert.HasCount(6, preview.Resources);
+        Assert.HasCount(7, preview.Resources);
         Assert.IsTrue(preview.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Create));
         var application = await management.ApplyAsync(selection, preview.Digest, principal.Id, default);
         Assert.AreEqual(BootstrapApplicationStatus.Succeeded, application.Definition.Status);
         Assert.AreEqual("bootstrap-model", application.Definition.Bindings.Single().Target.Name);
-        Assert.HasCount(6, application.Definition.Resources);
+        Assert.HasCount(7, application.Definition.Resources);
         Assert.IsTrue(application.Definition.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Create));
         var persistedBindingTargets = await management.GetBindingTargetsAsync(
             selection.Target,
@@ -644,6 +647,8 @@ public sealed class DeclarativeBootstrapTests
                 .GetAgentAsync("bootstrap-agent", default);
             var flow = await scope.ServiceProvider.GetRequiredService<FlowService>()
                 .GetAsync(new(workspace.Id), new("bootstrap-flow"), default);
+            var knowledgeSource = await scope.ServiceProvider.GetRequiredService<KnowledgeSourceManagementService>()
+                .GetAsync(new("bootstrap-knowledge"), default);
             var entry = await scope.ServiceProvider.GetRequiredService<IWorkplaceRepository>()
                 .GetEntryAsync(new(workspace.Id), new("bootstrap-entry"), default);
             var resourceStore = scope.ServiceProvider.GetRequiredService<IResourceStore>();
@@ -657,6 +662,7 @@ public sealed class DeclarativeBootstrapTests
             Assert.IsNotNull(model);
             Assert.IsNotNull(agent);
             Assert.IsNotNull(flow);
+            Assert.IsNotNull(knowledgeSource);
             Assert.IsNotNull(entry);
             Assert.IsNotNull(internalProvider);
             Assert.IsNotNull(planningTool);
@@ -666,6 +672,7 @@ public sealed class DeclarativeBootstrapTests
             Assert.IsFalse(model.Value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name));
             Assert.IsFalse(agent.Value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name));
             Assert.IsFalse(flow.Value.Metadata.ContainsKey(PackProvenanceAnnotations.Name));
+            Assert.IsFalse(knowledgeSource.Value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name));
         }
 
         var secondPreview = await management.PreviewAsync(selection, principal.Id, default);
@@ -1173,6 +1180,20 @@ public sealed class DeclarativeBootstrapTests
               id: bootstrap-agent
           publish: true
           activate: true
+        """;
+
+    private static string KnowledgeSource() => $$"""
+        apiVersion: {{ResourceApiVersions.CoreV1}}
+        kind: KnowledgeSource
+        metadata:
+          name: bootstrap-knowledge
+        definition:
+          displayName: Bootstrap knowledge
+          enabled: true
+          ingestionFlow:
+            name: bootstrap-flow
+          retrievalFlow:
+            name: bootstrap-flow
         """;
 
     private static string Entry() => $$"""

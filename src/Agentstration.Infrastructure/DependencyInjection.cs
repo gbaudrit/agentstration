@@ -19,6 +19,7 @@ using Agentstration.Infrastructure.Sources;
 using Agentstration.Infrastructure.Tools;
 using Agentstration.Infrastructure.Triggers;
 using Agentstration.Infrastructure.Work;
+using Agentstration.Knowledge;
 using Agentstration.ModelProviders;
 using Agentstration.Packs;
 using Agentstration.Parameters;
@@ -138,6 +139,7 @@ public static class DependencyInjection
         services.AddSingleton<ISecretVaultProvider, SharedKeyFileSecretVaultProvider>();
         services.AddSingleton<DescendantResourceUseAuthorizer>();
         services.AddSingleton<ParameterManagementService>();
+        services.AddSingleton<KnowledgeSourceManagementService>();
         services.AddSingleton<IParameterResolver>(provider => provider.GetRequiredService<ParameterManagementService>());
         services.AddSingleton<SecretManagementService>();
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
@@ -168,6 +170,7 @@ public static class DependencyInjection
         services.AddScoped<IBootstrapResourceHandler, ModelProfileBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, AgentBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, FlowBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, KnowledgeSourceBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, EntryBootstrapResourceHandler>();
         services.AddSingleton<WorkspaceMembershipAdministrationService>();
         services.AddSingleton<IdentityExperienceService>();
@@ -204,6 +207,7 @@ public static class DependencyInjection
         services.AddSingleton<IPackResourceHandler, ModelProfilePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, AgentPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, FlowPackResourceHandler>();
+        services.AddSingleton<IPackResourceHandler, KnowledgeSourcePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, EntryPackResourceHandler>();
         services.AddSingleton<IPackWorkspaceResourceCatalog, WorkspacePackResourceCatalog>();
         services.AddSingleton<PackManagementService>();
@@ -378,8 +382,10 @@ public static class DependencyInjection
         services.AddSingleton<FlowService>();
         services.AddSingleton<IEntryExecutionResolver, EntryExecutionResolver>();
         services.AddSingleton<IToolDefinitionFlowResolver, ToolDefinitionFlowResolver>();
+        services.AddSingleton<IKnowledgeFlowResolver, KnowledgeFlowResolver>();
         services.AddSingleton<IFlowVersionActivationGuard, ToolDefinitionFlowActivationGuard>();
         services.AddSingleton<IFlowDeletionGuard, ToolDefinitionFlowDeletionGuard>();
+        services.AddSingleton<IFlowDeletionGuard, KnowledgeFlowDeletionGuard>();
         services.AddSingleton<IEntryTargetResolver, EntryTargetResolver>();
         services.AddSingleton<EntryResourceDeletionGuard>();
         services.AddSingleton<IResourceDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());

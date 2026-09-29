@@ -3,6 +3,7 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../Agentstration.Agents.Api/Agentstration.Agents.Api.csproj" />
     <ProjectReference Include="../Agentstration.Flows.Api/Agentstration.Flows.Api.csproj" />
+    <ProjectReference Include="../Agentstration.Knowledge.Api/Agentstration.Knowledge.Api.csproj" />
     <ProjectReference Include="../Agentstration.Models.Api/Agentstration.Models.Api.csproj" />
     <ProjectReference Include="../Agentstration.Parameters.Api/Agentstration.Parameters.Api.csproj" />
     <ProjectReference Include="../Agentstration.ResourcePlanning.Api/Agentstration.ResourcePlanning.Api.csproj" />

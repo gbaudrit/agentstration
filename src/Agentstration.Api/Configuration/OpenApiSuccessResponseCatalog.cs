@@ -5,6 +5,7 @@ using Agentstration.Extensions.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.Parameters;
@@ -394,6 +395,16 @@ internal static class OpenApiSuccessResponseCatalog
                     : Json<IReadOnlyList<ParameterResource>>(200, "List Parameters");
             return Json<ParameterResource>(200, method == "PUT" ? "Update a Parameter" : "Get a Parameter");
         }
+        if (path.StartsWith("/api/knowledgesources", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path.EndsWith("/readiness", StringComparison.OrdinalIgnoreCase))
+                return Json<KnowledgeSourceReadiness>(200, "Inspect KnowledgeSource readiness");
+            if (path == "/api/knowledgesources")
+                return method == "POST"
+                    ? Json<KnowledgeSourceResource>(201, "Create a KnowledgeSource")
+                    : Json<IReadOnlyList<KnowledgeSourceResource>>(200, "List KnowledgeSources");
+            return Json<KnowledgeSourceResource>(200, method == "PUT" ? "Update a KnowledgeSource" : "Get a KnowledgeSource");
+        }
         if (path.StartsWith("/api/secrets", StringComparison.OrdinalIgnoreCase))
         {
             if (path.EndsWith("/value", StringComparison.OrdinalIgnoreCase)) return NoContent(method == "PUT" ? "Set a Secret value" : "Delete a Secret value");
@@ -489,6 +500,7 @@ internal static class OpenApiSuccessResponseCatalog
         || path.StartsWith("/api/tools", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/toolexecutionhooks", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/parameters", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/api/knowledgesources", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/vaults", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/secrets", StringComparison.OrdinalIgnoreCase);
 
