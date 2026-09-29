@@ -1,8 +1,10 @@
 using Agentstration.Flows;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Models;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -28,7 +30,11 @@ public sealed class OverviewRenderingTests
             new StubWorkClient(),
             api,
             new StubModelProvidersClient(),
+            new StubExtensionsClient(),
             NullLogger<PlatformDashboardService>.Instance));
+        var notifications = new NotificationState();
+        notifications.Add(new NotificationItem(Guid.NewGuid(), "Review required", "A resource changed.", DateTimeOffset.UtcNow, UiStatus.Warning));
+        context.Services.AddSingleton(notifications);
         context.Services.AddSingleton<IAgentstrationEventStream>(eventStream);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
@@ -36,9 +42,22 @@ public sealed class OverviewRenderingTests
 
         rendered.WaitForAssertion(() =>
         {
-            Assert.IsNotNull(rendered.Find(".overview-metric-grid"));
+            var groups = rendered.FindAll(".overview-metric-group");
+            Assert.HasCount(3, groups);
+            CollectionAssert.AreEqual(
+                new[] { "Build / Configure", "Operate", "Supervise" },
+                groups.Select(group => group.QuerySelector("h2")!.TextContent.Trim()).ToArray());
+            CollectionAssert.AreEqual(
+                new[] { "Defined agents", "Defined flows", "Extensions", "Model providers" },
+                groups[0].QuerySelectorAll(".metric-label").Select(label => label.TextContent.Trim()).ToArray());
+            Assert.IsEmpty(rendered.FindAll(".dashboard-sources"));
             StringAssert.Contains(rendered.Find(".dashboard-grid").TextContent, "Loading run events…");
         });
+        var notificationsCard = rendered.Find(".metric-card-button");
+        Assert.AreEqual("Notifications", notificationsCard.QuerySelector(".metric-label")!.TextContent.Trim());
+        Assert.AreEqual("1", notificationsCard.QuerySelector("strong")!.TextContent.Trim());
+        notificationsCard.Click();
+        Assert.IsTrue(notifications.IsPanelOpen);
         Assert.IsFalse(eventStream.IsCompleted);
 
         eventStream.Complete([
@@ -70,6 +89,42 @@ public sealed class OverviewRenderingTests
     }
 
     [TestMethod]
+    public void OverviewLocalizesMetricDetailsInFrench()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = new BunitContext();
+        var api = new MockApiClient(TimeProvider.System);
+        var eventStream = new ControlledEventStream();
+        eventStream.Complete([]);
+        context.Services.AddSingleton(new PlatformDashboardService(
+            api,
+            api,
+            new StubWorkClient(),
+            api,
+            new StubModelProvidersClient(),
+            new StubExtensionsClient(),
+            NullLogger<PlatformDashboardService>.Instance));
+        context.Services.AddSingleton<NotificationState>();
+        context.Services.AddSingleton<IAgentstrationEventStream>(eventStream);
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Home>();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var details = rendered.FindAll(".overview-metric-grid .metric-card small")
+                .Select(detail => detail.TextContent.Trim())
+                .ToArray();
+            CollectionAssert.Contains(details, "Prêts / souhaités");
+            Assert.IsTrue(details.Any(detail => detail.EndsWith(" en attente d’une saisie", StringComparison.Ordinal)));
+            Assert.IsTrue(details.Any(detail => detail.EndsWith(" échec(s) lors de la dernière exécution", StringComparison.Ordinal)));
+            Assert.IsTrue(details.Any(detail => detail.EndsWith(" indisponible(s)", StringComparison.Ordinal)));
+            StringAssert.Contains(rendered.Markup, "Aucun événement d’exécution");
+            StringAssert.Contains(rendered.Markup, "Les événements persistants du cycle de vie du Runtime et des Flows apparaîtront ici.");
+        });
+    }
+
+    [TestMethod]
     public void OverviewDisplaysReadyTilesWithoutWaitingForSlowTiles()
     {
         using var culture = new TestCultureScope("en-US");
@@ -83,7 +138,9 @@ public sealed class OverviewRenderingTests
             work,
             api,
             new StubModelProvidersClient(),
+            new StubExtensionsClient(),
             NullLogger<PlatformDashboardService>.Instance));
+        context.Services.AddSingleton<NotificationState>();
         context.Services.AddSingleton<IAgentstrationEventStream>(new ControlledEventStream());
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
@@ -93,7 +150,7 @@ public sealed class OverviewRenderingTests
         {
             var cards = rendered.FindAll(".overview-metric-grid > *");
             var agents = cards[0];
-            var tasks = cards[4];
+            var tasks = cards[7];
             Assert.IsFalse(agents.ClassList.Contains("metric-card-loading"));
             Assert.IsTrue(tasks.ClassList.Contains("metric-card-loading"));
             Assert.IsTrue(work.IsSummaryPending);
@@ -154,5 +211,15 @@ public sealed class OverviewRenderingTests
         public Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderStatusResponse> TestProviderAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class StubExtensionsClient : IExtensionsClient
+    {
+        public Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ExtensionResponse>>([]);
+        public Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

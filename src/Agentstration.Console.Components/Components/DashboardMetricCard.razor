@@ -1,4 +1,5 @@
 @implements IDisposable
+@inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.Components.Pages.HomeStrings> Localizer
 
 @if (metric is null)
 {
@@ -10,7 +11,7 @@
 }
 else
 {
-    <MetricCard Label="@Label" Value="@metric.Value" Detail="@metric.Detail" Status="@metric.Status" Url="@Url" />
+    <MetricCard Label="@Label" Value="@metric.Value" Detail="@MetricDetail" Status="@metric.Status" Url="@Url" />
 }
 
 @code {
@@ -20,6 +21,9 @@ else
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
     [Parameter, EditorRequired] public Task<DashboardMetric> Load { get; set; } = Task.FromResult(new DashboardMetric("—", null, UiStatus.Neutral));
     [Parameter] public string? Url { get; set; }
+    private string? MetricDetail => metric?.DetailResourceKey is { } key
+        ? Localizer[key, metric.DetailArguments?.ToArray() ?? []].Value
+        : metric?.Detail;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -36,7 +40,7 @@ else
         }
         catch (Exception)
         {
-            metric = new("—", "Unavailable", UiStatus.Danger);
+            metric = new("—", null, UiStatus.Danger, "Unavailable");
         }
 
         if (!disposed)
