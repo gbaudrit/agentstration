@@ -81,6 +81,8 @@ public sealed record PlatformSnapshot
 {
     public required string Status { get; init; }
     public int DefinedAgents { get; init; }
+    public int DefinedFlows { get; init; }
+    public int ConfiguredExtensions { get; init; }
     public int ReadyDeployments { get; init; }
     public int DesiredDeployments { get; init; }
     public int RunningRuntimeRuns { get; init; }
@@ -99,9 +101,16 @@ public sealed record PlatformSnapshot
     public IReadOnlyList<ComponentHealth> AttentionItems { get; init; } = [];
     public IReadOnlyList<ComponentHealth> Sources { get; init; } = [];
 }
-public sealed record DashboardMetric(string Value, string? Detail, UiStatus Status);
+public sealed record DashboardMetric(
+    string Value,
+    string? Detail,
+    UiStatus Status,
+    string? DetailResourceKey = null,
+    IReadOnlyList<object>? DetailArguments = null);
 public sealed record PlatformDashboardLoad(
     Task<DashboardMetric> DefinedAgents,
+    Task<DashboardMetric> DefinedFlows,
+    Task<DashboardMetric> ConfiguredExtensions,
     Task<DashboardMetric> ReadyDeployments,
     Task<DashboardMetric> RuntimeRuns,
     Task<DashboardMetric> RunningTasks,

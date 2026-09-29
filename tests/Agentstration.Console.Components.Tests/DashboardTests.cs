@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Agents.Contracts;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Flows;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
@@ -47,11 +48,14 @@ public sealed class DashboardTests
             new StubWorkClient(new(2, 3, 1, 4, 5)),
             fake,
             providers,
+            new StubExtensionsClient([Extension("extension-a"), Extension("extension-b")]),
             NullLogger<PlatformDashboardService>.Instance);
 
         var snapshot = await service.GetAsync(CancellationToken.None);
 
         Assert.AreEqual(2, snapshot.DefinedAgents);
+        Assert.AreEqual(3, snapshot.DefinedFlows);
+        Assert.AreEqual(2, snapshot.ConfiguredExtensions);
         Assert.AreEqual(1, snapshot.ReadyDeployments);
         Assert.AreEqual(2, snapshot.DesiredDeployments);
         Assert.AreEqual(2, snapshot.RunningTasks);
@@ -65,6 +69,12 @@ public sealed class DashboardTests
         Assert.AreEqual(10, snapshot.AttentionCount);
         Assert.AreEqual("Attention required", snapshot.Status);
         Assert.IsTrue(snapshot.Sources.All(source => source.Severity == UiStatus.Success));
+        Assert.IsTrue(snapshot.AttentionItems.All(item => !string.IsNullOrWhiteSpace(item.Url)));
+        Assert.IsTrue(snapshot.AttentionItems.Any(item => item.Url == "/deployments#deployment-default-deployment-failed"));
+        Assert.IsTrue(snapshot.AttentionItems.Any(item => item.Url == "/tasks?hasPendingAction=true"));
+        Assert.IsTrue(snapshot.AttentionItems.Any(item => item.Url == "/tasks?status=Failed"));
+        Assert.IsTrue(snapshot.AttentionItems.Any(item => item.Url == "/triggers/failed-trigger"));
+        Assert.IsTrue(snapshot.AttentionItems.Any(item => item.Url == "/modelproviders/unavailable-provider?namespace=default"));
     }
 
     [TestMethod]
@@ -77,6 +87,7 @@ public sealed class DashboardTests
             new StubWorkClient(new(2, 0, 0, 0, 0)),
             fake,
             new StubModelProvidersClient([]),
+            new StubExtensionsClient([]),
             NullLogger<PlatformDashboardService>.Instance);
 
         var snapshot = await service.GetAsync(CancellationToken.None);
@@ -99,6 +110,7 @@ public sealed class DashboardTests
             new StubWorkClient(new(0, 0, 0, 0, 0)),
             fake,
             new StubModelProvidersClient([]),
+            new StubExtensionsClient([]),
             NullLogger<PlatformDashboardService>.Instance);
 
         var snapshot = await service.GetAsync(CancellationToken.None);
@@ -121,6 +133,7 @@ public sealed class DashboardTests
             new StubWorkClient(new(0, 0, 0, 0, 0)),
             fake,
             new StubModelProvidersClient([]),
+            new StubExtensionsClient([]),
             NullLogger<PlatformDashboardService>.Instance);
 
         var load = service.Start(CancellationToken.None);
@@ -131,7 +144,9 @@ public sealed class DashboardTests
         Assert.AreEqual(1, snapshot.WaitingForInputFlowRuns);
         Assert.AreEqual(1, snapshot.AttentionCount);
         Assert.AreEqual("1", metric.Value);
-        Assert.AreEqual("1 awaiting input", metric.Detail);
+        Assert.IsNull(metric.Detail);
+        Assert.AreEqual("Metric.AwaitingInput", metric.DetailResourceKey);
+        Assert.AreEqual(1, metric.DetailArguments?.Single());
         Assert.AreEqual(UiStatus.Warning, metric.Status);
         var attention = snapshot.AttentionItems.Single();
         Assert.AreEqual("approval-flow", attention.Name);
@@ -150,6 +165,7 @@ public sealed class DashboardTests
             work,
             fake,
             new StubModelProvidersClient([]),
+            new StubExtensionsClient([]),
             NullLogger<PlatformDashboardService>.Instance);
         var sharedLoad = service.StartShared();
         using var pageCancellation = new CancellationTokenSource();
@@ -215,6 +231,19 @@ public sealed class DashboardTests
         name,
         new ModelProviderPropertiesResponse(name, "aep", "local", "extension", "default", "configured", status, null, 1));
 
+    private static ExtensionResponse Extension(string name) => new(
+        name,
+        "default",
+        new Uri($"https://{name}.example.test"),
+        "available",
+        new ExtensionIdentityResponse(name, name, "1.0.0", null),
+        [],
+        [],
+        [],
+        [],
+        null,
+        "configured");
+
     private static FlowRun CreateFlowRun(string id, FlowRunStatus status)
     {
         var workspaceId = new WorkspaceId(Guid.Parse("11111111-1111-1111-1111-111111111111"));
@@ -265,6 +294,16 @@ public sealed class DashboardTests
         public Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderStatusResponse> TestProviderAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class StubExtensionsClient(IReadOnlyList<ExtensionResponse> extensions) : IExtensionsClient
+    {
+        public Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) => Task.FromResult(extensions);
+        public Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class StubWorkClient(WorkTaskOperationsCountersResponse counters) : IWorkApiClient
