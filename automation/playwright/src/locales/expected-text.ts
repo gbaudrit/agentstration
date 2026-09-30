@@ -32,6 +32,10 @@ export interface ExpectedText {
     operational: string;
     partiallyUnavailable: string;
   };
+  platformOverview: {
+    groups: readonly string[];
+    labels: readonly string[];
+  };
 }
 
 export const ExpectedTextByLocale = {
@@ -74,6 +78,10 @@ export const ExpectedTextByLocale = {
       operational: 'Operational',
       partiallyUnavailable: 'Partially unavailable',
     },
+    platformOverview: {
+      groups: ['Build / Configure', 'Operate', 'Supervise'],
+      labels: ['Defined agents', 'Defined flows', 'Extensions', 'Model providers', 'Enabled triggers', 'Agent runs', 'Flow runs', 'Tasks running', 'Ready deployments', 'Needs attention', 'Notifications'],
+    },
   },
   'fr-FR': {
     navigation: {
@@ -113,6 +121,10 @@ export const ExpectedTextByLocale = {
       connecting: 'Connexion en cours',
       operational: 'Opérationnelle',
       partiallyUnavailable: 'Partiellement indisponible',
+    },
+    platformOverview: {
+      groups: ['Créer / Configurer', 'Exploiter', 'Superviser'],
+      labels: ['Agents définis', 'Flows définis', 'Extensions', 'Fournisseurs de modèles', 'Déclencheurs actifs', 'Exécutions d’agents', 'Exécutions de Flows', 'Tâches en cours', 'Déploiements prêts', 'Nécessite votre attention', 'Notifications'],
     },
   },
 } as const satisfies Record<SupportedTestLocale, ExpectedText>;

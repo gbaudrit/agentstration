@@ -84,6 +84,10 @@ export const Checkpoints = {
     directRoute: 'platform-health-direct-route',
     afterNavigation: 'platform-health-after-navigation',
   },
+  platformOverview: {
+    content: 'platform-overview-content',
+    responsive: 'platform-overview-responsive',
+  },
   descendantSecrets: {
     vaultCreated: 'descendant-secrets-vault-created',
     vaultUnavailable: 'descendant-secrets-vault-unavailable',
