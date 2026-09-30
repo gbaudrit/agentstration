@@ -8,31 +8,35 @@
     }
     else
     {
-        <div class="agent-tool-groups">
+        <div class="agent-toolset-grid">
         @foreach (var version in Versions.OrderBy(value => value.ToolSetName, StringComparer.CurrentCultureIgnoreCase).ThenByDescending(value => value.PublishedAt))
         {
             var assignment = Assignment(version);
-            <article class="agent-tool-group" data-toolset="@version.ToolSetName" data-version="@version.Version">
-                <header><div class="agent-tool-provider-identity"><span class="agent-tool-provider-icon" aria-hidden="true"><TablerIcon Name="layers" /></span><div><span class="agent-tool-provider-type">@T("PublishedToolSet")</span><h3>@version.ToolSetName</h3><code>@version.Namespace/@version.ToolSetName:@version.Version</code></div></div><a class="text-button" href="@ToolSetUrl(version)">@T("InspectToolSet") →</a></header>
-                <div class="agent-tool-list">
-                    <div class="agent-tool-option">
-                        <input id="@FullInputId(version)" type="checkbox" checked="@(assignment is not null)" @onchange="args => ToggleFullAsync(version, (bool)args.Value!)" />
-                        <label class="agent-tool-card-icon" for="@FullInputId(version)" aria-hidden="true"><TablerIcon Name="layers" /></label>
-                        <span class="agent-tool-copy"><strong><label for="@FullInputId(version)">@T(assignment?.Members.Count == 0 ? "AllMembers" : "SelectedMembers")</label></strong><small>@T("PinnedVersionHelp", version.Version)</small></span>
-                    </div>
-                    @if (assignment is not null)
-                    {
+            <article class="agent-toolset-card @(assignment is not null ? "selected" : null)" data-toolset="@version.ToolSetName" data-version="@version.Version">
+                <header class="agent-toolset-header">
+                    <div class="agent-toolset-identity"><span class="agent-toolset-icon" aria-hidden="true"><TablerIcon Name="layers" /></span><div><span class="agent-toolset-kind">@T("PublishedToolSet")</span><h3>@version.ToolSetName</h3><code>@version.Namespace/@version.ToolSetName:@version.Version</code></div></div>
+                    <a class="text-button" href="@ToolSetUrl(version)">@T("InspectToolSet") →</a>
+                </header>
+                <div class="agent-toolset-assignment">
+                    <input id="@FullInputId(version)" type="checkbox" checked="@(assignment is not null)" @onchange="args => ToggleFullAsync(version, (bool)args.Value!)" />
+                    <label for="@FullInputId(version)"><strong>@T(assignment?.Members.Count == 0 ? "AllMembers" : "SelectedMembers")</strong><small>@T("PinnedVersionHelp", version.Version)</small></label>
+                </div>
+                @if (assignment is not null)
+                {
+                    <div class="agent-toolset-members" aria-label="@T("ToolSetMembers")">
+                        <p>@T("ChooseToolSetMembers")</p>
+                        <div class="agent-toolset-member-grid">
                         @foreach (var member in version.Members)
                         {
                             var selected = assignment.Members.Count == 0 || assignment.Members.Contains(member.ToolName, StringComparer.Ordinal);
-                            <div class="agent-tool-option">
+                            <label class="agent-toolset-member" for="@MemberInputId(version, member)">
                                 <input id="@MemberInputId(version, member)" type="checkbox" checked="@selected" @onchange="args => ToggleMemberAsync(version, member.ToolName, (bool)args.Value!)" />
-                                <label class="agent-tool-card-icon" for="@MemberInputId(version, member)" aria-hidden="true"><TablerIcon Name="tool" /></label>
-                                <span class="agent-tool-copy"><strong><label for="@MemberInputId(version, member)">@member.ToolName</label></strong><small><code>@member.Capability · @member.Route</code> · @member.ProviderName</small></span>
-                            </div>
+                                <span><strong>@member.ToolName</strong><small><code>@member.Capability · @member.Route</code><span>@member.ProviderName</span></small></span>
+                            </label>
                         }
-                    }
-                </div>
+                        </div>
+                    </div>
+                }
             </article>
         }
         </div>

@@ -47,15 +47,21 @@
   <data name="OpenProvider"><value>Ouvrir le fournisseur</value></data>
   <data name="References"><value>Références</value></data>
   <data name="ToolsAndTags"><value>Outils et étiquettes</value></data>
-  <data name="GovernedTools"><value>Outils gouvernés</value></data>
+  <data name="GovernedTools"><value>Outils individuels supplémentaires</value></data>
   <data name="ToolConfiguration"><value>Configuration des outils</value></data>
-  <data name="ToolConfigurationHelp"><value>Sélectionnez les outils gouvernés accessibles à cet agent. Les outils sont regroupés par source MCP.</value></data>
+  <data name="ToolConfigurationHelp"><value>Ajoutez des Tools individuels en complément de ceux déjà accordés par un ToolSet. Les droits issus des ToolSets apparaissent cochés et en lecture seule ; seuls les ajouts individuels sont enregistrés ici.</value></data>
   <data name="ManageMcpTools"><value>Gérer MCP / outils</value></data>
   <data name="OpenToolCatalog"><value>Ouvrir MCP / outils</value></data>
   <data name="McpProvider"><value>MCP</value></data>
   <data name="OpenMcp"><value>Ouvrir le MCP</value></data>
   <data name="UnknownMcp"><value>MCP inconnu</value></data>
   <data name="SelectedTools"><value>Sélection : {0}</value></data>
+  <data name="EffectiveSelectedTools"><value>Effectifs : {0}</value></data>
+  <data name="EffectiveToolAccess"><value>Accès effectif aux outils</value></data>
+  <data name="EffectiveTools"><value>effectif(s)</value></data>
+  <data name="ViaToolSets"><value>via les ToolSets</value></data>
+  <data name="IndividualTools"><value>individuel(s)</value></data>
+  <data name="GrantedViaToolSet"><value>Accordé via {0}</value></data>
   <data name="ToolCount"><value>{0} outil(s)</value></data>
   <data name="NoDiscoveredTools"><value>Aucun outil découvert n’est disponible. Configurez-les dans Outils.</value></data>
   <data name="Available"><value>Disponible</value></data>
@@ -93,6 +99,6 @@
   <data name="ToolCategoriesHelp"><value>Utilisez une catégorie pour sélectionner en masse ses outils actuellement assignables. Seules les références individuelles des outils sont enregistrées sur l’agent.</value></data>
   <data name="ManageCategories"><value>Gérer les catégories</value></data>
   <data name="CategorySelection"><value>{0} sur {1} sélectionné(s)</value></data>
-  <data name="ToolSetConfiguration" xml:space="preserve"><value>Droits versionnés</value></data><data name="GovernedToolSets" xml:space="preserve"><value>ToolSets gouvernés</value></data><data name="ToolSetConfigurationHelp" xml:space="preserve"><value>Attribuez une version publiée exacte et tous ses membres ou un sous-ensemble explicite. La sélection est figée lors de la publication d’une révision d’Agent.</value></data><data name="ManageToolSets" xml:space="preserve"><value>Gérer les ToolSets</value></data><data name="NoPublishedToolSets" xml:space="preserve"><value>Aucune version publiée de ToolSet n’est disponible dans cet espace de travail.</value></data><data name="PublishedToolSet" xml:space="preserve"><value>ToolSet publié</value></data><data name="InspectToolSet" xml:space="preserve"><value>Consulter</value></data><data name="AllMembers" xml:space="preserve"><value>Tous les membres</value></data><data name="SelectedMembers" xml:space="preserve"><value>Membres sélectionnés uniquement</value></data><data name="PinnedVersionHelp" xml:space="preserve"><value>La version {0} sera figée ; les ajouts ultérieurs n’étendent pas une révision d’Agent déjà publiée.</value></data>
+  <data name="ToolSetConfiguration" xml:space="preserve"><value>Droits versionnés</value></data><data name="GovernedToolSets" xml:space="preserve"><value>Droits accordés par ToolSet</value></data><data name="ToolSetConfigurationHelp" xml:space="preserve"><value>Accordez une version publiée exacte d’un ToolSet, puis conservez tous ses membres ou choisissez un sous-ensemble. Les Tools accordés sont reflétés dans la liste des accès effectifs ci-dessous.</value></data><data name="ManageToolSets" xml:space="preserve"><value>Gérer les ToolSets</value></data><data name="NoPublishedToolSets" xml:space="preserve"><value>Aucune version publiée de ToolSet n’est disponible dans cet espace de travail.</value></data><data name="PublishedToolSet" xml:space="preserve"><value>ToolSet publié</value></data><data name="InspectToolSet" xml:space="preserve"><value>Consulter</value></data><data name="AllMembers" xml:space="preserve"><value>Accorder tous les membres</value></data><data name="SelectedMembers" xml:space="preserve"><value>Accorder les membres sélectionnés</value></data><data name="PinnedVersionHelp" xml:space="preserve"><value>La version {0} sera figée ; les ajouts ultérieurs n’étendent pas une révision d’Agent déjà publiée.</value></data><data name="ToolSetMembers" xml:space="preserve"><value>Membres du ToolSet</value></data><data name="ChooseToolSetMembers" xml:space="preserve"><value>Choisissez les membres accordés par cette version.</value></data>
   <data name="ActiveRevision"><value>Révision active</value></data><data name="PinnedToolSetAssignments"><value>Attributions de ToolSets figées</value></data><data name="PinnedToolSetAssignmentsHelp"><value>Cette preuve immuable contrôle les outils disponibles pour la révision active de l’Agent.</value></data><data name="ToolSet"><value>ToolSet</value></data><data name="Version"><value>Version</value></data><data name="DefinitionHash"><value>Empreinte de définition</value></data><data name="EffectiveMembers"><value>Membres effectifs</value></data>
 </root>

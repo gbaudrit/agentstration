@@ -83,7 +83,7 @@ else
         @if (toolsMode)
         {
             <AgentToolSetConfiguration Versions="catalogToolSetVersions" Selected="SelectedToolSets" SelectedChanged="UpdateSelectedToolSets" />
-            <AgentToolConfiguration Tools="catalogTools" Providers="catalogProviders" Categories="catalogCategories" SelectedToolIds="SelectedToolIds" SelectedToolIdsChanged="UpdateSelectedTools" />
+            <AgentToolConfiguration Tools="catalogTools" Providers="catalogProviders" Categories="catalogCategories" SelectedToolIds="SelectedToolIds" ToolSetGrantedTools="ToolSetGrantedTools" SelectedToolIdsChanged="UpdateSelectedTools" />
         }
         else
         {
@@ -317,6 +317,41 @@ else
     }
     private IReadOnlyList<string> SelectedToolIds => model?.ToolNames.Split(['\r','\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
     private IReadOnlyList<AgentToolSetSelection> SelectedToolSets => model?.ToolSets ?? [];
+    private IReadOnlyDictionary<string, IReadOnlyList<string>> ToolSetGrantedTools
+    {
+        get
+        {
+            var grants = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (var selection in SelectedToolSets)
+            {
+                var selectedNamespace = selection.ToolSet.Namespace ?? ResourceNamespace.Default;
+                var version = catalogToolSetVersions.SingleOrDefault(value =>
+                    value.Namespace == selectedNamespace
+                    && string.Equals(value.ToolSetName, selection.ToolSet.Name, StringComparison.Ordinal)
+                    && string.Equals(value.Version, selection.Version, StringComparison.Ordinal));
+                if (version is null) continue;
+
+                var selectedMembers = selection.Members.Count == 0
+                    ? version.Members
+                    : version.Members.Where(value => selection.Members.Contains(value.ToolName, StringComparer.Ordinal)).ToArray();
+                var source = $"{version.ToolSetName}@{version.Version}";
+                foreach (var member in selectedMembers)
+                {
+                    if (!grants.TryGetValue(member.ToolName, out var sources))
+                    {
+                        sources = [];
+                        grants.Add(member.ToolName, sources);
+                    }
+                    if (!sources.Contains(source, StringComparer.Ordinal)) sources.Add(source);
+                }
+            }
+
+            return grants.ToDictionary(
+                pair => pair.Key,
+                pair => (IReadOnlyList<string>)pair.Value,
+                StringComparer.Ordinal);
+        }
+    }
     private Task UpdateSelectedTools(IReadOnlyList<string> values)
     {
         if (model is not null)
