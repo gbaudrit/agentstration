@@ -54,6 +54,9 @@ public static class SecurityAuditActions
     public const string KnowledgeSourceEnabled = "knowledge-source.enabled";
     public const string KnowledgeSourceDisabled = "knowledge-source.disabled";
     public const string KnowledgeSourceDeleted = "knowledge-source.deleted";
+    public const string KnowledgeAcquisitionStarted = "knowledge-acquisition.started";
+    public const string KnowledgeAcquisitionCancelled = "knowledge-acquisition.cancelled";
+    public const string KnowledgeAcquisitionRetried = "knowledge-acquisition.retried";
     public const string ToolSetCreated = "tool-set.created";
     public const string ToolSetUpdated = "tool-set.updated";
     public const string ToolSetDeleted = "tool-set.deleted";
