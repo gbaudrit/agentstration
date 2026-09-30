@@ -313,6 +313,30 @@ public sealed record KnowledgeRetrievalSnapshotInput
     public IReadOnlyList<KnowledgeSnapshotArtifact> Artifacts { get; init; } = [];
 }
 
+public sealed record KnowledgeRetrievalCaller
+{
+    [JsonPropertyName("principalId")]
+    public required Guid PrincipalId { get; init; }
+    [JsonPropertyName("tenantId")]
+    public required Guid TenantId { get; init; }
+    [JsonPropertyName("workspaceId")]
+    public required Guid WorkspaceId { get; init; }
+    [JsonPropertyName("agentId")]
+    public string? AgentId { get; init; }
+    [JsonPropertyName("agentRevisionId")]
+    public string? AgentRevisionId { get; init; }
+    [JsonPropertyName("runtimeRunId")]
+    public string? RuntimeRunId { get; init; }
+    [JsonPropertyName("flowRunId")]
+    public string? FlowRunId { get; init; }
+    [JsonPropertyName("flowStepId")]
+    public string? FlowStepId { get; init; }
+    [JsonPropertyName("toolCallId")]
+    public string? ToolCallId { get; init; }
+    [JsonPropertyName("toolInvocationId")]
+    public string? ToolInvocationId { get; init; }
+}
+
 public sealed record KnowledgeRetrievalInput
 {
     [JsonPropertyName("knowledgeSourceId")]
@@ -328,7 +352,7 @@ public sealed record KnowledgeRetrievalInput
     [JsonPropertyName("request")]
     public required JsonElement Request { get; init; }
     [JsonPropertyName("caller")]
-    public required KnowledgeAcquisitionCaller Caller { get; init; }
+    public required KnowledgeRetrievalCaller Caller { get; init; }
     [JsonPropertyName("correlationId")]
     public required string CorrelationId { get; init; }
     [JsonPropertyName("retrievalId")]

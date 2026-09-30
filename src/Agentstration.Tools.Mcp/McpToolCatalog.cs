@@ -319,7 +319,14 @@ public sealed class McpToolInvoker(
                 context.CorrelationId,
                 context.Arguments ?? JsonSerializer.SerializeToElement(new { }),
                 context.AgentId is not null ? ToolDefinitionCallerKind.Agent : context.OwnerKind == ToolExecutionOwnerKind.FlowRun ? ToolDefinitionCallerKind.Flow : ToolDefinitionCallerKind.Agent,
-                context.AgentId is not null ? $"agent:{context.AgentId}" : context.RunId is not null ? $"flow:{context.RunId}" : null), cancellationToken);
+                context.AgentId is not null ? $"agent:{context.AgentId}" : context.RunId is not null ? $"flow:{context.RunId}" : null,
+                new ToolDefinitionInvocationContext(
+                    context.AgentId,
+                    context.AgentRevisionId,
+                    context.OwnerKind == ToolExecutionOwnerKind.RuntimeRun ? context.RunId : null,
+                    context.OwnerKind == ToolExecutionOwnerKind.FlowRun ? context.RunId : null,
+                    context.FlowStepId,
+                    context.InvocationId)), cancellationToken);
             return result.Output?.Clone();
         }
         return await providers.InvokeAsync(provider.Value, tool.Value, context.Arguments, cancellationToken);
