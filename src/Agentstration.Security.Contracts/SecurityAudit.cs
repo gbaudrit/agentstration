@@ -57,6 +57,9 @@ public static class SecurityAuditActions
     public const string KnowledgeAcquisitionStarted = "knowledge-acquisition.started";
     public const string KnowledgeAcquisitionCancelled = "knowledge-acquisition.cancelled";
     public const string KnowledgeAcquisitionRetried = "knowledge-acquisition.retried";
+    public const string KnowledgeSnapshotPublished = "knowledge-snapshot.published";
+    public const string KnowledgeSnapshotPublicationFailed = "knowledge-snapshot.publication-failed";
+    public const string KnowledgeSnapshotActivated = "knowledge-snapshot.activated";
     public const string ToolSetCreated = "tool-set.created";
     public const string ToolSetUpdated = "tool-set.updated";
     public const string ToolSetDeleted = "tool-set.deleted";

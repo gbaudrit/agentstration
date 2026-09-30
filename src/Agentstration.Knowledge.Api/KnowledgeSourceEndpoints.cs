@@ -171,7 +171,10 @@ internal static class KnowledgeSourceEndpoints
         catch (ResourceScopeAccessDeniedException exception)
         { return Problem("resource-scope-access-denied", "Resource scope access denied", 403, exception.Message); }
         catch (KnowledgeSourceValidationException exception)
-        { return Problem(exception.Code, "Invalid KnowledgeSource", 422, exception.Message); }
+        {
+            var status = exception.Code == "knowledge_source_in_use_by_snapshot" ? 409 : 422;
+            return Problem(exception.Code, "Invalid KnowledgeSource", status, exception.Message);
+        }
         catch (ToolDefinitionValidationException exception)
         { return Problem(exception.Code, "Invalid KnowledgeSource Tool exposure", 422, exception.Message); }
         catch (ToolSetValidationException exception)

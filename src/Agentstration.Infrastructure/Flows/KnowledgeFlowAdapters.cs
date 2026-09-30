@@ -201,6 +201,44 @@ public sealed class KnowledgeArtifactReferenceValidator(IResourceStore store)
     }
 }
 
+public sealed class KnowledgeSnapshotArtifactResolver(IResourceStore store)
+    : IKnowledgeSnapshotArtifactResolver
+{
+    public async Task<IReadOnlyList<KnowledgeDurableArtifactEvidence>> ResolveAsync(
+        Guid workspaceId,
+        IReadOnlyList<string> artifactIds,
+        CancellationToken cancellationToken)
+    {
+        var result = new List<KnowledgeDurableArtifactEvidence>(artifactIds.Count);
+        foreach (var artifactId in artifactIds)
+        {
+            FlowRunArtifactId parsed;
+            try { parsed = FlowRunArtifactId.Parse(artifactId); }
+            catch (FormatException exception)
+            {
+                throw new KnowledgeSnapshotException("knowledge_snapshot_artifact_invalid",
+                    $"FlowRunArtifact identity '{artifactId}' is invalid.", exception);
+            }
+            var artifact = await store.GetExactAsync<FlowRunArtifactResource>(ScopedResourceAddress.Create(
+                ResourceScopeRef.Workspace(workspaceId), ResourceNamespace.Default,
+                ArtifactResourceKinds.FlowRunArtifact, parsed.ToString()), cancellationToken);
+            if (artifact is null || artifact.Value.WorkspaceId.Value != workspaceId)
+                throw new KnowledgeSnapshotException("knowledge_snapshot_artifact_not_found",
+                    $"FlowRunArtifact '{artifactId}' was not found in Workspace '{workspaceId:D}'.");
+            result.Add(new(
+                artifact.Value.ArtifactId.ToString(),
+                artifact.Value.ProducerFlowRunId,
+                artifact.Value.ProducerFlowStepId,
+                artifact.Value.Receipt.StorageFlowRunId,
+                artifact.Value.Receipt.MediaType,
+                artifact.Value.Receipt.Length,
+                artifact.Value.Receipt.Sha256,
+                new Dictionary<string, string>(artifact.Value.Receipt.Provenance, StringComparer.Ordinal)));
+        }
+        return result;
+    }
+}
+
 public sealed class KnowledgeFlowDeletionGuard(
     IResourceStore store,
     IRequestContextScopeFactory requestScopes) : IFlowDeletionGuard
@@ -217,10 +255,40 @@ public sealed class KnowledgeFlowDeletionGuard(
         if (usage is not null)
             throw new FlowValidationException("flow_in_use_by_knowledge_source",
                 $"Flow '{flowId}' is referenced by KnowledgeSource '{usage.Address}'.");
+        var snapshots = await store.ListAllAsync<KnowledgeSnapshotResource>(KnowledgeResourceKinds.KnowledgeSnapshot, cancellationToken);
+        var retained = snapshots.Select(value => value.Value).FirstOrDefault(value =>
+            value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
+            && targetId == workspaceId.Value
+            && string.Equals(value.IngestionFlow.Name, flowId.Value, StringComparison.Ordinal)
+            && value.IngestionFlow.Namespace == flowId.Namespace);
+        if (retained is not null)
+            throw new FlowValidationException("flow_in_use_by_knowledge_snapshot",
+                $"Flow '{flowId}' is retained by Knowledge Snapshot '{retained.Address}'.");
     }
 
     private static bool References(KnowledgeSourceResource source, KnowledgeFlowTarget? target, FlowId flowId) =>
         target is not null
         && string.Equals(target.Name, flowId.Value, StringComparison.Ordinal)
         && (target.Namespace ?? source.Namespace) == flowId.Namespace;
+}
+
+public sealed class KnowledgeSnapshotFlowRunDeletionGuard(
+    IResourceStore store,
+    IRequestContextScopeFactory requestScopes) : IFlowRunDeletionGuard
+{
+    public async Task ValidateDeleteAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken)
+    {
+        using var requestScope = requestScopes.PushSystem();
+        var snapshots = await store.ListAllAsync<KnowledgeSnapshotResource>(
+            KnowledgeResourceKinds.KnowledgeSnapshot, cancellationToken);
+        var retained = snapshots.Select(value => value.Value).FirstOrDefault(value =>
+            value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
+            && targetId == workspaceId.Value
+            && (string.Equals(value.IngestionFlowRunId, runId, StringComparison.Ordinal)
+                || value.Artifacts.Any(artifact => string.Equals(
+                    artifact.StorageFlowRunId, runId, StringComparison.Ordinal))));
+        if (retained is not null)
+            throw new FlowValidationException("flow_run_in_use_by_knowledge_snapshot",
+                $"FlowRun '{runId}' is retained by Knowledge Snapshot '{retained.Address}'.");
+    }
 }

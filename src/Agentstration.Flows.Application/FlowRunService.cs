@@ -92,6 +92,11 @@ public interface IFlowRunCancellationRegistry
     void Complete(FlowRunKey key);
 }
 
+public interface IFlowRunDeletionGuard
+{
+    Task ValidateDeleteAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken);
+}
+
 public interface IFlowRunEventSink
 {
     Task PublishAsync(FlowRunEvent runEvent, CancellationToken cancellationToken);
@@ -156,7 +161,8 @@ public sealed partial class FlowRunService(
     FlowRunExecutionOptions? executionOptions = null,
     IFlowInputRequestSink? inputRequestSink = null,
     IFlowToolExecutor? configuredToolExecutor = null,
-    IFlowToolSetResolver? configuredToolSetResolver = null)
+    IFlowToolSetResolver? configuredToolSetResolver = null,
+    IEnumerable<IFlowRunDeletionGuard>? configuredRunDeletionGuards = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly FlowRunExecutionOptions executionOptions = executionOptions is null
@@ -170,6 +176,8 @@ public sealed partial class FlowRunService(
             : throw new ArgumentOutOfRangeException(nameof(executionOptions), "Execution and input timeouts must be positive, and the execution lease must exceed the orchestration timeout.");
     private readonly IFlowToolExecutor toolExecutor = configuredToolExecutor ?? UnsupportedFlowToolExecutor.Instance;
     private readonly IFlowToolSetResolver toolSetResolver = configuredToolSetResolver ?? UnsupportedFlowToolSetResolver.Instance;
+    private readonly IReadOnlyList<IFlowRunDeletionGuard> runDeletionGuards =
+        configuredRunDeletionGuards?.ToArray() ?? [];
     public static readonly ActivitySource ActivitySource = new("Agentstration.Flows");
     public static readonly Meter Meter = new("Agentstration.Flows");
     private static readonly Counter<long> RunsCreated = Meter.CreateCounter<long>("agentstration.flow.runs.created");

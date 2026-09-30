@@ -417,12 +417,16 @@ public static class DependencyInjection
         services.AddSingleton<IKnowledgeFlowResolver, KnowledgeFlowResolver>();
         services.AddSingleton<IKnowledgeAcquisitionFlowGateway, KnowledgeAcquisitionFlowGateway>();
         services.AddSingleton<IKnowledgeArtifactReferenceValidator, KnowledgeArtifactReferenceValidator>();
+        services.AddSingleton<IKnowledgeSnapshotArtifactResolver, KnowledgeSnapshotArtifactResolver>();
+        services.AddSingleton<KnowledgeSnapshotService>();
         if (enableHostedServices) services.AddHostedService<KnowledgeAcquisitionRecoveryWorker>();
+        if (enableHostedServices) services.AddHostedService<KnowledgeSnapshotRecoveryWorker>();
         services.AddSingleton<KnowledgeSourceToolExposureService>();
         services.AddSingleton<IFlowVersionActivationGuard, ToolDefinitionFlowActivationGuard>();
         services.AddSingleton<IFlowVersionActivationGuard, KnowledgeIngestionFlowActivationGuard>();
         services.AddSingleton<IFlowDeletionGuard, ToolDefinitionFlowDeletionGuard>();
         services.AddSingleton<IFlowDeletionGuard, KnowledgeFlowDeletionGuard>();
+        services.AddSingleton<IFlowRunDeletionGuard, KnowledgeSnapshotFlowRunDeletionGuard>();
         services.AddSingleton<IEntryTargetResolver, EntryTargetResolver>();
         services.AddSingleton<EntryResourceDeletionGuard>();
         services.AddSingleton<IResourceDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());

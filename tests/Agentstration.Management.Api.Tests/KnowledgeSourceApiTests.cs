@@ -220,6 +220,182 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
+    public async Task SnapshotsPublishDurableAcquisitionOutputsImmutablyAndSelectActiveHistory()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        await CreatePublishedIngestionFlowAsync(factory.Services, context, "snapshot-ingest", null);
+        await CreatePublishedFlowAsync(factory.Services, context, "snapshot-retrieve");
+        var source = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(
+            new KnowledgeSourceResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSource,
+                Metadata = new() { Name = "snapshot-source" },
+                ScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId),
+                Definition = Properties("Snapshot source", "snapshot-ingest", "snapshot-retrieve")
+            }, default);
+        using var client = factory.CreateClient();
+        using var startedResponse = await client.PostAsJsonAsync("/api/knowledgesources/snapshot-source/acquisitions",
+            new StartKnowledgeAcquisitionRequest());
+        var started = await startedResponse.Content.ReadFromJsonAsync<KnowledgeAcquisitionResource>();
+        Assert.AreEqual(HttpStatusCode.Accepted, startedResponse.StatusCode);
+        await factory.Services.GetRequiredService<FlowRunService>().ExecuteAsync(
+            new FlowRunQueueItem(started!.FlowRunId,
+                new FlowRunScope(context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId)), default);
+        var completed = await client.GetFromJsonAsync<KnowledgeAcquisitionResource>(startedResponse.Headers.Location);
+        Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, completed!.State);
+
+        var firstArtifact = await CreateDurableArtifactAsync(factory.Services, started.FlowRunId, "first");
+        var secondArtifact = await CreateDurableArtifactAsync(factory.Services, started.FlowRunId, "second");
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        var acquisitionAddress = ScopedResourceAddress.Create(ResourceScopeRef.Workspace(context.WorkspaceId),
+            ResourceNamespace.Default, KnowledgeResourceKinds.KnowledgeAcquisition, started.Name);
+        var storedAcquisition = await store.GetExactAsync<KnowledgeAcquisitionResource>(acquisitionAddress, default);
+        var artifacts = new[] { firstArtifact, secondArtifact }.Select(value => new KnowledgeAcquisitionArtifact
+        {
+            ArtifactId = value.ArtifactId.ToString(),
+            Kind = KnowledgeArtifactKind.Durable,
+            Disposition = KnowledgeArtifactDisposition.Publishable,
+            MediaType = value.Receipt.MediaType,
+            Digest = value.Receipt.Sha256
+        }).ToArray();
+        _ = await store.PutExactAsync(ResourceScopeRef.Workspace(context.WorkspaceId), storedAcquisition!.Value with
+        {
+            Generation = checked(storedAcquisition.Value.Generation + 1),
+            Manifest = new() { Artifacts = artifacts }
+        }, storedAcquisition.ETag, false, default);
+
+        var first = await PublishSnapshotAsync(client, started.Name, "snapshot-publication-1",
+            new() { ArtifactIds = [firstArtifact.ArtifactId.ToString()] });
+        var firstPublications = await client.GetFromJsonAsync<KnowledgeSnapshotPublicationResource[]>(
+            $"/api/knowledgeacquisitions/{started.Name}/snapshot-publications");
+        var firstPublication = firstPublications!.Single();
+        var publicationAddress = ScopedResourceAddress.Create(ResourceScopeRef.Workspace(context.WorkspaceId),
+            ResourceNamespace.Default, KnowledgeResourceKinds.KnowledgeSnapshotPublication, firstPublication.Name);
+        var storedPublication = await store.GetExactAsync<KnowledgeSnapshotPublicationResource>(publicationAddress, default);
+        _ = await store.PutExactAsync(ResourceScopeRef.Workspace(context.WorkspaceId), storedPublication!.Value with
+        {
+            Generation = checked(storedPublication.Value.Generation + 1),
+            PublicationState = KnowledgeSnapshotPublicationState.Pending,
+            SnapshotName = null,
+            CompletedAt = null
+        }, storedPublication.ETag, false, default);
+        await factory.Services.GetRequiredService<KnowledgeSnapshotService>().RecoverPendingAsync(default);
+        var recoveredPublication = await store.GetExactAsync<KnowledgeSnapshotPublicationResource>(publicationAddress, default);
+        Assert.AreEqual(KnowledgeSnapshotPublicationState.Succeeded, recoveredPublication!.Value.PublicationState);
+        Assert.AreEqual(first.Name, recoveredPublication.Value.SnapshotName);
+        var second = await PublishSnapshotAsync(client, started.Name, "snapshot-publication-2",
+            new() { ArtifactIds = [secondArtifact.ArtifactId.ToString()] });
+        Assert.AreNotEqual(first.Name, second.Name);
+        Assert.AreEqual(started.FlowRunId, first.IngestionFlowRunId);
+        Assert.AreEqual(source.Value.Generation, first.KnowledgeSourceGeneration);
+        Assert.HasCount(1, first.Artifacts);
+        Assert.AreEqual(firstArtifact.Receipt.Sha256, first.Artifacts[0].Sha256);
+
+        var active = await client.GetFromJsonAsync<KnowledgeSnapshotView>(
+            "/api/knowledgesources/snapshot-source/snapshots/active");
+        Assert.AreEqual(second.Name, active!.Snapshot.Name);
+        Assert.AreEqual(KnowledgeSnapshotLifecycleState.Active, active.LifecycleState);
+        var history = await client.GetFromJsonAsync<KnowledgeSnapshotView[]>(
+            "/api/knowledgesources/snapshot-source/snapshots");
+        Assert.HasCount(2, history!);
+        Assert.AreEqual(KnowledgeSnapshotLifecycleState.Superseded,
+            history!.Single(value => value.Snapshot.Name == first.Name).LifecycleState);
+        var historical = await client.GetFromJsonAsync<KnowledgeSnapshotView>(
+            $"/api/knowledgesnapshots/{first.Name}");
+        Assert.AreEqual(first.Name, historical!.Snapshot.Name);
+        Assert.AreEqual(KnowledgeSnapshotLifecycleState.Superseded, historical.LifecycleState);
+        using var selectFirst = await client.PutAsJsonAsync(
+            "/api/knowledgesources/snapshot-source/snapshots/active",
+            new SelectActiveKnowledgeSnapshotRequest(first.Name));
+        Assert.AreEqual(HttpStatusCode.OK, selectFirst.StatusCode);
+        using var selectSecond = await client.PutAsJsonAsync(
+            "/api/knowledgesources/snapshot-source/snapshots/active",
+            new SelectActiveKnowledgeSnapshotRequest(second.Name));
+        Assert.AreEqual(HttpStatusCode.OK, selectSecond.StatusCode);
+
+        using var repeatRequest = SnapshotRequest(started.Name, "snapshot-publication-1",
+            new() { ArtifactIds = [firstArtifact.ArtifactId.ToString()] });
+        using var repeatedResponse = await client.SendAsync(repeatRequest);
+        var repeated = await repeatedResponse.Content.ReadFromJsonAsync<KnowledgeSnapshotResource>();
+        Assert.AreEqual(HttpStatusCode.Created, repeatedResponse.StatusCode);
+        Assert.AreEqual(first.Name, repeated!.Name);
+
+        using var conflictRequest = SnapshotRequest(started.Name, "snapshot-publication-1",
+            new() { ArtifactIds = [firstArtifact.ArtifactId.ToString()], Activate = false });
+        using var conflict = await client.SendAsync(conflictRequest);
+        Assert.AreEqual(HttpStatusCode.Conflict, conflict.StatusCode);
+
+        using var failedRequest = SnapshotRequest(started.Name, "snapshot-publication-failed",
+            new() { ArtifactIds = [Guid.NewGuid().ToString("N")] });
+        using var failedResponse = await client.SendAsync(failedRequest);
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, failedResponse.StatusCode);
+        var activeAfterFailure = await client.GetFromJsonAsync<KnowledgeSnapshotView>(
+            "/api/knowledgesources/snapshot-source/snapshots/active");
+        Assert.AreEqual(second.Name, activeAfterFailure!.Snapshot.Name);
+        var publications = await client.GetFromJsonAsync<KnowledgeSnapshotPublicationResource[]>(
+            $"/api/knowledgeacquisitions/{started.Name}/snapshot-publications");
+        Assert.AreEqual(1, publications!.Count(value =>
+            value.PublicationState == KnowledgeSnapshotPublicationState.Failed));
+
+        var immutable = await store.GetExactAsync<KnowledgeSnapshotResource>(ScopedResourceAddress.Create(
+            ResourceScopeRef.Workspace(context.WorkspaceId), ResourceNamespace.Default,
+            KnowledgeResourceKinds.KnowledgeSnapshot, first.Name), default);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.PutExactAsync(
+            ResourceScopeRef.Workspace(context.WorkspaceId), immutable!.Value with { PublishedBy = Guid.NewGuid() },
+            immutable.ETag, false, default));
+
+        var sourceInUse = await Assert.ThrowsAsync<KnowledgeSourceValidationException>(() =>
+            factory.Services.GetRequiredService<KnowledgeSourceManagementService>()
+                .DeleteAsync(new("snapshot-source"), source.ETag, default));
+        Assert.AreEqual("knowledge_source_in_use_by_snapshot", sourceInUse.Code);
+        await CreatePublishedIngestionFlowAsync(factory.Services, context, "replacement-ingest", null);
+        var sourceService = factory.Services.GetRequiredService<KnowledgeSourceManagementService>();
+        var currentSource = await sourceService.GetAsync(new("snapshot-source"), default);
+        _ = await sourceService.PutAsync(new("snapshot-source"), currentSource!.Value.Definition with
+        {
+            IngestionFlow = new() { Name = "replacement-ingest" }
+        }, currentSource.ETag, default);
+        var oldFlow = await factory.Services.GetRequiredService<FlowService>().GetAsync(
+            new(context.WorkspaceId), new("snapshot-ingest"), default);
+        var flowInUse = await Assert.ThrowsAsync<FlowValidationException>(() =>
+            factory.Services.GetRequiredService<FlowService>().DeleteAsync(
+                new(context.WorkspaceId), new("snapshot-ingest"), oldFlow!.ETag, default));
+        Assert.AreEqual("flow_in_use_by_knowledge_snapshot", flowInUse.Code);
+        var run = await factory.Services.GetRequiredService<FlowRunService>().GetAsync(
+            new WorkspaceId(context.WorkspaceId), started.FlowRunId, default);
+        var runInUse = await Assert.ThrowsAsync<FlowValidationException>(() =>
+            factory.Services.GetRequiredService<FlowRunService>().DeleteAsync(started.FlowRunId, run!.ETag,
+                new(context.TenantId, new(context.WorkspaceId), context.PrincipalId), default));
+        Assert.AreEqual("flow_run_in_use_by_knowledge_snapshot", runInUse.Code);
+    }
+
+    [TestMethod]
+    public async Task SnapshotArtifactResolutionRejectsAnotherWorkspace()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        FlowRunArtifactResource artifact;
+        using (scopes.Push(context))
+        {
+            artifact = await CreateDurableArtifactAsync(factory.Services, "foreign-producer", "private");
+            var otherWorkspaceId = Guid.NewGuid();
+            var otherWorkspace = new Workspace(otherWorkspaceId, context.TenantId, $"snapshot-{otherWorkspaceId:N}",
+                "Snapshot isolation", WorkspaceStatus.Initializing, DateTimeOffset.UtcNow);
+            await factory.Services.GetRequiredService<IIdentityStore>().AddWorkspaceAsync(otherWorkspace, default);
+            await factory.Services.GetRequiredService<IWorkspaceProvisioner>().ProvisionAsync(otherWorkspace, default);
+            using var otherScope = scopes.Push(context with { WorkspaceId = otherWorkspaceId });
+            var denied = await Assert.ThrowsAsync<KnowledgeSnapshotException>(() =>
+                factory.Services.GetRequiredService<IKnowledgeSnapshotArtifactResolver>()
+                    .ResolveAsync(otherWorkspaceId, [artifact.ArtifactId.ToString()], default));
+            Assert.AreEqual("knowledge_snapshot_artifact_not_found", denied.Code);
+        }
+    }
+
+    [TestMethod]
     public async Task KnowledgeSourceExposureCreatesSourceSpecificToolsWithFixedRoutingArguments()
     {
         await using var factory = Factory();
@@ -524,7 +700,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         IServiceProvider services,
         RequestContext context,
         string name,
-        string artifactId)
+        string? artifactId)
     {
         var inputSchema = JsonSerializer.SerializeToElement(new
         {
@@ -539,13 +715,10 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             },
             required = new[] { "knowledgeSourceId", "parameters", "caller", "correlationId", "acquisitionId" }
         });
-        var output = JsonSerializer.SerializeToElement(new
-        {
-            artifacts = new[]
-            {
-                new { artifactId, kind = "staged", disposition = "publishable", name = "Documentation", mediaType = "text/markdown" }
-            }
-        });
+        var outputArtifacts = artifactId is null
+            ? Array.Empty<object>()
+            : [new { artifactId, kind = "staged", disposition = "publishable", name = "Documentation", mediaType = "text/markdown" }];
+        var output = JsonSerializer.SerializeToElement(new { artifacts = outputArtifacts });
         var outputSchema = JsonSerializer.SerializeToElement(new
         {
             type = "object",
@@ -571,5 +744,59 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
                 Transitions = [new("input-output", "input", "completed", "output")]
             }), default, default);
         await flows.PublishVersionAsync(workspaceId, new(name), "1.0.0", true, default);
+    }
+
+    private static async Task<FlowRunArtifactResource> CreateDurableArtifactAsync(
+        IServiceProvider services,
+        string producerFlowRunId,
+        string content)
+    {
+        var artifacts = services.GetRequiredService<ArtifactManagementService>();
+        var staged = await artifacts.CreateStagedAsync(new($"{content}.md", "text/markdown", new ArtifactProducer
+        {
+            Kind = ArtifactProducerKind.FlowRun,
+            Id = producerFlowRunId,
+            FlowRunId = producerFlowRunId,
+            FlowStepId = "output"
+        }), default);
+        _ = await artifacts.WriteAsync(staged.Value.ArtifactId, 0,
+            System.Text.Encoding.UTF8.GetBytes(content), default);
+        var sealedArtifact = await artifacts.SealAsync(staged.Value.ArtifactId, default);
+        return (await artifacts.CompleteFlowRunArtifactAsync(staged.Value.ArtifactId,
+            new(producerFlowRunId, "output", new ArtifactStorageReceipt
+            {
+                StorageFlowRunId = $"storage-{Guid.NewGuid():N}",
+                OpaqueReference = $"knowledge/{Guid.NewGuid():N}",
+                MediaType = sealedArtifact.Value.MediaType,
+                Length = sealedArtifact.Value.Length,
+                Sha256 = sealedArtifact.Value.Sha256!,
+                Provenance = new Dictionary<string, string> { ["backend"] = "test" }
+            }), default)).Value;
+    }
+
+    private static HttpRequestMessage SnapshotRequest(
+        string acquisitionId,
+        string idempotencyKey,
+        PublishKnowledgeSnapshotRequest body)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post,
+            $"/api/knowledgeacquisitions/{Uri.EscapeDataString(acquisitionId)}/snapshots")
+        {
+            Content = JsonContent.Create(body)
+        };
+        request.Headers.Add("Idempotency-Key", idempotencyKey);
+        return request;
+    }
+
+    private static async Task<KnowledgeSnapshotResource> PublishSnapshotAsync(
+        HttpClient client,
+        string acquisitionId,
+        string idempotencyKey,
+        PublishKnowledgeSnapshotRequest body)
+    {
+        using var request = SnapshotRequest(acquisitionId, idempotencyKey, body);
+        using var response = await client.SendAsync(request);
+        Assert.AreEqual(HttpStatusCode.Created, response.StatusCode, await response.Content.ReadAsStringAsync());
+        return (await response.Content.ReadFromJsonAsync<KnowledgeSnapshotResource>())!;
     }
 }
