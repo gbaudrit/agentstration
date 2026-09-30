@@ -178,3 +178,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 150. [ADR-0150 — Artifacts use ToolSet-backed staging and Storage Flows](0150-artifacts-use-toolset-backed-staging-and-storage-flows.md)
 151. [ADR-0151 — Knowledge acquisition runs published ingestion Flows](0151-knowledge-acquisition-runs-published-ingestion-flows.md)
 152. [ADR-0152 — Knowledge Snapshots are immutable artifact publications](0152-knowledge-snapshots-are-immutable-publications.md)
+153. [ADR-0153 — Knowledge retrieval is a Snapshot-bound Flow invocation](0153-knowledge-retrieval-is-a-snapshot-bound-flow-invocation.md)

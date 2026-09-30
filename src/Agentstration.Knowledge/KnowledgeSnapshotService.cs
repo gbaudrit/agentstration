@@ -191,6 +191,37 @@ public sealed class KnowledgeSnapshotService(
             : await ViewAsync(snapshot.Value, scopeRef, cancellationToken);
     }
 
+    public async Task<KnowledgeSnapshotResource> ResolveForRetrievalAsync(
+        KnowledgeSourceId sourceId,
+        string? snapshotName,
+        CancellationToken cancellationToken)
+    {
+        var context = RequireContext();
+        await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsExecute, cancellationToken);
+        var scopeRef = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var source = await RequireSourceAsync(scopeRef, sourceId.Value, sourceId.Namespace, cancellationToken);
+        StoredResource<KnowledgeSnapshotResource> snapshot;
+        if (string.IsNullOrWhiteSpace(snapshotName))
+        {
+            var observed = await LoadObservedAsync(scopeRef, source.Value, cancellationToken);
+            if (observed?.Value.ActiveSnapshotName is null)
+                throw Error("knowledge_snapshot_active_not_found",
+                    $"KnowledgeSource '{source.Value.Address}' has no active Knowledge Snapshot.");
+            snapshot = await RequireSnapshotAsync(scopeRef, observed.Value.ActiveSnapshotName,
+                sourceId.Namespace, cancellationToken);
+        }
+        else
+        {
+            snapshot = await RequireSnapshotAsync(scopeRef, snapshotName.Trim(), sourceId.Namespace, cancellationToken);
+        }
+        if (snapshot.Value.KnowledgeSourceUid != source.Value.Uid)
+            throw Error("knowledge_snapshot_source_mismatch",
+                "The selected Knowledge Snapshot belongs to another KnowledgeSource.");
+        _ = await artifacts.ResolveAsync(context.WorkspaceId,
+            snapshot.Value.Artifacts.Select(value => value.ArtifactId).ToArray(), cancellationToken);
+        return snapshot.Value;
+    }
+
     public async Task<KnowledgeSnapshotView> SelectActiveAsync(
         KnowledgeSourceId sourceId,
         string snapshotName,

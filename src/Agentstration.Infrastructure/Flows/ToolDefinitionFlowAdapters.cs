@@ -5,6 +5,8 @@ using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
+using Agentstration.Knowledge;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Tools;
@@ -83,8 +85,11 @@ public sealed class ToolDefinitionExecutor(
     ToolDefinitionService definitions,
     IToolDefinitionFlowResolver flowResolver,
     RootFlowSubmissionService submissions,
-    FlowRunService runs) : IToolDefinitionExecutor
+    FlowRunService runs,
+    KnowledgeRetrievalService? knowledgeRetrieval = null) : IToolDefinitionExecutor
 {
+    private static readonly JsonSerializerOptions WebJsonOptions = new(JsonSerializerDefaults.Web);
+
     public async Task<ToolDefinitionInvocationResult> ExecuteAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
     {
         var stored = await definitions.GetAsync(invocation.ToolName, invocation.Namespace, cancellationToken)
@@ -106,6 +111,13 @@ public sealed class ToolDefinitionExecutor(
         {
             throw new ToolDefinitionInvocationException("tool_definition_input_invalid", exception.Message, exception);
         }
+
+        if (knowledgeRetrieval is not null
+            && stored.Value.Metadata.Annotations.TryGetValue("agentstration.io/knowledge-source", out var sourceName)
+            && stored.Value.Metadata.Annotations.TryGetValue("agentstration.io/knowledge-operation", out var operationName)
+            && Enum.TryParse<KnowledgeSourceOperation>(operationName, true, out var operation))
+            return await ExecuteKnowledgeRetrievalAsync(stored.Value, invocation, sourceName, operation,
+                knowledgeRetrieval, cancellationToken);
 
         var flowInput = MergeArguments(invocation.Arguments, stored.Value.Definition.FixedArguments);
         var flowContract = await flowResolver.ResolveAsync(stored.Value.ScopeRef.Value, stored.Value.Namespace,
@@ -187,6 +199,75 @@ public sealed class ToolDefinitionExecutor(
             completed.Value.FlowVersion,
             completed.Value.CorrelationId ?? string.Empty,
             submission.Recovered));
+    }
+
+    private static async Task<ToolDefinitionInvocationResult> ExecuteKnowledgeRetrievalAsync(
+        ToolDefinitionResource definition,
+        ToolDefinitionInvocation invocation,
+        string sourceName,
+        KnowledgeSourceOperation operation,
+        KnowledgeRetrievalService retrieval,
+        CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(definition.Definition.InvocationTimeoutSeconds));
+        try
+        {
+            if (!invocation.Arguments.TryGetProperty("request", out var request)
+                || request.ValueKind != JsonValueKind.Object)
+                throw new ToolDefinitionInvocationException("knowledge_retrieval_request_invalid",
+                    "A Knowledge retrieval request object is required.");
+            var origin = invocation.CallerKind switch
+            {
+                ToolDefinitionCallerKind.Agent => KnowledgeRetrievalInvocationOrigin.Agent,
+                ToolDefinitionCallerKind.Flow => KnowledgeRetrievalInvocationOrigin.Flow,
+                _ => KnowledgeRetrievalInvocationOrigin.Mcp
+            };
+            var sourceId = new KnowledgeSourceId(sourceName, definition.Namespace);
+            var result = operation switch
+            {
+                KnowledgeSourceOperation.Search => await retrieval.SearchAsync(sourceId,
+                    request.Deserialize<SearchKnowledgeRequest>(WebJsonOptions)
+                    ?? throw new JsonException("Search request was empty."), timeout.Token, origin, invocation.CallerId),
+                KnowledgeSourceOperation.Query => await retrieval.QueryAsync(sourceId,
+                    request.Deserialize<QueryKnowledgeRequest>(WebJsonOptions)
+                    ?? throw new JsonException("Query request was empty."), timeout.Token, origin, invocation.CallerId),
+                KnowledgeSourceOperation.Read => await retrieval.ReadAsync(sourceId,
+                    request.Deserialize<ReadKnowledgeRequest>(WebJsonOptions)
+                    ?? throw new JsonException("Read request was empty."), timeout.Token, origin, invocation.CallerId),
+                _ => throw new ArgumentOutOfRangeException(nameof(operation))
+            };
+            var output = JsonSerializer.SerializeToElement(new KnowledgeRetrievalFlowOutput
+            {
+                Items = result.Items,
+                Citations = result.Citations,
+                Answer = result.Answer,
+                ContinuationToken = result.ContinuationToken
+            }, WebJsonOptions);
+            return new(output, new ToolDefinitionOperationReceipt(
+                $"knowledge-retrieval:{result.FlowRunId}",
+                result.FlowRunId,
+                result.RetrievalFlow.Name,
+                result.RetrievalFlow.Namespace,
+                result.RetrievalFlow.Version,
+                result.CorrelationId,
+                false));
+        }
+        catch (ToolDefinitionInvocationException) { throw; }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new ToolDefinitionInvocationException("tool_definition_timed_out",
+                $"ToolDefinition '{definition.Address}' exceeded its execution timeout.");
+        }
+        catch (KnowledgeRetrievalException exception)
+        {
+            throw new ToolDefinitionInvocationException(exception.Code, exception.Message, exception);
+        }
+        catch (JsonException exception)
+        {
+            throw new ToolDefinitionInvocationException("knowledge_retrieval_request_invalid",
+                $"The Knowledge retrieval request is invalid: {exception.Message}", exception);
+        }
     }
 
     private static JsonElement MergeArguments(JsonElement arguments, JsonElement? fixedArguments)

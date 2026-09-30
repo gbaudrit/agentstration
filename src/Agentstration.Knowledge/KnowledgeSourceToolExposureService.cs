@@ -41,13 +41,21 @@ public sealed class KnowledgeSourceToolExposureService(
             ?? throw new KnowledgeSourceValidationException("knowledge_source_retrieval_flow_unavailable", "The KnowledgeSource retrieval Flow is unavailable.");
         if (!readiness.Ready)
             throw new KnowledgeSourceValidationException("knowledge_source_not_ready", "Only a ready KnowledgeSource can be exposed as Tools.");
+        if (!string.Equals(retrieval.Contract, KnowledgeFlowContracts.Retrieval, StringComparison.Ordinal))
+            throw new KnowledgeSourceValidationException("knowledge_source_retrieval_contract_invalid",
+                $"The retrieval Flow must declare '{KnowledgeFlowContracts.Retrieval}'.");
+        var supportedOperations = Operations.Where(operation => retrieval.Capabilities?.Contains(
+            KnowledgeFlowContracts.Capability(operation), StringComparer.Ordinal) == true).ToArray();
+        if (supportedOperations.Length == 0)
+            throw new KnowledgeSourceValidationException("knowledge_source_retrieval_capabilities_missing",
+                "The retrieval Flow must declare at least one supported Knowledge capability.");
         var existingToolSet = await toolSets.GetAsync(source.Value.Namespace, source.Value.Name, cancellationToken);
         if (existingToolSet is not null
             && (existingToolSet.Value.ScopeRef != scopeRef || !IsOwnedBy(existingToolSet.Value.Metadata, source.Value.Uid)))
             throw new KnowledgeSourceValidationException("knowledge_source_tool_set_conflict",
                 $"ToolSet '{source.Value.Namespace}/{source.Value.Name}' is not owned by this KnowledgeSource.");
         var currentDefinitions = new Dictionary<KnowledgeSourceOperation, StoredResource<ToolDefinitionResource>?>();
-        foreach (var operation in Operations)
+        foreach (var operation in supportedOperations)
         {
             var definitionName = $"{source.Value.Name}.{operation.ToString().ToLowerInvariant()}";
             var current = await definitions.GetAsync(definitionName, source.Value.Namespace, cancellationToken);
@@ -57,9 +65,9 @@ public sealed class KnowledgeSourceToolExposureService(
             currentDefinitions.Add(operation, current);
         }
         var publicSchema = PublicSchema(retrieval.InputSchema);
-        var operations = new List<KnowledgeSourceToolOperationExposure>(Operations.Length);
-        var members = new List<ToolSetMember>(Operations.Length);
-        foreach (var operation in Operations)
+        var operations = new List<KnowledgeSourceToolOperationExposure>(supportedOperations.Length);
+        var members = new List<ToolSetMember>(supportedOperations.Length);
+        foreach (var operation in supportedOperations)
         {
             var route = operation.ToString().ToLowerInvariant();
             var definitionName = $"{source.Value.Name}.{route}";
@@ -90,7 +98,13 @@ public sealed class KnowledgeSourceToolExposureService(
                     FixedArguments = JsonSerializer.SerializeToElement(new
                     {
                         knowledgeSourceId = ToolResourceIdentity.CatalogId(source.Value.Namespace, source.Value.Name),
-                        operation = route
+                        knowledgeSourceUid = source.Value.Uid,
+                        knowledgeSourceGeneration = source.Value.Generation,
+                        operation = route,
+                        snapshot = new { name = string.Empty, uid = Guid.Empty, artifacts = Array.Empty<object>() },
+                        caller = new { principalId = Guid.Empty, tenantId = Guid.Empty, workspaceId = Guid.Empty },
+                        correlationId = string.Empty,
+                        retrievalId = string.Empty
                     }),
                     OutputSchema = retrieval.OutputSchema?.Clone(),
                     Flow = new ToolDefinitionFlowTarget
@@ -190,13 +204,20 @@ public sealed class KnowledgeSourceToolExposureService(
             ?? throw new KnowledgeSourceValidationException("knowledge_source_retrieval_input_schema_invalid", "The retrieval Flow input schema is invalid.");
         if (root["properties"] is not JsonObject properties
             || !properties.ContainsKey("knowledgeSourceId")
-            || !properties.ContainsKey("operation"))
-            throw new KnowledgeSourceValidationException("knowledge_source_retrieval_contract_invalid", "The retrieval Flow must declare knowledgeSourceId and operation inputs.");
-        properties.Remove("knowledgeSourceId");
-        properties.Remove("operation");
+            || !properties.ContainsKey("operation")
+            || !properties.ContainsKey("request"))
+            throw new KnowledgeSourceValidationException("knowledge_source_retrieval_contract_invalid",
+                "The retrieval Flow must declare the shared Knowledge retrieval input envelope.");
+        string[] fixedNames =
+        [
+            "knowledgeSourceId", "knowledgeSourceUid", "knowledgeSourceGeneration", "operation",
+            "snapshot", "caller", "correlationId", "retrievalId"
+        ];
+        foreach (var name in fixedNames) properties.Remove(name);
         if (root["required"] is JsonArray required)
             for (var index = required.Count - 1; index >= 0; index--)
-                if (required[index]?.GetValue<string>() is "knowledgeSourceId" or "operation") required.RemoveAt(index);
+                if (required[index]?.GetValue<string>() is { } name && fixedNames.Contains(name, StringComparer.Ordinal))
+                    required.RemoveAt(index);
         return JsonSerializer.SerializeToElement(root);
     }
 }

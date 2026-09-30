@@ -17,7 +17,20 @@ public static class KnowledgeResourceKinds
 public static class KnowledgeFlowContracts
 {
     public const string MetadataKey = "knowledge.contract";
+    public const string CapabilitiesMetadataKey = "knowledge.capabilities";
     public const string Ingestion = "knowledge.ingestion/v1";
+    public const string Retrieval = "knowledge.retrieval/v1";
+    public const string Search = "knowledge.search/v1";
+    public const string Query = "knowledge.query/v1";
+    public const string Read = "knowledge.read/v1";
+
+    public static string Capability(KnowledgeSourceOperation operation) => operation switch
+    {
+        KnowledgeSourceOperation.Search => Search,
+        KnowledgeSourceOperation.Query => Query,
+        KnowledgeSourceOperation.Read => Read,
+        _ => throw new ArgumentOutOfRangeException(nameof(operation))
+    };
 }
 
 public enum KnowledgeSourceOperation { Search, Query, Read }
@@ -61,7 +74,8 @@ public sealed record ResolvedKnowledgeFlowBinding(
     bool UsesActiveVersion,
     JsonElement? InputSchema,
     JsonElement? OutputSchema,
-    string? Contract = null);
+    string? Contract = null,
+    IReadOnlyList<string>? Capabilities = null);
 
 public sealed record KnowledgeSourceReadiness(
     bool Ready,
@@ -263,3 +277,104 @@ public sealed record PublishKnowledgeSnapshotRequest
 }
 
 public sealed record SelectActiveKnowledgeSnapshotRequest(string SnapshotName);
+
+public sealed record SearchKnowledgeRequest
+{
+    public required string Query { get; init; }
+    public IReadOnlyDictionary<string, string> Filters { get; init; } = new Dictionary<string, string>();
+    public int Limit { get; init; } = 10;
+    public string? ContinuationToken { get; init; }
+    public string? SnapshotName { get; init; }
+    public string? CorrelationId { get; init; }
+}
+
+public sealed record QueryKnowledgeRequest
+{
+    public required string Question { get; init; }
+    public int MaximumItems { get; init; } = 10;
+    public int MaximumOutputCharacters { get; init; } = 16_384;
+    public string? SnapshotName { get; init; }
+    public string? CorrelationId { get; init; }
+}
+
+public sealed record ReadKnowledgeRequest
+{
+    public required string ArtifactId { get; init; }
+    public long Offset { get; init; }
+    public int Length { get; init; } = 65_536;
+    public string? SnapshotName { get; init; }
+    public string? CorrelationId { get; init; }
+}
+
+public sealed record KnowledgeRetrievalSnapshotInput
+{
+    public required string Name { get; init; }
+    public required Guid Uid { get; init; }
+    public IReadOnlyList<KnowledgeSnapshotArtifact> Artifacts { get; init; } = [];
+}
+
+public sealed record KnowledgeRetrievalInput
+{
+    [JsonPropertyName("knowledgeSourceId")]
+    public required string KnowledgeSourceId { get; init; }
+    [JsonPropertyName("knowledgeSourceUid")]
+    public required Guid KnowledgeSourceUid { get; init; }
+    [JsonPropertyName("knowledgeSourceGeneration")]
+    public required long KnowledgeSourceGeneration { get; init; }
+    [JsonPropertyName("operation")]
+    public required string Operation { get; init; }
+    [JsonPropertyName("snapshot")]
+    public required KnowledgeRetrievalSnapshotInput Snapshot { get; init; }
+    [JsonPropertyName("request")]
+    public required JsonElement Request { get; init; }
+    [JsonPropertyName("caller")]
+    public required KnowledgeAcquisitionCaller Caller { get; init; }
+    [JsonPropertyName("correlationId")]
+    public required string CorrelationId { get; init; }
+    [JsonPropertyName("retrievalId")]
+    public required string RetrievalId { get; init; }
+}
+
+public sealed record KnowledgeRetrievalItem
+{
+    public required string Id { get; init; }
+    public required string ArtifactId { get; init; }
+    public string? Content { get; init; }
+    public string? MediaType { get; init; }
+    public double? Score { get; init; }
+    public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
+}
+
+public sealed record KnowledgeRetrievalCitation
+{
+    public required string ArtifactId { get; init; }
+    public string? Locator { get; init; }
+    public long? Start { get; init; }
+    public long? End { get; init; }
+    public string? Excerpt { get; init; }
+}
+
+public sealed record KnowledgeRetrievalFlowOutput
+{
+    public IReadOnlyList<KnowledgeRetrievalItem> Items { get; init; } = [];
+    public IReadOnlyList<KnowledgeRetrievalCitation> Citations { get; init; } = [];
+    public string? Answer { get; init; }
+    public string? ContinuationToken { get; init; }
+}
+
+public sealed record KnowledgeRetrievalResult
+{
+    public required KnowledgeSourceOperation Operation { get; init; }
+    public required string KnowledgeSourceId { get; init; }
+    public required Guid KnowledgeSourceUid { get; init; }
+    public required long KnowledgeSourceGeneration { get; init; }
+    public required string SnapshotName { get; init; }
+    public required Guid SnapshotUid { get; init; }
+    public required ResolvedKnowledgeFlowBinding RetrievalFlow { get; init; }
+    public required string FlowRunId { get; init; }
+    public required string CorrelationId { get; init; }
+    public IReadOnlyList<KnowledgeRetrievalItem> Items { get; init; } = [];
+    public IReadOnlyList<KnowledgeRetrievalCitation> Citations { get; init; } = [];
+    public string? Answer { get; init; }
+    public string? ContinuationToken { get; init; }
+}
