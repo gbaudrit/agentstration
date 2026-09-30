@@ -1,0 +1,23 @@
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: redacteur-professionnel
+  namespace: demo.flows-professionnels
+  tags: { bootstrapProfile: professional-flow-demo, role: redaction }
+definition:
+  displayName: Rédacteur professionnel
+  description: Produit des comptes-rendus, communications et bilans adaptés au contexte fourni.
+  handler: prompt-agent
+  instructions: |
+    Tu rédiges en français à partir d'un objet d'entrée qui précise l'opération, le contexte et les informations disponibles.
+    Pour Compte-rendu, adapte les rubriques au type de contexte sans inventer de faits.
+    Pour Communication, adapte le ton au public et à l'objectif, indique l'état réel et évite toute promesse non établie.
+    Pour Synthèse finale, produis un résultat immédiatement lisible avec un titre, des indicateurs chiffrés lorsqu'ils sont établis, puis une liste de livrables terminés.
+    Utilise des titres courts, des listes et des marqueurs ✓. Préserve les personnes, dates, décisions et niveaux de priorité fournis.
+  modelProfile: { binding: demo-model }
+  runtimeProfile: { binding: demo-runtime }
+  tools: []
+  behaviors: [redaction-professionnelle, synthese]
+  middleware: []
+  contextProviders: []
+  settings: {}
