@@ -224,17 +224,28 @@ public sealed class ToolDefinitionExecutor(
                 _ => KnowledgeRetrievalInvocationOrigin.Mcp
             };
             var sourceId = new KnowledgeSourceId(sourceName, definition.Namespace);
+            var executionContext = new KnowledgeRetrievalExecutionContext(
+                invocation.ExecutionContext?.AgentId,
+                invocation.ExecutionContext?.AgentRevisionId,
+                invocation.ExecutionContext?.RuntimeRunId,
+                invocation.ExecutionContext?.FlowRunId,
+                invocation.ExecutionContext?.FlowStepId,
+                invocation.CallId,
+                invocation.ExecutionContext?.InvocationId);
             var result = operation switch
             {
                 KnowledgeSourceOperation.Search => await retrieval.SearchAsync(sourceId,
                     request.Deserialize<SearchKnowledgeRequest>(WebJsonOptions)
-                    ?? throw new JsonException("Search request was empty."), timeout.Token, origin, invocation.CallerId),
+                    ?? throw new JsonException("Search request was empty."), timeout.Token, origin, invocation.CallerId,
+                    executionContext),
                 KnowledgeSourceOperation.Query => await retrieval.QueryAsync(sourceId,
                     request.Deserialize<QueryKnowledgeRequest>(WebJsonOptions)
-                    ?? throw new JsonException("Query request was empty."), timeout.Token, origin, invocation.CallerId),
+                    ?? throw new JsonException("Query request was empty."), timeout.Token, origin, invocation.CallerId,
+                    executionContext),
                 KnowledgeSourceOperation.Read => await retrieval.ReadAsync(sourceId,
                     request.Deserialize<ReadKnowledgeRequest>(WebJsonOptions)
-                    ?? throw new JsonException("Read request was empty."), timeout.Token, origin, invocation.CallerId),
+                    ?? throw new JsonException("Read request was empty."), timeout.Token, origin, invocation.CallerId,
+                    executionContext),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation))
             };
             var output = JsonSerializer.SerializeToElement(new KnowledgeRetrievalFlowOutput
@@ -251,7 +262,18 @@ public sealed class ToolDefinitionExecutor(
                 result.RetrievalFlow.Namespace,
                 result.RetrievalFlow.Version,
                 result.CorrelationId,
-                false));
+                false,
+                new ToolDefinitionKnowledgeReceipt(
+                    result.KnowledgeSourceId,
+                    result.KnowledgeSourceUid,
+                    result.KnowledgeSourceGeneration,
+                    result.SnapshotName,
+                    result.SnapshotUid,
+                    result.Items.Select(value => value.ArtifactId)
+                        .Concat(result.Citations.Select(value => value.ArtifactId))
+                        .Distinct(StringComparer.Ordinal)
+                        .Order(StringComparer.Ordinal)
+                        .ToArray())));
         }
         catch (ToolDefinitionInvocationException) { throw; }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)

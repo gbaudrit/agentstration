@@ -10,10 +10,13 @@ using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 using Agentstration.Security.Contracts;
 using Agentstration.Tools;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using ModelContextProtocol.Client;
 
 namespace Agentstration.Management.Tests;
 
@@ -511,9 +514,91 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         Assert.AreEqual(firstArtifact.ArtifactId.ToString(),
             toolItems[0].GetProperty("artifactId").GetString());
 
+        var transport = new HttpClientTransport(
+            new HttpClientTransportOptions
+            {
+                Endpoint = new Uri(client.BaseAddress!, "mcp"),
+                Name = "knowledge-retrieval-test"
+            },
+            client,
+            NullLoggerFactory.Instance,
+            ownsHttpClient: false);
+        await using var mcp = await McpClient.CreateAsync(transport, loggerFactory: NullLoggerFactory.Instance);
+        var publishedTool = (await mcp.ListToolsAsync()).Single(value => value.Name == "retrieval-source.search");
+        Assert.AreEqual("retrieval-source",
+            publishedTool.ProtocolTool.Meta?["agentstration/knowledgeSource"]?.GetValue<string>());
+        Assert.AreEqual("search",
+            publishedTool.ProtocolTool.Meta?["agentstration/knowledgeOperation"]?.GetValue<string>());
+        Assert.IsFalse(publishedTool.JsonSchema.GetProperty("properties")
+            .TryGetProperty("knowledgeSourceId", out _));
+        var mcpResult = await mcp.CallToolAsync("retrieval-source.search", new Dictionary<string, object?>
+        {
+            ["request"] = new Dictionary<string, object?>
+            {
+                ["query"] = "documentation",
+                ["limit"] = 5,
+                ["snapshotName"] = firstSnapshot.Name
+            }
+        });
+        Assert.AreNotEqual(true, mcpResult.IsError);
+        StringAssert.Contains(JsonSerializer.Serialize(mcpResult.StructuredContent), firstArtifact.ArtifactId.ToString());
+        var mcpReceipt = JsonSerializer.Serialize(mcpResult.Meta);
+        StringAssert.Contains(mcpReceipt, firstSnapshot.Name);
+        StringAssert.Contains(mcpReceipt, firstArtifact.ArtifactId.ToString());
+
+        var runtimeOutput = await factory.Services.GetRequiredService<IToolInvoker>().InvokeAsync(
+            new ToolExecutionContext
+            {
+                OwnerKind = ToolExecutionOwnerKind.RuntimeRun,
+                ToolCallId = "runtime-knowledge-call",
+                InvocationId = "runtime-knowledge-invocation",
+                ToolId = AgentstrationToolProvider.ToolResourceName("retrieval-source.search"),
+                ToolNamespace = ResourceNamespace.Default,
+                ToolName = "retrieval-source.search",
+                ToolProviderId = AgentstrationToolProvider.Name,
+                ToolProviderNamespace = ResourceNamespace.Default,
+                ExternalToolId = "retrieval-source.search",
+                TenantId = context.TenantId,
+                WorkspaceId = new WorkspaceId(context.WorkspaceId),
+                PrincipalId = context.PrincipalId,
+                RunId = "runtime-run-knowledge",
+                FlowStepId = "agent-step",
+                AgentId = "retrieval-agent",
+                AgentRevisionId = "retrieval-agent-r1",
+                CorrelationId = "runtime-knowledge-correlation",
+                Arguments = JsonSerializer.SerializeToElement(new
+                {
+                    request = new
+                    {
+                        query = "documentation",
+                        limit = 5,
+                        snapshotName = firstSnapshot.Name
+                    }
+                })
+            });
+        Assert.IsNotNull(runtimeOutput);
+        var scope = new FlowRunScope(context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId);
+        var retrievalRuns = await factory.Services.GetRequiredService<FlowRunService>().ListAsync(
+            new FlowId("retrieval-flow"), null, 0, 100, scope, default);
+        var runtimeRun = retrievalRuns.Items.Select(value => value.Value).Single(value =>
+            value.Input.GetProperty("caller").GetProperty("runtimeRunId").GetString() == "runtime-run-knowledge");
+        Assert.AreEqual("retrieval-agent", runtimeRun.Input.GetProperty("caller").GetProperty("agentId").GetString());
+        Assert.AreEqual("retrieval-agent-r1", runtimeRun.Input.GetProperty("caller").GetProperty("agentRevisionId").GetString());
+        Assert.AreEqual("agent-step", runtimeRun.Input.GetProperty("caller").GetProperty("flowStepId").GetString());
+        Assert.AreEqual("runtime-knowledge-call", runtimeRun.Input.GetProperty("caller").GetProperty("toolCallId").GetString());
+        Assert.AreEqual("runtime-knowledge-invocation", runtimeRun.CausationId);
+
         var secondArtifact = await CreateDurableArtifactAsync(factory.Services, "retrieval-producer-2", "second");
         _ = await CreateActiveSnapshotAsync(factory.Services, context, source.Value,
             secondArtifact, "snapshot-retrieval-second");
+        var mcpFailure = await mcp.CallToolAsync("retrieval-source.search", new Dictionary<string, object?>
+        {
+            ["request"] = new Dictionary<string, object?> { ["query"] = "documentation", ["limit"] = 5 }
+        });
+        Assert.AreEqual(true, mcpFailure.IsError);
+        StringAssert.Contains(JsonSerializer.Serialize(mcpFailure.Meta), "knowledge_retrieval_output_outside_snapshot");
+        Assert.IsTrue(mcpFailure.Content.OfType<ModelContextProtocol.Protocol.TextContentBlock>()
+            .All(value => value.Text.Length <= 2_000));
         using var escaped = await client.PostAsJsonAsync("/api/knowledgesources/retrieval-source/search",
             new SearchKnowledgeRequest { Query = "documentation", Limit = 5 });
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, escaped.StatusCode);

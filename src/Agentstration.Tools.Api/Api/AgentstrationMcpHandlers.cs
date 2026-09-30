@@ -64,12 +64,7 @@ internal static class AgentstrationMcpHandlers
                     Description = value.Definition.Description,
                     InputSchema = value.Definition.InputSchema.Clone(),
                     OutputSchema = value.Definition.OutputSchema?.Clone(),
-                    Meta = new JsonObject
-                    {
-                        ["agentstration/namespace"] = value.Namespace.Value,
-                        ["agentstration/requiresApproval"] = value.Definition.RequiresApproval,
-                        ["agentstration/implementation"] = "flow"
-                    }
+                    Meta = Metadata(value)
                 }))
                 .OrderBy(value => value.Name, StringComparer.Ordinal)
                 .ToList()
@@ -169,13 +164,40 @@ internal static class AgentstrationMcpHandlers
     private static CallToolResult Error(string code, string message) => new()
     {
         IsError = true,
-        Content = [new TextContentBlock { Text = message }],
+        Content = [new TextContentBlock { Text = SafeMessage(code, message) }],
         Meta = new JsonObject { ["agentstration/errorCode"] = code }
     };
+
+    private static string SafeMessage(string code, string message)
+    {
+        var value = code is "knowledge_retrieval_execution_failed"
+            or "knowledge_retrieval_flow_rejected"
+            or "knowledge_retrieval_output_invalid"
+            or "knowledge_retrieval_output_missing"
+            ? "Knowledge retrieval could not be completed. Inspect the correlated Flow Run for authorized diagnostics."
+            : message;
+        const int maximumCharacters = 2_000;
+        return value.Length <= maximumCharacters ? value : value[..maximumCharacters];
+    }
 
     private static string PublicName(ToolDefinitionResource definition) => definition.Namespace.IsDefault
         ? definition.Name
         : $"{definition.Namespace.Value}.{definition.Name}";
+
+    private static JsonObject Metadata(ToolDefinitionResource definition)
+    {
+        var metadata = new JsonObject
+        {
+            ["agentstration/namespace"] = definition.Namespace.Value,
+            ["agentstration/requiresApproval"] = definition.Definition.RequiresApproval,
+            ["agentstration/implementation"] = "flow"
+        };
+        if (definition.Metadata.Annotations.TryGetValue("agentstration.io/knowledge-source", out var source))
+            metadata["agentstration/knowledgeSource"] = source;
+        if (definition.Metadata.Annotations.TryGetValue("agentstration.io/knowledge-operation", out var operation))
+            metadata["agentstration/knowledgeOperation"] = operation;
+        return metadata;
+    }
 
     private static string? Correlation(JsonObject? metadata) =>
         metadata?["agentstration/correlationId"]?.GetValue<string>();

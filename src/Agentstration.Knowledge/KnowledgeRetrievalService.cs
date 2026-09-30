@@ -15,6 +15,15 @@ public sealed class KnowledgeRetrievalException(string code, string message, Exc
 
 public enum KnowledgeRetrievalInvocationOrigin { Api, Tool, Mcp, Flow, Agent }
 
+public sealed record KnowledgeRetrievalExecutionContext(
+    string? AgentId = null,
+    string? AgentRevisionId = null,
+    string? RuntimeRunId = null,
+    string? FlowRunId = null,
+    string? FlowStepId = null,
+    string? ToolCallId = null,
+    string? ToolInvocationId = null);
+
 public sealed record KnowledgeRetrievalFlowRequest(
     Guid TenantId,
     Guid WorkspaceId,
@@ -24,7 +33,8 @@ public sealed record KnowledgeRetrievalFlowRequest(
     string CallerId,
     string CorrelationId,
     KnowledgeRetrievalInvocationOrigin Origin,
-    JsonElement Input);
+    JsonElement Input,
+    KnowledgeRetrievalExecutionContext? ExecutionContext = null);
 
 public sealed record KnowledgeRetrievalFlowResult(
     string RunId,
@@ -62,7 +72,8 @@ public sealed class KnowledgeRetrievalService(
         SearchKnowledgeRequest request,
         CancellationToken cancellationToken,
         KnowledgeRetrievalInvocationOrigin origin = KnowledgeRetrievalInvocationOrigin.Api,
-        string? callerId = null)
+        string? callerId = null,
+        KnowledgeRetrievalExecutionContext? executionContext = null)
     {
         if (string.IsNullOrWhiteSpace(request.Query) || request.Query.Length > MaximumSearchQueryCharacters)
             throw Error("knowledge_search_query_invalid",
@@ -83,7 +94,7 @@ public sealed class KnowledgeRetrievalService(
             continuationToken = request.ContinuationToken
         }, JsonOptions);
         return ExecuteAsync(sourceId, KnowledgeSourceOperation.Search, payload, request.SnapshotName,
-            request.CorrelationId, request.Limit, null, cancellationToken, origin, callerId);
+            request.CorrelationId, request.Limit, null, cancellationToken, origin, callerId, executionContext);
     }
 
     public Task<KnowledgeRetrievalResult> QueryAsync(
@@ -91,7 +102,8 @@ public sealed class KnowledgeRetrievalService(
         QueryKnowledgeRequest request,
         CancellationToken cancellationToken,
         KnowledgeRetrievalInvocationOrigin origin = KnowledgeRetrievalInvocationOrigin.Api,
-        string? callerId = null)
+        string? callerId = null,
+        KnowledgeRetrievalExecutionContext? executionContext = null)
     {
         if (string.IsNullOrWhiteSpace(request.Question) || request.Question.Length > MaximumQuestionCharacters)
             throw Error("knowledge_query_question_invalid",
@@ -108,7 +120,7 @@ public sealed class KnowledgeRetrievalService(
             maximumOutputCharacters = request.MaximumOutputCharacters
         }, JsonOptions);
         return ExecuteAsync(sourceId, KnowledgeSourceOperation.Query, payload, request.SnapshotName,
-            request.CorrelationId, request.MaximumItems, null, cancellationToken, origin, callerId);
+            request.CorrelationId, request.MaximumItems, null, cancellationToken, origin, callerId, executionContext);
     }
 
     public Task<KnowledgeRetrievalResult> ReadAsync(
@@ -116,7 +128,8 @@ public sealed class KnowledgeRetrievalService(
         ReadKnowledgeRequest request,
         CancellationToken cancellationToken,
         KnowledgeRetrievalInvocationOrigin origin = KnowledgeRetrievalInvocationOrigin.Api,
-        string? callerId = null)
+        string? callerId = null,
+        KnowledgeRetrievalExecutionContext? executionContext = null)
     {
         if (string.IsNullOrWhiteSpace(request.ArtifactId) || request.ArtifactId.Length > 200)
             throw Error("knowledge_read_artifact_invalid", "A bounded artifact identity is required.");
@@ -130,7 +143,7 @@ public sealed class KnowledgeRetrievalService(
             length = request.Length
         }, JsonOptions);
         return ExecuteAsync(sourceId, KnowledgeSourceOperation.Read, payload, request.SnapshotName,
-            request.CorrelationId, 1, request.ArtifactId.Trim(), cancellationToken, origin, callerId);
+            request.CorrelationId, 1, request.ArtifactId.Trim(), cancellationToken, origin, callerId, executionContext);
     }
 
     public Task<KnowledgeRetrievalResult> ExecuteAsync(
@@ -143,8 +156,9 @@ public sealed class KnowledgeRetrievalService(
         string? requiredArtifactId,
         CancellationToken cancellationToken,
         KnowledgeRetrievalInvocationOrigin origin = KnowledgeRetrievalInvocationOrigin.Api,
-        string? callerId = null) => ExecuteCoreAsync(sourceId, operation, request, snapshotName, correlationId,
-            maximumItems, requiredArtifactId, origin, callerId, cancellationToken);
+        string? callerId = null,
+        KnowledgeRetrievalExecutionContext? executionContext = null) => ExecuteCoreAsync(sourceId, operation, request, snapshotName, correlationId,
+            maximumItems, requiredArtifactId, origin, callerId, executionContext, cancellationToken);
 
     private async Task<KnowledgeRetrievalResult> ExecuteCoreAsync(
         KnowledgeSourceId sourceId,
@@ -156,6 +170,7 @@ public sealed class KnowledgeRetrievalService(
         string? requiredArtifactId,
         KnowledgeRetrievalInvocationOrigin origin,
         string? callerId,
+        KnowledgeRetrievalExecutionContext? executionContext,
         CancellationToken cancellationToken)
     {
         var context = RequireContext();
@@ -217,7 +232,19 @@ public sealed class KnowledgeRetrievalService(
                     Artifacts = snapshot.Artifacts
                 },
                 Request = request.Clone(),
-                Caller = new(context.PrincipalId, context.TenantId, context.WorkspaceId),
+                Caller = new()
+                {
+                    PrincipalId = context.PrincipalId,
+                    TenantId = context.TenantId,
+                    WorkspaceId = context.WorkspaceId,
+                    AgentId = executionContext?.AgentId,
+                    AgentRevisionId = executionContext?.AgentRevisionId,
+                    RuntimeRunId = executionContext?.RuntimeRunId,
+                    FlowRunId = executionContext?.FlowRunId,
+                    FlowStepId = executionContext?.FlowStepId,
+                    ToolCallId = executionContext?.ToolCallId,
+                    ToolInvocationId = executionContext?.ToolInvocationId
+                },
                 CorrelationId = effectiveCorrelationId,
                 RetrievalId = retrievalId
             }, JsonOptions);
@@ -233,7 +260,8 @@ public sealed class KnowledgeRetrievalService(
                     callerId ?? context.PrincipalId.ToString("D"),
                     effectiveCorrelationId,
                     origin,
-                    input), cancellationToken);
+                    input,
+                    executionContext), cancellationToken);
             }
             catch (KnowledgeRetrievalException) { throw; }
             catch (Exception exception) when (exception is not OperationCanceledException)

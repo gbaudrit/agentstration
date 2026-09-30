@@ -179,3 +179,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 151. [ADR-0151 — Knowledge acquisition runs published ingestion Flows](0151-knowledge-acquisition-runs-published-ingestion-flows.md)
 152. [ADR-0152 — Knowledge Snapshots are immutable artifact publications](0152-knowledge-snapshots-are-immutable-publications.md)
 153. [ADR-0153 — Knowledge retrieval is a Snapshot-bound Flow invocation](0153-knowledge-retrieval-is-a-snapshot-bound-flow-invocation.md)
+154. [ADR-0154 — Knowledge Tools use the governed internal MCP path](0154-knowledge-tools-use-the-governed-internal-mcp-path.md)
