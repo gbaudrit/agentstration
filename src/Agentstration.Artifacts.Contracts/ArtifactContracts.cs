@@ -149,7 +149,7 @@ public sealed record ArtifactStorageReceipt
     public IReadOnlyDictionary<string, string> Provenance { get; init; } = new Dictionary<string, string>();
 }
 
-public sealed record FlowRunArtifactResource : Resource
+public sealed record FlowRunArtifactResource : Resource, IImmutableResource
 {
     public required WorkspaceId WorkspaceId { get; init; }
     public required FlowRunArtifactId ArtifactId { get; init; }

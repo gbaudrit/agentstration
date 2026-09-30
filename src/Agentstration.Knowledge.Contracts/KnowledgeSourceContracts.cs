@@ -9,6 +9,9 @@ public static class KnowledgeResourceKinds
     public const string KnowledgeSource = "KnowledgeSource";
     public const string KnowledgeSourceToolExposure = "KnowledgeSourceToolExposure";
     public const string KnowledgeAcquisition = "KnowledgeAcquisition";
+    public const string KnowledgeSnapshot = "KnowledgeSnapshot";
+    public const string KnowledgeSnapshotPublication = "KnowledgeSnapshotPublication";
+    public const string KnowledgeSnapshotObservedState = "KnowledgeSnapshotObservedState";
 }
 
 public static class KnowledgeFlowContracts
@@ -20,6 +23,11 @@ public static class KnowledgeFlowContracts
 public enum KnowledgeSourceOperation { Search, Query, Read }
 
 public readonly record struct KnowledgeSourceId(string Value, ResourceNamespace Namespace = default)
+{
+    public override string ToString() => $"{Namespace}/{Value}";
+}
+
+public readonly record struct KnowledgeSnapshotId(string Value, ResourceNamespace Namespace = default)
 {
     public override string ToString() => $"{Namespace}/{Value}";
 }
@@ -177,3 +185,81 @@ public sealed record RetryKnowledgeAcquisitionRequest
 {
     public string? CorrelationId { get; init; }
 }
+
+public enum KnowledgeSnapshotPublicationState { Pending, Succeeded, Failed }
+public enum KnowledgeSnapshotLifecycleState { Active, Superseded, Unavailable }
+
+public sealed record KnowledgeSnapshotArtifact
+{
+    public required string ArtifactId { get; init; }
+    public required string ProducerFlowRunId { get; init; }
+    public required string ProducerFlowStepId { get; init; }
+    public required string StorageFlowRunId { get; init; }
+    public required string MediaType { get; init; }
+    public required long Length { get; init; }
+    public required string Sha256 { get; init; }
+    public IReadOnlyDictionary<string, string> Provenance { get; init; } = new Dictionary<string, string>();
+}
+
+public sealed record KnowledgeSnapshotResource : Resource, IImmutableResource
+{
+    public required Guid KnowledgeSourceUid { get; init; }
+    public required string KnowledgeSourceName { get; init; }
+    public required ResourceNamespace KnowledgeSourceNamespace { get; init; }
+    public required long KnowledgeSourceGeneration { get; init; }
+    public required string AcquisitionId { get; init; }
+    public required Guid AcquisitionUid { get; init; }
+    public required DateTimeOffset AcquiredAt { get; init; }
+    public required ResolvedKnowledgeFlowBinding IngestionFlow { get; init; }
+    public required string IngestionFlowRunId { get; init; }
+    public required string PublicationId { get; init; }
+    public required string RequestHash { get; init; }
+    public required DateTimeOffset PublishedAt { get; init; }
+    public required Guid PublishedBy { get; init; }
+    public IReadOnlyList<KnowledgeSnapshotArtifact> Artifacts { get; init; } = [];
+}
+
+public sealed record KnowledgeSnapshotPublicationResource : Resource
+{
+    public required string AcquisitionId { get; init; }
+    public required Guid AcquisitionUid { get; init; }
+    public required Guid KnowledgeSourceUid { get; init; }
+    public required string KnowledgeSourceName { get; init; }
+    public required ResourceNamespace KnowledgeSourceNamespace { get; init; }
+    public required string RequestHash { get; init; }
+    public string? IdempotencyKey { get; init; }
+    public IReadOnlyList<string> ArtifactIds { get; init; } = [];
+    public bool Activate { get; init; } = true;
+    public required KnowledgeSnapshotPublicationState PublicationState { get; init; }
+    public string? SnapshotName { get; init; }
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+    public required Guid TenantId { get; init; }
+    public required Guid CreatedBy { get; init; }
+    public required DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset? CompletedAt { get; init; }
+}
+
+public sealed record KnowledgeSnapshotObservedResource : Resource
+{
+    public required Guid KnowledgeSourceUid { get; init; }
+    public string? ActiveSnapshotName { get; init; }
+    public Guid? ActiveSnapshotUid { get; init; }
+    public string? LastPublicationId { get; init; }
+    public DateTimeOffset? LastPublishedAt { get; init; }
+    public string? LastErrorCode { get; init; }
+    public string? LastErrorMessage { get; init; }
+    public DateTimeOffset? LastAttemptAt { get; init; }
+}
+
+public sealed record KnowledgeSnapshotView(
+    KnowledgeSnapshotResource Snapshot,
+    KnowledgeSnapshotLifecycleState LifecycleState);
+
+public sealed record PublishKnowledgeSnapshotRequest
+{
+    public IReadOnlyList<string> ArtifactIds { get; init; } = [];
+    public bool Activate { get; init; } = true;
+}
+
+public sealed record SelectActiveKnowledgeSnapshotRequest(string SnapshotName);

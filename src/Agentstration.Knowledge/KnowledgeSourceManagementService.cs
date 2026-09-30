@@ -162,10 +162,28 @@ public sealed class KnowledgeSourceManagementService(
         await scopeOperations.WriteAsync(KnowledgeResourceKinds.KnowledgeSource, scopeRef,
             AuthorizationPermissions.ResourcesDelete, async token =>
             {
+                if (await HasSnapshotAsync(scopeRef, existing.Value.Uid, token))
+                    throw new KnowledgeSourceValidationException("knowledge_source_in_use_by_snapshot",
+                        $"KnowledgeSource '{existing.Value.Address}' is retained by an immutable Knowledge Snapshot.");
                 await store.DeleteExactAsync(Scoped(scopeRef, new(existing.Value.Name, existing.Value.Namespace)), etag, token);
                 return true;
             }, cancellationToken);
         await AuditAsync(SecurityAuditActions.KnowledgeSourceDeleted, scopeRef, cancellationToken);
+    }
+
+    private async Task<bool> HasSnapshotAsync(
+        ResourceScopeRef scopeRef,
+        Guid sourceUid,
+        CancellationToken cancellationToken)
+    {
+        const int pageSize = 1000;
+        for (var skip = 0; ; skip += pageSize)
+        {
+            var page = await store.ListExactAsync<KnowledgeSnapshotResource>(scopeRef,
+                KnowledgeResourceKinds.KnowledgeSnapshot, skip, pageSize, cancellationToken);
+            if (page.Any(value => value.Value.KnowledgeSourceUid == sourceUid)) return true;
+            if (page.Count < pageSize) return false;
+        }
     }
 
     private async Task<KnowledgeSourceReadiness> ValidateAsync(
