@@ -391,8 +391,195 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             var denied = await Assert.ThrowsAsync<KnowledgeSnapshotException>(() =>
                 factory.Services.GetRequiredService<IKnowledgeSnapshotArtifactResolver>()
                     .ResolveAsync(otherWorkspaceId, [artifact.ArtifactId.ToString()], default));
-            Assert.AreEqual("knowledge_snapshot_artifact_not_found", denied.Code);
+        Assert.AreEqual("knowledge_snapshot_artifact_not_found", denied.Code);
         }
+    }
+
+    [TestMethod]
+    public async Task RetrievalRoutesTrustedOperationsThroughExactFlowsAndSnapshotBoundaries()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var firstArtifact = await CreateDurableArtifactAsync(factory.Services, "retrieval-producer", "first");
+        var output = JsonSerializer.SerializeToElement(new
+        {
+            items = new[]
+            {
+                new
+                {
+                    id = "first-result",
+                    artifactId = firstArtifact.ArtifactId.ToString(),
+                    content = "first",
+                    mediaType = "text/markdown",
+                    score = 1.0
+                }
+            },
+            citations = new[]
+            {
+                new { artifactId = firstArtifact.ArtifactId.ToString(), locator = "line:1", excerpt = "first" }
+            },
+            answer = "first",
+            continuationToken = "next-page"
+        });
+        await CreatePublishedFlowAsync(factory.Services, context, "retrieval-ingest");
+        await CreatePublishedRetrievalFlowAsync(factory.Services, context, "retrieval-flow", output);
+        var source = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(
+            new KnowledgeSourceResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSource,
+                Metadata = new() { Name = "retrieval-source" },
+                ScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId),
+                Definition = Properties("Retrieval source", "retrieval-ingest", "retrieval-flow")
+            }, default);
+        var firstSnapshot = await CreateActiveSnapshotAsync(factory.Services, context, source.Value,
+            firstArtifact, "snapshot-retrieval-first");
+        using var client = factory.CreateClient();
+
+        using var searchResponse = await client.PostAsJsonAsync("/api/knowledgesources/retrieval-source/search",
+            new SearchKnowledgeRequest
+            {
+                Query = "documentation",
+                Filters = new Dictionary<string, string> { ["locale"] = "en-US" },
+                Limit = 5,
+                CorrelationId = "retrieval-correlation"
+            });
+        Assert.AreEqual(HttpStatusCode.OK, searchResponse.StatusCode,
+            await searchResponse.Content.ReadAsStringAsync());
+        var search = await searchResponse.Content.ReadFromJsonAsync<KnowledgeRetrievalResult>();
+        Assert.IsNotNull(search);
+        Assert.AreEqual(KnowledgeSourceOperation.Search, search.Operation);
+        Assert.AreEqual(firstSnapshot.Name, search.SnapshotName);
+        Assert.AreEqual("1.0.0", search.RetrievalFlow.Version);
+        Assert.AreEqual(KnowledgeFlowContracts.Retrieval, search.RetrievalFlow.Contract);
+        Assert.AreEqual("retrieval-correlation", search.CorrelationId);
+        Assert.HasCount(1, search.Items);
+        Assert.AreEqual(firstArtifact.ArtifactId.ToString(), search.Items[0].ArtifactId);
+
+        using var queryResponse = await client.PostAsJsonAsync("/api/knowledgesources/retrieval-source/query",
+            new QueryKnowledgeRequest
+            {
+                Question = "What is first?",
+                SnapshotName = firstSnapshot.Name,
+                MaximumItems = 2,
+                MaximumOutputCharacters = 100
+            });
+        var query = await queryResponse.Content.ReadFromJsonAsync<KnowledgeRetrievalResult>();
+        Assert.AreEqual(HttpStatusCode.OK, queryResponse.StatusCode,
+            await queryResponse.Content.ReadAsStringAsync());
+        Assert.AreEqual("first", query!.Answer);
+        Assert.HasCount(1, query.Citations);
+
+        using var readResponse = await client.PostAsJsonAsync("/api/knowledgesources/retrieval-source/read",
+            new ReadKnowledgeRequest
+            {
+                ArtifactId = firstArtifact.ArtifactId.ToString(),
+                SnapshotName = firstSnapshot.Name,
+                Length = 5
+            });
+        Assert.AreEqual(HttpStatusCode.OK, readResponse.StatusCode,
+            await readResponse.Content.ReadAsStringAsync());
+
+        using var exposureResponse = await client.PostAsJsonAsync(
+            "/api/knowledgesources/retrieval-source/tool-exposure",
+            new PublishKnowledgeSourceToolExposureRequest { Version = "1.0.0" });
+        Assert.AreEqual(HttpStatusCode.Created, exposureResponse.StatusCode,
+            await exposureResponse.Content.ReadAsStringAsync());
+        var tool = await factory.Services.GetRequiredService<IToolDefinitionExecutor>().ExecuteAsync(
+            new ToolDefinitionInvocation(
+                context.TenantId,
+                new WorkspaceId(context.WorkspaceId),
+                context.PrincipalId,
+                default,
+                "retrieval-source.search",
+                "retrieval-tool-call",
+                "retrieval-tool-correlation",
+                JsonSerializer.SerializeToElement(new
+                {
+                    request = new
+                    {
+                        query = "documentation",
+                        limit = 5,
+                        snapshotName = firstSnapshot.Name
+                    }
+                }),
+                ToolDefinitionCallerKind.Agent,
+                "retrieval-agent"), default);
+        var toolItems = tool.Output!.Value.GetProperty("items");
+        Assert.AreEqual(1, toolItems.GetArrayLength());
+        Assert.AreEqual(firstArtifact.ArtifactId.ToString(),
+            toolItems[0].GetProperty("artifactId").GetString());
+
+        var secondArtifact = await CreateDurableArtifactAsync(factory.Services, "retrieval-producer-2", "second");
+        _ = await CreateActiveSnapshotAsync(factory.Services, context, source.Value,
+            secondArtifact, "snapshot-retrieval-second");
+        using var escaped = await client.PostAsJsonAsync("/api/knowledgesources/retrieval-source/search",
+            new SearchKnowledgeRequest { Query = "documentation", Limit = 5 });
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, escaped.StatusCode);
+        var escapedProblem = await escaped.Content.ReadFromJsonAsync<ProblemDetails>();
+        StringAssert.EndsWith(escapedProblem!.Type, "knowledge_retrieval_output_outside_snapshot");
+
+        using var historical = await client.PostAsJsonAsync("/api/knowledgesources/retrieval-source/search",
+            new SearchKnowledgeRequest { Query = "documentation", Limit = 5, SnapshotName = firstSnapshot.Name });
+        Assert.AreEqual(HttpStatusCode.OK, historical.StatusCode,
+            await historical.Content.ReadAsStringAsync());
+        using var wrongRead = await client.PostAsJsonAsync("/api/knowledgesources/retrieval-source/read",
+            new ReadKnowledgeRequest
+            {
+                ArtifactId = secondArtifact.ArtifactId.ToString(),
+                SnapshotName = firstSnapshot.Name,
+                Length = 1
+            });
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, wrongRead.StatusCode);
+        var wrongReadProblem = await wrongRead.Content.ReadFromJsonAsync<ProblemDetails>();
+        StringAssert.EndsWith(wrongReadProblem!.Type, "knowledge_read_artifact_outside_snapshot");
+
+        var otherWorkspaceId = Guid.NewGuid();
+        var otherWorkspace = new Workspace(otherWorkspaceId, context.TenantId, $"retrieval-{otherWorkspaceId:N}",
+            "Retrieval isolation", WorkspaceStatus.Initializing, DateTimeOffset.UtcNow);
+        await factory.Services.GetRequiredService<IIdentityStore>().AddWorkspaceAsync(otherWorkspace, default);
+        await factory.Services.GetRequiredService<IWorkspaceProvisioner>().ProvisionAsync(otherWorkspace, default);
+        using var otherScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>()
+            .Push(context with { WorkspaceId = otherWorkspaceId });
+        _ = await Assert.ThrowsAsync<AuthorizationDeniedException>(() => factory.Services
+            .GetRequiredService<KnowledgeRetrievalService>().SearchAsync(new("retrieval-source"),
+                new SearchKnowledgeRequest { Query = "documentation" }, default));
+
+        var audit = await factory.Services.GetRequiredService<ISecurityAuditStore>().ListLatestAsync(100, default);
+        Assert.IsTrue(audit.Any(value => value.WorkspaceId == context.WorkspaceId
+            && value.Action == SecurityAuditActions.KnowledgeRetrievalCompleted));
+        Assert.IsTrue(audit.Any(value => value.WorkspaceId == context.WorkspaceId
+            && value.Action == SecurityAuditActions.KnowledgeRetrievalFailed));
+    }
+
+    [TestMethod]
+    public async Task RetrievalCapabilitiesControlToolExposureAndRejectUnknownDeclarations()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        await CreatePublishedFlowAsync(factory.Services, context, "capability-ingest");
+        await CreatePublishedRetrievalFlowAsync(factory.Services, context, "search-only", capabilities:
+            KnowledgeFlowContracts.Search);
+        _ = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(
+            new KnowledgeSourceResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSource,
+                Metadata = new() { Name = "search-only-source" },
+                ScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId),
+                Definition = Properties("Search only", "capability-ingest", "search-only")
+            }, default);
+        var exposure = await factory.Services.GetRequiredService<KnowledgeSourceToolExposureService>()
+            .PublishAsync(new("search-only-source"), "1.0.0", false, default);
+        Assert.HasCount(1, exposure.Value.Operations);
+        Assert.AreEqual(KnowledgeSourceOperation.Search, exposure.Value.Operations[0].Operation);
+
+        var rejected = await Assert.ThrowsAsync<FlowValidationException>(() =>
+            CreatePublishedRetrievalFlowAsync(factory.Services, context, "invalid-capability", capabilities:
+                "knowledge.unsupported/v1"));
+        Assert.AreEqual("knowledge_retrieval_capabilities_invalid", rejected.Code);
     }
 
     [TestMethod]
@@ -432,7 +619,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         var publicProperties = search.Value.Definition.InputSchema.GetProperty("properties");
         Assert.IsFalse(publicProperties.TryGetProperty("knowledgeSourceId", out _));
         Assert.IsFalse(publicProperties.TryGetProperty("operation", out _));
-        Assert.IsTrue(publicProperties.TryGetProperty("query", out _));
+        Assert.IsTrue(publicProperties.TryGetProperty("request", out _));
         var executor = factory.Services.GetRequiredService<IToolDefinitionExecutor>();
         var rejected = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(() => executor.ExecuteAsync(
             new ToolDefinitionInvocation(
@@ -443,7 +630,11 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
                 "agentstration-documentation.search",
                 "fixed-argument-test",
                 null,
-                JsonSerializer.SerializeToElement(new { knowledgeSourceId = "another-source", query = "override" }),
+                JsonSerializer.SerializeToElement(new
+                {
+                    knowledgeSourceId = "another-source",
+                    request = new { query = "override" }
+                }),
                 ToolDefinitionCallerKind.Agent,
                 "test-agent"), default));
         Assert.AreEqual("tool_definition_fixed_argument_override", rejected.Code);
@@ -662,34 +853,70 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
     private static async Task CreatePublishedRetrievalFlowAsync(
         IServiceProvider services,
         RequestContext context,
-        string name)
+        string name,
+        JsonElement? output = null,
+        string? capabilities = null)
     {
-        var schema = JsonSerializer.SerializeToElement(new
+        var inputSchema = JsonSerializer.SerializeToElement(new
         {
             type = "object",
             properties = new
             {
                 knowledgeSourceId = new { type = "string" },
+                knowledgeSourceUid = new { type = "string" },
+                knowledgeSourceGeneration = new { type = "integer" },
                 operation = new { type = "string" },
-                query = new { type = "string" }
+                snapshot = new { type = "object" },
+                request = new { type = "object" },
+                caller = new { type = "object" },
+                correlationId = new { type = "string" },
+                retrievalId = new { type = "string" }
             },
-            required = new[] { "knowledgeSourceId", "operation", "query" },
+            required = new[]
+            {
+                "knowledgeSourceId", "knowledgeSourceUid", "knowledgeSourceGeneration", "operation",
+                "snapshot", "request", "caller", "correlationId", "retrievalId"
+            },
             additionalProperties = false
+        });
+        var outputSchema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new
+            {
+                items = new { type = "array" },
+                citations = new { type = "array" },
+                answer = new { type = "string" },
+                continuationToken = new { type = "string" }
+            },
+            required = new[] { "items", "citations" },
+            additionalProperties = false
+        });
+        var result = output ?? JsonSerializer.SerializeToElement(new
+        {
+            items = Array.Empty<object>(),
+            citations = Array.Empty<object>()
         });
         var flows = services.GetRequiredService<FlowService>();
         var workspaceId = new WorkspaceId(context.WorkspaceId);
         await flows.CreateAsync(workspaceId, new CreateFlowCommand(
             name, null, "1.0.0", true,
             new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
+            new Dictionary<string, string>
+            {
+                [KnowledgeFlowContracts.MetadataKey] = KnowledgeFlowContracts.Retrieval,
+                [KnowledgeFlowContracts.CapabilitiesMetadataKey] = capabilities ?? string.Join(',',
+                    KnowledgeFlowContracts.Search, KnowledgeFlowContracts.Query, KnowledgeFlowContracts.Read)
+            },
             Graph: new FlowGraphDefinition
             {
                 EntryStep = "input",
-                InputSchema = schema.Clone(),
-                OutputSchema = schema.Clone(),
+                InputSchema = inputSchema,
+                OutputSchema = outputSchema,
                 Steps =
                 [
-                    new InputFlowStepDefinition { Name = "input", Schema = schema.Clone() },
-                    new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${input}") }
+                    new InputFlowStepDefinition { Name = "input", Schema = inputSchema },
+                    new OutputFlowStepDefinition { Name = "output", OutputMapping = result }
                 ],
                 Transitions = [new("input-output", "input", "completed", "output")]
             }), default, default);
@@ -772,6 +999,74 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
                 Sha256 = sealedArtifact.Value.Sha256!,
                 Provenance = new Dictionary<string, string> { ["backend"] = "test" }
             }), default)).Value;
+    }
+
+    private static async Task<KnowledgeSnapshotResource> CreateActiveSnapshotAsync(
+        IServiceProvider services,
+        RequestContext context,
+        KnowledgeSourceResource source,
+        FlowRunArtifactResource artifact,
+        string name)
+    {
+        var store = services.GetRequiredService<IResourceStore>();
+        var scopeRef = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var snapshot = (await store.CreateImmutableAsync(new KnowledgeSnapshotResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeSnapshot,
+            Metadata = new() { Name = name, Namespace = source.Namespace },
+            ScopeRef = scopeRef,
+            Generation = 1,
+            Status = new() { ProvisioningState = ProvisioningState.Succeeded },
+            KnowledgeSourceUid = source.Uid,
+            KnowledgeSourceName = source.Name,
+            KnowledgeSourceNamespace = source.Namespace,
+            KnowledgeSourceGeneration = source.Generation,
+            AcquisitionId = $"acquisition-{name}",
+            AcquisitionUid = Guid.NewGuid(),
+            AcquiredAt = DateTimeOffset.UtcNow,
+            IngestionFlow = new("retrieval-ingest", source.Namespace, "1.0.0", false, null, null,
+                KnowledgeFlowContracts.Ingestion),
+            IngestionFlowRunId = artifact.ProducerFlowRunId,
+            PublicationId = $"publication-{name}",
+            RequestHash = name,
+            PublishedAt = DateTimeOffset.UtcNow,
+            PublishedBy = context.PrincipalId,
+            Artifacts =
+            [
+                new KnowledgeSnapshotArtifact
+                {
+                    ArtifactId = artifact.ArtifactId.ToString(),
+                    ProducerFlowRunId = artifact.ProducerFlowRunId,
+                    ProducerFlowStepId = artifact.ProducerFlowStepId,
+                    StorageFlowRunId = artifact.Receipt.StorageFlowRunId,
+                    MediaType = artifact.Receipt.MediaType,
+                    Length = artifact.Receipt.Length,
+                    Sha256 = artifact.Receipt.Sha256,
+                    Provenance = artifact.Receipt.Provenance
+                }
+            ]
+        }, default)).Value;
+        var observedName = $"snapshot-state-{source.Uid:N}";
+        var address = ScopedResourceAddress.Create(scopeRef, source.Namespace,
+            KnowledgeResourceKinds.KnowledgeSnapshotObservedState, observedName);
+        var current = await store.GetExactAsync<KnowledgeSnapshotObservedResource>(address, default);
+        _ = await store.PutExactAsync(scopeRef, new KnowledgeSnapshotObservedResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeSnapshotObservedState,
+            Metadata = new() { Name = observedName, Namespace = source.Namespace },
+            ScopeRef = scopeRef,
+            Uid = current?.Value.Uid ?? Guid.Empty,
+            Generation = current is null ? 1 : checked(current.Value.Generation + 1),
+            Status = new() { ProvisioningState = ProvisioningState.Succeeded },
+            KnowledgeSourceUid = source.Uid,
+            ActiveSnapshotName = snapshot.Name,
+            ActiveSnapshotUid = snapshot.Uid,
+            LastPublishedAt = DateTimeOffset.UtcNow,
+            LastAttemptAt = DateTimeOffset.UtcNow
+        }, current?.ETag, current is null, default);
+        return snapshot;
     }
 
     private static HttpRequestMessage SnapshotRequest(

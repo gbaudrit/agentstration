@@ -143,6 +143,7 @@ public static class DependencyInjection
         services.AddSingleton<ParameterManagementService>();
         services.AddSingleton<KnowledgeSourceManagementService>();
         services.AddSingleton<KnowledgeAcquisitionService>();
+        services.AddSingleton<KnowledgeRetrievalService>();
         services.AddSingleton<IParameterResolver>(provider => provider.GetRequiredService<ParameterManagementService>());
         services.AddSingleton<SecretManagementService>();
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
@@ -416,6 +417,7 @@ public static class DependencyInjection
         services.AddSingleton<IToolDefinitionFlowResolver, ToolDefinitionFlowResolver>();
         services.AddSingleton<IKnowledgeFlowResolver, KnowledgeFlowResolver>();
         services.AddSingleton<IKnowledgeAcquisitionFlowGateway, KnowledgeAcquisitionFlowGateway>();
+        services.AddSingleton<IKnowledgeRetrievalFlowGateway, KnowledgeRetrievalFlowGateway>();
         services.AddSingleton<IKnowledgeArtifactReferenceValidator, KnowledgeArtifactReferenceValidator>();
         services.AddSingleton<IKnowledgeSnapshotArtifactResolver, KnowledgeSnapshotArtifactResolver>();
         services.AddSingleton<KnowledgeSnapshotService>();
@@ -423,7 +425,7 @@ public static class DependencyInjection
         if (enableHostedServices) services.AddHostedService<KnowledgeSnapshotRecoveryWorker>();
         services.AddSingleton<KnowledgeSourceToolExposureService>();
         services.AddSingleton<IFlowVersionActivationGuard, ToolDefinitionFlowActivationGuard>();
-        services.AddSingleton<IFlowVersionActivationGuard, KnowledgeIngestionFlowActivationGuard>();
+        services.AddSingleton<IFlowVersionActivationGuard, KnowledgeFlowActivationGuard>();
         services.AddSingleton<IFlowDeletionGuard, ToolDefinitionFlowDeletionGuard>();
         services.AddSingleton<IFlowDeletionGuard, KnowledgeFlowDeletionGuard>();
         services.AddSingleton<IFlowRunDeletionGuard, KnowledgeSnapshotFlowRunDeletionGuard>();
