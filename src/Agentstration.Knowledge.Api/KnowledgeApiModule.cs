@@ -8,7 +8,9 @@ public static class KnowledgeApiModule
 
     public static IEndpointRouteBuilder MapKnowledgeApi(this IEndpointRouteBuilder endpoints)
     {
-        KnowledgeSourceEndpoints.Map(endpoints.MapGroup("/api/knowledgesources"));
+        var sources = endpoints.MapGroup("/api/knowledgesources");
+        KnowledgeSourceEndpoints.Map(sources);
+        KnowledgeAcquisitionEndpoints.Map(sources, endpoints.MapGroup("/api/knowledgeacquisitions"));
         return endpoints;
     }
 }

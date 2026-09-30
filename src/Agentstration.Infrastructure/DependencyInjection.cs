@@ -142,6 +142,7 @@ public static class DependencyInjection
         services.AddSingleton<DescendantResourceUseAuthorizer>();
         services.AddSingleton<ParameterManagementService>();
         services.AddSingleton<KnowledgeSourceManagementService>();
+        services.AddSingleton<KnowledgeAcquisitionService>();
         services.AddSingleton<IParameterResolver>(provider => provider.GetRequiredService<ParameterManagementService>());
         services.AddSingleton<SecretManagementService>();
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
@@ -414,8 +415,12 @@ public static class DependencyInjection
         services.AddSingleton<IEntryExecutionResolver, EntryExecutionResolver>();
         services.AddSingleton<IToolDefinitionFlowResolver, ToolDefinitionFlowResolver>();
         services.AddSingleton<IKnowledgeFlowResolver, KnowledgeFlowResolver>();
+        services.AddSingleton<IKnowledgeAcquisitionFlowGateway, KnowledgeAcquisitionFlowGateway>();
+        services.AddSingleton<IKnowledgeArtifactReferenceValidator, KnowledgeArtifactReferenceValidator>();
+        if (enableHostedServices) services.AddHostedService<KnowledgeAcquisitionRecoveryWorker>();
         services.AddSingleton<KnowledgeSourceToolExposureService>();
         services.AddSingleton<IFlowVersionActivationGuard, ToolDefinitionFlowActivationGuard>();
+        services.AddSingleton<IFlowVersionActivationGuard, KnowledgeIngestionFlowActivationGuard>();
         services.AddSingleton<IFlowDeletionGuard, ToolDefinitionFlowDeletionGuard>();
         services.AddSingleton<IFlowDeletionGuard, KnowledgeFlowDeletionGuard>();
         services.AddSingleton<IEntryTargetResolver, EntryTargetResolver>();

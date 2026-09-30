@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Agentstration.Artifacts;
+using Agentstration.Artifacts.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
@@ -18,6 +20,205 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task AcquisitionRunsTheExactPublishedIngestionFlowAndReturnsABoundedManifest()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var staged = await factory.Services.GetRequiredService<ArtifactManagementService>().CreateStagedAsync(
+            new("docs.md", "text/markdown", new ArtifactProducer
+            {
+                Kind = ArtifactProducerKind.FlowRun,
+                Id = "knowledge-test",
+                FlowRunId = "knowledge-test"
+            }), default);
+        _ = await factory.Services.GetRequiredService<ArtifactManagementService>().WriteAsync(
+            staged.Value.ArtifactId, 0, "# Docs"u8.ToArray(), default);
+        _ = await factory.Services.GetRequiredService<ArtifactManagementService>().SealAsync(staged.Value.ArtifactId, default);
+        await CreatePublishedIngestionFlowAsync(factory.Services, context, "docs-ingest", staged.Value.ArtifactId.ToString());
+        await CreatePublishedFlowAsync(factory.Services, context, "docs-retrieve");
+        var source = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(
+            new KnowledgeSourceResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSource,
+                Metadata = new() { Name = "docs" },
+                ScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId),
+                Definition = Properties("Documentation", "docs-ingest", "docs-retrieve")
+            }, default);
+        using var client = factory.CreateClient();
+        using var firstRequest = new HttpRequestMessage(HttpMethod.Post, "/api/knowledgesources/docs/acquisitions")
+        {
+            Content = JsonContent.Create(new StartKnowledgeAcquisitionRequest
+            {
+                Parameters = JsonSerializer.SerializeToElement(new { locale = "en-US" }),
+                CorrelationId = "knowledge-correlation"
+            })
+        };
+        firstRequest.Headers.Add("Idempotency-Key", "docs-acquisition-1");
+
+        using var startedResponse = await client.SendAsync(firstRequest);
+
+        Assert.AreEqual(HttpStatusCode.Accepted, startedResponse.StatusCode,
+            await startedResponse.Content.ReadAsStringAsync());
+        var started = await startedResponse.Content.ReadFromJsonAsync<KnowledgeAcquisitionResource>();
+        Assert.IsNotNull(started);
+        Assert.AreEqual(source.Value.Uid, started.KnowledgeSourceUid);
+        Assert.AreEqual(source.Value.Generation, started.KnowledgeSourceGeneration);
+        Assert.AreEqual("1.0.0", started.IngestionFlow.Version);
+        Assert.AreEqual(KnowledgeFlowContracts.Ingestion, started.IngestionFlow.Contract);
+        Assert.AreEqual("knowledge-correlation", started.CorrelationId);
+
+        await factory.Services.GetRequiredService<FlowRunService>().ExecuteAsync(
+            new FlowRunQueueItem(started.FlowRunId,
+                new FlowRunScope(context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId)), default);
+
+        KnowledgeAcquisitionResource? completed = null;
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            completed = await client.GetFromJsonAsync<KnowledgeAcquisitionResource>(startedResponse.Headers.Location);
+            if (completed?.State is KnowledgeAcquisitionState.Succeeded or KnowledgeAcquisitionState.Failed) break;
+            await Task.Delay(50);
+        }
+        Assert.IsNotNull(completed);
+        Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, completed.State, completed.ErrorMessage);
+        Assert.HasCount(1, completed.Manifest!.Artifacts);
+        Assert.AreEqual(KnowledgeArtifactDisposition.Publishable, completed.Manifest.Artifacts[0].Disposition);
+        Assert.AreEqual(staged.Value.ArtifactId.ToString(), completed.Manifest.Artifacts[0].ArtifactId);
+
+        using var repeatedRequest = new HttpRequestMessage(HttpMethod.Post, "/api/knowledgesources/docs/acquisitions")
+        {
+            Content = JsonContent.Create(new StartKnowledgeAcquisitionRequest
+            {
+                Parameters = JsonSerializer.SerializeToElement(new { locale = "en-US" }),
+                CorrelationId = "knowledge-correlation"
+            })
+        };
+        repeatedRequest.Headers.Add("Idempotency-Key", "docs-acquisition-1");
+        using var repeatedResponse = await client.SendAsync(repeatedRequest);
+        var repeated = await repeatedResponse.Content.ReadFromJsonAsync<KnowledgeAcquisitionResource>();
+        Assert.AreEqual(HttpStatusCode.Accepted, repeatedResponse.StatusCode);
+        Assert.AreEqual(started.Name, repeated!.Name);
+
+        using var conflictingRequest = new HttpRequestMessage(HttpMethod.Post, "/api/knowledgesources/docs/acquisitions")
+        {
+            Content = JsonContent.Create(new StartKnowledgeAcquisitionRequest
+            {
+                Parameters = JsonSerializer.SerializeToElement(new { locale = "fr-FR" })
+            })
+        };
+        conflictingRequest.Headers.Add("Idempotency-Key", "docs-acquisition-1");
+        using var conflict = await client.SendAsync(conflictingRequest);
+        Assert.AreEqual(HttpStatusCode.Conflict, conflict.StatusCode);
+
+        var history = await client.GetFromJsonAsync<KnowledgeAcquisitionResource[]>("/api/knowledgesources/docs/acquisitions");
+        Assert.HasCount(1, history!);
+    }
+
+    [TestMethod]
+    public async Task AcquisitionRejectsAFlowWithoutTheIngestionContract()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        await CreatePublishedFlowAsync(factory.Services, context, "plain-flow");
+        await CreatePublishedFlowAsync(factory.Services, context, "retrieve-flow");
+        _ = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(new KnowledgeSourceResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeSource,
+            Metadata = new() { Name = "invalid-contract" },
+            ScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId),
+            Definition = Properties("Invalid contract", "plain-flow", "retrieve-flow")
+        }, default);
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsJsonAsync("/api/knowledgesources/invalid-contract/acquisitions",
+            new StartKnowledgeAcquisitionRequest());
+
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        StringAssert.EndsWith(problem!.Type, "knowledge_ingestion_contract_required");
+    }
+
+    [TestMethod]
+    public async Task AcquisitionEnforcesSingleActiveRunAndSupportsCancellationAndRetry()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        await CreatePublishedIngestionFlowAsync(factory.Services, context, "controlled-ingest", Guid.NewGuid().ToString("N"));
+        await CreatePublishedFlowAsync(factory.Services, context, "controlled-retrieve");
+        _ = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(new KnowledgeSourceResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeSource,
+            Metadata = new() { Name = "controlled" },
+            ScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId),
+            Definition = Properties("Controlled", "controlled-ingest", "controlled-retrieve")
+        }, default);
+        using var client = factory.CreateClient();
+        using var startedResponse = await client.PostAsJsonAsync("/api/knowledgesources/controlled/acquisitions",
+            new StartKnowledgeAcquisitionRequest { Parameters = JsonSerializer.SerializeToElement(new { page = 1 }) });
+        var started = await startedResponse.Content.ReadFromJsonAsync<KnowledgeAcquisitionResource>();
+        Assert.AreEqual(HttpStatusCode.Accepted, startedResponse.StatusCode);
+
+        using var concurrent = await client.PostAsJsonAsync("/api/knowledgesources/controlled/acquisitions",
+            new StartKnowledgeAcquisitionRequest { Parameters = JsonSerializer.SerializeToElement(new { page = 2 }) });
+        Assert.AreEqual(HttpStatusCode.Conflict, concurrent.StatusCode);
+
+        using var cancelledResponse = await client.PostAsync($"/api/knowledgeacquisitions/{started!.Name}/cancel", null);
+        var cancelled = await cancelledResponse.Content.ReadFromJsonAsync<KnowledgeAcquisitionResource>();
+        Assert.AreEqual(HttpStatusCode.OK, cancelledResponse.StatusCode);
+        Assert.AreEqual(KnowledgeAcquisitionState.Cancelled, cancelled!.State);
+
+        using var retriedResponse = await client.PostAsJsonAsync($"/api/knowledgeacquisitions/{started.Name}/retry",
+            new RetryKnowledgeAcquisitionRequest { CorrelationId = "retry-correlation" });
+        var retried = await retriedResponse.Content.ReadFromJsonAsync<KnowledgeAcquisitionResource>();
+        Assert.AreEqual(HttpStatusCode.Accepted, retriedResponse.StatusCode);
+        Assert.AreNotEqual(started.Name, retried!.Name);
+        Assert.AreEqual(started.Name, retried.RetriedFrom);
+        Assert.AreEqual(2, retried.Attempt);
+        Assert.AreEqual("retry-correlation", retried.CorrelationId);
+        Assert.AreEqual(1, retried.Parameters.GetProperty("page").GetInt32());
+    }
+
+    [TestMethod]
+    public async Task AcquisitionArtifactReferencesCannotCrossWorkspaceBoundaries()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var staged = await factory.Services.GetRequiredService<ArtifactManagementService>().CreateStagedAsync(
+            new("private.md", "text/markdown", new ArtifactProducer
+            {
+                Kind = ArtifactProducerKind.FlowRun,
+                Id = "knowledge-isolation",
+                FlowRunId = "knowledge-isolation"
+            }), default);
+        var otherWorkspaceId = Guid.NewGuid();
+        var otherWorkspace = new Workspace(otherWorkspaceId, context.TenantId, $"knowledge-{otherWorkspaceId:N}",
+            "Knowledge isolation", WorkspaceStatus.Initializing, DateTimeOffset.UtcNow);
+        await factory.Services.GetRequiredService<IIdentityStore>().AddWorkspaceAsync(otherWorkspace, default);
+        await factory.Services.GetRequiredService<IWorkspaceProvisioner>().ProvisionAsync(otherWorkspace, default);
+        var validator = factory.Services.GetRequiredService<IKnowledgeArtifactReferenceValidator>();
+        using var otherRequestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>()
+            .Push(context with { WorkspaceId = otherWorkspaceId });
+
+        var denied = await Assert.ThrowsAsync<KnowledgeAcquisitionException>(() => validator.ValidateAsync(
+            otherWorkspaceId,
+            [new KnowledgeAcquisitionArtifact
+            {
+                ArtifactId = staged.Value.ArtifactId.ToString(),
+                Kind = KnowledgeArtifactKind.Staged,
+                Disposition = KnowledgeArtifactDisposition.Publishable
+            }],
+            default));
+
+        Assert.AreEqual("knowledge_ingestion_artifact_not_found", denied.Code);
+    }
+
     [TestMethod]
     public async Task KnowledgeSourceExposureCreatesSourceSpecificToolsWithFixedRoutingArguments()
     {
@@ -313,6 +514,59 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
                 [
                     new InputFlowStepDefinition { Name = "input", Schema = schema.Clone() },
                     new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${input}") }
+                ],
+                Transitions = [new("input-output", "input", "completed", "output")]
+            }), default, default);
+        await flows.PublishVersionAsync(workspaceId, new(name), "1.0.0", true, default);
+    }
+
+    private static async Task CreatePublishedIngestionFlowAsync(
+        IServiceProvider services,
+        RequestContext context,
+        string name,
+        string artifactId)
+    {
+        var inputSchema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new
+            {
+                knowledgeSourceId = new { type = "string" },
+                parameters = new { type = "object" },
+                caller = new { type = "object" },
+                correlationId = new { type = "string" },
+                acquisitionId = new { type = "string" }
+            },
+            required = new[] { "knowledgeSourceId", "parameters", "caller", "correlationId", "acquisitionId" }
+        });
+        var output = JsonSerializer.SerializeToElement(new
+        {
+            artifacts = new[]
+            {
+                new { artifactId, kind = "staged", disposition = "publishable", name = "Documentation", mediaType = "text/markdown" }
+            }
+        });
+        var outputSchema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { artifacts = new { type = "array" } },
+            required = new[] { "artifacts" }
+        });
+        var flows = services.GetRequiredService<FlowService>();
+        var workspaceId = new WorkspaceId(context.WorkspaceId);
+        await flows.CreateAsync(workspaceId, new CreateFlowCommand(
+            name, null, "1.0.0", true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
+            new Dictionary<string, string> { [KnowledgeFlowContracts.MetadataKey] = KnowledgeFlowContracts.Ingestion },
+            new FlowGraphDefinition
+            {
+                EntryStep = "input",
+                InputSchema = inputSchema,
+                OutputSchema = outputSchema,
+                Steps =
+                [
+                    new InputFlowStepDefinition { Name = "input", Schema = inputSchema },
+                    new OutputFlowStepDefinition { Name = "output", OutputMapping = output }
                 ],
                 Transitions = [new("input-output", "input", "completed", "output")]
             }), default, default);
