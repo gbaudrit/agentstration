@@ -48,6 +48,11 @@ public static class SecurityAuditActions
     public const string SourceRegistryDeleted = "source-registry.deleted";
     public const string SourceRegistryRefreshed = "source-registry.refreshed";
     public const string SourceRegistrySourceImported = "source-registry.source-imported";
+    public const string KnowledgeSourceCreated = "knowledge-source.created";
+    public const string KnowledgeSourceUpdated = "knowledge-source.updated";
+    public const string KnowledgeSourceEnabled = "knowledge-source.enabled";
+    public const string KnowledgeSourceDisabled = "knowledge-source.disabled";
+    public const string KnowledgeSourceDeleted = "knowledge-source.deleted";
 }
 
 public sealed record SecurityAuditEvent(

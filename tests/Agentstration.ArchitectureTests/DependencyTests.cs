@@ -17,6 +17,8 @@ using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
+using Agentstration.Knowledge;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Packs;
@@ -699,6 +701,7 @@ public sealed class DependencyTests
             typeof(AepEnrollmentService).Assembly,
             typeof(ExternalIdentityAdministrationService).Assembly,
             typeof(ModelProviderManagementService).Assembly,
+            typeof(KnowledgeSourceManagementService).Assembly,
             typeof(PackManagementService).Assembly,
             typeof(SourceManagementService).Assembly,
             typeof(RuntimeProfileManagementService).Assembly,
@@ -790,13 +793,13 @@ public sealed class DependencyTests
     {
         var expected = new[]
         {
-            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "ModelProvider", "ModelProfile", "RuntimeProfile", "Parameter",
+            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "KnowledgeSource", "ModelProvider", "ModelProfile", "RuntimeProfile", "Parameter",
             "Secret", "Vault", "Tool", "ToolDefinition", "ToolProvider", "ToolExecutionHook", "Trigger", "Source", "SourceVersion", "SourceProvider"
         };
         var actual = new[]
         {
             AgentResourceKinds.Agent, AgentResourceKinds.AgentRevision, AgentResourceKinds.AgentDeployment, FlowResourceKinds.Flow,
-            EntryResourceKinds.Entry, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile, ParameterResourceKinds.Parameter,
+            EntryResourceKinds.Entry, KnowledgeResourceKinds.KnowledgeSource, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile, ParameterResourceKinds.Parameter,
             SecretResourceKinds.Secret, SecretResourceKinds.Vault, ToolResourceKinds.Tool, ToolResourceKinds.ToolDefinition,
             ToolResourceKinds.ToolProvider, ToolResourceKinds.ToolExecutionHook, TriggerResourceKinds.Trigger, SourceResourceKinds.Source,
             SourceResourceKinds.SourceVersion, SourceResourceKinds.SourceProvider
@@ -815,6 +818,7 @@ public sealed class DependencyTests
             typeof(Agentstration.Bootstrap.Contracts.BootstrapApplicationResource).Assembly,
             typeof(Agentstration.Extensions.Contracts.ExtensionResponse).Assembly,
             typeof(Agentstration.Identity.Contracts.IdentityConsoleContextResponse).Assembly,
+            typeof(KnowledgeSourceResource).Assembly,
             typeof(Agentstration.Models.Contracts.ModelProviderResponse).Assembly,
             typeof(Agentstration.Parameters.Contracts.CreateParameterRequest).Assembly,
             typeof(Agentstration.ResourceManagement.Contracts.ResourceDeclaration<>).Assembly,

@@ -37,6 +37,8 @@
     <ProjectReference Include="../../src/Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Knowledge.Contracts/Agentstration.Knowledge.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Knowledge/Agentstration.Knowledge.csproj" />
     <ProjectReference Include="../../src/Agentstration.Models.Contracts/Agentstration.Models.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Secrets.Contracts/Agentstration.Secrets.Contracts.csproj" />

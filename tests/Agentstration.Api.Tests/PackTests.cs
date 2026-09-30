@@ -7,9 +7,12 @@ using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Api.Contracts;
 using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Flows.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Packs;
+using Agentstration.Knowledge;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.Models;
 using Agentstration.Packs;
 using Agentstration.Parameters;
@@ -679,6 +682,76 @@ public sealed class PackTests
         Assert.IsNull(await runtimeProfiles.GetAsync(new ResourceNamespace("agentstration.test-pack"), "pack-runtime", default));
         using var missing = await client.GetAsync("/api/packs/agentstration/test-pack");
         Assert.AreEqual(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task PackInstallsKnowledgeSourceAfterItsPublishedFlowsAndRemovesItFirst()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        await using var archive = CreateZip(new Dictionary<string, string>
+        {
+            ["pack.yaml"] = Manifest("flows/pack-flow.yaml", "knowledge-sources/pack-knowledge.yaml"),
+            ["flows/pack-flow.yaml"] = """
+                apiVersion: agentstration.io/v1
+                kind: Flow
+                metadata:
+                  name: pack-flow
+                definition:
+                  displayName: Pack flow
+                  version: 1.0.0
+                  enabled: true
+                  spec:
+                    flowKind: direct
+                    target:
+                      kind: agent
+                      id: unused
+                  publish: true
+                  activate: true
+                """,
+            ["knowledge-sources/pack-knowledge.yaml"] = """
+                apiVersion: agentstration.io/v1
+                kind: KnowledgeSource
+                metadata:
+                  name: pack-knowledge
+                definition:
+                  displayName: Pack knowledge
+                  enabled: true
+                  ingestionFlow:
+                    name: pack-flow
+                  retrievalFlow:
+                    name: pack-flow
+                """
+        });
+        var bytes = archive.ToArray();
+
+        using var previewContent = ArchiveContent(bytes, "knowledge.pack.zip");
+        using var previewResponse = await client.PostAsync("/api/packs/preview", previewContent);
+        Assert.AreEqual(HttpStatusCode.OK, previewResponse.StatusCode, await previewResponse.Content.ReadAsStringAsync());
+        var preview = await previewResponse.Content.ReadFromJsonAsync<PackInstallationPreview>();
+        Assert.IsTrue(preview!.CanInstall);
+        CollectionAssert.AreEqual(
+            new[] { FlowResourceKinds.Flow, KnowledgeResourceKinds.KnowledgeSource },
+            preview.Resources.Select(value => value.Kind).ToArray());
+
+        using var installContent = ArchiveContent(bytes, "knowledge.pack.zip");
+        using var installedResponse = await client.PostAsync("/api/packs", installContent);
+        Assert.AreEqual(HttpStatusCode.Created, installedResponse.StatusCode, await installedResponse.Content.ReadAsStringAsync());
+        var ns = new ResourceNamespace("agentstration.test-pack");
+        var source = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>()
+            .GetAsync(new("pack-knowledge", ns), default);
+        Assert.IsNotNull(source);
+        Assert.AreEqual("True", source.Value.Status.Conditions.Single(value => value.Type == "Ready").Status);
+        Assert.AreEqual("test-pack", source.Value.Metadata.Annotations[PackProvenanceAnnotations.Name]);
+
+        using var removed = await client.DeleteAsync("/api/packs/agentstration/test-pack");
+        Assert.AreEqual(HttpStatusCode.NoContent, removed.StatusCode, await removed.Content.ReadAsStringAsync());
+        Assert.IsNull(await factory.Services.GetRequiredService<KnowledgeSourceManagementService>()
+            .GetAsync(new("pack-knowledge", ns), default));
+        Assert.IsNull(await factory.Services.GetRequiredService<FlowService>()
+            .GetAsync(new(requestContext.WorkspaceId), new("pack-flow", ns), default));
     }
 
     [TestMethod]
