@@ -214,6 +214,34 @@ public sealed class ToolSetService(
         return new(name, @namespace, version, selected);
     }
 
+    public async Task<ToolSetRouteSelection> ResolveRouteExactAsync(
+        ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace,
+        string name,
+        string version,
+        string capability,
+        string? route,
+        CancellationToken cancellationToken)
+    {
+        var published = await GetVersionExactAsync(scopeRef, @namespace, name, version, cancellationToken)
+            ?? throw new ToolSetValidationException("tool_set_version_not_found", $"Published ToolSet '{@namespace}/{name}:{version}' was not found in scope '{scopeRef}'.");
+        var candidates = published.Value.Members.Where(member =>
+            string.Equals(member.Capability, capability, StringComparison.Ordinal)
+            && (route is null || string.Equals(member.Route, route, StringComparison.Ordinal))).ToArray();
+        if (candidates.Length == 0)
+            throw new ToolSetValidationException("tool_route_not_found", $"ToolSet '{@namespace}/{name}:{version}' has no compatible route for capability '{capability}'.");
+        if (candidates.Length > 1)
+            throw new ToolSetValidationException("tool_route_ambiguous", $"ToolSet '{@namespace}/{name}:{version}' has multiple compatible routes for capability '{capability}'.");
+        var selected = candidates[0];
+        var current = await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
+            scopeRef, selected.ToolNamespace, ToolResourceKinds.Tool, selected.ToolName), cancellationToken);
+        if (current is null || current.Value.Uid != selected.ToolUid || current.Value.Generation != selected.ToolGeneration)
+            throw new ToolSetValidationException("tool_set_member_stale", $"Published Tool member '{selected.ToolNamespace}/{selected.ToolName}' no longer matches its pinned revision.");
+        if (!current.Value.Definition.Enabled || current.Value.Definition.Discovery?.Available != true)
+            throw new ToolSetValidationException("tool_set_member_unavailable", $"Published Tool member '{selected.ToolNamespace}/{selected.ToolName}' is unavailable.");
+        return new(name, @namespace, version, selected);
+    }
+
     private async Task<IReadOnlyList<PublishedToolSetMember>> ResolveMembersAsync(
         ToolSetResource resource,
         ResourceScopeRef scopeRef,

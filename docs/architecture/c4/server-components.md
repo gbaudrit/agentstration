@@ -6,7 +6,7 @@ The canonical [interactive C4 L3 view](../interactive.mdx) opens the **Authorita
 | --- | --- | --- |
 | API transport | Family-owned REST, MCP, SignalR, OpenAPI, request-context, and HTTP security adapters | `Agentstration.Api`, `Agentstration.*.Api` |
 | Identity and authorization | Authentication, Principals, Workspace access, RBAC, PATs, delegation, and security audit | `Agentstration.Identity`, `Agentstration.Identity.Contracts`, `Agentstration.Security.Contracts` |
-| Resource-family services | Family-owned resource validation, lifecycle, desired state, and provider-neutral ports | `Agentstration.Agents`, `Agentstration.Models.Application`, `Agentstration.Triggers`, `Agentstration.Extensions.Aep`, `Agentstration.Sources`, `Agentstration.Secrets` |
+| Resource-family services | Family-owned resource validation, lifecycle, desired state, and provider-neutral ports | `Agentstration.Agents`, `Agentstration.Models.Application`, `Agentstration.Triggers`, `Agentstration.Extensions.Aep`, `Agentstration.Sources`, `Agentstration.Secrets`, `Agentstration.Artifacts` |
 | Distribution and bootstrap | API-driven Bootstrap profiles, Pack and Source distribution, generic manifest planning delegated to owning families, and bounded startup initialization | `Agentstration.Bootstrap.Contracts`, `Agentstration.ResourceManagement.Contracts`, `Agentstration.Packs`, `Agentstration.Sources` |
 | Work and Workplace application | Functional Work lifecycle, interactions, notifications, projections, and root execution submission | `Agentstration.Application`, `Agentstration.Work`, `Agentstration.Work.Contracts` |
 | Flow engine | Flow definitions, immutable publications, durable Flow Runs, and provider-neutral graph execution | `Agentstration.Flows.*` |

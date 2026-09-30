@@ -1,5 +1,7 @@
 using Agentstration.Agents;
 using Agentstration.Application.Work;
+using Agentstration.Artifacts;
+using Agentstration.Artifacts.Contracts;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.PostgreSql;
 using Agentstration.Flows.Storage.Sqlite;
@@ -280,6 +282,7 @@ public static class DependencyInjection
         services.AddSingleton<ToolSetService>();
         services.AddSingleton<ToolDefinitionService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
+        services.AddSingleton<IToolExecutionHook, ArtifactStagingExecutionGuard>();
         services.AddSingleton<RuntimeProfileManagementService>();
         services.AddSingleton<ITriggerScheduleCalculator, QuartzTriggerScheduleCalculator>();
         services.AddSingleton<ITriggerTargetValidator, FlowTriggerTargetValidator>();
@@ -348,6 +351,13 @@ public static class DependencyInjection
             services.AddSqliteWorkPlane(workPlaneConnectionString);
         }
         services.AddSingleton<IArtifactStore>(_ => new FileSystemArtifactStore(Path.Combine(dataDirectory, "artifacts")));
+        services.AddSingleton<IArtifactContentStore>(_ => new FileSystemStagedArtifactContentStore(Path.Combine(dataDirectory, "staged-artifacts")));
+        services.AddSingleton<IArtifactDurableStore>(_ => new FileSystemDurableArtifactStore(Path.Combine(dataDirectory, "durable-artifacts")));
+        services.AddSingleton<IArtifactStagingToolExecutor, ToolSetArtifactStagingExecutor>();
+        services.AddSingleton<ArtifactManagementService>();
+        services.AddSingleton<ArtifactPlatformResourceProvisioner>();
+        services.AddSingleton(new StagedArtifactCleanupOptions());
+        if (enableHostedServices) services.AddHostedService<StagedArtifactCleanupWorker>();
         services.AddSingleton<LocalWorkExecutionGateway>();
         services.AddSingleton<IWorkExecutionGateway>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
         services.AddSingleton<ILocalWorkExecutionQueue>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
@@ -371,6 +381,22 @@ public static class DependencyInjection
         AddInternalTool<ResourcePlanMaterializeMcpTool>(services);
         AddInternalTool<ResourceChangeSetCreateMcpTool>(services);
         AddInternalTool<ResourceChangeSetValidateMcpTool>(services);
+        AddInternalTool<ArtifactStagingCreateMcpTool>(services);
+        AddInternalTool<ArtifactStagingWriteMcpTool>(services);
+        AddInternalTool<ArtifactStagingReadMcpTool>(services);
+        AddInternalTool<ArtifactStagingStatMcpTool>(services);
+        AddInternalTool<ArtifactStagingDeleteMcpTool>(services);
+        AddInternalTool<StagedArtifactCreateMcpTool>(services);
+        AddInternalTool<StagedArtifactWriteMcpTool>(services);
+        AddInternalTool<StagedArtifactSealMcpTool>(services);
+        AddInternalTool<StagedArtifactInspectMcpTool>(services);
+        AddInternalTool<StagedArtifactReadContentMcpTool>(services);
+        AddInternalTool<StagedArtifactCreateLeaseMcpTool>(services);
+        AddInternalTool<StagedArtifactHandoffMcpTool>(services);
+        AddInternalTool<StagedArtifactManageRetentionMcpTool>(services);
+        AddInternalTool<StagedArtifactPurgeMcpTool>(services);
+        AddInternalTool<ArtifactStorageWriteMcpTool>(services);
+        AddInternalTool<ArtifactStorageReadMcpTool>(services);
         services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<WorkNotificationMcpTool>());
         services.AddSingleton<InternalMcpToolProjectionService>();
         services.AddSingleton(provider => new Lazy<IEnumerable<IInternalMcpToolHandler>>(

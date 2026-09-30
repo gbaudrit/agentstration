@@ -12,7 +12,7 @@ Standalone mode deliberately separates module-owned persistence. The default SQL
 | Flow definitions, versions, drafts, Runs, and events | `flow-plane.db` |
 | Runtime Runs, attempts, and events | `runtime-plane.db` |
 
-The same data directory also contains bounded file-backed state where relational storage is not the owning abstraction: encrypted local secret material under `secrets/`, ASP.NET Core data-protection keys, Pack archives, Source snapshots and caches, and Work artifacts. These are not a legacy JSON content store.
+The same data directory also contains bounded file-backed state where relational storage is not the owning abstraction: encrypted local secret material under `secrets/`, ASP.NET Core data-protection keys, Pack archives, Source snapshots and caches, Work artifacts, and the default Workspace-isolated staged and durable Artifact content stores. Artifact metadata, leases, retention, integrity hashes, provenance, ToolSet bindings, and opaque receipts remain canonical resources; filesystem paths are never public contracts. These are not a legacy JSON content store.
 
 PostgreSQL is an optional server storage profile. It may consolidate relational infrastructure physically, but module ownership remains separated by the `management`, `work`, `flow`, `runtime`, `identity`, and `scheduler` schemas. Resource planning remains an explicit module boundary in either profile.
 

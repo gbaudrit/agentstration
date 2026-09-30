@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Agentstration.Artifacts.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Notifications;
 using Agentstration.ResourceManagement;
@@ -31,6 +32,7 @@ internal static class AgentstrationMcpHandlers
             .ToDictionary(value => value.Definition.ExternalId ?? string.Empty, StringComparer.Ordinal);
         var builtIns = services.GetServices<IInternalMcpToolDefinitionProvider>()
             .Select(value => value.Definition)
+            .Where(value => value.ExposeThroughMcp)
             .Where(value => projected.TryGetValue(value.Name, out var tool)
                 && tool.Definition.Enabled
                 && tool.Definition.Discovery?.Available == true)
@@ -91,6 +93,8 @@ internal static class AgentstrationMcpHandlers
                 .SingleOrDefault(value => string.Equals(value.Definition.Name, parameters.Name, StringComparison.Ordinal));
             if (builtIn is not null)
             {
+                if (!builtIn.Definition.ExposeThroughMcp)
+                    throw new ToolDefinitionInvocationException("tool_not_exposed", $"Tool '{parameters.Name}' is an internal implementation Tool and is not exposed by the MCP broker.");
                 var callId = IdempotencyKey(parameters.Meta) ?? request.JsonRpcRequest.Id.ToString();
                 var resourceName = AgentstrationToolProvider.ToolResourceName(builtIn.Definition.Name);
                 var builtInOutput = await services.GetRequiredService<IToolExecutionPipeline>().ExecuteAsync(new ToolExecutionContext
@@ -151,6 +155,14 @@ internal static class AgentstrationMcpHandlers
         catch (ToolResolutionException exception)
         {
             return Error(exception.Code, exception.Message);
+        }
+        catch (ArtifactValidationException exception)
+        {
+            return Error(exception.Code, exception.Message);
+        }
+        catch (AuthorizationDeniedException exception)
+        {
+            return Error("authorization_denied", exception.Message);
         }
     }
 

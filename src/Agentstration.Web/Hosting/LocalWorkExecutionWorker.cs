@@ -143,13 +143,39 @@ public sealed class LocalWorkExecutionWorker(
 
         var output = current.Output;
         var text = output is { ValueKind: JsonValueKind.String } ? output.Value.GetString() : null;
+        var artifacts = DurableArtifactReferences(output);
         var result = new WorkResult(
             [new WorkResultContent(text, output?.Clone(), output?.ValueKind == JsonValueKind.String ? "text/plain" : "application/json")],
-            [],
+            artifacts,
             new Dictionary<string, string> { ["flowRunId"] = current.Id, ["flowId"] = current.FlowId.Value },
             timeProvider.GetUtcNow());
         await workItems.ApplyExecutionEventAsync(new WorkExecutionCompleted(
             Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId, timeProvider.GetUtcNow(), result), cancellationToken);
+    }
+
+    private static IReadOnlyList<WorkArtifact> DurableArtifactReferences(JsonElement? output)
+    {
+        if (output is not { ValueKind: JsonValueKind.Object } value
+            || !value.TryGetProperty("flowRunArtifactId", out var id)
+            || id.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(id.GetString())) return [];
+        var mediaType = value.TryGetProperty("receipt", out var receipt)
+            && receipt.ValueKind == JsonValueKind.Object
+            && receipt.TryGetProperty("mediaType", out var media)
+            && media.ValueKind == JsonValueKind.String
+                ? media.GetString()
+                : null;
+        var length = receipt.ValueKind == JsonValueKind.Object
+            && receipt.TryGetProperty("length", out var size)
+            && size.TryGetInt64(out var parsedLength)
+                ? parsedLength
+                : (long?)null;
+        var artifactId = id.GetString()!;
+        return [new WorkArtifact(
+            $"artifact-{artifactId[..Math.Min(12, artifactId.Length)]}",
+            new WorkContentReference($"artifact://flow-run/{artifactId}", mediaType),
+            new Dictionary<string, string> { ["flowRunArtifactId"] = artifactId },
+            length)];
     }
 
     private static FlowRunTrigger TriggerFor(FlowInvocationOrigin origin) => origin switch

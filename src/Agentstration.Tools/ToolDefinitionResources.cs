@@ -94,7 +94,8 @@ public sealed record InternalMcpToolDefinition(
     JsonElement InputSchema,
     JsonElement? OutputSchema = null,
     bool RequiresApproval = false,
-    InitialToolCategory? InitialCategory = null);
+    InitialToolCategory? InitialCategory = null,
+    bool ExposeThroughMcp = true);
 
 public sealed record InitialToolCategory(
     string Name,
