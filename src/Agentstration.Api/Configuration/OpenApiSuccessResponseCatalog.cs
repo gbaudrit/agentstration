@@ -375,6 +375,15 @@ internal static class OpenApiSuccessResponseCatalog
             if (path.EndsWith("/tools", StringComparison.OrdinalIgnoreCase)) return Json<ValueResponse<ToolResource>>(200, "List Tool Provider tools");
             return Json<ToolProviderResource>(200, method == "PUT" ? "Update a Tool Provider" : "Get a Tool Provider");
         }
+        if (path.StartsWith("/api/toolsets", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path.EndsWith("/route", StringComparison.OrdinalIgnoreCase)) return Json<ToolSetRouteSelection>(200, "Resolve a ToolSet route");
+            if (path.Contains("/versions/", StringComparison.OrdinalIgnoreCase)) return Json<ToolSetVersionResource>(200, "Get a published ToolSet version");
+            if (path.EndsWith("/versions", StringComparison.OrdinalIgnoreCase))
+                return method == "POST" ? Json<ToolSetVersionResource>(201, "Publish a ToolSet version") : Json<ValueResponse<ToolSetVersionResource>>(200, "List ToolSet versions");
+            if (path == "/api/toolsets") return method == "POST" ? Json<ToolSetResource>(201, "Create a ToolSet") : Json<ValueResponse<ToolSetResource>>(200, "List ToolSets");
+            return Json<ToolSetResource>(200, method == "PUT" ? "Update a ToolSet" : "Get a ToolSet");
+        }
         if (path.StartsWith("/api/tools", StringComparison.OrdinalIgnoreCase))
             return path == "/api/tools" ? Json<ValueResponse<ToolResource>>(200, "List Tools") : Json<ToolResource>(200, "Get or update a Tool");
         if (path.StartsWith("/api/toolexecutionhooks", StringComparison.OrdinalIgnoreCase))

@@ -24,6 +24,20 @@ public sealed record ResolvedFlowTool(
     bool Enabled,
     bool Available,
     bool RequiresApproval);
+public sealed record ResolvedFlowToolRoute(
+    FlowToolReference Tool,
+    string ToolSetName,
+    ResourceNamespace ToolSetNamespace,
+    string ToolSetVersion,
+    string Capability,
+    string Route,
+    Guid ToolUid,
+    long ToolGeneration,
+    string ProviderName,
+    ResourceNamespace ProviderNamespace,
+    JsonElement InputSchema,
+    JsonElement? OutputSchema,
+    bool RequiresApproval);
 
 public interface IFlowDefinitionValidator
 {
@@ -50,6 +64,12 @@ public interface IFlowResourceReferenceResolver
         ResourceNamespace ownerNamespace,
         FlowToolReference reference,
         CancellationToken cancellationToken) => Task.FromResult<ResolvedFlowTool?>(null);
+
+    Task<ResolvedFlowToolRoute?> ResolveToolRouteAsync(
+        WorkspaceId workspaceId,
+        ResourceNamespace ownerNamespace,
+        ToolRouteFlowStepDefinition step,
+        CancellationToken cancellationToken) => Task.FromResult<ResolvedFlowToolRoute?>(null);
 }
 
 public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver resources) : IFlowDefinitionValidator
@@ -130,10 +150,39 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             case ToolFlowStepDefinition tool:
                 await ValidateToolAsync(tool, context, issues, token);
                 break;
+            case ToolRouteFlowStepDefinition route:
+                await ValidateToolRouteAsync(route, context, issues, token);
+                break;
             case OutputFlowStepDefinition output:
                 ValidateJsonExpressions(output.OutputMapping, issues, step.Name, "outputMapping");
                 break;
         }
+    }
+
+    private async Task ValidateToolRouteAsync(
+        ToolRouteFlowStepDefinition step,
+        FlowValidationContext context,
+        List<FlowValidationIssue> issues,
+        CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(step.ToolSet.ResourceId)
+            || string.IsNullOrWhiteSpace(step.ToolSet.Version)
+            || string.IsNullOrWhiteSpace(step.Capability))
+        {
+            issues.Add(Error("tool_route_reference_invalid", "ToolRoute requires a ToolSet, exact version, and capability.", step.Name, property: "toolSet"));
+            return;
+        }
+        ValidateJsonExpressions(step.ArgumentsMapping, issues, step.Name, "argumentsMapping");
+        if (!context.ResolveResources || context.WorkspaceId is null || context.OwnerFlowId is null) return;
+        var resolved = await resources.ResolveToolRouteAsync(context.WorkspaceId.Value,
+            context.OwnerFlowId.Value.Namespace, step, token);
+        if (resolved is null)
+        {
+            issues.Add(Error("tool_route_not_found", "The ToolSet route could not be resolved deterministically.", step.Name, property: "toolSet"));
+            return;
+        }
+        ValidateMappingAgainstSchema(step.Name, "argumentsMapping", step.ArgumentsMapping,
+            resolved.InputSchema, "tool_route_argument", issues);
     }
 
     private async Task ValidateToolAsync(

@@ -24,6 +24,7 @@ public sealed record ToolDefinitionProperties
     public bool Enabled { get; init; } = true;
     public bool RequiresApproval { get; init; }
     public required JsonElement InputSchema { get; init; }
+    public JsonElement? FixedArguments { get; init; }
     public JsonElement? OutputSchema { get; init; }
     public required ToolDefinitionFlowTarget Flow { get; init; }
     public int InvocationTimeoutSeconds { get; init; } = 90;

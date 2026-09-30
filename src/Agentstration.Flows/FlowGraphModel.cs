@@ -25,6 +25,7 @@ public sealed record FlowDesignerMetadata
 [JsonDerivedType(typeof(TransformFlowStepDefinition), "transform")]
 [JsonDerivedType(typeof(FlowCallStepDefinition), "flow")]
 [JsonDerivedType(typeof(ToolFlowStepDefinition), "tool")]
+[JsonDerivedType(typeof(ToolRouteFlowStepDefinition), "toolRoute")]
 [JsonDerivedType(typeof(OutputFlowStepDefinition), "output")]
 [JsonDerivedType(typeof(FailureFlowStepDefinition), "failure")]
 public abstract record FlowStepDefinition
@@ -111,6 +112,22 @@ public sealed record ToolFlowStepDefinition : FlowStepDefinition
     public JsonElement? ArgumentsMapping { get; init; }
 }
 
+public sealed record FlowToolSetReference(
+    string ResourceId,
+    string Version,
+    ResourceNamespace? Namespace = null)
+{
+    public ResourceNamespace ResolveNamespace(ResourceNamespace ownerNamespace) => Namespace ?? ownerNamespace;
+}
+
+public sealed record ToolRouteFlowStepDefinition : FlowStepDefinition
+{
+    public required FlowToolSetReference ToolSet { get; init; }
+    public required string Capability { get; init; }
+    public string? Route { get; init; }
+    public JsonElement? ArgumentsMapping { get; init; }
+}
+
 public sealed record OutputFlowStepDefinition : FlowStepDefinition
 {
     public JsonElement? OutputMapping { get; init; }
@@ -177,6 +194,7 @@ public static class FlowStepDefinitionExtensions
         TransformFlowStepDefinition => "transform",
         FlowCallStepDefinition => "flow",
         ToolFlowStepDefinition => "tool",
+        ToolRouteFlowStepDefinition => "toolRoute",
         OutputFlowStepDefinition => "output",
         FailureFlowStepDefinition => "failure",
         _ => throw new ArgumentOutOfRangeException(nameof(step))
