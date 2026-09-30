@@ -16,6 +16,7 @@ using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Profiles;
+using Agentstration.Tools;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 
@@ -226,10 +227,48 @@ public sealed class ModelProfileBootstrapResourceHandler(
     }
 }
 
+public sealed class ToolSetBootstrapResourceHandler(ToolSetService service) : IBootstrapResourceHandler
+{
+    public string Kind => ToolResourceKinds.ToolSet;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
+
+    public async Task<BootstrapResourcePlanResult> PlanAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        BootstrapPlanningContext planning,
+        CancellationToken cancellationToken)
+    {
+        var value = WorkspaceBootstrapResource.Parse<ToolSetResource>(resource) with
+        {
+            ScopeRef = ResourceScopeRef.Workspace(WorkspaceBootstrapResource.Workspace(operation).Value)
+        };
+        if (await service.GetExactAsync(value.ScopeRef.Value, value.Namespace, value.Name, cancellationToken) is not null)
+            return new(BootstrapResourceDisposition.Skip);
+        ToolSetService.Validate(value);
+        return WorkspaceBootstrapResource.Created(planning, Kind, value.Name, value.Namespace, resource);
+    }
+
+    public async Task<BootstrapResourceApplyResult> ApplyAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        CancellationToken cancellationToken)
+    {
+        var value = WorkspaceBootstrapResource.Parse<ToolSetResource>(resource) with
+        {
+            ScopeRef = ResourceScopeRef.Workspace(WorkspaceBootstrapResource.Workspace(operation).Value)
+        };
+        if (await service.GetExactAsync(value.ScopeRef.Value, value.Namespace, value.Name, cancellationToken) is not null)
+            return BootstrapResourceApplyResult.Skipped;
+        _ = await service.CreateAsync(value, cancellationToken);
+        return BootstrapResourceApplyResult.Created;
+    }
+}
+
 public sealed class AgentBootstrapResourceHandler(
     AgentManagementService service,
     ModelProfileManagementService modelProfiles,
-    RuntimeProfileManagementService runtimeProfiles) : IBootstrapResourceHandler
+    RuntimeProfileManagementService runtimeProfiles,
+    ToolSetService serviceToolSets) : IBootstrapResourceHandler
 {
     public string Kind => AgentResourceKinds.Agent;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
@@ -248,11 +287,20 @@ public sealed class AgentBootstrapResourceHandler(
         var runtime = value.Definition.RuntimeProfile.Resolve(value.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
         var modelExists = await modelProfiles.GetAsync(model.Namespace, model.Name, cancellationToken) is not null;
         var runtimeExists = await runtimeProfiles.GetAsync(runtime.Namespace, runtime.Name, cancellationToken) is not null;
+        var toolSetsExist = true;
+        foreach (var assignment in value.Definition.ToolSets)
+        {
+            var ns = assignment.ToolSet.Namespace ?? value.Namespace;
+            var exists = await serviceToolSets.GetVersionAsync(ns, assignment.ToolSet.Name, assignment.Version, cancellationToken) is not null;
+            if (!exists && !WorkspaceBootstrapResource.IsAvailable(planning, ToolResourceKinds.ToolSet, assignment.ToolSet.Name, ns))
+                throw new InvalidOperationException($"Referenced ToolSet '{ns}/{assignment.ToolSet.Name}:{assignment.Version}' does not exist and was not planned earlier.");
+            toolSetsExist &= exists;
+        }
         if (!modelExists && !WorkspaceBootstrapResource.IsAvailable(planning, model.Kind, model.Name, model.Namespace))
             throw new InvalidOperationException($"Referenced model profile '{model}' does not exist and was not planned earlier.");
         if (!runtimeExists && !WorkspaceBootstrapResource.IsAvailable(planning, runtime.Kind, runtime.Name, runtime.Namespace))
             throw new InvalidOperationException($"Referenced runtime profile '{runtime}' does not exist and was not planned earlier.");
-        if (modelExists && runtimeExists)
+        if (modelExists && runtimeExists && toolSetsExist)
             await service.ValidateForCreateAsync(value, cancellationToken);
         return WorkspaceBootstrapResource.Created(planning, Kind, value.Name, value.Namespace);
     }

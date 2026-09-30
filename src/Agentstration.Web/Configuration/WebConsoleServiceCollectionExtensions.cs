@@ -69,6 +69,8 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<TriggerApiClient, ITriggerApiClient>(services, configured.ManagementApi);
         AddClient<ResourcePlansApiClient, IResourcePlansApiClient>(services, configured.ManagementApi);
         AddClient<ToolsApiClient, IToolsClient>(services, configured.ManagementApi);
+        AddClient<ToolSetsApiClient, IToolSetsClient>(services, configured.ManagementApi);
+        AddClient<KnowledgeSourcesApiClient, IKnowledgeSourcesClient>(services, configured.ManagementApi);
         AddClient<ToolCategoriesApiClient, IToolCategoriesClient>(services, configured.ManagementApi);
         AddClient<ToolDefinitionsApiClient, IToolDefinitionsClient>(services, configured.ManagementApi);
         AddSensitiveClient<SecretsApiClient, ISecretsClient>(services, configured.ManagementApi);

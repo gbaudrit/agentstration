@@ -17,6 +17,7 @@ using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Profiles;
+using Agentstration.Tools;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 
@@ -156,6 +157,41 @@ public sealed class ModelProfilePackResourceHandler(ModelProfileManagementServic
     public Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken) => service.DeleteAsync(resource.Namespace, resource.Name, resource.VersionToken, cancellationToken);
     private static ModelProfileResource Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<ModelProfileResource>(resource.Manifest.GetRawText());
     private static ManagedPackResource Managed(PackResourceDocument resource, ResourceNamespace @namespace, string token) => new() { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = token };
+}
+
+public sealed class ToolSetPackResourceHandler(ToolSetService service) : IPackResourceHandler
+{
+    public string Kind => ToolResourceKinds.ToolSet;
+    public int InstallOrder => 35;
+    public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken)
+    {
+        var value = Parse(resource);
+        ToolSetService.Validate(value with { ScopeRef = value.ScopeRef ?? ResourceScopeRef.Workspace(Guid.Empty) });
+        return Task.CompletedTask;
+    }
+    public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        await service.GetAsync(@namespace, name, cancellationToken) is not null;
+    public async Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, ResourceNamespace @namespace, string packVersion, CancellationToken cancellationToken)
+    {
+        var value = Parse(resource);
+        var stored = await service.CreateAsync(value with { Metadata = PackProvenance.Add(value.Metadata, pack, @namespace, packVersion) }, cancellationToken);
+        return Managed(resource, @namespace, stored.ETag);
+    }
+    public async Task<ManagedPackResource> UpdateAsync(PackResourceDocument resource, ManagedPackResource current, PackIdentity pack, string packVersion, CancellationToken cancellationToken)
+    {
+        var value = Parse(resource);
+        var stored = await service.PutAsync(current.Namespace, current.Name, value.Definition, current.VersionToken, cancellationToken);
+        return Managed(resource, current.Namespace, stored.ETag);
+    }
+    public async Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        (await service.GetAsync(@namespace, name, cancellationToken))?.ETag;
+    public Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken) =>
+        service.DeleteAsync(resource.Namespace, resource.Name, resource.VersionToken, cancellationToken);
+    private static ToolSetResource Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<ToolSetResource>(resource.Manifest.GetRawText());
+    private static ManagedPackResource Managed(PackResourceDocument resource, ResourceNamespace @namespace, string token) => new()
+    {
+        Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = token
+    };
 }
 
 public sealed class AgentPackResourceHandler(AgentManagementService service) : IPackResourceHandler

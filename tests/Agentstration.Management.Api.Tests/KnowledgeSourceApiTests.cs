@@ -9,6 +9,7 @@ using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Security.Contracts;
+using Agentstration.Tools;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,6 +18,65 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task KnowledgeSourceExposureCreatesSourceSpecificToolsWithFixedRoutingArguments()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        await CreatePublishedFlowAsync(factory.Services, context, "docs-ingest");
+        await CreatePublishedRetrievalFlowAsync(factory.Services, context, "docs-retrieve");
+        var sources = factory.Services.GetRequiredService<KnowledgeSourceManagementService>();
+        _ = await sources.CreateAsync(new KnowledgeSourceResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeSource,
+            Metadata = new ResourceMetadata { Name = "agentstration-documentation" },
+            ScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId),
+            Definition = Properties("Agentstration documentation", "docs-ingest", "docs-retrieve")
+        }, default);
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsJsonAsync(
+            "/api/knowledgesources/agentstration-documentation/tool-exposure",
+            new PublishKnowledgeSourceToolExposureRequest { Version = "1.0.0" });
+
+        Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
+        var exposure = await response.Content.ReadFromJsonAsync<KnowledgeSourceToolExposureResource>();
+        Assert.IsNotNull(exposure);
+        Assert.HasCount(3, exposure.Operations);
+        CollectionAssert.AreEquivalent(new[] { "search", "query", "read" },
+            exposure.Operations.Select(value => value.Route).ToArray());
+        var definitions = factory.Services.GetRequiredService<ToolDefinitionService>();
+        var search = await definitions.GetAsync("agentstration-documentation.search", default, default);
+        Assert.IsNotNull(search);
+        Assert.AreEqual("agentstration-documentation", search.Value.Definition.FixedArguments?.GetProperty("knowledgeSourceId").GetString());
+        Assert.AreEqual("search", search.Value.Definition.FixedArguments?.GetProperty("operation").GetString());
+        var publicProperties = search.Value.Definition.InputSchema.GetProperty("properties");
+        Assert.IsFalse(publicProperties.TryGetProperty("knowledgeSourceId", out _));
+        Assert.IsFalse(publicProperties.TryGetProperty("operation", out _));
+        Assert.IsTrue(publicProperties.TryGetProperty("query", out _));
+        var executor = factory.Services.GetRequiredService<IToolDefinitionExecutor>();
+        var rejected = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(() => executor.ExecuteAsync(
+            new ToolDefinitionInvocation(
+                context.TenantId,
+                new WorkspaceId(context.WorkspaceId),
+                context.PrincipalId,
+                default,
+                "agentstration-documentation.search",
+                "fixed-argument-test",
+                null,
+                JsonSerializer.SerializeToElement(new { knowledgeSourceId = "another-source", query = "override" }),
+                ToolDefinitionCallerKind.Agent,
+                "test-agent"), default));
+        Assert.AreEqual("tool_definition_fixed_argument_override", rejected.Code);
+        var published = await factory.Services.GetRequiredService<ToolSetService>()
+            .GetVersionAsync(default, "agentstration-documentation", "1.0.0", default);
+        Assert.IsNotNull(published);
+        Assert.HasCount(3, published.Value.Members);
+        Assert.IsTrue(published.Value.Metadata.Tags.ContainsKey("agentstration.io/category"));
+    }
+
     [TestMethod]
     public async Task KnowledgeSourceCrudReportsReadinessAndProtectsItsFlows()
     {
@@ -220,5 +280,42 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
                 Transitions = [new("input-output", "input", "completed", "output")]
             }), ns, default);
         await flows.PublishVersionAsync(workspaceId, new(name, ns), "1.0.0", true, default);
+    }
+
+    private static async Task CreatePublishedRetrievalFlowAsync(
+        IServiceProvider services,
+        RequestContext context,
+        string name)
+    {
+        var schema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new
+            {
+                knowledgeSourceId = new { type = "string" },
+                operation = new { type = "string" },
+                query = new { type = "string" }
+            },
+            required = new[] { "knowledgeSourceId", "operation", "query" },
+            additionalProperties = false
+        });
+        var flows = services.GetRequiredService<FlowService>();
+        var workspaceId = new WorkspaceId(context.WorkspaceId);
+        await flows.CreateAsync(workspaceId, new CreateFlowCommand(
+            name, null, "1.0.0", true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
+            Graph: new FlowGraphDefinition
+            {
+                EntryStep = "input",
+                InputSchema = schema.Clone(),
+                OutputSchema = schema.Clone(),
+                Steps =
+                [
+                    new InputFlowStepDefinition { Name = "input", Schema = schema.Clone() },
+                    new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${input}") }
+                ],
+                Transitions = [new("input-output", "input", "completed", "output")]
+            }), default, default);
+        await flows.PublishVersionAsync(workspaceId, new(name), "1.0.0", true, default);
     }
 }

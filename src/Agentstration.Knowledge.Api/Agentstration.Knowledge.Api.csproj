@@ -7,5 +7,6 @@
     <ProjectReference Include="../Agentstration.Knowledge.Contracts/Agentstration.Knowledge.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Knowledge/Agentstration.Knowledge.csproj" />
     <ProjectReference Include="../Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
+    <ProjectReference Include="../Agentstration.Tools/Agentstration.Tools.csproj" />
   </ItemGroup>
 </Project>

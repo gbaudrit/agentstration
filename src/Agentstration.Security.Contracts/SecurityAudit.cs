@@ -49,10 +49,15 @@ public static class SecurityAuditActions
     public const string SourceRegistryRefreshed = "source-registry.refreshed";
     public const string SourceRegistrySourceImported = "source-registry.source-imported";
     public const string KnowledgeSourceCreated = "knowledge-source.created";
+    public const string KnowledgeSourceToolExposurePublished = "knowledge-source.tool-exposure-published";
     public const string KnowledgeSourceUpdated = "knowledge-source.updated";
     public const string KnowledgeSourceEnabled = "knowledge-source.enabled";
     public const string KnowledgeSourceDisabled = "knowledge-source.disabled";
     public const string KnowledgeSourceDeleted = "knowledge-source.deleted";
+    public const string ToolSetCreated = "tool-set.created";
+    public const string ToolSetUpdated = "tool-set.updated";
+    public const string ToolSetDeleted = "tool-set.deleted";
+    public const string ToolSetVersionPublished = "tool-set.version-published";
 }
 
 public sealed record SecurityAuditEvent(

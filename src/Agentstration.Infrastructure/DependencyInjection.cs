@@ -168,6 +168,7 @@ public static class DependencyInjection
         services.AddScoped<IBootstrapResourceHandler, ModelProviderBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, RuntimeProfileBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ModelProfileBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, ToolSetBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, AgentBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, FlowBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, KnowledgeSourceBootstrapResourceHandler>();
@@ -205,6 +206,7 @@ public static class DependencyInjection
         services.AddSingleton<IPackResourceHandler, ParameterPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, RuntimeProfilePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, ModelProfilePackResourceHandler>();
+        services.AddSingleton<IPackResourceHandler, ToolSetPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, AgentPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, FlowPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, KnowledgeSourcePackResourceHandler>();
@@ -275,6 +277,7 @@ public static class DependencyInjection
         services.AddSingleton<ISourceVerificationEvidenceProvider>(services => services.GetRequiredService<SourceRegistryTrustEvaluationService>());
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<ToolCategoryService>();
+        services.AddSingleton<ToolSetService>();
         services.AddSingleton<ToolDefinitionService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
@@ -334,6 +337,8 @@ public static class DependencyInjection
         services.AddSingleton<IToolGovernanceAuditReader, ToolGovernanceAuditReader>();
         services.AddSingleton<IToolExecutionPipeline, ToolExecutionPipeline>();
         services.AddSingleton<IFlowToolExecutor, ManagedFlowToolExecutor>();
+        services.AddSingleton<IFlowToolSetResolver, ManagementFlowToolSetResolver>();
+        services.AddSingleton<IToolSetDeletionGuard, ToolSetDeletionGuard>();
         services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
             services.AddPostgreSqlWorkPlane(storageOptions.ConnectionString!);
@@ -383,6 +388,7 @@ public static class DependencyInjection
         services.AddSingleton<IEntryExecutionResolver, EntryExecutionResolver>();
         services.AddSingleton<IToolDefinitionFlowResolver, ToolDefinitionFlowResolver>();
         services.AddSingleton<IKnowledgeFlowResolver, KnowledgeFlowResolver>();
+        services.AddSingleton<KnowledgeSourceToolExposureService>();
         services.AddSingleton<IFlowVersionActivationGuard, ToolDefinitionFlowActivationGuard>();
         services.AddSingleton<IFlowDeletionGuard, ToolDefinitionFlowDeletionGuard>();
         services.AddSingleton<IFlowDeletionGuard, KnowledgeFlowDeletionGuard>();

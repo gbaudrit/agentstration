@@ -238,7 +238,7 @@ model {
   agentstration.server.scheduling -> agentstration.server.work 'Submits scheduled execution'
   agentstration.server.work -> agentstration.server.flow 'Submits pinned Flow references'
   agentstration.server.flow -> agentstration.server.runtime 'Invokes Agent steps'
-  agentstration.server.flow -> agentstration.server.tools 'Invokes governed Tool steps'
+  agentstration.server.flow -> agentstration.server.tools 'Resolves ToolSets and invokes governed Tool steps'
   agentstration.server.runtime -> agentstration.server.resources 'Resolves immutable Agents and profiles'
   agentstration.server.runtime -> agentstration.server.tools 'Invokes assigned agent Tools'
   agentstration.server.tools -> agentstration.server.resources 'Resolves Tool definitions, providers, and policies'

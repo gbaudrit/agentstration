@@ -24,6 +24,18 @@ public sealed record FlowOrchestrationResult(
     FlowOrchestrationStrategy Strategy,
     JsonElement FinalOutput,
     IReadOnlyList<FlowParticipantResult> Participants);
+public sealed record FlowToolRouteResolution(
+    string ToolSetName,
+    ResourceNamespace ToolSetNamespace,
+    string ToolSetVersion,
+    string Capability,
+    string Route,
+    string ToolName,
+    ResourceNamespace ToolNamespace,
+    Guid ToolUid,
+    long ToolGeneration,
+    string ProviderName,
+    ResourceNamespace ProviderNamespace);
 public sealed record FlowStepRun
 {
     public required string StepName { get; init; }
@@ -45,6 +57,7 @@ public sealed record FlowStepRun
     public FlowStepRunUsage? Usage { get; init; }
     public FlowRunError? Error { get; init; }
     public string? ChildFlowRunId { get; init; }
+    public FlowToolRouteResolution? ToolRoute { get; init; }
 }
 
 public sealed record FlowRun

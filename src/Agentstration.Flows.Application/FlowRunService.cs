@@ -45,6 +45,24 @@ public interface IFlowToolExecutor
     Task<JsonElement?> ExecuteAsync(FlowToolExecutionRequest request, CancellationToken cancellationToken);
 }
 
+public interface IFlowToolSetResolver
+{
+    Task<ResolvedFlowToolRoute> ResolveAsync(
+        WorkspaceId workspaceId,
+        ResourceNamespace ownerNamespace,
+        ToolRouteFlowStepDefinition step,
+        CancellationToken cancellationToken);
+}
+
+public sealed class UnsupportedFlowToolSetResolver : IFlowToolSetResolver
+{
+    public static UnsupportedFlowToolSetResolver Instance { get; } = new();
+    private UnsupportedFlowToolSetResolver() { }
+    public Task<ResolvedFlowToolRoute> ResolveAsync(WorkspaceId workspaceId, ResourceNamespace ownerNamespace,
+        ToolRouteFlowStepDefinition step, CancellationToken cancellationToken) =>
+        Task.FromException<ResolvedFlowToolRoute>(new FlowValidationException("flow_tool_set_resolver_unavailable", "No ToolSet resolver is configured for Flow Runs."));
+}
+
 public sealed class UnsupportedFlowToolExecutor : IFlowToolExecutor
 {
     public static UnsupportedFlowToolExecutor Instance { get; } = new();
@@ -137,7 +155,8 @@ public sealed partial class FlowRunService(
     TimeProvider timeProvider,
     FlowRunExecutionOptions? executionOptions = null,
     IFlowInputRequestSink? inputRequestSink = null,
-    IFlowToolExecutor? configuredToolExecutor = null)
+    IFlowToolExecutor? configuredToolExecutor = null,
+    IFlowToolSetResolver? configuredToolSetResolver = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly FlowRunExecutionOptions executionOptions = executionOptions is null
@@ -150,6 +169,7 @@ public sealed partial class FlowRunService(
             ? executionOptions
             : throw new ArgumentOutOfRangeException(nameof(executionOptions), "Execution and input timeouts must be positive, and the execution lease must exceed the orchestration timeout.");
     private readonly IFlowToolExecutor toolExecutor = configuredToolExecutor ?? UnsupportedFlowToolExecutor.Instance;
+    private readonly IFlowToolSetResolver toolSetResolver = configuredToolSetResolver ?? UnsupportedFlowToolSetResolver.Instance;
     public static readonly ActivitySource ActivitySource = new("Agentstration.Flows");
     public static readonly Meter Meter = new("Agentstration.Flows");
     private static readonly Counter<long> RunsCreated = Meter.CreateCounter<long>("agentstration.flow.runs.created");

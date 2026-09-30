@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Agentstration.Application.Work;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
@@ -80,6 +81,7 @@ public sealed class ToolDefinitionFlowDeletionGuard(
 
 public sealed class ToolDefinitionExecutor(
     ToolDefinitionService definitions,
+    IToolDefinitionFlowResolver flowResolver,
     RootFlowSubmissionService submissions,
     FlowRunService runs) : IToolDefinitionExecutor
 {
@@ -94,10 +96,24 @@ public sealed class ToolDefinitionExecutor(
             throw new ToolDefinitionInvocationException("tool_definition_scope_mismatch", "The ToolDefinition is not owned by the invocation Workspace.");
         if (invocation.Arguments.GetRawText().Length > 65_536)
             throw new ToolDefinitionInvocationException("tool_definition_input_too_large", "ToolDefinition input cannot exceed 65536 JSON characters.");
+        if (stored.Value.Definition.FixedArguments is { ValueKind: JsonValueKind.Object } fixedArguments)
+            foreach (var property in fixedArguments.EnumerateObject())
+                if (invocation.Arguments.TryGetProperty(property.Name, out _))
+                    throw new ToolDefinitionInvocationException("tool_definition_fixed_argument_override",
+                        $"ToolDefinition argument '{property.Name}' is fixed and cannot be supplied by the caller.");
         try { FlowRunService.ValidateInput(stored.Value.Definition.InputSchema, invocation.Arguments); }
         catch (FlowValidationException exception)
         {
             throw new ToolDefinitionInvocationException("tool_definition_input_invalid", exception.Message, exception);
+        }
+
+        var flowInput = MergeArguments(invocation.Arguments, stored.Value.Definition.FixedArguments);
+        var flowContract = await flowResolver.ResolveAsync(stored.Value.ScopeRef.Value, stored.Value.Namespace,
+            stored.Value.Definition.Flow, cancellationToken);
+        try { FlowRunService.ValidateInput(flowContract.InputSchema, flowInput); }
+        catch (FlowValidationException exception)
+        {
+            throw new ToolDefinitionInvocationException("tool_definition_fixed_input_invalid", exception.Message, exception);
         }
 
         var target = stored.Value.Definition.Flow;
@@ -111,7 +127,7 @@ public sealed class ToolDefinitionExecutor(
             submission = await submissions.SubmitAsync(new SubmitRootFlowCommand(
                 invocation.WorkspaceId,
                 new FlowReference(new FlowId(target.Name, flowNamespace), target.Version, target.UseActiveVersion, flowNamespace),
-                invocation.Arguments,
+                flowInput,
                 origin,
                 callerId,
                 invocation.CallerKind == ToolDefinitionCallerKind.Flow ? FlowRunTrigger.Flow : FlowRunTrigger.Api,
@@ -171,6 +187,16 @@ public sealed class ToolDefinitionExecutor(
             completed.Value.FlowVersion,
             completed.Value.CorrelationId ?? string.Empty,
             submission.Recovered));
+    }
+
+    private static JsonElement MergeArguments(JsonElement arguments, JsonElement? fixedArguments)
+    {
+        if (fixedArguments is null) return arguments.Clone();
+        var merged = JsonNode.Parse(arguments.GetRawText())?.AsObject()
+            ?? throw new ToolDefinitionInvocationException("tool_definition_input_invalid", "ToolDefinition input must be an object.");
+        foreach (var property in fixedArguments.Value.EnumerateObject())
+            merged[property.Name] = JsonNode.Parse(property.Value.GetRawText());
+        return JsonSerializer.SerializeToElement(merged);
     }
 
     private async Task<StoredFlowRun> AwaitCompletionAsync(string runId, FlowRunScope scope, CancellationToken cancellationToken)

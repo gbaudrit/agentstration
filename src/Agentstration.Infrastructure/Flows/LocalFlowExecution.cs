@@ -7,6 +7,7 @@ using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -188,7 +189,10 @@ public sealed class ManagedFlowOrchestrationEngine(
     }
 }
 
-public sealed class ManagementFlowResourceReferenceResolver(IResourceStore store, IFlowRepository flows) : IFlowResourceReferenceResolver
+public sealed class ManagementFlowResourceReferenceResolver(
+    IResourceStore store,
+    IFlowRepository flows,
+    ToolSetService? toolSets = null) : IFlowResourceReferenceResolver
 {
     public async Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken) =>
         await store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, resourceId, @namespace ?? ResourceNamespace.Default), cancellationToken) is not null;
@@ -241,6 +245,41 @@ public sealed class ManagementFlowResourceReferenceResolver(IResourceStore store
             tool.Definition.RequiresApproval);
     }
 
+    public async Task<ResolvedFlowToolRoute?> ResolveToolRouteAsync(
+        WorkspaceId workspaceId,
+        ResourceNamespace ownerNamespace,
+        ToolRouteFlowStepDefinition step,
+        CancellationToken cancellationToken)
+    {
+        _ = workspaceId;
+        if (toolSets is null) return null;
+        try
+        {
+            var toolSetNamespace = step.ToolSet.ResolveNamespace(ownerNamespace);
+            var selected = await toolSets.ResolveRouteAsync(toolSetNamespace, step.ToolSet.ResourceId,
+                step.ToolSet.Version, step.Capability, step.Route, cancellationToken);
+            var member = selected.Member;
+            return new ResolvedFlowToolRoute(
+                new FlowToolReference(member.ToolName, member.ToolNamespace),
+                selected.ToolSetName,
+                selected.ToolSetNamespace,
+                selected.ToolSetVersion,
+                member.Capability,
+                member.Route,
+                member.ToolUid,
+                member.ToolGeneration,
+                member.ProviderName,
+                member.ProviderNamespace,
+                member.InputSchema.Clone(),
+                member.OutputSchema?.Clone(),
+                member.RequiresApproval);
+        }
+        catch (ToolSetValidationException)
+        {
+            return null;
+        }
+    }
+
     public async Task<bool> CreatesFlowCycleAsync(
         WorkspaceId workspaceId,
         FlowId ownerFlowId,
@@ -264,6 +303,102 @@ public sealed class ManagementFlowResourceReferenceResolver(IResourceStore store
         }
         return false;
     }
+}
+
+public sealed class ManagementFlowToolSetResolver(ToolSetService toolSets) : IFlowToolSetResolver
+{
+    public async Task<ResolvedFlowToolRoute> ResolveAsync(
+        WorkspaceId workspaceId,
+        ResourceNamespace ownerNamespace,
+        ToolRouteFlowStepDefinition step,
+        CancellationToken cancellationToken)
+    {
+        _ = workspaceId;
+        try
+        {
+            var toolSetNamespace = step.ToolSet.ResolveNamespace(ownerNamespace);
+            var selected = await toolSets.ResolveRouteAsync(toolSetNamespace, step.ToolSet.ResourceId,
+                step.ToolSet.Version, step.Capability, step.Route, cancellationToken);
+            var member = selected.Member;
+            return new ResolvedFlowToolRoute(
+                new FlowToolReference(member.ToolName, member.ToolNamespace),
+                selected.ToolSetName,
+                selected.ToolSetNamespace,
+                selected.ToolSetVersion,
+                member.Capability,
+                member.Route,
+                member.ToolUid,
+                member.ToolGeneration,
+                member.ProviderName,
+                member.ProviderNamespace,
+                member.InputSchema.Clone(),
+                member.OutputSchema?.Clone(),
+                member.RequiresApproval);
+        }
+        catch (ToolSetValidationException exception)
+        {
+            throw new FlowValidationException(exception.Code, exception.Message);
+        }
+    }
+}
+
+public sealed class ToolSetDeletionGuard(
+    IResourceStore store,
+    IFlowRepository flows,
+    IRequestContextScopeFactory requestScopes) : IToolSetDeletionGuard
+{
+    public async Task ValidateDeleteAsync(
+        ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        if (scopeRef is not { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId })
+            throw new ToolSetValidationException("tool_set_scope_invalid", "A ToolSet requires a Workspace ownership scope.");
+        using var requestScope = requestScopes.PushSystem();
+        var agents = await store.ListAllAsync<AgentResource>(AgentResourceKinds.Agent, cancellationToken);
+        if (agents.Any(stored => stored.Value.ScopeRef == scopeRef && stored.Value.Definition.ToolSets.Any(selection =>
+                string.Equals(selection.ToolSet.Name, name, StringComparison.Ordinal)
+                && (selection.ToolSet.Namespace ?? stored.Value.Namespace) == @namespace)))
+            throw new ToolSetValidationException("tool_set_in_use_by_agent", $"ToolSet '{@namespace}/{name}' is assigned to an Agent.");
+
+        var revisions = await store.ListAllAsync<AgentRevision>(AgentResourceKinds.AgentRevision, cancellationToken);
+        if (revisions.Any(stored => stored.Value.ScopeRef == scopeRef && stored.Value.Definition.ToolSetAssignments.Any(assignment =>
+                string.Equals(assignment.ToolSetName, name, StringComparison.Ordinal)
+                && assignment.ToolSetNamespace == @namespace)))
+            throw new ToolSetValidationException("tool_set_in_use_by_agent_revision", $"ToolSet '{@namespace}/{name}' is pinned by an Agent revision.");
+
+        var exposures = await store.ListAllAsync<KnowledgeSourceToolExposureResource>(
+            KnowledgeResourceKinds.KnowledgeSourceToolExposure, cancellationToken);
+        if (exposures.Any(stored => stored.Value.ScopeRef == scopeRef
+            && string.Equals(stored.Value.ToolSet.Name, name, StringComparison.Ordinal)
+            && (stored.Value.ToolSet.Namespace ?? stored.Value.Namespace) == @namespace))
+            throw new ToolSetValidationException("tool_set_in_use_by_knowledge_source", $"ToolSet '{@namespace}/{name}' exposes a KnowledgeSource.");
+
+        var workspaceId = new WorkspaceId(targetId);
+        for (var skip = 0; ; skip += 100)
+        {
+            var page = await flows.ListAsync(workspaceId, skip, 100, cancellationToken);
+            foreach (var flow in page.Items)
+            {
+                if (References(flow.Value.Graph, flow.Value.Id.Namespace, @namespace, name))
+                    throw new ToolSetValidationException("tool_set_in_use_by_flow", $"ToolSet '{@namespace}/{name}' is referenced by Flow '{flow.Value.Id}'.");
+                foreach (var version in await flows.ListVersionsAsync(workspaceId, flow.Value.Id, cancellationToken))
+                    if (References(version.Value.Graph, version.Value.FlowId.Namespace, @namespace, name))
+                        throw new ToolSetValidationException("tool_set_in_use_by_flow", $"ToolSet '{@namespace}/{name}' is referenced by published Flow '{version.Value.FlowId}:{version.Value.Version}'.");
+            }
+            if (!page.HasMore) break;
+        }
+    }
+
+    private static bool References(
+        FlowGraphDefinition? graph,
+        ResourceNamespace ownerNamespace,
+        ResourceNamespace targetNamespace,
+        string targetName) =>
+        graph?.Steps.OfType<ToolRouteFlowStepDefinition>().Any(step =>
+            string.Equals(step.ToolSet.ResourceId, targetName, StringComparison.Ordinal)
+            && step.ToolSet.ResolveNamespace(ownerNamespace) == targetNamespace) == true;
 }
 
 public sealed class ManagedFlowToolExecutor(
