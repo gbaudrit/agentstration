@@ -10,6 +10,11 @@
     <Project Path="src/Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />
     <Project Path="src/Agentstration.Agents/Agentstration.Agents.csproj" />
   </Folder>
+  <Folder Name="/src/Artifacts/">
+    <Project Path="src/Agentstration.Artifacts.Api/Agentstration.Artifacts.Api.csproj" />
+    <Project Path="src/Agentstration.Artifacts.Contracts/Agentstration.Artifacts.Contracts.csproj" />
+    <Project Path="src/Agentstration.Artifacts/Agentstration.Artifacts.csproj" />
+  </Folder>
   <Folder Name="/src/Bootstrap/">
     <Project Path="src/Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <Project Path="src/Agentstration.Bootstrap.Api/Agentstration.Bootstrap.Api.csproj" />

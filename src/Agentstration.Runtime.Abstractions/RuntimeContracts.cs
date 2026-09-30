@@ -267,7 +267,7 @@ public interface IToolCatalog
     ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(IEnumerable<string> toolIds, CancellationToken cancellationToken = default);
 }
 
-public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun }
+public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun, ArtifactService }
 
 public sealed record ToolExecutionScope
 {

@@ -112,6 +112,16 @@ public sealed class SqliteIdentityStore(IDbContextFactory<ResourceManagementDbCo
     public async Task<RoleDefinition?> FindRoleDefinitionByNameAsync(string name, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.RoleDefinitions.AsNoTracking().SingleOrDefaultAsync(x => x.Name == name, token)); }
     public async Task<RoleDefinition?> GetRoleDefinitionAsync(Guid id, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.RoleDefinitions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, token)); }
     public Task AddRoleDefinitionAsync(RoleDefinition x, CancellationToken token) => AddAsync(db => db.RoleDefinitions.Add(new() { Id = x.Id, Name = x.Name, DisplayName = x.DisplayName, PermissionsJson = JsonSerializer.Serialize(x.Permissions, JsonOptions), IsBuiltIn = x.IsBuiltIn }), token);
+    public async Task UpdateRoleDefinitionAsync(RoleDefinition x, CancellationToken token)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(token);
+        var entity = await db.RoleDefinitions.SingleAsync(value => value.Id == x.Id, token);
+        entity.Name = x.Name;
+        entity.DisplayName = x.DisplayName;
+        entity.PermissionsJson = JsonSerializer.Serialize(x.Permissions, JsonOptions);
+        entity.IsBuiltIn = x.IsBuiltIn;
+        await db.SaveChangesAsync(token);
+    }
     public async Task<IReadOnlyList<RoleAssignment>> ListRoleAssignmentsAsync(Guid tenantId, Guid principalId, CancellationToken token) { await using var db = await CreateAsync(token); return (await db.RoleAssignments.AsNoTracking().Where(x => x.TenantId == tenantId && x.PrincipalId == principalId).ToArrayAsync(token)).Select(x => Map(x)!).ToArray(); }
     public Task AddRoleAssignmentAsync(RoleAssignment x, CancellationToken token) => AddAsync(db => db.RoleAssignments.Add(new() { Id = x.Id, TenantId = x.TenantId, PrincipalId = x.PrincipalId, PrincipalType = x.PrincipalType, RoleDefinitionId = x.RoleDefinitionId, Scope = x.Scope }), token);
     public async Task RemoveRoleAssignmentAsync(Guid id, CancellationToken token) { await using var db = await CreateAsync(token); var row = await db.RoleAssignments.SingleOrDefaultAsync(value => value.Id == id, token); if (row is null) return; db.RoleAssignments.Remove(row); await db.SaveChangesAsync(token); }

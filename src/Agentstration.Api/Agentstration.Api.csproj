@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../Agentstration.Artifacts.Api/Agentstration.Artifacts.Api.csproj" />
     <ProjectReference Include="../Agentstration.Agents.Api/Agentstration.Agents.Api.csproj" />
     <ProjectReference Include="../Agentstration.Flows.Api/Agentstration.Flows.Api.csproj" />
     <ProjectReference Include="../Agentstration.Knowledge.Api/Agentstration.Knowledge.Api.csproj" />

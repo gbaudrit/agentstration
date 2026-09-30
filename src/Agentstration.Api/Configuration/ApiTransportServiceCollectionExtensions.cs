@@ -1,4 +1,5 @@
 using Agentstration.Agents.Api;
+using Agentstration.Artifacts.Api;
 using Agentstration.Bootstrap.Api;
 using Agentstration.Extensions.Api;
 using Agentstration.Flows.Api;
@@ -31,6 +32,7 @@ public static class ApiTransportServiceCollectionExtensions
         IHostEnvironment environment)
     {
         services.AddProblemDetails();
+        services.AddArtifactsApi();
         services.AddIdentityApi(configuration, environment);
         services.AddKnowledgeApi();
         services.AddBootstrapApi();
