@@ -7,6 +7,7 @@
 @inject IRuntimeProfilesClient RuntimeProfilesClient
 @inject IToolsClient ToolsClient
 @inject IToolCategoriesClient ToolCategoriesClient
+@inject IToolSetsClient ToolSetsClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
@@ -36,6 +37,18 @@ else
         <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
                 <Actions>@if (!IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">@T("ApplyGeneration")</button> }</Actions>
         </StateComparison>
+        @if (activeRevision?.Definition.ToolSetAssignments.Count > 0)
+        {
+            <section class="panel form-section" data-testid="agent-active-toolsets">
+                <div class="panel-header"><div><p class="eyebrow">@T("ActiveRevision")</p><h2>@T("PinnedToolSetAssignments")</h2><p>@T("PinnedToolSetAssignmentsHelp")</p></div><code>@activeRevision.Metadata.Name</code></div>
+                <div class="table-shell"><table class="resource-table"><thead><tr><th>@T("ToolSet")</th><th>@T("Version")</th><th>@T("DefinitionHash")</th><th>@T("EffectiveMembers")</th></tr></thead><tbody>
+                @foreach (var assignment in activeRevision.Definition.ToolSetAssignments.OrderBy(value => value.ToolSetName, StringComparer.Ordinal))
+                {
+                    <tr><td><code>@assignment.ToolSetNamespace/@assignment.ToolSetName</code></td><td><code>@assignment.Version</code></td><td><code>@assignment.DefinitionHash</code></td><td>@string.Join(", ", assignment.Members)</td></tr>
+                }
+                </tbody></table></div>
+            </section>
+        }
     }
 
     @if (!string.IsNullOrWhiteSpace(errorMessage))
@@ -69,6 +82,7 @@ else
 
         @if (toolsMode)
         {
+            <AgentToolSetConfiguration Versions="catalogToolSetVersions" Selected="SelectedToolSets" SelectedChanged="UpdateSelectedToolSets" />
             <AgentToolConfiguration Tools="catalogTools" Providers="catalogProviders" Categories="catalogCategories" SelectedToolIds="SelectedToolIds" SelectedToolIdsChanged="UpdateSelectedTools" />
         }
         else
@@ -138,6 +152,7 @@ else
     private IReadOnlyList<ToolResource> catalogTools = [];
     private IReadOnlyList<ToolProviderResource> catalogProviders = [];
     private IReadOnlyList<ToolCategoryResource> catalogCategories = [];
+    private IReadOnlyList<ToolSetVersionResource> catalogToolSetVersions = [];
     private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
     private string? etag;
     private string? resourceId;
@@ -149,6 +164,7 @@ else
     private string? rawError;
     private AgentModelResponse? agentModel;
     private AgentRuntimeReadinessResponse? readiness;
+    private AgentRevision? activeRevision;
     private string provisioningStatus = "Valid";
     private long generation;
     private bool loading = true;
@@ -191,11 +207,13 @@ else
             var toolsTask = ToolsClient.GetToolsAsync(cancellationToken: cancellation.Token);
             var providersTask = ToolsClient.GetProvidersAsync(cancellation.Token);
             var categoriesTask = ToolCategoriesClient.GetCategoriesAsync(cancellation.Token);
+            var toolSetVersionsTask = LoadToolSetVersionsAsync();
             var runtimeProfilesTask = RuntimeProfilesClient.GetRuntimeProfilesAsync(cancellation.Token);
-            await Task.WhenAll(toolsTask, providersTask, categoriesTask, runtimeProfilesTask);
+            await Task.WhenAll(toolsTask, providersTask, categoriesTask, toolSetVersionsTask, runtimeProfilesTask);
             catalogTools = await toolsTask;
             catalogProviders = await providersTask;
             catalogCategories = await categoriesTask;
+            catalogToolSetVersions = await toolSetVersionsTask;
             runtimeProfiles = await runtimeProfilesTask;
             if (IsNew)
             {
@@ -298,6 +316,7 @@ else
         if (!IsNew) ShowSource();
     }
     private IReadOnlyList<string> SelectedToolIds => model?.ToolNames.Split(['\r','\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
+    private IReadOnlyList<AgentToolSetSelection> SelectedToolSets => model?.ToolSets ?? [];
     private Task UpdateSelectedTools(IReadOnlyList<string> values)
     {
         if (model is not null)
@@ -306,6 +325,22 @@ else
             isDirty = true;
         }
         return Task.CompletedTask;
+    }
+    private Task UpdateSelectedToolSets(IReadOnlyList<AgentToolSetSelection> values)
+    {
+        if (model is not null)
+        {
+            model.ToolSets = values;
+            isDirty = true;
+        }
+        return Task.CompletedTask;
+    }
+    private async Task<IReadOnlyList<ToolSetVersionResource>> LoadToolSetVersionsAsync()
+    {
+        var toolSets = await ToolSetsClient.GetToolSetsAsync(cancellation.Token);
+        var tasks = toolSets.Select(value => ToolSetsClient.GetVersionsAsync(value.Namespace, value.Name, cancellation.Token)).ToArray();
+        await Task.WhenAll(tasks);
+        return tasks.SelectMany(task => task.Result).ToArray();
     }
     private Task DiscardAsync() => OnParametersSetAsync();
 
@@ -346,7 +381,17 @@ else
     private async Task LoadReadinessAsync(string name, long desiredGeneration)
     {
         readiness = null;
-        try { readiness = await RuntimeClient.GetAgentReadinessAsync(AgentResourceNamespace, name, desiredGeneration, cancellation.Token); }
+        activeRevision = null;
+        try
+        {
+            readiness = await RuntimeClient.GetAgentReadinessAsync(AgentResourceNamespace, name, desiredGeneration, cancellation.Token);
+            if (readiness.Ready && !string.IsNullOrWhiteSpace(readiness.RevisionId))
+                activeRevision = (await Client.GetAgentRevisionAsync(
+                    AgentResourceNamespace,
+                    name,
+                    readiness.RevisionId,
+                    cancellation.Token)).Value;
+        }
         catch (AgentstrationApiException) { }
     }
 

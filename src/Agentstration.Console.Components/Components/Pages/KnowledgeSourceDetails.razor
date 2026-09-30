@@ -1,0 +1,93 @@
+@page "/knowledge-sources/{Name}"
+@implements IDisposable
+@inject IKnowledgeSourcesClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
+
+<PageTitle>@(source?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
+<PageHeader Title="@(source?.Definition.DisplayName ?? Name)" Description="@(source?.Definition.Description ?? T("DetailsDescription"))" TestId="resource-knowledge-source-details">
+    <Actions><a class="button-secondary" href="/knowledge-sources">@T("Back")</a></Actions>
+</PageHeader>
+
+@if (loading) { <LoadingState Message="@T("LoadingDetails")" /> }
+else if (error is not null) { <ErrorState Message="@error" /> }
+else if (source is not null && readiness is not null)
+{
+    @if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")" role="status">@message</div> }
+    <section class="metric-grid" aria-label="@T("Readiness")">
+        <MetricCard Label="@T("Readiness")" Value="@T(readiness.Ready ? "Ready" : "NotReady")" Detail="@(readiness.Issues.Count == 0 ? T("NoIssues") : string.Join(" · ", readiness.Issues))" Status="@(readiness.Ready ? UiStatus.Success : UiStatus.Warning)" />
+        <MetricCard Label="@T("Generation")" Value="@source.Generation.ToString()" Detail="@T(source.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(source.Definition.Enabled ? UiStatus.Info : UiStatus.Warning)" />
+        <MetricCard Label="@T("ToolExposure")" Value="@(exposure is null ? T("NotPublished") : exposure.ToolSetVersion)" Detail="@(exposure is null ? T("ExposureHelp") : $"{exposure.ToolSet.Name} · {exposure.Operations.Count} {T("Operations")}")" Status="@(exposure is null ? UiStatus.Neutral : UiStatus.Success)" />
+    </section>
+    <section class="panel form-section">
+        <div class="panel-header"><div><p class="eyebrow">@T("FlowBindings")</p><h2>@T("ResolvedFlows")</h2></div></div>
+        <dl class="resource-details"><dt>@T("IngestionFlow")</dt><dd>@Binding(readiness.Ingestion)</dd><dt>@T("RetrievalFlow")</dt><dd>@Binding(readiness.Retrieval)</dd></dl>
+    </section>
+    <section class="panel form-section" data-testid="knowledge-source-tool-exposure">
+        <div class="panel-header"><div><p class="eyebrow">@T("Governance")</p><h2>@T("ToolExposure")</h2><p>@T("ExposureExplanation")</p></div>@if (exposure is not null) { <a class="button-secondary" href="@ToolSetUrl">@T("OpenToolSet")</a> }</div>
+        @if (exposure is null)
+        {
+            <div class="form-grid"><label><span>@T("Version")</span><input @bind="version" /></label><label class="checkbox-row"><input type="checkbox" @bind="requiresApproval" /><span>@T("RequireApproval")</span></label></div>
+            <div class="form-actions"><button class="button-primary" type="button" @onclick="PublishAsync" disabled="@(!readiness.Ready || busy)">@(busy ? T("Publishing") : T("PublishExposure"))</button></div>
+            @if (!readiness.Ready) { <p class="inline-warning">@T("ReadyRequired")</p> }
+        }
+        else
+        {
+            <DataGrid TItem="KnowledgeSourceToolOperationExposure" Items="exposure.Operations">
+                <Header><tr><th>@T("Operation")</th><th>@T("Capability")</th><th>@T("Route")</th><th>@T("Tool")</th></tr></Header>
+                <Row Context="operation"><tr><td>@operation.Operation</td><td><code>@operation.Capability</code></td><td><code>@operation.Route</code></td><td><code>@operation.Tool.Namespace/@operation.Tool.Name</code></td></tr></Row>
+            </DataGrid>
+            <p class="resource-hint">@T("PinnedSourceHelp")</p>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public string Name { get; set; } = string.Empty;
+    [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private KnowledgeSourceResource? source;
+    private KnowledgeSourceReadiness? readiness;
+    private KnowledgeSourceToolExposureResource? exposure;
+    private bool loading = true, busy, failed, requiresApproval;
+    private string version = "1.0.0";
+    private string? error, message;
+    private ResourceNamespace SourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
+    private string ToolSetUrl => exposure is null ? "/tools/sets" : exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
+        ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
+        : $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}?namespace={Uri.EscapeDataString((exposure.ToolSet.Namespace ?? SourceNamespace).Value)}";
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            var sourceTask = Client.GetAsync(SourceNamespace, Name, cancellation.Token);
+            var readinessTask = Client.GetReadinessAsync(SourceNamespace, Name, cancellation.Token);
+            var exposureTask = Client.GetExposureAsync(SourceNamespace, Name, cancellation.Token);
+            await Task.WhenAll(sourceTask, readinessTask, exposureTask);
+            source = (await sourceTask).Value;
+            readiness = await readinessTask;
+            exposure = await exposureTask;
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { loading = false; }
+    }
+    private async Task PublishAsync()
+    {
+        if (busy) return;
+        busy = true;
+        failed = false;
+        message = null;
+        try
+        {
+            exposure = (await Client.PublishExposureAsync(SourceNamespace, Name,
+                new PublishKnowledgeSourceToolExposureRequest { Version = version.Trim(), RequiresApproval = requiresApproval }, cancellation.Token)).Value;
+            message = T("ExposurePublished");
+        }
+        catch (Exception exception) { failed = true; message = exception.Message; }
+        finally { busy = false; }
+    }
+    private static string Binding(ResolvedKnowledgeFlowBinding? value) => value is null ? "—" : $"{value.Namespace}/{value.Name}:{value.Version}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

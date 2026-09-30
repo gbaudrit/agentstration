@@ -51,4 +51,5 @@
   <data name="Delete"><value>Supprimer</value></data>
   <data name="Edit"><value>Modifier →</value></data>
   <data name="Categories" xml:space="preserve"><value>Catégories</value></data>
+  <data name="ToolSets" xml:space="preserve"><value>ToolSets</value></data>
 </root>

@@ -24,7 +24,7 @@ public partial class MainLayout
         new("Group.Operate", [new("Nav.Conversations", "/conversations", "message-circle", "work", ["runs/read"]), new("Nav.Tasks", "/tasks", "tasks", "work")]),
         new("Group.Observe", [new("Nav.Deployments", "/deployments", "server", "runtime"), new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
         new("Group.Workplace", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work")]),
-        new("Group.Resources", [new("Nav.Packs", "/packs", "package"), new("Nav.Sources", "/settings/sources", "books"), new("Nav.SourceRegistries", "/settings/source-registries", "database")]),
+        new("Group.Resources", [new("Nav.Packs", "/packs", "package"), new("Nav.KnowledgeSources", "/knowledge-sources", "books", "tool"), new("Nav.Sources", "/settings/sources", "books"), new("Nav.SourceRegistries", "/settings/source-registries", "database")]),
         new("Group.Integrations", [new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.SourceProviders", "/sourceproviders", "database", "source")]),
         new("Group.Configuration", [new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key"), new("Nav.ResourceScopes", "/settings/resource-scopes", "layers", RequiredPermissions: ["resources/read"])]),
         new("Group.System", [new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "cloud-upload"), new("Nav.Cleanup", "/cleanup", "trash", RequiredPermissions: ["resources/delete", "runs/delete"]), new("Nav.Settings", "/settings", "settings")])
@@ -55,6 +55,7 @@ public partial class MainLayout
         new("Command.CreateToolProvider", "/tools/providers/new", "plus", "Command", "new nouveau MCP AEP provider fournisseur"),
         new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "Group.Workplace", "workspace composition primary entries espace composition"),
         new("Nav.Packs", "/packs", "package", "Group.Resources", "package distribution install archive resources paquet installation"),
+        new("Nav.KnowledgeSources", "/knowledge-sources", "books", "Group.Resources", "knowledge source retrieval ingestion connaissances", ["resources/read"]),
         new("Command.CreateModelProvider", "/modelproviders/new", "plus", "Command", "new nouveau provider fournisseur"),
         new("Nav.SourceProviders", "/sourceproviders", "database", "Group.Integrations", "source providers fournisseurs Git AEP"),
         new("Command.CreateSourceProvider", "/sourceproviders/new", "plus", "Command", "new nouveau source provider fournisseur"),

@@ -68,6 +68,8 @@ export const TestIds = {
     vaults: 'resource-vaults',
     vaultEditor: 'resource-vault-editor',
     tools: 'resource-tools',
+    toolSets: 'resource-toolsets',
+    knowledgeSources: 'resource-knowledge-sources',
     toolDetails: 'resource-tool-details',
     toolProviders: 'resource-tool-providers',
     toolProviderEditor: 'resource-tool-provider-editor',

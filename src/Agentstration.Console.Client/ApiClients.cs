@@ -25,6 +25,8 @@ public interface IManagementApiClient
     Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken);
     Task<ResourceSnapshot<AgentResource>> GetAgentAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetAgentAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Agents.");
+    Task<ResourceSnapshot<AgentRevision>> GetAgentRevisionAsync(ResourceNamespace @namespace, string agentName, string revisionName, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support Agent revision inspection.");
     Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken);
     Task DeleteAgentAsync(string name, string etag, CancellationToken cancellationToken);
     Task<ManagementSummary> GetSummaryAsync(CancellationToken cancellationToken);

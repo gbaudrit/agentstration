@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Agentstration.Agents;
 using Agentstration.Agents.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
@@ -31,6 +32,15 @@ public sealed partial class ApiClientTests
             RuntimeProfileName = "maf-shared",
             RuntimeProfileNamespace = "shared.platform",
             ToolNames = "search",
+            ToolSets =
+            [
+                new AgentToolSetSelection
+                {
+                    ToolSet = new ResourceReference("documentation", @namespace: new ResourceNamespace("shared.knowledge")),
+                    Version = "2.1.0",
+                    Members = ["documentation.search"]
+                }
+            ],
             Tags = "domain=web\nowner=platform"
         };
 
@@ -41,6 +51,9 @@ public sealed partial class ApiClientTests
         Assert.AreEqual("maf-shared", request.Definition.RuntimeProfile.Name);
         Assert.AreEqual(new ResourceNamespace("shared.platform"), request.Definition.RuntimeProfile.Namespace);
         Assert.HasCount(1, request.Definition.Tools);
+        Assert.HasCount(1, request.Definition.ToolSets);
+        Assert.AreEqual("2.1.0", request.Definition.ToolSets[0].Version);
+        CollectionAssert.AreEqual(new[] { "documentation.search" }, request.Definition.ToolSets[0].Members.ToArray());
         Assert.AreEqual("web", request.Metadata.Tags["domain"]);
     }
 
@@ -56,6 +69,14 @@ public sealed partial class ApiClientTests
             ModelProfileName = "reasoning",
             RuntimeProfileName = "maf-shared",
             ToolNames = "search",
+            ToolSets =
+            [
+                new AgentToolSetSelection
+                {
+                    ToolSet = new ResourceReference("documentation"),
+                    Version = "1.0.0"
+                }
+            ],
             Tags = "role=welcome"
         };
 
@@ -69,6 +90,7 @@ public sealed partial class ApiClientTests
         Assert.AreEqual(expected.Description, actual.Description);
         Assert.AreEqual(expected.Instructions, actual.Instructions);
         Assert.AreEqual(expected.ToolNames, actual.ToolNames);
+        Assert.AreEqual("1.0.0", actual.ToolSets.Single().Version);
         Assert.AreEqual(expected.Tags, actual.Tags);
         CollectionAssert.AreEqual(new[] { "handoff" }, roundTripped.Definition.Behaviors.ToArray());
         CollectionAssert.AreEqual(new[] { "audit" }, roundTripped.Definition.Middleware.ToArray());
