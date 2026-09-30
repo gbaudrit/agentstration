@@ -223,6 +223,7 @@ internal static class OpenApiSuccessResponseCatalog
             if (path.EndsWith("/model", StringComparison.OrdinalIgnoreCase)) return Json<AgentModelResponse>(200, "Get the agent model resolution");
             if (path.EndsWith("/purge-impact", StringComparison.OrdinalIgnoreCase)) return Json<AgentRevisionPurgeImpactResponse>(200, "Get agent revision purge impact");
             if (path.EndsWith("/revisions", StringComparison.OrdinalIgnoreCase)) return Json<AgentRevision>(201, "Create an agent revision");
+            if (path.Contains("/revisions/", StringComparison.OrdinalIgnoreCase)) return Json<AgentRevision>(200, "Get an agent revision");
             var collection = path.EndsWith("/agents", StringComparison.OrdinalIgnoreCase);
             if (collection) return Json<PagedResponse<AgentResource>>(200, "List agents");
             return Json<AgentResource>(200, method == "PUT" ? "Create or update an agent" : "Get an agent");

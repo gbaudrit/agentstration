@@ -227,6 +227,20 @@ public sealed class AgentManagementService(
         && revision.AgentVersion == agent.Generation
         && string.Equals(revision.DefinitionHash, definition.DefinitionHash, StringComparison.Ordinal);
 
+    public async Task<StoredResource<AgentRevision>> GetRevisionAsync(
+        ResourceNamespace @namespace,
+        string agentName,
+        string revisionName,
+        CancellationToken cancellationToken)
+    {
+        var key = new ResourceKey(AgentResourceKinds.AgentRevision, revisionName, @namespace);
+        var revision = await store.GetAsync<AgentRevision>(key, cancellationToken)
+            ?? throw new ResourceNotFoundException(key);
+        if (!string.Equals(revision.Value.AgentName, agentName, StringComparison.Ordinal))
+            throw new ResourceNotFoundException(key);
+        return revision;
+    }
+
     public async Task<AgentRevisionPurgeImpact> GetRevisionPurgeImpactAsync(
         ResourceNamespace @namespace,
         string agentName,
