@@ -1,6 +1,7 @@
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Notifications;
 using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.Knowledge;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -19,7 +20,8 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     IRequestContextScopeFactory scopes,
     IResourceStore resources,
     InternalMcpToolProjectionService internalTools,
-    ArtifactPlatformResourceProvisioner artifacts) : IWorkspacePlatformResourceProvisioner, IWorkspaceProvisioner
+    ArtifactPlatformResourceProvisioner artifacts,
+    KnowledgePlatformResourceProvisioner knowledge) : IWorkspacePlatformResourceProvisioner, IWorkspaceProvisioner
 {
     public async Task EnsureAllAsync(CancellationToken cancellationToken)
     {
@@ -28,10 +30,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
         {
             var workspaces = await identities.ListWorkspacesAsync(tenant.Id, cancellationToken);
             foreach (var workspace in workspaces.Where(value => value.Status is WorkspaceStatus.Initializing or WorkspaceStatus.Active))
-            {
                 await EnsureAsync(tenant.Id, workspace.Id, cancellationToken);
-                await artifacts.EnsureStorageFlowsAsync(new WorkspaceId(workspace.Id), cancellationToken);
-            }
         }
     }
 
@@ -44,6 +43,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
             ResourceNamespace.Default,
             cancellationToken);
         await artifacts.EnsureAsync(ResourceScopeRef.Workspace(workspaceId), cancellationToken);
+        await knowledge.EnsureAsync(ResourceScopeRef.Workspace(workspaceId), cancellationToken);
         var workspace = await identities.GetWorkspaceAsync(tenantId, workspaceId, cancellationToken)
             ?? throw new InvalidOperationException($"Workspace '{workspaceId:D}' no longer exists.");
         if (workspace.Status == WorkspaceStatus.Initializing)

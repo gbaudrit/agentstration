@@ -106,12 +106,93 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
 
         var flows = factory.Services.GetRequiredService<FlowService>();
         var workspaceId = new WorkspaceId(context.WorkspaceId);
-        var writeFlow = await flows.GetAsync(workspaceId, new("artifact-storage-filesystem-write"), default);
-        var readFlow = await flows.GetAsync(workspaceId, new("artifact-storage-filesystem-read"), default);
+        var writeFlow = await flows.GetAsync(workspaceId, new(ArtifactPlatformResourceProvisioner.StorageWriteFlowName), default);
+        var readFlow = await flows.GetAsync(workspaceId, new(ArtifactPlatformResourceProvisioner.StorageReadFlowName), default);
         Assert.AreEqual("1.0.0", writeFlow?.Value.ActiveVersion);
         Assert.AreEqual("1.0.0", readFlow?.Value.ActiveVersion);
         Assert.AreEqual(ArtifactFlowContracts.StorageWrite, writeFlow?.Value.Metadata["artifact.contract"]);
         Assert.AreEqual(ArtifactFlowContracts.StorageRead, readFlow?.Value.Metadata["artifact.contract"]);
+        Assert.AreEqual("true", writeFlow?.Value.Metadata[ResourceProvenanceAnnotations.BuiltIn]);
+        Assert.AreEqual("true", readFlow?.Value.Metadata[ResourceProvenanceAnnotations.BuiltIn]);
+    }
+
+    [TestMethod]
+    public async Task NewWorkspaceImmediatelyReceivesCompleteBuiltInArtifactResources()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var workspaceId = Guid.NewGuid();
+        var workspace = new Workspace(workspaceId, context.TenantId, $"provision-{workspaceId:N}",
+            "Provisioned Workspace", WorkspaceStatus.Initializing, DateTimeOffset.UtcNow);
+        var identities = factory.Services.GetRequiredService<IIdentityStore>();
+        await identities.AddWorkspaceAsync(workspace, default);
+
+        await factory.Services.GetRequiredService<IWorkspaceProvisioner>().ProvisionAsync(workspace, default);
+
+        var flows = factory.Services.GetRequiredService<FlowService>();
+        var write = await flows.GetAsync(new WorkspaceId(workspaceId),
+            new(ArtifactPlatformResourceProvisioner.StorageWriteFlowName), default);
+        var read = await flows.GetAsync(new WorkspaceId(workspaceId),
+            new(ArtifactPlatformResourceProvisioner.StorageReadFlowName), default);
+        Assert.AreEqual(ArtifactPlatformResourceProvisioner.DefaultToolSetVersion, write?.Value.ActiveVersion);
+        Assert.AreEqual(ArtifactPlatformResourceProvisioner.DefaultToolSetVersion, read?.Value.ActiveVersion);
+
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        using var systemScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        var scope = ResourceScopeRef.Workspace(workspaceId);
+        var binding = await store.GetExactAsync<ArtifactStagingBindingResource>(ScopedResourceAddress.Create(
+            scope, ResourceNamespace.Default, ArtifactResourceKinds.ArtifactStagingBinding,
+            ArtifactPlatformResourceProvisioner.DefaultBindingName), default);
+        var staging = await store.GetExactAsync<ToolSetResource>(ScopedResourceAddress.Create(
+            scope, ResourceNamespace.Default, ToolResourceKinds.ToolSet,
+            ArtifactPlatformResourceProvisioner.DefaultToolSetName), default);
+        var broker = await store.GetExactAsync<ToolSetResource>(ScopedResourceAddress.Create(
+            scope, ResourceNamespace.Default, ToolResourceKinds.ToolSet,
+            ArtifactPlatformResourceProvisioner.BrokerToolSetName), default);
+        Assert.IsTrue(binding?.Value.Definition.IsDefault);
+        Assert.AreEqual("true", staging?.Value.Metadata.Annotations[ResourceProvenanceAnnotations.BuiltIn]);
+        Assert.AreEqual("true", broker?.Value.Metadata.Annotations[ResourceProvenanceAnnotations.BuiltIn]);
+    }
+
+    [TestMethod]
+    public async Task ProvisioningDemotesLegacyBuiltInDefaultBindingWithoutBreakingCompatibility()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var currentAddress = ScopedResourceAddress.Create(scope, ResourceNamespace.Default,
+            ArtifactResourceKinds.ArtifactStagingBinding, ArtifactPlatformResourceProvisioner.DefaultBindingName);
+        var current = await store.GetExactAsync<ArtifactStagingBindingResource>(currentAddress, default);
+        Assert.IsNotNull(current);
+        _ = await store.PutExactAsync(scope, current.Value with
+        {
+            Generation = checked(current.Value.Generation + 1),
+            Definition = current.Value.Definition with { IsDefault = false }
+        }, current.ETag, false, default);
+        var legacy = await store.PutExactAsync(scope, new ArtifactStagingBindingResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ArtifactResourceKinds.ArtifactStagingBinding,
+            Metadata = new()
+            {
+                Name = "filesystem-default",
+                Annotations = new Dictionary<string, string> { [ResourceProvenanceAnnotations.BuiltIn] = "true" }
+            },
+            ScopeRef = scope,
+            Generation = 1,
+            Status = new() { ProvisioningState = ProvisioningState.Succeeded },
+            Definition = current.Value.Definition with { IsDefault = true }
+        }, null, true, default);
+
+        await factory.Services.GetRequiredService<ArtifactPlatformResourceProvisioner>().EnsureAsync(scope, default);
+
+        var migratedLegacy = await store.GetExactAsync<ArtifactStagingBindingResource>(
+            ScopedResourceAddress.Create(scope, legacy.Value.Namespace, legacy.Value.Kind, legacy.Value.Name), default);
+        var restoredCurrent = await store.GetExactAsync<ArtifactStagingBindingResource>(currentAddress, default);
+        Assert.IsFalse(migratedLegacy?.Value.Definition.IsDefault);
+        Assert.IsTrue(restoredCurrent?.Value.Definition.IsDefault);
     }
 
     [TestMethod]
