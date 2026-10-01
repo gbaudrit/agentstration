@@ -4,12 +4,12 @@
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
 <PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-knowledge-sources">
-    <Actions><a class="button-secondary" href="/tools/sets">@T("OpenToolSets")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
+    <Actions><a class="button-primary" href="/knowledge-sources/new">@T("CreateSource")</a><a class="button-secondary" href="/artifacts">@T("OpenArtifacts")</a><a class="button-secondary" href="/tools/sets">@T("OpenToolSets")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
 </PageHeader>
 
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else if (error is not null) { <ErrorState Message="@error" /> }
-else if (sources.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
+else if (sources.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"><a class="button-primary" href="/knowledge-sources/new">@T("CreateSource")</a></EmptyState> }
 else
 {
     <DataGrid TItem="KnowledgeSourceResource" Items="sources">

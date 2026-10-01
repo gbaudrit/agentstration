@@ -17,4 +17,5 @@
   <data name="Nav.Conversations" xml:space="preserve"><value>Conversations</value></data>
   <data name="Command.CreateToolCategory" xml:space="preserve"><value>Créer une catégorie d’outils</value></data>
   <data name="Nav.KnowledgeSources" xml:space="preserve"><value>Sources de connaissances</value></data>
+  <data name="Nav.Artifacts" xml:space="preserve"><value>Artefacts</value></data>
 </root>
