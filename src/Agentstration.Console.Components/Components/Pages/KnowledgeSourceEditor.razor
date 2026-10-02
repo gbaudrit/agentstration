@@ -17,12 +17,11 @@ else
     @if (message is not null) { <div class="form-alert form-alert-danger" role="alert">@message</div> }
     <EditForm Model="this" OnValidSubmit="SaveAsync" class="panel form-section">
         <div class="form-grid">
+            <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="knowledge-source-display-name" TechnicalNameTestId="knowledge-source-name" />
             @if (IsNew)
             {
-                <label><span>@T("TechnicalName")</span><input @bind="technicalName" required maxlength="128" data-testid="knowledge-source-name" /></label>
                 <label><span>@T("Namespace")</span><input @bind="sourceNamespace" maxlength="128" /></label>
             }
-            <label><span>@T("DisplayName")</span><input @bind="displayName" required maxlength="200" data-testid="knowledge-source-display-name" /></label>
             <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="description" maxlength="2000"></textarea></label>
             <label><span>@T("IngestionFlow")</span><select @bind="ingestionKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select></label>
             <label><span>@T("RetrievalFlow")</span><select @bind="retrievalKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select></label>
@@ -58,6 +57,7 @@ else
             {
                 var snapshot = await Client.GetAsync(ExistingNamespace, Name!, cancellation.Token);
                 etag = snapshot.ETag;
+                technicalName = snapshot.Value.Name;
                 displayName = snapshot.Value.Definition.DisplayName;
                 description = snapshot.Value.Definition.Description ?? string.Empty;
                 enabled = snapshot.Value.Definition.Enabled;
