@@ -1,0 +1,23 @@
+.knowledge-acquisition-identity {
+    display: grid;
+    gap: .25rem;
+    min-width: 0;
+}
+
+.knowledge-acquisition-identity code,
+.knowledge-flow-run-link code {
+    overflow-wrap: anywhere;
+}
+
+.knowledge-acquisition-identity small {
+    color: var(--muted);
+}
+
+.knowledge-flow-run-link {
+    display: inline-flex;
+    max-width: 100%;
+}
+
+.knowledge-flow-run-link code {
+    color: inherit;
+}
