@@ -42,6 +42,25 @@
     color: var(--primary);
 }
 
+.knowledge-tool-link {
+    display: inline-grid;
+    gap: .15rem;
+}
+
+.knowledge-tool-link span {
+    color: var(--muted);
+    font: .7rem/1.3 var(--font-mono);
+}
+
+.knowledge-yaml-field {
+    display: grid;
+    gap: .5rem;
+}
+
+.knowledge-yaml-field textarea {
+    width: 100%;
+}
+
 .knowledge-acquisition-parameters {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(18rem, .8fr);

@@ -1,12 +1,13 @@
 @page "/knowledge-sources/{Name}"
 @implements IDisposable
 @inject IKnowledgeSourcesClient Client
+@inject IFlowApiClient Flows
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
 
 <PageTitle>@(source?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
 <PageHeader Title="@(source?.Definition.DisplayName ?? Name)" Description="@(source?.Definition.Description ?? T("DetailsDescription"))" TestId="resource-knowledge-source-details">
-    <Actions>@if (source is not null) { <button class="button-danger" type="button" disabled="@busy" data-testid="knowledge-source-delete" @onclick="() => confirmDelete = true">@T("Delete")</button><a class="button-secondary" href="@EditUrl">@T("EditSource")</a> }<a class="button-secondary" href="/knowledge-sources">@T("Back")</a></Actions>
+    <Actions>@if (source is not null) { <button class="button-danger" type="button" disabled="@busy" data-testid="knowledge-source-delete" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/knowledge-sources">@T("Back")</a></Actions>
 </PageHeader>
 
 @if (loading) { <LoadingState Message="@T("LoadingDetails")" /> }
@@ -17,7 +18,7 @@ else if (source is not null && readiness is not null)
     <ResourceTabs Label="@T("DetailsSections")">
         @foreach (var tab in Enum.GetValues<DetailsTab>())
         {
-            <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="knowledge-source-tab-panel" class="@(activeTab == tab ? "active" : null)" data-testid="@TabId(tab)" @onclick="() => activeTab = tab">@T($"Tab.{tab}")</button>
+            <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="knowledge-source-tab-panel" class="@(activeTab == tab ? "active" : null)" data-testid="@TabId(tab)" @onclick="() => SelectTab(tab)">@T($"Tab.{tab}")</button>
         }
     </ResourceTabs>
     <main id="knowledge-source-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
@@ -33,6 +34,21 @@ else if (source is not null && readiness is not null)
             <div class="panel-header"><div><p class="eyebrow">@T("FlowBindings")</p><h2>@T("ResolvedFlows")</h2></div><button class="button-secondary" type="button" disabled="@busy" @onclick="ToggleEnabledAsync">@T(source.Definition.Enabled ? "DisableSource" : "EnableSource")</button></div>
             <dl class="resource-details"><dt>@T("IngestionFlow")</dt><dd>@if (readiness.Ingestion is { } ingestion) { <a class="knowledge-flow-link" href="@FlowUrl(ingestion)" data-testid="knowledge-ingestion-flow-link"><strong>@ingestion.Name</strong><span>@FlowIdentity(ingestion)</span></a> } else { <span>—</span> }</dd><dt>@T("RetrievalFlow")</dt><dd>@if (readiness.Retrieval is { } retrieval) { <a class="knowledge-flow-link" href="@FlowUrl(retrieval)" data-testid="knowledge-retrieval-flow-link"><strong>@retrieval.Name</strong><span>@FlowIdentity(retrieval)</span></a> } else { <span>—</span> }</dd></dl>
         </section>
+    }
+    else if (activeTab == DetailsTab.Definition)
+    {
+        <EditForm Model="this" OnValidSubmit="SaveDefinitionAsync" class="panel form-section" data-testid="knowledge-source-definition-form">
+            <div class="panel-header"><div><p class="eyebrow">@T("Definition")</p><h2>@T("SourceDefinition")</h2><p>@T("DefinitionHelp")</p></div></div>
+            <div class="form-grid">
+                <ResourceIdentityFields @bind-DisplayName="definitionDisplayName" @bind-TechnicalName="definitionTechnicalName" IsNew="false" DisplayNameTestId="knowledge-source-definition-display-name" TechnicalNameTestId="knowledge-source-definition-name" />
+                <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="definitionDescription" maxlength="2000"></textarea></label>
+                <label><span>@T("IngestionFlow")</span><select @bind="definitionIngestionKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select></label>
+                <label><span>@T("RetrievalFlow")</span><select @bind="definitionRetrievalKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select></label>
+                <label class="checkbox-row"><input type="checkbox" @bind="definitionEnabled" /><span>@T("Enabled")</span></label>
+            </div>
+            <p class="resource-hint">@T("FlowCompatibilityHelp")</p>
+            <div class="form-actions"><button class="button-primary" type="submit" disabled="@busy" data-testid="knowledge-source-definition-save">@(busy ? T("Saving") : T("Save"))</button></div>
+        </EditForm>
     }
     else if (activeTab == DetailsTab.Acquisitions)
     {
@@ -89,7 +105,7 @@ else if (source is not null && readiness is not null)
         @if (retrievalResult is not null) { <div class="result-panel" role="status"><strong>@T("VerificationResult", retrievalResult.Operation, retrievalResult.Items.Count)</strong><p>@(retrievalResult.Answer ?? T("NoAnswer"))</p><ul>@foreach (var item in retrievalResult.Items) { <li><code>@item.ArtifactId</code>@if (!string.IsNullOrWhiteSpace(item.Content)) { <span> — @Preview(item.Content)</span> }</li> }</ul><small>@T("RetrievalProvenance", retrievalResult.SnapshotName, retrievalResult.FlowRunId)</small></div> }
         </section>
     }
-    else
+    else if (activeTab == DetailsTab.Tools)
     {
         <section class="panel form-section" data-testid="knowledge-source-tool-exposure">
         <div class="panel-header"><div><p class="eyebrow">@T("Governance")</p><h2>@T("ToolExposure")</h2><p>@T("ExposureExplanation")</p></div>@if (exposure is not null) { <a class="button-secondary" href="@ToolSetUrl">@T("OpenToolSet")</a> }</div>
@@ -103,10 +119,19 @@ else if (source is not null && readiness is not null)
         {
             <DataGrid TItem="KnowledgeSourceToolOperationExposure" Items="exposure.Operations">
                 <Header><tr><th>@T("Operation")</th><th>@T("Capability")</th><th>@T("Route")</th><th>@T("Tool")</th></tr></Header>
-                <Row Context="operation"><tr><td>@operation.Operation</td><td><code>@operation.Capability</code></td><td><code>@operation.Route</code></td><td><code>@operation.Tool.Namespace/@operation.Tool.Name</code></td></tr></Row>
+                <Row Context="operation"><tr><td>@operation.Operation</td><td><code>@operation.Capability</code></td><td><code>@operation.Route</code></td><td><a class="resource-name-link knowledge-tool-link" href="@ToolUrl(operation.Tool)" data-testid="knowledge-tool-link"><strong>@operation.Tool.Name</strong><span>@ToolNamespace(operation.Tool)</span></a></td></tr></Row>
             </DataGrid>
             <p class="resource-hint">@T("PinnedSourceHelp")</p>
         }
+        </section>
+    }
+    else
+    {
+        <section class="panel form-section" data-testid="knowledge-source-yaml">
+            <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("KnowledgeSourceYaml")</h2><p>@T("KnowledgeSourceYamlHelp")</p></div></div>
+            @if (!string.IsNullOrWhiteSpace(rawError)) { <div class="form-alert form-alert-danger" role="alert">@rawError</div> }
+            <label class="knowledge-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="30" aria-label="@T("ResourceManifest")" data-testid="knowledge-source-yaml-editor" @bind="rawYaml" @bind:event="oninput"></textarea></label>
+            <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@busy">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@busy" data-testid="knowledge-source-yaml-save">@(busy ? T("Saving") : T("SaveYaml"))</button></div>
         </section>
     }
     </main>
@@ -122,18 +147,22 @@ else if (source is not null && readiness is not null)
     private KnowledgeSourceResource? source;
     private KnowledgeSourceReadiness? readiness;
     private KnowledgeSourceToolExposureResource? exposure;
+    private IReadOnlyList<FlowSummary> flows = [];
     private IReadOnlyList<KnowledgeAcquisitionResource> acquisitions = [];
     private IReadOnlyList<KnowledgeSnapshotView> snapshots = [];
     private KnowledgeRetrievalResult? retrievalResult;
     private bool loading = true, busy, failed, requiresApproval, confirmDelete;
     private DetailsTab activeTab;
-    private string version = "1.0.0", acquisitionParameters = "{}", retrievalOperation = "search", retrievalText = string.Empty, retrievalSnapshot = string.Empty;
-    private string? etag, error, message, acquisitionParametersError;
+    private string version = "1.0.0", acquisitionParameters = "{}", retrievalOperation = "search", retrievalText = string.Empty, retrievalSnapshot = string.Empty,
+        rawYaml = string.Empty;
+    private string definitionTechnicalName = string.Empty, definitionDisplayName = string.Empty, definitionDescription = string.Empty,
+        definitionIngestionKey = string.Empty, definitionRetrievalKey = string.Empty;
+    private bool definitionEnabled;
+    private string? etag, error, message, acquisitionParametersError, rawError;
     private ResourceNamespace SourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
     private string ToolSetUrl => exposure is null ? "/tools/sets" : exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
         ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
         : $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}?namespace={Uri.EscapeDataString((exposure.ToolSet.Namespace ?? SourceNamespace).Value)}";
-    private string EditUrl => SourceNamespace.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(Name)}/edit" : $"/knowledge-sources/{Uri.EscapeDataString(Name)}/edit?namespace={Uri.EscapeDataString(SourceNamespace.Value)}";
     private bool CanStartAcquisition => readiness?.Ready == true && !busy && acquisitionParametersError is null && !acquisitions.Any(value => IsRunning(value.State));
     private System.Text.Json.JsonElement? AcquisitionParametersSchema => ParameterSchema(readiness?.Ingestion?.InputSchema);
     private IReadOnlyList<AcquisitionParameterField> AcquisitionParameterFields => SchemaFields(AcquisitionParametersSchema);
@@ -152,26 +181,107 @@ else if (source is not null && readiness is not null)
             var exposureTask = Client.GetExposureAsync(SourceNamespace, Name, cancellation.Token);
             var acquisitionsTask = Client.GetAcquisitionsAsync(SourceNamespace, Name, cancellation.Token);
             var snapshotsTask = Client.GetSnapshotsAsync(SourceNamespace, Name, cancellation.Token);
-            await Task.WhenAll(sourceTask, readinessTask, exposureTask, acquisitionsTask, snapshotsTask);
+            var flowsTask = Flows.GetFlowsAsync(cancellation.Token);
+            await Task.WhenAll(sourceTask, readinessTask, exposureTask, acquisitionsTask, snapshotsTask, flowsTask);
             var sourceSnapshot = await sourceTask;
             source = sourceSnapshot.Value;
             etag = sourceSnapshot.ETag;
+            flows = await flowsTask;
+            LoadDefinition(source);
             readiness = await readinessTask;
             exposure = await exposureTask;
             acquisitions = (await acquisitionsTask).OrderByDescending(value => value.CreatedAt).ToArray();
             snapshots = (await snapshotsTask).OrderByDescending(value => value.Snapshot.PublishedAt).ToArray();
             activeTab = View?.ToLowerInvariant() switch
             {
+                "definition" => DetailsTab.Definition,
                 "acquisitions" => DetailsTab.Acquisitions,
                 "snapshots" => DetailsTab.Snapshots,
                 "retrieval" => DetailsTab.Retrieval,
                 "tools" => DetailsTab.Tools,
+                "yaml" => DetailsTab.Yaml,
                 _ => activeTab
             };
+            if (activeTab == DetailsTab.Yaml) PrepareRawYaml();
         }
         catch (Exception exception) { error = exception.Message; }
         finally { loading = false; }
     }
+    private async Task SaveDefinitionAsync()
+    {
+        if (busy) return;
+        busy = true;
+        failed = false;
+        message = null;
+        try
+        {
+            var properties = new KnowledgeSourceProperties
+            {
+                DisplayName = definitionDisplayName.Trim(),
+                Description = string.IsNullOrWhiteSpace(definitionDescription) ? null : definitionDescription.Trim(),
+                Enabled = definitionEnabled,
+                IngestionFlow = Target(definitionIngestionKey),
+                RetrievalFlow = Target(definitionRetrievalKey)
+            };
+            var saved = await Client.UpdateAsync(SourceNamespace, Name, new PutKnowledgeSourceRequest(properties), etag!, cancellation.Token);
+            source = saved.Value;
+            etag = saved.ETag;
+            readiness = await Client.GetReadinessAsync(SourceNamespace, Name, cancellation.Token);
+            LoadDefinition(source);
+            message = T("SourceSaved");
+        }
+        catch (Exception exception) { failed = true; message = exception.Message; }
+        finally { busy = false; }
+    }
+    private void SelectTab(DetailsTab tab)
+    {
+        if (tab == DetailsTab.Yaml) PrepareRawYaml();
+        activeTab = tab;
+    }
+    private void PrepareRawYaml()
+    {
+        rawError = null;
+        try { rawYaml = ResourceManifestSerializer.ToYaml(RawResource()); }
+        catch (Exception exception) { rawError = exception.Message; }
+    }
+    private bool ApplyRawYaml()
+    {
+        rawError = null;
+        try
+        {
+            var manifest = ResourceManifestSerializer.FromYaml<RawKnowledgeSourceResource>(rawYaml);
+            if (!string.Equals(manifest.ApiVersion, ResourceApiVersions.CoreV1, StringComparison.Ordinal)) throw new ArgumentException(T("ApiVersionRequired", ResourceApiVersions.CoreV1));
+            if (!string.Equals(manifest.Kind, KnowledgeResourceKinds.KnowledgeSource, StringComparison.Ordinal)) throw new ArgumentException(T("KindRequired", KnowledgeResourceKinds.KnowledgeSource));
+            if (manifest.Metadata.Namespace != SourceNamespace) throw new ArgumentException(T("SourceNamespaceImmutable"));
+            if (!string.Equals(manifest.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException(T("SourceNameImmutable"));
+            LoadDefinition(source! with { Definition = manifest.Definition });
+            rawYaml = ResourceManifestSerializer.ToYaml(RawResource());
+            message = T("YamlApplied");
+            failed = false;
+            return true;
+        }
+        catch (Exception exception) { rawError = exception.Message; return false; }
+    }
+    private async Task SaveRawAsync()
+    {
+        if (!ApplyRawYaml()) return;
+        await SaveDefinitionAsync();
+        if (!failed) PrepareRawYaml();
+    }
+    private RawKnowledgeSourceResource RawResource() => new()
+    {
+        ApiVersion = source!.ApiVersion,
+        Kind = source.Kind,
+        Metadata = source.Metadata,
+        Definition = new KnowledgeSourceProperties
+        {
+            DisplayName = definitionDisplayName.Trim(),
+            Description = string.IsNullOrWhiteSpace(definitionDescription) ? null : definitionDescription.Trim(),
+            Enabled = definitionEnabled,
+            IngestionFlow = Target(definitionIngestionKey),
+            RetrievalFlow = Target(definitionRetrievalKey)
+        }
+    };
     private async Task PublishAsync()
     {
         if (busy) return;
@@ -248,6 +358,31 @@ else if (source is not null && readiness is not null)
     private static string FlowUrl(ResolvedKnowledgeFlowBinding value) => value.Namespace.IsDefault
         ? $"/flows/{Uri.EscapeDataString(value.Name)}"
         : $"/namespaces/{Uri.EscapeDataString(value.Namespace.Value)}/flows/{Uri.EscapeDataString(value.Name)}";
+    private string ToolUrl(ResourceReference value)
+    {
+        var address = value.Resolve(SourceNamespace, ToolResourceKinds.Tool);
+        return address.Namespace.IsDefault
+            ? $"/tools/{Uri.EscapeDataString(address.Name)}"
+            : $"/tools/{Uri.EscapeDataString(address.Name)}?namespace={Uri.EscapeDataString(address.Namespace.Value)}";
+    }
+    private string ToolNamespace(ResourceReference value) => value.Resolve(SourceNamespace, ToolResourceKinds.Tool).Namespace.Value;
+    private void LoadDefinition(KnowledgeSourceResource value)
+    {
+        definitionTechnicalName = value.Name;
+        definitionDisplayName = value.Definition.DisplayName;
+        definitionDescription = value.Definition.Description ?? string.Empty;
+        definitionEnabled = value.Definition.Enabled;
+        definitionIngestionKey = TargetKey(value.Definition.IngestionFlow);
+        definitionRetrievalKey = TargetKey(value.Definition.RetrievalFlow);
+    }
+    private static string Key(ResourceNamespace ns, string name) => $"{ns.Value}|{name}";
+    private static string TargetKey(KnowledgeFlowTarget? target) => target is null ? string.Empty : Key(target.Namespace ?? ResourceNamespace.Default, target.Name);
+    private static KnowledgeFlowTarget? Target(string key)
+    {
+        var parts = key.Split('|', 2);
+        return parts.Length != 2 ? null : new KnowledgeFlowTarget { Name = parts[1], Namespace = ResourceNamespace.Parse(parts[0]), UseActiveVersion = true };
+    }
+    private static string FlowLabel(FlowSummary flow) => $"{flow.Namespace}/{flow.Name} · {flow.ActiveVersion ?? flow.Version ?? "—"}";
     private static string TabId(DetailsTab tab) => $"knowledge-source-{tab.ToString().ToLowerInvariant()}-tab";
     private static System.Text.Json.JsonElement? ParameterSchema(System.Text.Json.JsonElement? inputSchema)
     {
@@ -286,6 +421,13 @@ else if (source is not null && readiness is not null)
         && value.TryGetProperty(propertyName, out var property)
         && property.ValueKind == System.Text.Json.JsonValueKind.String ? property.GetString() : null;
     private readonly record struct AcquisitionParameterField(string Name, string Type, string? Description, bool Required);
-    private enum DetailsTab { Overview, Acquisitions, Snapshots, Retrieval, Tools }
+    private sealed record RawKnowledgeSourceResource
+    {
+        public required string ApiVersion { get; init; }
+        public required string Kind { get; init; }
+        public required ResourceMetadata Metadata { get; init; }
+        public required KnowledgeSourceProperties Definition { get; init; }
+    }
+    private enum DetailsTab { Overview, Definition, Acquisitions, Snapshots, Retrieval, Tools, Yaml }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }
