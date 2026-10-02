@@ -85,6 +85,8 @@ public sealed class KnowledgeSourceEditorTests
             Assert.IsEmpty(rendered.FindAll("[data-testid='knowledge-acquisitions']"));
             Assert.AreEqual("/flows/knowledge-ingestion-builtin", rendered.Find("[data-testid='knowledge-ingestion-flow-link']").GetAttribute("href"));
             Assert.AreEqual("/flows/knowledge-retrieval-builtin", rendered.Find("[data-testid='knowledge-retrieval-flow-link']").GetAttribute("href"));
+            Assert.IsTrue(rendered.Find("[data-testid='knowledge-ingestion-flow-link']").ClassList.Contains("knowledge-flow-link"));
+            Assert.AreEqual("Delete", rendered.Find("[data-testid='knowledge-source-delete']").TextContent);
         });
 
         rendered.Find("[data-testid='knowledge-source-delete']").Click();
@@ -103,6 +105,24 @@ public sealed class KnowledgeSourceEditorTests
             Assert.AreEqual(acquisition.FlowRunId, flowRunLink.GetAttribute("title"));
             Assert.EndsWith("…", flowRunLink.TextContent);
             Assert.AreEqual("Attempt 1", rendered.Find(".knowledge-acquisition-identity small").TextContent);
+            var contract = rendered.Find("[data-testid='knowledge-acquisition-contract-fields']").TextContent;
+            StringAssert.Contains(contract, "location");
+            StringAssert.Contains(contract, "Required");
+            StringAssert.Contains(contract, "Type: string");
+            StringAssert.Contains(contract, "Location to acquire");
+        });
+
+        rendered.Find("[data-testid='knowledge-acquisition-parameters']").Input("not-json");
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsTrue(rendered.Find("[data-testid='knowledge-start-acquisition']").HasAttribute("disabled"));
+            Assert.HasCount(1, rendered.FindAll(".field-validation-error"));
+        });
+        rendered.Find("[data-testid='knowledge-acquisition-parameters']").Input("{\"location\":\"docs\"}");
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsFalse(rendered.Find("[data-testid='knowledge-start-acquisition']").HasAttribute("disabled"));
+            Assert.IsEmpty(rendered.FindAll(".field-validation-error"));
         });
 
         rendered.Find("[data-testid='knowledge-source-snapshots-tab']").Click();
@@ -165,7 +185,7 @@ public sealed class KnowledgeSourceEditorTests
         KnowledgeSourceGeneration = 1,
         IngestionFlow = new ResolvedKnowledgeFlowBinding("knowledge-ingestion-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Ingestion),
         FlowRunId = "flowrun-knowledge-b70e6bffe11a4af291349d8ef86e5166",
-        State = KnowledgeAcquisitionState.Pending,
+        State = KnowledgeAcquisitionState.Succeeded,
         CorrelationId = "correlation-1",
         RequestHash = "request-hash",
         CreatedBy = Guid.NewGuid(),
@@ -185,7 +205,7 @@ public sealed class KnowledgeSourceEditorTests
         public Task DeleteAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<KnowledgeSourceReadiness> GetReadinessAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
             Task.FromResult(new KnowledgeSourceReadiness(true, true,
-                new ResolvedKnowledgeFlowBinding("knowledge-ingestion-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Ingestion),
+                new ResolvedKnowledgeFlowBinding("knowledge-ingestion-builtin", ResourceNamespace.Default, "1.0.0", true, IngestionInputSchema(), null, KnowledgeFlowContracts.Ingestion),
                 new ResolvedKnowledgeFlowBinding("knowledge-retrieval-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Retrieval),
                 []));
         public Task<KnowledgeSourceToolExposureResource?> GetExposureAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult<KnowledgeSourceToolExposureResource?>(null);
@@ -201,6 +221,20 @@ public sealed class KnowledgeSourceEditorTests
         public Task<KnowledgeRetrievalResult> QueryAsync(ResourceNamespace @namespace, string name, QueryKnowledgeRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<KnowledgeRetrievalResult> ReadAsync(ResourceNamespace @namespace, string name, ReadKnowledgeRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
+
+    private static JsonElement IngestionInputSchema() => JsonSerializer.SerializeToElement(new
+    {
+        type = "object",
+        properties = new
+        {
+            parameters = new
+            {
+                type = "object",
+                properties = new { location = new { type = "string", description = "Location to acquire" } },
+                required = new[] { "location" }
+            }
+        }
+    });
 
     private sealed class FlowClientStub : IFlowApiClient
     {

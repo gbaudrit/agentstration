@@ -6,7 +6,7 @@
 
 <PageTitle>@(source?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
 <PageHeader Title="@(source?.Definition.DisplayName ?? Name)" Description="@(source?.Definition.Description ?? T("DetailsDescription"))" TestId="resource-knowledge-source-details">
-    <Actions>@if (source is not null) { <button class="button-danger" type="button" disabled="@busy" data-testid="knowledge-source-delete" @onclick="() => confirmDelete = true">@T("DeleteSource")</button><a class="button-secondary" href="@EditUrl">@T("EditSource")</a> }<a class="button-secondary" href="/knowledge-sources">@T("Back")</a></Actions>
+    <Actions>@if (source is not null) { <button class="button-danger" type="button" disabled="@busy" data-testid="knowledge-source-delete" @onclick="() => confirmDelete = true">@T("Delete")</button><a class="button-secondary" href="@EditUrl">@T("EditSource")</a> }<a class="button-secondary" href="/knowledge-sources">@T("Back")</a></Actions>
 </PageHeader>
 
 @if (loading) { <LoadingState Message="@T("LoadingDetails")" /> }
@@ -31,14 +31,40 @@ else if (source is not null && readiness is not null)
         </section>
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("FlowBindings")</p><h2>@T("ResolvedFlows")</h2></div><button class="button-secondary" type="button" disabled="@busy" @onclick="ToggleEnabledAsync">@T(source.Definition.Enabled ? "DisableSource" : "EnableSource")</button></div>
-            <dl class="resource-details"><dt>@T("IngestionFlow")</dt><dd>@if (readiness.Ingestion is { } ingestion) { <a class="text-button" href="@FlowUrl(ingestion)" data-testid="knowledge-ingestion-flow-link"><code>@Binding(ingestion)</code></a> } else { <span>—</span> }</dd><dt>@T("RetrievalFlow")</dt><dd>@if (readiness.Retrieval is { } retrieval) { <a class="text-button" href="@FlowUrl(retrieval)" data-testid="knowledge-retrieval-flow-link"><code>@Binding(retrieval)</code></a> } else { <span>—</span> }</dd></dl>
+            <dl class="resource-details"><dt>@T("IngestionFlow")</dt><dd>@if (readiness.Ingestion is { } ingestion) { <a class="knowledge-flow-link" href="@FlowUrl(ingestion)" data-testid="knowledge-ingestion-flow-link"><strong>@ingestion.Name</strong><span>@FlowIdentity(ingestion)</span></a> } else { <span>—</span> }</dd><dt>@T("RetrievalFlow")</dt><dd>@if (readiness.Retrieval is { } retrieval) { <a class="knowledge-flow-link" href="@FlowUrl(retrieval)" data-testid="knowledge-retrieval-flow-link"><strong>@retrieval.Name</strong><span>@FlowIdentity(retrieval)</span></a> } else { <span>—</span> }</dd></dl>
         </section>
     }
     else if (activeTab == DetailsTab.Acquisitions)
     {
         <section class="panel form-section" data-testid="knowledge-acquisitions">
-        <div class="panel-header"><div><p class="eyebrow">@T("Acquisition")</p><h2>@T("AcquisitionHistory")</h2><p>@T("AcquisitionHelp")</p></div><button class="button-primary" type="button" disabled="@(!readiness.Ready || busy || acquisitions.Any(value => IsRunning(value.State)))" @onclick="StartAcquisitionAsync">@T("StartAcquisition")</button></div>
-        <label class="form-field-wide"><span>@T("AcquisitionParameters")</span><textarea @bind="acquisitionParameters"></textarea><small>@T("JsonObjectHelp")</small></label>
+        <div class="panel-header"><div><p class="eyebrow">@T("Acquisition")</p><h2>@T("AcquisitionHistory")</h2><p>@T("AcquisitionHelp")</p></div><button class="button-primary" type="button" disabled="@(!CanStartAcquisition)" data-testid="knowledge-start-acquisition" @onclick="StartAcquisitionAsync">@T("StartAcquisition")</button></div>
+        <div class="knowledge-acquisition-parameters">
+            <label class="knowledge-parameters-editor"><span>@T("AcquisitionParameters")</span><textarea class="form-code-editor runner-json" rows="11" value="@acquisitionParameters" aria-invalid="@(acquisitionParametersError is null ? "false" : "true")" data-testid="knowledge-acquisition-parameters" @oninput="UpdateAcquisitionParameters"></textarea><small>@T("JsonObjectHelp")</small>@if (acquisitionParametersError is not null) { <span class="field-validation-error" role="alert">@acquisitionParametersError</span> }</label>
+            <aside class="knowledge-parameters-contract" aria-labelledby="knowledge-parameters-contract-title">
+                <div><p class="eyebrow">@T("PublishedContract")</p><h3 id="knowledge-parameters-contract-title">@T("ExpectedParameters")</h3></div>
+                @if (AcquisitionParametersSchema is null)
+                {
+                    <p class="muted">@T("ParameterSchemaUnavailable")</p>
+                }
+                else if (AcquisitionParameterFields.Count == 0)
+                {
+                    <p class="muted">@T("ParameterSchemaOpenObject")</p>
+                }
+                else
+                {
+                    <ul class="knowledge-parameter-fields" data-testid="knowledge-acquisition-contract-fields">
+                        @foreach (var field in AcquisitionParameterFields)
+                        {
+                            <li><div><code>@field.Name</code><StatusBadge Text="@T(field.Required ? "Required" : "Optional")" Status="@(field.Required ? UiStatus.Info : UiStatus.Neutral)" /></div><span>@T("ParameterType", field.Type)</span>@if (!string.IsNullOrWhiteSpace(field.Description)) { <small>@field.Description</small> }</li>
+                        }
+                    </ul>
+                }
+                @if (AcquisitionParametersSchemaJson is not null)
+                {
+                    <details><summary>@T("ViewParameterSchema")</summary><pre class="runner-json">@AcquisitionParametersSchemaJson</pre></details>
+                }
+            </aside>
+        </div>
         @if (acquisitions.Count == 0) { <p class="muted">@T("NoAcquisitions")</p> }
         else
         {
@@ -102,12 +128,18 @@ else if (source is not null && readiness is not null)
     private bool loading = true, busy, failed, requiresApproval, confirmDelete;
     private DetailsTab activeTab;
     private string version = "1.0.0", acquisitionParameters = "{}", retrievalOperation = "search", retrievalText = string.Empty, retrievalSnapshot = string.Empty;
-    private string? etag, error, message;
+    private string? etag, error, message, acquisitionParametersError;
     private ResourceNamespace SourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
     private string ToolSetUrl => exposure is null ? "/tools/sets" : exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
         ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
         : $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}?namespace={Uri.EscapeDataString((exposure.ToolSet.Namespace ?? SourceNamespace).Value)}";
     private string EditUrl => SourceNamespace.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(Name)}/edit" : $"/knowledge-sources/{Uri.EscapeDataString(Name)}/edit?namespace={Uri.EscapeDataString(SourceNamespace.Value)}";
+    private bool CanStartAcquisition => readiness?.Ready == true && !busy && acquisitionParametersError is null && !acquisitions.Any(value => IsRunning(value.State));
+    private System.Text.Json.JsonElement? AcquisitionParametersSchema => ParameterSchema(readiness?.Ingestion?.InputSchema);
+    private IReadOnlyList<AcquisitionParameterField> AcquisitionParameterFields => SchemaFields(AcquisitionParametersSchema);
+    private string? AcquisitionParametersSchemaJson => AcquisitionParametersSchema is { } schema
+        ? System.Text.Json.JsonSerializer.Serialize(schema, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })
+        : null;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     protected override async Task OnParametersSetAsync()
     {
@@ -173,6 +205,11 @@ else if (source is not null && readiness is not null)
         using var document = System.Text.Json.JsonDocument.Parse(acquisitionParameters);
         await Client.StartAcquisitionAsync(SourceNamespace, Name, new StartKnowledgeAcquisitionRequest { Parameters = document.RootElement.Clone() }, cancellationToken: cancellation.Token);
     }, "AcquisitionStarted");
+    private void UpdateAcquisitionParameters(ChangeEventArgs arguments)
+    {
+        acquisitionParameters = arguments.Value?.ToString() ?? string.Empty;
+        acquisitionParametersError = ValidateJsonObject(acquisitionParameters);
+    }
     private Task CancelAcquisitionAsync(KnowledgeAcquisitionResource value) => RunActionAsync(async () => { await Client.CancelAcquisitionAsync(SourceNamespace, value.Name, cancellation.Token); }, "AcquisitionCancelled");
     private Task RetryAcquisitionAsync(KnowledgeAcquisitionResource value) => RunActionAsync(async () => { await Client.RetryAcquisitionAsync(SourceNamespace, value.Name, new RetryKnowledgeAcquisitionRequest(), cancellation.Token); }, "AcquisitionRetried");
     private Task PublishSnapshotAsync(KnowledgeAcquisitionResource value) => RunActionAsync(async () =>
@@ -207,11 +244,48 @@ else if (source is not null && readiness is not null)
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
     private static string Preview(string value) => value.Length <= 240 ? value : $"{value[..240]}…";
     private static string ShortIdentifier(string value) => value.Length > 28 ? $"{value[..28]}…" : value;
-    private static string Binding(ResolvedKnowledgeFlowBinding? value) => value is null ? "—" : $"{value.Namespace}/{value.Name}:{value.Version}";
+    private static string FlowIdentity(ResolvedKnowledgeFlowBinding value) => $"{value.Namespace} · {value.Version}";
     private static string FlowUrl(ResolvedKnowledgeFlowBinding value) => value.Namespace.IsDefault
         ? $"/flows/{Uri.EscapeDataString(value.Name)}"
         : $"/namespaces/{Uri.EscapeDataString(value.Namespace.Value)}/flows/{Uri.EscapeDataString(value.Name)}";
     private static string TabId(DetailsTab tab) => $"knowledge-source-{tab.ToString().ToLowerInvariant()}-tab";
+    private static System.Text.Json.JsonElement? ParameterSchema(System.Text.Json.JsonElement? inputSchema)
+    {
+        if (inputSchema is not { ValueKind: System.Text.Json.JsonValueKind.Object } schema
+            || !schema.TryGetProperty("properties", out var properties)
+            || properties.ValueKind != System.Text.Json.JsonValueKind.Object
+            || !properties.TryGetProperty("parameters", out var parameters)
+            || parameters.ValueKind != System.Text.Json.JsonValueKind.Object) return null;
+        return parameters;
+    }
+    private static IReadOnlyList<AcquisitionParameterField> SchemaFields(System.Text.Json.JsonElement? parameterSchema)
+    {
+        if (parameterSchema is not { ValueKind: System.Text.Json.JsonValueKind.Object } schema
+            || !schema.TryGetProperty("properties", out var properties)
+            || properties.ValueKind != System.Text.Json.JsonValueKind.Object) return [];
+        var required = schema.TryGetProperty("required", out var requiredValue) && requiredValue.ValueKind == System.Text.Json.JsonValueKind.Array
+            ? requiredValue.EnumerateArray().Where(value => value.ValueKind == System.Text.Json.JsonValueKind.String).Select(value => value.GetString()!).ToHashSet(StringComparer.Ordinal)
+            : [];
+        return properties.EnumerateObject().Select(property => new AcquisitionParameterField(
+            property.Name,
+            PropertyText(property.Value, "type") ?? "any",
+            PropertyText(property.Value, "description"),
+            required.Contains(property.Name))).ToArray();
+    }
+    private string? ValidateJsonObject(string value)
+    {
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(value);
+            return document.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object ? null : T("JsonObjectRequired");
+        }
+        catch (System.Text.Json.JsonException exception) { return T("InvalidJson", exception.LineNumber ?? 0, exception.BytePositionInLine ?? 0); }
+    }
+    private static string? PropertyText(System.Text.Json.JsonElement value, string propertyName) =>
+        value.ValueKind == System.Text.Json.JsonValueKind.Object
+        && value.TryGetProperty(propertyName, out var property)
+        && property.ValueKind == System.Text.Json.JsonValueKind.String ? property.GetString() : null;
+    private readonly record struct AcquisitionParameterField(string Name, string Type, string? Description, bool Required);
     private enum DetailsTab { Overview, Acquisitions, Snapshots, Retrieval, Tools }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }
