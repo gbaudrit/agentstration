@@ -180,3 +180,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 152. [ADR-0152 — Knowledge Snapshots are immutable artifact publications](0152-knowledge-snapshots-are-immutable-publications.md)
 153. [ADR-0153 — Knowledge retrieval is a Snapshot-bound Flow invocation](0153-knowledge-retrieval-is-a-snapshot-bound-flow-invocation.md)
 154. [ADR-0154 — Knowledge Tools use the governed internal MCP path](0154-knowledge-tools-use-the-governed-internal-mcp-path.md)
+155. [ADR-0155 — Workspaces reconcile code-owned built-in resources](0155-workspaces-reconcile-code-owned-builtin-resources.md)

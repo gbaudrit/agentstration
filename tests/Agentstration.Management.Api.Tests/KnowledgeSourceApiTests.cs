@@ -6,6 +6,8 @@ using Agentstration.Artifacts.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
+using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
@@ -23,6 +25,107 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task BuiltInKnowledgeFlowsAreProvisionedAndExecuteThroughGovernedToolSetRoutes()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var workspaceId = new WorkspaceId(context.WorkspaceId);
+        var flows = factory.Services.GetRequiredService<FlowService>();
+        var ingestionFlow = await flows.GetAsync(workspaceId, new(KnowledgePlatformResourceProvisioner.IngestionFlowName), default);
+        var retrievalFlow = await flows.GetAsync(workspaceId, new(KnowledgePlatformResourceProvisioner.RetrievalFlowName), default);
+        Assert.IsNotNull(ingestionFlow);
+        Assert.IsNotNull(retrievalFlow);
+        Assert.AreEqual(KnowledgePlatformResourceProvisioner.Version, ingestionFlow.Value.ActiveVersion);
+        Assert.AreEqual(KnowledgeFlowContracts.Ingestion, ingestionFlow.Value.Metadata[KnowledgeFlowContracts.MetadataKey]);
+        Assert.AreEqual(KnowledgePlatformResourceProvisioner.Version, retrievalFlow.Value.ActiveVersion);
+        Assert.AreEqual(KnowledgeFlowContracts.Retrieval, retrievalFlow.Value.Metadata[KnowledgeFlowContracts.MetadataKey]);
+        Assert.AreEqual("true", ingestionFlow.Value.Metadata[ResourceProvenanceAnnotations.BuiltIn]);
+        Assert.AreEqual("true", retrievalFlow.Value.Metadata[ResourceProvenanceAnnotations.BuiltIn]);
+        Assert.IsTrue(ingestionFlow.Value.Graph!.Steps.OfType<ToolRouteFlowStepDefinition>().Any());
+        Assert.HasCount(3, retrievalFlow.Value.Graph!.Steps.OfType<ToolRouteFlowStepDefinition>().ToArray());
+
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var ingestionTools = await store.GetExactAsync<ToolSetResource>(ScopedResourceAddress.Create(scope,
+            ResourceNamespace.Default, ToolResourceKinds.ToolSet, KnowledgePlatformResourceProvisioner.IngestionToolSetName), default);
+        var retrievalTools = await store.GetExactAsync<ToolSetResource>(ScopedResourceAddress.Create(scope,
+            ResourceNamespace.Default, ToolResourceKinds.ToolSet, KnowledgePlatformResourceProvisioner.RetrievalToolSetName), default);
+        Assert.AreEqual("true", ingestionTools?.Value.Metadata.Annotations[ResourceProvenanceAnnotations.BuiltIn]);
+        Assert.AreEqual("true", retrievalTools?.Value.Metadata.Annotations[ResourceProvenanceAnnotations.BuiltIn]);
+
+        var artifacts = factory.Services.GetRequiredService<ArtifactManagementService>();
+        var staged = await artifacts.CreateStagedAsync(new("builtin-knowledge.md", "text/markdown", new ArtifactProducer
+        {
+            Kind = ArtifactProducerKind.FlowRun,
+            Id = "builtin-producer",
+            FlowRunId = "builtin-producer",
+            FlowStepId = "output"
+        }), default);
+        var content = "Agentstration builtin retrieval is deterministic."u8.ToArray();
+        _ = await artifacts.WriteAsync(staged.Value.ArtifactId, 0, content, default);
+        _ = await artifacts.SealAsync(staged.Value.ArtifactId, default);
+        var storedOutput = await factory.Services.GetRequiredService<ArtifactStorageWriteMcpTool>().ExecuteAsync(
+            new(context.TenantId, workspaceId, context.PrincipalId, "builtin-storage-call", "builtin-correlation",
+                JsonSerializer.SerializeToElement(new
+                {
+                    stagedArtifactId = staged.Value.ArtifactId.ToString(),
+                    producerFlowRunId = "builtin-producer",
+                    producerFlowStepId = "output"
+                }), ToolDefinitionCallerKind.Flow, RunId: "builtin-storage-run", FlowStepId: "storage"), default);
+        var durableId = FlowRunArtifactId.Parse(storedOutput!.Value.GetProperty("flowRunArtifactId").GetString()!);
+        var durable = await artifacts.GetFlowRunArtifactAsync(durableId, default);
+        Assert.IsNotNull(durable);
+
+        var source = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(
+            new KnowledgeSourceResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSource,
+                Metadata = new() { Name = "builtin-knowledge" },
+                ScopeRef = scope,
+                Definition = Properties("Built-in Knowledge", KnowledgePlatformResourceProvisioner.IngestionFlowName,
+                    KnowledgePlatformResourceProvisioner.RetrievalFlowName)
+            }, default);
+        var acquisitions = factory.Services.GetRequiredService<KnowledgeAcquisitionService>();
+        var started = await acquisitions.StartAsync(new("builtin-knowledge"),
+            JsonSerializer.SerializeToElement(new { artifactIds = new[] { durableId.ToString() } }),
+            "builtin-acquisition", "builtin-acquisition", default);
+        await factory.Services.GetRequiredService<FlowRunService>().ExecuteAsync(new(started.Value.FlowRunId,
+            new(context.TenantId, workspaceId, context.PrincipalId)), default);
+        var completed = await acquisitions.GetAsync(started.Value.Name, ResourceNamespace.Default, default);
+        Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, completed.Value.State, completed.Value.ErrorMessage);
+        Assert.AreEqual(durableId.ToString(), completed.Value.Manifest?.Artifacts.Single().ArtifactId);
+
+        _ = await CreateActiveSnapshotAsync(factory.Services, context, source.Value, durable.Value, "builtin-snapshot");
+        var retrieval = factory.Services.GetRequiredService<KnowledgeRetrievalService>();
+        var result = await retrieval.SearchAsync(
+            new("builtin-knowledge"), new SearchKnowledgeRequest { Query = "deterministic", Limit = 5 }, default);
+        Assert.HasCount(1, result.Items);
+        Assert.AreEqual(durableId.ToString(), result.Items[0].ArtifactId);
+        StringAssert.Contains(result.Items[0].Content, "deterministic");
+        Assert.AreEqual(KnowledgePlatformResourceProvisioner.RetrievalFlowName, result.RetrievalFlow.Name);
+
+        var query = await retrieval.QueryAsync(new("builtin-knowledge"), new QueryKnowledgeRequest
+        {
+            Question = "Is retrieval deterministic?",
+            MaximumItems = 5,
+            MaximumOutputCharacters = 1_024
+        }, default);
+        Assert.HasCount(1, query.Items);
+        StringAssert.Contains(query.Answer, "deterministic");
+
+        var read = await retrieval.ReadAsync(new("builtin-knowledge"), new ReadKnowledgeRequest
+        {
+            ArtifactId = durableId.ToString(),
+            Offset = 0,
+            Length = content.Length
+        }, default);
+        Assert.HasCount(1, read.Items);
+        Assert.AreEqual("Agentstration builtin retrieval is deterministic.", read.Items[0].Content);
+    }
+
     [TestMethod]
     public async Task AcquisitionRunsTheExactPublishedIngestionFlowAndReturnsABoundedManifest()
     {

@@ -9,6 +9,7 @@ using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Agents;
 using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Infrastructure.Assistant;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.Events;
@@ -358,6 +359,7 @@ public static class DependencyInjection
         services.AddSingleton<IArtifactStagingToolExecutor, ToolSetArtifactStagingExecutor>();
         services.AddSingleton<ArtifactManagementService>();
         services.AddSingleton<ArtifactPlatformResourceProvisioner>();
+        services.AddSingleton<KnowledgePlatformResourceProvisioner>();
         services.AddSingleton(new StagedArtifactCleanupOptions());
         if (enableHostedServices) services.AddHostedService<StagedArtifactCleanupWorker>();
         services.AddSingleton<LocalWorkExecutionGateway>();
@@ -399,6 +401,10 @@ public static class DependencyInjection
         AddInternalTool<StagedArtifactPurgeMcpTool>(services);
         AddInternalTool<ArtifactStorageWriteMcpTool>(services);
         AddInternalTool<ArtifactStorageReadMcpTool>(services);
+        AddInternalTool<KnowledgeIngestionImportMcpTool>(services);
+        AddInternalTool<KnowledgeRetrievalSearchMcpTool>(services);
+        AddInternalTool<KnowledgeRetrievalQueryMcpTool>(services);
+        AddInternalTool<KnowledgeRetrievalReadMcpTool>(services);
         services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<WorkNotificationMcpTool>());
         services.AddSingleton<InternalMcpToolProjectionService>();
         services.AddSingleton(provider => new Lazy<IEnumerable<IInternalMcpToolHandler>>(
