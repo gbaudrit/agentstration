@@ -83,7 +83,14 @@ public sealed class KnowledgeSourceEditorTests
             Assert.AreEqual("true", rendered.Find("[data-testid='knowledge-source-overview-tab']").GetAttribute("aria-selected"));
             Assert.HasCount(1, rendered.FindAll(".metric-grid"));
             Assert.IsEmpty(rendered.FindAll("[data-testid='knowledge-acquisitions']"));
+            Assert.AreEqual("/flows/knowledge-ingestion-builtin", rendered.Find("[data-testid='knowledge-ingestion-flow-link']").GetAttribute("href"));
+            Assert.AreEqual("/flows/knowledge-retrieval-builtin", rendered.Find("[data-testid='knowledge-retrieval-flow-link']").GetAttribute("href"));
         });
+
+        rendered.Find("[data-testid='knowledge-source-delete']").Click();
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-delete-dialog']")));
+        rendered.Find("[data-testid='knowledge-source-delete-dialog'] .button-secondary").Click();
+        rendered.WaitForAssertion(() => Assert.IsEmpty(rendered.FindAll("[data-testid='knowledge-source-delete-dialog']")));
 
         rendered.Find("[data-testid='knowledge-source-acquisitions-tab']").Click();
         rendered.WaitForAssertion(() =>
@@ -106,6 +113,22 @@ public sealed class KnowledgeSourceEditorTests
 
         rendered.Find("[data-testid='knowledge-source-tools-tab']").Click();
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-tool-exposure']")));
+    }
+
+    [TestMethod]
+    public void ListMakesTheKnowledgeSourceNameClickable()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(new KnowledgeClientStub(ExistingSource()));
+
+        var rendered = context.Render<KnowledgeSources>();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var link = rendered.Find("[data-testid='knowledge-source-name-link']");
+            Assert.AreEqual("Agentstration documentation", link.TextContent);
+            Assert.AreEqual("/knowledge-sources/agentstration-documentation", link.GetAttribute("href"));
+        });
     }
 
     private static BunitContext CreateContext(IKnowledgeSourcesClient knowledge)

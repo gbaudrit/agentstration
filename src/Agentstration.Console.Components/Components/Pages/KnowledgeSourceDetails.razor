@@ -6,7 +6,7 @@
 
 <PageTitle>@(source?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
 <PageHeader Title="@(source?.Definition.DisplayName ?? Name)" Description="@(source?.Definition.Description ?? T("DetailsDescription"))" TestId="resource-knowledge-source-details">
-    <Actions>@if (source is not null) { <a class="button-secondary" href="@EditUrl">@T("EditSource")</a> }<a class="button-secondary" href="/knowledge-sources">@T("Back")</a></Actions>
+    <Actions>@if (source is not null) { <button class="button-danger" type="button" disabled="@busy" data-testid="knowledge-source-delete" @onclick="() => confirmDelete = true">@T("DeleteSource")</button><a class="button-secondary" href="@EditUrl">@T("EditSource")</a> }<a class="button-secondary" href="/knowledge-sources">@T("Back")</a></Actions>
 </PageHeader>
 
 @if (loading) { <LoadingState Message="@T("LoadingDetails")" /> }
@@ -31,9 +31,8 @@ else if (source is not null && readiness is not null)
         </section>
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("FlowBindings")</p><h2>@T("ResolvedFlows")</h2></div><button class="button-secondary" type="button" disabled="@busy" @onclick="ToggleEnabledAsync">@T(source.Definition.Enabled ? "DisableSource" : "EnableSource")</button></div>
-            <dl class="resource-details"><dt>@T("IngestionFlow")</dt><dd>@Binding(readiness.Ingestion)</dd><dt>@T("RetrievalFlow")</dt><dd>@Binding(readiness.Retrieval)</dd></dl>
+            <dl class="resource-details"><dt>@T("IngestionFlow")</dt><dd>@if (readiness.Ingestion is { } ingestion) { <a class="text-button" href="@FlowUrl(ingestion)" data-testid="knowledge-ingestion-flow-link"><code>@Binding(ingestion)</code></a> } else { <span>—</span> }</dd><dt>@T("RetrievalFlow")</dt><dd>@if (readiness.Retrieval is { } retrieval) { <a class="text-button" href="@FlowUrl(retrieval)" data-testid="knowledge-retrieval-flow-link"><code>@Binding(retrieval)</code></a> } else { <span>—</span> }</dd></dl>
         </section>
-        <section class="panel danger-zone"><div><h2>@T("DeleteSource")</h2><p>@T("DeleteSourceHelp")</p></div>@if (!confirmDelete) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("DeleteSource")</button> } else { <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => confirmDelete = false">@T("Cancel")</button><button class="button-danger" type="button" @onclick="DeleteAsync">@T("ConfirmDelete")</button></div> }</section>
     }
     else if (activeTab == DetailsTab.Acquisitions)
     {
@@ -86,6 +85,8 @@ else if (source is not null && readiness is not null)
     }
     </main>
 }
+
+<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteSource")" Message="@T("DeleteSourceHelp")" ConfirmLabel="@T("ConfirmDelete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" TestId="knowledge-source-delete-dialog" />
 
 @code {
     [Parameter] public string Name { get; set; } = string.Empty;
@@ -195,7 +196,7 @@ else if (source is not null && readiness is not null)
     private async Task DeleteAsync()
     {
         if (busy) return;
-        busy = true; failed = false; message = null;
+        busy = true; failed = false; message = null; confirmDelete = false;
         try { await Client.DeleteAsync(SourceNamespace, Name, etag!, cancellation.Token); Navigation.NavigateTo("/knowledge-sources"); }
         catch (Exception exception) { failed = true; message = exception.Message; busy = false; }
     }
@@ -207,6 +208,9 @@ else if (source is not null && readiness is not null)
     private static string Preview(string value) => value.Length <= 240 ? value : $"{value[..240]}…";
     private static string ShortIdentifier(string value) => value.Length > 28 ? $"{value[..28]}…" : value;
     private static string Binding(ResolvedKnowledgeFlowBinding? value) => value is null ? "—" : $"{value.Namespace}/{value.Name}:{value.Version}";
+    private static string FlowUrl(ResolvedKnowledgeFlowBinding value) => value.Namespace.IsDefault
+        ? $"/flows/{Uri.EscapeDataString(value.Name)}"
+        : $"/namespaces/{Uri.EscapeDataString(value.Namespace.Value)}/flows/{Uri.EscapeDataString(value.Name)}";
     private static string TabId(DetailsTab tab) => $"knowledge-source-{tab.ToString().ToLowerInvariant()}-tab";
     private enum DetailsTab { Overview, Acquisitions, Snapshots, Retrieval, Tools }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
