@@ -1,0 +1,106 @@
+@page "/knowledge-sources/new"
+@page "/knowledge-sources/{Name}/edit"
+@implements IDisposable
+@inject IKnowledgeSourcesClient Client
+@inject IFlowApiClient Flows
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
+
+<PageTitle>@T(IsNew ? "CreateSource" : "EditSource") · Agentstration</PageTitle>
+<PageHeader Title="@T(IsNew ? "CreateSource" : "EditSource")" Description="@T("EditorDescription")" TestId="knowledge-source-editor">
+    <Actions><a class="button-secondary" href="@(IsNew ? "/knowledge-sources" : DetailsUrl)">@T("Cancel")</a></Actions>
+</PageHeader>
+
+@if (loading) { <LoadingState Message="@T("LoadingDetails")" /> }
+else
+{
+    @if (message is not null) { <div class="form-alert form-alert-danger" role="alert">@message</div> }
+    <EditForm Model="this" OnValidSubmit="SaveAsync" class="panel form-section">
+        <div class="form-grid">
+            <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="knowledge-source-display-name" TechnicalNameTestId="knowledge-source-name" />
+            @if (IsNew)
+            {
+                <label><span>@T("Namespace")</span><input @bind="sourceNamespace" maxlength="128" /></label>
+            }
+            <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="description" maxlength="2000"></textarea></label>
+            <label><span>@T("IngestionFlow")</span><select @bind="ingestionKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select></label>
+            <label><span>@T("RetrievalFlow")</span><select @bind="retrievalKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select></label>
+            <label class="checkbox-row"><input type="checkbox" @bind="enabled" /><span>@T("Enabled")</span></label>
+        </div>
+        <p class="resource-hint">@T("FlowCompatibilityHelp")</p>
+        <div class="form-actions"><button class="button-primary" type="submit" disabled="@busy">@(busy ? T("Saving") : T("Save"))</button></div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<FlowSummary> flows = [];
+    private string technicalName = string.Empty, sourceNamespace = "default", displayName = string.Empty,
+        description = string.Empty, ingestionKey = string.Empty, retrievalKey = string.Empty;
+    private string? etag, message;
+    private bool enabled, busy, loading = true;
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private ResourceNamespace ExistingNamespace => ResourceNamespace.Parse(Namespace);
+    private string DetailsUrl => ExistingNamespace.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(Name!)}" : $"/knowledge-sources/{Uri.EscapeDataString(Name!)}?namespace={Uri.EscapeDataString(ExistingNamespace.Value)}";
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        message = null;
+        try
+        {
+            flows = await Flows.GetFlowsAsync(cancellation.Token);
+            if (!IsNew)
+            {
+                var snapshot = await Client.GetAsync(ExistingNamespace, Name!, cancellation.Token);
+                etag = snapshot.ETag;
+                technicalName = snapshot.Value.Name;
+                displayName = snapshot.Value.Definition.DisplayName;
+                description = snapshot.Value.Definition.Description ?? string.Empty;
+                enabled = snapshot.Value.Definition.Enabled;
+                ingestionKey = TargetKey(snapshot.Value.Definition.IngestionFlow);
+                retrievalKey = TargetKey(snapshot.Value.Definition.RetrievalFlow);
+            }
+        }
+        catch (Exception exception) { message = exception.Message; }
+        finally { loading = false; }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy) return;
+        busy = true;
+        message = null;
+        try
+        {
+            var properties = new KnowledgeSourceProperties
+            {
+                DisplayName = displayName.Trim(),
+                Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+                Enabled = enabled,
+                IngestionFlow = Target(ingestionKey),
+                RetrievalFlow = Target(retrievalKey)
+            };
+            var saved = IsNew
+                ? await Client.CreateAsync(new CreateKnowledgeSourceRequest(technicalName.Trim(), properties, sourceNamespace.Trim()), cancellation.Token)
+                : await Client.UpdateAsync(ExistingNamespace, Name!, new PutKnowledgeSourceRequest(properties), etag!, cancellation.Token);
+            var ns = saved.Value.Namespace;
+            Navigation.NavigateTo(ns.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}" : $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}?namespace={Uri.EscapeDataString(ns.Value)}");
+        }
+        catch (Exception exception) { message = exception.Message; }
+        finally { busy = false; }
+    }
+
+    private static string Key(ResourceNamespace ns, string name) => $"{ns.Value}|{name}";
+    private static string TargetKey(KnowledgeFlowTarget? target) => target is null ? string.Empty : Key(target.Namespace ?? ResourceNamespace.Default, target.Name);
+    private static KnowledgeFlowTarget? Target(string key)
+    {
+        var parts = key.Split('|', 2);
+        return parts.Length != 2 ? null : new KnowledgeFlowTarget { Name = parts[1], Namespace = ResourceNamespace.Parse(parts[0]), UseActiveVersion = true };
+    }
+    private static string FlowLabel(FlowSummary flow) => $"{flow.Namespace}/{flow.Name} · {flow.ActiveVersion ?? flow.Version ?? "—"}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

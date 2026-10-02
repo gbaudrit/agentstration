@@ -8,6 +8,7 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="YamlDotNet" />
     <ProjectReference Include="../Agentstration.Agents/Agentstration.Agents.csproj" />
+    <ProjectReference Include="../Agentstration.Artifacts.Contracts/Agentstration.Artifacts.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Console.Client/Agentstration.Console.Client.csproj" />
     <ProjectReference Include="../Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />

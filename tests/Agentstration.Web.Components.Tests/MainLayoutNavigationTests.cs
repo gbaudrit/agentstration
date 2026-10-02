@@ -25,7 +25,7 @@ public sealed class MainLayoutNavigationTests
             ("Operate", [("Conversations", "/conversations"), ("Tasks", "/tasks")]),
             ("Observe", [("Deployments", "/deployments"), ("Agent runs", "/agent-runs"), ("Flow runs", "/flow-runs"), ("Run events", "/run-events")]),
             ("Workplace", [("Configuration", "/workspaces")]),
-            ("Resources", [("Packs", "/packs"), ("Knowledge Sources", "/knowledge-sources"), ("Sources", "/settings/sources"), ("Source registries", "/settings/source-registries")]),
+            ("Resources", [("Packs", "/packs"), ("Knowledge Sources", "/knowledge-sources"), ("Artifacts", "/artifacts"), ("Sources", "/settings/sources"), ("Source registries", "/settings/source-registries")]),
             ("Integrations", [("MCP & Tools", "/tools"), ("Extensions", "/extensions"), ("Model providers", "/modelproviders"), ("Source providers", "/sourceproviders")]),
             ("Configuration", [("Runtime profiles", "/runtimeprofiles"), ("Secrets", "/secrets"), ("Resource scopes", "/settings/resource-scopes")]),
             ("System", [("Organization", "/settings/organization"), ("Bootstrap", "/settings/bootstrap"), ("Cleanup", "/cleanup"), ("Settings", "/settings")]));
