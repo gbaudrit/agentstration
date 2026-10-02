@@ -8,6 +8,7 @@ using Agentstration.Application.Work;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
+using Agentstration.Extensions.Crawl4AI;
 using Agentstration.Extensions.Git;
 using Agentstration.Extensions.LlamaCpp;
 using Agentstration.Extensions.LocalAI;
@@ -55,6 +56,27 @@ namespace Agentstration.ArchitectureTests;
 [TestClass]
 public sealed class DependencyTests
 {
+    [TestMethod]
+    public void Crawl4AiDependenciesStayInsideTheAutonomousExtension()
+    {
+        var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
+        var extensionProject = Path.Combine(sourceRoot, "Agentstration.Extensions.Crawl4AI", "Agentstration.Extensions.Crawl4AI.csproj");
+        var appHostProject = Path.Combine(sourceRoot, "Agentstration.AppHost", "Agentstration.AppHost.csproj");
+        Assert.IsTrue(File.Exists(extensionProject));
+        Assert.Contains("../Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj", File.ReadAllText(appHostProject));
+        Assert.IsFalse(typeof(Crawl4AiClient).Assembly.GetReferencedAssemblies().Any(reference =>
+            reference.Name is "Agentstration.Knowledge" or "Agentstration.Knowledge.Contracts"));
+
+        var violations = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !string.Equals(path, extensionProject, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(path, appHostProject, StringComparison.OrdinalIgnoreCase))
+            .Where(path => File.ReadAllText(path).Contains("Agentstration.Extensions.Crawl4AI", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(sourceRoot, path))
+            .ToArray();
+
+        Assert.IsEmpty(violations, $"Crawl4AI must not enter product modules: {string.Join(", ", violations)}");
+    }
+
     [TestMethod]
     public void FoundryDependenciesStayInsideTheAutonomousExtension()
     {

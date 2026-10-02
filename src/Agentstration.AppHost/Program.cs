@@ -67,6 +67,36 @@ var foundryEnabledSetting = builder.Configuration["Foundry:Enabled"];
 if (foundryEnabledSetting is not null && !bool.TryParse(foundryEnabledSetting, out _))
     throw new InvalidOperationException("Foundry:Enabled must be true or false.");
 var foundryEnabled = bool.TryParse(foundryEnabledSetting, out var configuredFoundryEnabled) && configuredFoundryEnabled;
+var crawl4AiEnabledSetting = builder.Configuration["Crawl4AI:Enabled"];
+if (crawl4AiEnabledSetting is not null && !bool.TryParse(crawl4AiEnabledSetting, out _))
+    throw new InvalidOperationException("Crawl4AI:Enabled must be true or false.");
+var crawl4AiEnabled = bool.TryParse(crawl4AiEnabledSetting, out var configuredCrawl4AiEnabled) && configuredCrawl4AiEnabled;
+var crawl4AiEndpoint = builder.Configuration["Crawl4AI:Endpoint"] ?? "http://localhost:11235";
+if (!Uri.TryCreate(crawl4AiEndpoint, UriKind.Absolute, out var parsedCrawl4AiEndpoint)
+    || (parsedCrawl4AiEndpoint.Scheme != Uri.UriSchemeHttp && parsedCrawl4AiEndpoint.Scheme != Uri.UriSchemeHttps))
+{
+    throw new InvalidOperationException("Crawl4AI:Endpoint must be an absolute HTTP(S) URL.");
+}
+var crawl4AiAllowedDomains = builder.Configuration.GetSection("Crawl4AI:AllowedDomains")
+    .GetChildren()
+    .Select(value => value.Value)
+    .Where(value => !string.IsNullOrWhiteSpace(value))
+    .Cast<string>()
+    .ToArray();
+if (crawl4AiEnabled && crawl4AiAllowedDomains.Length == 0)
+    throw new InvalidOperationException("Crawl4AI:AllowedDomains must contain at least one domain when Crawl4AI is enabled.");
+var crawl4AiAllowedMediaTypes = builder.Configuration.GetSection("Crawl4AI:AllowedMediaTypes")
+    .GetChildren()
+    .Select(value => value.Value)
+    .Where(value => !string.IsNullOrWhiteSpace(value))
+    .Cast<string>()
+    .ToArray();
+var crawl4AiAllowedPorts = builder.Configuration.GetSection("Crawl4AI:AllowedPorts")
+    .GetChildren()
+    .Select(value => value.Value)
+    .Where(value => !string.IsNullOrWhiteSpace(value))
+    .Cast<string>()
+    .ToArray();
 
 var ollamaExtension = builder.AddProject<Projects.Agentstration_Extensions_Ollama>("ollama-extension")
     .WithEnvironment("Agentstration__Slot", slot)
@@ -116,6 +146,33 @@ if (foundryEnabled)
     }
     developmentExtensions.Add(new DevelopmentAepExtension(
         "Agentstration.Extensions.Foundry", "foundry-extension", foundryExtension));
+}
+if (crawl4AiEnabled)
+{
+    var crawl4AiExtension = builder.AddProject<Projects.Agentstration_Extensions_Crawl4AI>("crawl4ai-extension")
+        .WithEnvironment("Agentstration__Slot", slot)
+        .WithEnvironment("Crawl4AI__Endpoint", parsedCrawl4AiEndpoint.AbsoluteUri)
+        .WithEnvironment("Crawl4AI__ContentDirectory", Path.Combine(slotDataPath, "crawl4ai-content"))
+        .WithHttpHealthCheck("/health/ready")
+        .WithDynamicHostPorts(dynamicApplicationPorts);
+    for (var index = 0; index < crawl4AiAllowedDomains.Length; index++)
+        crawl4AiExtension.WithEnvironment($"Crawl4AI__AllowedDomains__{index}", crawl4AiAllowedDomains[index]);
+    for (var index = 0; index < crawl4AiAllowedMediaTypes.Length; index++)
+        crawl4AiExtension.WithEnvironment($"Crawl4AI__AllowedMediaTypes__{index}", crawl4AiAllowedMediaTypes[index]);
+    for (var index = 0; index < crawl4AiAllowedPorts.Length; index++)
+        crawl4AiExtension.WithEnvironment($"Crawl4AI__AllowedPorts__{index}", crawl4AiAllowedPorts[index]);
+    foreach (var key in new[]
+    {
+        "ApiTokenFile", "AllowPrivateAddresses", "MaximumDepth", "MaximumPages", "RequestTimeoutSeconds",
+        "MaximumResponseBytes", "MaximumContentBytes", "MaximumLinksPerPage", "MaximumReadChunkBytes",
+        "ContentRetentionMinutes", "MaximumSpoolBytes"
+    })
+    {
+        if (builder.Configuration[$"Crawl4AI:{key}"] is { } value)
+            crawl4AiExtension.WithEnvironment($"Crawl4AI__{key}", value);
+    }
+    developmentExtensions.Add(new DevelopmentAepExtension(
+        "Agentstration.Extensions.Crawl4AI", "crawl4ai-extension", crawl4AiExtension));
 }
 var sharedKeys = usePairingCode
     ? new Dictionary<string, string>(StringComparer.Ordinal)

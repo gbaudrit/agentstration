@@ -45,6 +45,7 @@
     <Project Path="src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj" />
     <Project Path="src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
     <Project Path="src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
+    <Project Path="src/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj" />
   </Folder>
   <Folder Name="/src/Flows/">
     <Project Path="src/Agentstration.Flows/Agentstration.Flows.csproj" />
@@ -168,6 +169,7 @@
   <Folder Name="/tests/Extensions/">
     <Project Path="tests/Agentstration.Management.Aep.Tests/Agentstration.Management.Aep.Tests.csproj" />
     <Project Path="tests/Agentstration.SourceProviders.Git.Tests/Agentstration.SourceProviders.Git.Tests.csproj" />
+    <Project Path="tests/Agentstration.Extensions.Crawl4AI.Tests/Agentstration.Extensions.Crawl4AI.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Models/">
     <Project Path="tests/Agentstration.Models.Tests/Agentstration.Models.Tests.csproj" />
