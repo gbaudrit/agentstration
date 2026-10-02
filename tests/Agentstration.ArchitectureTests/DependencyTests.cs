@@ -78,6 +78,27 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void AspireCrawl4AiRegistrationKeepsManagedProvisioningOptionalAndHardened()
+    {
+        var appHost = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Agentstration.AppHost", "Program.cs"));
+        var settings = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Agentstration.AppHost", "appsettings.json"));
+
+        Assert.Contains("if (crawl4AiEnabled)", appHost, StringComparison.Ordinal);
+        Assert.Contains("Crawl4AI:Provisioning", appHost, StringComparison.Ordinal);
+        Assert.Contains("builder.AddContainer(", appHost, StringComparison.Ordinal);
+        Assert.Contains("unclecode/crawl4ai", appHost, StringComparison.Ordinal);
+        Assert.Contains("/run/secrets/api_token", appHost, StringComparison.Ordinal);
+        Assert.Contains("isReadOnly: true", appHost, StringComparison.Ordinal);
+        Assert.Contains("--cap-drop=ALL", appHost, StringComparison.Ordinal);
+        Assert.Contains("--security-opt=no-new-privileges", appHost, StringComparison.Ordinal);
+        Assert.Contains("--read-only", appHost, StringComparison.Ordinal);
+        Assert.Contains(".WaitFor(crawl4AiService)", appHost, StringComparison.Ordinal);
+        Assert.Contains("\"Provisioning\": \"Managed\"", settings, StringComparison.Ordinal);
+        Assert.Contains("\"ImageTag\": \"0.9.4\"", settings, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"ImageTag\": \"latest\"", settings, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [TestMethod]
     public void FoundryDependenciesStayInsideTheAutonomousExtension()
     {
         var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");

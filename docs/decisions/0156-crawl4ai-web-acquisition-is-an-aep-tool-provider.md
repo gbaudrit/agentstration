@@ -18,13 +18,13 @@ The extension sends only validated URLs to a self-hosted Crawl4AI 0.9.0 or newer
 
 Acquisition content is written to a bounded extension-local temporary spool. Tool results contain opaque references, media type, length, digest, links, bounded metadata, source URL, and correlation ID rather than full documents. `content.read` transfers bounded base64 chunks to the governed StagedArtifact `create`/`write`/`seal` path selected by a Flow. `content.delete` removes the extension-local copy after transfer; retention expiry is the recovery path for abandoned copies. The temporary reference is not a `StagedArtifact` and is not durable.
 
-The extension implements multi-page traversal itself with deterministic breadth-first semantics instead of exposing Crawl4AI deep-crawl configuration. Aspire starts the extension only when explicitly enabled and configured; the default Agentstration topology remains offline and unchanged.
+The extension implements multi-page traversal itself with deterministic breadth-first semantics instead of exposing Crawl4AI deep-crawl configuration. Aspire starts the extension only when explicitly enabled. Its default managed mode also starts a pinned, least-privilege Crawl4AI container and shares a generated token through a protected host file mounted read-only into the container. An external mode accepts an operator-managed endpoint and token file. The default Agentstration topology remains offline and unchanged.
 
 ## Consequences
 
 - Web acquisition remains replaceable Flow composition, not a Knowledge domain dependency.
 - Every acquisition and transfer operation remains a separately governable Tool.
 - Large document bodies do not enter normal Flow transition state or model context merely because acquisition completed.
-- Operators must run and secure a compatible Crawl4AI service and explicitly approve reachable domains.
+- Operators must explicitly approve reachable domains. They may use Aspire-managed Crawl4AI for development or operate a compatible external service.
 - Private intranet acquisition requires an explicit operator opt-in and still cannot target local metadata, loopback, link-local, or reserved ranges.
 - Temporary references are meaningful only to the issuing extension instance; Flows must stage required content before expiry or fail and retry acquisition.

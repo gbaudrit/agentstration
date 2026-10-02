@@ -11,7 +11,12 @@ The main verified settings are:
 | `LocalAI:Endpoint` | `http://localhost:8081` | Native LocalAI server used by the autonomous LocalAI extension and Aspire. Port 8081 avoids the llama.cpp default on 8080. |
 | `LocalAI:ApiKey` | unset | Optional LocalAI Bearer key. Supply it through environment or secret-backed host configuration; never commit it. |
 | `Foundry:Enabled` | `false` | AppHost-only opt-in to start the Foundry AEP extension; each Model Provider supplies endpoints and authentication through AEP Value Bindings. |
-| `Crawl4AI:Enabled` | `false` | AppHost-only opt-in to start the Crawl4AI web-acquisition AEP extension. It also requires an endpoint and at least one explicitly allowed domain. |
+| `Crawl4AI:Enabled` | `false` | AppHost-only opt-in to start the Crawl4AI web-acquisition AEP extension and, by default, its managed container. At least one explicitly allowed domain is required. |
+| `Crawl4AI:Provisioning` | `Managed` | `Managed` starts the pinned Crawl4AI container through Aspire; `External` connects the extension to `Crawl4AI:Endpoint`. |
+| `Crawl4AI:Image` | `unclecode/crawl4ai` | Managed-provisioning container image. |
+| `Crawl4AI:ImageTag` | `0.9.4` | Explicit managed-provisioning image tag; `latest` is not used. |
+| `Crawl4AI:Endpoint` | `http://localhost:11235` | Crawl4AI service URL used only with external provisioning. |
+| `Crawl4AI:ApiTokenFile` | unset | Optional protected API-token file used only with external provisioning; managed provisioning creates and shares its own file. |
 | `OLLAMA_IMAGE` | `ollama/ollama:0.33.2` | Compose-only Ollama image override. |
 | `LLAMA_CPP_IMAGE` | `ghcr.io/ggml-org/llama.cpp:server-b10830` | Compose-only llama.cpp image override. |
 | `LLAMA_CPP_MODELS_PATH` | `./.models/llama-cpp` | Compose-only host directory containing GGUF models. |

@@ -4,16 +4,29 @@ Agentstration provides an optional AEP extension that exposes a self-hosted Craw
 
 ## Requirements and activation
 
-Run [Crawl4AI](https://github.com/unclecode/crawl4ai) 0.9.0 or newer and enable its API authentication. This baseline retains Crawl4AI's [secure request boundary and SSRF protections](https://docs.crawl4ai.com/core/security/). Configure the token in a protected file readable by the extension process. For Aspire development, enable the extension and provide at least one allowed domain:
+Run [Crawl4AI](https://github.com/unclecode/crawl4ai) 0.9.0 or newer and enable its API authentication. This baseline retains Crawl4AI's [secure request boundary and SSRF protections](https://docs.crawl4ai.com/core/security/).
+
+Aspire uses managed provisioning by default when the extension is enabled. It starts the pinned Crawl4AI container, creates a worktree-local protected token file, mounts that file read-only into the container, passes the same file to the AEP extension, and waits for Crawl4AI readiness before starting the extension:
 
 ```text
 Crawl4AI__Enabled=true
-Crawl4AI__Endpoint=http://localhost:11235
+Crawl4AI__Provisioning=Managed
+Crawl4AI__AllowedDomains__0=docs.example.com
+```
+
+The managed image defaults to `unclecode/crawl4ai:0.9.4`; `Crawl4AI:Image` and `Crawl4AI:ImageTag` allow an explicit operator override. The container is not created while `Enabled` is false, so Docker remains optional for the default topology.
+
+Use external provisioning when Crawl4AI is administered independently. The endpoint is then required, and an optional protected token file can be supplied to the extension:
+
+```text
+Crawl4AI__Enabled=true
+Crawl4AI__Provisioning=External
+Crawl4AI__Endpoint=https://crawler.example.net
 Crawl4AI__ApiTokenFile=C:\protected\crawl4ai.token
 Crawl4AI__AllowedDomains__0=docs.example.com
 ```
 
-`Enabled` is consumed by AppHost. The remaining settings are passed to the extension. A manually launched extension uses the same settings without `Enabled`.
+`Enabled` and `Provisioning` are consumed by AppHost. The acquisition limits and destination policy are passed to the extension. A manually launched extension uses the extension settings directly without those two AppHost controls.
 
 The extension sends a minimal `{ "urls": ["…"] }` request to Crawl4AI. Flow or Agent input cannot set browser arguments, execute JavaScript, supply cookies or headers, choose a proxy, or override the configured endpoint.
 
