@@ -24,6 +24,7 @@ The main verified settings are:
 | `Agentstration:Storage:Provider` | `Sqlite` | Relational storage profile: `Sqlite` or `PostgreSql` (case-insensitive). |
 | `Agentstration:RuntimeWorker:Lease:HeartbeatInterval` | `00:00:10` | Renewal cadence and expired-assignment reconciliation interval. Must be at least one second. |
 | `Agentstration:RuntimeWorker:Lease:LeaseDuration` | `00:00:45` | Server-time ownership lease. Must be at least three heartbeat intervals and no more than fifteen minutes. |
+| `Agentstration:RuntimeWorker:Lease:MinimumSideEffectLeaseRemaining` | `00:00:05` | Minimum remaining lease required before Agentstration starts a governed model, Tool, child-Flow or Artifact side effect. |
 | `Agentstration:InstanceId` | persisted `.agentstration/instance-id` value | Optional explicit AppHost worktree identity used to isolate PostgreSQL volumes and persisted passwords. |
 | `ConnectionStrings:Agentstration` | unset | Required main PostgreSQL connection when the storage provider is `PostgreSql`. |
 | `Data:ControlPlanePath` | `.agentstration/control-plane.db` | Management Plane SQLite database. |

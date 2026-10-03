@@ -98,6 +98,53 @@ public sealed partial class SecurityApiTests
             Assert.IsTrue(heartbeatResponse?.Payload.LeaseExpiresAt > claimed.Ownership.LeaseExpiresAt);
             Assert.IsFalse(heartbeatResponse?.Payload.Cancellation.Requested);
 
+            AwpAgentTurnLocation turn;
+            using (var openTurn = await client.SendAsync(SignedJsonRequest(
+                       credential, sessionId, AwpProtocol.OpenTurnPath,
+                       Envelope(new AwpOpenTurnRequest(context, runId, ParticipantId: "agent")))))
+            {
+                Assert.AreEqual(HttpStatusCode.OK, openTurn.StatusCode);
+                var response = await openTurn.Content.ReadFromJsonAsync<AwpEnvelope<AwpOpenTurnResponse>>(AwpProtocol.JsonOptions);
+                turn = response?.Payload.Turn ?? throw new AssertFailedException("Expected an authorized Turn.");
+                Assert.AreEqual(1, turn.Attempt.TurnAttemptNumber);
+            }
+
+            var eventId = new AwpEventId(Guid.NewGuid());
+            var eventBatch = Envelope(new AwpAppendEventsRequest(context,
+            [
+                new(eventId, 1, DateTimeOffset.UtcNow, AwpExecutionEventKind.TurnStarted,
+                    new(runId, AgentTurn: turn))
+            ]));
+            using (var append = await client.SendAsync(SignedJsonRequest(
+                       credential, sessionId, AwpProtocol.AppendEventsPath, eventBatch)))
+            {
+                Assert.AreEqual(HttpStatusCode.OK, append.StatusCode, await append.Content.ReadAsStringAsync());
+                var response = await append.Content.ReadFromJsonAsync<AwpEnvelope<AwpAppendEventsResponse>>(AwpProtocol.JsonOptions);
+                Assert.AreEqual(1, response?.Payload.AcceptedThroughSequence);
+            }
+            using (var replay = await client.SendAsync(SignedJsonRequest(
+                       credential, sessionId, AwpProtocol.AppendEventsPath, eventBatch)))
+            {
+                Assert.AreEqual(HttpStatusCode.OK, replay.StatusCode);
+                var response = await replay.Content.ReadFromJsonAsync<AwpEnvelope<AwpAppendEventsResponse>>(AwpProtocol.JsonOptions);
+                Assert.AreEqual(eventId, response?.Payload.DuplicateEventIds.Single());
+            }
+
+            var checkpointPayload = JsonSerializer.SerializeToElement(new { state = 1 });
+            using (var storeCheckpoint = await client.SendAsync(SignedJsonRequest(
+                       credential, sessionId, AwpProtocol.StoreCheckpointPath,
+                       Envelope(new AwpStoreCheckpointRequest(context, "checkpoint-1", "maf-json-v1",
+                           claimed.ExecutionMaterial.Digest, checkpointPayload)))))
+                Assert.AreEqual(HttpStatusCode.OK, storeCheckpoint.StatusCode);
+            using (var getCheckpoint = await client.SendAsync(SignedJsonRequest(
+                       credential, sessionId, AwpProtocol.GetCheckpointPath,
+                       Envelope(new AwpGetCheckpointRequest(context, "checkpoint-1")))))
+            {
+                Assert.AreEqual(HttpStatusCode.OK, getCheckpoint.StatusCode);
+                var response = await getCheckpoint.Content.ReadFromJsonAsync<AwpEnvelope<AwpCheckpointResponse>>(AwpProtocol.JsonOptions);
+                Assert.AreEqual(1, response?.Payload.Payload.GetProperty("state").GetInt32());
+            }
+
             var forgedContext = context with
             {
                 Scope = context.Scope with { WorkspaceId = Guid.NewGuid().ToString("D") }

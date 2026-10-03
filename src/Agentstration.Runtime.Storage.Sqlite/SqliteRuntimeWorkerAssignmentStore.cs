@@ -83,9 +83,12 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
     public async Task<StoredRuntimeWorkerAssignment> CreateAsync(RuntimeWorkerAssignment assignment, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var runExists = await context.Runs.AnyAsync(value => value.WorkspaceId == assignment.WorkspaceId.Value
-            && value.RunId == assignment.TargetRunId, cancellationToken);
-        if (!runExists) throw new RuntimeRunNotFoundException(assignment.TargetRunId);
+        if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
+        {
+            var runExists = await context.Runs.AnyAsync(value => value.WorkspaceId == assignment.WorkspaceId.Value
+                && value.RunId == assignment.TargetRunId, cancellationToken);
+            if (!runExists) throw new RuntimeRunNotFoundException(assignment.TargetRunId);
+        }
         var etag = NewETag();
         context.WorkerAssignments.Add(ToDocument(assignment, etag, null));
         try { await context.SaveChangesAsync(cancellationToken); }
@@ -149,7 +152,8 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
             Attempts = assignment.Attempts.Append(attempt).ToArray()
         };
         Apply(document, assignment, Convert.ToHexString(ownershipTokenDigest), leaseExpiresAt);
-        await SetRunStateAsync(context, assignment, RuntimeRunState.Running, acquiredAt, null, null, cancellationToken);
+        if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
+            await SetRunStateAsync(context, assignment, RuntimeRunState.Running, acquiredAt, null, null, cancellationToken);
         try
         {
             await context.SaveChangesAsync(cancellationToken);
@@ -195,6 +199,137 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
             assignment.CurrentAttempt!.LeaseExpiresAt - observedAt);
     }
 
+    public async Task<RuntimeAssignmentStepExecution> OpenStepExecutionAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        byte[] ownershipTokenDigest,
+        RuntimeAssignmentStepExecution step,
+        DateTimeOffset observedAt,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, observedAt);
+        var replay = assignment.StepExecutions.SingleOrDefault(value => value.CommandId == step.CommandId);
+        if (replay is not null)
+        {
+            if (replay.FlowRunId != step.FlowRunId || replay.FlowVersion != step.FlowVersion
+                || replay.FlowDefinitionHash != step.FlowDefinitionHash || replay.StepDefinitionId != step.StepDefinitionId)
+                throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.ReplayConflict, "A replayed StepExecution command has different content.");
+            return replay;
+        }
+        if (assignment.StepExecutions.Count >= 10_000)
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.LimitExceeded, "The assignment StepExecution limit was reached.");
+        assignment = assignment with
+        {
+            UpdatedAt = observedAt,
+            StepExecutions = assignment.StepExecutions.Append(step).ToArray()
+        };
+        Apply(document, assignment, document.OwnershipTokenDigest, assignment.CurrentAttempt!.LeaseExpiresAt);
+        await SaveAsync(context, cancellationToken);
+        return step;
+    }
+
+    public async Task<RuntimeAssignmentTurn> OpenTurnAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        byte[] ownershipTokenDigest,
+        RuntimeAssignmentTurn turn,
+        DateTimeOffset observedAt,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, observedAt);
+        var replay = assignment.Turns.SingleOrDefault(value => value.CommandId == turn.CommandId);
+        if (replay is not null)
+        {
+            if (replay.RunId != turn.RunId || replay.StepExecutionId != turn.StepExecutionId
+                || replay.ParticipantId != turn.ParticipantId)
+                throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.ReplayConflict, "A replayed Turn command has different content.");
+            return replay;
+        }
+        ValidateTurn(assignment, turn);
+        if (assignment.Turns.Count >= 10_000)
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.LimitExceeded, "The assignment Turn limit was reached.");
+        assignment = assignment with { UpdatedAt = observedAt, Turns = assignment.Turns.Append(turn).ToArray() };
+        Apply(document, assignment, document.OwnershipTokenDigest, assignment.CurrentAttempt!.LeaseExpiresAt);
+        await SaveAsync(context, cancellationToken);
+        return turn;
+    }
+
+    public async Task<RuntimeAssignmentEventAppendResult> AppendEventsAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        byte[] ownershipTokenDigest,
+        IReadOnlyList<RuntimeAssignmentExecutionEvent> events,
+        DateTimeOffset observedAt,
+        CancellationToken cancellationToken)
+    {
+        if (events.Count is < 1 or > 256)
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.LimitExceeded, "An event batch must contain between 1 and 256 events.");
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, observedAt);
+        var accepted = assignment.ExecutionEvents.ToList();
+        var duplicates = new List<Guid>();
+        var nextSequence = accepted.Count == 0 ? 1 : checked(accepted[^1].AttemptEventSequence + 1);
+        foreach (var executionEvent in events)
+        {
+            var existing = accepted.FirstOrDefault(value => value.EventId == executionEvent.EventId);
+            if (existing is not null)
+            {
+                if (!Equivalent(existing, executionEvent))
+                    throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.ReplayConflict, "A replayed EventId has different content.");
+                duplicates.Add(executionEvent.EventId);
+                continue;
+            }
+            if (executionEvent.AttemptEventSequence != nextSequence)
+                throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.InvalidEventSequence, $"Expected attempt event sequence {nextSequence}.");
+            ValidateEventCoordinates(assignment, executionEvent);
+            accepted.Add(executionEvent);
+            nextSequence++;
+        }
+        if (accepted.Count > 10_000)
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.LimitExceeded, "The assignment event limit was reached.");
+        assignment = assignment with { UpdatedAt = observedAt, ExecutionEvents = accepted };
+        Apply(document, assignment, document.OwnershipTokenDigest, assignment.CurrentAttempt!.LeaseExpiresAt);
+        await SaveAsync(context, cancellationToken);
+        return new RuntimeAssignmentEventAppendResult(nextSequence - 1, duplicates);
+    }
+
+    public async Task StoreCheckpointAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        byte[] ownershipTokenDigest,
+        RuntimeAssignmentCheckpoint checkpoint,
+        DateTimeOffset observedAt,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, observedAt);
+        var existing = assignment.Checkpoints.SingleOrDefault(value => value.CheckpointId == checkpoint.CheckpointId);
+        if (existing is not null && (!string.Equals(existing.SchemaVersion, checkpoint.SchemaVersion, StringComparison.Ordinal)
+            || !string.Equals(existing.CompatibilityKey, checkpoint.CompatibilityKey, StringComparison.Ordinal)))
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.ReplayConflict, "A checkpoint cannot be replaced with a different schema or compatibility key.");
+        var checkpoints = assignment.Checkpoints.Where(value => value.CheckpointId != checkpoint.CheckpointId).Append(checkpoint).ToArray();
+        if (checkpoints.Length > 100)
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.LimitExceeded, "The assignment checkpoint limit was reached.");
+        assignment = assignment with { UpdatedAt = observedAt, Checkpoints = checkpoints };
+        Apply(document, assignment, document.OwnershipTokenDigest, assignment.CurrentAttempt!.LeaseExpiresAt);
+        await SaveAsync(context, cancellationToken);
+    }
+
+    public async Task<RuntimeAssignmentCheckpoint?> GetCheckpointAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        byte[] ownershipTokenDigest,
+        string checkpointId,
+        DateTimeOffset observedAt,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, observedAt);
+        return assignment.Checkpoints.SingleOrDefault(value => value.CheckpointId == checkpointId);
+    }
+
     public async Task<StoredRuntimeWorkerAssignment> RequestCancellationAsync(
         WorkspaceId workspaceId,
         RuntimeAssignmentId assignmentId,
@@ -211,7 +346,8 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         if (assignment.State == RuntimeAssignmentState.Pending)
             assignment = assignment with { State = RuntimeAssignmentState.Cancelled };
         Apply(document, assignment, document.OwnershipTokenDigest, assignment.CurrentAttempt?.LeaseExpiresAt);
-        await SetRunStateAsync(context, assignment, RuntimeRunState.Cancelled, requestedAt, null, "Cancelled by the caller.", cancellationToken);
+        if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
+            await SetRunStateAsync(context, assignment, RuntimeRunState.Cancelled, requestedAt, null, "Cancelled by the caller.", cancellationToken);
         await SaveAsync(context, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Deserialize(document);
@@ -236,8 +372,10 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         if (existing.State is RuntimeAssignmentState.Succeeded or RuntimeAssignmentState.Failed or RuntimeAssignmentState.Cancelled)
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.TerminalConflict, "The assignment already has a different terminal outcome.");
         var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, completedAt);
-        var run = await RequiredRunAsync(context, assignment, cancellationToken);
-        var cancelled = assignment.CancellationRequestedAt is not null || run.State == nameof(RuntimeRunState.Cancelled);
+        var run = assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun
+            ? await RequiredRunAsync(context, assignment, cancellationToken)
+            : null;
+        var cancelled = assignment.CancellationRequestedAt is not null || run?.State == nameof(RuntimeRunState.Cancelled);
         var assignmentState = cancelled ? RuntimeAssignmentState.Cancelled : command.Outcome == RuntimeAssignmentTerminalOutcome.Succeeded
             ? RuntimeAssignmentState.Succeeded : RuntimeAssignmentState.Failed;
         var attemptState = cancelled ? RuntimeAssignmentAttemptState.Interrupted : command.Outcome == RuntimeAssignmentTerminalOutcome.Succeeded
@@ -257,13 +395,16 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         };
         Apply(document, assignment, document.OwnershipTokenDigest, null);
         var runState = ToRunState(assignmentState);
-        await SetRunStateAsync(context, assignment, runState, completedAt,
-            cancelled ? null : command.Response,
-            cancelled ? "Cancelled by the caller." : command.Error,
-            cancellationToken,
-            cancelled ? null : command.ErrorCode);
-        await AppendTerminalEventAsync(context, assignment, command.EventId, runState, completedAt,
-            cancelled ? "Run cancelled" : command.Error ?? "Run completed", cancellationToken);
+        if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
+        {
+            await SetRunStateAsync(context, assignment, runState, completedAt,
+                cancelled ? null : command.Response,
+                cancelled ? "Cancelled by the caller." : command.Error,
+                cancellationToken,
+                cancelled ? null : command.ErrorCode);
+            await AppendTerminalEventAsync(context, assignment, command.EventId, runState, completedAt,
+                cancelled ? "Run cancelled" : command.Error ?? "Run completed", cancellationToken);
+        }
         await SaveAsync(context, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new RuntimeAssignmentTerminalResult(assignment, runState, false);
@@ -299,11 +440,14 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
             };
             Apply(document, assignment, null, null);
             var runState = cancelled ? RuntimeRunState.Cancelled : RuntimeRunState.Failed;
-            await SetRunStateAsync(context, assignment, runState, observedAt, null,
-                cancelled ? "Cancelled by the caller." : "The Runtime Worker lease expired.", cancellationToken,
-                cancelled ? null : "worker_lost");
-            await AppendTerminalEventAsync(context, assignment, Guid.NewGuid(), runState, observedAt,
-                cancelled ? "Run cancelled after Worker loss" : "Runtime Worker lost", cancellationToken);
+            if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
+            {
+                await SetRunStateAsync(context, assignment, runState, observedAt, null,
+                    cancelled ? "Cancelled by the caller." : "The Runtime Worker lease expired.", cancellationToken,
+                    cancelled ? null : "worker_lost");
+                await AppendTerminalEventAsync(context, assignment, Guid.NewGuid(), runState, observedAt,
+                    cancelled ? "Run cancelled after Worker loss" : "Runtime Worker lost", cancellationToken);
+            }
             results.Add(new RuntimeAssignmentTerminalResult(assignment, runState, false));
         }
         await SaveAsync(context, cancellationToken);
@@ -345,11 +489,14 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
             };
             Apply(document, assignment, null, null);
             var runState = cancelled ? RuntimeRunState.Cancelled : RuntimeRunState.Failed;
-            await SetRunStateAsync(context, assignment, runState, observedAt, null,
-                cancelled ? "Cancelled by the caller." : "The Runtime Worker session was superseded.", cancellationToken,
-                cancelled ? null : "worker_lost");
-            await AppendTerminalEventAsync(context, assignment, Guid.NewGuid(), runState, observedAt,
-                cancelled ? "Run cancelled after Worker session replacement" : "Runtime Worker session superseded", cancellationToken);
+            if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
+            {
+                await SetRunStateAsync(context, assignment, runState, observedAt, null,
+                    cancelled ? "Cancelled by the caller." : "The Runtime Worker session was superseded.", cancellationToken,
+                    cancelled ? null : "worker_lost");
+                await AppendTerminalEventAsync(context, assignment, Guid.NewGuid(), runState, observedAt,
+                    cancelled ? "Run cancelled after Worker session replacement" : "Runtime Worker session superseded", cancellationToken);
+            }
             results.Add(new RuntimeAssignmentTerminalResult(assignment, runState, false));
         }
         await SaveAsync(context, cancellationToken);
@@ -377,6 +524,46 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.NotOwned, "The ownership token is invalid.");
         return assignment;
     }
+
+    private static void ValidateTurn(RuntimeWorkerAssignment assignment, RuntimeAssignmentTurn turn)
+    {
+        if (turn.AttemptNumber != 1 || turn.AttemptId == Guid.Empty || turn.Id == Guid.Empty
+            || !string.Equals(turn.RunId, assignment.TargetRunId, StringComparison.Ordinal))
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.InvalidCoordinate, "The Turn coordinate is invalid for this assignment.");
+        if (turn.StepExecutionId is { } stepId && assignment.StepExecutions.All(value => value.Id != stepId))
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.InvalidCoordinate, "The Turn references an unknown StepExecution.");
+    }
+
+    private static void ValidateEventCoordinates(RuntimeWorkerAssignment assignment, RuntimeAssignmentExecutionEvent executionEvent)
+    {
+        if (executionEvent.EventId == Guid.Empty || executionEvent.AttemptEventSequence < 1
+            || !string.Equals(executionEvent.RunId, assignment.TargetRunId, StringComparison.Ordinal))
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.InvalidCoordinate, "The execution event identity is invalid.");
+        if (executionEvent.StepExecutionId is { } stepId && assignment.StepExecutions.All(value => value.Id != stepId))
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.InvalidCoordinate, "The event references an unknown StepExecution.");
+        if (executionEvent.TurnId is not { } turnId) return;
+        var turn = assignment.Turns.SingleOrDefault(value => value.Id == turnId)
+            ?? throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.InvalidCoordinate, "The event references an unknown Turn.");
+        if (executionEvent.TurnAttemptId != turn.AttemptId)
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.InvalidCoordinate, "The event references an unknown TurnAttempt.");
+        if (executionEvent.StepExecutionId != turn.StepExecutionId)
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.InvalidCoordinate, "The event Turn and StepExecution do not belong to the same coordinate.");
+    }
+
+    private static bool Equivalent(RuntimeAssignmentExecutionEvent left, RuntimeAssignmentExecutionEvent right) =>
+        left.EventId == right.EventId
+        && left.AttemptEventSequence == right.AttemptEventSequence
+        && left.OccurredAt == right.OccurredAt
+        && string.Equals(left.Kind, right.Kind, StringComparison.Ordinal)
+        && string.Equals(left.RunId, right.RunId, StringComparison.Ordinal)
+        && left.StepExecutionId == right.StepExecutionId
+        && left.TurnId == right.TurnId
+        && left.TurnAttemptId == right.TurnAttemptId
+        && left.ToolCallId == right.ToolCallId
+        && NullableJsonEquals(left.Payload, right.Payload);
+
+    private static bool NullableJsonEquals(JsonElement? left, JsonElement? right) =>
+        left.HasValue == right.HasValue && (!left.HasValue || JsonElement.DeepEquals(left.Value, right!.Value));
 
     private static void ValidateTerminalReplay(
         RuntimeWorkerAssignmentDocument document,

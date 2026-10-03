@@ -38,6 +38,7 @@ public sealed record AwpExecutionLocation(
     AwpFlowStepLocation? FlowStep = null,
     AwpAgentTurnLocation? AgentTurn = null);
 
+[JsonConverter(typeof(AwpCamelCaseEnumConverter<AwpExecutionEventKind>))]
 public enum AwpExecutionEventKind
 {
     AssignmentStarted,
@@ -94,6 +95,7 @@ public sealed record AwpOpenTurnResponse(
     DateTimeOffset ServerTime,
     AwpAgentTurnLocation Turn);
 
+[JsonConverter(typeof(AwpCamelCaseEnumConverter<AwpExecutionFailureKind>))]
 public enum AwpExecutionFailureKind
 {
     Execution,
@@ -118,6 +120,7 @@ public sealed record AwpFailAssignmentRequest(
     AwpEventId CommandId,
     AwpExecutionFailure Failure);
 
+[JsonConverter(typeof(AwpCamelCaseEnumConverter<AwpTerminalState>))]
 public enum AwpTerminalState
 {
     Succeeded,
@@ -129,3 +132,7 @@ public sealed record AwpTerminalResponse(
     DateTimeOffset ServerTime,
     AwpTerminalState State,
     long LastEventSequence);
+
+public sealed class AwpCamelCaseEnumConverter<TEnum>()
+    : JsonStringEnumConverter<TEnum>(JsonNamingPolicy.CamelCase, allowIntegerValues: false)
+    where TEnum : struct, Enum;

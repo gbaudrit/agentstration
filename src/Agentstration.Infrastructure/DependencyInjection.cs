@@ -329,6 +329,9 @@ public static class DependencyInjection
         services.TryAddSingleton(runtimeWorkerDispatchOptions ?? new RuntimeWorkerDispatchOptions());
         services.AddSingleton<RuntimeAssignmentAvailabilitySignal>();
         services.AddSingleton<RuntimeWorkerAssignmentService>();
+        services.AddSingleton<IRuntimeExecutionMaterialResolver, RuntimeExecutionMaterialResolver>();
+        services.AddSingleton<RuntimeWorkerExecutionService>();
+        services.AddSingleton<IRuntimeWorkerOperationGateway, RuntimeWorkerOperationGateway>();
         services.AddSingleton<RuntimeWorkerDispatchService>();
         services.TryAddSingleton(new ToolExecutionCaptureOptions());
         services.AddSingleton<IToolExecutionEventSink, RuntimeToolExecutionEventSink>();

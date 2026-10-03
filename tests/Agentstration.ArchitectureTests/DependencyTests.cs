@@ -1336,6 +1336,29 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void AwpContractsDoNotReferenceServerRuntimeStorageOrMicrosoftAgentFramework()
+    {
+        var references = typeof(Agentstration.Awp.Abstractions.AwpProtocol).Assembly
+            .GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .ToArray();
+        var forbidden = new[]
+        {
+            "Agentstration.Infrastructure",
+            "Agentstration.Runtime",
+            "Agentstration.Flows",
+            "Agentstration.ResourceManagement",
+            "Storage.Sqlite",
+            "Storage.PostgreSql",
+            "EntityFrameworkCore",
+            "Microsoft.Agents.AI"
+        };
+
+        Assert.IsFalse(references.Any(reference =>
+            forbidden.Any(value => reference!.Contains(value, StringComparison.Ordinal))));
+    }
+
+    [TestMethod]
     public void AspireDoesNotOverrideTheManagedAiProvider()
     {
         var repositoryRoot = FindRepositoryRoot();

@@ -166,6 +166,64 @@ public sealed class AwpContractTests
     }
 
     [TestMethod]
+    public void ExecutionMaterialIsTypedPinnedAndContainsNoBackendLocation()
+    {
+        AwpExecutionMaterial material = new AwpDirectAgentExecutionMaterial(
+            "material-1", "1.0", "sha256:material", "runtime-run-1",
+            [new("User", "hello")], null,
+            new(120, "Automatic", false, new Dictionary<string, JsonElement>()),
+            new("agent:1", "agent", Guid.Parse("80000000-0000-0000-0000-000000000001"), "assistant", 4,
+                "revision-4", "sha256:agent", "MicrosoftAgentFramework", "Assistant", "Description",
+                "Instructions", "default", "default", []));
+
+        var json = JsonSerializer.Serialize(material, AwpProtocol.JsonOptions);
+        var actual = JsonSerializer.Deserialize<AwpExecutionMaterial>(json, AwpProtocol.JsonOptions);
+
+        Assert.IsInstanceOfType<AwpDirectAgentExecutionMaterial>(actual);
+        Assert.AreEqual("sha256:material", actual.Digest);
+        Assert.DoesNotContain("path", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("credential", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [TestMethod]
+    public void CheckpointCarriesExplicitSchemaAndMaterialCompatibilityKey()
+    {
+        var request = new AwpStoreCheckpointRequest(CreateCommandContext(), "checkpoint-1", "maf-json-v1",
+            "sha256:material", JsonSerializer.SerializeToElement(new { state = 1 }));
+
+        var json = JsonSerializer.Serialize(request, AwpProtocol.JsonOptions);
+        var actual = JsonSerializer.Deserialize<AwpStoreCheckpointRequest>(json, AwpProtocol.JsonOptions)!;
+
+        Assert.AreEqual("checkpoint-1", actual.CheckpointId);
+        Assert.AreEqual("maf-json-v1", actual.SchemaVersion);
+        Assert.AreEqual("sha256:material", actual.CompatibilityKey);
+        Assert.AreEqual(1, actual.Payload.GetProperty("state").GetInt32());
+    }
+
+    [TestMethod]
+    public void GovernedModelMessagesPreserveToolCallAndResultContent()
+    {
+        var request = new AwpInvokeModelRequest(
+            CreateCommandContext(),
+            "agent",
+            new(Guid.Parse("40000000-0000-0000-0000-000000000001")),
+            new(Guid.Parse("50000000-0000-0000-0000-000000000001")),
+            [
+                new("assistant", [new AwpModelToolCallContent("provider-call-1", "weather",
+                    JsonSerializer.SerializeToElement(new { city = "Paris" }))]),
+                new("tool", [new AwpModelToolResultContent("provider-call-1",
+                    JsonSerializer.SerializeToElement(new { temperature = 21 }))])
+            ]);
+
+        var json = JsonSerializer.Serialize(request, AwpProtocol.JsonOptions);
+        var actual = JsonSerializer.Deserialize<AwpInvokeModelRequest>(json, AwpProtocol.JsonOptions)!;
+
+        Assert.IsInstanceOfType<AwpModelToolCallContent>(actual.Messages[0].Contents.Single());
+        Assert.IsInstanceOfType<AwpModelToolResultContent>(actual.Messages[1].Contents.Single());
+    }
+
+    [TestMethod]
     public void StableErrorCodesAreUniqueLowerSnakeCaseValues()
     {
         var values = typeof(AwpErrorCodes).GetFields()

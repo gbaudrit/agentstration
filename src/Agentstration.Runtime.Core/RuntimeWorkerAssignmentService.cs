@@ -10,6 +10,7 @@ public sealed record RuntimeWorkerLeaseOptions
 
     public TimeSpan HeartbeatInterval { get; init; } = TimeSpan.FromSeconds(10);
     public TimeSpan LeaseDuration { get; init; } = TimeSpan.FromSeconds(45);
+    public TimeSpan MinimumSideEffectLeaseRemaining { get; init; } = TimeSpan.FromSeconds(5);
 
     public void Validate()
     {
@@ -19,6 +20,9 @@ public sealed record RuntimeWorkerLeaseOptions
             throw new InvalidOperationException("The Runtime Worker lease duration must be at least three heartbeat intervals.");
         if (LeaseDuration > TimeSpan.FromMinutes(15))
             throw new InvalidOperationException("The Runtime Worker lease duration cannot exceed fifteen minutes.");
+        if (MinimumSideEffectLeaseRemaining < TimeSpan.FromSeconds(1)
+            || MinimumSideEffectLeaseRemaining >= LeaseDuration)
+            throw new InvalidOperationException("The side-effect lease safety margin must be at least one second and shorter than the lease duration.");
     }
 }
 
@@ -43,6 +47,20 @@ public sealed class RuntimeWorkerAssignmentService(
         string executionMaterialId,
         string executionMaterialDigest,
         CancellationToken cancellationToken)
+        => CreateAsync(workspaceId, Guid.Empty, RuntimeAssignmentTargetKind.RuntimeRun, runId, runtimeCapability,
+            runtimeCapabilityVersion, executionMaterialVersion, executionMaterialId, executionMaterialDigest, cancellationToken);
+
+    public Task<StoredRuntimeWorkerAssignment> CreateAsync(
+        WorkspaceId workspaceId,
+        Guid tenantId,
+        RuntimeAssignmentTargetKind targetKind,
+        string runId,
+        string runtimeCapability,
+        string runtimeCapabilityVersion,
+        string executionMaterialVersion,
+        string executionMaterialId,
+        string executionMaterialDigest,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(runId);
         ArgumentException.ThrowIfNullOrWhiteSpace(runtimeCapability);
@@ -50,11 +68,15 @@ public sealed class RuntimeWorkerAssignmentService(
         ArgumentException.ThrowIfNullOrWhiteSpace(executionMaterialVersion);
         ArgumentException.ThrowIfNullOrWhiteSpace(executionMaterialId);
         ArgumentException.ThrowIfNullOrWhiteSpace(executionMaterialDigest);
+        if (targetKind == RuntimeAssignmentTargetKind.FlowRun && tenantId == Guid.Empty)
+            throw new ArgumentException("A Flow assignment requires its Tenant identity.", nameof(tenantId));
         var now = timeProvider.GetUtcNow();
         return CreateAndSignalAsync(new RuntimeWorkerAssignment
         {
             WorkspaceId = workspaceId,
+            TenantId = tenantId,
             Id = new RuntimeAssignmentId(Guid.NewGuid()),
+            TargetKind = targetKind,
             TargetRunId = runId,
             RuntimeCapability = runtimeCapability,
             RuntimeCapabilityVersion = runtimeCapabilityVersion,
@@ -123,6 +145,127 @@ public sealed class RuntimeWorkerAssignmentService(
         RuntimeAssignmentOwnershipProof proof,
         CancellationToken cancellationToken) =>
         assignments.ValidateOwnershipAsync(proof, Digest(proof.OwnershipToken), timeProvider.GetUtcNow(), cancellationToken);
+
+    public Task<RuntimeAssignmentStepExecution> OpenStepExecutionAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        string flowRunId,
+        string flowVersion,
+        string flowDefinitionHash,
+        string stepDefinitionId,
+        string stepName,
+        string stepType,
+        int definitionPosition,
+        CancellationToken cancellationToken) => OpenStepExecutionAsync(proof, Guid.NewGuid(), flowRunId, flowVersion,
+            flowDefinitionHash, stepDefinitionId, stepName, stepType, definitionPosition, cancellationToken);
+
+    public Task<RuntimeAssignmentStepExecution> OpenStepExecutionAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        Guid commandId,
+        string flowRunId,
+        string flowVersion,
+        string flowDefinitionHash,
+        string stepDefinitionId,
+        string stepName,
+        string stepType,
+        int definitionPosition,
+        CancellationToken cancellationToken)
+    {
+        if (commandId == Guid.Empty) throw new ArgumentException("The command identity must not be empty.", nameof(commandId));
+        ArgumentException.ThrowIfNullOrWhiteSpace(flowRunId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(flowVersion);
+        ArgumentException.ThrowIfNullOrWhiteSpace(flowDefinitionHash);
+        ArgumentException.ThrowIfNullOrWhiteSpace(stepDefinitionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(stepName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(stepType);
+        ArgumentOutOfRangeException.ThrowIfNegative(definitionPosition);
+        var now = timeProvider.GetUtcNow();
+        return assignments.OpenStepExecutionAsync(proof, Digest(proof.OwnershipToken), new RuntimeAssignmentStepExecution
+        {
+            CommandId = commandId,
+            Id = Guid.NewGuid(),
+            FlowRunId = flowRunId,
+            FlowVersion = flowVersion,
+            FlowDefinitionHash = flowDefinitionHash,
+            StepDefinitionId = stepDefinitionId,
+            StepName = stepName,
+            StepType = stepType,
+            DefinitionPosition = definitionPosition,
+            OpenedAt = now
+        }, now, cancellationToken);
+    }
+
+    public Task<RuntimeAssignmentTurn> OpenTurnAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        string runId,
+        Guid? stepExecutionId,
+        string? participantId,
+        CancellationToken cancellationToken) => OpenTurnAsync(proof, Guid.NewGuid(), runId, stepExecutionId, participantId, cancellationToken);
+
+    public Task<RuntimeAssignmentTurn> OpenTurnAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        Guid commandId,
+        string runId,
+        Guid? stepExecutionId,
+        string? participantId,
+        CancellationToken cancellationToken)
+    {
+        if (commandId == Guid.Empty) throw new ArgumentException("The command identity must not be empty.", nameof(commandId));
+        ArgumentException.ThrowIfNullOrWhiteSpace(runId);
+        var now = timeProvider.GetUtcNow();
+        return assignments.OpenTurnAsync(proof, Digest(proof.OwnershipToken), new RuntimeAssignmentTurn
+        {
+            CommandId = commandId,
+            Id = Guid.NewGuid(),
+            AttemptId = Guid.NewGuid(),
+            AttemptNumber = 1,
+            RunId = runId,
+            StepExecutionId = stepExecutionId,
+            ParticipantId = participantId,
+            OpenedAt = now
+        }, now, cancellationToken);
+    }
+
+    public Task<RuntimeAssignmentEventAppendResult> AppendEventsAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        IReadOnlyList<RuntimeAssignmentExecutionEvent> events,
+        CancellationToken cancellationToken)
+    {
+        if (events.Any(value => string.IsNullOrWhiteSpace(value.Kind) || value.Kind.Length > 128
+            || value.Payload?.GetRawText().Length > 65_536))
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.LimitExceeded,
+                "Event kinds are limited to 128 characters and individual payloads to 64 KiB.");
+        return assignments.AppendEventsAsync(proof, Digest(proof.OwnershipToken), events,
+            timeProvider.GetUtcNow(), cancellationToken);
+    }
+
+    public Task StoreCheckpointAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        string checkpointId,
+        string schemaVersion,
+        string compatibilityKey,
+        System.Text.Json.JsonElement payload,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(checkpointId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(schemaVersion);
+        ArgumentException.ThrowIfNullOrWhiteSpace(compatibilityKey);
+        if (payload.GetRawText().Length > 1_048_576)
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.LimitExceeded,
+                "A checkpoint payload cannot exceed 1 MiB.");
+        var now = timeProvider.GetUtcNow();
+        return assignments.StoreCheckpointAsync(proof, Digest(proof.OwnershipToken),
+            new RuntimeAssignmentCheckpoint(checkpointId, schemaVersion, compatibilityKey, payload.Clone(), now), now, cancellationToken);
+    }
+
+    public Task<RuntimeAssignmentCheckpoint?> GetCheckpointAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        string checkpointId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(checkpointId);
+        return assignments.GetCheckpointAsync(proof, Digest(proof.OwnershipToken), checkpointId,
+            timeProvider.GetUtcNow(), cancellationToken);
+    }
 
     public Task<StoredRuntimeWorkerAssignment> RequestCancellationAsync(
         WorkspaceId workspaceId,
