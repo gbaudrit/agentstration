@@ -424,6 +424,10 @@ public sealed class WorkspacePackResourceCatalog(
             {
                 yield return IncludeDependency(flowCall.Flow.ResourceId, flowCall.Flow.Namespace ?? flow.Id.Namespace, FlowResourceKinds.Flow, "graphFlow");
             }
+            else if (step is RepeatFlowStepDefinition repeat)
+            {
+                yield return IncludeDependency(repeat.Flow.ResourceId, repeat.Flow.Namespace ?? flow.Id.Namespace, FlowResourceKinds.Flow, "graphRepeatFlow");
+            }
             else if (step is ToolFlowStepDefinition tool)
             {
                 yield return UnsupportedDependency(

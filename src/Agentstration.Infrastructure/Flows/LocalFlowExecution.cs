@@ -295,14 +295,21 @@ public sealed class ManagementFlowResourceReferenceResolver(
             if (!visited.Add(current)) continue;
             var published = await flows.GetVersionAsync(workspaceId, current.Id, current.Version, cancellationToken);
             if (published?.Value.Graph is null) continue;
-            foreach (var call in published.Value.Graph.Steps.OfType<FlowCallStepDefinition>())
+            foreach (var reference in published.Value.Graph.Steps.Select(FlowReference).Where(reference => reference is not null))
             {
-                var resolved = await ResolveFlowAsync(workspaceId, current.Id.Namespace, call.Flow, cancellationToken);
+                var resolved = await ResolveFlowAsync(workspaceId, current.Id.Namespace, reference!, cancellationToken);
                 if (resolved is not null) pending.Enqueue((resolved.FlowId, resolved.Version));
             }
         }
         return false;
     }
+
+    private static FlowCallReference? FlowReference(FlowStepDefinition step) => step switch
+    {
+        FlowCallStepDefinition call => call.Flow,
+        RepeatFlowStepDefinition repeat => repeat.Flow,
+        _ => null
+    };
 }
 
 public sealed class ManagementFlowToolSetResolver(ToolSetService toolSets) : IFlowToolSetResolver

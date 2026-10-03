@@ -57,6 +57,8 @@ public sealed record FlowStepRun
     public FlowStepRunUsage? Usage { get; init; }
     public FlowRunError? Error { get; init; }
     public string? ChildFlowRunId { get; init; }
+    public IReadOnlyList<string> ChildFlowRunIds { get; init; } = [];
+    public int? RepeatIteration { get; init; }
     public FlowToolRouteResolution? ToolRoute { get; init; }
 }
 
