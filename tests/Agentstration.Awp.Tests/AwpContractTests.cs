@@ -159,6 +159,7 @@ public sealed class AwpContractTests
         var actualCompletion = JsonSerializer.Deserialize<AwpCompleteAssignmentRequest>(completionJson, AwpProtocol.JsonOptions)!;
 
         Assert.AreEqual(context, actualHeartbeat.Context);
+        Assert.AreEqual(context.Scope, actualHeartbeat.Context.Scope);
         Assert.AreEqual(12, actualHeartbeat.LastEventSequence);
         Assert.AreEqual(context.AssignmentId, actualCompletion.Context.AssignmentId);
         Assert.AreEqual("done", actualCompletion.Output!.Value.GetProperty("result").GetString());
@@ -223,6 +224,7 @@ public sealed class AwpContractTests
     private static AwpAssignmentCommandContext CreateCommandContext() => new(
         new(Guid.Parse("10000000-0000-0000-0000-000000000001")),
         new(Guid.Parse("10000000-0000-0000-0000-000000000002")),
+        new(Guid.Parse("10000000-0000-0000-0000-000000000003"), "20000000-0000-0000-0000-000000000003"),
         new(Guid.Parse("20000000-0000-0000-0000-000000000001")),
         new(Guid.Parse("20000000-0000-0000-0000-000000000002")),
         "opaque-ownership-token",

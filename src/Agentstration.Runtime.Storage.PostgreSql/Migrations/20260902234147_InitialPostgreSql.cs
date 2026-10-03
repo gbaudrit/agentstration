@@ -82,6 +82,8 @@ public partial class InitialPostgreSql : Migration
                 State = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                 FencingGeneration = table.Column<long>(type: "bigint", nullable: false),
                 LeaseExpiresAt = table.Column<long>(type: "bigint", nullable: true),
+                ActiveWorkerId = table.Column<Guid>(type: "uuid", nullable: true),
+                ActiveWorkerSessionId = table.Column<Guid>(type: "uuid", nullable: true),
                 OwnershipTokenDigest = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                 Payload = table.Column<string>(type: "text", nullable: false),
                 ETag = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
@@ -110,6 +112,12 @@ public partial class InitialPostgreSql : Migration
             schema: "runtime",
             table: "RuntimeRuns",
             columns: new[] { "WorkspaceId", "AgentResourceId", "CreatedAt" });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_RuntimeWorkerAssignments_State_ActiveWorkerId_ActiveWorkerSessionId",
+            schema: "runtime",
+            table: "RuntimeWorkerAssignments",
+            columns: new[] { "State", "ActiveWorkerId", "ActiveWorkerSessionId" });
 
         migrationBuilder.CreateIndex(
             name: "IX_RuntimeWorkerAssignments_State_LeaseExpiresAt",

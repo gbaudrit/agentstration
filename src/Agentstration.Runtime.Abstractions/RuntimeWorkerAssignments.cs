@@ -36,6 +36,8 @@ public sealed record RuntimeWorkerAssignment
     public required string RuntimeCapability { get; init; }
     public required string RuntimeCapabilityVersion { get; init; }
     public required string ExecutionMaterialVersion { get; init; }
+    public required string ExecutionMaterialId { get; init; }
+    public required string ExecutionMaterialDigest { get; init; }
     public RuntimeAssignmentState State { get; init; } = RuntimeAssignmentState.Pending;
     public long FencingGeneration { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
@@ -55,6 +57,7 @@ public sealed record RuntimeWorkerClaimRequest
     public required string RuntimeCapability { get; init; }
     public required IReadOnlySet<string> RuntimeCapabilityVersions { get; init; }
     public required IReadOnlySet<string> ExecutionMaterialVersions { get; init; }
+    public required int MaximumConcurrentAssignments { get; init; }
 }
 
 public sealed record RuntimeAssignmentOwnershipProof
@@ -138,6 +141,11 @@ public interface IRuntimeWorkerAssignmentStore
     Task<IReadOnlyList<RuntimeAssignmentTerminalResult>> ExpireLeasesAsync(
         DateTimeOffset observedAt,
         int take,
+        CancellationToken cancellationToken);
+    Task<IReadOnlyList<RuntimeAssignmentTerminalResult>> InterruptSupersededSessionsAsync(
+        RuntimeWorkerId workerId,
+        RuntimeWorkerSessionId activeSessionId,
+        DateTimeOffset observedAt,
         CancellationToken cancellationToken);
 }
 

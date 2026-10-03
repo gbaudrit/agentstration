@@ -128,6 +128,10 @@ internal static class StandaloneHostCompositionExtensions
             .GetSection(RuntimeWorkerLeaseOptions.SectionName)
             .Get<RuntimeWorkerLeaseOptions>() ?? new();
         runtimeWorkerLeaseOptions.Validate();
+        var runtimeWorkerDispatchOptions = builder.Configuration
+            .GetSection(RuntimeWorkerDispatchOptions.SectionName)
+            .Get<RuntimeWorkerDispatchOptions>() ?? new();
+        runtimeWorkerDispatchOptions.Validate();
 
         builder.Services.AddAgentstration(
             dataDirectory,
@@ -140,7 +144,8 @@ internal static class StandaloneHostCompositionExtensions
             enableHostedServices: hostedServicesEnabled,
             sourceVerificationIndexOptions: sourceVerificationIndexOptions,
             sourceRegistryTransportOptions: sourceRegistryTransportOptions,
-            runtimeWorkerLeaseOptions: runtimeWorkerLeaseOptions);
+            runtimeWorkerLeaseOptions: runtimeWorkerLeaseOptions,
+            runtimeWorkerDispatchOptions: runtimeWorkerDispatchOptions);
         builder.Services.AddAgentstrationModelProviders(builder.Configuration, useManagedProfileResolver);
         builder.Services.AddSingleton<ModelProviderManagementService>();
         builder.Services.AddSingleton<ModelDiscoveryService>();

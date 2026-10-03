@@ -179,10 +179,166 @@ public sealed class RuntimeWorkerAssignmentTests
             "microsoft-agent-framework",
             new HashSet<string>(StringComparer.Ordinal) { "2.0" },
             new HashSet<string>(StringComparer.Ordinal) { "1.0" },
+            1,
             default);
 
         Assert.IsNull(incompatible);
         Assert.IsNotNull(await fixture.ClaimAsync(Guid.NewGuid(), Guid.NewGuid()));
+    }
+
+    [TestMethod]
+    public async Task WorkerCapacityIsEnforcedByTheAtomicStoreClaim()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        await fixture.CreateAssignmentAsync();
+        await fixture.CreateAssignmentAsync($"run-{Guid.NewGuid():N}");
+        var workerId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+
+        var claims = await Task.WhenAll(
+            fixture.ClaimAsync(workerId, sessionId, 1),
+            fixture.ClaimAsync(workerId, sessionId, 1));
+
+        Assert.AreEqual(1, claims.Count(value => value is not null));
+        Assert.IsNotNull(await fixture.ClaimAsync(Guid.NewGuid(), Guid.NewGuid(), 1));
+    }
+
+    [TestMethod]
+    public async Task RegisteringReplacementSessionInterruptsFormerOwnership()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        await fixture.CreateAssignmentAsync();
+        var workerId = Guid.NewGuid();
+        var firstSession = Guid.NewGuid();
+        var claim = await fixture.ClaimAsync(workerId, firstSession, 1)
+            ?? throw new AssertFailedException("Expected an assignment claim.");
+
+        var interrupted = await fixture.Service.InterruptSupersededSessionsAsync(
+            new RuntimeWorkerId(workerId), new RuntimeWorkerSessionId(Guid.NewGuid()), default);
+
+        Assert.HasCount(1, interrupted);
+        Assert.AreEqual(RuntimeAssignmentState.Failed, interrupted[0].Assignment.State);
+        Assert.AreEqual(RuntimeAssignmentAttemptState.Interrupted, interrupted[0].Assignment.CurrentAttempt!.State);
+        Assert.AreEqual("worker_lost", interrupted[0].Assignment.CurrentAttempt!.ErrorCode);
+        var exception = await Assert.ThrowsExactlyAsync<RuntimeAssignmentException>(() =>
+            fixture.Service.HeartbeatAsync(claim.Ownership, default));
+        Assert.AreEqual(RuntimeAssignmentErrorCodes.NotOwned, exception.Code);
+    }
+
+    [TestMethod]
+    public async Task ReplacementSessionWakesAndRejectsFormerSessionLongPoll()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        var workerId = new RuntimeWorkerId(Guid.NewGuid());
+        var firstSession = new RuntimeWorkerSessionId(Guid.NewGuid());
+        var replacementSession = new RuntimeWorkerSessionId(Guid.NewGuid());
+        RuntimeWorkerCapabilityRegistration[] capabilities =
+        [
+            new("microsoft-agent-framework", "1.0",
+                new HashSet<string>(StringComparer.Ordinal) { "1.0" }, "test-maf")
+        ];
+        await fixture.Dispatch.RegisterAsync(workerId, firstSession, "test-worker", 1, capabilities, default);
+        var waiting = fixture.Dispatch.ClaimAsync(workerId, firstSession, 1, 5, default);
+        await Task.Delay(25);
+
+        await fixture.Dispatch.RegisterAsync(workerId, replacementSession, "test-worker", 1, capabilities, default);
+
+        var exception = await Assert.ThrowsExactlyAsync<RuntimeWorkerDispatchException>(() => waiting);
+        Assert.AreEqual("worker_session_superseded", exception.Code);
+    }
+
+    [TestMethod]
+    public async Task LongPollRechecksDurableWorkWhenAvailabilitySignalArrives()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        var workerId = new RuntimeWorkerId(Guid.NewGuid());
+        var sessionId = new RuntimeWorkerSessionId(Guid.NewGuid());
+        await fixture.Dispatch.RegisterAsync(workerId, sessionId, "test-worker", 1,
+        [
+            new RuntimeWorkerCapabilityRegistration(
+                "microsoft-agent-framework", "1.0", new HashSet<string>(StringComparer.Ordinal) { "1.0" }, "test-maf")
+        ], default);
+        var waiting = fixture.Dispatch.ClaimAsync(workerId, sessionId, 1, 5, default);
+
+        await Task.Delay(100);
+        await fixture.CreateAssignmentAsync();
+        var claimed = await waiting;
+
+        Assert.IsNotNull(claimed);
+        Assert.AreEqual(fixture.RunId, claimed.Assignment.TargetRunId);
+    }
+
+    [TestMethod]
+    public async Task CompatibleWorkersWithDifferentImplementationsServeTheSameRuntimeFamily()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        await fixture.CreateAssignmentAsync();
+        await fixture.CreateAssignmentAsync($"run-{Guid.NewGuid():N}");
+        var firstWorker = new RuntimeWorkerId(Guid.NewGuid());
+        var firstSession = new RuntimeWorkerSessionId(Guid.NewGuid());
+        var secondWorker = new RuntimeWorkerId(Guid.NewGuid());
+        var secondSession = new RuntimeWorkerSessionId(Guid.NewGuid());
+        await fixture.Dispatch.RegisterAsync(firstWorker, firstSession, "worker-1.0", 1,
+        [
+            new RuntimeWorkerCapabilityRegistration(
+                "microsoft-agent-framework", "1.0", new HashSet<string>(StringComparer.Ordinal) { "1.0" }, "maf-1.0")
+        ], default);
+        await fixture.Dispatch.RegisterAsync(secondWorker, secondSession, "worker-2.0", 1,
+        [
+            new RuntimeWorkerCapabilityRegistration(
+                "microsoft-agent-framework", "1.0", new HashSet<string>(StringComparer.Ordinal) { "1.0" }, "maf-2.0")
+        ], default);
+
+        var claims = await Task.WhenAll(
+            fixture.Dispatch.ClaimAsync(firstWorker, firstSession, 1, 0, default),
+            fixture.Dispatch.ClaimAsync(secondWorker, secondSession, 1, 0, default));
+
+        Assert.IsTrue(claims.All(value => value is not null));
+        Assert.AreEqual(2, claims.Select(value => value!.Assignment.Id).Distinct().Count());
+    }
+
+    [TestMethod]
+    public async Task AvailabilitySignalClosesLostWakeWindowAndCoalescesDuplicatePulses()
+    {
+        var signal = new RuntimeAssignmentAvailabilitySignal();
+        var beforePulses = signal.Capture();
+
+        signal.Pulse();
+        signal.Pulse();
+        await signal.WaitForChangeAsync(beforePulses, TimeSpan.FromSeconds(1), default);
+
+        var afterPulses = signal.Capture();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        var waiting = signal.WaitForChangeAsync(afterPulses, TimeSpan.FromSeconds(1), cancellation.Token);
+        await Task.Delay(25, cancellation.Token);
+        Assert.IsFalse(waiting.IsCompleted, "Previously coalesced wake-ups must not leak into a new wait.");
+        signal.Pulse();
+        await waiting;
+    }
+
+    [TestMethod]
+    public async Task RestartedDispatcherRequiresRegistrationThenFindsPreexistingDurableWork()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        await fixture.CreateAssignmentAsync();
+        var workerId = new RuntimeWorkerId(Guid.NewGuid());
+        var sessionId = new RuntimeWorkerSessionId(Guid.NewGuid());
+        var restarted = new RuntimeWorkerDispatchService(
+            fixture.Service, fixture.Availability, fixture.Clock, new RuntimeWorkerDispatchOptions());
+
+        var exception = await Assert.ThrowsExactlyAsync<RuntimeWorkerDispatchException>(() =>
+            restarted.ClaimAsync(workerId, sessionId, 1, 0, default));
+        Assert.AreEqual("worker_not_registered", exception.Code);
+        await restarted.RegisterAsync(workerId, sessionId, "restarted-worker", 1,
+        [
+            new RuntimeWorkerCapabilityRegistration(
+                "microsoft-agent-framework", "1.0", new HashSet<string>(StringComparer.Ordinal) { "1.0" }, null)
+        ], default);
+
+        var claimed = await restarted.ClaimAsync(workerId, sessionId, 1, 0, default);
+
+        Assert.IsNotNull(claimed);
+        Assert.AreEqual(fixture.RunId, claimed.Assignment.TargetRunId);
     }
 
     private sealed class AssignmentFixture : IAsyncDisposable
@@ -200,12 +356,16 @@ public sealed class RuntimeWorkerAssignmentTests
             Runs = provider.GetRequiredService<IRuntimeRunStore>();
             Assignments = provider.GetRequiredService<IRuntimeWorkerAssignmentStore>();
             Service = provider.GetRequiredService<RuntimeWorkerAssignmentService>();
+            Dispatch = provider.GetRequiredService<RuntimeWorkerDispatchService>();
+            Availability = provider.GetRequiredService<RuntimeAssignmentAvailabilitySignal>();
         }
 
         public MutableTimeProvider Clock { get; }
         public IRuntimeRunStore Runs { get; }
         public IRuntimeWorkerAssignmentStore Assignments { get; }
         public RuntimeWorkerAssignmentService Service { get; }
+        public RuntimeWorkerDispatchService Dispatch { get; }
+        public RuntimeAssignmentAvailabilitySignal Availability { get; }
         public string RunId { get; } = $"run-{Guid.NewGuid():N}";
         public RuntimeAssignmentId AssignmentId { get; private set; }
 
@@ -217,7 +377,10 @@ public sealed class RuntimeWorkerAssignmentTests
             var services = new ServiceCollection();
             services.AddSingleton<TimeProvider>(clock);
             services.AddSingleton(new RuntimeWorkerLeaseOptions());
+            services.AddSingleton(new RuntimeWorkerDispatchOptions());
+            services.AddSingleton<RuntimeAssignmentAvailabilitySignal>();
             services.AddSingleton<RuntimeWorkerAssignmentService>();
+            services.AddSingleton<RuntimeWorkerDispatchService>();
             services.AddSqliteRuntimeRuns($"Data Source={databasePath};Pooling=False");
             var provider = services.BuildServiceProvider();
             var fixture = new AssignmentFixture(provider, clock, databasePath, ownsDatabase);
@@ -226,14 +389,15 @@ public sealed class RuntimeWorkerAssignmentTests
             return fixture;
         }
 
-        public async Task CreateAssignmentAsync()
+        public async Task CreateAssignmentAsync(string? runId = null)
         {
+            runId ??= RunId;
             await Runs.CreateAsync(new RuntimeRun
             {
                 WorkspaceId = Workspace,
                 Scope = new RuntimeRunScope(Guid.NewGuid(), Workspace, Guid.NewGuid()),
-                Id = RunId,
-                Name = RunId,
+                Id = runId,
+                Name = runId,
                 Properties = new RuntimeRunProperties
                 {
                     Agent = new RuntimeAgentReference("agent", 1),
@@ -242,16 +406,18 @@ public sealed class RuntimeWorkerAssignmentTests
                 },
                 Status = new RuntimeRunStatus { State = RuntimeRunState.Pending, CreatedAt = Clock.GetUtcNow() }
             }, default);
-            var assignment = await Service.CreateAsync(Workspace, RunId, "microsoft-agent-framework", "1.0", "1.0", default);
+            var assignment = await Service.CreateAsync(Workspace, runId, "microsoft-agent-framework", "1.0", "1.0",
+                $"material-{runId}", "sha256:test", default);
             AssignmentId = assignment.Value.Id;
         }
 
-        public Task<ClaimedRuntimeWorkerAssignment?> ClaimAsync(Guid workerId, Guid sessionId) => Service.ClaimNextAsync(
+        public Task<ClaimedRuntimeWorkerAssignment?> ClaimAsync(Guid workerId, Guid sessionId, int maximumConcurrentAssignments = 1) => Service.ClaimNextAsync(
             new RuntimeWorkerId(workerId),
             new RuntimeWorkerSessionId(sessionId),
             "microsoft-agent-framework",
             new HashSet<string>(StringComparer.Ordinal) { "1.0" },
             new HashSet<string>(StringComparer.Ordinal) { "1.0" },
+            maximumConcurrentAssignments,
             default);
 
         public async Task<ClaimedRuntimeWorkerAssignment> ClaimRequiredAsync() =>

@@ -154,6 +154,12 @@ namespace Agentstration.Runtime.Storage.PostgreSql.Migrations
                     b.Property<long?>("LeaseExpiresAt")
                         .HasColumnType("bigint");
 
+                    b.Property<Guid?>("ActiveWorkerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActiveWorkerSessionId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("OwnershipTokenDigest")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
@@ -193,6 +199,8 @@ namespace Agentstration.Runtime.Storage.PostgreSql.Migrations
                     b.HasKey("WorkspaceId", "AssignmentId");
 
                     b.HasIndex("State", "LeaseExpiresAt");
+
+                    b.HasIndex("State", "ActiveWorkerId", "ActiveWorkerSessionId");
 
                     b.HasIndex("State", "RuntimeCapability", "CreatedAt");
 

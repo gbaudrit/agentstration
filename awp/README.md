@@ -31,3 +31,7 @@ Assignment
 One Agent StepExecution may contain several Turns. Every opened Turn has an initial TurnAttempt numbered `1`; AWP v1 does not create or accept attempt `2`. AssignmentAttempt is the separate lease/fencing ownership scope and must not be confused with a TurnAttempt.
 
 The ownership token is opaque. Every assignment-scoped command also carries the Worker, Worker session, Assignment, AssignmentAttempt, and fencing generation so the authoritative server can reject expired or superseded ownership.
+
+## Dispatch transport
+
+An authenticated process activates its fresh session, registers capacity and compatibility at `POST /api/awp/v1/workers/register`, then calls `POST /api/awp/v1/assignments/claim`. Claim performs an immediate durable eligibility check before any bounded wait and rechecks after every best-effort wake-up. `POST /api/awp/v1/assignments/heartbeat` renews only the exact assignment, attempt, Worker session, opaque ownership token and fencing generation returned by claim. Assignment command contexts include the Workspace scope required by the authoritative storage boundary.

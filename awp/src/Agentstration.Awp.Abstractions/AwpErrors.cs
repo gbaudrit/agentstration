@@ -8,6 +8,7 @@ public static class AwpErrorCodes
     public const string ProtocolVersionUnsupported = "protocol_version_unsupported";
     public const string RuntimeCapabilityIncompatible = "runtime_capability_incompatible";
     public const string ExecutionMaterialVersionUnsupported = "execution_material_version_unsupported";
+    public const string WorkerNotRegistered = "worker_not_registered";
     public const string WorkerSessionSuperseded = "worker_session_superseded";
     public const string AssignmentNotFound = "assignment_not_found";
     public const string AssignmentNotOwned = "assignment_not_owned";

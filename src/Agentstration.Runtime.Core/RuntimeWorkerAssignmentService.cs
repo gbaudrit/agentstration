@@ -25,7 +25,8 @@ public sealed record RuntimeWorkerLeaseOptions
 public sealed class RuntimeWorkerAssignmentService(
     IRuntimeWorkerAssignmentStore assignments,
     TimeProvider timeProvider,
-    RuntimeWorkerLeaseOptions options)
+    RuntimeWorkerLeaseOptions options,
+    RuntimeAssignmentAvailabilitySignal availability)
 {
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
@@ -39,14 +40,18 @@ public sealed class RuntimeWorkerAssignmentService(
         string runtimeCapability,
         string runtimeCapabilityVersion,
         string executionMaterialVersion,
+        string executionMaterialId,
+        string executionMaterialDigest,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(runId);
         ArgumentException.ThrowIfNullOrWhiteSpace(runtimeCapability);
         ArgumentException.ThrowIfNullOrWhiteSpace(runtimeCapabilityVersion);
         ArgumentException.ThrowIfNullOrWhiteSpace(executionMaterialVersion);
+        ArgumentException.ThrowIfNullOrWhiteSpace(executionMaterialId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(executionMaterialDigest);
         var now = timeProvider.GetUtcNow();
-        return assignments.CreateAsync(new RuntimeWorkerAssignment
+        return CreateAndSignalAsync(new RuntimeWorkerAssignment
         {
             WorkspaceId = workspaceId,
             Id = new RuntimeAssignmentId(Guid.NewGuid()),
@@ -54,6 +59,8 @@ public sealed class RuntimeWorkerAssignmentService(
             RuntimeCapability = runtimeCapability,
             RuntimeCapabilityVersion = runtimeCapabilityVersion,
             ExecutionMaterialVersion = executionMaterialVersion,
+            ExecutionMaterialId = executionMaterialId,
+            ExecutionMaterialDigest = executionMaterialDigest,
             CreatedAt = now,
             UpdatedAt = now
         }, cancellationToken);
@@ -65,6 +72,7 @@ public sealed class RuntimeWorkerAssignmentService(
         string runtimeCapability,
         IReadOnlySet<string> runtimeCapabilityVersions,
         IReadOnlySet<string> executionMaterialVersions,
+        int maximumConcurrentAssignments,
         CancellationToken cancellationToken)
     {
         if (workerId.Value == Guid.Empty || workerSessionId.Value == Guid.Empty)
@@ -72,6 +80,7 @@ public sealed class RuntimeWorkerAssignmentService(
         ArgumentException.ThrowIfNullOrWhiteSpace(runtimeCapability);
         if (runtimeCapabilityVersions.Count == 0 || executionMaterialVersions.Count == 0)
             throw new ArgumentException("At least one Runtime capability and execution-material version is required.");
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumConcurrentAssignments, 1);
 
         var now = timeProvider.GetUtcNow();
         var token = CreateOwnershipToken();
@@ -82,7 +91,8 @@ public sealed class RuntimeWorkerAssignmentService(
             WorkerSessionId = workerSessionId,
             RuntimeCapability = runtimeCapability,
             RuntimeCapabilityVersions = runtimeCapabilityVersions,
-            ExecutionMaterialVersions = executionMaterialVersions
+            ExecutionMaterialVersions = executionMaterialVersions,
+            MaximumConcurrentAssignments = maximumConcurrentAssignments
         };
         var claimed = await assignments.ClaimNextAsync(request, Digest(token), now, now.Add(options.LeaseDuration), cancellationToken);
         if (claimed is null) return null;
@@ -130,6 +140,21 @@ public sealed class RuntimeWorkerAssignmentService(
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
         return assignments.ExpireLeasesAsync(timeProvider.GetUtcNow(), Math.Min(take, 1000), cancellationToken);
+    }
+
+    public Task<IReadOnlyList<RuntimeAssignmentTerminalResult>> InterruptSupersededSessionsAsync(
+        RuntimeWorkerId workerId,
+        RuntimeWorkerSessionId activeSessionId,
+        CancellationToken cancellationToken) =>
+        assignments.InterruptSupersededSessionsAsync(workerId, activeSessionId, timeProvider.GetUtcNow(), cancellationToken);
+
+    private async Task<StoredRuntimeWorkerAssignment> CreateAndSignalAsync(
+        RuntimeWorkerAssignment assignment,
+        CancellationToken cancellationToken)
+    {
+        var stored = await assignments.CreateAsync(assignment, cancellationToken);
+        availability.Pulse();
+        return stored;
     }
 
     private static string CreateOwnershipToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
