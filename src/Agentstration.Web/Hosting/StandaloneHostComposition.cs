@@ -124,6 +124,10 @@ internal static class StandaloneHostCompositionExtensions
         var sourceRegistryTransportOptions = builder.Configuration
             .GetSection(Agentstration.Infrastructure.Sources.SourceRegistryTransportOptions.SectionName)
             .Get<Agentstration.Infrastructure.Sources.SourceRegistryTransportOptions>() ?? new();
+        var runtimeWorkerLeaseOptions = builder.Configuration
+            .GetSection(RuntimeWorkerLeaseOptions.SectionName)
+            .Get<RuntimeWorkerLeaseOptions>() ?? new();
+        runtimeWorkerLeaseOptions.Validate();
 
         builder.Services.AddAgentstration(
             dataDirectory,
@@ -135,7 +139,8 @@ internal static class StandaloneHostCompositionExtensions
             storageOptions,
             enableHostedServices: hostedServicesEnabled,
             sourceVerificationIndexOptions: sourceVerificationIndexOptions,
-            sourceRegistryTransportOptions: sourceRegistryTransportOptions);
+            sourceRegistryTransportOptions: sourceRegistryTransportOptions,
+            runtimeWorkerLeaseOptions: runtimeWorkerLeaseOptions);
         builder.Services.AddAgentstrationModelProviders(builder.Configuration, useManagedProfileResolver);
         builder.Services.AddSingleton<ModelProviderManagementService>();
         builder.Services.AddSingleton<ModelDiscoveryService>();
@@ -184,6 +189,7 @@ internal static class StandaloneHostCompositionExtensions
             builder.Services.AddHostedService<AgentDeploymentReconciliationWorker>();
             builder.Services.AddHostedService<LocalWorkExecutionWorker>();
             builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
+            builder.Services.AddHostedService<RuntimeAssignmentLeaseReaper>();
             builder.Services.AddHostedService<FlowRunExecutionWorker>();
             builder.Services.AddHostedService<FlowRunRecoveryWorker>();
             builder.Services.AddHostedService<SourceRefreshWorker>();

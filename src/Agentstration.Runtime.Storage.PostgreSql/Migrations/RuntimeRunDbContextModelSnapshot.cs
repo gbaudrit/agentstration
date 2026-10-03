@@ -125,6 +125,82 @@ namespace Agentstration.Runtime.Storage.PostgreSql.Migrations
 
                     b.ToTable("RuntimeRunEvents", "runtime");
                 });
+
+            modelBuilder.Entity("Agentstration.Runtime.Storage.PostgreSql.RuntimeWorkerAssignmentDocument", b =>
+                {
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AssignmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ETag")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ExecutionMaterialVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("FencingGeneration")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("LeaseExpiresAt")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("OwnershipTokenDigest")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RuntimeCapability")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("RuntimeCapabilityVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("TargetKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("TargetRunId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("WorkspaceId", "AssignmentId");
+
+                    b.HasIndex("State", "LeaseExpiresAt");
+
+                    b.HasIndex("State", "RuntimeCapability", "CreatedAt");
+
+                    b.HasIndex("WorkspaceId", "TargetKind", "TargetRunId")
+                        .IsUnique();
+
+                    b.ToTable("RuntimeWorkerAssignments", "runtime");
+                });
 #pragma warning restore 612, 618
         }
     }

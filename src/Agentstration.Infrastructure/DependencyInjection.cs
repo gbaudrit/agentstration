@@ -69,7 +69,8 @@ public static class DependencyInjection
         AgentstrationStorageOptions? storageOptions = null,
         bool enableHostedServices = true,
         SourceVerificationIndexOptions? sourceVerificationIndexOptions = null,
-        SourceRegistryTransportOptions? sourceRegistryTransportOptions = null)
+        SourceRegistryTransportOptions? sourceRegistryTransportOptions = null,
+        RuntimeWorkerLeaseOptions? runtimeWorkerLeaseOptions = null)
     {
         services.AddSingleton(TimeProvider.System);
         services.TryAddSingleton<LocalBootstrapOptions>();
@@ -323,6 +324,8 @@ public static class DependencyInjection
         }
         services.AddSingleton<RuntimeRunStateManager>();
         services.AddSingleton<RuntimeRunService>();
+        services.TryAddSingleton(runtimeWorkerLeaseOptions ?? new RuntimeWorkerLeaseOptions());
+        services.AddSingleton<RuntimeWorkerAssignmentService>();
         services.TryAddSingleton(new ToolExecutionCaptureOptions());
         services.AddSingleton<IToolExecutionEventSink, RuntimeToolExecutionEventSink>();
         services.AddSingleton<IToolExecutionEventSink, FlowToolExecutionEventSink>();

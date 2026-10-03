@@ -22,6 +22,8 @@ The main verified settings are:
 | `AGENTSTRATION_HTTP_PORT` | `5100` | Compose-only host port published for the authoritative server. |
 | `Data:Directory` | `.agentstration` | Base directory for module-owned SQLite databases, key material, Pack archives and Work artifacts. |
 | `Agentstration:Storage:Provider` | `Sqlite` | Relational storage profile: `Sqlite` or `PostgreSql` (case-insensitive). |
+| `Agentstration:RuntimeWorker:Lease:HeartbeatInterval` | `00:00:10` | Renewal cadence and expired-assignment reconciliation interval. Must be at least one second. |
+| `Agentstration:RuntimeWorker:Lease:LeaseDuration` | `00:00:45` | Server-time ownership lease. Must be at least three heartbeat intervals and no more than fifteen minutes. |
 | `Agentstration:InstanceId` | persisted `.agentstration/instance-id` value | Optional explicit AppHost worktree identity used to isolate PostgreSQL volumes and persisted passwords. |
 | `ConnectionStrings:Agentstration` | unset | Required main PostgreSQL connection when the storage provider is `PostgreSql`. |
 | `Data:ControlPlanePath` | `.agentstration/control-plane.db` | Management Plane SQLite database. |
