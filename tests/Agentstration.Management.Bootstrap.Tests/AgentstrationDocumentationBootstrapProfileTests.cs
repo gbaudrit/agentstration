@@ -54,7 +54,7 @@ public sealed class AgentstrationDocumentationBootstrapProfileTests
         Assert.AreEqual("${input.sourceConfiguration.url}",
             crawl.GetProperty("argumentsMapping").GetProperty("startUrl").GetString());
         var transfer = steps.Single(value => value.GetProperty("name").GetString() == "transfer");
-        Assert.AreEqual("${steps.crawl.output.corpus.reference}",
+        Assert.AreEqual("${steps.crawl.output.structuredContent.corpus.reference}",
             transfer.GetProperty("inputMapping").GetProperty("contentReference").GetString());
         var persist = steps.Single(value => value.GetProperty("name").GetString() == "persist");
         Assert.AreEqual("${execution.flowRunId}",

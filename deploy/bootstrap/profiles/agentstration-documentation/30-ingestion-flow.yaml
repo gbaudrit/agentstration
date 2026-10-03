@@ -44,12 +44,12 @@ definition:
         toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0 }
         capability: staged-artifact.create
         route: default
-        argumentsMapping: { fileName: agentstration-documentation.md, mediaType: "${steps.crawl.output.corpus.mediaType}" }
+        argumentsMapping: { fileName: agentstration-documentation.md, mediaType: "${steps.crawl.output.structuredContent.corpus.mediaType}" }
       - type: repeat
         name: transfer
         displayName: Transfer bounded content chunks
         flow: { resourceId: agentstration-documentation-transfer-chunk, versionStrategy: exact, version: 1.0.0 }
-        inputMapping: { contentReference: "${steps.crawl.output.corpus.reference}", stagedArtifactId: "${steps.create.output.artifactReference}", offset: 0 }
+        inputMapping: { contentReference: "${steps.crawl.output.structuredContent.corpus.reference}", stagedArtifactId: "${steps.create.output.artifactReference}", offset: 0 }
         nextInputMapping: { contentReference: "${steps.transfer.output.contentReference}", stagedArtifactId: "${steps.transfer.output.stagedArtifactId}", offset: "${steps.transfer.output.nextOffset}" }
         until: "${steps.transfer.output.endOfContent == true}"
         maximumIterations: 1000
@@ -71,7 +71,7 @@ definition:
         toolSet: { resourceId: agentstration-documentation-acquisition, version: 1.0.0 }
         capability: content.delete
         route: default
-        argumentsMapping: { contentReference: "${steps.crawl.output.corpus.reference}" }
+        argumentsMapping: { contentReference: "${steps.crawl.output.structuredContent.corpus.reference}" }
       - type: output
         name: output
         displayName: Publishable documentation Artifact

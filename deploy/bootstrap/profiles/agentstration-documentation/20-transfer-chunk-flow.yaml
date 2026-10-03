@@ -37,16 +37,16 @@ definition:
         route: default
         argumentsMapping:
           artifactId: "${input.stagedArtifactId}"
-          offset: "${steps.read.output.offset}"
-          contentBase64: "${steps.read.output.contentBase64}"
+          offset: "${steps.read.output.structuredContent.offset}"
+          contentBase64: "${steps.read.output.structuredContent.contentBase64}"
       - type: output
         name: output
         displayName: Chunk progress
         outputMapping:
           contentReference: "${input.contentReference}"
           stagedArtifactId: "${input.stagedArtifactId}"
-          nextOffset: "${steps.read.output.nextOffset}"
-          endOfContent: "${steps.read.output.endOfContent}"
+          nextOffset: "${steps.read.output.structuredContent.nextOffset}"
+          endOfContent: "${steps.read.output.structuredContent.endOfContent}"
     transitions:
       - { id: input-read, fromStep: input, event: completed, toStep: read }
       - { id: read-write, fromStep: read, event: completed, toStep: write }

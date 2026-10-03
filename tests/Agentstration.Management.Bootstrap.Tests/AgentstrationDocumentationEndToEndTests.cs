@@ -233,22 +233,25 @@ public sealed class AgentstrationDocumentationEndToEndTests
             var source = invocation.Arguments.GetProperty("startUrl").GetString()!;
             return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(new
             {
-                correlationId = invocation.CorrelationId,
-                startUrl = source,
-                maximumDepth = 3,
-                maximumPages = 25,
-                contents = Array.Empty<object>(),
-                corpus = new
+                structuredContent = new
                 {
-                    reference = "fixture-corpus",
-                    sourceUrl = source,
-                    mediaType = "text/markdown; charset=utf-8",
-                    length = FixtureCorpus.Length,
-                    sha256 = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(FixtureCorpus)),
-                    links = Array.Empty<string>(),
-                    metadata = new Dictionary<string, string> { ["kind"] = "crawl-corpus", ["pageCount"] = "1" }
-                },
-                truncated = false
+                    correlationId = invocation.CorrelationId,
+                    startUrl = source,
+                    maximumDepth = 3,
+                    maximumPages = 25,
+                    contents = Array.Empty<object>(),
+                    corpus = new
+                    {
+                        reference = "fixture-corpus",
+                        sourceUrl = source,
+                        mediaType = "text/markdown; charset=utf-8",
+                        length = FixtureCorpus.Length,
+                        sha256 = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(FixtureCorpus)),
+                        links = Array.Empty<string>(),
+                        metadata = new Dictionary<string, string> { ["kind"] = "crawl-corpus", ["pageCount"] = "1" }
+                    },
+                    truncated = false
+                }
             }));
         }
     }
@@ -274,11 +277,14 @@ public sealed class AgentstrationDocumentationEndToEndTests
             var nextOffset = offset + length;
             return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(new
             {
-                reference = "fixture-corpus",
-                offset,
-                nextOffset,
-                contentBase64 = Convert.ToBase64String(FixtureCorpus, offset, length),
-                endOfContent = nextOffset >= FixtureCorpus.Length
+                structuredContent = new
+                {
+                    reference = "fixture-corpus",
+                    offset,
+                    nextOffset,
+                    contentBase64 = Convert.ToBase64String(FixtureCorpus, offset, length),
+                    endOfContent = nextOffset >= FixtureCorpus.Length
+                }
             }));
         }
     }

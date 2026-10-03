@@ -56,6 +56,7 @@ public sealed class Crawl4AiExtensionTests
         CollectionAssert.AreEquivalent(
             new[] { "web_fetch", "web_crawl", "content_extract", "content_read", "content_delete" },
             tools.Select(tool => tool.Name).ToArray());
+        Assert.IsTrue(tools.All(tool => tool.ReturnJsonSchema is not null));
     }
 
     [TestMethod]
