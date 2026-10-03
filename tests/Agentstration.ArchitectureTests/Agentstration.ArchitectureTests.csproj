@@ -51,6 +51,7 @@
     <ProjectReference Include="../../src/Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Profiles/Agentstration.Runtime.Profiles.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Storage.Sqlite/Agentstration.Runtime.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj" />
     <ProjectReference Include="../../src/Agentstration.Tools.SourceRegistry/Agentstration.Tools.SourceRegistry.csproj" />
     <ProjectReference Include="../../src/Agentstration.Work/Agentstration.Work.csproj" />
     <ProjectReference Include="../../src/Agentstration.Work.Storage.Abstractions/Agentstration.Work.Storage.Abstractions.csproj" />

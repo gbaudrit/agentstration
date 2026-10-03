@@ -25,6 +25,11 @@ The main verified settings are:
 | `Agentstration:RuntimeWorker:Lease:HeartbeatInterval` | `00:00:10` | Renewal cadence and expired-assignment reconciliation interval. Must be at least one second. |
 | `Agentstration:RuntimeWorker:Lease:LeaseDuration` | `00:00:45` | Server-time ownership lease. Must be at least three heartbeat intervals and no more than fifteen minutes. |
 | `Agentstration:RuntimeWorker:Lease:MinimumSideEffectLeaseRemaining` | `00:00:05` | Minimum remaining lease required before Agentstration starts a governed model, Tool, child-Flow or Artifact side effect. |
+| `Agentstration:RuntimeWorkers:Count` | `1` | AppHost-only number of independent Microsoft Agent Framework Worker processes; accepts 1 through 16. |
+| `Agentstration:RuntimeWorker:AuthorityUrl` | `http://localhost:5100` | Worker-only authoritative Agentstration API origin. HTTPS is required unless `AllowInsecureHttp=true` for explicit local development. |
+| `Agentstration:RuntimeWorker:MaximumConcurrentAssignments` | `1` | Worker-only bounded capacity declaration and local concurrency limit; accepts 1 through 64. |
+| `Agentstration:RuntimeWorker:ClaimWaitSeconds` | `20` | Worker-only pull wait requested from Agentstration; accepts 1 through 30 seconds. |
+| `Agentstration:RuntimeWorker:LeaseSafetyMarginSeconds` | `8` | Worker-only margin before lease expiry inside which no new mutation or governed side effect begins. |
 | `Agentstration:InstanceId` | persisted `.agentstration/instance-id` value | Optional explicit AppHost worktree identity used to isolate PostgreSQL volumes and persisted passwords. |
 | `ConnectionStrings:Agentstration` | unset | Required main PostgreSQL connection when the storage provider is `PostgreSql`. |
 | `Data:ControlPlanePath` | `.agentstration/control-plane.db` | Management Plane SQLite database. |
@@ -41,6 +46,29 @@ The main verified settings are:
 | `Agentstration:Aep:Transport:BlockPrivateNetworks` | `true` | Blocks private DNS/IP targets unless their host is explicitly allowed. |
 
 Provider-specific options and persisted model resources are described in [Model providers](../concepts/model-providers.md) and [Model profiles](../concepts/model-profiles.md). Do not store secrets in committed settings files.
+
+## External Runtime Worker
+
+`Agentstration.Runtime.Worker.MicrosoftAgentFramework` is always a separate operating-system
+process. It connects only to the AWP HTTP surface and has no database, store, or backend filesystem
+configuration. Each process has a stable `WorkerId`, a fresh session ID per start, and its own
+credential. Heartbeat continues independently while an assignment executes. Transient HTTP retries
+are bounded and retain stable command/event identities; the Worker stops new mutations before its
+lease safety margin and has no grace after expiry.
+
+Aspire starts `Agentstration:RuntimeWorkers:Count` independently identified Workers and provisions
+their protected development key files. Compose starts the same executable as `runtime-worker-1` with
+an isolated read-only key volume. For manual startup, run:
+
+```powershell
+./scripts/runtime/start-maf-worker.ps1 -AuthorityUrl http://localhost:5100
+```
+
+The first run announces the Worker and waits for a pairing code on standard input, or the Worker may
+be configured with `PairingCodeFile`. Its one-time credential is persisted to the configured
+`CredentialStateFile`; pairing codes and credential values must never be passed in URLs, ordinary
+command-line arguments, or logs. A static deployment instead sets `WorkerId`, `CredentialId`,
+`InstanceId`, and `SharedKeyFile`, mounting that file read-only.
 
 ## AEP outbound transport
 
