@@ -1,4 +1,5 @@
 using Agentstration.Identity.Api.Security;
+using Agentstration.Identity.Api.Api;
 using Agentstration.Identity.Contracts;
 using Agentstration.Web;
 using Agentstration.Web.Configuration;
@@ -9,6 +10,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 namespace Agentstration.Identity.Api;
 
@@ -25,6 +28,10 @@ public static class IdentityApiModule
             .Bind(configuration.GetSection(BffWorkloadTrustOptions.SectionName))
             .Validate(value => value.Validate(), "BFF workload trust configuration is invalid.")
             .ValidateOnStart();
+        services.AddOptions<AwpWorkerTrustOptions>()
+            .Bind(configuration.GetSection(AwpWorkerTrustOptions.SectionName))
+            .Validate(value => value.Validate(), "AWP Worker trust configuration is invalid.")
+            .ValidateOnStart();
         services.AddOptions<InternalDelegationOptions>()
             .Bind(configuration.GetSection(InternalDelegationOptions.SectionName))
             .Validate(value => value.Validate(), "Internal delegation configuration is invalid.")
@@ -32,6 +39,20 @@ public static class IdentityApiModule
         services.AddSingleton<InternalDelegationKeys>();
         services.AddScoped<InternalDelegationService>();
         services.AddSingleton<IBffWorkloadReplayCache, BffWorkloadReplayCache>();
+        services.AddSingleton<IAwpWorkerReplayCache, AwpWorkerReplayCache>();
+        services.AddRateLimiter(rateLimiting =>
+        {
+            rateLimiting.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            rateLimiting.AddPolicy("awp-enrollment-public", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 20,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    }));
+        });
         services.AddScoped<BffSessionAuthorityService>();
         services.AddHostedService<BffWorkloadTrustAuditService>();
         var options = configuration.GetSection($"{AgentstrationApiOptions.SectionName}:Authentication")
@@ -47,6 +68,7 @@ public static class IdentityApiModule
         endpoints.MapAgentstrationLocalAccountAdministration();
         endpoints.MapAgentstrationIdentityApi();
         endpoints.MapBffWorkloadEndpoints();
+        endpoints.MapAwpWorkerEndpoints();
         return endpoints;
     }
 
@@ -75,6 +97,8 @@ public static class IdentityApiModule
                     {
                         if (context.Request.Path.StartsWithSegments("/api/internal/bff"))
                             return AgentstrationAuthenticationDefaults.BffWorkloadScheme;
+                        if (context.Request.Path.StartsWithSegments("/api/awp/v1"))
+                            return AgentstrationAuthenticationDefaults.AwpWorkerScheme;
                         if (IsInternalDelegation(context))
                             return InternalDelegationDefaults.Scheme;
                         var bearer = context.Request.Headers.Authorization.ToString()
@@ -109,6 +133,9 @@ public static class IdentityApiModule
                     _ => { })
                 .AddScheme<AuthenticationSchemeOptions, BffWorkloadAuthenticationHandler>(
                     AgentstrationAuthenticationDefaults.BffWorkloadScheme,
+                    _ => { })
+                .AddScheme<AuthenticationSchemeOptions, AwpWorkerAuthenticationHandler>(
+                    AgentstrationAuthenticationDefaults.AwpWorkerScheme,
                     _ => { })
                 .AddScheme<AuthenticationSchemeOptions, InternalDelegationAuthenticationHandler>(
                     InternalDelegationDefaults.Scheme,
@@ -158,6 +185,8 @@ public static class IdentityApiModule
                     {
                         if (context.Request.Path.StartsWithSegments("/api/internal/bff"))
                             return AgentstrationAuthenticationDefaults.BffWorkloadScheme;
+                        if (context.Request.Path.StartsWithSegments("/api/awp/v1"))
+                            return AgentstrationAuthenticationDefaults.AwpWorkerScheme;
                         return IsInternalDelegation(context)
                             ? InternalDelegationDefaults.Scheme
                             : DevelopmentAuthenticationHandler.SchemeName;
@@ -166,6 +195,9 @@ public static class IdentityApiModule
                 .AddScheme<AuthenticationSchemeOptions, DevelopmentAuthenticationHandler>(DevelopmentAuthenticationHandler.SchemeName, _ => { })
                 .AddScheme<AuthenticationSchemeOptions, BffWorkloadAuthenticationHandler>(
                     AgentstrationAuthenticationDefaults.BffWorkloadScheme,
+                    _ => { })
+                .AddScheme<AuthenticationSchemeOptions, AwpWorkerAuthenticationHandler>(
+                    AgentstrationAuthenticationDefaults.AwpWorkerScheme,
                     _ => { })
                 .AddScheme<AuthenticationSchemeOptions, InternalDelegationAuthenticationHandler>(
                     InternalDelegationDefaults.Scheme,
@@ -185,6 +217,15 @@ public static class IdentityApiModule
                 policy.RequireAuthenticatedUser();
                 policy.RequireClaim(BffWorkloadAuthentication.WorkloadClaim);
                 policy.RequireClaim(BffWorkloadAuthentication.CredentialClaim);
+            })
+            .AddPolicy(AgentstrationPolicies.AwpWorker, policy =>
+            {
+                policy.AuthenticationSchemes.Add(AgentstrationAuthenticationDefaults.AwpWorkerScheme);
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim(AwpWorkerAuthentication.WorkerClaim);
+                policy.RequireClaim(AwpWorkerAuthentication.SessionClaim);
+                policy.RequireClaim(AwpWorkerAuthentication.CredentialClaim);
+                policy.RequireClaim(AwpWorkerAuthentication.ProtocolClaim, AwpWorkerAuthentication.ProtocolVersion);
             })
             .AddPolicy(AgentstrationPolicies.PlatformAdmin, policy =>
             {

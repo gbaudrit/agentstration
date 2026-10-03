@@ -6,5 +6,6 @@
     <ProjectReference Include="../Agentstration.Triggers/Agentstration.Triggers.csproj" />
     <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Secrets.Abstractions/Agentstration.Secrets.Abstractions.csproj" />
   </ItemGroup>
 </Project>
