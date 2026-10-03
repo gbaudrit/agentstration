@@ -114,6 +114,7 @@ const sidebars = {
         'reference/packs',
         'reference/source-registries',
         'reference/source-registry-tool',
+        'reference/crawl4ai-web-acquisition',
         'reference/resources/agents',
         'reference/secrets-and-vaults',
         'reference/configuration',
