@@ -15,6 +15,6 @@ definition:
       - { type: output, name: output, displayName: Intent analysis, outputMapping: "${steps.analyze.output}" }
     transitions:
       - { id: input-to-analyze, fromStep: input, event: completed, toStep: analyze }
-      - { id: analyze-to-output, fromStep: analyze, event: completed, toStep: output }
+      - { id: analyze-to-output, fromStep: analyze, event: success, toStep: output }
   publish: true
   activate: true

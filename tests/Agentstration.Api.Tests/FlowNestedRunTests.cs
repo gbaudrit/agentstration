@@ -270,7 +270,7 @@ public sealed partial class FlowTests
             [
                 new("input-transform", "input", "completed", "transform"),
                 new("transform-agent", "transform", "completed", "agent"),
-                new("agent-output", "agent", "completed", "output")
+                new("agent-output", "agent", "success", "output")
             ]
         };
         var flow = await CreatePublishedGraphAsync(fixture, "mapping-defaults", graph);
@@ -615,7 +615,7 @@ public sealed partial class FlowTests
         Transitions =
         [
             new("input-analyze", "input", "completed", "analyze"),
-            new("analyze-deliver", "analyze", "completed", "deliver")
+            new("analyze-deliver", "analyze", "success", "deliver")
         ]
     };
 

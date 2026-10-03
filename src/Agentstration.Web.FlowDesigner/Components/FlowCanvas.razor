@@ -200,9 +200,9 @@
     private void OnLinkAttached(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
     {
         link.TargetAttached -= OnLinkAttached;
-        if (!TryEndpoints(link, out var from, out var to)) return;
-        var id = $"{from.Source.Name}-completed-{to.Source.Name}";
-        _ = TransitionCreated.InvokeAsync(new FlowTransitionDefinition(id, from.Source.Name, "completed", to.Source.Name));
+        if (!TryEndpoints(link, out var from, out var to, out var eventName)) return;
+        var id = $"{from.Source.Name}-{eventName}-{to.Source.Name}";
+        _ = TransitionCreated.InvokeAsync(new FlowTransitionDefinition(id, from.Source.Name, eventName, to.Source.Name));
     }
 
     private void AttachExistingLink(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
@@ -229,17 +229,19 @@
         Blazor.Diagrams.Core.Anchors.Anchor oldAnchor,
         Blazor.Diagrams.Core.Anchors.Anchor newAnchor)
     {
-        if (rebuilding || IsReadOnly || !TryEndpoints(link, out var from, out var to)) return;
-        _ = TransitionReconnected.InvokeAsync(new(link.Id, from.Source.Name, to.Source.Name));
+        if (rebuilding || IsReadOnly || !TryEndpoints(link, out var from, out var to, out var eventName)) return;
+        _ = TransitionReconnected.InvokeAsync(new(link.Id, from.Source.Name, to.Source.Name, eventName));
     }
 
     private static bool TryEndpoints(
         Blazor.Diagrams.Core.Models.Base.BaseLinkModel link,
         out FlowDiagramNode from,
-        out FlowDiagramNode to)
+        out FlowDiagramNode to,
+        out string eventName)
     {
         from = default!;
         to = default!;
+        eventName = string.Empty;
         if (link.Source.Model is not FlowDiagramPort first || link.Target.Model is not FlowDiagramPort second)
             return false;
 
@@ -250,7 +252,8 @@
 
         from = (FlowDiagramNode)output.Parent;
         to = (FlowDiagramNode)input.Parent;
-        return output.CanAttachTo(input);
+        eventName = output.EventName ?? string.Empty;
+        return eventName.Length > 0 && output.CanAttachTo(input);
     }
 
     private void OnLinkRemoved(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)

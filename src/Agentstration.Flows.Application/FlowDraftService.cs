@@ -199,8 +199,8 @@ public static class FlowDraftTemplates
                 new("input-completed", "input", "completed", "route-request"),
                 new("router-selected", "route-request", "selected", "execute-agent"),
                 new("router-failed", "route-request", "failed", "error"),
-                new("agent-completed", "execute-agent", "completed", "completed"),
-                new("agent-failed", "execute-agent", "failed", "error")
+                new("agent-success", "execute-agent", "success", "completed"),
+                new("agent-error", "execute-agent", "error", "error")
             ],
             Designer = new FlowDesignerMetadata { NodePositions = Positions("input", "route-request", "execute-agent", "completed", "error") }
         };

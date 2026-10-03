@@ -101,9 +101,9 @@ definition:
       - { id: consolidate-to-ready, fromStep: consolidate, event: completed, toStep: ready }
       - { id: blocked-to-clarification, fromStep: ready, event: "false", toStep: clarification }
       - { id: ready-to-create, fromStep: ready, event: "true", toStep: create-plan }
-      - { id: create-to-submit, fromStep: create-plan, event: completed, toStep: submit-plan }
-      - { id: submit-to-materialize, fromStep: submit-plan, event: completed, toStep: materialize-plan }
-      - { id: materialize-to-output, fromStep: materialize-plan, event: completed, toStep: output }
+      - { id: create-to-submit, fromStep: create-plan, event: success, toStep: submit-plan }
+      - { id: submit-to-materialize, fromStep: submit-plan, event: success, toStep: materialize-plan }
+      - { id: materialize-to-output, fromStep: materialize-plan, event: success, toStep: output }
     outputSchema:
       type: object
       additionalProperties: true

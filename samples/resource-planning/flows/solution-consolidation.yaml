@@ -15,6 +15,6 @@ definition:
       - { type: output, name: output, displayName: Coherent functional plan, outputMapping: "${steps.consolidate.output}" }
     transitions:
       - { id: input-to-consolidate, fromStep: input, event: completed, toStep: consolidate }
-      - { id: consolidate-to-output, fromStep: consolidate, event: completed, toStep: output }
+      - { id: consolidate-to-output, fromStep: consolidate, event: success, toStep: output }
   publish: true
   activate: true

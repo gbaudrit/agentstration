@@ -80,6 +80,10 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             if (!transitionIds.Add(transition.Id)) issues.Add(Error("transition_id_duplicate", $"Transition '{transition.Id}' is duplicated.", transitionId: transition.Id));
             if (!steps.ContainsKey(transition.FromStep)) issues.Add(Error("transition_source_unknown", $"Transition source '{transition.FromStep}' does not exist.", transitionId: transition.Id));
             if (!steps.ContainsKey(transition.ToStep)) issues.Add(Error("transition_target_unknown", $"Transition target '{transition.ToStep}' does not exist.", transitionId: transition.Id));
+            if (steps.GetValueOrDefault(transition.FromStep) is { } source
+                && source is not FlowCallStepDefinition
+                && !source.OutputEvents().Contains(transition.Event, StringComparer.Ordinal))
+                issues.Add(Error("transition_event_invalid", $"Step '{source.Name}' does not emit event '{transition.Event}'.", source.Name, transition.Id, "event"));
             if (!string.IsNullOrWhiteSpace(transition.Condition)) ValidateExpression(transition.Condition, issues, transition.FromStep, transition.Id, "condition");
         }
 

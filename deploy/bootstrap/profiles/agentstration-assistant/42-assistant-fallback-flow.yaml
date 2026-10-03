@@ -26,7 +26,7 @@ definition:
       - { type: output, name: output, displayName: Clarification }
     transitions:
       - { id: input-to-clarify, fromStep: input, event: completed, toStep: clarify }
-      - { id: clarify-to-output, fromStep: clarify, event: completed, toStep: output }
+      - { id: clarify-to-output, fromStep: clarify, event: success, toStep: output }
     outputSchema:
       type: object
       additionalProperties: true

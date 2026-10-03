@@ -207,6 +207,19 @@ public static class FlowStepDefinitionExtensions
         FailureFlowStepDefinition => "failure",
         _ => throw new ArgumentOutOfRangeException(nameof(step))
     };
+
+    public static IReadOnlyList<string> OutputEvents(this FlowStepDefinition step) => step switch
+    {
+        InputFlowStepDefinition => ["completed"],
+        AgentFlowStepDefinition => ["success", "error"],
+        RouterFlowStepDefinition => ["selected", "failed"],
+        ConditionFlowStepDefinition => ["true", "false"],
+        TransformFlowStepDefinition => ["completed"],
+        ToolFlowStepDefinition => ["success", "error"],
+        FlowCallStepDefinition => [],
+        OutputFlowStepDefinition or FailureFlowStepDefinition => [],
+        _ => throw new ArgumentOutOfRangeException(nameof(step))
+    };
 }
 
 public static class FlowGraphDefinitionExtensions

@@ -70,11 +70,11 @@ public sealed partial class FlowRunService
                             new FlowTargetReference(FlowTargetKind.Agent, agentId, Namespace: agent.Agent.Namespace ?? stored.Value.FlowId.Namespace),
                             resolvedInput,
                             stored.Value.CorrelationId!), runToken);
-                        output = agentResult.Output.Clone(); eventName = "completed";
+                        output = agentResult.Output.Clone(); eventName = "success";
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
                     {
-                        output = JsonSerializer.SerializeToElement(new { error = exception.Message }); eventName = "failed";
+                        output = JsonSerializer.SerializeToElement(new { error = exception.Message }); eventName = "error";
                         stepError = new FlowRunError("agent_step_failed", "The Agent step failed.", exception.Message);
                     }
                     break;
@@ -101,12 +101,12 @@ public sealed partial class FlowRunService
                             stored.Value.CorrelationId!,
                             tool.Tool,
                             arguments), runToken);
-                        eventName = "completed";
+                        eventName = "success";
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
                     {
                         output = JsonSerializer.SerializeToElement(new { error = exception.Message });
-                        eventName = "failed";
+                        eventName = "error";
                         stepError = exception is FlowValidationException validation
                             ? new FlowRunError(validation.Code, "The Tool step failed.", validation.Message)
                             : new FlowRunError("tool_step_failed", "The Tool step failed.", exception.Message);

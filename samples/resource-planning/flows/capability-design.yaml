@@ -15,6 +15,6 @@ definition:
       - { type: output, name: output, displayName: Capability intents, outputMapping: "${steps.design.output}" }
     transitions:
       - { id: input-to-design, fromStep: input, event: completed, toStep: design }
-      - { id: design-to-output, fromStep: design, event: completed, toStep: output }
+      - { id: design-to-output, fromStep: design, event: success, toStep: output }
   publish: true
   activate: true

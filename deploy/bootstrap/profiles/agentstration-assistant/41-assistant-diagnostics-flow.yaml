@@ -26,7 +26,7 @@ definition:
       - { type: output, name: output, displayName: Diagnostic findings }
     transitions:
       - { id: input-to-diagnose, fromStep: input, event: completed, toStep: diagnose }
-      - { id: diagnose-to-output, fromStep: diagnose, event: completed, toStep: output }
+      - { id: diagnose-to-output, fromStep: diagnose, event: success, toStep: output }
     outputSchema:
       type: object
       additionalProperties: true

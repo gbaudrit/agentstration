@@ -47,6 +47,6 @@ definition:
         outputMapping: "${steps.create-notification.output}"
     transitions:
       - { id: input-to-tool, fromStep: input, event: completed, toStep: create-notification }
-      - { id: tool-to-output, fromStep: create-notification, event: completed, toStep: output }
+      - { id: tool-to-output, fromStep: create-notification, event: success, toStep: output }
   publish: true
   activate: true

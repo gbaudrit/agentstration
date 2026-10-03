@@ -44,7 +44,7 @@ public sealed class FlowDesignerReadOnlyTests
             Transitions =
             [
                 new("input-agent", "input", "completed", "agent"),
-                new("agent-output", "agent", "completed", "output")
+                new("agent-output", "agent", "success", "output")
             ]
         };
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
@@ -617,7 +617,7 @@ public sealed class FlowDesignerReadOnlyTests
             Transitions =
             [
                 new("input-analyze", "input", "completed", "analyze"),
-                new("analyze-deliver", "analyze", "completed", "deliver")
+                new("analyze-deliver", "analyze", "success", "deliver")
             ]
         };
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
@@ -716,7 +716,7 @@ public sealed class FlowDesignerReadOnlyTests
                 new TransformFlowStepDefinition { Name = "transform" },
                 new OutputFlowStepDefinition { Name = "output" }
             ],
-            Transitions = [new("route", "input", "matched", "transform", "${input.ready}", 4)]
+            Transitions = [new("route", "input", "completed", "transform", "${input.ready}", 4)]
         };
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
         context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
@@ -735,7 +735,7 @@ public sealed class FlowDesignerReadOnlyTests
         var transition = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Transitions.Single();
         Assert.AreEqual("input", transition.FromStep);
         Assert.AreEqual("output", transition.ToStep);
-        Assert.AreEqual("matched", transition.Event);
+        Assert.AreEqual("completed", transition.Event);
         Assert.AreEqual("${input.ready}", transition.Condition);
         Assert.AreEqual(4, transition.Priority);
     }

@@ -66,6 +66,38 @@ public sealed class FlowToolStepTests
         Assert.IsTrue(result.Issues.Any(issue => issue.Code == "tool_argument_required"));
     }
 
+    [TestMethod]
+    public async Task AgentAndToolTransitionsRejectLegacyOutcomeEvents()
+    {
+        var schema = JsonSerializer.SerializeToElement(new { type = "object" });
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new AgentFlowStepDefinition { Name = "agent", Agent = new("assistant") },
+                new ToolFlowStepDefinition { Name = "tool", Tool = new("notification.send") },
+                new OutputFlowStepDefinition { Name = "output" }
+            ],
+            Transitions =
+            [
+                new("input-agent", "input", "completed", "agent"),
+                new("agent-tool", "agent", "completed", "tool"),
+                new("tool-output", "tool", "failed", "output")
+            ]
+        };
+
+        var result = await new FlowGraphValidator(new ToolResolver(schema)).ValidateAsync(
+            graph,
+            new(true, Workspace, new FlowId("parent")),
+            default);
+
+        CollectionAssert.AreEquivalent(
+            new[] { "agent-tool", "tool-output" },
+            result.Issues.Where(issue => issue.Code == "transition_event_invalid").Select(issue => issue.TransitionId).ToArray());
+    }
+
     private static FlowGraphDefinition Graph(JsonElement mapping) => new()
     {
         EntryStep = "input",
@@ -78,7 +110,7 @@ public sealed class FlowToolStepTests
         Transitions =
         [
             new("input-notify", "input", "completed", "notify"),
-            new("notify-output", "notify", "completed", "output")
+            new("notify-output", "notify", "success", "output")
         ]
     };
 

@@ -26,7 +26,7 @@ definition:
       - { type: output, name: output, displayName: Documented answer }
     transitions:
       - { id: input-to-answer, fromStep: input, event: completed, toStep: answer }
-      - { id: answer-to-output, fromStep: answer, event: completed, toStep: output }
+      - { id: answer-to-output, fromStep: answer, event: success, toStep: output }
     outputSchema:
       type: object
       additionalProperties: true

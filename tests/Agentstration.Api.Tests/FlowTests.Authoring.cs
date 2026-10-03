@@ -330,8 +330,8 @@ public sealed partial class FlowTests
                 new("t4", "condition", "false", "failure"),
                 new("t5", "router", "selected", "agent"),
                 new("t6", "router", "failed", "failure"),
-                new("t7", "agent", "completed", "output"),
-                new("t8", "agent", "failed", "failure")
+                new("t7", "agent", "success", "output"),
+                new("t8", "agent", "error", "failure")
             ]
         };
         var now = TimeProvider.System.GetUtcNow();

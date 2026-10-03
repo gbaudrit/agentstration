@@ -8,7 +8,7 @@ namespace Agentstration.Web.FlowDesigner.State;
 public enum FlowEditorMode { Designer, Definition, Split }
 public enum FlowSaveState { Saved, Saving, UnsavedChanges, SaveFailed }
 public sealed record FlowEditorSelection(string? StepName = null, string? TransitionId = null);
-public sealed record FlowDesignerNode(string Name, string Type, string DisplayName, FlowNodePosition Position, string? Resource);
+public sealed record FlowDesignerNode(string Name, string Type, string DisplayName, FlowNodePosition Position, string? Resource, IReadOnlyList<string> OutputEvents);
 public sealed record FlowDesignerLink(string Id, string From, string To, string Event);
 public sealed record FlowDesignerDocument(IReadOnlyList<FlowDesignerNode> Nodes, IReadOnlyList<FlowDesignerLink> Links)
 {
@@ -16,7 +16,10 @@ public sealed record FlowDesignerDocument(IReadOnlyList<FlowDesignerNode> Nodes,
     {
         var nodes = definition.Steps.Select((step, index) => new FlowDesignerNode(step.Name, step.Type(), step.DisplayName ?? step.Name,
             definition.Designer.NodePositions.TryGetValue(step.Name, out var position) ? position : new(index * 200, 50),
-            step switch { AgentFlowStepDefinition agent => agent.Agent.ResourceId, RouterFlowStepDefinition router => $"{router.Candidates.Count} routes", FlowCallStepDefinition flow => flow.Flow.ResourceId, ToolFlowStepDefinition tool => tool.Tool.ResourceId, _ => null })).ToArray();
+            step switch { AgentFlowStepDefinition agent => agent.Agent.ResourceId, RouterFlowStepDefinition router => $"{router.Candidates.Count} routes", FlowCallStepDefinition flow => flow.Flow.ResourceId, ToolFlowStepDefinition tool => tool.Tool.ResourceId, _ => null },
+            step is FlowCallStepDefinition
+                ? definition.Transitions.Where(transition => transition.FromStep == step.Name).Select(transition => transition.Event).Distinct(StringComparer.Ordinal).ToArray()
+                : step.OutputEvents())).ToArray();
         return new(nodes, definition.Transitions.Select(transition => new FlowDesignerLink(transition.Id, transition.FromStep, transition.ToStep, transition.Event)).ToArray());
     }
 }
@@ -80,12 +83,12 @@ public sealed record UpdateTransitionCommand(FlowTransitionDefinition Transition
         };
     }
 }
-public sealed record ReconnectTransitionCommand(string Id, string FromStep, string ToStep) : IFlowEditorCommand
+public sealed record ReconnectTransitionCommand(string Id, string FromStep, string ToStep, string Event) : IFlowEditorCommand
 {
     public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with
     {
         Transitions = definition.Transitions
-            .Select(item => item.Id == Id ? item with { FromStep = FromStep, ToStep = ToStep } : item)
+            .Select(item => item.Id == Id ? item with { FromStep = FromStep, ToStep = ToStep, Event = Event } : item)
             .ToArray()
     };
 }

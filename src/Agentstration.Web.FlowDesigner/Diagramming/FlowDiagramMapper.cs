@@ -17,14 +17,17 @@ public sealed class FlowDiagramNode : NodeModel
         ControlledSize = true;
         Size = new Size(RenderedWidth, RenderedHeight);
         Input = new FlowDiagramPort(this, PortAlignment.Left, FlowDiagramPortDirection.Input);
-        Output = new FlowDiagramPort(this, PortAlignment.Right, FlowDiagramPortDirection.Output);
+        Outputs = source.OutputEvents
+            .Select(eventName => new FlowDiagramPort(this, PortAlignment.Right, FlowDiagramPortDirection.Output, eventName))
+            .ToArray();
         AddPort(Input);
-        AddPort(Output);
+        foreach (var output in Outputs)
+            AddPort(output);
     }
 
     public FlowDesignerNode Source { get; }
     public FlowDiagramPort Input { get; }
-    public FlowDiagramPort Output { get; }
+    public IReadOnlyList<FlowDiagramPort> Outputs { get; }
 }
 
 public enum FlowDiagramPortDirection { Input, Output }
@@ -32,13 +35,18 @@ public enum FlowDiagramPortDirection { Input, Output }
 public sealed class FlowDiagramPort(
     FlowDiagramNode parent,
     PortAlignment alignment,
-    FlowDiagramPortDirection direction) : PortModel(parent, alignment)
+    FlowDiagramPortDirection direction,
+    string? eventName = null) : PortModel(parent, alignment)
 {
     public FlowDiagramPortDirection Direction { get; } = direction;
+    public string? EventName { get; } = eventName;
 
     public override bool CanAttachTo(Blazor.Diagrams.Core.Models.Base.ILinkable other)
     {
         if (other is not FlowDiagramPort candidate || candidate.Parent == Parent || candidate.Direction == Direction)
+            return false;
+
+        if (((FlowDiagramNode)Parent).Locked || ((FlowDiagramNode)candidate.Parent).Locked)
             return false;
 
         var output = Direction == FlowDiagramPortDirection.Output ? this : candidate;
@@ -60,15 +68,17 @@ public static class FlowDiagramMapper
     {
         var nodes = document.Nodes.Select(node => new FlowDiagramNode(node)).ToArray();
         var byName = nodes.ToDictionary(node => node.Source.Name, StringComparer.Ordinal);
-        var links = document.Links
-            .Where(link => byName.ContainsKey(link.From) && byName.ContainsKey(link.To))
-            .Select(link =>
-            {
-                var model = new LinkModel(link.Id, byName[link.From].Output, byName[link.To].Input);
-                model.AddLabel(link.Event, offset: new Point(0, -14));
-                return model;
-            })
-            .ToArray();
+        var links = new List<LinkModel>();
+        foreach (var link in document.Links.Where(link => byName.ContainsKey(link.From) && byName.ContainsKey(link.To)))
+        {
+            var output = byName[link.From].Outputs.FirstOrDefault(port => port.EventName == link.Event);
+            if (output is null)
+                continue;
+
+            var model = new LinkModel(link.Id, output, byName[link.To].Input);
+            model.AddLabel(link.Event, offset: new Point(0, -14));
+            links.Add(model);
+        }
         return new(nodes, links, byName);
     }
 }

@@ -38,7 +38,7 @@ definition:
         toStep: judge
       - id: judge-to-output
         fromStep: judge
-        event: completed
+        event: success
         toStep: output
     designer:
       preferredLayout: Horizontal

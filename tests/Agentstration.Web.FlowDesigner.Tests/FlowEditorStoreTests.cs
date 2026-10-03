@@ -56,8 +56,8 @@ public sealed class FlowEditorStoreTests
                 new("input-router", "input", "completed", "router"),
                 new("router-agent", "router", "selected", "agent"),
                 new("router-failure", "router", "failed", "failure"),
-                new("agent-output", "agent", "completed", "output"),
-                new("agent-failure", "agent", "failed", "failure")
+                new("agent-output", "agent", "success", "output"),
+                new("agent-failure", "agent", "error", "failure")
             ]
         };
 
@@ -77,7 +77,7 @@ public sealed class FlowEditorStoreTests
     }
 
     [TestMethod]
-    public async Task ReconnectingTransitionPreservesItsSemanticsAndSupportsUndoRedo()
+    public async Task ReconnectingTransitionUpdatesItsEventAndPreservesMetadata()
     {
         var definition = new FlowGraphDefinition
         {
@@ -95,12 +95,12 @@ public sealed class FlowEditorStoreTests
         var draft = new FlowDraft { WorkspaceId = WorkspaceId, Id = "editor-draft", FlowId = new("editor"), DisplayName = "Editor", Definition = definition, CreatedAt = now, UpdatedAt = now };
         store.Load(new FlowDraftResponse(draft, "\"etag-1\""), "entryStep: input");
 
-        await store.DispatchAsync(new ReconnectTransitionCommand("route", "transform", "output"));
+        await store.DispatchAsync(new ReconnectTransitionCommand("route", "transform", "output", "completed"));
 
         var transition = store.State.Resource!.Definition.Transitions.Single();
         Assert.AreEqual("transform", transition.FromStep);
         Assert.AreEqual("output", transition.ToStep);
-        Assert.AreEqual("matched", transition.Event);
+        Assert.AreEqual("completed", transition.Event);
         Assert.AreEqual("${input.ready}", transition.Condition);
         Assert.AreEqual(7, transition.Priority);
         store.Undo();
