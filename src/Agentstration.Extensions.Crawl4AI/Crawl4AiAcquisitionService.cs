@@ -41,6 +41,7 @@ public sealed class Crawl4AiAcquisitionService(
         var corpus = new StringBuilder();
         var corpusBytes = 0;
         var discoveredBeyondLimit = false;
+        var skippedPage = false;
         try
         {
             while (queue.Count > 0 && contents.Count < pageLimit)
@@ -48,7 +49,16 @@ public sealed class Crawl4AiAcquisitionService(
                 cancellationToken.ThrowIfCancellationRequested();
                 var current = queue.Dequeue();
                 if (!visited.Add(current.Url)) continue;
-                var page = await client.FetchAsync(current.Url, correlation, cancellationToken);
+                CrawlPage page;
+                try
+                {
+                    page = await client.FetchAsync(current.Url, correlation, cancellationToken);
+                }
+                catch (Crawl4AiException) when (current.Depth > 0)
+                {
+                    skippedPage = true;
+                    continue;
+                }
                 visited.Add(page.Url.GetComponents(UriComponents.HttpRequestUrl, UriFormat.UriEscaped));
                 contents.Add(await StoreAsync(page, cancellationToken));
                 AppendCorpusPage(corpus, page, ref corpusBytes);
@@ -81,7 +91,7 @@ public sealed class Crawl4AiAcquisitionService(
                     ["kind"] = "crawl-corpus"
                 });
             return new WebCrawlResult(correlation, startUrl, depthLimit, pageLimit, contents, corpusReference,
-                discoveredBeyondLimit || queue.Count > 0);
+                discoveredBeyondLimit || queue.Count > 0 || skippedPage);
         }
         catch
         {

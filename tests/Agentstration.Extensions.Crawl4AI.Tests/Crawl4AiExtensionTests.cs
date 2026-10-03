@@ -122,6 +122,46 @@ public sealed class Crawl4AiExtensionTests
     }
 
     [TestMethod]
+    public async Task CrawlSkipsFailedDiscoveredPagesAndKeepsTheBoundedCorpus()
+    {
+        await using var fixture = new TemporaryFixture(maximumPages: 5);
+        var service = fixture.Service(async (request, cancellationToken) =>
+        {
+            var input = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            var url = input.GetProperty("urls")[0].GetString()!;
+            if (url.EndsWith("/blocked", StringComparison.Ordinal))
+                return Json(new { results = new[] { new { success = false, url, error_message = "Blocked page" } } });
+            var links = url.EndsWith("/root", StringComparison.Ordinal) ? new[] { "/blocked", "/available" } : [];
+            return Json(new { results = new[] { new { success = true, url, markdown = url, links = new { @internal = links } } } });
+        });
+
+        var result = await service.CrawlAsync("https://example.test/root", 1, 3, "crawl-partial", default);
+
+        Assert.HasCount(2, result.Contents);
+        Assert.AreEqual("https://example.test/root", result.Contents[0].SourceUrl);
+        Assert.AreEqual("https://example.test/available", result.Contents[1].SourceUrl);
+        Assert.IsTrue(result.Truncated);
+        var corpus = await service.ReadAsync(result.Corpus.Reference, 0, 4096, default);
+        StringAssert.Contains(Encoding.UTF8.GetString(Convert.FromBase64String(corpus.ContentBase64)),
+            "Source: https://example.test/available");
+    }
+
+    [TestMethod]
+    public async Task CrawlStillFailsWhenTheStartingPageCannotBeAcquired()
+    {
+        await using var fixture = new TemporaryFixture();
+        var service = fixture.Service((_, _) => Json(new
+        {
+            results = new[] { new { success = false, url = "https://example.test/root", error_message = "Blocked root" } }
+        }));
+
+        var exception = await Assert.ThrowsAsync<Crawl4AiException>(() =>
+            service.CrawlAsync("https://example.test/root", 1, 3, "crawl-root-failure", default));
+
+        Assert.AreEqual("crawl4ai_acquisition_failed", exception.Code);
+    }
+
+    [TestMethod]
     public async Task CrawlRejectsAnAggregateCorpusBeyondTheConfiguredBound()
     {
         await using var fixture = new TemporaryFixture(maximumPages: 2, maximumContentBytes: 180);
