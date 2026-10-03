@@ -127,6 +127,9 @@ public sealed class KnowledgeAcquisitionService(
             var input = JsonSerializer.SerializeToElement(new KnowledgeIngestionInput
             {
                 KnowledgeSourceId = $"{source.Value.Namespace}/{source.Value.Name}",
+                KnowledgeSourceUid = source.Value.Uid,
+                KnowledgeSourceGeneration = source.Value.Generation,
+                SourceConfiguration = source.Value.Definition.AcquisitionConfiguration.Clone(),
                 Parameters = parameters.Clone(),
                 Caller = new(context.PrincipalId, context.TenantId, context.WorkspaceId),
                 CorrelationId = effectiveCorrelationId,
@@ -150,6 +153,7 @@ public sealed class KnowledgeAcquisitionService(
                 CorrelationId = effectiveCorrelationId,
                 IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
                 RequestHash = requestHash,
+                SourceConfiguration = source.Value.Definition.AcquisitionConfiguration.Clone(),
                 Parameters = parameters.Clone(),
                 CreatedBy = context.PrincipalId,
                 TenantId = context.TenantId,
@@ -284,6 +288,9 @@ public sealed class KnowledgeAcquisitionService(
             var input = JsonSerializer.SerializeToElement(new KnowledgeIngestionInput
             {
                 KnowledgeSourceId = $"{value.KnowledgeSourceNamespace}/{value.KnowledgeSourceName}",
+                KnowledgeSourceUid = value.KnowledgeSourceUid,
+                KnowledgeSourceGeneration = value.KnowledgeSourceGeneration,
+                SourceConfiguration = value.SourceConfiguration.Clone(),
                 Parameters = value.Parameters.Clone(),
                 Caller = new(value.CreatedBy, value.TenantId, workspaceId),
                 CorrelationId = value.CorrelationId,
@@ -416,7 +423,8 @@ public sealed class KnowledgeAcquisitionService(
     private static void ValidateContract(ResolvedKnowledgeFlowBinding flow)
     {
         RequireProperties(flow.InputSchema,
-            ["knowledgeSourceId", "parameters", "caller", "correlationId", "acquisitionId"], "input");
+            ["knowledgeSourceId", "knowledgeSourceUid", "knowledgeSourceGeneration", "sourceConfiguration",
+                "parameters", "caller", "correlationId", "acquisitionId"], "input");
         RequireProperties(flow.OutputSchema, ["artifacts"], "output");
     }
 

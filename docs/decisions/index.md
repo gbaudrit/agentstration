@@ -183,3 +183,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 155. [ADR-0155 — Workspaces reconcile code-owned built-in resources](0155-workspaces-reconcile-code-owned-builtin-resources.md)
 156. [ADR-0156 — Crawl4AI web acquisition is an AEP Tool Provider](0156-crawl4ai-web-acquisition-is-an-aep-tool-provider.md)
 157. [ADR-0157 — Bounded Flow repetition composes durable child runs](0157-bounded-flow-repetition-composes-child-runs.md)
+158. [ADR-0158 — Knowledge acquisition snapshots governed source configuration](0158-knowledge-acquisition-snapshots-governed-source-configuration.md)

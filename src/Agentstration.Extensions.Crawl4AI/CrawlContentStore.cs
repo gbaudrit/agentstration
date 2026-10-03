@@ -113,7 +113,8 @@ public sealed class FileCrawlContentStore(
             read += current;
         }
         File.SetLastWriteTimeUtc(path, timeProvider.GetUtcNow().UtcDateTime);
-        return new ContentReadResult(reference, offset, Convert.ToBase64String(buffer, 0, read), offset + read >= stream.Length);
+        var nextOffset = checked(offset + read);
+        return new ContentReadResult(reference, offset, nextOffset, Convert.ToBase64String(buffer, 0, read), nextOffset >= stream.Length);
     }
 
     public async Task<StoredCrawlContent> ReadAllAsync(string reference, CancellationToken cancellationToken)

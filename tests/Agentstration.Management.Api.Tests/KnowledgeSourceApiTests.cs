@@ -37,9 +37,9 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         var retrievalFlow = await flows.GetAsync(workspaceId, new(KnowledgePlatformResourceProvisioner.RetrievalFlowName), default);
         Assert.IsNotNull(ingestionFlow);
         Assert.IsNotNull(retrievalFlow);
-        Assert.AreEqual(KnowledgePlatformResourceProvisioner.Version, ingestionFlow.Value.ActiveVersion);
+        Assert.AreEqual(KnowledgePlatformResourceProvisioner.IngestionFlowVersion, ingestionFlow.Value.ActiveVersion);
         Assert.AreEqual(KnowledgeFlowContracts.Ingestion, ingestionFlow.Value.Metadata[KnowledgeFlowContracts.MetadataKey]);
-        Assert.AreEqual(KnowledgePlatformResourceProvisioner.Version, retrievalFlow.Value.ActiveVersion);
+        Assert.AreEqual(KnowledgePlatformResourceProvisioner.RetrievalFlowVersion, retrievalFlow.Value.ActiveVersion);
         Assert.AreEqual(KnowledgeFlowContracts.Retrieval, retrievalFlow.Value.Metadata[KnowledgeFlowContracts.MetadataKey]);
         Assert.AreEqual("true", ingestionFlow.Value.Metadata[ResourceProvenanceAnnotations.BuiltIn]);
         Assert.AreEqual("true", retrievalFlow.Value.Metadata[ResourceProvenanceAnnotations.BuiltIn]);
@@ -151,7 +151,8 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
                 Kind = KnowledgeResourceKinds.KnowledgeSource,
                 Metadata = new() { Name = "docs" },
                 ScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId),
-                Definition = Properties("Documentation", "docs-ingest", "docs-retrieve")
+                Definition = Properties("Documentation", "docs-ingest", "docs-retrieve",
+                    JsonSerializer.SerializeToElement(new { url = "https://docs.agentstration.io/", acquisitionRoute = "crawl4ai" }))
             }, default);
         using var client = factory.CreateClient();
         using var firstRequest = new HttpRequestMessage(HttpMethod.Post, "/api/knowledgesources/docs/acquisitions")
@@ -175,6 +176,16 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         Assert.AreEqual("1.0.0", started.IngestionFlow.Version);
         Assert.AreEqual(KnowledgeFlowContracts.Ingestion, started.IngestionFlow.Contract);
         Assert.AreEqual("knowledge-correlation", started.CorrelationId);
+        Assert.AreEqual("https://docs.agentstration.io/", started.SourceConfiguration.GetProperty("url").GetString());
+
+        var flowRun = await factory.Services.GetRequiredService<FlowRunService>().GetAsync(
+            new WorkspaceId(context.WorkspaceId), started.FlowRunId, default);
+        Assert.IsNotNull(flowRun);
+        Assert.AreEqual(source.Value.Uid, flowRun.Value.Input.GetProperty("knowledgeSourceUid").GetGuid());
+        Assert.AreEqual(source.Value.Generation, flowRun.Value.Input.GetProperty("knowledgeSourceGeneration").GetInt64());
+        Assert.AreEqual("https://docs.agentstration.io/",
+            flowRun.Value.Input.GetProperty("sourceConfiguration").GetProperty("url").GetString());
+        Assert.AreEqual("en-US", flowRun.Value.Input.GetProperty("parameters").GetProperty("locale").GetString());
 
         await factory.Services.GetRequiredService<FlowRunService>().ExecuteAsync(
             new FlowRunQueueItem(started.FlowRunId,
@@ -943,6 +954,42 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
+    public async Task KnowledgeSourceRequiresBoundedObjectAcquisitionConfiguration()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        using var client = factory.CreateClient();
+
+        using var invalid = await client.PostAsJsonAsync("/api/knowledgesources", new CreateKnowledgeSourceRequest(
+            "invalid-configuration",
+            new KnowledgeSourceProperties
+            {
+                DisplayName = "Invalid configuration",
+                Enabled = false,
+                AcquisitionConfiguration = JsonSerializer.SerializeToElement(new[] { "not", "an", "object" })
+            }));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+        var invalidProblem = await invalid.Content.ReadFromJsonAsync<ProblemDetails>();
+        StringAssert.EndsWith(invalidProblem!.Type, "knowledge_source_acquisition_configuration_invalid");
+
+        using var tooLarge = await client.PostAsJsonAsync("/api/knowledgesources", new CreateKnowledgeSourceRequest(
+            "large-configuration",
+            new KnowledgeSourceProperties
+            {
+                DisplayName = "Large configuration",
+                Enabled = false,
+                AcquisitionConfiguration = JsonSerializer.SerializeToElement(new
+                {
+                    value = new string('x', KnowledgeSourceManagementService.MaximumAcquisitionConfigurationBytes)
+                })
+            }));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, tooLarge.StatusCode);
+        var tooLargeProblem = await tooLarge.Content.ReadFromJsonAsync<ProblemDetails>();
+        StringAssert.EndsWith(tooLargeProblem!.Type, "knowledge_source_acquisition_configuration_too_large");
+    }
+
+    [TestMethod]
     public async Task KnowledgeSourceCannotBeCreatedInAnotherWorkspace()
     {
         await using var factory = Factory();
@@ -996,9 +1043,11 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
     private static KnowledgeSourceProperties Properties(
         string displayName,
         string ingestion,
-        string retrieval) => new()
+        string retrieval,
+        JsonElement? acquisitionConfiguration = null) => new()
         {
             DisplayName = displayName,
+            AcquisitionConfiguration = acquisitionConfiguration?.Clone() ?? JsonSerializer.SerializeToElement(new { }),
             IngestionFlow = new() { Name = ingestion },
             RetrievalFlow = new() { Name = retrieval }
         };
@@ -1123,12 +1172,16 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             properties = new
             {
                 knowledgeSourceId = new { type = "string" },
+                knowledgeSourceUid = new { type = "string" },
+                knowledgeSourceGeneration = new { type = "integer" },
+                sourceConfiguration = new { type = "object" },
                 parameters = new { type = "object" },
                 caller = new { type = "object" },
                 correlationId = new { type = "string" },
                 acquisitionId = new { type = "string" }
             },
-            required = new[] { "knowledgeSourceId", "parameters", "caller", "correlationId", "acquisitionId" }
+            required = new[] { "knowledgeSourceId", "knowledgeSourceUid", "knowledgeSourceGeneration", "sourceConfiguration",
+                "parameters", "caller", "correlationId", "acquisitionId" }
         });
         var outputArtifacts = artifactId is null
             ? Array.Empty<object>()

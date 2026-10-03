@@ -227,7 +227,8 @@ public sealed class KnowledgeFlowActivationGuard : IFlowVersionActivationGuard
                 $"Knowledge Flow contract '{contract}' is not supported.");
         RequireObjectSchema(version.Graph?.InputSchema, "input");
         RequireProperties(version.Graph!.InputSchema!.Value,
-            ["knowledgeSourceId", "parameters", "caller", "correlationId", "acquisitionId"], "input");
+            ["knowledgeSourceId", "knowledgeSourceUid", "knowledgeSourceGeneration", "sourceConfiguration",
+                "parameters", "caller", "correlationId", "acquisitionId"], "input");
         RequireObjectSchema(version.Graph.OutputSchema, "output");
         RequireProperties(version.Graph.OutputSchema!.Value, ["artifacts"], "output");
         return Task.CompletedTask;

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge.Contracts;
@@ -33,6 +34,7 @@ public sealed class KnowledgeSourceManagementService(
 {
     public const int MaximumDisplayNameLength = 200;
     public const int MaximumDescriptionLength = 2_000;
+    public const int MaximumAcquisitionConfigurationBytes = 64 * 1024;
 
     public Task<IReadOnlyList<StoredResource<KnowledgeSourceResource>>> ListAsync(CancellationToken cancellationToken) =>
         store.ListAllAsync<KnowledgeSourceResource>(KnowledgeResourceKinds.KnowledgeSource, cancellationToken);
@@ -208,6 +210,13 @@ public sealed class KnowledgeSourceManagementService(
         if (resource.Definition.Description?.Length > MaximumDescriptionLength)
             throw new KnowledgeSourceValidationException("knowledge_source_description_too_long",
                 $"KnowledgeSource descriptions cannot exceed {MaximumDescriptionLength} characters.");
+        if (resource.Definition.AcquisitionConfiguration.ValueKind != JsonValueKind.Object)
+            throw new KnowledgeSourceValidationException("knowledge_source_acquisition_configuration_invalid",
+                "KnowledgeSource acquisitionConfiguration must be a JSON object.");
+        if (Encoding.UTF8.GetByteCount(resource.Definition.AcquisitionConfiguration.GetRawText())
+            > MaximumAcquisitionConfigurationBytes)
+            throw new KnowledgeSourceValidationException("knowledge_source_acquisition_configuration_too_large",
+                $"KnowledgeSource acquisitionConfiguration cannot exceed {MaximumAcquisitionConfigurationBytes} bytes.");
         ValidateTarget(resource.Definition.IngestionFlow, "ingestion");
         ValidateTarget(resource.Definition.RetrievalFlow, "retrieval");
         if (resource.Definition.Enabled

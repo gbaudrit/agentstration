@@ -19,7 +19,7 @@ public sealed record WebCrawlResult(
     IReadOnlyList<AcquiredContentReference> Contents,
     bool Truncated);
 
-public sealed record ContentReadResult(string Reference, long Offset, string ContentBase64, bool EndOfContent);
+public sealed record ContentReadResult(string Reference, long Offset, long NextOffset, string ContentBase64, bool EndOfContent);
 
 public sealed class Crawl4AiException(string code, string message, Exception? innerException = null) : Exception($"{code}: {message}", innerException)
 {

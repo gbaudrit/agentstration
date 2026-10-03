@@ -58,6 +58,7 @@ public sealed record KnowledgeSourceProperties
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public bool Enabled { get; init; } = true;
+    public JsonElement AcquisitionConfiguration { get; init; } = JsonSerializer.SerializeToElement(new { });
     public KnowledgeFlowTarget? IngestionFlow { get; init; }
     public KnowledgeFlowTarget? RetrievalFlow { get; init; }
 }
@@ -155,6 +156,12 @@ public sealed record KnowledgeIngestionInput
 {
     [JsonPropertyName("knowledgeSourceId")]
     public required string KnowledgeSourceId { get; init; }
+    [JsonPropertyName("knowledgeSourceUid")]
+    public required Guid KnowledgeSourceUid { get; init; }
+    [JsonPropertyName("knowledgeSourceGeneration")]
+    public required long KnowledgeSourceGeneration { get; init; }
+    [JsonPropertyName("sourceConfiguration")]
+    public JsonElement SourceConfiguration { get; init; } = JsonSerializer.SerializeToElement(new { });
     [JsonPropertyName("parameters")]
     public JsonElement Parameters { get; init; } = JsonSerializer.SerializeToElement(new { });
     [JsonPropertyName("caller")]
@@ -177,6 +184,7 @@ public sealed record KnowledgeAcquisitionResource : Resource
     public required string CorrelationId { get; init; }
     public string? IdempotencyKey { get; init; }
     public required string RequestHash { get; init; }
+    public JsonElement SourceConfiguration { get; init; } = JsonSerializer.SerializeToElement(new { });
     public JsonElement Parameters { get; init; } = JsonSerializer.SerializeToElement(new { });
     public required Guid CreatedBy { get; init; }
     public required Guid TenantId { get; init; }
