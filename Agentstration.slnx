@@ -94,7 +94,7 @@
   <Folder Name="/src/Runtime/">
     <Project Path="src/Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
     <Project Path="src/Agentstration.Runtime.Api/Agentstration.Runtime.Api.csproj" />
-    <Project Path="src/Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />
+    <Project Path="src/Agentstration.Runtime.MicrosoftAgentFramework/Agentstration.Runtime.MicrosoftAgentFramework.csproj" />
     <Project Path="src/Agentstration.Runtime.Contracts/Agentstration.Runtime.Contracts.csproj" />
     <Project Path="src/Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
     <Project Path="src/Agentstration.Runtime.Profiles/Agentstration.Runtime.Profiles.csproj" />

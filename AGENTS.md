@@ -49,7 +49,7 @@ src/
   Agentstration.Sources/         Source and source-registry use cases
   Agentstration.Management.Storage.Sqlite/
   Agentstration.Runtime.Abstractions/
-  Agentstration.Runtime.AgentFramework/
+  Agentstration.Runtime.MicrosoftAgentFramework/
   Agentstration.Runtime.Local/
   Agentstration.Runtime.Profiles/  Runtime-profile administration
   Agentstration.Work/             WorkItem aggregate and Runtime-facing port
@@ -88,7 +88,7 @@ Web -> Management / Flow / Runtime public boundaries
 - `Web` is the composition and transport layer. REST endpoints, Razor components, hosted workers, and MCP tools must delegate to the same application services.
 - Agentstration is the source of truth for agent definitions, immutable revisions, deployments, and desired state. Never persist a concrete `AIAgent`.
 - Management abstractions are owned by their resource families. Identity, authorization and PAT contracts belong to `Agentstration.Identity.Contracts`; provider-neutral audit contracts belong to `Agentstration.Security.Contracts`; Extension and AEP contracts belong to `Agentstration.Extensions.Contracts`; Pack installation, Pack catalog schemas and authoring contracts belong to `Agentstration.Packs.Contracts`; Source and Source Registry contracts, policies, provenance and provider ports belong to `Agentstration.Sources.Contracts`. Packs may consume the narrow Source catalog/content contracts, but Sources must never reference Pack assemblies or own Pack lifecycle orchestration. Generic Bootstrap documents, planning and handler ports belong to `Agentstration.ResourceManagement.Contracts`; composed application/API contracts belong to the narrow `Agentstration.Bootstrap.Contracts` façade. Do not recreate a catch-all Management business module or kind catalogue.
-- Concrete Microsoft Agent Framework types belong only in `Agentstration.Runtime.AgentFramework`.
+- Concrete Microsoft Agent Framework types belong only in `Agentstration.Runtime.MicrosoftAgentFramework`.
 - EF Core and SQLite control-plane implementation details belong only in `Agentstration.Management.Storage.Sqlite`.
 - Work Plane EF Core and SQLite details belong only in `Agentstration.Work.Storage.Sqlite`; Work data must not use management or runtime storage.
 - Flow domain types must remain provider-neutral. EF Core belongs only in `Agentstration.Flow.Storage.Sqlite`; Flow Core and Application must not reference Runtime, Web, MAF, or concrete storage.

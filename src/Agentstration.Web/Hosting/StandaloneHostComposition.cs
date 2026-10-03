@@ -15,7 +15,7 @@ using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourcePlanning;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.AgentFramework;
+using Agentstration.Runtime.MicrosoftAgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Security.AspNetCoreIdentity;

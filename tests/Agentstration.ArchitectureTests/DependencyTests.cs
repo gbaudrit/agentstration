@@ -26,7 +26,7 @@ using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.AgentFramework;
+using Agentstration.Runtime.MicrosoftAgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Runtime.Storage.Sqlite;
@@ -134,7 +134,7 @@ public sealed class DependencyTests
             "Agentstration.Infrastructure",
             "Agentstration.Management.Core",
             "Agentstration.ModelProviders",
-            "Agentstration.Runtime.AgentFramework",
+            "Agentstration.Runtime.MicrosoftAgentFramework",
             "Agentstration.Runtime.Core",
             "Agentstration.Security.AspNetCoreIdentity",
             "Agentstration.Tools.Mcp",
@@ -178,7 +178,7 @@ public sealed class DependencyTests
             "Agentstration.Infrastructure",
             "Agentstration.Management.Core",
             "Agentstration.ModelProviders",
-            "Agentstration.Runtime.AgentFramework",
+            "Agentstration.Runtime.MicrosoftAgentFramework",
             "Agentstration.Runtime.Core",
             "Agentstration.Security.AspNetCoreIdentity",
             "Agentstration.Tools.Mcp",
@@ -466,7 +466,7 @@ public sealed class DependencyTests
     {
         var references = typeof(WorkplaceService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Storage.Sqlite", StringComparison.Ordinal)
-            || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
+            || name.Contains("Runtime.MicrosoftAgentFramework", StringComparison.Ordinal)
             || name.Contains("Runtime.Local", StringComparison.Ordinal)));
     }
 
@@ -486,7 +486,7 @@ public sealed class DependencyTests
             || name.Contains("LocalAI", StringComparison.Ordinal)
             || name.Contains("Extensions.Git", StringComparison.Ordinal)
             || name.Contains("Aspire", StringComparison.Ordinal)
-            || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
+            || name.Contains("Runtime.MicrosoftAgentFramework", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
     }
 
@@ -554,7 +554,16 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void AgentFrameworkRuntimeDoesNotReferenceConcreteModelProviders()
+    public void MicrosoftAgentFrameworkRuntimeUsesExplicitBoundaryName()
+    {
+        var runtimeType = typeof(AgentFrameworkRuntimeFactory);
+
+        Assert.AreEqual("Agentstration.Runtime.MicrosoftAgentFramework", runtimeType.Assembly.GetName().Name);
+        Assert.AreEqual("Agentstration.Runtime.MicrosoftAgentFramework", runtimeType.Namespace);
+    }
+
+    [TestMethod]
+    public void MicrosoftAgentFrameworkRuntimeDoesNotReferenceConcreteModelProviders()
     {
         var references = typeof(AgentFrameworkRuntimeFactory).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Ollama", StringComparison.Ordinal)
@@ -564,7 +573,7 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void RuntimeCoreDoesNotReferenceManagementWebWorkConcreteStorageOrAgentFramework()
+    public void RuntimeCoreDoesNotReferenceManagementWebWorkConcreteStorageOrMicrosoftAgentFramework()
     {
         var references = typeof(RuntimeRunService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Management", StringComparison.Ordinal)
@@ -572,12 +581,12 @@ public sealed class DependencyTests
             || name.Contains("Agentstration.Work", StringComparison.Ordinal)
             || name.Contains("Storage.Sqlite", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
-            || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
+            || name.Contains("Runtime.MicrosoftAgentFramework", StringComparison.Ordinal)
             || name.Contains("Runtime.Local", StringComparison.Ordinal)));
     }
 
     [TestMethod]
-    public void RuntimeSqliteStorageDoesNotReferenceWebWorkOrAgentFramework()
+    public void RuntimeSqliteStorageDoesNotReferenceWebWorkOrMicrosoftAgentFramework()
     {
         var references = typeof(SqliteRuntimeRunStore).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Web", StringComparison.Ordinal)
@@ -690,7 +699,7 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void ResourceFamilyApplicationModulesDoNotReferenceHostsConcreteStorageOrAgentFramework()
+    public void ResourceFamilyApplicationModulesDoNotReferenceHostsConcreteStorageOrMicrosoftAgentFramework()
     {
         var assemblies = new[]
         {
@@ -713,7 +722,7 @@ public sealed class DependencyTests
             || name.Contains(".Storage.", StringComparison.Ordinal)
             || name.Contains("EntityFramework", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
-            || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
+            || name.Contains("Runtime.MicrosoftAgentFramework", StringComparison.Ordinal)
             || name.Contains("Runtime.Local", StringComparison.Ordinal)));
     }
 
@@ -1363,7 +1372,7 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void FlowCoreDoesNotReferenceInfrastructureRuntimeOrAgentFramework()
+    public void FlowCoreDoesNotReferenceInfrastructureRuntimeOrMicrosoftAgentFramework()
     {
         var references = typeof(FlowDefinition).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("EntityFramework", StringComparison.Ordinal)

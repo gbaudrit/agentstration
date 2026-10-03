@@ -54,7 +54,7 @@ src/
   Agentstration.Runtime.Abstractions/
   Agentstration.Runtime.Core/       Runtime Run lifecycle, observation, cancellation
   Agentstration.Runtime.Contracts/  Public Runtime Run HTTP contracts
-  Agentstration.Runtime.AgentFramework/
+  Agentstration.Runtime.MicrosoftAgentFramework/
   Agentstration.Runtime.Local/
   Agentstration.Runtime.Profiles/  Runtime-profile administration
   Agentstration.Runtime.Storage.Sqlite/
@@ -104,7 +104,7 @@ Extensions.LlamaCpp -> Aep.AspNetCore + native HTTP
 Extensions.LocalAI -> Aep.AspNetCore + native HTTP
 Extensions.Git -> Aep.AspNetCore + bounded Git process
 AppHost -> provider extensions (configured local inference endpoints)
-Runtime.AgentFramework -> runtime abstractions + ModelProviders + Microsoft Agent Framework
+Runtime.MicrosoftAgentFramework -> runtime abstractions + ModelProviders + Microsoft Agent Framework
 Application -> Work + Work storage abstractions
 Flows.Application -> Flows + Flows.Storage.Abstractions
 Flows.Storage.Sqlite -> Flows.Storage.Abstractions + EF Core SQLite
@@ -118,7 +118,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 
 `Agentstration.Web/Program.cs` is deliberately limited to creating the builder, applying the standalone composition, initializing it, and running it. `StandaloneHostComposition` remains in the executable project and is the single place that selects storage and identity providers, registers concrete adapters and workers, configures observability, orders startup initialization, and assembles `Agentstration.Api` with the Console libraries. The independently runnable `Agentstration.Console.Web` hosts the same Console routes and shared static assets with interactive server rendering, its own antiforgery/culture pipeline, liveness/readiness endpoints, and separately configurable Management, Work, Flow, and Runtime origins. It intentionally contains no authoritative server implementation. Its dedicated signed workload client verifies local credentials through private identity operations and establishes an opaque BFF cookie backed by server-side session state. Active Principal and selected Tenant/Workspace state are revalidated by the authoritative server on every authenticated browser request. Server-side Console clients use short-lived, audience-bound API delegation; the API checks current authentication and authorization for each call. External OIDC login remains dependent on #204, so `Agentstration.Web` remains the functional standalone fallback. See ADR-0111, ADR-0112, ADR-0115, and ADR-0116.
 
-Management abstractions and kind constants are owned by their resource families; the former compatibility assembly has been removed. Identity, authorization and PAT contracts are owned by `Identity.Contracts`, provider-neutral audit contracts by `Security.Contracts`, Extension registration and AEP contracts by `Extensions.Contracts`, and all Source and Source Registry contracts, policies, provenance and provider ports by `Sources.Contracts`. Generic Bootstrap documents, planning and handler ports are owned by `ResourceManagement.Contracts`; composed application and HTTP contracts live in the narrow `Bootstrap.Contracts` façade. Validation and use cases live in plural resource-family modules. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
+Management abstractions and kind constants are owned by their resource families; the former compatibility assembly has been removed. Identity, authorization and PAT contracts are owned by `Identity.Contracts`, provider-neutral audit contracts by `Security.Contracts`, Extension registration and AEP contracts by `Extensions.Contracts`, and all Source and Source Registry contracts, policies, provenance and provider ports by `Sources.Contracts`. Generic Bootstrap documents, planning and handler ports are owned by `ResourceManagement.Contracts`; composed application and HTTP contracts live in the narrow `Bootstrap.Contracts` façade. Validation and use cases live in plural resource-family modules. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.MicrosoftAgentFramework`. Foundry is absent from every central project.
 
 The optional Foundry AEP extension is process-stateless with respect to projects: contribution-scoped Value Requirements place project and inference endpoints, authentication mode and identity inputs on each Model Provider. Standard values bind Parameters or Secrets; the secured API credential binds only a Secret and is redeemed through a one-use AEP grant for each bounded operation. Operator configuration retains only timeouts, size/count limits and the private-network allowlist, so one extension can isolate concurrent providers without making Azure part of local startup. See ADR-0134.
 
@@ -270,7 +270,7 @@ Console save-and-apply / explicit Runtime reconcile
   -> on failure, keep the previous healthy generation running
 ```
 
-Management never constructs an `AIAgent`, resolves credentials, injects a model client, instantiates tools, or executes an agent. `ResolvedAgentSpec` is the provider-neutral boundary for the direct Agent definition, model profile, and tools; concrete MAF materialization remains in `Agentstration.Runtime.AgentFramework`.
+Management never constructs an `AIAgent`, resolves credentials, injects a model client, instantiates tools, or executes an agent. `ResolvedAgentSpec` is the provider-neutral boundary for the direct Agent definition, model profile, and tools; concrete MAF materialization remains in `Agentstration.Runtime.MicrosoftAgentFramework`.
 
 Local activation is idempotent. During the short overlap needed for a safe replacement, routing selects the highest ready `AgentVersion` for each logical agent, so an older ready deployment cannot win because of storage enumeration order.
 
@@ -303,7 +303,7 @@ Agent modelProfile.resourceId
    -> persisted Management provider (AEP URL + contribution id + options)
    -> generic AEP model provider
    -> AepChatClient : Microsoft.Extensions.AI.IChatClient
-   -> Runtime.AgentFramework
+   -> Runtime.MicrosoftAgentFramework
    -> MAF AIAgent
    -> AEP HTTP/JSON or SSE
    -> selected AEP extension
@@ -329,7 +329,7 @@ Agent tool reference: Agentstration.Tools/tools/{name}
   -> AEP descriptor mapping OR direct MCP tools/list
   -> MCP tools/list supplies input/output schemas and annotations
   -> official McpClientTool (Microsoft.Extensions.AI AITool)
-  -> Runtime.AgentFramework -> MAF agent tool invocation -> MCP tools/call
+  -> Runtime.MicrosoftAgentFramework -> MAF agent tool invocation -> MCP tools/call
 ```
 
 AEP owns extension identity, presentation metadata, server declarations, and the mapping from a lightweight contribution to MCP. It deliberately carries no tool schema, invocation payload, result, or operational MCP error. MCP remains authoritative for `tools/list`, schema/annotations, `tools/call`, results, and protocol failures. Agentstration owns persistent `ToolProviderResource` and `ToolResource` documents, discovery state, assignment by canonical resource ID, enablement, and approval policy. Direct external MCP is a ToolProvider and does not pass through AEP. The catalog is independent of MAF; the Runtime adapter consumes its provider-neutral `IAgentTool` and reuses the official SDK's native `AITool` when available. A governed tool marked `requiresApproval` is exposed as an `ApprovalRequiredAIFunction`; MAF's external request then follows the durable `InputRequest` suspension and resume path.

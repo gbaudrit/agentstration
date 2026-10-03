@@ -9,7 +9,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
-namespace Agentstration.Runtime.AgentFramework;
+namespace Agentstration.Runtime.MicrosoftAgentFramework;
 
 public sealed class AgentFrameworkRuntimeFactory(
     IChatClientResolver chatClients,
