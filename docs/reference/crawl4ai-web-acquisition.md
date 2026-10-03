@@ -47,26 +47,25 @@ The MCP schemas expose these stable arguments and results:
 | Tool | Inputs | Result |
 | --- | --- | --- |
 | `web_fetch` | `url`; optional `correlationId` | `correlationId` and one content reference. |
-| `web_crawl` | `startUrl`; optional `maximumDepth`, `maximumPages`, `correlationId` | Applied bounds, ordered content references, and `truncated`. |
+| `web_crawl` | `startUrl`; optional `maximumDepth`, `maximumPages`, `correlationId` | Applied bounds, ordered page references, one normalized corpus reference, and `truncated`. |
 | `content_extract` | `contentReference`; optional `correlationId` | A separate normalized `text/plain` content reference; source URL and media type are resolved from the opaque reference. |
 | `content_read` | `contentReference`, `offset`; optional `maximumBytes` | Base64 chunk, original offset, and `endOfContent`. |
 | `content_delete` | `contentReference` | `true` after the idempotent deletion attempt. |
 
 A content reference contains `reference`, `sourceUrl`, `mediaType`, `length`, `sha256`, `links`, and scalar `metadata`. Tool-specific optional values remain optional in the generated JSON Schema; configured ceilings always take precedence over smaller caller-requested crawl and read bounds.
 
-Fetch and crawl results never embed the acquired document. Each result returns an opaque reference with its source URL, media type, byte length, lowercase SHA-256 digest, accepted links, bounded scalar metadata, and correlation ID. A reference begins with `crawl4ai-content:` but its remaining value is opaque.
+Fetch and crawl results never embed the acquired document. Each result returns opaque references with source URL, media type, byte length, lowercase SHA-256 digest, accepted links, bounded scalar metadata, and correlation ID. A crawl additionally returns one `text/markdown` corpus reference containing the normalized pages separated by their canonical source URLs. The corpus is subject to the same per-content byte limit, so an oversized site fails explicitly instead of crossing the extension boundary unbounded. A reference begins with `crawl4ai-content:` but its remaining value is opaque.
 
 `content_read` accepts the reference, a zero-based byte offset, and an optional bounded byte count. It returns the same offset, base64 content, and an end-of-content flag. Callers advance the offset by the decoded byte count.
 
 ## Ingestion Flow composition
 
-A typical ingestion Flow is:
+A typical site ingestion Flow is:
 
 ```text
 Knowledge Source identifier and acquisition parameters
-  -> route to the selected acquisition Tool or ToolSet
-  -> web_fetch or web_crawl
-  -> optional content_extract
+  -> route to the selected acquisition ToolSet
+  -> web_crawl and select its opaque normalized corpus reference
   -> StagedArtifact create
   -> repeat content_read -> StagedArtifact write
   -> StagedArtifact seal

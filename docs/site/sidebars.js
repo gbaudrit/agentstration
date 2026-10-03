@@ -17,6 +17,14 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: 'Guides',
+      items: [
+        'guides/official-assistant',
+        'guides/agentstration-documentation-knowledge-source',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Concepts',
       items: [
         'concepts/overview',

@@ -1,4 +1,5 @@
 using Agentstration.Artifacts;
+using Agentstration.Identity.Contracts;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -12,6 +13,7 @@ public sealed record StagedArtifactCleanupOptions
 
 public sealed partial class StagedArtifactCleanupWorker(
     ArtifactManagementService artifacts,
+    IRequestContextScopeFactory requestScopes,
     StagedArtifactCleanupOptions options,
     TimeProvider timeProvider,
     ILogger<StagedArtifactCleanupWorker> logger) : BackgroundService
@@ -25,6 +27,7 @@ public sealed partial class StagedArtifactCleanupWorker(
         {
             try
             {
+                using var requestScope = requestScopes.PushSystem();
                 var purged = await artifacts.ExpireAndPurgeAsync(options.MaximumPerPass, stoppingToken);
                 if (purged > 0) CleanupCompleted(logger, purged);
             }

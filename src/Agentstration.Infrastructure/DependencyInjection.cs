@@ -177,6 +177,7 @@ public static class DependencyInjection
         services.AddScoped<IBootstrapResourceHandler, AgentBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, FlowBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, KnowledgeSourceBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, KnowledgeSourceToolExposureBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, EntryBootstrapResourceHandler>();
         services.AddSingleton<WorkspaceMembershipAdministrationService>();
         services.AddSingleton<IdentityExperienceService>();

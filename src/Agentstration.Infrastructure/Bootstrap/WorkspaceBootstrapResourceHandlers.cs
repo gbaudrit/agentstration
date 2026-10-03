@@ -459,6 +459,54 @@ public sealed class KnowledgeSourceBootstrapResourceHandler(
     }
 }
 
+internal sealed record DeclarativeKnowledgeSourceToolExposureDefinition
+{
+    public string Version { get; init; } = "1.0.0";
+    public bool RequiresApproval { get; init; }
+}
+
+public sealed class KnowledgeSourceToolExposureBootstrapResourceHandler(
+    KnowledgeSourceManagementService sources,
+    KnowledgeSourceToolExposureService exposures) : IBootstrapResourceHandler
+{
+    public string Kind => KnowledgeResourceKinds.KnowledgeSourceToolExposure;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
+
+    public async Task<BootstrapResourcePlanResult> PlanAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        BootstrapPlanningContext planning,
+        CancellationToken cancellationToken)
+    {
+        var value = WorkspaceBootstrapResource.Parse<DeclarativeResourceEnvelope<DeclarativeKnowledgeSourceToolExposureDefinition>>(resource);
+        var id = new KnowledgeSourceId(value.Metadata.Name, value.Metadata.Namespace);
+        if (await exposures.GetAsync(id, cancellationToken) is not null)
+            return new(BootstrapResourceDisposition.Skip);
+
+        var source = await sources.GetAsync(id, cancellationToken);
+        if (source is null && !WorkspaceBootstrapResource.IsAvailable(
+                planning, KnowledgeResourceKinds.KnowledgeSource, id.Value, id.Namespace))
+            throw new InvalidOperationException($"Referenced KnowledgeSource '{id}' does not exist and was not planned earlier.");
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(value.Definition.Version);
+        planning.Register(ToolResourceKinds.ToolSet, id.Value, WorkspaceBootstrapResource.PlanningParent(id.Namespace));
+        return WorkspaceBootstrapResource.Created(planning, Kind, id.Value, id.Namespace, resource);
+    }
+
+    public async Task<BootstrapResourceApplyResult> ApplyAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        CancellationToken cancellationToken)
+    {
+        var value = WorkspaceBootstrapResource.Parse<DeclarativeResourceEnvelope<DeclarativeKnowledgeSourceToolExposureDefinition>>(resource);
+        var id = new KnowledgeSourceId(value.Metadata.Name, value.Metadata.Namespace);
+        if (await exposures.GetAsync(id, cancellationToken) is not null)
+            return BootstrapResourceApplyResult.Skipped;
+        _ = await exposures.PublishAsync(id, value.Definition.Version, value.Definition.RequiresApproval, cancellationToken);
+        return BootstrapResourceApplyResult.Created;
+    }
+}
+
 public sealed class EntryBootstrapResourceHandler(
     EntryAdministrationService service,
     IWorkplaceRepository repository,
