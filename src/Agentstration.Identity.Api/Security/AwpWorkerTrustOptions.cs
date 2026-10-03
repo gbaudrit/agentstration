@@ -8,7 +8,7 @@ public sealed class AwpWorkerTrustOptions
     public bool Enabled { get; set; }
     public string InstanceId { get; set; } = string.Empty;
     public int ReplayWindowSeconds { get; set; } = 300;
-    public int MaximumBodyBytes { get; set; } = 1_048_576;
+    public int MaximumBodyBytes { get; set; } = 2_097_152;
     public List<AwpWorkerCredentialOptions> Credentials { get; set; } = [];
 
     public bool Validate()

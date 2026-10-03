@@ -104,6 +104,7 @@
     <Project Path="src/Agentstration.Runtime.Local/Agentstration.Runtime.Local.csproj" />
     <Project Path="src/Agentstration.Runtime.Storage.Sqlite/Agentstration.Runtime.Storage.Sqlite.csproj" />
     <Project Path="src/Agentstration.Runtime.Storage.PostgreSql/Agentstration.Runtime.Storage.PostgreSql.csproj" />
+    <Project Path="src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj" />
   </Folder>
   <Folder Name="/src/Secrets/">
     <Project Path="src/Agentstration.Secrets.Abstractions/Agentstration.Secrets.Abstractions.csproj" />

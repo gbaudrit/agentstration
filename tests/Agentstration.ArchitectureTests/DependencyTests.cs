@@ -29,6 +29,7 @@ using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.MicrosoftAgentFramework;
 using Agentstration.Runtime.Core;
+using Agentstration.Runtime.Worker.MicrosoftAgentFramework;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Runtime.Storage.Sqlite;
 using Agentstration.Secrets;
@@ -536,6 +537,50 @@ public sealed class DependencyTests
             || reference.Contains("Npgsql", StringComparison.Ordinal)
             || reference.Contains("Aspire.Hosting", StringComparison.Ordinal)
             || reference.Contains("Kubernetes", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void MicrosoftAgentFrameworkWorkerHasNoServerStorageOrInfrastructureDependency()
+    {
+        var references = typeof(RuntimeWorkerOptions).Assembly.GetReferencedAssemblies()
+            .Select(reference => reference.Name ?? string.Empty)
+            .ToArray();
+        var forbidden = new[]
+        {
+            "Agentstration.Infrastructure",
+            "Agentstration.Runtime.Core",
+            "Agentstration.Runtime.Api",
+            "Agentstration.Web",
+            "Storage.Sqlite",
+            "Storage.PostgreSql",
+            "EntityFrameworkCore",
+            "Npgsql"
+        };
+        Assert.IsFalse(references.Any(reference =>
+            forbidden.Any(value => reference.Contains(value, StringComparison.Ordinal))));
+
+        var project = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src",
+            "Agentstration.Runtime.Worker.MicrosoftAgentFramework",
+            "Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj"));
+        Assert.DoesNotContain("Agentstration.Infrastructure", project, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Storage.", project, StringComparison.Ordinal);
+        Assert.DoesNotContain("EntityFrameworkCore", project, StringComparison.Ordinal);
+        Assert.Contains("Agentstration.Runtime.MicrosoftAgentFramework", project, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public void AspireAndComposeHostRuntimeWorkersAsSeparateProcesses()
+    {
+        var root = FindRepositoryRoot();
+        var appHost = File.ReadAllText(Path.Combine(root, "src", "Agentstration.AppHost", "Program.cs"));
+        var compose = File.ReadAllText(Path.Combine(root, "deploy", "compose", "base.yml"));
+        Assert.Contains("Agentstration:RuntimeWorkers:Count", appHost, StringComparison.Ordinal);
+        Assert.Contains("AddProject<Projects.Agentstration_Runtime_Worker_MicrosoftAgentFramework>", appHost, StringComparison.Ordinal);
+        Assert.Contains("runtime-worker-1:", compose, StringComparison.Ordinal);
+        Assert.Contains("dockerfile: Dockerfile.worker", compose, StringComparison.Ordinal);
+        Assert.DoesNotContain("Agentstration.Runtime.Worker.MicrosoftAgentFramework",
+            File.ReadAllText(Path.Combine(root, "src", "Agentstration.Web", "Agentstration.Web.csproj")),
+            StringComparison.Ordinal);
     }
 
     [TestMethod]
