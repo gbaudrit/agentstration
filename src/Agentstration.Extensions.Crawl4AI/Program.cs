@@ -11,7 +11,7 @@ builder.Services.AddOptions<Crawl4AiOptions>()
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IDestinationAddressResolver, SystemDestinationAddressResolver>();
 builder.Services.AddSingleton<DestinationPolicy>();
-builder.Services.AddSingleton<ICrawl4AiTokenProvider, FileCrawl4AiTokenProvider>();
+builder.Services.AddSingleton<ICrawl4AiTokenProvider, ConfiguredCrawl4AiTokenProvider>();
 builder.Services.AddSingleton<ICrawlContentStore, FileCrawlContentStore>();
 builder.Services.AddHttpClient<Crawl4AiClient>()
     .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });

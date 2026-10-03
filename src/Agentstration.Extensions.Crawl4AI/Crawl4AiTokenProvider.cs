@@ -7,10 +7,12 @@ public interface ICrawl4AiTokenProvider
     Task<string?> GetTokenAsync(CancellationToken cancellationToken);
 }
 
-public sealed class FileCrawl4AiTokenProvider(IOptions<Crawl4AiOptions> options) : ICrawl4AiTokenProvider
+public sealed class ConfiguredCrawl4AiTokenProvider(IOptions<Crawl4AiOptions> options) : ICrawl4AiTokenProvider
 {
     public async Task<string?> GetTokenAsync(CancellationToken cancellationToken)
     {
+        if (options.Value.ApiToken is { } configuredToken)
+            return Validate(configuredToken);
         var path = options.Value.ApiTokenFile;
         if (string.IsNullOrWhiteSpace(path)) return null;
         try
@@ -21,9 +23,7 @@ public sealed class FileCrawl4AiTokenProvider(IOptions<Crawl4AiOptions> options)
             var token = await File.ReadAllTextAsync(path, cancellationToken);
             if (token.EndsWith("\r\n", StringComparison.Ordinal)) token = token[..^2];
             else if (token.EndsWith('\n')) token = token[..^1];
-            if (token.Length is < 1 or > 4096 || token.Contains('\n', StringComparison.Ordinal) || token.Contains('\r', StringComparison.Ordinal))
-                throw new Crawl4AiException("crawl4ai_token_invalid", "The configured Crawl4AI API token is invalid.");
-            return token;
+            return Validate(token);
         }
         catch (Crawl4AiException)
         {
@@ -33,5 +33,16 @@ public sealed class FileCrawl4AiTokenProvider(IOptions<Crawl4AiOptions> options)
         {
             throw new Crawl4AiException("crawl4ai_token_unavailable", "The configured Crawl4AI API token file is unavailable.", exception);
         }
+    }
+
+    private static string Validate(string token)
+    {
+        if (token.Length is < 1 or > 4096
+            || token.Contains('\n', StringComparison.Ordinal)
+            || token.Contains('\r', StringComparison.Ordinal))
+        {
+            throw new Crawl4AiException("crawl4ai_token_invalid", "The configured Crawl4AI API token is invalid.");
+        }
+        return token;
     }
 }

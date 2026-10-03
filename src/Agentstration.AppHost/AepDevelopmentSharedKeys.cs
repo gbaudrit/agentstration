@@ -5,12 +5,6 @@ namespace Agentstration.AppHost;
 
 public static class AepDevelopmentSharedKeys
 {
-    public static IReadOnlyDictionary<string, string> Provision(string directory, params string[] extensionNames) =>
-        DevelopmentTokenFiles.Provision(directory, extensionNames);
-}
-
-public static class DevelopmentTokenFiles
-{
     private const int MinimumTokenBytes = 32;
     private const int MaximumFileBytes = 4096;
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
@@ -29,17 +23,6 @@ public static class DevelopmentTokenFiles
             result.Add(extensionName, path);
         }
         return result;
-    }
-
-    public static string Provision(string directory, string fileName)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
-        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
-        Directory.CreateDirectory(directory);
-        var path = Path.Combine(directory, fileName);
-        if (!File.Exists(path)) WriteAtomic(path);
-        Validate(path);
-        return path;
     }
 
     private static void WriteAtomic(string path)

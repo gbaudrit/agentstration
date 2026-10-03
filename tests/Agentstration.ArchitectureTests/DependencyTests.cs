@@ -87,8 +87,13 @@ public sealed class DependencyTests
         Assert.Contains("Crawl4AI:Provisioning", appHost, StringComparison.Ordinal);
         Assert.Contains("builder.AddContainer(", appHost, StringComparison.Ordinal);
         Assert.Contains("unclecode/crawl4ai", appHost, StringComparison.Ordinal);
-        Assert.Contains("/run/secrets/api_token", appHost, StringComparison.Ordinal);
-        Assert.Contains("isReadOnly: true", appHost, StringComparison.Ordinal);
+        Assert.Contains("new GenerateParameterDefault()", appHost, StringComparison.Ordinal);
+        Assert.Contains("secret: true", appHost, StringComparison.Ordinal);
+        Assert.Contains(".WithEnvironment(\"CRAWL4AI_API_TOKEN\", crawl4AiToken)", appHost, StringComparison.Ordinal);
+        Assert.Contains(".WithEnvironment(\"Crawl4AI__ApiToken\", crawl4AiToken)", appHost, StringComparison.Ordinal);
+        Assert.Contains("DeveloperCertificateDefaultHttpsTerminationEnabled = false", appHost, StringComparison.Ordinal);
+        Assert.Contains(".WithDeveloperCertificateTrust(false)", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain(".WithBindMount(crawl4AiTokenFile", appHost, StringComparison.Ordinal);
         Assert.Contains("--cap-drop=ALL", appHost, StringComparison.Ordinal);
         Assert.Contains("--security-opt=no-new-privileges", appHost, StringComparison.Ordinal);
         Assert.Contains("--read-only", appHost, StringComparison.Ordinal);

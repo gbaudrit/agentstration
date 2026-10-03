@@ -201,6 +201,32 @@ public sealed class Crawl4AiExtensionTests
             service.FetchAsync("https://example.test/page", null, cancellation.Token));
     }
 
+    [TestMethod]
+    public async Task TokenProviderReturnsTheOrchestratorManagedToken()
+    {
+        var provider = new ConfiguredCrawl4AiTokenProvider(Options.Create(new Crawl4AiOptions
+        {
+            ApiToken = "managed-token"
+        }));
+
+        var token = await provider.GetTokenAsync(default);
+
+        Assert.AreEqual("managed-token", token);
+    }
+
+    [TestMethod]
+    public async Task TokenProviderRejectsMultilineManagedToken()
+    {
+        var provider = new ConfiguredCrawl4AiTokenProvider(Options.Create(new Crawl4AiOptions
+        {
+            ApiToken = "invalid\ntoken"
+        }));
+
+        var exception = await Assert.ThrowsAsync<Crawl4AiException>(() => provider.GetTokenAsync(default));
+
+        Assert.AreEqual("crawl4ai_token_invalid", exception.Code);
+    }
+
     private static HttpResponseMessage Json(object value) => new(HttpStatusCode.OK) { Content = JsonContent.Create(value) };
 
     private sealed class TemporaryFixture : IAsyncDisposable

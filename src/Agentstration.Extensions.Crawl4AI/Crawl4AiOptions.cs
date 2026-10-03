@@ -7,6 +7,7 @@ public sealed record Crawl4AiOptions
 {
     public const string SectionName = "Crawl4AI";
     public Uri Endpoint { get; init; } = new("http://localhost:11235");
+    public string? ApiToken { get; init; }
     public string? ApiTokenFile { get; init; }
     public IReadOnlyList<string> AllowedDomains { get; init; } = [];
     public IReadOnlyList<int> AllowedPorts { get; init; } = [80, 443];

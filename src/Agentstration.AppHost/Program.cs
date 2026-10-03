@@ -1,7 +1,11 @@
 using Agentstration.AppHost;
 using Aspire.Hosting.ApplicationModel;
 
-var builder = DistributedApplication.CreateBuilder(args);
+var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions
+{
+    Args = args,
+    DeveloperCertificateDefaultHttpsTerminationEnabled = false
+});
 var worktreeRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", ".."));
 var slot = builder.Configuration["Agentstration:Slot"] ?? "main";
 var dynamicApplicationPorts = bool.TryParse(
@@ -153,9 +157,7 @@ if (foundryEnabled)
 }
 if (crawl4AiEnabled)
 {
-    var crawl4AiTokenFile = crawl4AiManaged
-        ? DevelopmentTokenFiles.Provision(Path.Combine(slotDataPath, "crawl4ai"), "api-token")
-        : builder.Configuration["Crawl4AI:ApiTokenFile"];
+    var crawl4AiTokenFile = builder.Configuration["Crawl4AI:ApiTokenFile"];
     var crawl4AiExtension = builder.AddProject<Projects.Agentstration_Extensions_Crawl4AI>("crawl4ai-extension")
         .WithEnvironment("Agentstration__Slot", slot)
         .WithEnvironment("Crawl4AI__ContentDirectory", Path.Combine(slotDataPath, "crawl4ai-content"))
@@ -163,13 +165,19 @@ if (crawl4AiEnabled)
         .WithDynamicHostPorts(dynamicApplicationPorts);
     if (crawl4AiManaged)
     {
+        var crawl4AiToken = builder.AddParameter(
+            $"crawl4ai-token-{instanceId}",
+            new GenerateParameterDefault(),
+            secret: true,
+            persist: true);
         var crawl4AiService = builder.AddContainer(
                 "crawl4ai",
                 builder.Configuration["Crawl4AI:Image"] ?? "unclecode/crawl4ai")
             .WithImageTag(builder.Configuration["Crawl4AI:ImageTag"] ?? "0.9.4")
             .WithHttpEndpoint(targetPort: 11235, name: "http")
             .WithHttpHealthCheck("/health")
-            .WithBindMount(crawl4AiTokenFile!, "/run/secrets/api_token", isReadOnly: true)
+            .WithEnvironment("CRAWL4AI_API_TOKEN", crawl4AiToken)
+            .WithDeveloperCertificateTrust(false)
             .WithContainerRuntimeArgs(
                 "--shm-size=1g",
                 "--cap-drop=ALL",
@@ -185,7 +193,7 @@ if (crawl4AiEnabled)
                 "--memory=4g");
         crawl4AiExtension
             .WithEnvironment("Crawl4AI__Endpoint", crawl4AiService.GetEndpoint("http"))
-            .WithEnvironment("Crawl4AI__ApiTokenFile", crawl4AiTokenFile!)
+            .WithEnvironment("Crawl4AI__ApiToken", crawl4AiToken)
             .WaitFor(crawl4AiService);
     }
     else

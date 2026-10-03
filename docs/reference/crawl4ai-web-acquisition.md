@@ -6,7 +6,7 @@ Agentstration provides an optional AEP extension that exposes a self-hosted Craw
 
 Run [Crawl4AI](https://github.com/unclecode/crawl4ai) 0.9.0 or newer and enable its API authentication. This baseline retains Crawl4AI's [secure request boundary and SSRF protections](https://docs.crawl4ai.com/core/security/).
 
-Aspire uses managed provisioning by default when the extension is enabled. It starts the pinned Crawl4AI container, creates a worktree-local protected token file, mounts that file read-only into the container, passes the same file to the AEP extension, and waits for Crawl4AI readiness before starting the extension:
+Aspire uses managed provisioning by default when the extension is enabled. It starts the pinned Crawl4AI container, creates a persisted Aspire secret parameter, injects it into Crawl4AI's supported `CRAWL4AI_API_TOKEN` environment variable and the extension's protected configuration, and waits for Crawl4AI readiness before starting the extension. Aspire masks the parameter in its dashboard and persists it in AppHost user secrets. This avoids host bind mounts so Windows AppHosts can target a Linux Docker daemon running in WSL. The AppHost disables implicit development-certificate HTTPS termination for non-ASP.NET resources; HTTPS must be configured explicitly for any such resource that needs it. Crawl4AI is HTTP-only, opts out of development-certificate trust, and retains a read-only root filesystem:
 
 ```text
 Crawl4AI__Enabled=true
@@ -26,7 +26,7 @@ Crawl4AI__ApiTokenFile=C:\protected\crawl4ai.token
 Crawl4AI__AllowedDomains__0=docs.example.com
 ```
 
-`Enabled` and `Provisioning` are consumed by AppHost. The acquisition limits and destination policy are passed to the extension. A manually launched extension uses the extension settings directly without those two AppHost controls.
+`Enabled` and `Provisioning` are consumed by AppHost. The acquisition limits and destination policy are passed to the extension. A manually launched extension uses the extension settings directly without those two AppHost controls. `Crawl4AI:ApiToken` is reserved for orchestrator-managed secret injection; prefer `ApiTokenFile` for a manually hosted or external deployment.
 
 The extension sends a minimal `{ "urls": ["…"] }` request to Crawl4AI. Flow or Agent input cannot set browser arguments, execute JavaScript, supply cookies or headers, choose a proxy, or override the configured endpoint.
 
