@@ -70,6 +70,11 @@ be configured with `PairingCodeFile`. Its one-time credential is persisted to th
 command-line arguments, or logs. A static deployment instead sets `WorkerId`, `CredentialId`,
 `InstanceId`, and `SharedKeyFile`, mounting that file read-only.
 
+When `OTEL_EXPORTER_OTLP_ENDPOINT` is supplied (Aspire injects it), the Worker exports logs, HTTP
+client/server telemetry, MAF telemetry, and a `runtime.worker.assignment.execute` span under its own
+resource. Assignment spans carry Worker, session, assignment, attempt, fencing and Run correlation
+attributes without recording prompts, credentials, ownership tokens, Tool arguments or model output.
+
 ## AEP outbound transport
 
 Agentstration disables redirects for authenticated AEP requests and requires remote extensions to use HTTPS. The default local profile permits HTTP and private addresses only for `localhost`, `127.0.0.1`, and `::1`. Aspire resolves its local project endpoints through those loopback origins.

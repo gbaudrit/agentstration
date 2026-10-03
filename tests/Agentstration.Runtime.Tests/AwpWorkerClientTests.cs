@@ -66,6 +66,13 @@ public sealed class AwpWorkerClientTests
     }
 
     [TestMethod]
+    public void WorkerUsesDedicatedTelemetrySource()
+    {
+        Assert.AreEqual("Agentstration.Runtime.Worker.MicrosoftAgentFramework",
+            AwpRuntimeWorkerService.ActivitySource.Name);
+    }
+
+    [TestMethod]
     public async Task EventRejectedByTransportIsReplayedWithStableIdentityBeforeNextEvent()
     {
         var clock = new MutableTimeProvider(DateTimeOffset.Parse("2026-10-03T12:00:00Z",

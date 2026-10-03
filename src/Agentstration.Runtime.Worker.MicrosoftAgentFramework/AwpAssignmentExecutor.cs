@@ -30,7 +30,7 @@ internal sealed class AwpAssignmentExecutor(ILoggerFactory loggerFactory)
         var chatClient = new AwpModelChatClient(session, material.Agent, turn);
         var toolPipeline = new AwpToolExecutionPipeline(session, material.Agent, turn);
         var factory = new AgentFrameworkRuntimeFactory(new AwpChatClientResolver(chatClient), loggerFactory,
-            new GenAiObservabilityOptions { Enabled = false });
+            new GenAiObservabilityOptions { Enabled = true });
         var definition = new ExecutableAgentDefinition
         {
             AgentId = material.Agent.AgentId,

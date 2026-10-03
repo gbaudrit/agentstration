@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using System.Text.Json;
@@ -15,6 +16,8 @@ internal sealed class AwpRuntimeWorkerService(
     TimeProvider timeProvider,
     ILogger<AwpRuntimeWorkerService> logger) : BackgroundService
 {
+    public static readonly ActivitySource ActivitySource = new("Agentstration.Runtime.Worker.MicrosoftAgentFramework");
+
     private readonly ConcurrentDictionary<AwpAssignmentId, Task> active = new();
     private int activeCount;
 
@@ -96,6 +99,19 @@ internal sealed class AwpRuntimeWorkerService(
     private async Task RunAssignmentAsync(AwpClient client, AwpRunAssignment assignment, DateTimeOffset serverTime,
         RuntimeWorkerOptions configured, CancellationToken stoppingToken)
     {
+        using var activity = ActivitySource.StartActivity("runtime.worker.assignment.execute", ActivityKind.Consumer);
+        activity?.SetTag("agentstration.worker.id", client.WorkerId.Value);
+        activity?.SetTag("agentstration.worker.session.id", client.SessionId.Value);
+        activity?.SetTag("agentstration.assignment.id", assignment.AssignmentId.Value);
+        activity?.SetTag("agentstration.assignment.attempt.id", assignment.AttemptId.Value);
+        activity?.SetTag("agentstration.assignment.fencing_generation", assignment.Ownership.FencingGeneration);
+        activity?.SetTag("agentstration.run.id", assignment.Target switch
+        {
+            AwpDirectAgentRunTarget direct => direct.RuntimeRunId,
+            AwpRootFlowRunTarget flow => flow.FlowRunId,
+            _ => null
+        });
+        activity?.SetTag("agentstration.run.target_kind", assignment.Target.GetType().Name);
         var session = new AwpAssignmentSession(client, assignment, serverTime, timeProvider,
             TimeSpan.FromSeconds(configured.LeaseSafetyMarginSeconds));
         using var execution = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
@@ -117,24 +133,29 @@ internal sealed class AwpRuntimeWorkerService(
             var output = await executor.ExecuteAsync(session, material, execution.Token);
             session.EnsureCanStartMutation();
             await client.CompleteAsync(new(session.Context, new(Guid.NewGuid()), output), execution.Token);
+            activity?.SetStatus(ActivityStatusCode.Ok);
         }
         catch (OperationCanceledException) when (cancellationRequested && session.CanStartMutation())
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "assignment_cancelled");
             await TryFailAsync(session, AwpExecutionFailureKind.Cancelled, "assignment_cancelled",
                 "The authoritative server requested cancellation.", stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested && session.CanStartMutation())
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "worker_shutdown");
             await TryFailAsync(session, AwpExecutionFailureKind.Cancelled, "worker_shutdown",
                 "The Runtime Worker is shutting down.", CancellationToken.None);
         }
         catch (OperationCanceledException) when (!session.CanStartMutation())
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "lease_unsafe");
             logger.LogWarning("Stopped assignment {AssignmentId} because its lease can no longer safely authorize mutations",
                 assignment.AssignmentId.Value);
         }
         catch (AwpLeaseUnsafeException)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "lease_unsafe");
             logger.LogWarning("Stopped assignment {AssignmentId} because its lease can no longer safely authorize mutations",
                 assignment.AssignmentId.Value);
         }
@@ -142,7 +163,17 @@ internal sealed class AwpRuntimeWorkerService(
         {
             var code = exception is AwpExecutionNotSupportedException unsupported
                 ? unsupported.Code : "worker_execution_failed";
+            activity?.SetStatus(ActivityStatusCode.Error, code);
+            activity?.SetTag("error.type", exception.GetType().FullName);
             await TryFailAsync(session, AwpExecutionFailureKind.Execution, code, exception.Message, stoppingToken);
+        }
+        catch (Exception exception)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "lease_unsafe");
+            activity?.SetTag("error.type", exception.GetType().FullName);
+            logger.LogWarning(exception,
+                "Stopped assignment {AssignmentId} without another mutation because its lease is no longer safe",
+                assignment.AssignmentId.Value);
         }
         finally
         {
