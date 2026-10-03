@@ -58,7 +58,10 @@ src/
   Agentstration.Work.Storage.Sqlite/
   Agentstration.Web/             REST, Razor Components, MCP, hosted workers
   Agentstration.AppHost/         Aspire orchestration and dashboard
+awp/
+  src/Agentstration.Awp.Abstractions/ Provider-neutral AWP wire contracts
 tests/
+  Agentstration.Awp.Tests/
   Agentstration.Application.Tests/
   Agentstration.ArchitectureTests/
   Agentstration.Tools.Tests/

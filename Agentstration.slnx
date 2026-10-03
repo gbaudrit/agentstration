@@ -5,6 +5,9 @@
     <Project Path="aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
     <Project Path="aep/src/Agentstration.Aep.MicrosoftExtensionsAI/Agentstration.Aep.MicrosoftExtensionsAI.csproj" />
   </Folder>
+  <Folder Name="/awp/">
+    <Project Path="awp/src/Agentstration.Awp.Abstractions/Agentstration.Awp.Abstractions.csproj" />
+  </Folder>
   <Folder Name="/src/Agents/">
     <Project Path="src/Agentstration.Agents.Api/Agentstration.Agents.Api.csproj" />
     <Project Path="src/Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />
@@ -172,6 +175,7 @@
     <Project Path="tests/Agentstration.Management.Security.Tests/Agentstration.Management.Security.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Runtime/">
+    <Project Path="tests/Agentstration.Awp.Tests/Agentstration.Awp.Tests.csproj" />
     <Project Path="tests/Agentstration.Runtime.Tests/Agentstration.Runtime.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Tools/">
