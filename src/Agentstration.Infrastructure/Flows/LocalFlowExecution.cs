@@ -215,7 +215,12 @@ public sealed class ManagementFlowResourceReferenceResolver(IResourceStore store
         var published = await flows.GetVersionAsync(workspaceId, id, version, cancellationToken);
         return published is null
             ? null
-            : new ResolvedFlowCall(id, published.Value.Version, published.Value.Graph?.InputSchema, published.Value.Graph?.OutputSchema);
+            : new ResolvedFlowCall(
+                id,
+                published.Value.Version,
+                published.Value.Graph?.InputSchema,
+                published.Value.Graph?.OutputSchema,
+                published.Value.Graph?.GetOutputs());
     }
 
     public async Task<ResolvedFlowTool?> ResolveToolAsync(

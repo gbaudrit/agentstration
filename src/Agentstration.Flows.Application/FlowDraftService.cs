@@ -191,22 +191,22 @@ public static class FlowDraftTemplates
                 new InputFlowStepDefinition { Name = "input", DisplayName = "Input", Schema = schema },
                 new RouterFlowStepDefinition { Name = "route-request", DisplayName = "Route request", Candidates = [new("sql", new(SqlAgent), "SQL questions", ["query", "database"]), new("dotnet", new(DotNetAgent), ".NET questions", ["C#", "ASP.NET"])], Fallback = new(DotNetAgent) },
                 new AgentFlowStepDefinition { Name = "execute-agent", DisplayName = "Selected Agent", Agent = new("${steps.route-request.output.selectedAgent}"), InputMapping = JsonSerializer.SerializeToElement(new { prompt = "${input.prompt}" }) },
-                new OutputFlowStepDefinition { Name = "complete-flow", DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement(new { result = "${steps.execute-agent.output}" }) },
-                new FailureFlowStepDefinition { Name = "fail-flow", DisplayName = "Failure" }
+                new OutputFlowStepDefinition { Name = "completed", DisplayName = "Completed", Outcome = FlowOutputOutcome.Success, OutputMapping = JsonSerializer.SerializeToElement(new { result = "${steps.execute-agent.output}" }) },
+                new OutputFlowStepDefinition { Name = "error", DisplayName = "Error", Outcome = FlowOutputOutcome.Error }
             ],
             Transitions =
             [
                 new("input-completed", "input", "completed", "route-request"),
                 new("router-selected", "route-request", "selected", "execute-agent"),
-                new("router-failed", "route-request", "failed", "fail-flow"),
-                new("agent-completed", "execute-agent", "completed", "complete-flow"),
-                new("agent-failed", "execute-agent", "failed", "fail-flow")
+                new("router-failed", "route-request", "failed", "error"),
+                new("agent-completed", "execute-agent", "completed", "completed"),
+                new("agent-failed", "execute-agent", "failed", "error")
             ],
-            Designer = new FlowDesignerMetadata { NodePositions = Positions("input", "route-request", "execute-agent", "complete-flow", "fail-flow") }
+            Designer = new FlowDesignerMetadata { NodePositions = Positions("input", "route-request", "execute-agent", "completed", "error") }
         };
     }
 
-    private static FlowGraphDefinition Empty() => new() { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input", DisplayName = "Input" }, new OutputFlowStepDefinition { Name = "output", DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") }], Transitions = [new("input-output", "input", "completed", "output")], Designer = new() { NodePositions = Positions("input", "output") } };
+    private static FlowGraphDefinition Empty() => new() { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input", DisplayName = "Input" }, new OutputFlowStepDefinition { Name = "completed", DisplayName = "Completed", Outcome = FlowOutputOutcome.Success, OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") }, new OutputFlowStepDefinition { Name = "error", DisplayName = "Error", Outcome = FlowOutputOutcome.Error }], Transitions = [new("input-completed", "input", "completed", "completed")], Designer = new() { NodePositions = Positions("input", "completed", "error") } };
     private static FlowGraphDefinition Sequential() => Empty();
     private static FlowGraphDefinition Conditional() => AgentRouting();
     private static IReadOnlyDictionary<string, FlowNodePosition> Positions(params string[] names) => names.Select((name, index) => new KeyValuePair<string, FlowNodePosition>(name, new(index < names.Length - 1 ? index * 210 : 630, index == names.Length - 1 ? 190 : 40))).ToDictionary();

@@ -10,6 +10,100 @@ namespace Agentstration.Application.Tests;
 public sealed partial class FlowTests
 {
     [TestMethod]
+    public void NamedOutputsRoundTripThroughJsonAndYamlAndExposeEffectiveSchemas()
+    {
+        var successSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { answer = new { type = "string" } } });
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new OutputFlowStepDefinition
+                {
+                    Name = "approved",
+                    DisplayName = "Approved",
+                    Outcome = FlowOutputOutcome.Success,
+                    Schema = successSchema,
+                    OutputMapping = JsonSerializer.SerializeToElement("${transition.output}")
+                },
+                new OutputFlowStepDefinition
+                {
+                    Name = "rejected",
+                    DisplayName = "Rejected",
+                    Outcome = FlowOutputOutcome.Error,
+                    Code = "REJECTED",
+                    Message = "The request was rejected."
+                }
+            ],
+            Transitions = [new("input-approved", "input", "completed", "approved")]
+        };
+
+        var json = JsonSerializer.Serialize(graph, JsonOptions);
+        var jsonRestored = JsonSerializer.Deserialize<FlowGraphDefinition>(json, JsonOptions)!;
+        var yaml = FlowDraftService.ToYaml(graph);
+        var yamlRestored = new FlowDraftService(null!, null!, null!, TimeProvider.System).ParseSource(yaml, "yaml");
+
+        CollectionAssert.AreEquivalent(new[] { "approved", "rejected" }, jsonRestored.GetOutputs().Select(output => output.Name).ToArray());
+        Assert.AreEqual(FlowOutputOutcome.Success, jsonRestored.GetOutputs().Single(output => output.Name == "approved").Outcome);
+        Assert.AreEqual("string", yamlRestored.GetOutputs().Single(output => output.Name == "approved").Schema?.GetProperty("properties").GetProperty("answer").GetProperty("type").GetString());
+        StringAssert.Contains(json, "\"outcome\":\"success\"");
+        StringAssert.Contains(yaml, "outcome: success");
+    }
+
+    [TestMethod]
+    public void LegacyOutputAndFailureRemainReadableWithTheirPreviousDefaults()
+    {
+        const string json = """
+            {"entryStep":"input","steps":[{"type":"input","name":"input"},{"type":"output","name":"output"},{"type":"failure","name":"failure"}],"transitions":[{"id":"done","fromStep":"input","event":"completed","toStep":"output"}]}
+            """;
+
+        var restored = JsonSerializer.Deserialize<FlowGraphDefinition>(json, JsonOptions)!;
+        var output = Assert.IsInstanceOfType<OutputFlowStepDefinition>(restored.Steps[1]);
+        var failure = Assert.IsInstanceOfType<FailureFlowStepDefinition>(restored.Steps[2]);
+
+        Assert.IsNull(output.Outcome);
+        Assert.AreEqual(FlowOutputOutcome.Success, restored.GetOutputs().Single(value => value.Name == "output").Outcome);
+        Assert.AreEqual("FLOW_FAILED", failure.Code);
+        using var serialized = JsonDocument.Parse(JsonSerializer.Serialize(restored, JsonOptions));
+        var legacyOutput = serialized.RootElement.GetProperty("steps")[1];
+        Assert.IsFalse(legacyOutput.TryGetProperty("outcome", out _));
+        Assert.IsFalse(legacyOutput.TryGetProperty("schema", out _));
+        Assert.IsFalse(legacyOutput.TryGetProperty("code", out _));
+        Assert.IsFalse(legacyOutput.TryGetProperty("message", out _));
+    }
+
+    [TestMethod]
+    public async Task OutputSchemaInferenceRejectsIncompatibleIncomingContracts()
+    {
+        var firstSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { first = new { type = "string" } } });
+        var secondSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { second = new { type = "number" } } });
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "first",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "first", Schema = firstSchema },
+                new InputFlowStepDefinition { Name = "second", Schema = secondSchema },
+                new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success }
+            ],
+            Transitions =
+            [
+                new("first-completed", "first", "completed", "completed"),
+                new("second-completed", "second", "completed", "completed")
+            ]
+        };
+
+        var result = await new FlowGraphValidator(new FlowCallResolverStub(null!)).ValidateAsync(
+            graph,
+            new FlowValidationContext(ResolveResources: false),
+            default);
+
+        Assert.IsTrue(result.Issues.Any(issue => issue.Code == "flow_output_schema_ambiguous"));
+        Assert.IsNull(graph.GetOutputs().Single(output => output.Name == "completed").Schema);
+    }
+
+    [TestMethod]
     public void FlowCallRoundTripsThroughJsonAndYamlAndContributesToTheDefinitionHash()
     {
         var graph = Graph(new FlowCallStepDefinition
@@ -118,6 +212,7 @@ public sealed partial class FlowTests
 
         Assert.IsNotNull(target);
         Assert.AreEqual("1.0.0", target.Version);
+        CollectionAssert.Contains(target.Outputs!.Select(output => output.Name).ToArray(), "output");
         Assert.IsTrue(await resolver.CreatesFlowCycleAsync(TestScope.WorkspaceId, parent.Value.Id, target, default));
         var otherWorkspace = new WorkspaceId(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
         Assert.IsNull(await resolver.ResolveFlowAsync(otherWorkspace, ResourceNamespace.Default, new("child"), default));
