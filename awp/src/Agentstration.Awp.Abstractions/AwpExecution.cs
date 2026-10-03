@@ -43,6 +43,7 @@ public enum AwpExecutionEventKind
 {
     AssignmentStarted,
     RunStarted,
+    RunCompleted,
     StepStarted,
     StepCompleted,
     TurnStarted,

@@ -36,7 +36,8 @@ public sealed record AwpRunAssignment(
     AwpAssignmentTarget Target,
     AwpRuntimeRequirement Runtime,
     AwpExecutionMaterialReference ExecutionMaterial,
-    AwpAssignmentOwnership Ownership);
+    AwpAssignmentOwnership Ownership,
+    long InitialEventSequence = 0);
 
 public sealed record AwpClaimRequest(
     AwpWorkerId WorkerId,

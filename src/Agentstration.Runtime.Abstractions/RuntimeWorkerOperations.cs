@@ -45,7 +45,8 @@ public sealed record RuntimeGovernedArtifact(
 public sealed record RuntimeGovernedChildFlow(
     string RunId,
     string Status,
-    JsonElement? Output);
+    JsonElement? Output,
+    RuntimeRootFlowExecutionMaterial? Material = null);
 
 public interface IRuntimeWorkerOperationGateway
 {

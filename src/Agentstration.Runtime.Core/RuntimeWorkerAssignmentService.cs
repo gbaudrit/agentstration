@@ -30,8 +30,10 @@ public sealed class RuntimeWorkerAssignmentService(
     IRuntimeWorkerAssignmentStore assignments,
     TimeProvider timeProvider,
     RuntimeWorkerLeaseOptions options,
-    RuntimeAssignmentAvailabilitySignal availability)
+    RuntimeAssignmentAvailabilitySignal availability,
+    IRuntimeAssignmentProjection? configuredProjection = null)
 {
+    private readonly IRuntimeAssignmentProjection projection = configuredProjection ?? new NullRuntimeAssignmentProjection();
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         options.Validate();
@@ -225,7 +227,15 @@ public sealed class RuntimeWorkerAssignmentService(
         }, now, cancellationToken);
     }
 
-    public Task<RuntimeAssignmentEventAppendResult> AppendEventsAsync(
+    public Task RegisterChildFlowAsync(RuntimeAssignmentOwnershipProof proof, string childFlowRunId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(childFlowRunId);
+        return assignments.RegisterChildFlowAsync(proof, Digest(proof.OwnershipToken), childFlowRunId,
+            timeProvider.GetUtcNow(), cancellationToken);
+    }
+
+    public async Task<RuntimeAssignmentEventAppendResult> AppendEventsAsync(
         RuntimeAssignmentOwnershipProof proof,
         IReadOnlyList<RuntimeAssignmentExecutionEvent> events,
         CancellationToken cancellationToken)
@@ -234,8 +244,11 @@ public sealed class RuntimeWorkerAssignmentService(
             || value.Payload?.GetRawText().Length > 65_536))
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.LimitExceeded,
                 "Event kinds are limited to 128 characters and individual payloads to 64 KiB.");
-        return assignments.AppendEventsAsync(proof, Digest(proof.OwnershipToken), events,
+        var result = await assignments.AppendEventsAsync(proof, Digest(proof.OwnershipToken), events,
             timeProvider.GetUtcNow(), cancellationToken);
+        var assignment = (await assignments.GetAsync(proof.WorkspaceId, proof.AssignmentId, cancellationToken))!.Value;
+        await projection.ProjectEventsAsync(assignment, events, cancellationToken);
+        return result;
     }
 
     public Task StoreCheckpointAsync(
@@ -273,23 +286,50 @@ public sealed class RuntimeWorkerAssignmentService(
         CancellationToken cancellationToken) =>
         assignments.RequestCancellationAsync(workspaceId, assignmentId, timeProvider.GetUtcNow(), cancellationToken);
 
-    public Task<RuntimeAssignmentTerminalResult> CompleteAsync(
+    public async Task<RuntimeAssignmentTerminalResult> CompleteAsync(
         RuntimeAssignmentOwnershipProof proof,
         RuntimeAssignmentTerminalCommand command,
-        CancellationToken cancellationToken) =>
-        assignments.CompleteAsync(proof, Digest(proof.OwnershipToken), command, timeProvider.GetUtcNow(), cancellationToken);
-
-    public Task<IReadOnlyList<RuntimeAssignmentTerminalResult>> ExpireLeasesAsync(int take, CancellationToken cancellationToken)
+        CancellationToken cancellationToken)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
-        return assignments.ExpireLeasesAsync(timeProvider.GetUtcNow(), Math.Min(take, 1000), cancellationToken);
+        var result = await assignments.CompleteAsync(proof, Digest(proof.OwnershipToken), command, timeProvider.GetUtcNow(), cancellationToken);
+        await projection.ProjectTerminalAsync(result, cancellationToken);
+        return result;
     }
 
-    public Task<IReadOnlyList<RuntimeAssignmentTerminalResult>> InterruptSupersededSessionsAsync(
+    public async Task<IReadOnlyList<RuntimeAssignmentTerminalResult>> ExpireLeasesAsync(int take, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        var results = await assignments.ExpireLeasesAsync(timeProvider.GetUtcNow(), Math.Min(take, 1000), cancellationToken);
+        foreach (var result in results) await projection.ProjectTerminalAsync(result, cancellationToken);
+        return results;
+    }
+
+    public async Task<IReadOnlyList<RuntimeAssignmentTerminalResult>> InterruptSupersededSessionsAsync(
         RuntimeWorkerId workerId,
         RuntimeWorkerSessionId activeSessionId,
+        CancellationToken cancellationToken)
+    {
+        var results = await assignments.InterruptSupersededSessionsAsync(workerId, activeSessionId, timeProvider.GetUtcNow(), cancellationToken);
+        foreach (var result in results) await projection.ProjectTerminalAsync(result, cancellationToken);
+        return results;
+    }
+
+    public Task<StoredRuntimeWorkerAssignment?> GetByTargetAsync(
+        WorkspaceId workspaceId,
+        RuntimeAssignmentTargetKind targetKind,
+        string targetRunId,
         CancellationToken cancellationToken) =>
-        assignments.InterruptSupersededSessionsAsync(workerId, activeSessionId, timeProvider.GetUtcNow(), cancellationToken);
+        assignments.GetByTargetAsync(workspaceId, targetKind, targetRunId, cancellationToken);
+
+    public async Task<StoredRuntimeWorkerAssignment> RequeueAsync(
+        WorkspaceId workspaceId,
+        RuntimeAssignmentId assignmentId,
+        CancellationToken cancellationToken)
+    {
+        var stored = await assignments.RequeueAsync(workspaceId, assignmentId, timeProvider.GetUtcNow(), cancellationToken);
+        availability.Pulse();
+        return stored;
+    }
 
     private async Task<StoredRuntimeWorkerAssignment> CreateAndSignalAsync(
         RuntimeWorkerAssignment assignment,

@@ -289,7 +289,9 @@ public static class AwpRuntimeWorkerEndpoints
             ?? throw new RuntimeWorkerDispatchException(AwpErrorCodes.InvalidRequest, "The completion request is required.");
         ValidateCommand(identity, request.Context, dispatch);
         var result = await assignments.CompleteAsync(ToProof(request.Context), new RuntimeAssignmentTerminalCommand(
-            RuntimeAssignmentTerminalOutcome.Succeeded, request.CommandId.Value, request.Output?.GetRawText()), cancellationToken);
+            RuntimeAssignmentTerminalOutcome.Succeeded, request.CommandId.Value,
+            request.Output is { ValueKind: System.Text.Json.JsonValueKind.String } output
+                ? output.GetString() : request.Output?.GetRawText()), cancellationToken);
         var now = timeProvider.GetUtcNow();
         return Envelope(envelope.MessageId, now, new AwpTerminalResponse(now, ToContract(result.RunState),
             result.Assignment.ExecutionEvents.LastOrDefault()?.AttemptEventSequence ?? 0));
@@ -407,7 +409,8 @@ public static class AwpRuntimeWorkerEndpoints
         var child = await execution.CreateOrGetChildFlowAsync(ToProof(request.Context), request.StepExecutionId.Value,
             request.Input, cancellationToken);
         var now = timeProvider.GetUtcNow();
-        return Envelope(envelope.MessageId, now, new AwpChildFlowResponse(now, child.RunId, child.Status, child.Output));
+        return Envelope(envelope.MessageId, now, new AwpChildFlowResponse(now, child.RunId, child.Status, child.Output,
+            child.Material is null ? null : (AwpRootFlowExecutionMaterial)ToContract(child.Material)));
     }, principal);
 
     private static async Task<IResult> ExecuteAsync<T>(
@@ -506,7 +509,8 @@ public static class AwpRuntimeWorkerEndpoints
             new(assignment.RuntimeCapability, assignment.RuntimeCapabilityVersion, assignment.ExecutionMaterialVersion),
             new(assignment.ExecutionMaterialId, assignment.ExecutionMaterialVersion, assignment.ExecutionMaterialDigest),
             new(claimed.Ownership.OwnershipToken, attempt.FencingGeneration, attempt.LeaseExpiresAt,
-                checked((int)claimed.HeartbeatInterval.TotalSeconds)));
+                checked((int)claimed.HeartbeatInterval.TotalSeconds)),
+            assignment.ExecutionEvents.LastOrDefault()?.AttemptEventSequence ?? 0);
     }
 
     private static AwpFlowStepLocation ToContract(RuntimeAssignmentStepExecution step) => new(
@@ -542,7 +546,12 @@ public static class AwpRuntimeWorkerEndpoints
             flow.FlowDefinitionHash,
             flow.Input,
             flow.Definition,
-            flow.Agents.Select(ToContract).ToArray()),
+            flow.Agents.Select(ToContract).ToArray(),
+            flow.Resume is null ? null : new AwpFlowResumeMaterial(
+                flow.Resume.RuntimeType, flow.Resume.StateId, flow.Resume.InputRequestId,
+                flow.Resume.RuntimeRequestId, flow.Resume.Prompt, flow.Resume.InputType,
+                flow.Resume.Options, flow.Resume.Source, flow.Resume.Response,
+                flow.Resume.RespondedAt, flow.Resume.PrincipalId)),
         _ => throw new ArgumentOutOfRangeException(nameof(material))
     };
 

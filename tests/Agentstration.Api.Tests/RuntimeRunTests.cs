@@ -414,7 +414,7 @@ public sealed class RuntimeRunTests
     }
 
     [TestMethod]
-    public async Task RuntimeApiExecutesAndObservesRunWithoutCreatingWorkItem()
+    public async Task RuntimeApiDispatchesRunWithoutExecutingItInWebOrCreatingWorkItem()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -445,26 +445,20 @@ public sealed class RuntimeRunTests
         Assert.AreEqual(current.PrincipalId.ToString("D"), created.Properties.Initiator);
         Assert.IsNull(typeof(CreateRuntimeRunRequest).GetProperty("Initiator"));
 
-        RuntimeRun? completed = null;
-        for (var attempt = 0; attempt < 50; attempt++)
-        {
-            completed = await client.GetFromJsonAsync<RuntimeRun>($"/api/runtime/runs/{created.Id}");
-            if (completed!.Status.State.IsTerminal()) break;
-            await Task.Delay(100);
-        }
-        var eventStream = await client.GetStringAsync($"/api/runtime/runs/{created.Id}/events");
+        var dispatched = await client.GetFromJsonAsync<RuntimeRun>($"/api/runtime/runs/{created.Id}");
         var eventHistory = await client.GetFromJsonAsync<RuntimeRunEvent[]>($"/api/runtime/runs/{created.Id}/eventHistory?afterSequence=0");
         var workAfter = await client.GetFromJsonAsync<WorkItemPageResponse>("/api/work/workitems?top=100");
+        var assignment = await factory.Services.GetRequiredService<RuntimeWorkerAssignmentService>()
+            .GetByTargetAsync(new(current.WorkspaceId), RuntimeAssignmentTargetKind.RuntimeRun, created.Id, default);
 
-        Assert.AreEqual(RuntimeRunState.Succeeded, completed!.Status.State);
+        Assert.AreEqual(RuntimeRunState.Pending, dispatched!.Status.State);
+        Assert.IsNotNull(assignment);
+        Assert.AreEqual(RuntimeAssignmentState.Pending, assignment.Value.State);
         Assert.IsTrue(readiness?.Ready);
         Assert.IsNotNull(deployments);
         Assert.IsTrue(deployments.Value.Any(deployment => deployment.AgentName == "sql-expert" && deployment.OperationalState == OperationalState.Ready));
-        StringAssert.Contains(eventStream, "event: ResponseDelta");
-        StringAssert.Contains(eventStream, "event: RunCompleted");
         Assert.IsNotNull(eventHistory);
-        Assert.IsTrue(eventHistory.Any(item => item.Kind == RuntimeRunEventKind.ResponseDelta));
-        Assert.AreEqual(RuntimeRunEventKind.RunCompleted, eventHistory[^1].Kind);
+        Assert.IsFalse(eventHistory.Any(item => item.Kind is RuntimeRunEventKind.ResponseDelta or RuntimeRunEventKind.RunCompleted));
         Assert.AreEqual(workBefore!.Value.Count, workAfter!.Value.Count);
     }
 

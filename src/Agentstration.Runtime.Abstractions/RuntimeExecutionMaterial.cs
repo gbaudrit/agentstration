@@ -73,8 +73,22 @@ public sealed record RuntimeRootFlowExecutionMaterial(
     string FlowDefinitionHash,
     JsonElement Input,
     JsonElement Definition,
-    IReadOnlyList<RuntimeExecutionAgentMaterial> Agents)
+    IReadOnlyList<RuntimeExecutionAgentMaterial> Agents,
+    RuntimeFlowResumeMaterial? Resume = null)
     : RuntimeExecutionMaterial(MaterialId, SchemaVersion, Digest, RuntimeAssignmentTargetKind.FlowRun, WorkspaceId, TenantId, PrincipalId, RunId);
+
+public sealed record RuntimeFlowResumeMaterial(
+    string RuntimeType,
+    string StateId,
+    string InputRequestId,
+    string RuntimeRequestId,
+    string Prompt,
+    string InputType,
+    IReadOnlyList<string> Options,
+    string? Source,
+    JsonElement Response,
+    DateTimeOffset RespondedAt,
+    string PrincipalId);
 
 public sealed record RuntimeFlowStepMaterial(
     string FlowRunId,
@@ -88,6 +102,12 @@ public sealed record RuntimeFlowStepMaterial(
 public interface IRuntimeExecutionMaterialResolver
 {
     Task<RuntimeExecutionMaterial> ResolveAsync(RuntimeWorkerAssignment assignment, CancellationToken cancellationToken);
+    Task<RuntimeRootFlowExecutionMaterial> ResolveFlowRunAsync(
+        RuntimeWorkerAssignment assignment,
+        string flowRunId,
+        CancellationToken cancellationToken) =>
+        Task.FromException<RuntimeRootFlowExecutionMaterial>(new RuntimeExecutionMaterialException(
+            "flow_material_unsupported", "The execution material resolver does not support child Flows."));
     Task<RuntimeFlowStepMaterial> ResolveStepAsync(
         RuntimeWorkerAssignment assignment,
         string flowRunId,

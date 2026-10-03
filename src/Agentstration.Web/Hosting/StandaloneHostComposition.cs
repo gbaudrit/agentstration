@@ -194,9 +194,7 @@ internal static class StandaloneHostCompositionExtensions
         {
             builder.Services.AddHostedService<AgentDeploymentReconciliationWorker>();
             builder.Services.AddHostedService<LocalWorkExecutionWorker>();
-            builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
             builder.Services.AddHostedService<RuntimeAssignmentLeaseReaper>();
-            builder.Services.AddHostedService<FlowRunExecutionWorker>();
             builder.Services.AddHostedService<FlowRunRecoveryWorker>();
             builder.Services.AddHostedService<SourceRefreshWorker>();
         }

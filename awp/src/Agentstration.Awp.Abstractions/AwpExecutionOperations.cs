@@ -59,8 +59,22 @@ public sealed record AwpRootFlowExecutionMaterial(
     string FlowDefinitionHash,
     JsonElement Input,
     JsonElement Definition,
-    IReadOnlyList<AwpExecutionAgentMaterial> Agents)
+    IReadOnlyList<AwpExecutionAgentMaterial> Agents,
+    AwpFlowResumeMaterial? Resume = null)
     : AwpExecutionMaterial(MaterialId, SchemaVersion, Digest, RunId);
+
+public sealed record AwpFlowResumeMaterial(
+    string RuntimeType,
+    string StateId,
+    string InputRequestId,
+    string RuntimeRequestId,
+    string Prompt,
+    string InputType,
+    IReadOnlyList<string> Options,
+    string? Source,
+    JsonElement Response,
+    DateTimeOffset RespondedAt,
+    string PrincipalId);
 
 public sealed record AwpExecutionMessage(string Role, string Content);
 
@@ -149,4 +163,9 @@ public sealed record AwpCreateChildFlowRequest(
     AwpStepExecutionId StepExecutionId,
     JsonElement Input);
 
-public sealed record AwpChildFlowResponse(DateTimeOffset ServerTime, string RunId, string Status, JsonElement? Output);
+public sealed record AwpChildFlowResponse(
+    DateTimeOffset ServerTime,
+    string RunId,
+    string Status,
+    JsonElement? Output,
+    AwpRootFlowExecutionMaterial? Material = null);

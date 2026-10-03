@@ -21,7 +21,7 @@ public sealed class RuntimeExecutionMaterialResolver(
         CancellationToken cancellationToken) => assignment.TargetKind switch
     {
         RuntimeAssignmentTargetKind.RuntimeRun => await ResolveRuntimeRunAsync(assignment, cancellationToken),
-        RuntimeAssignmentTargetKind.FlowRun => await ResolveFlowRunAsync(assignment, cancellationToken),
+        RuntimeAssignmentTargetKind.FlowRun => await ResolveFlowRunAsync(assignment, assignment.TargetRunId, cancellationToken),
         _ => throw new RuntimeExecutionMaterialException("execution_target_unsupported", "The assignment target is unsupported.")
     };
 
@@ -33,23 +33,23 @@ public sealed class RuntimeExecutionMaterialResolver(
         string stepDefinitionId,
         CancellationToken cancellationToken)
     {
-        if (assignment.TargetKind != RuntimeAssignmentTargetKind.FlowRun
-            || !string.Equals(assignment.TargetRunId, flowRunId, StringComparison.Ordinal))
+        if (assignment.TargetKind != RuntimeAssignmentTargetKind.FlowRun)
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Flow Run does not belong to this assignment.");
         var stored = await flowRuns.GetRunAsync(assignment.WorkspaceId, flowRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
+        if (!BelongsToAssignment(assignment, run))
+            throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Flow Run does not belong to this root assignment.");
         await flowScopes.ValidateAsync(run.Scope, cancellationToken);
         using var scope = flowScopes.Enter(run.Scope);
         if (!string.Equals(run.FlowVersion, flowVersion, StringComparison.Ordinal)
-            || !string.Equals(run.DefinitionHash, flowDefinitionHash, StringComparison.Ordinal))
+            || !string.Equals(DefinitionHash(run), flowDefinitionHash, StringComparison.Ordinal))
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The step does not reference the pinned Flow version and hash.");
-        var graph = run.DefinitionSnapshot.Graph
-            ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The pinned Flow has no graph definition.");
+        var steps = ExecutionSteps(run.DefinitionSnapshot);
         var position = -1;
-        for (var index = 0; index < graph.Steps.Count; index++)
+        for (var index = 0; index < steps.Count; index++)
         {
-            if (string.Equals(graph.Steps[index].Name, stepDefinitionId, StringComparison.Ordinal))
+            if (string.Equals(steps[index].Name, stepDefinitionId, StringComparison.Ordinal))
             {
                 position = index;
                 break;
@@ -57,9 +57,9 @@ public sealed class RuntimeExecutionMaterialResolver(
         }
         if (position < 0)
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The StepDefinitionId is not present in the pinned Flow definition.");
-        var step = graph.Steps[position];
-        return new RuntimeFlowStepMaterial(run.Id, run.FlowVersion, run.DefinitionHash!, stepDefinitionId,
-            step.DisplayName ?? step.Name, step.Type(), position);
+        var step = steps[position];
+        return new RuntimeFlowStepMaterial(run.Id, run.FlowVersion, DefinitionHash(run), stepDefinitionId,
+            step.DisplayName, step.Type, position);
     }
 
     private async Task<RuntimeExecutionMaterial> ResolveRuntimeRunAsync(
@@ -84,32 +84,55 @@ public sealed class RuntimeExecutionMaterialResolver(
             agent);
     }
 
-    private async Task<RuntimeExecutionMaterial> ResolveFlowRunAsync(
+    public async Task<RuntimeRootFlowExecutionMaterial> ResolveFlowRunAsync(
         RuntimeWorkerAssignment assignment,
+        string flowRunId,
         CancellationToken cancellationToken)
     {
-        var stored = await flowRuns.GetRunAsync(assignment.WorkspaceId, assignment.TargetRunId, cancellationToken)
+        if (assignment.TargetKind != RuntimeAssignmentTargetKind.FlowRun)
+            throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "Only a Flow assignment can resolve Flow material.");
+        var stored = await flowRuns.GetRunAsync(assignment.WorkspaceId, flowRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
+        if (!BelongsToAssignment(assignment, run))
+            throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Flow Run does not belong to this root assignment.");
         await flowScopes.ValidateAsync(run.Scope, cancellationToken);
         using var scope = flowScopes.Enter(run.Scope);
         if (!string.Equals(run.FlowVersion, run.DefinitionSnapshot.Version, StringComparison.Ordinal)
-            || !string.Equals(run.DefinitionHash, run.DefinitionSnapshot.DefinitionHash, StringComparison.Ordinal))
+            || run.DefinitionHash is not null
+            && !string.Equals(run.DefinitionHash, run.DefinitionSnapshot.DefinitionHash, StringComparison.Ordinal))
             throw new RuntimeExecutionMaterialException("execution_material_drift", "The Flow Run snapshot no longer matches its immutable version and hash pins.");
 
-        var resolvedAgents = new List<RuntimeExecutionAgentMaterial>(run.RuntimeBindings.Count);
-        foreach (var binding in run.RuntimeBindings)
+        var references = ExecutionAgentReferences(run.DefinitionSnapshot);
+        var resolvedAgents = new List<RuntimeExecutionAgentMaterial>(references.Count);
+        foreach (var reference in references)
         {
-            var material = await ResolveAgentAsync(binding.ParticipantId,
-                new RuntimeAgentReference(binding.AgentResourceId, binding.AgentGeneration) { Namespace = binding.AgentNamespace },
-                cancellationToken);
-            if (!string.Equals(material.RevisionId, binding.RevisionId, StringComparison.Ordinal))
+            var binding = run.RuntimeBindings.SingleOrDefault(value =>
+                string.Equals(value.ParticipantId, reference.ParticipantId, StringComparison.Ordinal));
+            var agentReference = binding is null
+                ? reference.Reference
+                : new RuntimeAgentReference(binding.AgentResourceId, binding.AgentGeneration) { Namespace = binding.AgentNamespace };
+            var material = await ResolveAgentAsync(reference.ParticipantId, agentReference, cancellationToken);
+            if (binding is not null && !string.Equals(material.RevisionId, binding.RevisionId, StringComparison.Ordinal))
                 throw new RuntimeExecutionMaterialException("execution_material_drift", $"Participant '{binding.ParticipantId}' no longer resolves to its pinned revision.");
             resolvedAgents.Add(material);
         }
 
+        RuntimeFlowResumeMaterial? resume = null;
+        if (run.RuntimeState is not null)
+        {
+            var answered = (await flowRuns.ListInputRequestsAsync(run.WorkspaceId, run.Id,
+                InputRequestStatus.Answered, cancellationToken)).LastOrDefault();
+            if (answered?.Value.Response is { } response)
+                resume = new(run.RuntimeState.RuntimeType, run.RuntimeState.StateId,
+                    answered.Value.Id, answered.Value.RuntimeRequestId, answered.Value.Prompt,
+                    answered.Value.Type.ToString(), answered.Value.Options, answered.Value.Source,
+                    response.Value.Clone(), response.ReceivedAt, response.PrincipalId);
+        }
+
         return new RuntimeRootFlowExecutionMaterial(
-            assignment.ExecutionMaterialId,
+            string.Equals(run.Id, assignment.TargetRunId, StringComparison.Ordinal)
+                ? assignment.ExecutionMaterialId : $"{assignment.ExecutionMaterialId}:child:{run.Id}",
             assignment.ExecutionMaterialVersion,
             assignment.ExecutionMaterialDigest,
             assignment.WorkspaceId,
@@ -119,11 +142,69 @@ public sealed class RuntimeExecutionMaterialResolver(
             run.FlowId.Value,
             run.FlowId.Namespace.ToString(),
             run.FlowVersion,
-            run.DefinitionHash ?? throw new RuntimeExecutionMaterialException("execution_material_invalid", "The Flow Run has no definition hash."),
+            DefinitionHash(run),
             run.Input.Clone(),
             JsonSerializer.SerializeToElement(run.DefinitionSnapshot, JsonOptions),
-            resolvedAgents);
+            resolvedAgents,
+            resume);
     }
+
+    private static bool BelongsToAssignment(RuntimeWorkerAssignment assignment, FlowRun run) =>
+        string.Equals(run.Id, assignment.TargetRunId, StringComparison.Ordinal)
+        || string.Equals(run.RootFlowRunId, assignment.TargetRunId, StringComparison.Ordinal);
+
+    private static IReadOnlyList<(string ParticipantId, RuntimeAgentReference Reference)> ExecutionAgentReferences(FlowVersion version)
+    {
+        IEnumerable<(string ParticipantId, FlowTargetReference Target)> references = version.Graph is not null
+            ? version.Graph.Steps.OfType<AgentFlowStepDefinition>().Select(step => (step.Name,
+                new FlowTargetReference(FlowTargetKind.Agent, step.Agent.ResourceId,
+                    step.Agent.Version?.ToString(System.Globalization.CultureInfo.InvariantCulture), step.Agent.Namespace)))
+            : version.Definition switch
+            {
+                DirectFlowDefinition direct => [("Agent", direct.Target)],
+                RoutingFlowDefinition routing => routing.Destinations
+                    .Append(routing.Fallback)
+                    .Where(value => value is not null)
+                    .Select((value, index) => ($"Agent:{index}", value!)),
+                OrchestrationFlowDefinition orchestration => orchestration.Participants
+                    .Concat(orchestration.Pattern is MagenticOrchestrationPattern magentic ? [magentic.Manager] : [])
+                    .Select(value => (value.Id, value)),
+                _ => []
+            };
+        return references
+            .Where(value => value.Target.Kind == FlowTargetKind.Agent)
+            .GroupBy(value => value.ParticipantId, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .Select(value => (value.ParticipantId, new RuntimeAgentReference(value.Target.Id,
+                ParseGeneration(value.Target.Version)) { Namespace = value.Target.Namespace ?? version.FlowId.Namespace }))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<(string Name, string DisplayName, string Type)> ExecutionSteps(FlowVersion version)
+    {
+        if (version.Graph is not null)
+            return version.Graph.Steps.Select(step => (step.Name, step.DisplayName ?? step.Name, step.Type())).ToArray();
+        var steps = new List<(string, string, string)> { ("Input", "Input", "input") };
+        if (version.Definition is RoutingFlowDefinition) steps.Add(("Router", "Router", "router"));
+        if (version.Definition is OrchestrationFlowDefinition orchestration)
+        {
+            steps.AddRange(orchestration.Participants.Select(value => (value.Id, value.Id, "agent")));
+            if (orchestration.Pattern is MagenticOrchestrationPattern magentic
+                && steps.All(value => !string.Equals(value.Item1, magentic.Manager.Id, StringComparison.Ordinal)))
+                steps.Add((magentic.Manager.Id, magentic.Manager.Id, "agent"));
+        }
+        else
+            steps.Add(("Agent", "Agent", "agent"));
+        steps.Add(("Output", "Output", "output"));
+        return steps;
+    }
+
+    private static long ParseGeneration(string? version) =>
+        long.TryParse(version, out var generation) && generation > 0 ? generation : 1;
+
+    private static string DefinitionHash(FlowRun run) => run.DefinitionHash
+        ?? $"sha256:{Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(run.DefinitionSnapshot, JsonOptions))))}";
 
     private async Task<RuntimeExecutionAgentMaterial> ResolveAgentAsync(
         string participantId,

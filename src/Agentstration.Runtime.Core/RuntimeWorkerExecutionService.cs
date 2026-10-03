@@ -52,12 +52,21 @@ public sealed class RuntimeWorkerExecutionService(
         CancellationToken cancellationToken)
     {
         var authorization = await assignments.AuthorizeAsync(proof, cancellationToken);
-        RuntimeExecutionMaterial? material = null;
-        var participants = authorization.Assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun
-            ? new[] { "agent" }
-            : (material = await GetMaterialAsync(proof, cancellationToken)) is RuntimeRootFlowExecutionMaterial flow
-                ? flow.Agents.Select(value => value.ParticipantId).ToArray()
-                : [];
+        IReadOnlyList<string> participants;
+        if (authorization.Assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
+            participants = ["agent"];
+        else if (stepExecutionId is { } flowStepId)
+        {
+            var flowMaterial = await materials.ResolveFlowRunAsync(authorization.Assignment,
+                authorization.Assignment.StepExecutions.Single(value => value.Id == flowStepId).FlowRunId,
+                cancellationToken);
+            participants = flowMaterial.Agents.Select(value => value.ParticipantId).ToArray();
+        }
+        else
+        {
+            participants = (await GetMaterialAsync(proof, cancellationToken) as RuntimeRootFlowExecutionMaterial)?.Agents
+                .Select(value => value.ParticipantId).ToArray() ?? [];
+        }
         if (participantId is not null && !participants.Contains(participantId, StringComparer.Ordinal))
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The participant is not present in the assigned execution material.");
         if (authorization.Assignment.TargetKind == RuntimeAssignmentTargetKind.FlowRun && stepExecutionId is null)
@@ -102,7 +111,7 @@ public sealed class RuntimeWorkerExecutionService(
         if (messages.Count is < 1 or > 256 || ModelPayloadLength(messages) > 1_048_576)
             throw new RuntimeExecutionMaterialException("model_request_too_large",
                 "A model request must contain between 1 and 256 messages and cannot exceed 1 MiB.");
-        var (authorization, material, agent) = await AuthorizeParticipantSideEffectAsync(proof, participantId, cancellationToken);
+        var (authorization, material, agent) = await AuthorizeParticipantSideEffectAsync(proof, participantId, turnId, cancellationToken);
         _ = authorization.Assignment.Turns.SingleOrDefault(value => value.Id == turnId
             && value.AttemptId == turnAttemptId && string.Equals(value.ParticipantId, participantId, StringComparison.Ordinal))
             ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The model call does not reference an authorized Turn and TurnAttempt.");
@@ -125,7 +134,7 @@ public sealed class RuntimeWorkerExecutionService(
     {
         if (arguments?.GetRawText().Length > 1_048_576)
             throw new RuntimeExecutionMaterialException("tool_arguments_too_large", "Tool arguments cannot exceed 1 MiB.");
-        var (authorization, material, agent) = await AuthorizeParticipantSideEffectAsync(proof, participantId, cancellationToken);
+        var (authorization, material, agent) = await AuthorizeParticipantSideEffectAsync(proof, participantId, turnId, cancellationToken);
         var turn = authorization.Assignment.Turns.SingleOrDefault(value => value.Id == turnId
             && value.AttemptId == turnAttemptId && string.Equals(value.ParticipantId, participantId, StringComparison.Ordinal))
             ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Tool call does not reference an authorized Turn and TurnAttempt.");
@@ -171,18 +180,28 @@ public sealed class RuntimeWorkerExecutionService(
         var step = authorization.Assignment.StepExecutions.SingleOrDefault(value => value.Id == stepExecutionId)
             ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The child Flow does not reference an authorized StepExecution.");
         using var lease = CreateLeaseCancellation(authorization, cancellationToken);
-        return await operations.CreateOrGetChildFlowAsync(proof.WorkspaceId, authorization.Assignment.TargetRunId,
+        var child = await operations.CreateOrGetChildFlowAsync(proof.WorkspaceId, step.FlowRunId,
             step.StepDefinitionId, input, lease.Token);
+        await assignments.RegisterChildFlowAsync(proof, child.RunId, lease.Token);
+        var material = await materials.ResolveFlowRunAsync(authorization.Assignment, child.RunId, lease.Token);
+        return child with { Material = material };
     }
 
     private async Task<(RuntimeAssignmentAuthorization Authorization, RuntimeExecutionMaterial Material, RuntimeExecutionAgentMaterial Agent)>
         AuthorizeParticipantSideEffectAsync(
             RuntimeAssignmentOwnershipProof proof,
             string participantId,
+            Guid turnId,
             CancellationToken cancellationToken)
     {
         var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
-        var material = await materials.ResolveAsync(authorization.Assignment, cancellationToken);
+        var turn = authorization.Assignment.Turns.SingleOrDefault(value => value.Id == turnId)
+            ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The model or Tool call references an unknown Turn.");
+        var material = authorization.Assignment.TargetKind == RuntimeAssignmentTargetKind.FlowRun
+            && turn.StepExecutionId is { } stepId
+            ? await materials.ResolveFlowRunAsync(authorization.Assignment,
+                authorization.Assignment.StepExecutions.Single(value => value.Id == stepId).FlowRunId, cancellationToken)
+            : await materials.ResolveAsync(authorization.Assignment, cancellationToken);
         authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
         var agent = material switch
         {

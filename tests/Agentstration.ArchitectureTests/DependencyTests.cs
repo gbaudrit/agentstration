@@ -381,14 +381,14 @@ public sealed class DependencyTests
                  {
                      "AgentDeploymentReconciliationWorker",
                      "LocalWorkExecutionWorker",
-                     "RuntimeRunExecutionWorker",
-                     "FlowRunExecutionWorker",
                      "FlowRunRecoveryWorker",
                      "SourceRefreshWorker"
                  })
         {
             Assert.AreEqual(1, CountOccurrences(composition, $"AddHostedService<{worker}>"), worker);
         }
+        Assert.DoesNotContain("AddHostedService<RuntimeRunExecutionWorker>", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddHostedService<FlowRunExecutionWorker>", composition, StringComparison.Ordinal);
 
         Assert.AreEqual(1, CountOccurrences(apiTransport, "AddSignalR("));
         Assert.AreEqual(1, CountOccurrences(apiTransport, "AddMcpServer("));

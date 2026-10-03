@@ -143,6 +143,7 @@ public sealed class RuntimeRunService(
     {
         var stored = await GetRequiredAsync(workspaceId, runId, cancellationToken);
         if (stored.Value.Status.State.IsTerminal()) return stored;
+        await queue.RequestCancellationAsync(new RuntimeRunQueueItem(stored.Value.Scope, runId), cancellationToken);
         cancellations.Cancel(new RuntimeRunKey(workspaceId, runId));
         StoredRuntimeRun cancelled;
         try

@@ -131,9 +131,16 @@ internal sealed class AwpRuntimeWorkerService(
             ValidateMaterialReference(assignment.ExecutionMaterial, material);
             await session.AppendEventAsync(AwpExecutionEventKind.RunStarted, location, null, null, execution.Token);
             var output = await executor.ExecuteAsync(session, material, execution.Token);
+            await session.AppendEventAsync(AwpExecutionEventKind.RunCompleted, location,
+                JsonSerializer.SerializeToElement(new { status = "succeeded", output }), null, execution.Token);
             session.EnsureCanStartMutation();
             await client.CompleteAsync(new(session.Context, new(Guid.NewGuid()), output), execution.Token);
             activity?.SetStatus(ActivityStatusCode.Ok);
+        }
+        catch (AwpWaitingForInputException) when (session.CanStartMutation())
+        {
+            await client.CompleteAsync(new(session.Context, new(Guid.NewGuid()), null), stoppingToken);
+            activity?.SetStatus(ActivityStatusCode.Ok, "waiting_for_input");
         }
         catch (OperationCanceledException) when (cancellationRequested && session.CanStartMutation())
         {

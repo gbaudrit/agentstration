@@ -23,6 +23,7 @@ internal sealed class AwpAssignmentSession
         this.safetyMargin = safetyMargin;
         leaseExpiresAt = assignment.Ownership.LeaseExpiresAt;
         serverOffset = serverTime - timeProvider.GetUtcNow();
+        eventSequence = assignment.InitialEventSequence;
         Context = new(client.WorkerId, client.SessionId, assignment.Scope, assignment.AssignmentId,
             assignment.AttemptId, assignment.Ownership.Token, assignment.Ownership.FencingGeneration);
     }

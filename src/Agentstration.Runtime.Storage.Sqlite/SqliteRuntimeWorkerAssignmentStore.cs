@@ -104,6 +104,18 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         return document is null ? null : Deserialize(document);
     }
 
+    public async Task<StoredRuntimeWorkerAssignment?> GetByTargetAsync(
+        WorkspaceId workspaceId, RuntimeAssignmentTargetKind targetKind, string targetRunId,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var kind = targetKind.ToString();
+        var document = await context.WorkerAssignments.AsNoTracking().SingleOrDefaultAsync(value =>
+            value.WorkspaceId == workspaceId.Value && value.TargetKind == kind
+            && value.TargetRunId == targetRunId, cancellationToken);
+        return document is null ? null : Deserialize(document);
+    }
+
     public async Task<StoredRuntimeWorkerAssignment?> ClaimNextAsync(
         RuntimeWorkerClaimRequest request,
         byte[] ownershipTokenDigest,
@@ -256,6 +268,22 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         return turn;
     }
 
+    public async Task RegisterChildFlowAsync(RuntimeAssignmentOwnershipProof proof, byte[] ownershipTokenDigest,
+        string childFlowRunId, DateTimeOffset observedAt, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, observedAt);
+        if (assignment.ChildFlowRunIds.Contains(childFlowRunId, StringComparer.Ordinal)) return;
+        assignment = assignment with
+        {
+            UpdatedAt = observedAt,
+            ChildFlowRunIds = assignment.ChildFlowRunIds.Append(childFlowRunId).ToArray()
+        };
+        Apply(document, assignment, document.OwnershipTokenDigest, assignment.CurrentAttempt!.LeaseExpiresAt);
+        await SaveAsync(context, cancellationToken);
+    }
+
     public async Task<RuntimeAssignmentEventAppendResult> AppendEventsAsync(
         RuntimeAssignmentOwnershipProof proof,
         byte[] ownershipTokenDigest,
@@ -350,6 +378,30 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
             await SetRunStateAsync(context, assignment, RuntimeRunState.Cancelled, requestedAt, null, "Cancelled by the caller.", cancellationToken);
         await SaveAsync(context, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        return Deserialize(document);
+    }
+
+    public async Task<StoredRuntimeWorkerAssignment> RequeueAsync(
+        WorkspaceId workspaceId,
+        RuntimeAssignmentId assignmentId,
+        DateTimeOffset requestedAt,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await RequiredAsync(context, workspaceId, assignmentId, cancellationToken);
+        var assignment = Deserialize(document).Value;
+        if (assignment.State != RuntimeAssignmentState.Succeeded
+            || assignment.CurrentAttempt?.State != RuntimeAssignmentAttemptState.Succeeded)
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.TerminalConflict,
+                "Only a successfully suspended assignment can be requeued.");
+        assignment = assignment with
+        {
+            State = RuntimeAssignmentState.Pending,
+            UpdatedAt = requestedAt,
+            CancellationRequestedAt = null
+        };
+        Apply(document, assignment, null, null);
+        await SaveAsync(context, cancellationToken);
         return Deserialize(document);
     }
 
@@ -527,17 +579,28 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
 
     private static void ValidateTurn(RuntimeWorkerAssignment assignment, RuntimeAssignmentTurn turn)
     {
+        var step = turn.StepExecutionId is { } stepId
+            ? assignment.StepExecutions.SingleOrDefault(value => value.Id == stepId)
+            : null;
+        var expectedRunId = step?.FlowRunId ?? assignment.TargetRunId;
         if (turn.AttemptNumber != 1 || turn.AttemptId == Guid.Empty || turn.Id == Guid.Empty
-            || !string.Equals(turn.RunId, assignment.TargetRunId, StringComparison.Ordinal))
+            || !string.Equals(turn.RunId, expectedRunId, StringComparison.Ordinal))
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.InvalidCoordinate, "The Turn coordinate is invalid for this assignment.");
-        if (turn.StepExecutionId is { } stepId && assignment.StepExecutions.All(value => value.Id != stepId))
+        if (turn.StepExecutionId is { } referencedStepId && assignment.StepExecutions.All(value => value.Id != referencedStepId))
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.InvalidCoordinate, "The Turn references an unknown StepExecution.");
     }
 
     private static void ValidateEventCoordinates(RuntimeWorkerAssignment assignment, RuntimeAssignmentExecutionEvent executionEvent)
     {
+        var step = executionEvent.StepExecutionId is { } eventStepId
+            ? assignment.StepExecutions.SingleOrDefault(value => value.Id == eventStepId)
+            : null;
+        var validRun = step is not null
+            ? string.Equals(executionEvent.RunId, step.FlowRunId, StringComparison.Ordinal)
+            : string.Equals(executionEvent.RunId, assignment.TargetRunId, StringComparison.Ordinal)
+              || assignment.ChildFlowRunIds.Contains(executionEvent.RunId, StringComparer.Ordinal);
         if (executionEvent.EventId == Guid.Empty || executionEvent.AttemptEventSequence < 1
-            || !string.Equals(executionEvent.RunId, assignment.TargetRunId, StringComparison.Ordinal))
+            || !validRun)
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.InvalidCoordinate, "The execution event identity is invalid.");
         if (executionEvent.StepExecutionId is { } stepId && assignment.StepExecutions.All(value => value.Id != stepId))
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.InvalidCoordinate, "The event references an unknown StepExecution.");

@@ -57,6 +57,7 @@ public interface IFlowRunQueue
 {
     ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken);
     IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync(CancellationToken cancellationToken);
+    ValueTask RequestCancellationAsync(FlowRunQueueItem item, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
 
 public sealed record FlowRunQueueItem(string RunId, FlowRunScope Scope);

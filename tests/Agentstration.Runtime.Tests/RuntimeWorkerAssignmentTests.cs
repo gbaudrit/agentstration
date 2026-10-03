@@ -120,6 +120,30 @@ public sealed class RuntimeWorkerAssignmentTests
     }
 
     [TestMethod]
+    public async Task SuspendedFlowAssignmentCanBeRequeuedWithANewAttemptAndFence()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        var runId = $"flowrun-{Guid.NewGuid():N}";
+        var created = await fixture.Service.CreateAsync(Workspace, Guid.NewGuid(),
+            RuntimeAssignmentTargetKind.FlowRun, runId, "microsoft-agent-framework", "1.0", "1.0",
+            $"material-{runId}", "sha256:flow", default);
+        var first = await fixture.ClaimRequiredAsync();
+        await fixture.Service.CompleteAsync(first.Ownership,
+            new(RuntimeAssignmentTerminalOutcome.Succeeded, Guid.NewGuid()), default);
+
+        var pending = await fixture.Service.RequeueAsync(Workspace, created.Value.Id, default);
+        var second = await fixture.ClaimRequiredAsync();
+
+        Assert.AreEqual(RuntimeAssignmentState.Pending, pending.Value.State);
+        Assert.AreEqual(2, second.Assignment.Attempts.Count);
+        Assert.AreEqual(first.Ownership.FencingGeneration + 1, second.Ownership.FencingGeneration);
+        Assert.AreNotEqual(first.Ownership.AttemptId, second.Ownership.AttemptId);
+        var stale = await Assert.ThrowsExactlyAsync<RuntimeAssignmentException>(() =>
+            fixture.Service.HeartbeatAsync(first.Ownership, default));
+        Assert.AreEqual(RuntimeAssignmentErrorCodes.NotOwned, stale.Code);
+    }
+
+    [TestMethod]
     public async Task CancellationBeforeExpiryProducesCancelledRunAndInterruptedAttempt()
     {
         await using var fixture = await AssignmentFixture.CreateAsync();

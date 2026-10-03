@@ -186,7 +186,7 @@ public static class DependencyInjection
         services.AddSingleton<Agentstration.Runtime.Abstractions.IAgentRuntimeFactory>(services =>
             services.GetRequiredService<AgentFrameworkRuntimeFactory>());
         services.AddSingleton<IRuntimeRegistry, RuntimeRegistry>();
-        services.AddSingleton<IRuntimeRunQueue, LocalRuntimeRunQueue>();
+        services.AddSingleton<IRuntimeRunQueue, AwpRuntimeRunQueue>();
         services.AddSingleton<IRuntimeRunCancellationRegistry, LocalRuntimeRunCancellationRegistry>();
         services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
         services.AddSingleton<IAgentDeploymentProvisioner, InProcessAgentProvisioner>();
@@ -328,6 +328,7 @@ public static class DependencyInjection
         services.TryAddSingleton(runtimeWorkerLeaseOptions ?? new RuntimeWorkerLeaseOptions());
         services.TryAddSingleton(runtimeWorkerDispatchOptions ?? new RuntimeWorkerDispatchOptions());
         services.AddSingleton<RuntimeAssignmentAvailabilitySignal>();
+        services.AddSingleton<IRuntimeAssignmentProjection, AwpAssignmentProjection>();
         services.AddSingleton<RuntimeWorkerAssignmentService>();
         services.AddSingleton<IRuntimeExecutionMaterialResolver, RuntimeExecutionMaterialResolver>();
         services.AddSingleton<RuntimeWorkerExecutionService>();
@@ -397,7 +398,7 @@ public static class DependencyInjection
         services.AddSingleton<EntryAdministrationService>();
         services.AddSingleton<IWorkplaceContext, CurrentWorkplaceContext>();
         services.AddSingleton<DashboardAdministrationService>();
-        services.AddSingleton<IFlowRunQueue, LocalFlowRunQueue>();
+        services.AddSingleton<IFlowRunQueue, AwpFlowRunQueue>();
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
         services.AddSingleton<IFlowRunExecutionScope, WorkspaceFlowRunExecutionScope>();
         services.AddSingleton<IWorkExecutionScopeAccessor, CurrentWorkExecutionScopeAccessor>();

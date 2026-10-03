@@ -165,6 +165,7 @@ public interface IRuntimeRunQueue
 {
     ValueTask EnqueueAsync(RuntimeRunQueueItem item, CancellationToken cancellationToken);
     IAsyncEnumerable<RuntimeRunQueueItem> ReadAllAsync(CancellationToken cancellationToken);
+    ValueTask RequestCancellationAsync(RuntimeRunQueueItem item, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
 
 public interface IRuntimeRunExecutionScope

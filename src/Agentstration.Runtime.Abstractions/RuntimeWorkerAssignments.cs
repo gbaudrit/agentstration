@@ -49,6 +49,7 @@ public sealed record RuntimeWorkerAssignment
     public IReadOnlyList<RuntimeAssignmentTurn> Turns { get; init; } = [];
     public IReadOnlyList<RuntimeAssignmentExecutionEvent> ExecutionEvents { get; init; } = [];
     public IReadOnlyList<RuntimeAssignmentCheckpoint> Checkpoints { get; init; } = [];
+    public IReadOnlyList<string> ChildFlowRunIds { get; init; } = [];
     public RuntimeAssignmentAttempt? CurrentAttempt => Attempts.LastOrDefault();
 }
 
@@ -171,6 +172,11 @@ public interface IRuntimeWorkerAssignmentStore
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<StoredRuntimeWorkerAssignment> CreateAsync(RuntimeWorkerAssignment assignment, CancellationToken cancellationToken);
     Task<StoredRuntimeWorkerAssignment?> GetAsync(WorkspaceId workspaceId, RuntimeAssignmentId assignmentId, CancellationToken cancellationToken);
+    Task<StoredRuntimeWorkerAssignment?> GetByTargetAsync(
+        WorkspaceId workspaceId,
+        RuntimeAssignmentTargetKind targetKind,
+        string targetRunId,
+        CancellationToken cancellationToken) => Task.FromResult<StoredRuntimeWorkerAssignment?>(null);
     Task<StoredRuntimeWorkerAssignment?> ClaimNextAsync(
         RuntimeWorkerClaimRequest request,
         byte[] ownershipTokenDigest,
@@ -200,6 +206,12 @@ public interface IRuntimeWorkerAssignmentStore
         RuntimeAssignmentTurn turn,
         DateTimeOffset observedAt,
         CancellationToken cancellationToken);
+    Task RegisterChildFlowAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        byte[] ownershipTokenDigest,
+        string childFlowRunId,
+        DateTimeOffset observedAt,
+        CancellationToken cancellationToken) => Task.CompletedTask;
     Task<RuntimeAssignmentEventAppendResult> AppendEventsAsync(
         RuntimeAssignmentOwnershipProof proof,
         byte[] ownershipTokenDigest,
@@ -223,6 +235,12 @@ public interface IRuntimeWorkerAssignmentStore
         RuntimeAssignmentId assignmentId,
         DateTimeOffset requestedAt,
         CancellationToken cancellationToken);
+    Task<StoredRuntimeWorkerAssignment> RequeueAsync(
+        WorkspaceId workspaceId,
+        RuntimeAssignmentId assignmentId,
+        DateTimeOffset requestedAt,
+        CancellationToken cancellationToken) =>
+        Task.FromException<StoredRuntimeWorkerAssignment>(new NotSupportedException("Assignment requeue is not supported by this store."));
     Task<RuntimeAssignmentTerminalResult> CompleteAsync(
         RuntimeAssignmentOwnershipProof proof,
         byte[] ownershipTokenDigest,
@@ -238,6 +256,27 @@ public interface IRuntimeWorkerAssignmentStore
         RuntimeWorkerSessionId activeSessionId,
         DateTimeOffset observedAt,
         CancellationToken cancellationToken);
+}
+
+public interface IRuntimeAssignmentProjection
+{
+    Task ProjectEventsAsync(
+        RuntimeWorkerAssignment assignment,
+        IReadOnlyList<RuntimeAssignmentExecutionEvent> events,
+        CancellationToken cancellationToken);
+
+    Task ProjectTerminalAsync(
+        RuntimeAssignmentTerminalResult result,
+        CancellationToken cancellationToken);
+}
+
+public sealed class NullRuntimeAssignmentProjection : IRuntimeAssignmentProjection
+{
+    public Task ProjectEventsAsync(RuntimeWorkerAssignment assignment,
+        IReadOnlyList<RuntimeAssignmentExecutionEvent> events, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task ProjectTerminalAsync(RuntimeAssignmentTerminalResult result,
+        CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 public sealed class RuntimeAssignmentException(string code, string message) : Exception(message)
