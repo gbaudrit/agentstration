@@ -24,6 +24,7 @@ public sealed record FlowDesignerMetadata
 [JsonDerivedType(typeof(ConditionFlowStepDefinition), "condition")]
 [JsonDerivedType(typeof(TransformFlowStepDefinition), "transform")]
 [JsonDerivedType(typeof(FlowCallStepDefinition), "flow")]
+[JsonDerivedType(typeof(RepeatFlowStepDefinition), "repeat")]
 [JsonDerivedType(typeof(ToolFlowStepDefinition), "tool")]
 [JsonDerivedType(typeof(ToolRouteFlowStepDefinition), "toolRoute")]
 [JsonDerivedType(typeof(OutputFlowStepDefinition), "output")]
@@ -97,6 +98,15 @@ public sealed record FlowCallStepDefinition : FlowStepDefinition
 {
     public required FlowCallReference Flow { get; init; }
     public JsonElement? InputMapping { get; init; }
+}
+
+public sealed record RepeatFlowStepDefinition : FlowStepDefinition
+{
+    public required FlowCallReference Flow { get; init; }
+    public JsonElement? InputMapping { get; init; }
+    public JsonElement? NextInputMapping { get; init; }
+    public required string Until { get; init; }
+    public int MaximumIterations { get; init; } = 100;
 }
 
 public sealed record FlowToolReference(
@@ -193,6 +203,7 @@ public static class FlowStepDefinitionExtensions
         ConditionFlowStepDefinition => "condition",
         TransformFlowStepDefinition => "transform",
         FlowCallStepDefinition => "flow",
+        RepeatFlowStepDefinition => "repeat",
         ToolFlowStepDefinition => "tool",
         ToolRouteFlowStepDefinition => "toolRoute",
         OutputFlowStepDefinition => "output",

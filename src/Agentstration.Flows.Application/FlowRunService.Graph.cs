@@ -159,7 +159,7 @@ public sealed partial class FlowRunService
                     var child = await repository.GetRunAsync(stored.Value.WorkspaceId, childRunId, runToken);
                     if (child is null)
                     {
-                        stored = await SuspendForChildAsync(stored, step.Name, childRunId, runToken);
+                        stored = await SuspendForChildAsync(stored, step.Name, childRunId, runToken, callInput);
                         await EnsureChildFlowRunAsync(stored.Value, flowCall, callInput, childRunId, runToken);
                         return;
                     }
@@ -187,6 +187,70 @@ public sealed partial class FlowRunService
                             childError?.Details ?? childError?.Message);
                     }
                     break;
+                case RepeatFlowStepDefinition repeat:
+                    var repeatStepRun = stored.Value.Steps.Single(item => item.StepName == step.Name);
+                    var iteration = repeatStepRun.RepeatIteration ?? 1;
+                    var repeatInput = repeatStepRun.ResolvedInput?.Clone()
+                        ?? (repeat.InputMapping is null
+                            ? transitionOutput?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
+                            : await ResolveJsonAsync(repeat.InputMapping.Value, context, runToken));
+                    var repeatChildRunId = repeatStepRun.ChildFlowRunId
+                        ?? ChildFlowRunId(stored.Value, step.Name, repeatStepRun.Attempt, iteration);
+                    var repeatCall = RepeatCall(repeat);
+                    var repeatChild = await repository.GetRunAsync(stored.Value.WorkspaceId, repeatChildRunId, runToken);
+                    if (repeatChild is null)
+                    {
+                        stored = await SuspendForChildAsync(stored, step.Name, repeatChildRunId, runToken, repeatInput, iteration);
+                        await EnsureChildFlowRunAsync(stored.Value, repeatCall, repeatInput, repeatChildRunId, runToken);
+                        return;
+                    }
+                    ValidateChildIdentity(stored.Value, repeatCall, repeatChild.Value, repeatChildRunId);
+                    if (!repeatChild.Value.Status.IsTerminal())
+                    {
+                        await SuspendForChildAsync(stored, step.Name, repeatChildRunId, runToken, repeatInput, iteration);
+                        return;
+                    }
+                    output = repeatChild.Value.Output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
+                    eventName = repeatChild.Value.Status switch
+                    {
+                        FlowRunStatus.Succeeded => "completed",
+                        FlowRunStatus.Failed => "failed",
+                        FlowRunStatus.TimedOut => "timedOut",
+                        FlowRunStatus.Cancelled => "cancelled",
+                        _ => throw new InvalidOperationException($"Child Flow Run '{repeatChildRunId}' has unsupported terminal status '{repeatChild.Value.Status}'.")
+                    };
+                    if (repeatChild.Value.Status != FlowRunStatus.Succeeded)
+                    {
+                        var childError = repeatChild.Value.Error;
+                        stepError = new FlowRunError(
+                            childError?.Code ?? $"child_flow_{eventName}",
+                            $"Child Flow Run '{repeatChildRunId}' {eventName}.",
+                            childError?.Details ?? childError?.Message);
+                        break;
+                    }
+
+                    outputs[step.Name] = output.Value.Clone();
+                    var until = await EvaluateExpressionAsync(
+                        repeat.Until,
+                        new FlowExecutionContext(stored.Value.Input, outputs, output),
+                        runToken);
+                    if (until?.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+                        throw new FlowValidationException("flow_repeat_until_invalid", $"Repeat step '{step.Name}' until expression must return a boolean.");
+                    if (until.Value.ValueKind == JsonValueKind.True) break;
+                    if (iteration >= repeat.MaximumIterations)
+                        throw new FlowValidationException("flow_repeat_limit_exceeded", $"Repeat step '{step.Name}' reached its maximum of {repeat.MaximumIterations} iterations.");
+
+                    var nextInput = repeat.NextInputMapping is null
+                        ? output.Value.Clone()
+                        : await ResolveJsonAsync(
+                            repeat.NextInputMapping.Value,
+                            new FlowExecutionContext(stored.Value.Input, outputs, output),
+                            runToken);
+                    var nextIteration = iteration + 1;
+                    var nextChildRunId = ChildFlowRunId(stored.Value, step.Name, repeatStepRun.Attempt, nextIteration);
+                    stored = await SuspendForChildAsync(stored, step.Name, nextChildRunId, runToken, nextInput, nextIteration);
+                    await EnsureChildFlowRunAsync(stored.Value, repeatCall, nextInput, nextChildRunId, runToken);
+                    return;
                 case OutputFlowStepDefinition terminal:
                     output = terminal.OutputMapping is null
                         ? transitionOutput?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
@@ -264,7 +328,7 @@ public sealed partial class FlowRunService
     private async Task<StoredFlowRun> FinishGraphStepAsync(StoredFlowRun stored, string name, JsonElement? output, string? transition, CancellationToken token)
     {
         var now = timeProvider.GetUtcNow();
-        var steps = stored.Value.Steps.Select(step => step.StepName == name ? step with { Status = FlowStepRunStatus.Succeeded, ResolvedInput = stored.Value.Input.Clone(), Output = output?.Clone(), SelectedTransition = transition, CompletedAt = now, Logs = [.. step.Logs, $"{name} completed."] } : step).ToArray();
+        var steps = stored.Value.Steps.Select(step => step.StepName == name ? step with { Status = FlowStepRunStatus.Succeeded, ResolvedInput = step.ResolvedInput?.Clone() ?? stored.Value.Input.Clone(), Output = output?.Clone(), SelectedTransition = transition, CompletedAt = now, Logs = [.. step.Logs, $"{name} completed."] } : step).ToArray();
         var updated = await SaveAsync(stored, stored.Value with { Steps = steps }, token);
         await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.StepRunCompleted, name, JsonSerializer.SerializeToElement(new { transition }), token);
         return updated;
@@ -365,6 +429,15 @@ public sealed partial class FlowRunService
         return value.Clone();
     }
 
-    private static JsonElement? StepDeclaredInput(FlowStepDefinition step) => step switch { AgentFlowStepDefinition agent => agent.InputMapping?.Clone(), FlowCallStepDefinition flow => flow.InputMapping?.Clone(), ToolFlowStepDefinition tool => tool.ArgumentsMapping?.Clone(), ToolRouteFlowStepDefinition route => route.ArgumentsMapping?.Clone(), TransformFlowStepDefinition transform => transform.Mapping?.Clone(), OutputFlowStepDefinition output => output.OutputMapping?.Clone(), _ => null };
+    private static FlowCallStepDefinition RepeatCall(RepeatFlowStepDefinition repeat) => new()
+    {
+        Name = repeat.Name,
+        DisplayName = repeat.DisplayName,
+        Description = repeat.Description,
+        Flow = repeat.Flow,
+        InputMapping = repeat.InputMapping
+    };
+
+    private static JsonElement? StepDeclaredInput(FlowStepDefinition step) => step switch { AgentFlowStepDefinition agent => agent.InputMapping?.Clone(), FlowCallStepDefinition flow => flow.InputMapping?.Clone(), RepeatFlowStepDefinition repeat => repeat.InputMapping?.Clone(), ToolFlowStepDefinition tool => tool.ArgumentsMapping?.Clone(), ToolRouteFlowStepDefinition route => route.ArgumentsMapping?.Clone(), TransformFlowStepDefinition transform => transform.Mapping?.Clone(), OutputFlowStepDefinition output => output.OutputMapping?.Clone(), _ => null };
 }
 

@@ -74,6 +74,8 @@ public interface IFlowResourceReferenceResolver
 
 public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver resources) : IFlowDefinitionValidator
 {
+    public const int MaximumRepeatIterations = 1000;
+
     [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$", RegexOptions.CultureInvariant)]
     private static partial Regex NamePattern();
 
@@ -146,6 +148,21 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 break;
             case FlowCallStepDefinition flowCall:
                 await ValidateFlowCallAsync(flowCall, context, issues, token);
+                break;
+            case RepeatFlowStepDefinition repeat:
+                if (repeat.MaximumIterations is < 1 or > MaximumRepeatIterations)
+                    issues.Add(Error("flow_repeat_iterations_invalid", $"Repeat maximumIterations must be between 1 and {MaximumRepeatIterations}.", step.Name, property: "maximumIterations"));
+                ValidateExpression(repeat.Until, issues, step.Name, property: "until");
+                ValidateJsonExpressions(repeat.NextInputMapping, issues, step.Name, "nextInputMapping");
+                await ValidateFlowCallAsync(new FlowCallStepDefinition
+                {
+                    Name = repeat.Name,
+                    DisplayName = repeat.DisplayName,
+                    Description = repeat.Description,
+                    Flow = repeat.Flow,
+                    InputMapping = repeat.InputMapping
+                }, context, issues, token);
+                await ValidateRepeatNextInputAsync(repeat, context, issues, token);
                 break;
             case ToolFlowStepDefinition tool:
                 await ValidateToolAsync(tool, context, issues, token);
@@ -253,6 +270,34 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         ValidateMappingAgainstSchema(step, target.InputSchema, issues);
         if (await resources.CreatesFlowCycleAsync(context.WorkspaceId.Value, context.OwnerFlowId.Value, target, token))
             issues.Add(Error("flow_dependency_cycle", $"Calling Flow '{target.FlowId}' would create a direct or indirect dependency cycle.", step.Name, property: "flow"));
+    }
+
+    private async Task ValidateRepeatNextInputAsync(
+        RepeatFlowStepDefinition step,
+        FlowValidationContext context,
+        List<FlowValidationIssue> issues,
+        CancellationToken token)
+    {
+        if (step.NextInputMapping is null
+            || !context.ResolveResources
+            || context.WorkspaceId is null
+            || context.OwnerFlowId is null)
+            return;
+
+        var target = await resources.ResolveFlowAsync(
+            context.WorkspaceId.Value,
+            context.OwnerFlowId.Value.Namespace,
+            step.Flow,
+            token);
+        if (target is null || !ValidContractSchema(target.InputSchema)) return;
+        if (target.InputSchema is { } schema)
+        {
+            if (step.NextInputMapping is { ValueKind: JsonValueKind.String } mapping
+                && FlowExpressionParser.TryParse(mapping.GetString()!, out var expression, out _)
+                && IsCompleteObjectReference(expression.Body))
+                return;
+            ValidateMappingAgainstSchema(step.Name, "nextInputMapping", step.NextInputMapping, schema, "flow_next_input_mapping", issues);
+        }
     }
 
     private static void ValidateMappingAgainstSchema(FlowCallStepDefinition step, JsonElement? schema, List<FlowValidationIssue> issues)

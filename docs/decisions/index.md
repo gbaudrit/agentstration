@@ -182,3 +182,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 154. [ADR-0154 — Knowledge Tools use the governed internal MCP path](0154-knowledge-tools-use-the-governed-internal-mcp-path.md)
 155. [ADR-0155 — Workspaces reconcile code-owned built-in resources](0155-workspaces-reconcile-code-owned-builtin-resources.md)
 156. [ADR-0156 — Crawl4AI web acquisition is an AEP Tool Provider](0156-crawl4ai-web-acquisition-is-an-aep-tool-provider.md)
+157. [ADR-0157 — Bounded Flow repetition composes durable child runs](0157-bounded-flow-repetition-composes-child-runs.md)
