@@ -17,6 +17,10 @@ public static class AwpErrorCodes
     public const string EventSequenceInvalid = "event_sequence_invalid";
     public const string TurnAttemptUnsupported = "turn_attempt_unsupported";
     public const string TerminalConflict = "terminal_conflict";
+    public const string AssignmentLeaseTooShort = "assignment_lease_too_short";
+    public const string ExecutionCoordinateInvalid = "execution_coordinate_invalid";
+    public const string ReplayConflict = "replay_conflict";
+    public const string LimitExceeded = "limit_exceeded";
 }
 
 public sealed record AwpError(

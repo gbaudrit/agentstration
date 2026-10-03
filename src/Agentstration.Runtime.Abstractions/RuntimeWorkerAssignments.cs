@@ -2,7 +2,7 @@ using Agentstration.Resources;
 
 namespace Agentstration.Runtime.Abstractions;
 
-public enum RuntimeAssignmentTargetKind { RuntimeRun }
+public enum RuntimeAssignmentTargetKind { RuntimeRun, FlowRun }
 public enum RuntimeAssignmentState { Pending, Assigned, Succeeded, Failed, Cancelled }
 public enum RuntimeAssignmentAttemptState { Active, Succeeded, Failed, Interrupted }
 public enum RuntimeAssignmentTerminalOutcome { Succeeded, Failed }
@@ -30,6 +30,7 @@ public sealed record RuntimeAssignmentAttempt
 public sealed record RuntimeWorkerAssignment
 {
     public required WorkspaceId WorkspaceId { get; init; }
+    public Guid TenantId { get; init; }
     public required RuntimeAssignmentId Id { get; init; }
     public RuntimeAssignmentTargetKind TargetKind { get; init; } = RuntimeAssignmentTargetKind.RuntimeRun;
     public required string TargetRunId { get; init; }
@@ -44,6 +45,10 @@ public sealed record RuntimeWorkerAssignment
     public required DateTimeOffset UpdatedAt { get; init; }
     public DateTimeOffset? CancellationRequestedAt { get; init; }
     public IReadOnlyList<RuntimeAssignmentAttempt> Attempts { get; init; } = [];
+    public IReadOnlyList<RuntimeAssignmentStepExecution> StepExecutions { get; init; } = [];
+    public IReadOnlyList<RuntimeAssignmentTurn> Turns { get; init; } = [];
+    public IReadOnlyList<RuntimeAssignmentExecutionEvent> ExecutionEvents { get; init; } = [];
+    public IReadOnlyList<RuntimeAssignmentCheckpoint> Checkpoints { get; init; } = [];
     public RuntimeAssignmentAttempt? CurrentAttempt => Attempts.LastOrDefault();
 }
 
@@ -90,6 +95,57 @@ public sealed record RuntimeAssignmentTerminalResult(
     RuntimeRunState RunState,
     bool IdempotentReplay);
 
+public sealed record RuntimeAssignmentStepExecution
+{
+    public required Guid CommandId { get; init; }
+    public required Guid Id { get; init; }
+    public required string FlowRunId { get; init; }
+    public required string FlowVersion { get; init; }
+    public required string FlowDefinitionHash { get; init; }
+    public required string StepDefinitionId { get; init; }
+    public required string StepName { get; init; }
+    public required string StepType { get; init; }
+    public required int DefinitionPosition { get; init; }
+    public required DateTimeOffset OpenedAt { get; init; }
+}
+
+public sealed record RuntimeAssignmentTurn
+{
+    public required Guid CommandId { get; init; }
+    public required Guid Id { get; init; }
+    public required Guid AttemptId { get; init; }
+    public int AttemptNumber { get; init; } = 1;
+    public required string RunId { get; init; }
+    public Guid? StepExecutionId { get; init; }
+    public string? ParticipantId { get; init; }
+    public required DateTimeOffset OpenedAt { get; init; }
+}
+
+public sealed record RuntimeAssignmentExecutionEvent
+{
+    public required Guid EventId { get; init; }
+    public required long AttemptEventSequence { get; init; }
+    public required DateTimeOffset OccurredAt { get; init; }
+    public required string Kind { get; init; }
+    public required string RunId { get; init; }
+    public Guid? StepExecutionId { get; init; }
+    public Guid? TurnId { get; init; }
+    public Guid? TurnAttemptId { get; init; }
+    public Guid? ToolCallId { get; init; }
+    public System.Text.Json.JsonElement? Payload { get; init; }
+}
+
+public sealed record RuntimeAssignmentEventAppendResult(
+    long AcceptedThroughSequence,
+    IReadOnlyList<Guid> DuplicateEventIds);
+
+public sealed record RuntimeAssignmentCheckpoint(
+    string CheckpointId,
+    string SchemaVersion,
+    string CompatibilityKey,
+    System.Text.Json.JsonElement Payload,
+    DateTimeOffset PersistedAt);
+
 public sealed record RuntimeAssignmentTerminalCommand(
     RuntimeAssignmentTerminalOutcome Outcome,
     Guid EventId,
@@ -103,6 +159,11 @@ public static class RuntimeAssignmentErrorCodes
     public const string LeaseExpired = "assignment_lease_expired";
     public const string FencingRejected = "assignment_fencing_rejected";
     public const string TerminalConflict = "assignment_terminal_conflict";
+    public const string InvalidCoordinate = "assignment_invalid_coordinate";
+    public const string InvalidEventSequence = "assignment_invalid_event_sequence";
+    public const string ReplayConflict = "assignment_replay_conflict";
+    public const string LimitExceeded = "assignment_limit_exceeded";
+    public const string LeaseTooShort = "assignment_lease_too_short";
 }
 
 public interface IRuntimeWorkerAssignmentStore
@@ -125,6 +186,36 @@ public interface IRuntimeWorkerAssignmentStore
     Task<RuntimeAssignmentAuthorization> ValidateOwnershipAsync(
         RuntimeAssignmentOwnershipProof proof,
         byte[] ownershipTokenDigest,
+        DateTimeOffset observedAt,
+        CancellationToken cancellationToken);
+    Task<RuntimeAssignmentStepExecution> OpenStepExecutionAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        byte[] ownershipTokenDigest,
+        RuntimeAssignmentStepExecution step,
+        DateTimeOffset observedAt,
+        CancellationToken cancellationToken);
+    Task<RuntimeAssignmentTurn> OpenTurnAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        byte[] ownershipTokenDigest,
+        RuntimeAssignmentTurn turn,
+        DateTimeOffset observedAt,
+        CancellationToken cancellationToken);
+    Task<RuntimeAssignmentEventAppendResult> AppendEventsAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        byte[] ownershipTokenDigest,
+        IReadOnlyList<RuntimeAssignmentExecutionEvent> events,
+        DateTimeOffset observedAt,
+        CancellationToken cancellationToken);
+    Task StoreCheckpointAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        byte[] ownershipTokenDigest,
+        RuntimeAssignmentCheckpoint checkpoint,
+        DateTimeOffset observedAt,
+        CancellationToken cancellationToken);
+    Task<RuntimeAssignmentCheckpoint?> GetCheckpointAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        byte[] ownershipTokenDigest,
+        string checkpointId,
         DateTimeOffset observedAt,
         CancellationToken cancellationToken);
     Task<StoredRuntimeWorkerAssignment> RequestCancellationAsync(

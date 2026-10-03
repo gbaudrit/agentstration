@@ -341,6 +341,118 @@ public sealed class RuntimeWorkerAssignmentTests
         Assert.AreEqual(fixture.RunId, claimed.Assignment.TargetRunId);
     }
 
+    [TestMethod]
+    public async Task AssignmentAuthorizesMultipleTurnsWithOneInitialAttemptEach()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        await fixture.CreateAssignmentAsync();
+        var claim = await fixture.ClaimRequiredAsync();
+
+        var first = await fixture.Service.OpenTurnAsync(claim.Ownership, fixture.RunId, null, "agent", default);
+        var second = await fixture.Service.OpenTurnAsync(claim.Ownership, fixture.RunId, null, "agent", default);
+
+        Assert.AreNotEqual(first.Id, second.Id);
+        Assert.AreNotEqual(first.AttemptId, second.AttemptId);
+        Assert.AreEqual(1, first.AttemptNumber);
+        Assert.AreEqual(1, second.AttemptNumber);
+        var stored = await fixture.Assignments.GetAsync(Workspace, claim.Assignment.Id, default);
+        Assert.IsNotNull(stored);
+        Assert.HasCount(2, stored.Value.Turns);
+    }
+
+    [TestMethod]
+    public async Task EventReplayIsIdempotentAndRequiresAttemptLocalContiguousOrdering()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        await fixture.CreateAssignmentAsync();
+        var claim = await fixture.ClaimRequiredAsync();
+        var turn = await fixture.Service.OpenTurnAsync(claim.Ownership, fixture.RunId, null, "agent", default);
+        var executionEvent = new RuntimeAssignmentExecutionEvent
+        {
+            EventId = Guid.NewGuid(),
+            AttemptEventSequence = 1,
+            OccurredAt = fixture.Clock.GetUtcNow(),
+            Kind = "TurnStarted",
+            RunId = fixture.RunId,
+            TurnId = turn.Id,
+            TurnAttemptId = turn.AttemptId,
+            Payload = System.Text.Json.JsonSerializer.SerializeToElement(new { value = "stable" })
+        };
+
+        var accepted = await fixture.Service.AppendEventsAsync(claim.Ownership, [executionEvent], default);
+        var replay = await fixture.Service.AppendEventsAsync(claim.Ownership, [executionEvent], default);
+
+        Assert.AreEqual(1, accepted.AcceptedThroughSequence);
+        Assert.AreEqual(executionEvent.EventId, replay.DuplicateEventIds.Single());
+        var exception = await Assert.ThrowsExactlyAsync<RuntimeAssignmentException>(() => fixture.Service.AppendEventsAsync(
+            claim.Ownership,
+            [executionEvent with { EventId = Guid.NewGuid(), AttemptEventSequence = 3 }],
+            default));
+        Assert.AreEqual(RuntimeAssignmentErrorCodes.InvalidEventSequence, exception.Code);
+    }
+
+    [TestMethod]
+    public async Task CheckpointRequiresCurrentOwnershipAndSurvivesStoreRestart()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"agentstration-runtime-checkpoint-{Guid.NewGuid():N}.db");
+        try
+        {
+            RuntimeAssignmentOwnershipProof ownership;
+            await using (var first = await AssignmentFixture.CreateAsync(path))
+            {
+                await first.CreateAssignmentAsync();
+                var claim = await first.ClaimRequiredAsync();
+                ownership = claim.Ownership;
+                await first.Service.StoreCheckpointAsync(ownership, "checkpoint-1", "maf-json-v1", "sha256:test",
+                    System.Text.Json.JsonSerializer.SerializeToElement(new { state = 1 }), default);
+            }
+
+            await using var second = await AssignmentFixture.CreateAsync(path);
+            var checkpoint = await second.Service.GetCheckpointAsync(ownership, "checkpoint-1", default);
+            Assert.IsNotNull(checkpoint);
+            Assert.AreEqual(1, checkpoint.Payload.GetProperty("state").GetInt32());
+            second.Clock.Advance(TimeSpan.FromSeconds(46));
+            var exception = await Assert.ThrowsExactlyAsync<RuntimeAssignmentException>(() =>
+                second.Service.GetCheckpointAsync(ownership, "checkpoint-1", default));
+            Assert.AreEqual(RuntimeAssignmentErrorCodes.LeaseExpired, exception.Code);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [TestMethod]
+    public async Task GovernedSideEffectIsRejectedInsideLeaseSafetyMargin()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        await fixture.CreateAssignmentAsync();
+        var claim = await fixture.ClaimRequiredAsync();
+        fixture.Clock.Advance(TimeSpan.FromSeconds(40));
+
+        var exception = await Assert.ThrowsExactlyAsync<RuntimeAssignmentException>(() =>
+            fixture.Execution.StoreArtifactAsync(claim.Ownership, "result.txt", "text/plain", "value"u8.ToArray(), default));
+
+        Assert.AreEqual(RuntimeAssignmentErrorCodes.LeaseTooShort, exception.Code);
+    }
+
+    [TestMethod]
+    public async Task RootFlowAssignmentCanBeClaimedWithoutARuntimeRunMirror()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        var flowRunId = $"flowrun-{Guid.NewGuid():N}";
+        var tenantId = Guid.NewGuid();
+        _ = await fixture.Service.CreateAsync(Workspace, tenantId, RuntimeAssignmentTargetKind.FlowRun,
+            flowRunId, "microsoft-agent-framework", "1.0", "1.0", $"material-{flowRunId}",
+            "sha256:flow", default);
+
+        var claim = await fixture.ClaimRequiredAsync();
+
+        Assert.AreEqual(RuntimeAssignmentTargetKind.FlowRun, claim.Assignment.TargetKind);
+        Assert.AreEqual(flowRunId, claim.Assignment.TargetRunId);
+        Assert.AreEqual(tenantId, claim.Assignment.TenantId);
+    }
+
     private sealed class AssignmentFixture : IAsyncDisposable
     {
         private readonly ServiceProvider provider;
@@ -358,6 +470,7 @@ public sealed class RuntimeWorkerAssignmentTests
             Service = provider.GetRequiredService<RuntimeWorkerAssignmentService>();
             Dispatch = provider.GetRequiredService<RuntimeWorkerDispatchService>();
             Availability = provider.GetRequiredService<RuntimeAssignmentAvailabilitySignal>();
+            Execution = provider.GetRequiredService<RuntimeWorkerExecutionService>();
         }
 
         public MutableTimeProvider Clock { get; }
@@ -366,6 +479,7 @@ public sealed class RuntimeWorkerAssignmentTests
         public RuntimeWorkerAssignmentService Service { get; }
         public RuntimeWorkerDispatchService Dispatch { get; }
         public RuntimeAssignmentAvailabilitySignal Availability { get; }
+        public RuntimeWorkerExecutionService Execution { get; }
         public string RunId { get; } = $"run-{Guid.NewGuid():N}";
         public RuntimeAssignmentId AssignmentId { get; private set; }
 
@@ -381,6 +495,9 @@ public sealed class RuntimeWorkerAssignmentTests
             services.AddSingleton<RuntimeAssignmentAvailabilitySignal>();
             services.AddSingleton<RuntimeWorkerAssignmentService>();
             services.AddSingleton<RuntimeWorkerDispatchService>();
+            services.AddSingleton<IRuntimeExecutionMaterialResolver, UnusedMaterialResolver>();
+            services.AddSingleton<IRuntimeWorkerOperationGateway, UnusedOperationGateway>();
+            services.AddSingleton<RuntimeWorkerExecutionService>();
             services.AddSqliteRuntimeRuns($"Data Source={databasePath};Pooling=False");
             var provider = services.BuildServiceProvider();
             var fixture = new AssignmentFixture(provider, clock, databasePath, ownsDatabase);
@@ -427,6 +544,27 @@ public sealed class RuntimeWorkerAssignmentTests
         {
             await provider.DisposeAsync();
             if (ownsDatabase && File.Exists(databasePath)) File.Delete(databasePath);
+        }
+
+        private sealed class UnusedMaterialResolver : IRuntimeExecutionMaterialResolver
+        {
+            public Task<RuntimeExecutionMaterial> ResolveAsync(RuntimeWorkerAssignment assignment, CancellationToken cancellationToken) =>
+                Task.FromException<RuntimeExecutionMaterial>(new AssertFailedException("Material resolution was not expected."));
+
+            public Task<RuntimeFlowStepMaterial> ResolveStepAsync(RuntimeWorkerAssignment assignment, string flowRunId,
+                string flowVersion, string flowDefinitionHash, string stepDefinitionId, CancellationToken cancellationToken) =>
+                Task.FromException<RuntimeFlowStepMaterial>(new AssertFailedException("Step resolution was not expected."));
+        }
+
+        private sealed class UnusedOperationGateway : IRuntimeWorkerOperationGateway
+        {
+            public Task<RuntimeGovernedModelResponse> InvokeModelAsync(RuntimeGovernedModelRequest request, CancellationToken cancellationToken) => Unexpected<RuntimeGovernedModelResponse>();
+            public Task<System.Text.Json.JsonElement?> InvokeToolAsync(RuntimeGovernedToolRequest request, CancellationToken cancellationToken) => Unexpected<System.Text.Json.JsonElement?>();
+            public Task<RuntimeGovernedArtifact> StoreArtifactAsync(WorkspaceId workspaceId, RuntimeAssignmentId assignmentId, string name, string contentType, byte[] content, CancellationToken cancellationToken) => Unexpected<RuntimeGovernedArtifact>();
+            public Task<RuntimeGovernedArtifact?> GetArtifactAsync(WorkspaceId workspaceId, RuntimeAssignmentId assignmentId, Guid artifactId, CancellationToken cancellationToken) => Unexpected<RuntimeGovernedArtifact?>();
+            public Task<RuntimeGovernedChildFlow> CreateOrGetChildFlowAsync(WorkspaceId workspaceId, string parentRunId, string stepDefinitionId, System.Text.Json.JsonElement input, CancellationToken cancellationToken) => Unexpected<RuntimeGovernedChildFlow>();
+
+            private static Task<T> Unexpected<T>() => Task.FromException<T>(new AssertFailedException("A governed operation was not expected."));
         }
     }
 

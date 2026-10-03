@@ -10,6 +10,19 @@ public static class AwpProtocol
     public const string RegistrationPath = BasePath + "/workers/register";
     public const string ClaimPath = BasePath + "/assignments/claim";
     public const string HeartbeatPath = BasePath + "/assignments/heartbeat";
+    public const string ExecutionMaterialPath = BasePath + "/assignments/material";
+    public const string OpenStepExecutionPath = BasePath + "/assignments/steps/open";
+    public const string OpenTurnPath = BasePath + "/assignments/turns/open";
+    public const string AppendEventsPath = BasePath + "/assignments/events";
+    public const string StoreCheckpointPath = BasePath + "/assignments/checkpoints";
+    public const string GetCheckpointPath = BasePath + "/assignments/checkpoints/get";
+    public const string CompleteAssignmentPath = BasePath + "/assignments/complete";
+    public const string FailAssignmentPath = BasePath + "/assignments/fail";
+    public const string InvokeModelPath = BasePath + "/assignments/model/invoke";
+    public const string InvokeToolPath = BasePath + "/assignments/tools/invoke";
+    public const string StoreArtifactPath = BasePath + "/assignments/artifacts";
+    public const string GetArtifactPath = BasePath + "/assignments/artifacts/get";
+    public const string CreateChildFlowPath = BasePath + "/assignments/child-flows";
 
     public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();
 

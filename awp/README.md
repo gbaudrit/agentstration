@@ -35,3 +35,19 @@ The ownership token is opaque. Every assignment-scoped command also carries the 
 ## Dispatch transport
 
 An authenticated process activates its fresh session, registers capacity and compatibility at `POST /api/awp/v1/workers/register`, then calls `POST /api/awp/v1/assignments/claim`. Claim performs an immediate durable eligibility check before any bounded wait and rechecks after every best-effort wake-up. `POST /api/awp/v1/assignments/heartbeat` renews only the exact assignment, attempt, Worker session, opaque ownership token and fencing generation returned by claim. Assignment command contexts include the Workspace scope required by the authoritative storage boundary.
+
+## Assignment-scoped execution boundary
+
+After claim, the Worker retrieves the immutable, versioned material referenced by the assignment through `/assignments/material`. Direct-Agent material contains the exact Agent revision, instructions, model-profile identity, declared Tool schemas, input and execution options. Root-Flow material additionally contains the pinned published Flow snapshot and its version/hash. It never contains a database connection, Secret value, provider credential, artifact storage key or filesystem path.
+
+The remaining AWP v1 operations are deliberately narrow:
+
+- `/assignments/steps/open` validates a `StepDefinitionId` against the pinned Flow snapshot and mints the effective `StepExecutionId`.
+- `/assignments/turns/open` mints a Turn and its single v1 `TurnAttempt` under an optional StepExecution.
+- `/assignments/model/invoke` and `/assignments/tools/invoke` keep model credentials, Tool authorization, governance hooks and audit inside Agentstration. Tool calls must reference a server-authorized Turn/TurnAttempt and a Tool declared by that Agent revision.
+- `/assignments/events` accepts at most 256 ordered events per call. Attempt-local sequences are contiguous, EventIds are stable across replay, identical duplicates are accepted idempotently, and conflicting replays are rejected.
+- `/assignments/checkpoints` persists only explicitly supplied checkpoints with a schema version and compatibility key equal to the assignment material digest. A checkpoint is not an automatic recovery promise after Worker loss.
+- `/assignments/child-flows` accepts only a server-authorized Flow-call StepExecution, while `/assignments/artifacts` uses opaque Artifact IDs and bounds content to 1 MiB.
+- `/assignments/complete` and `/assignments/fail` apply the terminal command idempotently.
+
+Every operation revalidates the Workspace, Worker session, AssignmentAttempt, opaque token, lease and fencing generation at the authoritative boundary. New governed side effects are rejected during the configured lease safety margin; an operation already in progress is cancelled before lease expiry. Read-only and durable mutation operations never expose a generic Management or storage API.
