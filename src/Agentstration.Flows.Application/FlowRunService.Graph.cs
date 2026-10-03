@@ -38,7 +38,7 @@ public sealed partial class FlowRunService
             var transitionOutput = incomingTransition is null
                 ? null
                 : outputs.GetValueOrDefault(incomingTransition.FromStep)?.Clone();
-            var context = new FlowExecutionContext(stored.Value.Input, outputs, transitionOutput);
+            var context = ExecutionContext(stored.Value, step.Name, outputs, transitionOutput);
             JsonElement? output;
             string eventName;
             FlowAgentExecutionResult? agentResult = null;
@@ -232,7 +232,7 @@ public sealed partial class FlowRunService
                     outputs[step.Name] = output.Value.Clone();
                     var until = await EvaluateExpressionAsync(
                         repeat.Until,
-                        new FlowExecutionContext(stored.Value.Input, outputs, output),
+                        ExecutionContext(stored.Value, step.Name, outputs, output),
                         runToken);
                     if (until?.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
                         throw new FlowValidationException("flow_repeat_until_invalid", $"Repeat step '{step.Name}' until expression must return a boolean.");
@@ -244,7 +244,7 @@ public sealed partial class FlowRunService
                         ? output.Value.Clone()
                         : await ResolveJsonAsync(
                             repeat.NextInputMapping.Value,
-                            new FlowExecutionContext(stored.Value.Input, outputs, output),
+                            ExecutionContext(stored.Value, step.Name, outputs, output),
                             runToken);
                     var nextIteration = iteration + 1;
                     var nextChildRunId = ChildFlowRunId(stored.Value, step.Name, repeatStepRun.Attempt, nextIteration);
@@ -262,7 +262,8 @@ public sealed partial class FlowRunService
                     throw new FlowValidationException("flow_step_type_unsupported", $"Step '{step.Name}' has an unsupported type.");
             }
             outputs[step.Name] = output?.Clone();
-            var transition = await SelectTransitionAsync(graph, step.Name, eventName, new FlowExecutionContext(stored.Value.Input, outputs), runToken);
+            var transition = await SelectTransitionAsync(graph, step.Name, eventName,
+                ExecutionContext(stored.Value, step.Name, outputs), runToken);
             if (stepError is not null) stored = await FinishFailedStepAsync(stored, step.Name, output, transition?.Id, stepError, runToken, toolRouteResolution);
             else if (agentResult is not null) stored = await FinishAgentStepAsync(stored, agentResult, runToken, transition?.Id, step.Name);
             else if (toolRouteResolution is not null) stored = await FinishToolRouteStepAsync(stored, step.Name, output, transition?.Id, toolRouteResolution, runToken);
@@ -289,6 +290,21 @@ public sealed partial class FlowRunService
         RecordCompletion(stored.Value.CreatedAt, now, stored.Value.DefinitionState);
         await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.FlowRunCompleted, null, null, stoppingToken);
     }
+
+    private static FlowExecutionContext ExecutionContext(
+        FlowRun run,
+        string stepName,
+        IReadOnlyDictionary<string, JsonElement?> outputs,
+        JsonElement? transitionOutput = null) => new(
+            run.Input,
+            outputs,
+            transitionOutput,
+            new(
+                run.Id,
+                run.RootFlowRunId ?? run.Id,
+                run.ParentFlowRunId,
+                stepName,
+                run.CorrelationId));
 
     private async Task<StoredFlowRun> FinishToolRouteStepAsync(StoredFlowRun stored, string name,
         JsonElement? output, string? transition, FlowToolRouteResolution resolution, CancellationToken token)

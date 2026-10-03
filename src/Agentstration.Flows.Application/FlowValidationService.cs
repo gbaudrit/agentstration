@@ -141,6 +141,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             case ConditionFlowStepDefinition condition:
                 if (condition.Mode.Equals("Advanced", StringComparison.OrdinalIgnoreCase)) ValidateExpression(condition.Expression, issues, step.Name, property: "expression");
                 else if (string.IsNullOrWhiteSpace(condition.Left)) issues.Add(Error("condition_left_required", "A simple Condition requires a left value.", step.Name, property: "left"));
+                else if (condition.Left.StartsWith("${", StringComparison.Ordinal)) ValidateExpression(condition.Left, issues, step.Name, property: "left");
                 break;
             case TransformFlowStepDefinition transform:
                 if (transform.Mode.Equals("Expression", StringComparison.OrdinalIgnoreCase)) ValidateExpression(transform.Expression, issues, step.Name, property: "expression");
@@ -421,7 +422,15 @@ public sealed record FlowExpressionContext(IReadOnlyCollection<string> StepNames
 public sealed record FlowExecutionContext(
     JsonElement Input,
     IReadOnlyDictionary<string, JsonElement?> StepOutputs,
-    JsonElement? TransitionOutput = null);
+    JsonElement? TransitionOutput = null,
+    FlowExecutionMetadata? Execution = null);
+
+public sealed record FlowExecutionMetadata(
+    string FlowRunId,
+    string RootFlowRunId,
+    string? ParentFlowRunId,
+    string StepName,
+    string? CorrelationId);
 
 public interface IExpressionParser { ExpressionParseResult Parse(string expression); }
 public interface IExpressionValidator { ExpressionValidationResult Validate(ParsedExpression expression, FlowExpressionContext context); }
@@ -434,6 +443,9 @@ public sealed class FlowExpressionParser : IExpressionParser, IExpressionValidat
     public ExpressionValidationResult Validate(ParsedExpression expression, FlowExpressionContext context)
     {
         var path = ComparisonParts(expression.Body)[0];
+        if (path.StartsWith("execution", StringComparison.Ordinal)
+            && !IsSupportedExecutionPath(path))
+            return new(false, $"Expression references unknown execution context property '{path}'.");
         if (path.StartsWith("steps.", StringComparison.Ordinal))
         {
             var segments = path.Split('.');
@@ -462,9 +474,15 @@ public sealed class FlowExpressionParser : IExpressionParser, IExpressionValidat
         var first = ComparisonParts(body)[0];
         if (!first.StartsWith("input", StringComparison.Ordinal)
             && !first.StartsWith("steps.", StringComparison.Ordinal)
-            && !first.StartsWith("transition.output", StringComparison.Ordinal))
+            && !first.StartsWith("transition.output", StringComparison.Ordinal)
+            && !first.StartsWith("execution.", StringComparison.Ordinal))
         {
-            error = "Expressions may reference only input, the incoming transition output, or step outputs.";
+            error = "Expressions may reference only input, execution context, the incoming transition output, or step outputs.";
+            return false;
+        }
+        if (first.StartsWith("execution.", StringComparison.Ordinal) && !IsSupportedExecutionPath(first))
+        {
+            error = $"Expression references unknown execution context property '{first}'.";
             return false;
         }
         parsed = new ParsedExpression(expression, body); return true;
@@ -485,6 +503,7 @@ public sealed class FlowExpressionParser : IExpressionParser, IExpressionValidat
         var segments = path.Split('.'); JsonElement? current;
         var offset = 1;
         if (segments[0] == "input") current = context.Input;
+        else if (segments[0] == "execution") return ResolveExecution(path, context.Execution);
         else if (segments[0] == "transition") { current = context.TransitionOutput; offset = 2; }
         else { if (segments.Length < 3 || !context.StepOutputs.TryGetValue(segments[1], out current)) return null; offset = segments[2] == "output" ? 3 : 2; }
         for (var index = offset; index < segments.Length; index++)
@@ -494,6 +513,23 @@ public sealed class FlowExpressionParser : IExpressionParser, IExpressionValidat
         }
         return current;
     }
+
+    private static JsonElement? ResolveExecution(string path, FlowExecutionMetadata? execution) => path switch
+    {
+        "execution.flowRunId" when execution is not null => JsonSerializer.SerializeToElement(execution.FlowRunId),
+        "execution.rootFlowRunId" when execution is not null => JsonSerializer.SerializeToElement(execution.RootFlowRunId),
+        "execution.parentFlowRunId" when execution?.ParentFlowRunId is { } value => JsonSerializer.SerializeToElement(value),
+        "execution.stepName" when execution is not null => JsonSerializer.SerializeToElement(execution.StepName),
+        "execution.correlationId" when execution?.CorrelationId is { } value => JsonSerializer.SerializeToElement(value),
+        _ => null
+    };
+
+    private static bool IsSupportedExecutionPath(string path) => path is
+        "execution.flowRunId"
+        or "execution.rootFlowRunId"
+        or "execution.parentFlowRunId"
+        or "execution.stepName"
+        or "execution.correlationId";
 
     private static JsonElement ResolveLiteral(string value)
     {
