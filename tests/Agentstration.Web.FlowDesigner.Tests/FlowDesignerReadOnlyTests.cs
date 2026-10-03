@@ -11,6 +11,7 @@ using Agentstration.Web.FlowDesigner.Diagramming;
 using Agentstration.Web.FlowDesigner.State;
 using AngleSharp.Dom;
 using Blazor.Diagrams;
+using Blazor.Diagrams.Core.Anchors;
 using Blazor.Diagrams.Core.Behaviors;
 using Blazor.Diagrams.Core.Geometry;
 using BlazorMonaco.Editor;
@@ -637,6 +638,106 @@ public sealed class FlowDesignerReadOnlyTests
         var call = Assert.IsInstanceOfType<FlowCallStepDefinition>(context.Services.GetRequiredService<FlowEditorStore>()
             .State.Resource!.Definition.Steps.Single(step => step.Name == "deliver"));
         Assert.AreEqual("${transition.output}", call.InputMapping?.GetString());
+    }
+
+    [TestMethod]
+    public async Task SelectingCanvasTransitionShowsEditableMetadata()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "output" }],
+            Transitions = [new("input-output", "input", "completed", "output")]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "sample"));
+        var diagram = GetDiagram(rendered.FindComponent<FlowCanvas>().Instance);
+
+        await rendered.InvokeAsync(() => diagram.SelectModel(diagram.Links.Single(), unselectOthers: true));
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='selected-transition-editor']")));
+        await rendered.Find("[data-testid='transition-event']").ChangeAsync(new() { Value = "approved" });
+        await rendered.Find("[data-testid='transition-condition']").ChangeAsync(new() { Value = "${input.approved}" });
+        await rendered.Find("[data-testid='transition-priority']").ChangeAsync(new() { Value = "3" });
+
+        var transition = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Transitions.Single();
+        Assert.AreEqual("input-output", transition.Id);
+        Assert.AreEqual("approved", transition.Event);
+        Assert.AreEqual("${input.approved}", transition.Condition);
+        Assert.AreEqual(3, transition.Priority);
+    }
+
+    [TestMethod]
+    public async Task SelectingInspectorTransitionSelectsCanvasLink()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "output" }],
+            Transitions = [new("input-output", "input", "completed", "output")]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "sample"));
+        var diagram = GetDiagram(rendered.FindComponent<FlowCanvas>().Instance);
+
+        await rendered.Find(".transition-list li > button:first-child").ClickAsync(new());
+
+        rendered.WaitForAssertion(() => Assert.IsTrue(diagram.Links.Single().Selected));
+    }
+
+    [TestMethod]
+    public async Task ReconnectingCanvasTransitionUpdatesItsTargetAndPreservesMetadata()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new TransformFlowStepDefinition { Name = "transform" },
+                new OutputFlowStepDefinition { Name = "output" }
+            ],
+            Transitions = [new("route", "input", "matched", "transform", "${input.ready}", 4)]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "sample"));
+        var diagram = GetDiagram(rendered.FindComponent<FlowCanvas>().Instance);
+        var output = diagram.Nodes.OfType<FlowDiagramNode>().Single(node => node.Source.Name == "output");
+
+        await rendered.InvokeAsync(() => diagram.Links.Single().SetTarget(new SinglePortAnchor(output.Input)));
+
+        var transition = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Transitions.Single();
+        Assert.AreEqual("input", transition.FromStep);
+        Assert.AreEqual("output", transition.ToStep);
+        Assert.AreEqual("matched", transition.Event);
+        Assert.AreEqual("${input.ready}", transition.Condition);
+        Assert.AreEqual(4, transition.Priority);
     }
 
     private static BunitContext CreateContext()

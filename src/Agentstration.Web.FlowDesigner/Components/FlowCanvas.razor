@@ -31,10 +31,13 @@
     [Parameter] public long FitRevision { get; set; }
     [Parameter] public bool IsReadOnly { get; set; }
     [Parameter] public string? EntryStep { get; set; }
+    [Parameter] public string? SelectedTransitionId { get; set; }
     [Parameter] public EventCallback<string?> SelectedStepChanged { get; set; }
+    [Parameter] public EventCallback<string?> SelectedTransitionChanged { get; set; }
     [Parameter] public EventCallback<MoveStepCommand> StepMoved { get; set; }
     [Parameter] public EventCallback<string> StepRemoved { get; set; }
     [Parameter] public EventCallback<FlowTransitionDefinition> TransitionCreated { get; set; }
+    [Parameter] public EventCallback<ReconnectTransitionCommand> TransitionReconnected { get; set; }
     [Parameter] public EventCallback<string> TransitionRemoved { get; set; }
 
     protected override void OnInitialized()
@@ -63,13 +66,24 @@
             renderedFitRevision = FitRevision;
             fitAfterRender = true;
         }
+        SynchronizeTransitionSelection();
     }
 
-    protected override Task OnAfterRenderAsync(bool firstRender)
+    private void SynchronizeTransitionSelection()
     {
-        TryFit();
-        return Task.CompletedTask;
+        foreach (var selected in diagram.GetSelectedModels().OfType<Blazor.Diagrams.Core.Models.Base.BaseLinkModel>().ToArray())
+        {
+            if (selected.Id != SelectedTransitionId)
+                diagram.UnselectModel(selected);
+        }
+
+        if (SelectedTransitionId is not { } id) return;
+        var link = diagram.Links.FirstOrDefault(candidate => candidate.Id == id);
+        if (link is not null && !link.Selected)
+            diagram.SelectModel(link, unselectOthers: true);
     }
+
+    protected override void OnAfterRender(bool firstRender) => TryFit();
 
     public void Center()
     {
@@ -93,6 +107,8 @@
             node.Moved -= OnNodeMoved;
             node.SizeChanged -= OnDiagramMetricsChanged;
         }
+        foreach (var link in diagram.Links)
+            DetachExistingLink(link);
         diagram.Links.Clear();
         diagram.Nodes.Clear();
         var projection = FlowDiagramMapper.Project(Document);
@@ -106,6 +122,7 @@
         foreach (var link in projection.Links)
         {
             link.Locked = IsReadOnly;
+            AttachExistingLink(link);
             diagram.Links.Add(link);
         }
         rebuilding = false;
@@ -113,10 +130,22 @@
 
     private void OnDiagramMetricsChanged(Blazor.Diagrams.Core.Models.Base.Model _)
     {
+        RefreshLinks();
         TryFit();
     }
 
-    private void OnContainerChanged() => TryFit();
+    private void RefreshLinks()
+    {
+        foreach (var link in diagram.Links)
+            link.Refresh();
+    }
+
+    private void OnContainerChanged()
+    {
+        foreach (var node in diagram.Nodes)
+            node.ReinitializePorts();
+        TryFit();
+    }
 
     private void TryFit()
     {
@@ -143,6 +172,8 @@
     {
         if (model is FlowDiagramNode node)
             _ = SelectedStepChanged.InvokeAsync(node.Source.Name);
+        else if (model is Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
+            _ = SelectedTransitionChanged.InvokeAsync(link.Id);
     }
 
     private void OnNodeMoved(Blazor.Diagrams.Core.Models.Base.MovableModel model)
@@ -168,17 +199,64 @@
 
     private void OnLinkAttached(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
     {
-        if (link.Source.Model is not PortModel source || link.Target.Model is not PortModel target) return;
-        var from = source.Parent as FlowDiagramNode;
-        var to = target.Parent as FlowDiagramNode;
-        if (from is null || to is null) return;
+        link.TargetAttached -= OnLinkAttached;
+        if (!TryEndpoints(link, out var from, out var to)) return;
         var id = $"{from.Source.Name}-completed-{to.Source.Name}";
         _ = TransitionCreated.InvokeAsync(new FlowTransitionDefinition(id, from.Source.Name, "completed", to.Source.Name));
+    }
+
+    private void AttachExistingLink(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
+    {
+        link.SourceChanged += OnLinkEndpointChanged;
+        link.TargetChanged += OnLinkEndpointChanged;
+        if (IsReadOnly) return;
+
+        diagram.Controls.AddFor(link, ControlsType.OnSelection)
+            .Add(new ArrowHeadControl(source: true, LinkMarker.Circle))
+            .Add(new ArrowHeadControl(source: false, LinkMarker.Circle));
+    }
+
+    private void DetachExistingLink(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
+    {
+        link.TargetAttached -= OnLinkAttached;
+        link.SourceChanged -= OnLinkEndpointChanged;
+        link.TargetChanged -= OnLinkEndpointChanged;
+        diagram.Controls.RemoveFor(link);
+    }
+
+    private void OnLinkEndpointChanged(
+        Blazor.Diagrams.Core.Models.Base.BaseLinkModel link,
+        Blazor.Diagrams.Core.Anchors.Anchor oldAnchor,
+        Blazor.Diagrams.Core.Anchors.Anchor newAnchor)
+    {
+        if (rebuilding || IsReadOnly || !TryEndpoints(link, out var from, out var to)) return;
+        _ = TransitionReconnected.InvokeAsync(new(link.Id, from.Source.Name, to.Source.Name));
+    }
+
+    private static bool TryEndpoints(
+        Blazor.Diagrams.Core.Models.Base.BaseLinkModel link,
+        out FlowDiagramNode from,
+        out FlowDiagramNode to)
+    {
+        from = default!;
+        to = default!;
+        if (link.Source.Model is not FlowDiagramPort first || link.Target.Model is not FlowDiagramPort second)
+            return false;
+
+        var output = first.Direction == FlowDiagramPortDirection.Output ? first : second;
+        var input = first.Direction == FlowDiagramPortDirection.Input ? first : second;
+        if (output.Direction != FlowDiagramPortDirection.Output || input.Direction != FlowDiagramPortDirection.Input)
+            return false;
+
+        from = (FlowDiagramNode)output.Parent;
+        to = (FlowDiagramNode)input.Parent;
+        return output.CanAttachTo(input);
     }
 
     private void OnLinkRemoved(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
     {
         if (rebuilding || IsReadOnly) return;
+        DetachExistingLink(link);
         // Removing a node also removes its links. The step command owns those transitions.
         if (link.Source.Model is PortModel source && source.Parent is FlowDiagramNode from && !diagram.Nodes.Contains(from)) return;
         if (link.Target.Model is PortModel target && target.Parent is FlowDiagramNode to && !diagram.Nodes.Contains(to)) return;
@@ -198,5 +276,7 @@
             node.Moved -= OnNodeMoved;
             node.SizeChanged -= OnDiagramMetricsChanged;
         }
+        foreach (var link in diagram.Links)
+            DetachExistingLink(link);
     }
 }

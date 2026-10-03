@@ -43,6 +43,8 @@
   <data name="LeftValue"><value>Valeur gauche</value></data><data name="Operator"><value>Opérateur</value></data><data name="RightValue"><value>Valeur droite</value></data>
   <data name="ErrorCode"><value>Code d’erreur</value></data><data name="Message"><value>Message</value></data><data name="DeleteStep"><value>Supprimer l’étape</value></data>
   <data name="Transitions"><value>Transitions</value></data><data name="From"><value>Depuis</value></data><data name="Event"><value>Événement</value></data><data name="To"><value>Vers</value></data><data name="AddTransition"><value>Ajouter la transition</value></data>
+  <data name="TransitionDetails"><value>Transition sélectionnée</value></data><data name="TransitionId"><value>ID de la transition</value></data><data name="TransitionCondition"><value>Condition</value></data><data name="TransitionPriority"><value>Priorité</value></data><data name="DeleteTransition"><value>Supprimer la transition</value></data><data name="DeleteTransitionNamed"><value>Supprimer la transition {0}</value></data>
+  <data name="InputConnectionHandle"><value>Poignée de transition entrante</value></data><data name="OutputConnectionHandle"><value>Poignée de transition sortante</value></data>
   <data name="Validation"><value>Validation</value></data><data name="IssueCount.One"><value>{0} problème</value></data><data name="IssueCount.Many"><value>{0} problèmes</value></data>
   <data name="PublishedDefinitionHelp"><value>Cette définition publiée est affichée sans créer de brouillon.</value></data>
   <data name="ValidationHelp"><value>Validez le brouillon pour vérifier la structure, l’accessibilité, les expressions et les ressources.</value></data>

@@ -1,12 +1,20 @@
 <div class="flow-node @Node.Source.Type" aria-label="@Node.Source.DisplayName">
-    <PortRenderer Port="Node.Input" />
+    <span class="flow-port-handle input" tabindex="0" title="@Localizer["InputConnectionHandle"]" aria-label="@Localizer["InputConnectionHandle"]">
+        <PortRenderer Port="Node.Input" />
+    </span>
     <span class="flow-node-icon" aria-hidden="true"><UiIcon Name="@FlowStepIcons.Name(Node.Source.Type)" /></span>
     <span class="flow-node-copy"><strong title="@Node.Source.DisplayName">@Node.Source.DisplayName</strong><small>@Node.Source.Type</small></span>
     @if (Node.Source.Resource is not null) { <code title="@Node.Source.Resource">@Short(Node.Source.Resource)</code> }
-    <PortRenderer Port="Node.Output" />
+    @if (Node.Source.Type is not ("output" or "failure"))
+    {
+        <span class="flow-port-handle output" tabindex="0" title="@Localizer["OutputConnectionHandle"]" aria-label="@Localizer["OutputConnectionHandle"]">
+            <PortRenderer Port="Node.Output" />
+        </span>
+    }
 </div>
 
 @code {
+    [Inject] private IStringLocalizer<FlowDesignerStrings> Localizer { get; set; } = default!;
     [Parameter, EditorRequired] public FlowDiagramNode Node { get; set; } = default!;
     private static string Short(string value) => value[(value.LastIndexOf('/') + 1)..];
 }

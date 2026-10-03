@@ -31,4 +31,19 @@ public sealed class FlowDiagramMapperTests
         Assert.AreSame(projection.NodesByName["input"].Output, ((SinglePortAnchor)projection.Links.Single().Source).Port);
         Assert.AreSame(projection.NodesByName["output"].Input, ((SinglePortAnchor)projection.Links.Single().Target).Port);
     }
+
+    [TestMethod]
+    public void PortsOnlyAllowOutputToInputConnectionsBetweenDifferentCompatibleNodes()
+    {
+        var input = new FlowDiagramNode(new("input", "input", "Input", new(0, 0), null));
+        var transform = new FlowDiagramNode(new("transform", "transform", "Transform", new(200, 0), null));
+        var output = new FlowDiagramNode(new("output", "output", "Output", new(400, 0), null));
+
+        Assert.IsTrue(input.Output.CanAttachTo(transform.Input));
+        Assert.IsTrue(transform.Input.CanAttachTo(input.Output));
+        Assert.IsFalse(input.Output.CanAttachTo(transform.Output));
+        Assert.IsFalse(transform.Input.CanAttachTo(transform.Output));
+        Assert.IsFalse(transform.Output.CanAttachTo(input.Input));
+        Assert.IsFalse(output.Output.CanAttachTo(transform.Input));
+    }
 }

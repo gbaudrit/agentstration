@@ -77,6 +77,62 @@ public sealed class FlowEditorStoreTests
     }
 
     [TestMethod]
+    public async Task ReconnectingTransitionPreservesItsSemanticsAndSupportsUndoRedo()
+    {
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new TransformFlowStepDefinition { Name = "transform" },
+                new OutputFlowStepDefinition { Name = "output" }
+            ],
+            Transitions = [new("route", "input", "matched", "output", "${input.ready}", 7)]
+        };
+        var store = new FlowEditorStore();
+        var now = DateTimeOffset.Parse("2026-08-04T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        var draft = new FlowDraft { WorkspaceId = WorkspaceId, Id = "editor-draft", FlowId = new("editor"), DisplayName = "Editor", Definition = definition, CreatedAt = now, UpdatedAt = now };
+        store.Load(new FlowDraftResponse(draft, "\"etag-1\""), "entryStep: input");
+
+        await store.DispatchAsync(new ReconnectTransitionCommand("route", "transform", "output"));
+
+        var transition = store.State.Resource!.Definition.Transitions.Single();
+        Assert.AreEqual("transform", transition.FromStep);
+        Assert.AreEqual("output", transition.ToStep);
+        Assert.AreEqual("matched", transition.Event);
+        Assert.AreEqual("${input.ready}", transition.Condition);
+        Assert.AreEqual(7, transition.Priority);
+        store.Undo();
+        Assert.AreEqual("input", store.State.Resource.Definition.Transitions.Single().FromStep);
+        store.Redo();
+        Assert.AreEqual("transform", store.State.Resource.Definition.Transitions.Single().FromStep);
+    }
+
+    [TestMethod]
+    public async Task UpdatingTransitionChangesMetadataWithoutReplacingItsIdentity()
+    {
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "output" }],
+            Transitions = [new("route", "input", "completed", "output")]
+        };
+        var store = new FlowEditorStore();
+        var now = DateTimeOffset.Parse("2026-08-04T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        var draft = new FlowDraft { WorkspaceId = WorkspaceId, Id = "editor-draft", FlowId = new("editor"), DisplayName = "Editor", Definition = definition, CreatedAt = now, UpdatedAt = now };
+        store.Load(new FlowDraftResponse(draft, "\"etag-1\""), "entryStep: input");
+
+        await store.DispatchAsync(new UpdateTransitionCommand(new("route", "input", "approved", "output", "${input.approved}", 2)));
+
+        var transition = store.State.Resource!.Definition.Transitions.Single();
+        Assert.AreEqual("route", transition.Id);
+        Assert.AreEqual("approved", transition.Event);
+        Assert.AreEqual("${input.approved}", transition.Condition);
+        Assert.AreEqual(2, transition.Priority);
+    }
+
+    [TestMethod]
     public async Task PublishedNamespacedDocumentRejectsCommands()
     {
         var definition = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] };

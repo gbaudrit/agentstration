@@ -65,6 +65,30 @@ public sealed record AddTransitionCommand(FlowTransitionDefinition Transition) :
 {
     public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with { Transitions = [.. definition.Transitions.Where(item => item.Id != Transition.Id), Transition] };
 }
+public sealed record UpdateTransitionCommand(FlowTransitionDefinition Transition) : IFlowEditorCommand
+{
+    public FlowGraphDefinition Apply(FlowGraphDefinition definition)
+    {
+        if (definition.Transitions.All(item => item.Id != Transition.Id))
+            return definition;
+
+        return definition with
+        {
+            Transitions = definition.Transitions
+                .Select(item => item.Id == Transition.Id ? Transition : item)
+                .ToArray()
+        };
+    }
+}
+public sealed record ReconnectTransitionCommand(string Id, string FromStep, string ToStep) : IFlowEditorCommand
+{
+    public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with
+    {
+        Transitions = definition.Transitions
+            .Select(item => item.Id == Id ? item with { FromStep = FromStep, ToStep = ToStep } : item)
+            .ToArray()
+    };
+}
 public sealed record RemoveTransitionCommand(string Id) : IFlowEditorCommand
 {
     public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with { Transitions = definition.Transitions.Where(item => item.Id != Id).ToArray() };
