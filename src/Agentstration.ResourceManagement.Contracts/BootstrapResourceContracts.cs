@@ -42,6 +42,7 @@ public enum BootstrapBindingTargetKind
     [JsonStringEnumMemberName("modelProvider")] ModelProvider,
     [JsonStringEnumMemberName("runtimeProfile")] RuntimeProfile,
     [JsonStringEnumMemberName("extensionRegistration")] ExtensionRegistration,
+    [JsonStringEnumMemberName("tool")] Tool,
     [JsonStringEnumMemberName("parameter")] Parameter,
     [JsonStringEnumMemberName("secret")] Secret
 }

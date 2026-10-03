@@ -1,0 +1,27 @@
+apiVersion: agentstration.io/v1
+kind: Entry
+metadata:
+  name: ask-agentstration-documentation
+definition:
+  displayName: Ask Agentstration documentation
+  description: Ask questions backed by the active governed documentation snapshot.
+  presentation:
+    kind: prompt
+    placeholder: Ask about Agentstration
+    allowAttachments: false
+    allowVoiceInput: false
+    fields:
+      - name: prompt
+        type: prompt
+        label: Question
+        required: true
+        order: 0
+        role: primaryInput
+  binding:
+    kind: flow
+    resourceId: agentstration-documentation-assistant
+  behavior:
+    taskCreationMode: automatic
+    allowConversation: true
+    streamResponse: true
+  publish: true

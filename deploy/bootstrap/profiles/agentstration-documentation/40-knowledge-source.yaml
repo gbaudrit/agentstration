@@ -1,0 +1,22 @@
+apiVersion: agentstration.io/v1
+kind: KnowledgeSource
+metadata:
+  name: agentstration-documentation
+  tags:
+    agentstration.io/category: knowledge-source
+definition:
+  displayName: Agentstration documentation
+  description: Public Agentstration product and operator documentation.
+  enabled: true
+  acquisitionConfiguration:
+    url: https://docs.agentstration.io/
+    maximumDepth: 3
+    maximumPages: 25
+  ingestionFlow:
+    name: agentstration-documentation-ingestion
+    version: 1.0.0
+    useActiveVersion: false
+  retrievalFlow:
+    name: knowledge-retrieval-builtin
+    version: 1.0.0
+    useActiveVersion: false

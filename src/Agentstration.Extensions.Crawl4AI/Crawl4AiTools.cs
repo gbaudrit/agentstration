@@ -12,7 +12,7 @@ public sealed class Crawl4AiTools(Crawl4AiAcquisitionService acquisition)
         [Description("Optional caller correlation identifier.")] string? correlationId = null,
         CancellationToken cancellationToken = default) => acquisition.FetchAsync(url, correlationId, cancellationToken);
 
-    [McpServerTool(Name = "web_crawl"), Description("Acquire a bounded breadth-first set of allowlisted web pages and return opaque temporary content references.")]
+    [McpServerTool(Name = "web_crawl"), Description("Acquire a bounded breadth-first set of allowlisted web pages and return both page references and one bounded normalized corpus reference.")]
     public Task<WebCrawlResult> CrawlAsync(
         [Description("Absolute HTTP(S) starting URL.")] string startUrl,
         [Description("Optional crawl depth, bounded by extension configuration.")] int? maximumDepth = null,

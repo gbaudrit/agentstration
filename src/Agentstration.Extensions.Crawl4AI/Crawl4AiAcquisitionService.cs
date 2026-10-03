@@ -38,30 +38,66 @@ public sealed class Crawl4AiAcquisitionService(
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var scheduled = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { startUrl };
         var contents = new List<AcquiredContentReference>();
+        var corpus = new StringBuilder();
+        var corpusBytes = 0;
         var discoveredBeyondLimit = false;
-        while (queue.Count > 0 && contents.Count < pageLimit)
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var current = queue.Dequeue();
-            if (!visited.Add(current.Url)) continue;
-            var page = await client.FetchAsync(current.Url, correlation, cancellationToken);
-            visited.Add(page.Url.GetComponents(UriComponents.HttpRequestUrl, UriFormat.UriEscaped));
-            contents.Add(await StoreAsync(page, cancellationToken));
-            if (current.Depth >= depthLimit) continue;
-            foreach (var link in page.Links)
+            while (queue.Count > 0 && contents.Count < pageLimit)
             {
-                var canonical = link.GetComponents(UriComponents.HttpRequestUrl, UriFormat.UriEscaped);
-                if (visited.Contains(canonical) || !scheduled.Add(canonical)) continue;
-                if (scheduled.Count > pageLimit)
+                cancellationToken.ThrowIfCancellationRequested();
+                var current = queue.Dequeue();
+                if (!visited.Add(current.Url)) continue;
+                var page = await client.FetchAsync(current.Url, correlation, cancellationToken);
+                visited.Add(page.Url.GetComponents(UriComponents.HttpRequestUrl, UriFormat.UriEscaped));
+                contents.Add(await StoreAsync(page, cancellationToken));
+                AppendCorpusPage(corpus, page, ref corpusBytes);
+                if (current.Depth >= depthLimit) continue;
+                foreach (var link in page.Links)
                 {
-                    discoveredBeyondLimit = true;
-                    break;
+                    var canonical = link.GetComponents(UriComponents.HttpRequestUrl, UriFormat.UriEscaped);
+                    if (visited.Contains(canonical) || !scheduled.Add(canonical)) continue;
+                    if (scheduled.Count > pageLimit)
+                    {
+                        discoveredBeyondLimit = true;
+                        break;
+                    }
+                    queue.Enqueue((canonical, current.Depth + 1));
                 }
-                queue.Enqueue((canonical, current.Depth + 1));
             }
-        }
 
-        return new WebCrawlResult(correlation, startUrl, depthLimit, pageLimit, contents, discoveredBeyondLimit || queue.Count > 0);
+            var corpusStored = await contentStore.WriteAsync(
+                Encoding.UTF8.GetBytes(corpus.ToString()), startUrl, "text/markdown; charset=utf-8", cancellationToken);
+            var corpusReference = new AcquiredContentReference(
+                corpusStored.Reference,
+                startUrl,
+                "text/markdown; charset=utf-8",
+                corpusStored.Length,
+                corpusStored.Sha256,
+                contents.Select(content => content.SourceUrl).ToArray(),
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["pageCount"] = contents.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["kind"] = "crawl-corpus"
+                });
+            return new WebCrawlResult(correlation, startUrl, depthLimit, pageLimit, contents, corpusReference,
+                discoveredBeyondLimit || queue.Count > 0);
+        }
+        catch
+        {
+            foreach (var content in contents)
+            {
+                try
+                {
+                    await contentStore.DeleteAsync(content.Reference, CancellationToken.None);
+                }
+                catch
+                {
+                    // Preserve the acquisition failure; orphaned bounded content is removed by store retention.
+                }
+            }
+            throw;
+        }
     }
 
     public async Task<WebFetchResult> ExtractAsync(
@@ -109,6 +145,19 @@ public sealed class Crawl4AiAcquisitionService(
             stored.Sha256,
             page.Links.Select(link => link.AbsoluteUri).ToArray(),
             page.Metadata);
+    }
+
+    private void AppendCorpusPage(StringBuilder corpus, CrawlPage page, ref int corpusBytes)
+    {
+        var text = Encoding.UTF8.GetString(page.Content);
+        if (page.MediaType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase)) text = ExtractHtmlText(text);
+        text = NormalizeText(text);
+        var section = $"\n\n---\n\nSource: {page.Url.AbsoluteUri}\n\n{text}";
+        corpusBytes = checked(corpusBytes + Encoding.UTF8.GetByteCount(section));
+        if (corpusBytes > options.MaximumContentBytes)
+            throw new Crawl4AiException("crawl4ai_corpus_too_large",
+                $"The normalized crawl corpus exceeds the configured {options.MaximumContentBytes}-byte content limit.");
+        corpus.Append(section);
     }
 
     private static string ExtractHtmlText(string html)

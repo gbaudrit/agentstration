@@ -1,0 +1,34 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: agentstration-documentation
+definition:
+  displayName: Agentstration documentation Knowledge Source
+  description: Provisions the governed documentation acquisition, retrieval, ToolSet exposure, and documentation assistant.
+  targetScope: workspace
+  bindings:
+    - name: crawl4ai-crawl
+      targetKind: tool
+      displayName: Crawl4AI crawl Tool
+      description: Select the discovered Crawl4AI web.crawl Tool.
+      required: true
+    - name: crawl4ai-read
+      targetKind: tool
+      displayName: Crawl4AI content read Tool
+      description: Select the discovered Crawl4AI content.read Tool.
+      required: true
+    - name: crawl4ai-delete
+      targetKind: tool
+      displayName: Crawl4AI content delete Tool
+      description: Select the discovered Crawl4AI content.delete Tool.
+      required: true
+    - name: assistant-model
+      targetKind: modelProfile
+      displayName: Documentation assistant model
+      description: Model profile used by the documentation assistant.
+      required: true
+    - name: assistant-runtime
+      targetKind: runtimeProfile
+      displayName: Documentation assistant runtime
+      description: Runtime profile used by the documentation assistant.
+      required: true
