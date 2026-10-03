@@ -40,6 +40,7 @@ else
     private string technicalName = string.Empty, sourceNamespace = "default", displayName = string.Empty,
         description = string.Empty, ingestionKey = string.Empty, retrievalKey = string.Empty;
     private string? etag, message;
+    private System.Text.Json.JsonElement acquisitionConfiguration = System.Text.Json.JsonSerializer.SerializeToElement(new { });
     private bool enabled, busy, loading = true;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace ExistingNamespace => ResourceNamespace.Parse(Namespace);
@@ -61,6 +62,7 @@ else
                 displayName = snapshot.Value.Definition.DisplayName;
                 description = snapshot.Value.Definition.Description ?? string.Empty;
                 enabled = snapshot.Value.Definition.Enabled;
+                acquisitionConfiguration = snapshot.Value.Definition.AcquisitionConfiguration.Clone();
                 ingestionKey = TargetKey(snapshot.Value.Definition.IngestionFlow);
                 retrievalKey = TargetKey(snapshot.Value.Definition.RetrievalFlow);
             }
@@ -81,6 +83,7 @@ else
                 DisplayName = displayName.Trim(),
                 Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
                 Enabled = enabled,
+                AcquisitionConfiguration = acquisitionConfiguration.Clone(),
                 IngestionFlow = Target(ingestionKey),
                 RetrievalFlow = Target(retrievalKey)
             };

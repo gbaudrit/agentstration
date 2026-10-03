@@ -17,7 +17,9 @@ public sealed class KnowledgePlatformResourceProvisioner(IResourceStore store, F
     public const string RetrievalToolSetName = "knowledge-retrieval-builtin";
     public const string IngestionFlowName = "knowledge-ingestion-builtin";
     public const string RetrievalFlowName = "knowledge-retrieval-builtin";
-    public const string Version = "1.0.0";
+    public const string ToolSetVersion = "1.0.0";
+    public const string IngestionFlowVersion = "1.1.0";
+    public const string RetrievalFlowVersion = "1.0.0";
 
     public async Task EnsureAsync(ResourceScopeRef workspaceScope, CancellationToken cancellationToken)
     {
@@ -61,7 +63,7 @@ public sealed class KnowledgePlatformResourceProvisioner(IResourceStore store, F
                     DisplayName = displayName,
                     Description = description,
                     Category = new ResourceReference("knowledge-source", scope, ResourceNamespace.Default),
-                    Version = Version,
+                    Version = ToolSetVersion,
                     Publish = true,
                     Members = routes.Select(route => new ToolSetMember
                     {
@@ -73,7 +75,7 @@ public sealed class KnowledgePlatformResourceProvisioner(IResourceStore store, F
             }, scope, cancellationToken);
         }
 
-        var versionName = VersionResourceName(name, Version);
+        var versionName = VersionResourceName(name, ToolSetVersion);
         var versionAddress = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ToolResourceKinds.ToolSetVersion, versionName);
         if (await store.GetExactAsync<ToolSetVersionResource>(versionAddress, cancellationToken) is not null) return;
         var members = new List<PublishedToolSetMember>(routes.Count);
@@ -116,7 +118,7 @@ public sealed class KnowledgePlatformResourceProvisioner(IResourceStore store, F
             ToolSetUid = toolSet.Value.Uid,
             ToolSetName = name,
             ToolSetGeneration = toolSet.Value.Generation,
-            Version = Version,
+            Version = ToolSetVersion,
             DefinitionHash = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(members))),
             PublishedAt = timeProvider.GetUtcNow(),
             Members = members
@@ -125,8 +127,7 @@ public sealed class KnowledgePlatformResourceProvisioner(IResourceStore store, F
 
     private async Task EnsureIngestionFlowAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
     {
-        if (await flows.GetAsync(workspaceId, new(IngestionFlowName), cancellationToken) is not null) return;
-        var input = KnowledgeBuiltinSchemas.IngestionInput;
+        var input = KnowledgeBuiltinSchemas.IngestionFlowInput;
         var output = KnowledgeBuiltinSchemas.IngestionOutput;
         var graph = new FlowGraphDefinition
         {
@@ -139,10 +140,17 @@ public sealed class KnowledgePlatformResourceProvisioner(IResourceStore store, F
                 new ToolRouteFlowStepDefinition
                 {
                     Name = "ingest", DisplayName = "Route ingestion",
-                    ToolSet = new(IngestionToolSetName, Version),
+                    ToolSet = new(IngestionToolSetName, ToolSetVersion),
                     Capability = KnowledgeFlowContracts.Ingestion,
                     Route = "default",
-                    ArgumentsMapping = JsonSerializer.SerializeToElement("${input}")
+                    ArgumentsMapping = JsonSerializer.SerializeToElement(new
+                    {
+                        knowledgeSourceId = "${input.knowledgeSourceId}",
+                        parameters = "${input.parameters}",
+                        caller = "${input.caller}",
+                        correlationId = "${input.correlationId}",
+                        acquisitionId = "${input.acquisitionId}"
+                    })
                 },
                 new OutputFlowStepDefinition { Name = "output", DisplayName = "Acquisition manifest",
                     OutputMapping = JsonSerializer.SerializeToElement("${steps.ingest.output}") }
@@ -150,17 +158,16 @@ public sealed class KnowledgePlatformResourceProvisioner(IResourceStore store, F
             Transitions = [new("input-ingest", "input", "completed", "ingest"), new("ingest-output", "ingest", "completed", "output")]
         };
         await CreateAndPublishFlowAsync(workspaceId, IngestionFlowName, "Knowledge ingestion · Built-in",
-            KnowledgeFlowContracts.Ingestion, null, graph, cancellationToken);
+            KnowledgeFlowContracts.Ingestion, null, IngestionFlowVersion, graph, cancellationToken);
     }
 
     private async Task EnsureRetrievalFlowAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
     {
-        if (await flows.GetAsync(workspaceId, new(RetrievalFlowName), cancellationToken) is not null) return;
         var input = KnowledgeBuiltinSchemas.RetrievalInput;
         var output = KnowledgeBuiltinSchemas.RetrievalOutput;
         ToolRouteFlowStepDefinition Route(string name, string displayName, string capability) => new()
         {
-            Name = name, DisplayName = displayName, ToolSet = new(RetrievalToolSetName, Version),
+            Name = name, DisplayName = displayName, ToolSet = new(RetrievalToolSetName, ToolSetVersion),
             Capability = capability, Route = "default", ArgumentsMapping = JsonSerializer.SerializeToElement("${input}")
         };
         var graph = new FlowGraphDefinition
@@ -194,11 +201,12 @@ public sealed class KnowledgePlatformResourceProvisioner(IResourceStore store, F
         };
         await CreateAndPublishFlowAsync(workspaceId, RetrievalFlowName, "Knowledge retrieval · Built-in",
             KnowledgeFlowContracts.Retrieval,
-            string.Join(',', KnowledgeFlowContracts.Search, KnowledgeFlowContracts.Query, KnowledgeFlowContracts.Read), graph, cancellationToken);
+            string.Join(',', KnowledgeFlowContracts.Search, KnowledgeFlowContracts.Query, KnowledgeFlowContracts.Read),
+            RetrievalFlowVersion, graph, cancellationToken);
     }
 
     private async Task CreateAndPublishFlowAsync(WorkspaceId workspaceId, string name, string displayName, string contract,
-        string? capabilities, FlowGraphDefinition graph, CancellationToken cancellationToken)
+        string? capabilities, string version, FlowGraphDefinition graph, CancellationToken cancellationToken)
     {
         var nodes = graph.Steps.Select(step => new FlowNode(step.Name, step switch
         {
@@ -216,20 +224,42 @@ public sealed class KnowledgePlatformResourceProvisioner(IResourceStore store, F
             [KnowledgeFlowContracts.MetadataKey] = contract
         };
         if (capabilities is not null) metadata[KnowledgeFlowContracts.CapabilitiesMetadataKey] = capabilities;
+        var id = new FlowId(name);
+        var existing = await flows.GetAsync(workspaceId, id, cancellationToken);
+        if (existing is not null && await flows.GetVersionAsync(workspaceId, id, version, cancellationToken) is not null)
+        {
+            _ = await flows.ActivateVersionAsync(workspaceId, id, version, cancellationToken);
+            return;
+        }
+
+        var description = $"Built-in local-first implementation of {contract}.";
+        var definition = new WorkflowFlowDefinition(graph.EntryStep, nodes,
+            graph.Transitions.Select(value => new FlowEdge(value.FromStep, value.ToStep)).ToArray(),
+            graph.Steps.OfType<OutputFlowStepDefinition>().Select(value => value.Name).ToArray());
         try
         {
-            _ = await flows.CreateAsync(workspaceId, new CreateFlowCommand(name,
-                $"Built-in local-first implementation of {contract}.", Version, true,
-                new WorkflowFlowDefinition(graph.EntryStep, nodes,
-                    graph.Transitions.Select(value => new FlowEdge(value.FromStep, value.ToStep)).ToArray(),
-                    graph.Steps.OfType<OutputFlowStepDefinition>().Select(value => value.Name).ToArray()),
-                metadata, graph, displayName), cancellationToken);
-            _ = await flows.PublishVersionAsync(workspaceId, new(name), Version, true, cancellationToken,
+            if (existing is null)
+                _ = await flows.CreateAsync(workspaceId, new CreateFlowCommand(name,
+                    description, version, true, definition, metadata, graph, displayName), cancellationToken);
+            else
+            {
+                if (!existing.Value.Metadata.TryGetValue(ResourceProvenanceAnnotations.BuiltIn, out var builtIn)
+                    || !string.Equals(builtIn, "true", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"Reserved built-in Flow identity '{name}' is already in use.");
+                _ = await flows.UpdateAsync(workspaceId, id, new UpdateFlowCommand(
+                    description, version, true, definition, metadata, graph, displayName), existing.ETag, cancellationToken);
+            }
+            _ = await flows.PublishVersionAsync(workspaceId, id, version, true, cancellationToken,
                 "Built-in local-first Knowledge contract implementation.");
         }
         catch (FlowConcurrencyException)
         {
-            if (await flows.GetAsync(workspaceId, new(name), cancellationToken) is null) throw;
+            if (await flows.GetVersionAsync(workspaceId, id, version, cancellationToken) is null) throw;
+            _ = await flows.ActivateVersionAsync(workspaceId, id, version, cancellationToken);
+        }
+        catch (FlowValidationException exception) when (exception.Code == "flow_version_already_published")
+        {
+            _ = await flows.ActivateVersionAsync(workspaceId, id, version, cancellationToken);
         }
     }
 

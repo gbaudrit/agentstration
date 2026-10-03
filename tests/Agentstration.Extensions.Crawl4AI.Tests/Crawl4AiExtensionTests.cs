@@ -82,6 +82,8 @@ public sealed class Crawl4AiExtensionTests
         var second = await service.ReadAsync(result.Content.Reference, 5, 1024, default);
 
         Assert.StartsWith("crawl4ai-content:", result.Content.Reference, StringComparison.Ordinal);
+        Assert.AreEqual(5, first.NextOffset);
+        Assert.AreEqual(result.Content.Length, second.NextOffset);
         Assert.AreEqual("text/markdown", result.Content.MediaType);
         Assert.AreEqual("flow-run-1", result.CorrelationId);
         Assert.AreEqual("# Acq", Encoding.UTF8.GetString(Convert.FromBase64String(first.ContentBase64)));

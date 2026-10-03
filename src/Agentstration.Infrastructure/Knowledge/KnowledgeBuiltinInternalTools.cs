@@ -253,6 +253,13 @@ internal static class KnowledgeBuiltinSchemas
         properties = new { knowledgeSourceId = new { type = "string" }, parameters = new { type = "object" }, caller = new { type = "object" },
             correlationId = new { type = "string" }, acquisitionId = new { type = "string" } },
         required = new[] { "knowledgeSourceId", "parameters", "caller", "correlationId", "acquisitionId" }, additionalProperties = false });
+    public static JsonElement IngestionFlowInput { get; } = JsonSerializer.SerializeToElement(new { type = "object",
+        properties = new { knowledgeSourceId = new { type = "string" }, knowledgeSourceUid = new { type = "string" },
+            knowledgeSourceGeneration = new { type = "integer" }, sourceConfiguration = new { type = "object" },
+            parameters = new { type = "object" }, caller = new { type = "object" },
+            correlationId = new { type = "string" }, acquisitionId = new { type = "string" } },
+        required = new[] { "knowledgeSourceId", "knowledgeSourceUid", "knowledgeSourceGeneration", "sourceConfiguration",
+            "parameters", "caller", "correlationId", "acquisitionId" }, additionalProperties = false });
     public static JsonElement IngestionOutput { get; } = JsonSerializer.SerializeToElement(new { type = "object",
         properties = new { artifacts = new { type = "array" } }, required = new[] { "artifacts" }, additionalProperties = false });
     public static JsonElement RetrievalInput { get; } = JsonSerializer.SerializeToElement(new { type = "object",

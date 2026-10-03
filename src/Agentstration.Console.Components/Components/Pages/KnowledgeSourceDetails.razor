@@ -158,6 +158,7 @@ else if (source is not null && readiness is not null)
     private string definitionTechnicalName = string.Empty, definitionDisplayName = string.Empty, definitionDescription = string.Empty,
         definitionIngestionKey = string.Empty, definitionRetrievalKey = string.Empty;
     private bool definitionEnabled;
+    private System.Text.Json.JsonElement definitionAcquisitionConfiguration = System.Text.Json.JsonSerializer.SerializeToElement(new { });
     private string? etag, error, message, acquisitionParametersError, rawError;
     private ResourceNamespace SourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
     private string ToolSetUrl => exposure is null ? "/tools/sets" : exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
@@ -220,6 +221,7 @@ else if (source is not null && readiness is not null)
                 DisplayName = definitionDisplayName.Trim(),
                 Description = string.IsNullOrWhiteSpace(definitionDescription) ? null : definitionDescription.Trim(),
                 Enabled = definitionEnabled,
+                AcquisitionConfiguration = definitionAcquisitionConfiguration.Clone(),
                 IngestionFlow = Target(definitionIngestionKey),
                 RetrievalFlow = Target(definitionRetrievalKey)
             };
@@ -278,6 +280,7 @@ else if (source is not null && readiness is not null)
             DisplayName = definitionDisplayName.Trim(),
             Description = string.IsNullOrWhiteSpace(definitionDescription) ? null : definitionDescription.Trim(),
             Enabled = definitionEnabled,
+            AcquisitionConfiguration = definitionAcquisitionConfiguration.Clone(),
             IngestionFlow = Target(definitionIngestionKey),
             RetrievalFlow = Target(definitionRetrievalKey)
         }
@@ -372,6 +375,7 @@ else if (source is not null && readiness is not null)
         definitionDisplayName = value.Definition.DisplayName;
         definitionDescription = value.Definition.Description ?? string.Empty;
         definitionEnabled = value.Definition.Enabled;
+        definitionAcquisitionConfiguration = value.Definition.AcquisitionConfiguration.Clone();
         definitionIngestionKey = TargetKey(value.Definition.IngestionFlow);
         definitionRetrievalKey = TargetKey(value.Definition.RetrievalFlow);
     }
