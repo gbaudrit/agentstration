@@ -154,6 +154,38 @@ public sealed class McpToolCatalogTests
     }
 
     [TestMethod]
+    public async Task AepMcpToolFailureIsPropagatedInsteadOfReturnedAsSuccessfulOutput()
+    {
+        await using var host = new WebApplicationFactory<UtilitiesExtension::Program>();
+        var provider = AepProvider();
+        var baseline = Tool(provider.Metadata.Name);
+        var tool = baseline with
+        {
+            Metadata = new ResourceMetadata { Name = "utilities.json.compact" },
+            ScopeRef = WorkspaceScope,
+            Definition = baseline.Definition with { ExternalId = "json.compact" }
+        };
+        var registration = Registration("utilities-extension", provider.Definition.Aep!.ExtensionId);
+        var store = new FakeStore(provider, tool, registration);
+        var adapter = new ToolProviderAdapter(
+            new ResourceAepExtensionRegistrationResolver(store),
+            new ConfigurationToolProviderEnvironmentResolver(new ConfigurationBuilder().Build()),
+            new TestHttpMessageHandlerFactory(host.Server.CreateHandler),
+            NullLoggerFactory.Instance);
+        var descriptor = (await new McpToolCatalog(store, adapter).ResolveAsync([tool.Metadata.Name])).Single();
+        var pipeline = new ToolExecutionPipeline(new McpToolInvoker(store, adapter));
+
+        var exception = await Assert.ThrowsAsync<ToolResolutionException>(async () =>
+            await pipeline.ExecuteAsync(Context(descriptor) with
+            {
+                Arguments = JsonSerializer.SerializeToElement(new { json = "{" })
+            }));
+
+        Assert.AreEqual("mcp_tool_failed", exception.Code);
+        StringAssert.Contains(exception.Message, "json_compact");
+    }
+
+    [TestMethod]
     public async Task AepDiscoveryAndMcpCallsUseThePairedRegistrationCredential()
     {
         await using var host = new WebApplicationFactory<UtilitiesExtension::Program>();

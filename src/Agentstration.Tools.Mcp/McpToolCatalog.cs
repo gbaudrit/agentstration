@@ -250,8 +250,30 @@ public sealed class ToolProviderAdapter(
             var values = arguments is { ValueKind: JsonValueKind.Object }
                 ? arguments.Value.EnumerateObject().ToDictionary(value => value.Name, value => (object?)value.Value.Clone(), StringComparer.Ordinal)
                 : new Dictionary<string, object?>();
-            return JsonSerializer.SerializeToElement(await native.InvokeAsync(new Microsoft.Extensions.AI.AIFunctionArguments(values), cancellationToken));
+            var result = JsonSerializer.SerializeToElement(
+                await native.InvokeAsync(new Microsoft.Extensions.AI.AIFunctionArguments(values), cancellationToken));
+            if (result.ValueKind == JsonValueKind.Object
+                && result.TryGetProperty("isError", out var isError)
+                && isError.ValueKind == JsonValueKind.True)
+                throw new ToolResolutionException("mcp_tool_failed", McpErrorMessage(result));
+            return result;
         }
+    }
+
+    private static string McpErrorMessage(JsonElement result)
+    {
+        if (result.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in content.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.Object
+                    && item.TryGetProperty("text", out var text)
+                    && text.ValueKind == JsonValueKind.String
+                    && text.GetString() is { Length: > 0 } message)
+                    return message[..Math.Min(message.Length, 512)];
+            }
+        }
+        return "The MCP Tool reported an execution failure.";
     }
 }
 
