@@ -89,6 +89,7 @@ public sealed record RuntimeRunStatus
     public DateTimeOffset? CompletedAt { get; init; }
     public string? Response { get; init; }
     public string? Error { get; init; }
+    public string? ErrorCode { get; init; }
     public string Runtime { get; init; } = "Local";
     public string? ModelProfile { get; init; }
     public string? ResolvedModel { get; init; }
