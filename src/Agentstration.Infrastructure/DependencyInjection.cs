@@ -70,7 +70,8 @@ public static class DependencyInjection
         bool enableHostedServices = true,
         SourceVerificationIndexOptions? sourceVerificationIndexOptions = null,
         SourceRegistryTransportOptions? sourceRegistryTransportOptions = null,
-        RuntimeWorkerLeaseOptions? runtimeWorkerLeaseOptions = null)
+        RuntimeWorkerLeaseOptions? runtimeWorkerLeaseOptions = null,
+        RuntimeWorkerDispatchOptions? runtimeWorkerDispatchOptions = null)
     {
         services.AddSingleton(TimeProvider.System);
         services.TryAddSingleton<LocalBootstrapOptions>();
@@ -325,7 +326,10 @@ public static class DependencyInjection
         services.AddSingleton<RuntimeRunStateManager>();
         services.AddSingleton<RuntimeRunService>();
         services.TryAddSingleton(runtimeWorkerLeaseOptions ?? new RuntimeWorkerLeaseOptions());
+        services.TryAddSingleton(runtimeWorkerDispatchOptions ?? new RuntimeWorkerDispatchOptions());
+        services.AddSingleton<RuntimeAssignmentAvailabilitySignal>();
         services.AddSingleton<RuntimeWorkerAssignmentService>();
+        services.AddSingleton<RuntimeWorkerDispatchService>();
         services.TryAddSingleton(new ToolExecutionCaptureOptions());
         services.AddSingleton<IToolExecutionEventSink, RuntimeToolExecutionEventSink>();
         services.AddSingleton<IToolExecutionEventSink, FlowToolExecutionEventSink>();

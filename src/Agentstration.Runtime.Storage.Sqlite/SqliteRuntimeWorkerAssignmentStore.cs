@@ -19,6 +19,8 @@ internal sealed class RuntimeWorkerAssignmentDocument
     public required string State { get; set; }
     public long FencingGeneration { get; set; }
     public long? LeaseExpiresAt { get; set; }
+    public Guid? ActiveWorkerId { get; set; }
+    public Guid? ActiveWorkerSessionId { get; set; }
     public string? OwnershipTokenDigest { get; set; }
     public required string Payload { get; set; }
     public required string ETag { get; set; }
@@ -44,6 +46,7 @@ internal static class RuntimeWorkerAssignmentModel
         assignment.HasIndex(value => new { value.WorkspaceId, value.TargetKind, value.TargetRunId }).IsUnique();
         assignment.HasIndex(value => new { value.State, value.RuntimeCapability, value.CreatedAt });
         assignment.HasIndex(value => new { value.State, value.LeaseExpiresAt });
+        assignment.HasIndex(value => new { value.State, value.ActiveWorkerId, value.ActiveWorkerSessionId });
     }
 }
 
@@ -62,6 +65,7 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
                 TargetRunId TEXT NOT NULL, RuntimeCapability TEXT NOT NULL,
                 RuntimeCapabilityVersion TEXT NOT NULL, ExecutionMaterialVersion TEXT NOT NULL,
                 State TEXT NOT NULL, FencingGeneration INTEGER NOT NULL, LeaseExpiresAt INTEGER NULL,
+                ActiveWorkerId TEXT NULL, ActiveWorkerSessionId TEXT NULL,
                 OwnershipTokenDigest TEXT NULL, Payload TEXT NOT NULL, ETag TEXT NOT NULL,
                 CreatedAt INTEGER NOT NULL, UpdatedAt INTEGER NOT NULL,
                 CONSTRAINT PK_RuntimeWorkerAssignments PRIMARY KEY (WorkspaceId, AssignmentId));
@@ -71,6 +75,8 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
                 ON RuntimeWorkerAssignments (State, RuntimeCapability, CreatedAt);
             CREATE INDEX IF NOT EXISTS IX_RuntimeWorkerAssignments_State_LeaseExpiresAt
                 ON RuntimeWorkerAssignments (State, LeaseExpiresAt);
+            CREATE INDEX IF NOT EXISTS IX_RuntimeWorkerAssignments_State_ActiveWorkerId_ActiveWorkerSessionId
+                ON RuntimeWorkerAssignments (State, ActiveWorkerId, ActiveWorkerSessionId);
             """, cancellationToken);
     }
 
@@ -104,6 +110,13 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var activeCount = await context.WorkerAssignments.AsNoTracking()
+            .Where(value => value.State == nameof(RuntimeAssignmentState.Assigned)
+                && value.LeaseExpiresAt != null && value.LeaseExpiresAt > acquiredAt.UtcTicks
+                && value.ActiveWorkerId == request.WorkerId.Value
+                && value.ActiveWorkerSessionId == request.WorkerSessionId.Value)
+            .CountAsync(cancellationToken);
+        if (activeCount >= request.MaximumConcurrentAssignments) return null;
         var versions = request.RuntimeCapabilityVersions.ToArray();
         var materials = request.ExecutionMaterialVersions.ToArray();
         var document = await context.WorkerAssignments
@@ -298,6 +311,52 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         return results;
     }
 
+    public async Task<IReadOnlyList<RuntimeAssignmentTerminalResult>> InterruptSupersededSessionsAsync(
+        RuntimeWorkerId workerId,
+        RuntimeWorkerSessionId activeSessionId,
+        DateTimeOffset observedAt,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var documents = await context.WorkerAssignments
+            .Where(value => value.State == nameof(RuntimeAssignmentState.Assigned)
+                && value.ActiveWorkerId == workerId.Value
+                && value.ActiveWorkerSessionId != activeSessionId.Value)
+            .ToArrayAsync(cancellationToken);
+        var results = new List<RuntimeAssignmentTerminalResult>();
+        foreach (var document in documents)
+        {
+            var assignment = Deserialize(document).Value;
+            var attempt = assignment.CurrentAttempt;
+            if (attempt?.WorkerId != workerId || attempt.WorkerSessionId == activeSessionId) continue;
+            var cancelled = assignment.CancellationRequestedAt is not null;
+            var interrupted = attempt with
+            {
+                State = RuntimeAssignmentAttemptState.Interrupted,
+                CompletedAt = observedAt,
+                ErrorCode = cancelled ? null : "worker_lost"
+            };
+            assignment = assignment with
+            {
+                State = cancelled ? RuntimeAssignmentState.Cancelled : RuntimeAssignmentState.Failed,
+                UpdatedAt = observedAt,
+                Attempts = assignment.Attempts.Take(assignment.Attempts.Count - 1).Append(interrupted).ToArray()
+            };
+            Apply(document, assignment, null, null);
+            var runState = cancelled ? RuntimeRunState.Cancelled : RuntimeRunState.Failed;
+            await SetRunStateAsync(context, assignment, runState, observedAt, null,
+                cancelled ? "Cancelled by the caller." : "The Runtime Worker session was superseded.", cancellationToken,
+                cancelled ? null : "worker_lost");
+            await AppendTerminalEventAsync(context, assignment, Guid.NewGuid(), runState, observedAt,
+                cancelled ? "Run cancelled after Worker session replacement" : "Runtime Worker session superseded", cancellationToken);
+            results.Add(new RuntimeAssignmentTerminalResult(assignment, runState, false));
+        }
+        await SaveAsync(context, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return results;
+    }
+
     private static RuntimeWorkerAssignment ValidateOwnership(
         RuntimeWorkerAssignmentDocument document,
         RuntimeAssignmentOwnershipProof proof,
@@ -418,6 +477,9 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         document.State = assignment.State.ToString();
         document.FencingGeneration = assignment.FencingGeneration;
         document.LeaseExpiresAt = leaseExpiresAt?.UtcTicks;
+        var activeAttempt = assignment.State == RuntimeAssignmentState.Assigned ? assignment.CurrentAttempt : null;
+        document.ActiveWorkerId = activeAttempt?.WorkerId.Value;
+        document.ActiveWorkerSessionId = activeAttempt?.WorkerSessionId.Value;
         document.OwnershipTokenDigest = digest;
         document.Payload = JsonSerializer.Serialize(assignment, JsonOptions);
         document.ETag = etag;
@@ -436,6 +498,8 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         State = assignment.State.ToString(),
         FencingGeneration = assignment.FencingGeneration,
         LeaseExpiresAt = assignment.CurrentAttempt?.LeaseExpiresAt.UtcTicks,
+        ActiveWorkerId = assignment.State == RuntimeAssignmentState.Assigned ? assignment.CurrentAttempt?.WorkerId.Value : null,
+        ActiveWorkerSessionId = assignment.State == RuntimeAssignmentState.Assigned ? assignment.CurrentAttempt?.WorkerSessionId.Value : null,
         OwnershipTokenDigest = digest,
         Payload = JsonSerializer.Serialize(assignment, JsonOptions),
         ETag = etag,

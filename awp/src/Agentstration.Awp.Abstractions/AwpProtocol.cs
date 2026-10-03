@@ -9,6 +9,7 @@ public static class AwpProtocol
     public const string BasePath = "/api/awp/v1";
     public const string RegistrationPath = BasePath + "/workers/register";
     public const string ClaimPath = BasePath + "/assignments/claim";
+    public const string HeartbeatPath = BasePath + "/assignments/heartbeat";
 
     public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();
 

@@ -49,6 +49,7 @@ public sealed record AwpClaimResponse(DateTimeOffset ServerTime, AwpRunAssignmen
 public sealed record AwpAssignmentCommandContext(
     AwpWorkerId WorkerId,
     AwpWorkerSessionId SessionId,
+    AwpWorkspaceScope Scope,
     AwpAssignmentId AssignmentId,
     AwpAssignmentAttemptId AttemptId,
     string OwnershipToken,
