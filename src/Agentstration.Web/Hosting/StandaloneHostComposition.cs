@@ -155,6 +155,7 @@ internal static class StandaloneHostCompositionExtensions
         builder.Services.AddSingleton<ExtensionRegistrationManagementService>();
         builder.Services.AddSingleton<AepEnrollmentSettingsService>();
         builder.Services.AddSingleton<AepEnrollmentService>();
+        builder.Services.AddSingleton<AwpWorkerIdentityService>();
         builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
         builder.Services.AddSingleton<ResourceScopeInventoryService>();
         builder.Services.AddSingleton<ExtensionManagementService>();

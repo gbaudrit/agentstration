@@ -32,6 +32,15 @@ public static class SecurityAuditActions
     public const string BffWorkloadCredentialRevoked = "bff-workload.credential-revoked";
     public const string BffWorkloadAuthenticated = "bff-workload.authenticated";
     public const string BffWorkloadAuthenticationFailed = "bff-workload.authentication-failed";
+    public const string AwpWorkerEnrollmentAnnounced = "awp-worker.enrollment-announced";
+    public const string AwpWorkerPairingCodeIssued = "awp-worker.pairing-code-issued";
+    public const string AwpWorkerCredentialIssued = "awp-worker.credential-issued";
+    public const string AwpWorkerCredentialRotated = "awp-worker.credential-rotated";
+    public const string AwpWorkerCredentialRevoked = "awp-worker.credential-revoked";
+    public const string AwpWorkerSessionStarted = "awp-worker.session-started";
+    public const string AwpWorkerEnrollmentFailed = "awp-worker.enrollment-failed";
+    public const string AwpWorkerAuthenticated = "awp-worker.authenticated";
+    public const string AwpWorkerAuthenticationFailed = "awp-worker.authentication-failed";
     public const string BootstrapProfileApplied = "bootstrap-profile.applied";
     public const string AepEnrollmentAnnounced = "aep-enrollment.announced";
     public const string AepPairingCodeIssued = "aep-enrollment.code-issued";

@@ -244,6 +244,23 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void AwpWorkerTrustIsSeparateFromConsoleAndHumanAuthority()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var endpoint = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Agentstration.Identity.Api", "Api", "AwpWorkerEndpoints.cs"));
+        var authentication = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Agentstration.Identity.Contracts", "AwpWorkerAuthentication.cs"));
+        var bffAuthentication = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Agentstration.Identity.Contracts", "BffWorkloadAuthentication.cs"));
+
+        StringAssert.Contains(endpoint, "/api/awp/v1/");
+        StringAssert.Contains(endpoint, "RequireAuthorization(AgentstrationPolicies.AwpWorker)");
+        StringAssert.Contains(authentication, "agentstration:awp:worker");
+        StringAssert.Contains(authentication, "agentstration:awp:session");
+        Assert.IsFalse(authentication.Contains("BffWorkload", StringComparison.Ordinal));
+        Assert.IsFalse(authentication.Contains("PersonalAccessToken", StringComparison.Ordinal));
+        Assert.IsFalse(bffAuthentication.Contains("AwpWorker", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void ApiTransportDoesNotReferenceConsoleOrExecutableHostAssemblies()
     {
         var references = typeof(Agentstration.Web.ApiTransportEndpointRouteBuilderExtensions).Assembly
