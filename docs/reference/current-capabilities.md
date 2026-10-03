@@ -265,7 +265,7 @@ $body = @{ prompt = "Reply with one short sentence." } | ConvertTo-Json
 Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://localhost:5100/api/diagnostics/models/ollama/chat
 ```
 
-`Agentstration.Models.Application` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. Autonomous Ollama, llama.cpp, and LocalAI extensions own their native transports, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no dependency on a concrete provider.
+`Agentstration.Models.Application` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. Autonomous Ollama, llama.cpp, and LocalAI extensions own their native transports, while `Agentstration.AppHost` owns orchestration. `Runtime.MicrosoftAgentFramework` consumes `IChatClient`; it has no dependency on a concrete provider.
 
 Current limitations are deliberate: credentials are not stored on provider resources, llama.cpp reasoning output is not represented as a distinct AEP content kind, and image input is not yet effective through the AEP-to-`IChatClient` adapter. Separate Flow Runs are not dispatched in parallel and there is no conversation persistence. Other legacy OpenAI-compatible endpoints still use host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
 

@@ -10,7 +10,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.AgentFramework;
+using Agentstration.Runtime.MicrosoftAgentFramework;
 using Agentstration.Tools;
 using Agentstration.Tools.Mcp;
 using Agentstration.Work;

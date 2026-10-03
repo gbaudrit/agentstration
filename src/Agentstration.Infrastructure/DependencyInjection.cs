@@ -29,7 +29,7 @@ using Agentstration.ResourcePlanning;
 using Agentstration.ResourcePlanning.Storage.PostgreSql;
 using Agentstration.ResourcePlanning.Storage.Sqlite;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.AgentFramework;
+using Agentstration.Runtime.MicrosoftAgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Local;
 using Agentstration.Runtime.Profiles;
