@@ -1,6 +1,6 @@
 # ADR-0032: Use one authoritative standalone server
 
-Status: Accepted — 2026-08-12
+Status: Accepted — 2026-08-12; partially superseded by ADR-0156 for transient Runtime execution
 
 ## Context
 

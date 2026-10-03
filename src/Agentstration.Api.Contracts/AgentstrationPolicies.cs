@@ -4,6 +4,7 @@ namespace Agentstration.Web.Security;
 public static class AgentstrationPolicies
 {
     public const string BffWorkload = "agentstration:bff-workload";
+    public const string AwpWorker = "agentstration:awp-worker";
     public const string Authenticated = "agentstration:authenticated";
     public const string PlatformAdmin = "agentstration:platform-admin";
     public const string WorkspaceReader = "agentstration:workspace-reader";

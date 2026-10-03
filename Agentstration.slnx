@@ -5,6 +5,9 @@
     <Project Path="aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
     <Project Path="aep/src/Agentstration.Aep.MicrosoftExtensionsAI/Agentstration.Aep.MicrosoftExtensionsAI.csproj" />
   </Folder>
+  <Folder Name="/awp/">
+    <Project Path="awp/src/Agentstration.Awp.Abstractions/Agentstration.Awp.Abstractions.csproj" />
+  </Folder>
   <Folder Name="/src/Agents/">
     <Project Path="src/Agentstration.Agents.Api/Agentstration.Agents.Api.csproj" />
     <Project Path="src/Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />
@@ -94,13 +97,14 @@
   <Folder Name="/src/Runtime/">
     <Project Path="src/Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
     <Project Path="src/Agentstration.Runtime.Api/Agentstration.Runtime.Api.csproj" />
-    <Project Path="src/Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />
+    <Project Path="src/Agentstration.Runtime.MicrosoftAgentFramework/Agentstration.Runtime.MicrosoftAgentFramework.csproj" />
     <Project Path="src/Agentstration.Runtime.Contracts/Agentstration.Runtime.Contracts.csproj" />
     <Project Path="src/Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
     <Project Path="src/Agentstration.Runtime.Profiles/Agentstration.Runtime.Profiles.csproj" />
     <Project Path="src/Agentstration.Runtime.Local/Agentstration.Runtime.Local.csproj" />
     <Project Path="src/Agentstration.Runtime.Storage.Sqlite/Agentstration.Runtime.Storage.Sqlite.csproj" />
     <Project Path="src/Agentstration.Runtime.Storage.PostgreSql/Agentstration.Runtime.Storage.PostgreSql.csproj" />
+    <Project Path="src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj" />
   </Folder>
   <Folder Name="/src/Secrets/">
     <Project Path="src/Agentstration.Secrets.Abstractions/Agentstration.Secrets.Abstractions.csproj" />
@@ -172,6 +176,7 @@
     <Project Path="tests/Agentstration.Management.Security.Tests/Agentstration.Management.Security.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Runtime/">
+    <Project Path="tests/Agentstration.Awp.Tests/Agentstration.Awp.Tests.csproj" />
     <Project Path="tests/Agentstration.Runtime.Tests/Agentstration.Runtime.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Tools/">

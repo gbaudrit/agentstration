@@ -16,7 +16,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkApiProgram = global::Program;
 
 namespace Agentstration.Api.Tests;
@@ -241,6 +243,7 @@ public sealed class WorkplaceApiTests
                 builder.UseEnvironment("Testing");
                 builder.UseSetting("Data:Directory", dataDirectory);
                 builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+                AddInProcessFlowTestHarness(builder);
             });
             using var client = factory.CreateClient();
 
@@ -606,6 +609,7 @@ public sealed class WorkplaceApiTests
                 builder.UseEnvironment("Testing");
                 builder.UseSetting("Data:Directory", dataDirectory);
                 builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+                AddInProcessFlowTestHarness(builder);
             });
             using var client = factory.CreateClient();
             using var submittedResponse = await client.PostAsJsonAsync(
@@ -709,6 +713,7 @@ public sealed class WorkplaceApiTests
                 builder.UseEnvironment("Testing");
                 builder.UseSetting("Data:Directory", dataDirectory);
                 builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+                AddInProcessFlowTestHarness(builder);
             });
             using var client = factory.CreateClient();
             var taskCreated = new TaskCompletionSource<TaskCreatedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -830,6 +835,35 @@ public sealed class WorkplaceApiTests
     {
         ["style"] = JsonSerializer.SerializeToElement(value)
     };
+
+    private static void AddInProcessFlowTestHarness(IWebHostBuilder builder) =>
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IFlowRunQueue>();
+            services.AddSingleton<IFlowRunQueue, InProcessFlowTestQueue>();
+        });
+
+    private sealed class InProcessFlowTestQueue(IServiceProvider services) : IFlowRunQueue
+    {
+        public ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken)
+        {
+            _ = Task.Run(async () =>
+            {
+                using var scope = services.CreateScope();
+                await scope.ServiceProvider.GetRequiredService<FlowRunService>()
+                    .ExecuteAsync(item, CancellationToken.None);
+            }, CancellationToken.None);
+            return ValueTask.CompletedTask;
+        }
+
+        public async IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.CompletedTask;
+            cancellationToken.ThrowIfCancellationRequested();
+            yield break;
+        }
+    }
 
     private static async Task<(WorkTaskResult[] Results, WorkTaskArtifact[] Artifacts)> WaitForOutputsAsync(HttpClient client, Guid taskId, int count)
     {

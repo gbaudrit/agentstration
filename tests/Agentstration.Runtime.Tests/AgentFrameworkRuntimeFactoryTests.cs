@@ -8,7 +8,7 @@ using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.AgentFramework;
+using Agentstration.Runtime.MicrosoftAgentFramework;
 using Agentstration.Runtime.Local;
 using Agentstration.Runtime.Storage.Sqlite;
 using Microsoft.Agents.AI;

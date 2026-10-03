@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../../awp/src/Agentstration.Awp.Abstractions/Agentstration.Awp.Abstractions.csproj" />
     <Compile Include="../ApiModuleGlobalUsings.cs" Link="GlobalUsings.cs" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />

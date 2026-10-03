@@ -15,7 +15,7 @@ using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourcePlanning;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.AgentFramework;
+using Agentstration.Runtime.MicrosoftAgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Security.AspNetCoreIdentity;
@@ -124,6 +124,14 @@ internal static class StandaloneHostCompositionExtensions
         var sourceRegistryTransportOptions = builder.Configuration
             .GetSection(Agentstration.Infrastructure.Sources.SourceRegistryTransportOptions.SectionName)
             .Get<Agentstration.Infrastructure.Sources.SourceRegistryTransportOptions>() ?? new();
+        var runtimeWorkerLeaseOptions = builder.Configuration
+            .GetSection(RuntimeWorkerLeaseOptions.SectionName)
+            .Get<RuntimeWorkerLeaseOptions>() ?? new();
+        runtimeWorkerLeaseOptions.Validate();
+        var runtimeWorkerDispatchOptions = builder.Configuration
+            .GetSection(RuntimeWorkerDispatchOptions.SectionName)
+            .Get<RuntimeWorkerDispatchOptions>() ?? new();
+        runtimeWorkerDispatchOptions.Validate();
 
         builder.Services.AddAgentstration(
             dataDirectory,
@@ -135,7 +143,9 @@ internal static class StandaloneHostCompositionExtensions
             storageOptions,
             enableHostedServices: hostedServicesEnabled,
             sourceVerificationIndexOptions: sourceVerificationIndexOptions,
-            sourceRegistryTransportOptions: sourceRegistryTransportOptions);
+            sourceRegistryTransportOptions: sourceRegistryTransportOptions,
+            runtimeWorkerLeaseOptions: runtimeWorkerLeaseOptions,
+            runtimeWorkerDispatchOptions: runtimeWorkerDispatchOptions);
         builder.Services.AddAgentstrationModelProviders(builder.Configuration, useManagedProfileResolver);
         builder.Services.AddSingleton<ModelProviderManagementService>();
         builder.Services.AddSingleton<ModelDiscoveryService>();
@@ -150,6 +160,7 @@ internal static class StandaloneHostCompositionExtensions
         builder.Services.AddSingleton<ExtensionRegistrationManagementService>();
         builder.Services.AddSingleton<AepEnrollmentSettingsService>();
         builder.Services.AddSingleton<AepEnrollmentService>();
+        builder.Services.AddSingleton<AwpWorkerIdentityService>();
         builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
         builder.Services.AddSingleton<ResourceScopeInventoryService>();
         builder.Services.AddSingleton<ExtensionManagementService>();
@@ -183,8 +194,7 @@ internal static class StandaloneHostCompositionExtensions
         {
             builder.Services.AddHostedService<AgentDeploymentReconciliationWorker>();
             builder.Services.AddHostedService<LocalWorkExecutionWorker>();
-            builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
-            builder.Services.AddHostedService<FlowRunExecutionWorker>();
+            builder.Services.AddHostedService<RuntimeAssignmentLeaseReaper>();
             builder.Services.AddHostedService<FlowRunRecoveryWorker>();
             builder.Services.AddHostedService<SourceRefreshWorker>();
         }

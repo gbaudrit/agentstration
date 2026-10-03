@@ -8,7 +8,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 
-namespace Agentstration.Runtime.AgentFramework;
+namespace Agentstration.Runtime.MicrosoftAgentFramework;
 
 public sealed partial class AgentFrameworkFlowOrchestrationEngine
 {

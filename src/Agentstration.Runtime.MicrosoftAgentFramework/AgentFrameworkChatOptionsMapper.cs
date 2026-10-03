@@ -3,7 +3,7 @@ using Agentstration.Models;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.AI;
 
-namespace Agentstration.Runtime.AgentFramework;
+namespace Agentstration.Runtime.MicrosoftAgentFramework;
 
 public static class AgentFrameworkChatOptionsMapper
 {

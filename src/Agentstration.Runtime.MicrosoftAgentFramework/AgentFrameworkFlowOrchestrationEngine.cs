@@ -8,7 +8,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 
-namespace Agentstration.Runtime.AgentFramework;
+namespace Agentstration.Runtime.MicrosoftAgentFramework;
 
 #pragma warning disable MAAIW001
 public sealed partial class AgentFrameworkFlowOrchestrationEngine(

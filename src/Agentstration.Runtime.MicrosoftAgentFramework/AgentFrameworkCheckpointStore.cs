@@ -4,7 +4,7 @@ using Agentstration.Runtime.Abstractions;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Agents.AI.Workflows.Checkpointing;
 
-namespace Agentstration.Runtime.AgentFramework;
+namespace Agentstration.Runtime.MicrosoftAgentFramework;
 
 #pragma warning disable MAAIW001
 internal sealed class AgentFrameworkCheckpointStore(
