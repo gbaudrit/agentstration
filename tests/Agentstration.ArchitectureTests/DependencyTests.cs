@@ -2,6 +2,7 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
+using Agentstration.Awp.Abstractions;
 using Agentstration.Agents;
 using Agentstration.Agents.Contracts;
 using Agentstration.Application.Work;
@@ -501,6 +502,23 @@ public sealed class DependencyTests
             || reference.Name.Contains("LlamaCpp", StringComparison.Ordinal)
             || reference.Name.Contains("LocalAI", StringComparison.Ordinal)
             || reference.Name.Contains("Extensions.Git", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void AwpAbstractionsDoNotReferenceAgentstrationMafStorageOrHostingImplementations()
+    {
+        var references = typeof(AwpProtocol).Assembly.GetReferencedAssemblies()
+            .Select(reference => reference.Name ?? "")
+            .ToArray();
+
+        Assert.IsFalse(references.Any(reference =>
+            reference.StartsWith("Agentstration.", StringComparison.Ordinal)
+            || reference.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
+            || reference.Contains("EntityFramework", StringComparison.Ordinal)
+            || reference.Contains("Sqlite", StringComparison.Ordinal)
+            || reference.Contains("Npgsql", StringComparison.Ordinal)
+            || reference.Contains("Aspire.Hosting", StringComparison.Ordinal)
+            || reference.Contains("Kubernetes", StringComparison.Ordinal)));
     }
 
     [TestMethod]
