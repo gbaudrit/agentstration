@@ -27,21 +27,25 @@ else if (profile is not null)
             <MetricCard Label="@T("Revisions")" Value="@revisions.Count.ToString()" Detail="@T("PublishedDependencies")" Status="@UiStatus.Neutral" />
             <MetricCard Label="@T("Routes")" Value="@((profile.Definition.ToolBindings.Count + profile.Definition.ToolSetRoutes.Count).ToString())" Detail="@T("GovernedRoutes")" Status="@UiStatus.Neutral" />
         </section>
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Dependencies")</p><h2>@T("FlowComposition")</h2></div></div>
-            <dl class="resource-details"><dt>@T("IngestionFlow")</dt><dd><a class="resource-name-link" href="@FlowUrl(profile.Definition.IngestionFlow)">@FlowLabel(profile.Definition.IngestionFlow)</a></dd><dt>@T("RetrievalFlow")</dt><dd><a class="resource-name-link" href="@FlowUrl(profile.Definition.RetrievalFlow)">@FlowLabel(profile.Definition.RetrievalFlow)</a></dd><dt>@T("StorageFlows")</dt><dd>@profile.Definition.StorageFlows.Count</dd><dt>@T("DirectTools")</dt><dd>@profile.Definition.ToolBindings.Count</dd><dt>@T("ToolSetRoutes")</dt><dd>@profile.Definition.ToolSetRoutes.Count</dd></dl>
+        <section class="panel form-section profile-composition"><div class="panel-header"><div><p class="eyebrow">@T("Dependencies")</p><h2>@T("FlowComposition")</h2><p>@T("FlowCompositionHelp")</p></div></div>
+            <div class="profile-flow-grid">
+                <a class="profile-flow-card" href="@FlowUrl(profile.Definition.IngestionFlow)" data-testid="profile-ingestion-flow"><span class="profile-flow-icon"><UiIcon Name="workflow" /></span><span><small>@T("IngestionFlow")</small><strong>@profile.Definition.IngestionFlow.Name</strong><code>@FlowLabel(profile.Definition.IngestionFlow)</code></span><UiIcon Name="arrow-right" /></a>
+                <a class="profile-flow-card" href="@FlowUrl(profile.Definition.RetrievalFlow)" data-testid="profile-retrieval-flow"><span class="profile-flow-icon"><UiIcon Name="search" /></span><span><small>@T("RetrievalFlow")</small><strong>@profile.Definition.RetrievalFlow.Name</strong><code>@FlowLabel(profile.Definition.RetrievalFlow)</code></span><UiIcon Name="arrow-right" /></a>
+            </div>
+            <div class="profile-composition-stats"><article><strong>@profile.Definition.StorageFlows.Count</strong><span>@T("StorageFlows")</span></article><article><strong>@profile.Definition.ToolBindings.Count</strong><span>@T("DirectTools")</span></article><article><strong>@profile.Definition.ToolSetRoutes.Count</strong><span>@T("ToolSetRoutes")</span></article></div>
         </section>
     }
     else if (activeTab == ProfileTab.Definition)
     {
         <EditForm Model="this" OnValidSubmit="SaveDefinitionAsync" class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("Definition")</p><h2>@T("DraftDefinition")</h2><p>@T("DefinitionHelp")</p></div></div>
-            <div class="form-grid">
+            <div class="form-grid profile-form-grid">
                 <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="false" />
                 <label class="form-field-wide"><span>@T("DescriptionLabel")</span><textarea @bind="description" maxlength="2000"></textarea></label>
                 <label><span>@T("Version")</span><input @bind="draftVersion" required /></label>
-                <label><span>@T("IngestionFlow")</span><select @bind="ingestionKey" required>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowSummaryLabel(flow)</option> }</select></label>
-                <label><span>@T("RetrievalFlow")</span><select @bind="retrievalKey" required>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowSummaryLabel(flow)</option> }</select></label>
-                <label class="checkbox-row"><input type="checkbox" @bind="enabled" /><span>@T("Enabled")</span></label>
+                <label><span>@T("IngestionFlow")</span><select @bind="ingestionKey" required>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowSummaryLabel(flow)</option> }</select><small>@T("IngestionFlowHelp")</small></label>
+                <label><span>@T("RetrievalFlow")</span><select @bind="retrievalKey" required>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowSummaryLabel(flow)</option> }</select><small>@T("RetrievalFlowHelp")</small></label>
+                <label class="profile-choice form-span-2" data-testid="profile-enabled-option"><input type="checkbox" @bind="enabled" /><span class="profile-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span></label>
                 <label class="form-field-wide"><span>@T("ConfigurationSchema")</span><textarea class="form-code-editor runner-json" rows="14" @bind="schemaJson"></textarea><small>@T("ConfigurationSchemaHelp")</small></label>
             </div>
             <div class="form-actions"><button class="button-primary" type="submit" disabled="@busy">@(busy ? T("Saving") : T("SaveDraft"))</button></div>
@@ -50,7 +54,7 @@ else if (profile is not null)
     else if (activeTab == ProfileTab.Revisions)
     {
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Publication")</p><h2>@T("ImmutableRevisions")</h2><p>@T("RevisionHelp")</p></div></div>
-            <div class="form-grid"><label><span>@T("Version")</span><input @bind="publishVersion" /></label><label class="checkbox-row"><input type="checkbox" @bind="activatePublished" /><span>@T("ActivateAfterPublish")</span></label></div>
+            <div class="form-grid profile-publish-grid"><label><span>@T("Version")</span><input @bind="publishVersion" /></label><label class="profile-choice" data-testid="profile-activate-option"><input type="checkbox" @bind="activatePublished" /><span class="profile-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("ActivateAfterPublish")</strong><small>@T("ActivateAfterPublishHelp")</small></span></label></div>
             <div class="form-actions"><button class="button-primary" type="button" disabled="@busy" @onclick="PublishAsync">@T("Publish")</button></div>
             @if (revisions.Count == 0) { <p class="muted">@T("NoRevisions")</p> }
             else { <DataGrid TItem="KnowledgeSourceProfileRevisionResource" Items="revisions"><Header><tr><th>@T("Version")</th><th>@T("Published")</th><th>@T("DefinitionHash")</th><th>@T("State")</th><th></th></tr></Header><Row Context="revision"><tr><td><code>@revision.Version</code></td><td>@revision.PublishedAt.ToLocalTime().ToString("g")</td><td><code>@Short(revision.DefinitionHash)</code></td><td>@(revision.Version == profile.ActiveVersion ? T("Active") : T("Inactive"))</td><td>@if (revision.Version != profile.ActiveVersion) { <button class="text-button" type="button" disabled="@busy" @onclick="() => ActivateAsync(revision.Version)">@T("ActivateRollback")</button> }</td></tr></Row></DataGrid> }
@@ -59,17 +63,17 @@ else if (profile is not null)
     else if (activeTab == ProfileTab.Apply)
     {
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Apply")</p><h2>@T("ApplyPublishedProfile")</h2><p>@T("ApplyHelp")</p></div></div>
-            <div class="form-grid"><label><span>@T("SourceProfile")</span><select @bind="sourceProfileKey"><option value="">@T("SelectProfile")</option>@foreach (var value in profiles.Where(value => value.Name != profile.Name || value.Namespace != profile.Namespace)) { <option value="@Key(value.Namespace, value.Name)">@value.Definition.DisplayName</option> }</select></label><label><span>@T("SourceVersion")</span><input @bind="sourceVersion" /></label><label><span>@T("TargetVersion")</span><input @bind="targetVersion" /></label><label class="form-field-wide"><span>@T("ConfigurationDefaults")</span><textarea class="form-code-editor runner-json" rows="8" @bind="defaultsJson"></textarea></label></div>
+            <div class="form-grid profile-application-grid"><label class="form-field-wide"><span>@T("SourceProfile")</span><select @bind="sourceProfileKey"><option value="">@T("SelectProfile")</option>@foreach (var value in profiles.Where(value => value.Name != profile.Name || value.Namespace != profile.Namespace)) { <option value="@Key(value.Namespace, value.Name)">@value.Definition.DisplayName</option> }</select><small>@T("SourceProfileHelp")</small></label><label><span>@T("SourceVersion")</span><input @bind="sourceVersion" /></label><label><span>@T("TargetVersion")</span><input @bind="targetVersion" /></label><label class="form-field-wide"><span>@T("ConfigurationDefaults")</span><textarea class="form-code-editor runner-json" rows="8" @bind="defaultsJson"></textarea></label></div>
             <div class="form-actions"><button class="button-secondary" type="button" disabled="@busy" @onclick="PreviewAsync">@T("Preview")</button><button class="button-primary" type="button" disabled="@(busy || applicationPlan?.Ready != true)" @onclick="ApplyAsync">@T("ApplyAndPublish")</button></div>
             @if (applicationPlan is not null) { <div class="form-alert @(applicationPlan.Ready ? "form-alert-success" : "form-alert-danger")"><strong>@T(applicationPlan.Ready ? "ApplicationReady" : "ApplicationBlocked")</strong><div>@T("DependencyChanges", applicationPlan.DependencyChanges.Count) · @T("SourceImpacts", applicationPlan.Sources.Count)</div>@foreach (var issue in applicationPlan.Issues) { <div>@issue</div> }</div> }
         </section>
     }
     else
     {
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("Yaml")</h2><p>@T("YamlHelp")</p></div></div>
+        <section class="panel form-section" data-testid="knowledge-source-profile-yaml"><div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("Yaml")</h2><p>@T("YamlHelp")</p></div></div>
             @if (yamlError is not null) { <div class="form-alert form-alert-danger">@yamlError</div> }
-            <label><span>@T("Manifest")</span><textarea class="form-code-editor runner-json" rows="32" @bind="rawYaml" @bind:event="oninput"></textarea></label>
-            <div class="form-actions"><button class="button-primary" type="button" disabled="@busy" @onclick="SaveYamlAsync">@T("SaveYaml")</button></div>
+            <label class="profile-yaml-field"><span>@T("Manifest")</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput" data-testid="knowledge-source-profile-yaml-editor"></textarea></label>
+            <div class="form-actions"><button class="button-secondary" type="button" disabled="@busy" @onclick="() => { ApplyYaml(); }">@T("ApplyToForm")</button><button class="button-primary" type="button" disabled="@busy" @onclick="SaveYamlAsync">@(busy ? T("Saving") : T("SaveYaml"))</button></div>
         </section>
     }
 }
@@ -122,12 +126,13 @@ else if (profile is not null)
     private async Task ApplyAsync() => await RunAsync(async () => { await Client.ApplyAsync(ProfileNamespace, Name, ApplicationRequest(), etag!, cancellation.Token); await ReloadCurrentAsync(); applicationPlan = null; }, "AppliedMessage");
     private void SelectTab(ProfileTab tab) { activeTab = tab; if (tab == ProfileTab.Yaml) PrepareYaml(); }
     private void PrepareYaml() { yamlError = null; rawYaml = ResourceManifestSerializer.ToYaml(new RawProfile { ApiVersion = profile!.ApiVersion, Kind = profile.Kind, Metadata = profile.Metadata, Definition = profile.Definition }); }
-    private async Task SaveYamlAsync()
+    private bool ApplyYaml()
     {
         yamlError = null;
-        try { var raw = ResourceManifestSerializer.FromYaml<RawProfile>(rawYaml); if (raw.Kind != KnowledgeResourceKinds.KnowledgeSourceProfile || raw.Metadata.Name != Name || raw.Metadata.Namespace != ProfileNamespace) throw new ArgumentException(T("IdentityImmutable")); var saved = await Client.UpdateAsync(ProfileNamespace, Name, new(raw.Definition with { Publish = false, Activate = false }), etag!, cancellation.Token); profile = saved.Value; etag = saved.ETag; LoadForm(); message = T("Saved"); failed = false; }
-        catch (Exception exception) { yamlError = exception.Message; }
+        try { var raw = ResourceManifestSerializer.FromYaml<RawProfile>(rawYaml); if (raw.Kind != KnowledgeResourceKinds.KnowledgeSourceProfile || raw.Metadata.Name != Name || raw.Metadata.Namespace != ProfileNamespace) throw new ArgumentException(T("IdentityImmutable")); profile = profile! with { Definition = raw.Definition with { Publish = false, Activate = false } }; LoadForm(); message = T("YamlApplied"); failed = false; return true; }
+        catch (Exception exception) { yamlError = exception.Message; return false; }
     }
+    private async Task SaveYamlAsync() { if (!ApplyYaml()) return; await RunAsync(async () => { var saved = await Client.UpdateAsync(ProfileNamespace, Name, new(profile!.Definition), etag!, cancellation.Token); profile = saved.Value; etag = saved.ETag; LoadForm(); }, "Saved"); }
     private async Task ReloadCurrentAsync() { var snapshot = await Client.GetAsync(ProfileNamespace, Name, cancellation.Token); profile = snapshot.Value; etag = snapshot.ETag; revisions = (await Client.GetRevisionsAsync(ProfileNamespace, Name, cancellation.Token)).OrderByDescending(value => value.PublishedAt).ToArray(); LoadForm(); }
     private async Task RunAsync(Func<Task> action, string success) { if (busy) return; busy = true; message = null; failed = false; try { await action(); message = T(success); } catch (Exception exception) { failed = true; message = exception.Message; } finally { busy = false; } }
     private async Task DeleteAsync() { confirmDelete = false; await RunAsync(async () => { await Client.DeleteAsync(ProfileNamespace, Name, etag!, cancellation.Token); Navigation.NavigateTo("/knowledge-source-profiles"); }, "Deleted"); }

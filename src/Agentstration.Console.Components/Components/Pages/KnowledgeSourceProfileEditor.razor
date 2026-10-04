@@ -11,15 +11,16 @@
 else
 {
     @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
-    <EditForm Model="this" OnValidSubmit="CreateAsync" class="panel form-section">
-        <div class="form-grid">
+    <EditForm Model="this" OnValidSubmit="CreateAsync" class="panel form-section knowledge-profile-form">
+        <div class="panel-header profile-form-header"><div class="profile-form-heading"><span class="profile-form-icon"><UiIcon Name="books" /></span><div><p class="eyebrow">@T("Definition")</p><h2>@T("DraftDefinition")</h2><p>@T("CreateFormHelp")</p></div></div></div>
+        <div class="form-grid profile-form-grid">
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="true" />
             <label><span>@T("Namespace")</span><input @bind="profileNamespace" maxlength="128" /></label>
             <label class="form-field-wide"><span>@T("DescriptionLabel")</span><textarea @bind="description" maxlength="2000"></textarea></label>
-            <label><span>@T("IngestionFlow")</span><select @bind="ingestionKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select></label>
-            <label><span>@T("RetrievalFlow")</span><select @bind="retrievalKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select></label>
+            <label><span>@T("IngestionFlow")</span><select @bind="ingestionKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select><small>@T("IngestionFlowHelp")</small></label>
+            <label><span>@T("RetrievalFlow")</span><select @bind="retrievalKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select><small>@T("RetrievalFlowHelp")</small></label>
             <label><span>@T("Version")</span><input @bind="version" required /></label>
-            <label class="checkbox-row"><input type="checkbox" @bind="publish" /><span>@T("PublishAndActivate")</span></label>
+            <label class="profile-choice form-span-2"><input type="checkbox" @bind="publish" /><span class="profile-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("PublishAndActivate")</strong><small>@T("PublishAndActivateHelp")</small></span></label>
         </div>
         <div class="form-actions"><button class="button-primary" type="submit" disabled="@busy">@(busy ? T("Saving") : T("Create"))</button></div>
     </EditForm>
