@@ -1,7 +1,9 @@
 using System.Text.Json;
+using Agentstration.Agents;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Infrastructure.Runtime;
@@ -12,6 +14,7 @@ public sealed class RuntimeExecutionMaterialResolver(
     IRuntimeRunExecutionScope runtimeScopes,
     IFlowRunExecutionScope flowScopes,
     IRuntimeAgentResolver agents,
+    AgentManagementService agentManagement,
     IToolCatalog tools) : IRuntimeExecutionMaterialResolver
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -109,10 +112,11 @@ public sealed class RuntimeExecutionMaterialResolver(
         {
             var binding = run.RuntimeBindings.SingleOrDefault(value =>
                 string.Equals(value.ParticipantId, reference.ParticipantId, StringComparison.Ordinal));
-            var agentReference = binding is null
-                ? reference.Reference
-                : new RuntimeAgentReference(binding.AgentResourceId, binding.AgentGeneration) { Namespace = binding.AgentNamespace };
-            var material = await ResolveAgentAsync(reference.ParticipantId, agentReference, cancellationToken);
+            var material = binding is null
+                ? await ResolveAgentAsync(reference.ParticipantId, reference.Target, cancellationToken)
+                : await ResolveAgentAsync(reference.ParticipantId,
+                    new RuntimeAgentReference(binding.AgentResourceId, binding.AgentGeneration) { Namespace = binding.AgentNamespace },
+                    cancellationToken);
             if (binding is not null && !string.Equals(material.RevisionId, binding.RevisionId, StringComparison.Ordinal))
                 throw new RuntimeExecutionMaterialException("execution_material_drift", $"Participant '{binding.ParticipantId}' no longer resolves to its pinned revision.");
             resolvedAgents.Add(material);
@@ -153,7 +157,7 @@ public sealed class RuntimeExecutionMaterialResolver(
         string.Equals(run.Id, assignment.TargetRunId, StringComparison.Ordinal)
         || string.Equals(run.RootFlowRunId, assignment.TargetRunId, StringComparison.Ordinal);
 
-    private static IReadOnlyList<(string ParticipantId, RuntimeAgentReference Reference)> ExecutionAgentReferences(FlowVersion version)
+    private static IReadOnlyList<(string ParticipantId, FlowTargetReference Target)> ExecutionAgentReferences(FlowVersion version)
     {
         IEnumerable<(string ParticipantId, FlowTargetReference Target)> references = version.Graph is not null
             ? version.Graph.Steps.OfType<AgentFlowStepDefinition>().Select(step => (step.Name,
@@ -175,9 +179,10 @@ public sealed class RuntimeExecutionMaterialResolver(
             .Where(value => value.Target.Kind == FlowTargetKind.Agent)
             .GroupBy(value => value.ParticipantId, StringComparer.Ordinal)
             .Select(group => group.First())
-            .Select(value => (value.ParticipantId, new RuntimeAgentReference(value.Target.Id,
-                ParseGeneration(value.Target.Version))
-            { Namespace = value.Target.Namespace ?? version.FlowId.Namespace }))
+            .Select(value => (value.ParticipantId, value.Target with
+            {
+                Namespace = value.Target.Namespace ?? version.FlowId.Namespace
+            }))
             .ToArray();
     }
 
@@ -200,9 +205,6 @@ public sealed class RuntimeExecutionMaterialResolver(
         return steps;
     }
 
-    private static long ParseGeneration(string? version) =>
-        long.TryParse(version, out var generation) && generation > 0 ? generation : 1;
-
     private static string DefinitionHash(FlowRun run) => run.DefinitionHash
         ?? $"sha256:{Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
             System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(run.DefinitionSnapshot, JsonOptions))))}";
@@ -213,8 +215,42 @@ public sealed class RuntimeExecutionMaterialResolver(
         CancellationToken cancellationToken)
     {
         var resolved = await agents.ResolveAsync(reference, cancellationToken);
+        return await CreateAgentMaterialAsync(participantId, resolved, cancellationToken);
+    }
+
+    private async Task<RuntimeExecutionAgentMaterial> ResolveAgentAsync(
+        string participantId,
+        FlowTargetReference reference,
+        CancellationToken cancellationToken)
+    {
+        var @namespace = reference.Namespace ?? ResourceNamespace.Default;
+        var agent = await agentManagement.GetAgentAsync(@namespace, reference.Id, cancellationToken)
+            ?? throw new RuntimeExecutionMaterialException("agent_not_found",
+                $"Agent '{@namespace}/{reference.Id}' was not found.");
+        var generation = agent.Value.Generation;
+        if (!string.IsNullOrWhiteSpace(reference.Version)
+            && (!long.TryParse(reference.Version, out generation) || generation < 1))
+            throw new RuntimeExecutionMaterialException("agent_version_invalid",
+                $"Agent version '{reference.Version}' is not a positive generation number.");
+        var prepared = await agentManagement.PrepareLocalRuntimeAsync(
+            @namespace, agent.Value.Metadata.Name, generation, cancellationToken);
+        if (prepared.Value.OperationalState != OperationalState.Ready)
+            throw new RuntimeExecutionMaterialException("agent_not_ready",
+                prepared.Value.LastError ?? $"Agent '{@namespace}/{reference.Id}' could not be prepared for execution.");
+        var resolved = await agents.ResolveAsync(new RuntimeAgentReference(reference.Id, generation)
+        {
+            Namespace = @namespace
+        }, cancellationToken);
+        return await CreateAgentMaterialAsync(participantId, resolved, cancellationToken);
+    }
+
+    private async Task<RuntimeExecutionAgentMaterial> CreateAgentMaterialAsync(
+        string participantId,
+        ResolvedRuntimeAgent resolved,
+        CancellationToken cancellationToken)
+    {
         if (!resolved.Ready)
-            throw new RuntimeExecutionMaterialException("agent_not_ready", resolved.Error ?? $"Agent '{reference.ResourceId}' is not ready.");
+            throw new RuntimeExecutionMaterialException("agent_not_ready", resolved.Error ?? $"Agent '{resolved.AgentName}' is not ready.");
         var resolvedTools = await tools.ResolveAsync(resolved.Definition.EffectiveToolNames, cancellationToken);
         var toolMaterials = resolvedTools.Select(tool => new RuntimeExecutionToolMaterial(
             tool.Id,

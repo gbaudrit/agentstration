@@ -778,6 +778,12 @@ public sealed class PackTests
             .GetByTargetAsync(run.WorkspaceId, RuntimeAssignmentTargetKind.FlowRun, run.Id, default);
         Assert.IsNotNull(assignment);
         Assert.AreEqual(RuntimeAssignmentState.Pending, assignment.Value.State);
+        var material = await factory.Services.GetRequiredService<IRuntimeExecutionMaterialResolver>()
+            .ResolveAsync(assignment.Value, default);
+        var flowMaterial = Assert.IsInstanceOfType<RuntimeRootFlowExecutionMaterial>(material);
+        var materialAgent = flowMaterial.Agents.Single();
+        Assert.AreEqual("who-am-i-judge", materialAgent.AgentName);
+        Assert.IsGreaterThan(0, materialAgent.Generation);
 
         using var forkResponse = await client.PostAsJsonAsync(
             "/api/packs/agentstration/who-am-i/fork",
