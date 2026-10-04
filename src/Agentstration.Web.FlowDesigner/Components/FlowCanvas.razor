@@ -17,7 +17,9 @@
     private readonly BlazorDiagram diagram = new(new BlazorDiagramOptions
     {
         AllowMultiSelection = true,
-        Zoom = { Enabled = true },
+        // Keep the browser wheel available for page scrolling. Zoom remains available
+        // through the explicit controls, which call SetZoom directly.
+        Zoom = { Enabled = false },
         Links = { RequireTarget = true }
     });
     private long renderedRevision = -1;

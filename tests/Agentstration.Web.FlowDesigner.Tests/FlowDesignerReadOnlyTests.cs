@@ -28,6 +28,24 @@ namespace Agentstration.Web.FlowDesigner.Tests;
 public sealed class FlowDesignerReadOnlyTests
 {
     [TestMethod]
+    public void CanvasLeavesTheMouseWheelToPageScrollingAndKeepsExplicitZoomControls()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowCanvas>(parameters => parameters
+            .Add(component => component.Document, new FlowDesignerDocument([], [])));
+        var diagram = GetDiagram(rendered.Instance);
+
+        Assert.IsFalse(diagram.Options.Zoom.Enabled);
+        rendered.FindAll(".flow-zoom-controls button").Single(button => button.TextContent.Trim() == "+").Click();
+        Assert.AreEqual(1.15, diagram.Zoom, 0.001);
+    }
+
+    [TestMethod]
     public async Task DeletingCanvasNodeUpdatesDraftAndDoesNotReappearAfterMovingAnotherNode()
     {
         using var culture = new CultureScope("en-US");
