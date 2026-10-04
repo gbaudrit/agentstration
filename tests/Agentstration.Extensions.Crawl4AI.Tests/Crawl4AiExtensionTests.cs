@@ -56,6 +56,7 @@ public sealed class Crawl4AiExtensionTests
         CollectionAssert.AreEquivalent(
             new[] { "web_fetch", "web_crawl", "content_extract", "content_read", "content_delete" },
             tools.Select(tool => tool.Name).ToArray());
+        Assert.IsTrue(tools.All(tool => tool.ReturnJsonSchema is not null));
     }
 
     [TestMethod]
@@ -112,6 +113,77 @@ public sealed class Crawl4AiExtensionTests
         Assert.IsTrue(result.Truncated);
         Assert.AreEqual("https://example.test/root", result.Contents[0].SourceUrl);
         Assert.AreEqual("https://example.test/first", result.Contents[1].SourceUrl);
+        Assert.AreEqual("text/markdown; charset=utf-8", result.Corpus.MediaType);
+        Assert.AreEqual("2", result.Corpus.Metadata["pageCount"]);
+        var corpus = await service.ReadAsync(result.Corpus.Reference, 0, 4096, default);
+        var text = Encoding.UTF8.GetString(Convert.FromBase64String(corpus.ContentBase64));
+        StringAssert.Contains(text, "Source: https://example.test/root");
+        StringAssert.Contains(text, "Source: https://example.test/first");
+    }
+
+    [TestMethod]
+    public async Task CrawlSkipsFailedDiscoveredPagesAndKeepsTheBoundedCorpus()
+    {
+        await using var fixture = new TemporaryFixture(maximumPages: 5);
+        var service = fixture.Service(async (request, cancellationToken) =>
+        {
+            var input = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            var url = input.GetProperty("urls")[0].GetString()!;
+            if (url.EndsWith("/blocked", StringComparison.Ordinal))
+                return Json(new { results = new[] { new { success = false, url, error_message = "Blocked page" } } });
+            var links = url.EndsWith("/root", StringComparison.Ordinal) ? new[] { "/blocked", "/available" } : [];
+            return Json(new { results = new[] { new { success = true, url, markdown = url, links = new { @internal = links } } } });
+        });
+
+        var result = await service.CrawlAsync("https://example.test/root", 1, 3, "crawl-partial", default);
+
+        Assert.HasCount(2, result.Contents);
+        Assert.AreEqual("https://example.test/root", result.Contents[0].SourceUrl);
+        Assert.AreEqual("https://example.test/available", result.Contents[1].SourceUrl);
+        Assert.IsTrue(result.Truncated);
+        var corpus = await service.ReadAsync(result.Corpus.Reference, 0, 4096, default);
+        StringAssert.Contains(Encoding.UTF8.GetString(Convert.FromBase64String(corpus.ContentBase64)),
+            "Source: https://example.test/available");
+    }
+
+    [TestMethod]
+    public async Task CrawlStillFailsWhenTheStartingPageCannotBeAcquired()
+    {
+        await using var fixture = new TemporaryFixture();
+        var service = fixture.Service((_, _) => Json(new
+        {
+            results = new[] { new { success = false, url = "https://example.test/root", error_message = "Blocked root" } }
+        }));
+
+        var exception = await Assert.ThrowsAsync<Crawl4AiException>(() =>
+            service.CrawlAsync("https://example.test/root", 1, 3, "crawl-root-failure", default));
+
+        Assert.AreEqual("crawl4ai_acquisition_failed", exception.Code);
+    }
+
+    [TestMethod]
+    public async Task CrawlRejectsAnAggregateCorpusBeyondTheConfiguredBound()
+    {
+        await using var fixture = new TemporaryFixture(maximumPages: 2, maximumContentBytes: 180);
+        var service = fixture.Service(async (request, cancellationToken) =>
+        {
+            var input = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            var url = input.GetProperty("urls")[0].GetString()!;
+            var links = url.EndsWith("/root", StringComparison.Ordinal) ? new[] { "/next" } : [];
+            return Json(new
+            {
+                results = new[]
+                {
+                    new { success = true, url, markdown = new string('x', 80), links = new { @internal = links } }
+                }
+            });
+        });
+
+        var exception = await Assert.ThrowsAsync<Crawl4AiException>(() =>
+            service.CrawlAsync("https://example.test/root", 1, 2, null, default));
+
+        Assert.AreEqual("crawl4ai_corpus_too_large", exception.Code);
+        Assert.IsFalse(Directory.EnumerateFiles(fixture.Root, "*.content").Any());
     }
 
     [TestMethod]
@@ -236,6 +308,7 @@ public sealed class Crawl4AiExtensionTests
         private readonly int maximumPages;
         private readonly IPAddress address;
         private readonly int maximumResponseBytes;
+        private readonly int maximumContentBytes;
         private readonly IReadOnlyList<string> allowedMediaTypes;
         public string Root { get; } = Path.Combine(Path.GetTempPath(), "agentstration-crawl4ai-tests", Guid.NewGuid().ToString("N"));
 
@@ -243,11 +316,13 @@ public sealed class Crawl4AiExtensionTests
             int maximumPages = 25,
             IPAddress? address = null,
             int maximumResponseBytes = 1024 * 1024,
+            int maximumContentBytes = 1024 * 1024,
             IReadOnlyList<string>? allowedMediaTypes = null)
         {
             this.maximumPages = maximumPages;
             this.address = address ?? IPAddress.Parse("93.184.216.34");
             this.maximumResponseBytes = maximumResponseBytes;
+            this.maximumContentBytes = maximumContentBytes;
             this.allowedMediaTypes = allowedMediaTypes ?? ["text/html", "text/markdown"];
         }
 
@@ -263,7 +338,7 @@ public sealed class Crawl4AiExtensionTests
                 AllowedMediaTypes = allowedMediaTypes,
                 MaximumDepth = 3,
                 MaximumPages = maximumPages,
-                MaximumContentBytes = 1024 * 1024,
+                MaximumContentBytes = maximumContentBytes,
                 MaximumResponseBytes = maximumResponseBytes,
                 MaximumReadChunkBytes = 64 * 1024,
                 MaximumSpoolBytes = 4 * 1024 * 1024,

@@ -17,6 +17,7 @@ public sealed record WebCrawlResult(
     int MaximumDepth,
     int MaximumPages,
     IReadOnlyList<AcquiredContentReference> Contents,
+    AcquiredContentReference Corpus,
     bool Truncated);
 
 public sealed record ContentReadResult(string Reference, long Offset, long NextOffset, string ContentBase64, bool EndOfContent);

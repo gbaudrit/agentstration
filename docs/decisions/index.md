@@ -185,3 +185,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 157. [ADR-0157 — Bounded Flow repetition composes durable child runs](0157-bounded-flow-repetition-composes-child-runs.md)
 158. [ADR-0158 — Knowledge acquisition snapshots governed source configuration](0158-knowledge-acquisition-snapshots-governed-source-configuration.md)
 159. [ADR-0159 — Flow expressions use authoritative execution context](0159-flow-expressions-use-authoritative-execution-context.md)
+160. [ADR-0160 — Web crawlers produce bounded aggregate content](0160-web-crawlers-produce-bounded-aggregate-content.md)

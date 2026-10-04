@@ -1,0 +1,7 @@
+apiVersion: agentstration.io/v1
+kind: KnowledgeSourceToolExposure
+metadata:
+  name: agentstration-documentation
+definition:
+  version: 1.0.0
+  requiresApproval: false

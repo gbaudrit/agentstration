@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Agentstration.Knowledge;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Assistant;
@@ -87,14 +89,18 @@ public sealed class AssistantDocumentationCatalog(string rootPath)
     }
 }
 
-public sealed class AssistantDocumentationMcpTool(AssistantDocumentationCatalog catalog) : IInternalMcpToolHandler
+public sealed class AssistantDocumentationMcpTool(
+    AssistantDocumentationCatalog catalog,
+    KnowledgeSourceManagementService? sources = null,
+    KnowledgeRetrievalService? retrieval = null) : IInternalMcpToolHandler
 {
+    private static readonly KnowledgeSourceId DocumentationSource = new("agentstration-documentation");
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public InternalMcpToolDefinition Definition { get; } = new(
         AgentstrationInternalTools.AssistantDocumentationSearch,
         "Search Agentstration documentation",
-        "Searches the bounded documentation bundled with this Agentstration installation. Results are evidence excerpts with local documentation paths. Use only returned evidence; an unavailable or no-match result must not be replaced with invented product guidance.",
+        "Searches the governed Agentstration documentation Knowledge Source when it is provisioned, with the bundled local documentation catalog retained only as a pre-provisioning fallback. Results are bounded evidence excerpts. Use only returned evidence; an unavailable or no-match result must not be replaced with invented product guidance.",
         JsonSerializer.SerializeToElement(new
         {
             type = "object",
@@ -136,6 +142,49 @@ public sealed class AssistantDocumentationMcpTool(AssistantDocumentationCatalog 
                 : 3;
         if (maximumResults is < 1 or > 5)
             throw new ToolDefinitionInvocationException("assistant_documentation_argument_invalid", "Argument 'maximumResults' must be between 1 and 5.");
-        return JsonSerializer.SerializeToElement(await catalog.SearchAsync(queryValue.GetString()!, maximumResults, cancellationToken), JsonOptions);
+        var query = queryValue.GetString()!;
+        if (sources is not null && retrieval is not null
+            && await sources.GetAsync(DocumentationSource, cancellationToken) is not null)
+        {
+            try
+            {
+                var result = await retrieval.SearchAsync(
+                    DocumentationSource,
+                    new SearchKnowledgeRequest
+                    {
+                        Query = query,
+                        Limit = maximumResults,
+                        CorrelationId = invocation.CorrelationId
+                    },
+                    cancellationToken,
+                    invocation.CallerKind == ToolDefinitionCallerKind.Agent
+                        ? KnowledgeRetrievalInvocationOrigin.Agent
+                        : KnowledgeRetrievalInvocationOrigin.Mcp,
+                    invocation.CallerId,
+                    new KnowledgeRetrievalExecutionContext(
+                        invocation.CallerKind == ToolDefinitionCallerKind.Agent ? invocation.CallerId : null,
+                        null,
+                        invocation.CallerKind == ToolDefinitionCallerKind.Agent ? invocation.RunId : null,
+                        invocation.CallerKind == ToolDefinitionCallerKind.Flow ? invocation.RunId : null,
+                        invocation.FlowStepId,
+                        invocation.CallId,
+                        null));
+                var matches = result.Items.Select((item, index) => new AssistantDocumentationMatch(
+                    item.Metadata.GetValueOrDefault("sourceUrl") ?? item.ArtifactId,
+                    item.Metadata.GetValueOrDefault("title") ?? "Agentstration documentation",
+                    item.Metadata.GetValueOrDefault("section"),
+                    item.Content ?? string.Empty,
+                    item.Score is { } score ? checked((int)Math.Round(score * 1000)) : maximumResults - index)).ToArray();
+                return JsonSerializer.SerializeToElement(new AssistantDocumentationSearchResult(
+                    matches.Length == 0 ? "no-match" : "available", query, matches), JsonOptions);
+            }
+            catch (KnowledgeRetrievalException)
+            {
+                return JsonSerializer.SerializeToElement(
+                    new AssistantDocumentationSearchResult("unavailable", query, []), JsonOptions);
+            }
+        }
+
+        return JsonSerializer.SerializeToElement(await catalog.SearchAsync(query, maximumResults, cancellationToken), JsonOptions);
     }
 }

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Resources;
@@ -27,7 +28,12 @@ public abstract class ArtifactBrokerInternalTool(ArtifactManagementService artif
     protected static DateTimeOffset? OptionalTimestamp(JsonElement arguments, string name) =>
         OptionalString(arguments, name) is { } value ? DateTimeOffset.Parse(value, System.Globalization.CultureInfo.InvariantCulture) : null;
     protected static ArtifactValidationException Error(string code, string message) => new(code, message);
-    protected static JsonElement View(StagedArtifactResource value) => JsonSerializer.SerializeToElement(ArtifactViews.Staged(value));
+    protected static JsonElement View(StagedArtifactResource value)
+    {
+        var view = JsonSerializer.SerializeToNode(ArtifactViews.Staged(value))!.AsObject();
+        view["artifactReference"] = value.ArtifactId.ToString();
+        return JsonSerializer.SerializeToElement(view);
+    }
 }
 
 public sealed class StagedArtifactCreateMcpTool(ArtifactManagementService artifacts) : ArtifactBrokerInternalTool(artifacts)

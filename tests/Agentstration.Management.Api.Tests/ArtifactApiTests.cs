@@ -373,27 +373,40 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
             services.AddSingleton<IArtifactStagingToolExecutor>(backend);
         }));
         var context = await GetBootstrapContextAsync(factory);
-        using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var requestScopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
-        var created = await service.CreateStagedAsync(new("expiry.bin", "application/octet-stream",
-            new ArtifactProducer { Kind = ArtifactProducerKind.Tool, Id = "tool" }, ExpiresAt: clock.GetUtcNow().AddMinutes(1)), default);
-        _ = await service.WriteAsync(created.Value.ArtifactId, 0, new byte[] { 4, 5, 6 }, default);
-        _ = await service.SealAsync(created.Value.ArtifactId, default);
+        StoredResource<StagedArtifactResource> created;
+        using (requestScopes.Push(context))
+        {
+            created = await service.CreateStagedAsync(new("expiry.bin", "application/octet-stream",
+                new ArtifactProducer { Kind = ArtifactProducerKind.Tool, Id = "tool" }, ExpiresAt: clock.GetUtcNow().AddMinutes(1)), default);
+            _ = await service.WriteAsync(created.Value.ArtifactId, 0, new byte[] { 4, 5, 6 }, default);
+            _ = await service.SealAsync(created.Value.ArtifactId, default);
+        }
         clock.Advance(TimeSpan.FromMinutes(2));
         backend.FailNextDelete = true;
 
-        Assert.AreEqual(0, await service.ExpireAndPurgeAsync(10, default));
-        var failed = await service.GetStagedAsync(created.Value.ArtifactId, null, ArtifactLeaseOperation.Inspect, default);
-        Assert.AreEqual(StagedArtifactStatus.Expired, failed?.Value.ArtifactStatus);
-        Assert.AreEqual("staged_artifact_backend_delete_failed", failed?.Value.FailureCode);
-        Assert.AreEqual(1, await service.ExpireAndPurgeAsync(10, default));
-        var purged = await service.GetStagedAsync(created.Value.ArtifactId, null, ArtifactLeaseOperation.Inspect, default);
-        Assert.AreEqual(StagedArtifactStatus.Purged, purged?.Value.ArtifactStatus);
+        using (requestScopes.PushSystem())
+            Assert.AreEqual(0, await service.ExpireAndPurgeAsync(10, default));
+        using (requestScopes.Push(context))
+        {
+            var failed = await service.GetStagedAsync(created.Value.ArtifactId, null, ArtifactLeaseOperation.Inspect, default);
+            Assert.AreEqual(StagedArtifactStatus.Expired, failed?.Value.ArtifactStatus);
+            Assert.AreEqual("staged_artifact_backend_delete_failed", failed?.Value.FailureCode);
+        }
+        using (requestScopes.PushSystem())
+            Assert.AreEqual(1, await service.ExpireAndPurgeAsync(10, default));
+        using (requestScopes.Push(context))
+        {
+            var purged = await service.GetStagedAsync(created.Value.ArtifactId, null, ArtifactLeaseOperation.Inspect, default);
+            Assert.AreEqual(StagedArtifactStatus.Purged, purged?.Value.ArtifactStatus);
+        }
 
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        _ = await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-            await service.ExpireAndPurgeAsync(10, cancellation.Token));
+        using (requestScopes.PushSystem())
+            _ = await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+                await service.ExpireAndPurgeAsync(10, cancellation.Token));
     }
 
     private static InternalMcpToolInvocation Invocation(RequestContext context, JsonElement arguments, string runId) => new(
