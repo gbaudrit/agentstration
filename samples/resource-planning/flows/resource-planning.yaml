@@ -64,7 +64,9 @@ definition:
       - type: output
         name: clarification
         displayName: Clarification required
+        outcome: success
         outputMapping: { status: blocked, diagnostics: "${steps.consolidate.output.diagnostics}", draft: "${steps.consolidate.output.plan}" }
+        schema: { type: object, additionalProperties: true }
       - type: tool
         name: create-plan
         displayName: Create governed Resource Plan
@@ -85,27 +87,43 @@ definition:
         tool: { resourceId: agentstration.resource-planning.plan.materialize }
         argumentsMapping: { planId: "${steps.create-plan.output.plan.id.value}" }
       - type: output
-        name: output
+        name: completed
         displayName: Plan ready for binding selection and review
+        outcome: success
         outputMapping:
           status: ready-for-review
           plan: "${steps.submit-plan.output.plan}"
           materialization: "${steps.materialize-plan.output}"
+        schema: { type: object, additionalProperties: true }
+      - type: output
+        name: error
+        displayName: Resource planning failed
+        outcome: error
+        code: RESOURCE_PLANNING_FAILED
+        message: Resource planning could not be completed.
+        outputMapping: "${transition.output}"
+        schema: { type: object, additionalProperties: true }
     transitions:
       - { id: input-to-intent, fromStep: input, event: completed, toStep: analyze-intent }
       - { id: intent-to-capabilities, fromStep: analyze-intent, event: completed, toStep: design-capabilities }
+      - { id: intent-error, fromStep: analyze-intent, event: error, toStep: error }
       - { id: capabilities-to-workflows, fromStep: design-capabilities, event: completed, toStep: design-workflows }
+      - { id: capabilities-error, fromStep: design-capabilities, event: error, toStep: error }
       - { id: workflows-to-integrations, fromStep: design-workflows, event: completed, toStep: design-integrations }
+      - { id: workflows-error, fromStep: design-workflows, event: error, toStep: error }
       - { id: integrations-to-experiences, fromStep: design-integrations, event: completed, toStep: design-experiences }
+      - { id: integrations-error, fromStep: design-integrations, event: error, toStep: error }
       - { id: experiences-to-consolidate, fromStep: design-experiences, event: completed, toStep: consolidate }
+      - { id: experiences-error, fromStep: design-experiences, event: error, toStep: error }
       - { id: consolidate-to-ready, fromStep: consolidate, event: completed, toStep: ready }
+      - { id: consolidate-error, fromStep: consolidate, event: error, toStep: error }
       - { id: blocked-to-clarification, fromStep: ready, event: "false", toStep: clarification }
       - { id: ready-to-create, fromStep: ready, event: "true", toStep: create-plan }
       - { id: create-to-submit, fromStep: create-plan, event: success, toStep: submit-plan }
+      - { id: create-error, fromStep: create-plan, event: error, toStep: error }
       - { id: submit-to-materialize, fromStep: submit-plan, event: success, toStep: materialize-plan }
-      - { id: materialize-to-output, fromStep: materialize-plan, event: success, toStep: output }
-    outputSchema:
-      type: object
-      additionalProperties: true
+      - { id: submit-error, fromStep: submit-plan, event: error, toStep: error }
+      - { id: materialize-to-completed, fromStep: materialize-plan, event: success, toStep: completed }
+      - { id: materialize-error, fromStep: materialize-plan, event: error, toStep: error }
   publish: true
   activate: true

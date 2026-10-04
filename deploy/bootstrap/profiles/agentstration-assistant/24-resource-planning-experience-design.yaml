@@ -12,9 +12,11 @@ definition:
     steps:
       - { type: input, name: input, displayName: Workflow and audience evidence }
       - { type: agent, name: design, displayName: Design experiences, agent: { resourceId: resource-planning-experience-designer, namespace: agentstration.resource-planning }, inputMapping: "${input}" }
-      - { type: output, name: output, displayName: Experience intents, outputMapping: "${steps.design.output}" }
+      - { type: output, name: completed, displayName: Experience intents, outcome: success, outputMapping: "${steps.design.output}" }
+      - { type: output, name: error, displayName: Experience design failed, outcome: error, code: RESOURCE_PLANNING_AGENT_FAILED, message: The experience design Agent failed., outputMapping: "${transition.output}" }
     transitions:
       - { id: input-to-design, fromStep: input, event: completed, toStep: design }
-      - { id: design-to-output, fromStep: design, event: success, toStep: output }
+      - { id: design-completed, fromStep: design, event: success, toStep: completed }
+      - { id: design-error, fromStep: design, event: error, toStep: error }
   publish: true
   activate: true

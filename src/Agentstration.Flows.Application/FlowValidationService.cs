@@ -67,7 +67,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         {
             if (!NamePattern().IsMatch(step.Name)) issues.Add(Error("step_name_invalid", "Step names must contain letters, digits, '-' or '_'.", step.Name, property: "name"));
             if (!steps.TryAdd(step.Name, step)) issues.Add(Error("step_name_duplicate", $"Step '{step.Name}' is duplicated.", step.Name));
-            await ValidateStepAsync(step, context, issues, cancellationToken);
+            await ValidateStepAsync(step, definition.Transitions, context, issues, cancellationToken);
         }
 
         if (!steps.ContainsKey(definition.EntryStep)) issues.Add(Error("entry_step_unknown", "The entry step does not exist.", property: "entryStep"));
@@ -108,7 +108,12 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         return new FlowValidationResult(issues);
     }
 
-    private async Task ValidateStepAsync(FlowStepDefinition step, FlowValidationContext context, List<FlowValidationIssue> issues, CancellationToken token)
+    private async Task ValidateStepAsync(
+        FlowStepDefinition step,
+        IReadOnlyList<FlowTransitionDefinition> transitions,
+        FlowValidationContext context,
+        List<FlowValidationIssue> issues,
+        CancellationToken token)
     {
         switch (step)
         {
@@ -137,7 +142,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 else ValidateJsonExpressions(transform.Mapping, issues, step.Name, "mapping");
                 break;
             case FlowCallStepDefinition flowCall:
-                await ValidateFlowCallAsync(flowCall, context, issues, token);
+                await ValidateFlowCallAsync(flowCall, transitions, context, issues, token);
                 break;
             case ToolFlowStepDefinition tool:
                 await ValidateToolAsync(tool, context, issues, token);
@@ -190,6 +195,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
 
     private async Task ValidateFlowCallAsync(
         FlowCallStepDefinition step,
+        IReadOnlyList<FlowTransitionDefinition> transitions,
         FlowValidationContext context,
         List<FlowValidationIssue> issues,
         CancellationToken token)
@@ -223,6 +229,17 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         foreach (var output in target.Outputs ?? [])
             if (!ValidContractSchema(output.Schema))
                 issues.Add(Error("flow_output_schema_invalid", $"Named output '{output.Name}' has an invalid or unsupported schema.", step.Name, property: $"flow.outputs.{output.Name}.schema"));
+        if (target.Outputs is { Count: > 0 })
+        {
+            var outputNames = target.Outputs.Select(output => output.Name).ToHashSet(StringComparer.Ordinal);
+            foreach (var transition in transitions.Where(transition => transition.FromStep == step.Name && !outputNames.Contains(transition.Event)))
+                issues.Add(Error(
+                    "transition_event_invalid",
+                    $"Flow step '{step.Name}' does not expose named output '{transition.Event}'.",
+                    step.Name,
+                    transition.Id,
+                    "event"));
+        }
         ValidateMappingAgainstSchema(step, target.InputSchema, issues);
         if (await resources.CreatesFlowCycleAsync(context.WorkspaceId.Value, context.OwnerFlowId.Value, target, token))
             issues.Add(Error("flow_dependency_cycle", $"Calling Flow '{target.FlowId}' would create a direct or indirect dependency cycle.", step.Name, property: "flow"));

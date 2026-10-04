@@ -63,25 +63,23 @@ definition:
         displayName: Clarification
         flow: { resourceId: assistant-fallback, namespace: agentstration.assistant, versionStrategy: active }
         inputMapping: "${input}"
-      - { type: output, name: output, displayName: Assistant response }
-      - { type: failure, name: failure, displayName: Capability failure, code: ASSISTANT_CAPABILITY_FAILED, message: The selected Assistant capability could not complete. }
+      - { type: output, name: completed, displayName: Assistant response, outcome: success, outputMapping: "${transition.output}", schema: { type: object, additionalProperties: true } }
+      - { type: output, name: error, displayName: Capability failure, outcome: error, code: ASSISTANT_CAPABILITY_FAILED, message: The selected Assistant capability could not complete., outputMapping: "${transition.output}", schema: { type: object, additionalProperties: true } }
     transitions:
       - { id: input-to-route, fromStep: input, event: completed, toStep: route }
       - { id: route-to-help, fromStep: route, event: selected, toStep: help, condition: "${steps.route.output.selectedRoute == 'help'}", priority: 10 }
       - { id: route-to-diagnostics, fromStep: route, event: selected, toStep: diagnostics, condition: "${steps.route.output.selectedRoute == 'diagnostics'}", priority: 20 }
       - { id: route-to-planning, fromStep: route, event: selected, toStep: resource-planning, condition: "${steps.route.output.selectedRoute == 'resource-planning'}", priority: 30 }
       - { id: route-to-fallback, fromStep: route, event: selected, toStep: fallback, condition: "${steps.route.output.selectedRoute == 'fallback'}", priority: 40 }
-      - { id: route-failed, fromStep: route, event: failed, toStep: failure }
-      - { id: help-completed, fromStep: help, event: completed, toStep: output }
-      - { id: help-failed, fromStep: help, event: failed, toStep: failure }
-      - { id: diagnostics-completed, fromStep: diagnostics, event: completed, toStep: output }
-      - { id: diagnostics-failed, fromStep: diagnostics, event: failed, toStep: failure }
-      - { id: planning-completed, fromStep: resource-planning, event: completed, toStep: output }
-      - { id: planning-failed, fromStep: resource-planning, event: failed, toStep: failure }
-      - { id: fallback-completed, fromStep: fallback, event: completed, toStep: output }
-      - { id: fallback-failed, fromStep: fallback, event: failed, toStep: failure }
-    outputSchema:
-      type: object
-      additionalProperties: true
+      - { id: route-failed, fromStep: route, event: failed, toStep: error }
+      - { id: help-completed, fromStep: help, event: completed, toStep: completed }
+      - { id: help-error, fromStep: help, event: error, toStep: error }
+      - { id: diagnostics-completed, fromStep: diagnostics, event: completed, toStep: completed }
+      - { id: diagnostics-error, fromStep: diagnostics, event: error, toStep: error }
+      - { id: planning-completed, fromStep: resource-planning, event: completed, toStep: completed }
+      - { id: planning-clarification, fromStep: resource-planning, event: clarification, toStep: completed }
+      - { id: planning-error, fromStep: resource-planning, event: error, toStep: error }
+      - { id: fallback-completed, fromStep: fallback, event: completed, toStep: completed }
+      - { id: fallback-error, fromStep: fallback, event: error, toStep: error }
   publish: true
   activate: true

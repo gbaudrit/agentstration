@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Agentstration.Flows;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Web.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -9,6 +11,8 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class OfficialAssistantBootstrapProfileTests
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     [TestMethod]
     public async Task ProfileDeclaresOrderedOrdinaryAssistantResources()
     {
@@ -52,8 +56,45 @@ public sealed class OfficialAssistantBootstrapProfileTests
         var planningStep = router.Definition.GetProperty("graph").GetProperty("steps")
             .EnumerateArray().Single(value => value.TryGetProperty("name", out var name) && name.GetString() == "resource-planning");
         Assert.AreEqual("agentstration.resource-planning", planningStep.GetProperty("flow").GetProperty("namespace").GetString());
+        AssertFlowTransitionsMatchDeclaredOutputs(resources);
         var entry = resources.Single(value => value.Kind == "Entry" && value.Metadata.Name == "ask-agentstration");
         Assert.AreEqual("agentstration.assistant", entry.Definition.GetProperty("binding").GetProperty("namespace").GetString());
+    }
+
+    private static void AssertFlowTransitionsMatchDeclaredOutputs(IReadOnlyCollection<BootstrapResourceDocument> resources)
+    {
+        var flows = resources
+            .Where(resource => resource.Kind == "Flow")
+            .Select(resource => new
+            {
+                Id = $"{resource.Metadata.Namespace.Value}/{resource.Metadata.Name}",
+                Namespace = resource.Metadata.Namespace,
+                Graph = resource.Definition.GetProperty("graph").Deserialize<FlowGraphDefinition>(JsonOptions)
+                    ?? throw new InvalidOperationException($"Flow '{resource.Metadata.Name}' graph could not be deserialized.")
+            })
+            .ToArray();
+        var outputsByFlow = flows.ToDictionary(
+            flow => flow.Id,
+            flow => flow.Graph.GetOutputs().Select(output => output.Name).ToHashSet(StringComparer.Ordinal),
+            StringComparer.Ordinal);
+
+        foreach (var flow in flows)
+        {
+            var graph = flow.Graph;
+            Assert.IsFalse(graph.Steps.OfType<FailureFlowStepDefinition>().Any(), $"Flow '{flow.Id}' still uses a legacy failure terminal.");
+            Assert.IsTrue(
+                graph.Steps.OfType<OutputFlowStepDefinition>().All(output => output.Outcome is not null),
+                $"Every output in Flow '{flow.Id}' must declare its outcome.");
+
+            foreach (var call in graph.Steps.OfType<FlowCallStepDefinition>())
+            {
+                var targetNamespace = call.Flow.Namespace ?? flow.Namespace;
+                var targetId = $"{targetNamespace.Value}/{call.Flow.ResourceId}";
+                Assert.IsTrue(outputsByFlow.TryGetValue(targetId, out var outputNames), $"FlowCall '{flow.Id}/{call.Name}' targets unknown Flow '{targetId}'.");
+                foreach (var transition in graph.Transitions.Where(transition => transition.FromStep == call.Name))
+                    Assert.IsTrue(outputNames.Contains(transition.Event), $"Transition '{flow.Id}/{transition.Id}' uses undeclared output '{transition.Event}' from '{targetId}'.");
+            }
+        }
     }
 
     private static string FindRepositoryRoot()

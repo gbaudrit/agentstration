@@ -190,6 +190,33 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task FlowCallValidationRejectsTransitionsThatDoNotMatchNamedOutputs()
+    {
+        var outputs = new[]
+        {
+            new FlowOutputDefinition("completed", "Completed", FlowOutputOutcome.Success, null),
+            new FlowOutputDefinition("error", "Error", FlowOutputOutcome.Error, null)
+        };
+        var resolver = new FlowCallResolverStub(new(new("analysis"), "3.0.0", null, null, outputs));
+        var graph = Graph(new FlowCallStepDefinition { Name = "analyze", Flow = new("analysis") });
+        graph = graph with
+        {
+            Transitions = graph.Transitions
+                .Select(transition => transition.FromStep == "analyze" ? transition with { Event = "failed" } : transition)
+                .ToArray()
+        };
+
+        var result = await new FlowGraphValidator(resolver).ValidateAsync(
+            graph,
+            new FlowValidationContext(true, TestScope.WorkspaceId, new("parent")),
+            default);
+
+        var issue = result.Issues.Single(issue => issue.Code == "transition_event_invalid");
+        Assert.AreEqual("call-output", issue.TransitionId);
+        Assert.AreEqual("analyze", issue.StepId);
+    }
+
+    [TestMethod]
     public async Task RepositoryResolverFindsNamespacedPublishedVersionsAndIndirectCycles()
     {
         await using var fixture = await FlowFixture.CreateAsync();
