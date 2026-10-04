@@ -92,7 +92,11 @@ public sealed class KnowledgeSourceEditorTests
             Assert.IsEmpty(rendered.FindAll("[data-testid='knowledge-acquisitions']"));
             Assert.AreEqual("/flows/knowledge-ingestion-builtin", rendered.Find("[data-testid='knowledge-ingestion-flow-link']").GetAttribute("href"));
             Assert.AreEqual("/flows/knowledge-retrieval-builtin", rendered.Find("[data-testid='knowledge-retrieval-flow-link']").GetAttribute("href"));
-            Assert.IsTrue(rendered.Find("[data-testid='knowledge-ingestion-flow-link']").ClassList.Contains("knowledge-flow-link"));
+            Assert.IsTrue(rendered.Find("[data-testid='knowledge-ingestion-flow-link']").ClassList.Contains("knowledge-flow-card"));
+            var profileLink = rendered.Find("[data-testid='knowledge-source-profile-link']");
+            Assert.AreEqual("/knowledge-source-profiles/web", profileLink.GetAttribute("href"));
+            StringAssert.Contains(profileLink.TextContent, "web");
+            StringAssert.Contains(profileLink.TextContent, "1.0.0");
             Assert.AreEqual("Delete", rendered.Find("[data-testid='knowledge-source-delete']").TextContent);
             Assert.IsEmpty(rendered.FindAll("a[href$='/edit']"));
         });
@@ -167,6 +171,9 @@ public sealed class KnowledgeSourceEditorTests
             Assert.AreEqual("agentstration-documentation", technicalName.GetAttribute("value"));
             Assert.IsTrue(technicalName.HasAttribute("readonly"));
             Assert.IsTrue(technicalName.HasAttribute("disabled"));
+            var profileOption = rendered.Find("[data-testid='knowledge-source-definition-profile'] option[value='default|web']");
+            Assert.AreEqual("Web (1.0.0)", profileOption.TextContent);
+            Assert.IsFalse(profileOption.TextContent.Contains("??", StringComparison.Ordinal));
         });
 
         rendered.Find("[data-testid='knowledge-source-definition-display-name']").Change("Updated documentation");
@@ -290,6 +297,19 @@ public sealed class KnowledgeSourceEditorTests
         }
     };
 
+    private static ResolvedKnowledgeSourceProfile ExistingResolvedProfile() => new()
+    {
+        Name = "web",
+        Namespace = ResourceNamespace.Default,
+        Uid = Guid.NewGuid(),
+        Generation = 1,
+        Version = "1.0.0",
+        DefinitionHash = "profile-definition-hash",
+        ConfigurationSchema = JsonSerializer.SerializeToElement(new { type = "object" }),
+        IngestionFlow = new ResolvedKnowledgeFlowBinding("knowledge-ingestion-builtin", ResourceNamespace.Default, "1.0.0", true, IngestionInputSchema(), null, KnowledgeFlowContracts.Ingestion),
+        RetrievalFlow = new ResolvedKnowledgeFlowBinding("knowledge-retrieval-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Retrieval)
+    };
+
     private static KnowledgeAcquisitionResource ExistingAcquisition() => new()
     {
         ApiVersion = ResourceApiVersions.CoreV1,
@@ -353,7 +373,8 @@ public sealed class KnowledgeSourceEditorTests
             Task.FromResult(new KnowledgeSourceReadiness(true, true,
                 new ResolvedKnowledgeFlowBinding("knowledge-ingestion-builtin", ResourceNamespace.Default, "1.0.0", true, IngestionInputSchema(), null, KnowledgeFlowContracts.Ingestion),
                 new ResolvedKnowledgeFlowBinding("knowledge-retrieval-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Retrieval),
-                []));
+                [],
+                ExistingResolvedProfile()));
         public Task<KnowledgeSourceToolExposureResource?> GetExposureAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(exposure);
         public Task<ResourceSnapshot<KnowledgeSourceToolExposureResource>> PublishExposureAsync(ResourceNamespace @namespace, string name, PublishKnowledgeSourceToolExposureRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<KnowledgeAcquisitionResource>> GetAcquisitionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(acquisitions ?? []);
