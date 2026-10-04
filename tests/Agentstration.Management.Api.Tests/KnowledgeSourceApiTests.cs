@@ -1040,6 +1040,195 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         Assert.AreEqual(1, stored.Value.Generation);
     }
 
+    [TestMethod]
+    public async Task KnowledgeSourceProfilePublishesImmutableRevisionsAndSharedSourcesFollowActivation()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        await CreatePublishedIngestionFlowAsync(factory.Services, context, "profile-ingest", null);
+        await CreatePublishedRetrievalFlowAsync(factory.Services, context, "profile-retrieve");
+        using var client = factory.CreateClient();
+        var schema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { url = new { type = "string" } },
+            required = new[] { "url" },
+            additionalProperties = false
+        });
+
+        using var createdProfileResponse = await client.PostAsJsonAsync("/api/knowledgesourceprofiles",
+            new CreateKnowledgeSourceProfileRequest("web", new KnowledgeSourceProfileProperties
+            {
+                DisplayName = "Web",
+                Version = "1.0.0",
+                Publish = true,
+                ConfigurationSchema = schema,
+                IngestionFlow = new() { Name = "profile-ingest" },
+                RetrievalFlow = new() { Name = "profile-retrieve" }
+            }));
+        Assert.AreEqual(HttpStatusCode.Created, createdProfileResponse.StatusCode);
+        var profile = await createdProfileResponse.Content.ReadFromJsonAsync<KnowledgeSourceProfileResource>();
+        Assert.AreEqual("1.0.0", profile!.ActiveVersion);
+
+        using var sourceResponse = await client.PostAsJsonAsync("/api/knowledgesources",
+            new CreateKnowledgeSourceRequest("docs", new KnowledgeSourceProperties
+            {
+                DisplayName = "Docs",
+                Profile = new("web"),
+                AcquisitionConfiguration = JsonSerializer.SerializeToElement(new { url = "https://example.test" })
+            }));
+        Assert.AreEqual(HttpStatusCode.Created, sourceResponse.StatusCode);
+        var source = await sourceResponse.Content.ReadFromJsonAsync<KnowledgeSourceResource>();
+        var readiness = await client.GetFromJsonAsync<KnowledgeSourceReadiness>("/api/knowledgesources/docs/readiness");
+        Assert.AreEqual("1.0.0", readiness!.Profile!.Version);
+        Assert.AreEqual("profile-ingest", readiness.Ingestion!.Name);
+        using var firstAcquisitionResponse = await client.PostAsJsonAsync("/api/knowledgesources/docs/acquisitions",
+            new StartKnowledgeAcquisitionRequest());
+        Assert.AreEqual(HttpStatusCode.Accepted, firstAcquisitionResponse.StatusCode);
+        var firstAcquisition = await firstAcquisitionResponse.Content.ReadFromJsonAsync<KnowledgeAcquisitionResource>();
+        Assert.AreEqual("1.0.0", firstAcquisition!.Profile!.Version);
+        using var cancelledResponse = await client.PostAsync(
+            $"/api/knowledgeacquisitions/{firstAcquisition.Name}/cancel", null);
+        Assert.AreEqual(HttpStatusCode.OK, cancelledResponse.StatusCode);
+
+        using var update = new HttpRequestMessage(HttpMethod.Put, "/api/knowledgesourceprofiles/web")
+        {
+            Content = JsonContent.Create(new PutKnowledgeSourceProfileRequest(profile.Definition with
+            {
+                Version = "2.0.0",
+                Publish = true
+            }))
+        };
+        update.Headers.IfMatch.Add(createdProfileResponse.Headers.ETag!);
+        using var updatedResponse = await client.SendAsync(update);
+        Assert.AreEqual(HttpStatusCode.OK, updatedResponse.StatusCode);
+        var updated = await updatedResponse.Content.ReadFromJsonAsync<KnowledgeSourceProfileResource>();
+        Assert.AreEqual("2.0.0", updated!.ActiveVersion);
+        readiness = await client.GetFromJsonAsync<KnowledgeSourceReadiness>("/api/knowledgesources/docs/readiness");
+        Assert.AreEqual("2.0.0", readiness!.Profile!.Version);
+        Assert.AreEqual(source!.Generation, (await client.GetFromJsonAsync<KnowledgeSourceResource>("/api/knowledgesources/docs"))!.Generation);
+        using var secondAcquisitionResponse = await client.PostAsJsonAsync("/api/knowledgesources/docs/acquisitions",
+            new StartKnowledgeAcquisitionRequest());
+        Assert.AreEqual(HttpStatusCode.Accepted, secondAcquisitionResponse.StatusCode);
+        var secondAcquisition = await secondAcquisitionResponse.Content.ReadFromJsonAsync<KnowledgeAcquisitionResource>();
+        Assert.AreEqual("2.0.0", secondAcquisition!.Profile!.Version);
+        var acquisitions = await client.GetFromJsonAsync<KnowledgeAcquisitionResource[]>(
+            "/api/knowledgesources/docs/acquisitions");
+        Assert.AreEqual("1.0.0", acquisitions!.Single(value => value.Uid == firstAcquisition.Uid).Profile!.Version);
+
+        var revisions = await client.GetFromJsonAsync<KnowledgeSourceProfileRevisionResource[]>(
+            "/api/knowledgesourceprofiles/web/revisions");
+        Assert.HasCount(2, revisions!);
+        Assert.AreNotEqual(revisions![0].DefinitionHash, string.Empty);
+    }
+
+    [TestMethod]
+    public async Task KnowledgeSourceProfileApplicationPreviewsConfigurationDefaultsAndPreservesTargetIdentity()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        await CreatePublishedIngestionFlowAsync(factory.Services, context, "apply-ingest", null);
+        await CreatePublishedRetrievalFlowAsync(factory.Services, context, "apply-retrieve");
+        var service = factory.Services.GetRequiredService<KnowledgeSourceProfileService>();
+        var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var originalSchema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { baseUrl = new { type = "string" } },
+            required = new[] { "baseUrl" },
+            additionalProperties = false
+        });
+        var replacementSchema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new
+            {
+                baseUrl = new { type = "string" },
+                endpoint = new { type = "string" }
+            },
+            required = new[] { "endpoint" },
+            additionalProperties = false
+        });
+        _ = await service.CreateAsync(Profile("web", "Shared Web", originalSchema, scope), default);
+        _ = await service.CreateAsync(Profile("provider-web", "Provider Web", replacementSchema, scope), default);
+        var sources = factory.Services.GetRequiredService<KnowledgeSourceManagementService>();
+        _ = await sources.CreateAsync(new KnowledgeSourceResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeSource,
+            Metadata = new() { Name = "shared-docs" },
+            ScopeRef = scope,
+            Definition = new()
+            {
+                DisplayName = "Shared docs",
+                Profile = new("web"),
+                AcquisitionConfiguration = JsonSerializer.SerializeToElement(new { baseUrl = "https://example.test" })
+            }
+        }, default);
+        using var client = factory.CreateClient();
+        var request = new PreviewKnowledgeSourceProfileApplicationRequest
+        {
+            SourceProfile = new("provider-web"),
+            SourceVersion = "1.0.0",
+            TargetVersion = "2.0.0"
+        };
+        using var incompatible = await client.PostAsJsonAsync("/api/knowledgesourceprofiles/web/application-plan", request);
+        var incompatiblePlan = await incompatible.Content.ReadFromJsonAsync<KnowledgeSourceProfileApplicationPlan>();
+        Assert.IsFalse(incompatiblePlan!.Ready);
+        Assert.IsFalse(incompatiblePlan.Sources.Single().Compatible);
+
+        var compatibleRequest = request with
+        {
+            ConfigurationDefaults = JsonSerializer.SerializeToElement(new { endpoint = "https://replacement.test" })
+        };
+        var compatiblePlan = await (await client.PostAsJsonAsync(
+            "/api/knowledgesourceprofiles/web/application-plan", compatibleRequest))
+            .Content.ReadFromJsonAsync<KnowledgeSourceProfileApplicationPlan>();
+        Assert.IsTrue(compatiblePlan!.Ready);
+        Assert.Contains("$.endpoint", compatiblePlan.Sources.Single().AppliedDefaults);
+
+        var target = await service.GetAsync(default, "web", default);
+        using var apply = new HttpRequestMessage(HttpMethod.Post, "/api/knowledgesourceprofiles/web/applications")
+        {
+            Content = JsonContent.Create(compatibleRequest)
+        };
+        apply.Headers.TryAddWithoutValidation("If-Match", target!.ETag);
+        using var appliedResponse = await client.SendAsync(apply);
+        var applicationFailure = appliedResponse.IsSuccessStatusCode
+            ? null
+            : await appliedResponse.Content.ReadAsStringAsync();
+        Assert.AreEqual(HttpStatusCode.Created, appliedResponse.StatusCode, applicationFailure);
+        var applied = await appliedResponse.Content.ReadFromJsonAsync<KnowledgeSourceProfileRevisionResource>();
+        Assert.AreEqual("web", applied!.ProfileName);
+        Assert.AreEqual("provider-web", applied.Definition.AppliedFrom!.ProfileName);
+        var migratedSource = await sources.GetAsync(new("shared-docs"), default);
+        Assert.AreEqual("https://replacement.test",
+            migratedSource!.Value.Definition.AcquisitionConfiguration.GetProperty("endpoint").GetString());
+    }
+
+    private static KnowledgeSourceProfileResource Profile(
+        string name,
+        string displayName,
+        JsonElement schema,
+        ResourceScopeRef scope) => new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeSourceProfile,
+            Metadata = new() { Name = name },
+            ScopeRef = scope,
+            Definition = new()
+            {
+                DisplayName = displayName,
+                Version = "1.0.0",
+                Publish = true,
+                ConfigurationSchema = schema,
+                IngestionFlow = new() { Name = "apply-ingest" },
+                RetrievalFlow = new() { Name = "apply-retrieve" }
+            }
+        };
+
     private static KnowledgeSourceProperties Properties(
         string displayName,
         string ingestion,

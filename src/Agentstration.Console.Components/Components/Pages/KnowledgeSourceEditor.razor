@@ -2,6 +2,7 @@
 @page "/knowledge-sources/{Name}/edit"
 @implements IDisposable
 @inject IKnowledgeSourcesClient Client
+@inject IKnowledgeSourceProfilesClient Profiles
 @inject IFlowApiClient Flows
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
@@ -23,8 +24,12 @@ else
                 <label><span>@T("Namespace")</span><input @bind="sourceNamespace" maxlength="128" /></label>
             }
             <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="description" maxlength="2000"></textarea></label>
-            <label><span>@T("IngestionFlow")</span><select @bind="ingestionKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select></label>
-            <label><span>@T("RetrievalFlow")</span><select @bind="retrievalKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select></label>
+            <label><span>@T("Profile")</span><select @bind="profileKey"><option value="">@T("LegacyDirectFlows")</option>@foreach (var profile in profiles) { <option value="@Key(profile.Namespace, profile.Name)">@profile.Definition.DisplayName (@profile.ActiveVersion ?? T("Draft"))</option> }</select></label>
+            @if (string.IsNullOrWhiteSpace(profileKey))
+            {
+                <label><span>@T("IngestionFlow")</span><select @bind="ingestionKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select></label>
+                <label><span>@T("RetrievalFlow")</span><select @bind="retrievalKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select></label>
+            }
             <label class="checkbox-row"><input type="checkbox" @bind="enabled" /><span>@T("Enabled")</span></label>
         </div>
         <p class="resource-hint">@T("FlowCompatibilityHelp")</p>
@@ -37,8 +42,9 @@ else
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<FlowSummary> flows = [];
+    private IReadOnlyList<KnowledgeSourceProfileResource> profiles = [];
     private string technicalName = string.Empty, sourceNamespace = "default", displayName = string.Empty,
-        description = string.Empty, ingestionKey = string.Empty, retrievalKey = string.Empty;
+        description = string.Empty, ingestionKey = string.Empty, retrievalKey = string.Empty, profileKey = string.Empty;
     private string? etag, message;
     private System.Text.Json.JsonElement acquisitionConfiguration = System.Text.Json.JsonSerializer.SerializeToElement(new { });
     private bool enabled, busy, loading = true;
@@ -53,7 +59,11 @@ else
         message = null;
         try
         {
-            flows = await Flows.GetFlowsAsync(cancellation.Token);
+            var flowsTask = Flows.GetFlowsAsync(cancellation.Token);
+            var profilesTask = Profiles.GetAsync(cancellation.Token);
+            await Task.WhenAll(flowsTask, profilesTask);
+            flows = await flowsTask;
+            profiles = await profilesTask;
             if (!IsNew)
             {
                 var snapshot = await Client.GetAsync(ExistingNamespace, Name!, cancellation.Token);
@@ -65,6 +75,7 @@ else
                 acquisitionConfiguration = snapshot.Value.Definition.AcquisitionConfiguration.Clone();
                 ingestionKey = TargetKey(snapshot.Value.Definition.IngestionFlow);
                 retrievalKey = TargetKey(snapshot.Value.Definition.RetrievalFlow);
+                profileKey = ReferenceKey(snapshot.Value.Definition.Profile, snapshot.Value.Namespace);
             }
         }
         catch (Exception exception) { message = exception.Message; }
@@ -84,8 +95,9 @@ else
                 Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
                 Enabled = enabled,
                 AcquisitionConfiguration = acquisitionConfiguration.Clone(),
-                IngestionFlow = Target(ingestionKey),
-                RetrievalFlow = Target(retrievalKey)
+                Profile = Reference(profileKey),
+                IngestionFlow = string.IsNullOrWhiteSpace(profileKey) ? Target(ingestionKey) : null,
+                RetrievalFlow = string.IsNullOrWhiteSpace(profileKey) ? Target(retrievalKey) : null
             };
             var saved = IsNew
                 ? await Client.CreateAsync(new CreateKnowledgeSourceRequest(technicalName.Trim(), properties, sourceNamespace.Trim()), cancellation.Token)
@@ -99,6 +111,12 @@ else
 
     private static string Key(ResourceNamespace ns, string name) => $"{ns.Value}|{name}";
     private static string TargetKey(KnowledgeFlowTarget? target) => target is null ? string.Empty : Key(target.Namespace ?? ResourceNamespace.Default, target.Name);
+    private static string ReferenceKey(ResourceReference? reference, ResourceNamespace owner) => reference is null ? string.Empty : Key(reference.Namespace ?? owner, reference.Name);
+    private static ResourceReference? Reference(string key)
+    {
+        var parts = key.Split('|', 2);
+        return parts.Length != 2 ? null : new ResourceReference(parts[1], null, ResourceNamespace.Parse(parts[0]));
+    }
     private static KnowledgeFlowTarget? Target(string key)
     {
         var parts = key.Split('|', 2);

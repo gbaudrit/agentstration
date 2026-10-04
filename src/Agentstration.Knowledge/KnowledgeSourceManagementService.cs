@@ -25,10 +25,16 @@ public interface IKnowledgeFlowResolver
         CancellationToken cancellationToken);
 }
 
+public sealed record ResolvedKnowledgeSourceComposition(
+    ResolvedKnowledgeFlowBinding Ingestion,
+    ResolvedKnowledgeFlowBinding Retrieval,
+    ResolvedKnowledgeSourceProfile? Profile);
+
 public sealed class KnowledgeSourceManagementService(
     IResourceStore store,
     IResourceScopeOperations scopeOperations,
     IKnowledgeFlowResolver flows,
+    KnowledgeSourceProfileService profiles,
     ISecurityAuditWriter audit,
     TimeProvider timeProvider)
 {
@@ -219,10 +225,14 @@ public sealed class KnowledgeSourceManagementService(
                 $"KnowledgeSource acquisitionConfiguration cannot exceed {MaximumAcquisitionConfigurationBytes} bytes.");
         ValidateTarget(resource.Definition.IngestionFlow, "ingestion");
         ValidateTarget(resource.Definition.RetrievalFlow, "retrieval");
-        if (resource.Definition.Enabled
+        if (resource.Definition.Profile is not null
+            && (resource.Definition.IngestionFlow is not null || resource.Definition.RetrievalFlow is not null))
+            throw new KnowledgeSourceValidationException("knowledge_source_profile_flow_conflict",
+                "A profiled KnowledgeSource cannot also declare direct ingestion or retrieval Flow bindings.");
+        if (resource.Definition.Enabled && resource.Definition.Profile is null
             && (resource.Definition.IngestionFlow is null || resource.Definition.RetrievalFlow is null))
             throw new KnowledgeSourceValidationException("knowledge_source_flow_bindings_required",
-                "An enabled KnowledgeSource requires both ingestionFlow and retrievalFlow bindings.");
+                "An enabled KnowledgeSource requires a profile or both legacy ingestionFlow and retrievalFlow bindings.");
     }
 
     private async Task<KnowledgeSourceReadiness> EvaluateReadinessAsync(
@@ -233,13 +243,48 @@ public sealed class KnowledgeSourceManagementService(
         var issues = new List<string>();
         ResolvedKnowledgeFlowBinding? ingestion = null;
         ResolvedKnowledgeFlowBinding? retrieval = null;
-        if (resource.Definition.IngestionFlow is null) issues.Add("Ingestion Flow is not configured.");
-        else ingestion = await ResolveAsync(resource, resource.Definition.IngestionFlow, "ingestion", issues, rejectInvalidBindings, cancellationToken);
-        if (resource.Definition.RetrievalFlow is null) issues.Add("Retrieval Flow is not configured.");
-        else retrieval = await ResolveAsync(resource, resource.Definition.RetrievalFlow, "retrieval", issues, rejectInvalidBindings, cancellationToken);
+        ResolvedKnowledgeSourceProfile? profile = null;
+        if (resource.Definition.Profile is not null)
+        {
+            try
+            {
+                profile = await profiles.ResolveActiveAsync(RequireScope(resource), resource.Namespace,
+                    resource.Definition.Profile, cancellationToken);
+                var configurationIssues = KnowledgeSourceProfileService.ValidateConfiguration(
+                    profile.ConfigurationSchema, resource.Definition.AcquisitionConfiguration);
+                if (configurationIssues.Count != 0)
+                    throw new KnowledgeSourceValidationException("knowledge_source_profile_configuration_invalid",
+                        string.Join(' ', configurationIssues));
+                ingestion = profile.IngestionFlow;
+                retrieval = profile.RetrievalFlow;
+            }
+            catch (Exception exception) when (!rejectInvalidBindings
+                && exception is KnowledgeSourceProfileValidationException or KnowledgeSourceValidationException)
+            {
+                issues.Add(exception.Message);
+            }
+        }
+        else
+        {
+            if (resource.Definition.IngestionFlow is null) issues.Add("Ingestion Flow is not configured.");
+            else ingestion = await ResolveAsync(resource, resource.Definition.IngestionFlow, "ingestion", issues, rejectInvalidBindings, cancellationToken);
+            if (resource.Definition.RetrievalFlow is null) issues.Add("Retrieval Flow is not configured.");
+            else retrieval = await ResolveAsync(resource, resource.Definition.RetrievalFlow, "retrieval", issues, rejectInvalidBindings, cancellationToken);
+        }
         if (!resource.Definition.Enabled) issues.Add("KnowledgeSource is disabled.");
         return new(resource.Definition.Enabled && ingestion is not null && retrieval is not null,
-            resource.Definition.Enabled, ingestion, retrieval, issues);
+            resource.Definition.Enabled, ingestion, retrieval, issues, profile);
+    }
+
+    public async Task<ResolvedKnowledgeSourceComposition> ResolveCompositionAsync(
+        KnowledgeSourceResource resource,
+        CancellationToken cancellationToken)
+    {
+        var readiness = await EvaluateReadinessAsync(resource, rejectInvalidBindings: true, cancellationToken);
+        if (!readiness.Ready || readiness.Ingestion is null || readiness.Retrieval is null)
+            throw new KnowledgeSourceValidationException("knowledge_source_not_ready",
+                string.Join(' ', readiness.Issues));
+        return new(readiness.Ingestion, readiness.Retrieval, readiness.Profile);
     }
 
     private async Task<ResolvedKnowledgeFlowBinding?> ResolveAsync(

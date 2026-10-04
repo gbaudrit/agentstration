@@ -383,6 +383,7 @@ public sealed class KnowledgeSnapshotService(
                         AcquisitionUid = acquisition.Value.Uid,
                         AcquiredAt = acquisition.Value.CompletedAt!.Value,
                         IngestionFlow = acquisition.Value.IngestionFlow,
+                        Profile = acquisition.Value.Profile,
                         IngestionFlowRunId = acquisition.Value.FlowRunId,
                         PublicationId = publication.Value.Name,
                         RequestHash = contentHash,
