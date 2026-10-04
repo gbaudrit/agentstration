@@ -19,7 +19,7 @@ public partial class MainLayout
     private static readonly NavigationGroup[] NavigationGroups =
     [
         new("", [new("Nav.Overview", "/", "home")]),
-        new("Group.Design", [new("Nav.Agents", "/agents", "agent", "agent"), new("Nav.Flows", "/flows", "workflow", "flow"), new("Nav.Entries", "/entries", "entry", "work"), new("Nav.ResourcePlans", "/resource-plans", "layers", "work", ["resources/read"]), new("Nav.ModelProfiles", "/modelprofiles", "layers", "model")]),
+        new("Group.Design", [new("Nav.Agents", "/agents", "agent", "agent"), new("Nav.Flows", "/flows", "workflow", "flow"), new("Nav.Entries", "/entries", "entry", "work"), new("Nav.ResourcePlans", "/resource-plans", "layers", "work", ["resources/read"]), new("Nav.ModelProfiles", "/modelprofiles", "layers", "model"), new("Nav.KnowledgeSourceProfiles", "/knowledge-source-profiles", "books", "tool", ["resources/read"])]),
         new("Group.Automate", [new("Nav.Triggers", "/triggers", "clock", "work")]),
         new("Group.Operate", [new("Nav.Conversations", "/conversations", "message-circle", "work", ["runs/read"]), new("Nav.Tasks", "/tasks", "tasks", "work")]),
         new("Group.Observe", [new("Nav.Deployments", "/deployments", "server", "runtime"), new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
@@ -37,6 +37,7 @@ public partial class MainLayout
         new("Command.CreateAgent", "/agents/new", "plus", "Command", "new nouveau agent"),
         new("Nav.ModelProfiles", "/modelprofiles", "layers", "Group.Design", "models modèles"),
         new("Command.CreateModelProfile", "/modelprofiles/new", "plus", "Command", "new nouveau model modèle"),
+        new("Nav.KnowledgeSourceProfiles", "/knowledge-source-profiles", "books", "Group.Design", "knowledge source profiles ingestion retrieval profils sources connaissances", ["resources/read"]),
         new("Nav.Flows", "/flows", "workflow", "Group.Design", "workflow designer flux conception"),
         new("Command.CreateFlow", "/flows/new", "plus", "Command", "new nouveau workflow flux"),
         new("Nav.Entries", "/entries", "entry", "Group.Design", "workplace entry entrée"),

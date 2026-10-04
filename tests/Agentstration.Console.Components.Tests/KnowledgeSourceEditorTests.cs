@@ -29,6 +29,10 @@ public sealed class KnowledgeSourceEditorTests
             Assert.AreEqual("knowledge-source-display-name", fields[0].QuerySelector("input")?.GetAttribute("data-testid"));
             Assert.AreEqual("knowledge-source-name", fields[1].QuerySelector("input")?.GetAttribute("data-testid"));
             Assert.IsTrue(rendered.Find("[data-testid='knowledge-source-display-name']").HasAttribute("autofocus"));
+            var profile = rendered.Find("[data-testid='knowledge-source-profile']");
+            Assert.IsTrue(profile.HasAttribute("required"));
+            Assert.AreEqual("Select a profile", profile.QuerySelector("option")?.TextContent);
+            Assert.IsFalse(rendered.Markup.Contains("Legacy direct Flow bindings", StringComparison.Ordinal));
         });
 
         rendered.Find("[data-testid='knowledge-source-display-name']").Change("Documentation Générale !");
@@ -171,6 +175,9 @@ public sealed class KnowledgeSourceEditorTests
         {
             Assert.IsNotNull(client.UpdatedRequest);
             Assert.AreEqual("Updated documentation", client.UpdatedRequest.Properties.DisplayName);
+            Assert.AreEqual("web", client.UpdatedRequest.Properties.Profile?.Name);
+            Assert.IsNull(client.UpdatedRequest.Properties.IngestionFlow);
+            Assert.IsNull(client.UpdatedRequest.Properties.RetrievalFlow);
             StringAssert.Contains(rendered.Markup, "The Knowledge Source definition was saved.");
         });
 
@@ -231,6 +238,21 @@ public sealed class KnowledgeSourceEditorTests
         Definition = new()
         {
             DisplayName = "Agentstration documentation",
+            Profile = new("web")
+        }
+    };
+
+    private static KnowledgeSourceProfileResource ExistingProfile() => new()
+    {
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = KnowledgeResourceKinds.KnowledgeSourceProfile,
+        Metadata = new() { Name = "web" },
+        ScopeRef = ResourceScopeRef.Workspace(Guid.NewGuid()),
+        ActiveVersion = "1.0.0",
+        Definition = new()
+        {
+            DisplayName = "Web",
+            Version = "1.0.0",
             IngestionFlow = new() { Name = "knowledge-ingestion-builtin" },
             RetrievalFlow = new() { Name = "knowledge-retrieval-builtin" }
         }
@@ -363,7 +385,7 @@ public sealed class KnowledgeSourceEditorTests
     private sealed class KnowledgeSourceProfilesClientStub : IKnowledgeSourceProfilesClient
     {
         public Task<IReadOnlyList<KnowledgeSourceProfileResource>> GetAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<KnowledgeSourceProfileResource>>([]);
+            Task.FromResult<IReadOnlyList<KnowledgeSourceProfileResource>>([ExistingProfile()]);
         public Task<ResourceSnapshot<KnowledgeSourceProfileResource>> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<KnowledgeSourceProfileRevisionResource>> GetRevisionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<KnowledgeSourceProfileResource>> CreateAsync(CreateKnowledgeSourceProfileRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();

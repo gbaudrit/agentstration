@@ -2,7 +2,6 @@
 @implements IDisposable
 @inject IKnowledgeSourcesClient Client
 @inject IKnowledgeSourceProfilesClient Profiles
-@inject IFlowApiClient Flows
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
 
@@ -43,12 +42,7 @@ else if (source is not null && readiness is not null)
             <div class="form-grid">
                 <ResourceIdentityFields @bind-DisplayName="definitionDisplayName" @bind-TechnicalName="definitionTechnicalName" IsNew="false" DisplayNameTestId="knowledge-source-definition-display-name" TechnicalNameTestId="knowledge-source-definition-name" />
                 <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="definitionDescription" maxlength="2000"></textarea></label>
-                <label><span>@T("Profile")</span><select @bind="definitionProfileKey"><option value="">@T("LegacyDirectFlows")</option>@foreach (var profile in profiles) { <option value="@Key(profile.Namespace, profile.Name)">@profile.Definition.DisplayName (@profile.ActiveVersion ?? T("Draft"))</option> }</select></label>
-                @if (string.IsNullOrWhiteSpace(definitionProfileKey))
-                {
-                    <label><span>@T("IngestionFlow")</span><select @bind="definitionIngestionKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select></label>
-                    <label><span>@T("RetrievalFlow")</span><select @bind="definitionRetrievalKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select></label>
-                }
+                <label><span>@T("Profile")</span><select @bind="definitionProfileKey" required data-testid="knowledge-source-definition-profile"><option value="">@T("SelectProfile")</option>@foreach (var profile in profiles) { <option value="@Key(profile.Namespace, profile.Name)">@profile.Definition.DisplayName (@profile.ActiveVersion ?? T("Draft"))</option> }</select></label>
                 <label class="checkbox-row"><input type="checkbox" @bind="definitionEnabled" /><span>@T("Enabled")</span></label>
             </div>
             <p class="resource-hint">@T("FlowCompatibilityHelp")</p>
@@ -152,7 +146,6 @@ else if (source is not null && readiness is not null)
     private KnowledgeSourceResource? source;
     private KnowledgeSourceReadiness? readiness;
     private KnowledgeSourceToolExposureResource? exposure;
-    private IReadOnlyList<FlowSummary> flows = [];
     private IReadOnlyList<KnowledgeSourceProfileResource> profiles = [];
     private IReadOnlyList<KnowledgeAcquisitionResource> acquisitions = [];
     private IReadOnlyList<KnowledgeSnapshotView> snapshots = [];
@@ -162,7 +155,8 @@ else if (source is not null && readiness is not null)
     private string version = "1.0.0", acquisitionParameters = "{}", retrievalOperation = "search", retrievalText = string.Empty, retrievalSnapshot = string.Empty,
         rawYaml = string.Empty;
     private string definitionTechnicalName = string.Empty, definitionDisplayName = string.Empty, definitionDescription = string.Empty,
-        definitionIngestionKey = string.Empty, definitionRetrievalKey = string.Empty, definitionProfileKey = string.Empty;
+        definitionProfileKey = string.Empty;
+    private KnowledgeFlowTarget? legacyIngestionFlow, legacyRetrievalFlow;
     private bool definitionEnabled;
     private System.Text.Json.JsonElement definitionAcquisitionConfiguration = System.Text.Json.JsonSerializer.SerializeToElement(new { });
     private string? etag, error, message, acquisitionParametersError, rawError;
@@ -188,13 +182,11 @@ else if (source is not null && readiness is not null)
             var exposureTask = Client.GetExposureAsync(SourceNamespace, Name, cancellation.Token);
             var acquisitionsTask = Client.GetAcquisitionsAsync(SourceNamespace, Name, cancellation.Token);
             var snapshotsTask = Client.GetSnapshotsAsync(SourceNamespace, Name, cancellation.Token);
-            var flowsTask = Flows.GetFlowsAsync(cancellation.Token);
             var profilesTask = Profiles.GetAsync(cancellation.Token);
-            await Task.WhenAll(sourceTask, readinessTask, exposureTask, acquisitionsTask, snapshotsTask, flowsTask, profilesTask);
+            await Task.WhenAll(sourceTask, readinessTask, exposureTask, acquisitionsTask, snapshotsTask, profilesTask);
             var sourceSnapshot = await sourceTask;
             source = sourceSnapshot.Value;
             etag = sourceSnapshot.ETag;
-            flows = await flowsTask;
             profiles = await profilesTask;
             LoadDefinition(source);
             readiness = await readinessTask;
@@ -231,8 +223,8 @@ else if (source is not null && readiness is not null)
                 Enabled = definitionEnabled,
                 AcquisitionConfiguration = definitionAcquisitionConfiguration.Clone(),
                 Profile = Reference(definitionProfileKey),
-                IngestionFlow = string.IsNullOrWhiteSpace(definitionProfileKey) ? Target(definitionIngestionKey) : null,
-                RetrievalFlow = string.IsNullOrWhiteSpace(definitionProfileKey) ? Target(definitionRetrievalKey) : null
+                IngestionFlow = string.IsNullOrWhiteSpace(definitionProfileKey) ? legacyIngestionFlow : null,
+                RetrievalFlow = string.IsNullOrWhiteSpace(definitionProfileKey) ? legacyRetrievalFlow : null
             };
             var saved = await Client.UpdateAsync(SourceNamespace, Name, new PutKnowledgeSourceRequest(properties), etag!, cancellation.Token);
             source = saved.Value;
@@ -291,8 +283,8 @@ else if (source is not null && readiness is not null)
             Enabled = definitionEnabled,
             AcquisitionConfiguration = definitionAcquisitionConfiguration.Clone(),
             Profile = Reference(definitionProfileKey),
-            IngestionFlow = string.IsNullOrWhiteSpace(definitionProfileKey) ? Target(definitionIngestionKey) : null,
-            RetrievalFlow = string.IsNullOrWhiteSpace(definitionProfileKey) ? Target(definitionRetrievalKey) : null
+            IngestionFlow = string.IsNullOrWhiteSpace(definitionProfileKey) ? legacyIngestionFlow : null,
+            RetrievalFlow = string.IsNullOrWhiteSpace(definitionProfileKey) ? legacyRetrievalFlow : null
         }
     };
     private async Task PublishAsync()
@@ -386,24 +378,17 @@ else if (source is not null && readiness is not null)
         definitionDescription = value.Definition.Description ?? string.Empty;
         definitionEnabled = value.Definition.Enabled;
         definitionAcquisitionConfiguration = value.Definition.AcquisitionConfiguration.Clone();
-        definitionIngestionKey = TargetKey(value.Definition.IngestionFlow);
-        definitionRetrievalKey = TargetKey(value.Definition.RetrievalFlow);
+        legacyIngestionFlow = value.Definition.IngestionFlow;
+        legacyRetrievalFlow = value.Definition.RetrievalFlow;
         definitionProfileKey = ReferenceKey(value.Definition.Profile, value.Namespace);
     }
     private static string Key(ResourceNamespace ns, string name) => $"{ns.Value}|{name}";
-    private static string TargetKey(KnowledgeFlowTarget? target) => target is null ? string.Empty : Key(target.Namespace ?? ResourceNamespace.Default, target.Name);
     private static string ReferenceKey(ResourceReference? reference, ResourceNamespace owner) => reference is null ? string.Empty : Key(reference.Namespace ?? owner, reference.Name);
     private static ResourceReference? Reference(string key)
     {
         var parts = key.Split('|', 2);
         return parts.Length != 2 ? null : new ResourceReference(parts[1], null, ResourceNamespace.Parse(parts[0]));
     }
-    private static KnowledgeFlowTarget? Target(string key)
-    {
-        var parts = key.Split('|', 2);
-        return parts.Length != 2 ? null : new KnowledgeFlowTarget { Name = parts[1], Namespace = ResourceNamespace.Parse(parts[0]), UseActiveVersion = true };
-    }
-    private static string FlowLabel(FlowSummary flow) => $"{flow.Namespace}/{flow.Name} · {flow.ActiveVersion ?? flow.Version ?? "—"}";
     private static string TabId(DetailsTab tab) => $"knowledge-source-{tab.ToString().ToLowerInvariant()}-tab";
     private static System.Text.Json.JsonElement? ParameterSchema(System.Text.Json.JsonElement? inputSchema)
     {
