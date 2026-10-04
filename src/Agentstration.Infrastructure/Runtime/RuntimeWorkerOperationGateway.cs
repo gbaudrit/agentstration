@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Flows.Application;
+using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Work;
@@ -14,7 +15,8 @@ public sealed class RuntimeWorkerOperationGateway(
     IArtifactStore artifacts,
     IRuntimeExecutionStateStore executionStates,
     FlowRunService flowRuns,
-    TimeProvider timeProvider) : IRuntimeWorkerOperationGateway
+    TimeProvider timeProvider,
+    IRequestContextScopeFactory requestScopes) : IRuntimeWorkerOperationGateway
 {
     private const string ArtifactRuntimeType = "awp-artifact-v1";
 
@@ -22,6 +24,7 @@ public sealed class RuntimeWorkerOperationGateway(
         RuntimeGovernedModelRequest request,
         CancellationToken cancellationToken)
     {
+        using var requestScope = EnterScope(request.TenantId, request.WorkspaceId, request.PrincipalId);
         var client = await chatClients.ResolveAsync(request.Agent.ModelProfileNamespace,
             request.Agent.ModelProfileName, cancellationToken);
         var messages = request.Messages.Select(value => new ChatMessage(ToRole(value.Role),
@@ -46,8 +49,10 @@ public sealed class RuntimeWorkerOperationGateway(
             ToInt32(response.Usage?.OutputTokenCount));
     }
 
-    public async Task<JsonElement?> InvokeToolAsync(RuntimeGovernedToolRequest request, CancellationToken cancellationToken) =>
-        await toolExecution.ExecuteAsync(new ToolExecutionContext
+    public async Task<JsonElement?> InvokeToolAsync(RuntimeGovernedToolRequest request, CancellationToken cancellationToken)
+    {
+        using var requestScope = EnterScope(request.TenantId, request.WorkspaceId, request.PrincipalId);
+        return await toolExecution.ExecuteAsync(new ToolExecutionContext
         {
             OwnerKind = request.StepExecutionId is null ? ToolExecutionOwnerKind.RuntimeRun : ToolExecutionOwnerKind.FlowRun,
             ToolCallId = request.ToolCallId.ToString("D"),
@@ -70,6 +75,7 @@ public sealed class RuntimeWorkerOperationGateway(
             PersistArguments = request.PersistArguments,
             Arguments = request.Arguments?.Clone()
         }, cancellationToken);
+    }
 
     public async Task<RuntimeGovernedArtifact> StoreArtifactAsync(
         Agentstration.Resources.WorkspaceId workspaceId,
@@ -152,6 +158,8 @@ public sealed class RuntimeWorkerOperationGateway(
 
     private static int? ToInt32(long? value) => value is null || value < 0 ? null : (int)Math.Min(value.Value, int.MaxValue);
     private static string AssignmentRunId(RuntimeAssignmentId assignmentId) => $"awp-assignment:{assignmentId.Value:N}";
+    private IDisposable EnterScope(Guid tenantId, Agentstration.Resources.WorkspaceId workspaceId, Guid principalId) =>
+        requestScopes.Push(new RequestContext(principalId, tenantId, workspaceId.Value));
 
     private sealed record ArtifactState(Guid ArtifactId, string Name, ArtifactReference Reference);
 }

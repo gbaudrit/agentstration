@@ -172,6 +172,8 @@ internal sealed class AwpRuntimeWorkerService(
                 ? unsupported.Code : "worker_execution_failed";
             activity?.SetStatus(ActivityStatusCode.Error, code);
             activity?.SetTag("error.type", exception.GetType().FullName);
+            logger.LogError(exception, "Assignment {AssignmentId} execution failed with code {ErrorCode}",
+                assignment.AssignmentId.Value, code);
             await TryFailAsync(session, AwpExecutionFailureKind.Execution, code, exception.Message, stoppingToken);
         }
         catch (Exception exception)

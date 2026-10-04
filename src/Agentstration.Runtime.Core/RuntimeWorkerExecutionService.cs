@@ -119,7 +119,8 @@ public sealed class RuntimeWorkerExecutionService(
         var options = material is RuntimeDirectAgentExecutionMaterial direct
             ? direct.Execution
             : new RuntimeExecutionOptions();
-        return await operations.InvokeModelAsync(new RuntimeGovernedModelRequest(agent, messages, options), lease.Token);
+        return await operations.InvokeModelAsync(new RuntimeGovernedModelRequest(
+            agent, messages, options, material.TenantId, material.WorkspaceId, material.PrincipalId), lease.Token);
     }
 
     public async Task<JsonElement?> InvokeToolAsync(

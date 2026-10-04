@@ -12,7 +12,10 @@ public sealed record RuntimeGovernedModelMessage(RuntimeMessageRole Role, IReadO
 public sealed record RuntimeGovernedModelRequest(
     RuntimeExecutionAgentMaterial Agent,
     IReadOnlyList<RuntimeGovernedModelMessage> Messages,
-    RuntimeExecutionOptions Options);
+    RuntimeExecutionOptions Options,
+    Guid TenantId,
+    WorkspaceId WorkspaceId,
+    Guid PrincipalId);
 
 public sealed record RuntimeGovernedModelResponse(
     IReadOnlyList<RuntimeGovernedModelContent> Contents,
