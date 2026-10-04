@@ -1,5 +1,6 @@
-using Agentstration.Identity.Api.Security;
+using System.Threading.RateLimiting;
 using Agentstration.Identity.Api.Api;
+using Agentstration.Identity.Api.Security;
 using Agentstration.Identity.Contracts;
 using Agentstration.Web;
 using Agentstration.Web.Configuration;
@@ -11,7 +12,6 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
-using System.Threading.RateLimiting;
 
 namespace Agentstration.Identity.Api;
 

@@ -154,7 +154,9 @@ internal sealed class AwpFlowAgentResolver(AwpRootFlowExecutionMaterial material
             ModelProfileNamespace = ResourceNamespace.Default,
             RuntimeProfileName = AwpRuntimeKinds.MicrosoftAgentFramework,
             EffectiveToolNames = agent.Tools.Select(tool => tool.Id).ToArray(),
-            MiddlewareIds = [], ContextProviderIds = [], Capabilities = [],
+            MiddlewareIds = [],
+            ContextProviderIds = [],
+            Capabilities = [],
             Handler = agent.Handler,
             DefinitionHash = agent.DefinitionHash
         }, true, "Ready", null);

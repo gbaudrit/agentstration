@@ -1,3 +1,4 @@
+import { randomBytes, randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import fs from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
@@ -45,14 +46,19 @@ export async function startProductHosts(): Promise<ProductHosts> {
   const dataDirectory = path.join(workDirectory, 'data');
   await fs.mkdir(dataDirectory, { recursive: true });
 
-  const [consolePort, workplacePort, extensionPort, gitExtensionPort, foundryExtensionPort] = await Promise.all([freePort(), freePort(), freePort(), freePort(), freePort()]);
+  const [consolePort, workplacePort, workerPort, extensionPort, gitExtensionPort, foundryExtensionPort] = await Promise.all([freePort(), freePort(), freePort(), freePort(), freePort(), freePort()]);
   const consoleUrl = `http://127.0.0.1:${consolePort}`;
   const workplaceUrl = `http://127.0.0.1:${workplacePort}`;
+  const workerUrl = `http://127.0.0.1:${workerPort}`;
   const extensionUrl = `http://127.0.0.1:${extensionPort}`;
   const gitExtensionUrl = `http://127.0.0.1:${gitExtensionPort}`;
   const foundryExtensionUrl = `http://127.0.0.1:${foundryExtensionPort}`;
   const bootstrapPath = path.join(repositoryRoot, 'deploy', 'bootstrap', 'profiles');
   const runtimeProxy = await startControlledRuntimeProxy(consoleUrl);
+  const workerId = randomUUID();
+  const credentialId = randomUUID();
+  const workerKeyFile = path.join(workDirectory, 'runtime-worker.key');
+  await fs.writeFile(workerKeyFile, `${randomBytes(48).toString('base64')}\n`, { mode: 0o600 });
 
   const fakeOllama = await startFakeOllama();
   const modelExtension = runDotnet('src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj', path.join(workDirectory, 'model-extension.log'), {
@@ -109,6 +115,11 @@ export async function startProductHosts(): Promise<ProductHosts> {
     Agentstration__FlowApi__BaseAddress: `${consoleUrl}/`,
     Agentstration__WorkplaceBaseUrl: `${workplaceUrl}/`,
     Agentstration__Extensions__DiscoverOnStartup: 'true',
+    Agentstration__AwpWorkerTrust__Enabled: 'true',
+    Agentstration__AwpWorkerTrust__InstanceId: runId,
+    Agentstration__AwpWorkerTrust__Credentials__0__WorkerId: workerId,
+    Agentstration__AwpWorkerTrust__Credentials__0__CredentialId: credentialId,
+    Agentstration__AwpWorkerTrust__Credentials__0__SharedKeyFile: workerKeyFile,
   }, [
     '--Agentstration:Extensions:Agentstration.Extensions.Ollama:RegistrationName=ollama-extension',
     `--Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint=${extensionUrl}`,
@@ -119,8 +130,21 @@ export async function startProductHosts(): Promise<ProductHosts> {
   ]);
 
   let workplaceHost: ManagedProcess | undefined;
+  let workerHost: ManagedProcess | undefined;
   try {
     await waitUntilHealthy(`${consoleUrl}/health/ready`, consoleHost);
+    workerHost = runDotnet('src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj', path.join(workDirectory, 'runtime-worker.log'), {
+      ASPNETCORE_ENVIRONMENT: 'Development',
+      ASPNETCORE_URLS: workerUrl,
+      Logging__EventLog__LogLevel__Default: 'None',
+      Agentstration__RuntimeWorker__AuthorityUrl: consoleUrl,
+      Agentstration__RuntimeWorker__WorkerId: workerId,
+      Agentstration__RuntimeWorker__CredentialId: credentialId,
+      Agentstration__RuntimeWorker__InstanceId: runId,
+      Agentstration__RuntimeWorker__SharedKeyFile: workerKeyFile,
+      Agentstration__RuntimeWorker__AllowInsecureHttp: 'true',
+    });
+    await waitUntilHealthy(`${workerUrl}/health/ready`, workerHost);
     workplaceHost = runDotnet('src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj', path.join(workDirectory, 'workplace.log'), {
       ASPNETCORE_ENVIRONMENT: 'Development',
       ASPNETCORE_URLS: workplaceUrl,
@@ -131,6 +155,7 @@ export async function startProductHosts(): Promise<ProductHosts> {
     await waitUntilHealthy(`${workplaceUrl}/health`, workplaceHost);
   } catch (error) {
     await stopProcess(workplaceHost);
+    await stopProcess(workerHost);
     await stopProcess(consoleHost);
     await stopProcess(modelExtension);
     await stopProcess(gitExtension);
@@ -146,6 +171,7 @@ export async function startProductHosts(): Promise<ProductHosts> {
     platformHealth: runtimeProxy,
     async stop() {
       await stopProcess(workplaceHost);
+      await stopProcess(workerHost);
       await stopProcess(consoleHost);
       await stopProcess(modelExtension);
       await stopProcess(gitExtension);

@@ -19,11 +19,11 @@ public sealed class RuntimeExecutionMaterialResolver(
     public async Task<RuntimeExecutionMaterial> ResolveAsync(
         RuntimeWorkerAssignment assignment,
         CancellationToken cancellationToken) => assignment.TargetKind switch
-    {
-        RuntimeAssignmentTargetKind.RuntimeRun => await ResolveRuntimeRunAsync(assignment, cancellationToken),
-        RuntimeAssignmentTargetKind.FlowRun => await ResolveFlowRunAsync(assignment, assignment.TargetRunId, cancellationToken),
-        _ => throw new RuntimeExecutionMaterialException("execution_target_unsupported", "The assignment target is unsupported.")
-    };
+        {
+            RuntimeAssignmentTargetKind.RuntimeRun => await ResolveRuntimeRunAsync(assignment, cancellationToken),
+            RuntimeAssignmentTargetKind.FlowRun => await ResolveFlowRunAsync(assignment, assignment.TargetRunId, cancellationToken),
+            _ => throw new RuntimeExecutionMaterialException("execution_target_unsupported", "The assignment target is unsupported.")
+        };
 
     public async Task<RuntimeFlowStepMaterial> ResolveStepAsync(
         RuntimeWorkerAssignment assignment,
@@ -176,7 +176,8 @@ public sealed class RuntimeExecutionMaterialResolver(
             .GroupBy(value => value.ParticipantId, StringComparer.Ordinal)
             .Select(group => group.First())
             .Select(value => (value.ParticipantId, new RuntimeAgentReference(value.Target.Id,
-                ParseGeneration(value.Target.Version)) { Namespace = value.Target.Namespace ?? version.FlowId.Namespace }))
+                ParseGeneration(value.Target.Version))
+            { Namespace = value.Target.Namespace ?? version.FlowId.Namespace }))
             .ToArray();
     }
 

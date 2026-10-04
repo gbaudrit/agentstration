@@ -15,11 +15,11 @@ internal sealed class AwpAssignmentExecutor(ILoggerFactory loggerFactory)
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     public async Task<JsonElement?> ExecuteAsync(AwpAssignmentSession session, AwpExecutionMaterial material,
         CancellationToken cancellationToken) => material switch
-    {
-        AwpDirectAgentExecutionMaterial direct => await ExecuteDirectAsync(session, direct, cancellationToken),
-        AwpRootFlowExecutionMaterial flow => await ExecuteFlowAsync(session, flow, cancellationToken),
-        _ => throw new AwpExecutionNotSupportedException("material_kind_unsupported", "The execution material kind is unsupported.")
-    };
+        {
+            AwpDirectAgentExecutionMaterial direct => await ExecuteDirectAsync(session, direct, cancellationToken),
+            AwpRootFlowExecutionMaterial flow => await ExecuteFlowAsync(session, flow, cancellationToken),
+            _ => throw new AwpExecutionNotSupportedException("material_kind_unsupported", "The execution material kind is unsupported.")
+        };
 
     private async Task<JsonElement?> ExecuteDirectAsync(AwpAssignmentSession session,
         AwpDirectAgentExecutionMaterial material, CancellationToken cancellationToken)
