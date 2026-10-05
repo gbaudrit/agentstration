@@ -187,3 +187,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 159. [ADR-0159 — Flow expressions use authoritative execution context](0159-flow-expressions-use-authoritative-execution-context.md)
 160. [ADR-0160 — Web crawlers produce bounded aggregate content](0160-web-crawlers-produce-bounded-aggregate-content.md)
 161. [ADR-0161 — Knowledge Sources resolve reusable versioned profiles](0161-knowledge-sources-resolve-versioned-profiles.md)
+162. [ADR-0162 — Core Knowledge Source Profiles are protected local defaults](0162-core-knowledge-source-profiles-are-protected-local-defaults.md)

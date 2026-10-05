@@ -38,6 +38,109 @@ public sealed class KnowledgeSourceProfileService(
         CancellationToken cancellationToken) =>
         store.GetAsync<KnowledgeSourceProfileResource>(new(KnowledgeResourceKinds.KnowledgeSourceProfile, name, @namespace), cancellationToken);
 
+    public async Task<StoredResource<KnowledgeSourceProfileResource>> EnsureBuiltInAsync(
+        KnowledgeSourceProfileResource resource,
+        CancellationToken cancellationToken)
+    {
+        if (requestContext.AccessMode != ControlPlaneAccessMode.System)
+            throw new InvalidOperationException("Built-in Knowledge Source Profiles require a system Control Plane context.");
+        if (!KnowledgeSourceProfileBuiltIns.IsReserved(resource.Name))
+            throw new InvalidOperationException($"Knowledge Source Profile '{resource.Name}' is not a reserved built-in identity.");
+        var scopeRef = RequireScope(resource);
+        var address = Scoped(scopeRef, resource.Namespace, resource.Kind, resource.Name);
+        var existing = await store.GetExactAsync<KnowledgeSourceProfileResource>(address, cancellationToken);
+        if (existing is not null)
+        {
+            if (!IsCoreBuiltIn(existing.Value))
+                throw Error("knowledge_source_profile_builtin_identity_conflict",
+                    $"Reserved built-in profile identity '{resource.Name}' is already used by a non-core resource.");
+            if (!string.Equals(existing.Value.Definition.Version, resource.Definition.Version, StringComparison.Ordinal))
+                return existing;
+            return await EnsureBuiltInRevisionAsync(existing, resource.Definition, cancellationToken);
+        }
+
+        var desired = resource with
+        {
+            ScopeRef = scopeRef,
+            Generation = 1,
+            ActiveVersion = null,
+            Status = Status("DraftReady", "The built-in profile draft is valid.")
+        };
+        Validate(desired);
+        ResourceScopePolicy.EnsureAllowed(desired, scopeRef);
+        var created = await store.PutExactAsync(scopeRef, desired, null, true, cancellationToken);
+        await AuditAsync(SecurityAuditActions.KnowledgeSourceProfileCreated, scopeRef, created.Value.Name, cancellationToken);
+        return await EnsureBuiltInRevisionAsync(created, resource.Definition, cancellationToken);
+    }
+
+    private async Task<StoredResource<KnowledgeSourceProfileResource>> EnsureBuiltInRevisionAsync(
+        StoredResource<KnowledgeSourceProfileResource> profile,
+        KnowledgeSourceProfileProperties definition,
+        CancellationToken cancellationToken)
+    {
+        var scopeRef = RequireScope(profile.Value);
+        var publishedDefinition = definition with { Publish = false, Activate = false };
+        var resolution = await ResolveDefinitionAsync(profile.Value with { Definition = publishedDefinition }, cancellationToken);
+        var definitionHash = DefinitionHash(publishedDefinition, resolution);
+        var revisionAddress = Scoped(scopeRef, profile.Value.Namespace,
+            KnowledgeResourceKinds.KnowledgeSourceProfileRevision, RevisionName(profile.Value.Name, definition.Version));
+        var storedRevision = await store.GetExactAsync<KnowledgeSourceProfileRevisionResource>(revisionAddress, cancellationToken);
+        if (storedRevision is not null)
+        {
+            if (storedRevision.Value.ProfileUid != profile.Value.Uid
+                || !string.Equals(storedRevision.Value.DefinitionHash, definitionHash, StringComparison.Ordinal))
+                throw Error("knowledge_source_profile_builtin_revision_conflict",
+                    $"Built-in profile revision '{profile.Value.Name}:{definition.Version}' does not match the core definition.");
+        }
+        else
+        {
+            var revision = new KnowledgeSourceProfileRevisionResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSourceProfileRevision,
+                Metadata = new ResourceMetadata
+                {
+                    Name = RevisionName(profile.Value.Name, definition.Version),
+                    Namespace = profile.Value.Namespace,
+                    Tags = profile.Value.Metadata.Tags,
+                    Annotations = profile.Value.Metadata.Annotations
+                },
+                ScopeRef = scopeRef,
+                Generation = 1,
+                Status = Status("Published", "The built-in profile revision is immutable."),
+                ProfileUid = profile.Value.Uid,
+                ProfileName = profile.Value.Name,
+                ProfileGeneration = profile.Value.Generation,
+                Version = definition.Version,
+                DefinitionHash = definitionHash,
+                PublishedAt = timeProvider.GetUtcNow(),
+                PublishedBy = Guid.Empty,
+                Definition = publishedDefinition,
+                Resolution = resolution with
+                {
+                    Uid = profile.Value.Uid,
+                    Generation = profile.Value.Generation,
+                    DefinitionHash = definitionHash
+                }
+            };
+            storedRevision = await store.CreateImmutableAsync(revision, cancellationToken);
+            await AuditAsync(SecurityAuditActions.KnowledgeSourceProfileRevisionPublished, scopeRef,
+                $"{profile.Value.Name}:{revision.Version}", cancellationToken);
+        }
+
+        if (string.Equals(profile.Value.ActiveVersion, definition.Version, StringComparison.Ordinal)) return profile;
+        if (profile.Value.ActiveVersion is not null) return profile;
+        var activated = profile.Value with
+        {
+            ActiveVersion = storedRevision.Value.Version,
+            Status = Status("ActiveRevision", $"Built-in profile revision '{storedRevision.Value.Version}' is active.")
+        };
+        var stored = await store.PutExactAsync(scopeRef, activated, profile.ETag, false, cancellationToken);
+        await AuditAsync(SecurityAuditActions.KnowledgeSourceProfileRevisionActivated, scopeRef,
+            $"{stored.Value.Name}:{storedRevision.Value.Version}", cancellationToken);
+        return stored;
+    }
+
     public async Task<IReadOnlyList<StoredResource<KnowledgeSourceProfileRevisionResource>>> ListRevisionsAsync(
         ResourceNamespace @namespace,
         string name,
@@ -73,6 +176,7 @@ public sealed class KnowledgeSourceProfileService(
         KnowledgeSourceProfileResource resource,
         CancellationToken cancellationToken)
     {
+        EnsureProtectedMutationAllowed(resource.Name);
         var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(KnowledgeResourceKinds.KnowledgeSourceProfile);
         var desired = resource with
         {
@@ -107,6 +211,7 @@ public sealed class KnowledgeSourceProfileService(
         CancellationToken cancellationToken)
     {
         var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw NotFound(@namespace, name);
+        EnsureProtectedMutationAllowed(existing.Value.Name);
         var desired = existing.Value with
         {
             Definition = definition,
@@ -140,6 +245,7 @@ public sealed class KnowledgeSourceProfileService(
     {
         ValidateDefaults(request.ConfigurationDefaults);
         var profile = await GetAsync(@namespace, name, cancellationToken) ?? throw NotFound(@namespace, name);
+        EnsureProtectedMutationAllowed(profile.Value.Name);
         if (!profile.Value.Definition.Enabled)
             throw Error("knowledge_source_profile_disabled", "A disabled Knowledge Source Profile cannot be published.");
         if (!string.Equals(profile.Value.Definition.Version, request.Version, StringComparison.Ordinal))
@@ -206,6 +312,7 @@ public sealed class KnowledgeSourceProfileService(
     {
         ValidateDefaults(request.ConfigurationDefaults);
         var profile = await GetAsync(@namespace, name, cancellationToken) ?? throw NotFound(@namespace, name);
+        EnsureProtectedMutationAllowed(profile.Value.Name);
         if (ifMatch is not null && !string.Equals(profile.ETag, ifMatch, StringComparison.Ordinal))
             throw new ResourceConcurrencyException("The Knowledge Source Profile changed before activation.");
         var revision = await GetRevisionAsync(@namespace, name, request.Version, cancellationToken)
@@ -267,6 +374,7 @@ public sealed class KnowledgeSourceProfileService(
         if (!plan.Ready)
             throw Error("knowledge_source_profile_application_not_ready", string.Join(' ', plan.Issues));
         var target = await GetAsync(targetNamespace, targetName, cancellationToken) ?? throw NotFound(targetNamespace, targetName);
+        EnsureProtectedMutationAllowed(target.Value.Name);
         if (ifMatch is not null && !string.Equals(target.ETag, ifMatch, StringComparison.Ordinal))
             throw new ResourceConcurrencyException("The target Knowledge Source Profile changed before application.");
         var source = await references.ResolveAsync<KnowledgeSourceProfileResource>(request.SourceProfile, targetNamespace,
@@ -313,6 +421,7 @@ public sealed class KnowledgeSourceProfileService(
         CancellationToken cancellationToken)
     {
         var profile = await GetAsync(@namespace, name, cancellationToken) ?? throw NotFound(@namespace, name);
+        EnsureProtectedMutationAllowed(profile.Value.Name);
         var scopeRef = RequireScope(profile.Value);
         var sources = await ReferencingSourcesAsync(profile.Value, cancellationToken);
         if (sources.Count != 0)
@@ -697,6 +806,22 @@ public sealed class KnowledgeSourceProfileService(
     private static ResourceNotFoundException NotFound(ResourceNamespace @namespace, string name) =>
         new(new ResourceKey(KnowledgeResourceKinds.KnowledgeSourceProfile, name, @namespace));
     private static KnowledgeSourceProfileValidationException Error(string code, string message) => new(code, message);
+
+    private static bool IsCoreBuiltIn(KnowledgeSourceProfileResource resource) =>
+        resource.Metadata.Annotations.TryGetValue(ResourceProvenanceAnnotations.BuiltIn, out var builtIn)
+        && string.Equals(builtIn, "true", StringComparison.OrdinalIgnoreCase)
+        && resource.Metadata.Annotations.TryGetValue(ResourceProvenanceAnnotations.Origin, out var origin)
+        && string.Equals(origin, KnowledgeSourceProfileBuiltIns.Origin, StringComparison.Ordinal)
+        && resource.Metadata.Annotations.TryGetValue(ResourceProvenanceAnnotations.Owner, out var owner)
+        && string.Equals(owner, KnowledgeSourceProfileBuiltIns.Owner, StringComparison.Ordinal);
+
+    private void EnsureProtectedMutationAllowed(string name)
+    {
+        if (KnowledgeSourceProfileBuiltIns.IsReserved(name)
+            && requestContext.AccessMode != ControlPlaneAccessMode.System)
+            throw Error("knowledge_source_profile_builtin_protected",
+                $"Knowledge Source Profile '{name}' is managed by Agentstration and cannot be modified directly.");
+    }
     private static ResourceStatus Status(string reason, string message) => new()
     {
         ProvisioningState = ProvisioningState.Succeeded,
