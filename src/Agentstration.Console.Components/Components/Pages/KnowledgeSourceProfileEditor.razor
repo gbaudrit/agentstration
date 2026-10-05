@@ -1,0 +1,57 @@
+@page "/knowledge-source-profiles/new"
+@implements IDisposable
+@inject IKnowledgeSourceProfilesClient Client
+@inject IFlowApiClient Flows
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourceProfilesStrings> Localizer
+
+<PageTitle>@T("Create") · Agentstration</PageTitle>
+<PageHeader Title="@T("Create")" Description="@T("CreateHelp")" TestId="knowledge-source-profile-editor"><Actions><a class="button-secondary" href="/knowledge-source-profiles">@T("Cancel")</a></Actions></PageHeader>
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else
+{
+    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
+    <EditForm Model="this" OnValidSubmit="CreateAsync" class="panel form-section knowledge-profile-form">
+        <div class="panel-header profile-form-header"><div class="profile-form-heading"><span class="profile-form-icon"><UiIcon Name="books" /></span><div><p class="eyebrow">@T("Definition")</p><h2>@T("DraftDefinition")</h2><p>@T("CreateFormHelp")</p></div></div></div>
+        <div class="form-grid profile-form-grid">
+            <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="true" />
+            <label><span>@T("Namespace")</span><input @bind="profileNamespace" maxlength="128" /></label>
+            <label class="form-field-wide"><span>@T("DescriptionLabel")</span><textarea @bind="description" maxlength="2000"></textarea></label>
+            <label><span>@T("IngestionFlow")</span><select @bind="ingestionKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select><small>@T("IngestionFlowHelp")</small></label>
+            <label><span>@T("RetrievalFlow")</span><select @bind="retrievalKey" required><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@Key(flow.Namespace, flow.Id)">@FlowLabel(flow)</option> }</select><small>@T("RetrievalFlowHelp")</small></label>
+            <label><span>@T("Version")</span><input @bind="version" required /></label>
+            <label class="profile-choice form-span-2"><input type="checkbox" @bind="publish" /><span class="profile-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("PublishAndActivate")</strong><small>@T("PublishAndActivateHelp")</small></span></label>
+        </div>
+        <div class="form-actions"><button class="button-primary" type="submit" disabled="@busy">@(busy ? T("Saving") : T("Create"))</button></div>
+    </EditForm>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<FlowSummary> flows = [];
+    private string name = string.Empty, displayName = string.Empty, description = string.Empty, profileNamespace = "default", ingestionKey = string.Empty, retrievalKey = string.Empty, version = "1.0.0";
+    private bool loading = true, busy, publish = true;
+    private string? error;
+    private string T(string key, params object[] args) => Localizer[key, args];
+    protected override async Task OnInitializedAsync() { try { flows = await Flows.GetFlowsAsync(cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
+    private async Task CreateAsync()
+    {
+        busy = true; error = null;
+        try
+        {
+            var saved = await Client.CreateAsync(new(name.Trim(), new KnowledgeSourceProfileProperties
+            {
+                DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+                Version = version.Trim(), Publish = publish, Activate = publish,
+                IngestionFlow = Target(ingestionKey), RetrievalFlow = Target(retrievalKey)
+            }, profileNamespace.Trim()), cancellation.Token);
+            Navigation.NavigateTo(saved.Value.Namespace.IsDefault ? $"/knowledge-source-profiles/{Uri.EscapeDataString(saved.Value.Name)}" : $"/knowledge-source-profiles/{Uri.EscapeDataString(saved.Value.Name)}?namespace={Uri.EscapeDataString(saved.Value.Namespace.Value)}");
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { busy = false; }
+    }
+    private static string Key(ResourceNamespace ns, string value) => $"{ns.Value}|{value}";
+    private static KnowledgeFlowTarget Target(string key) { var parts = key.Split('|', 2); return new() { Name = parts[1], Namespace = ResourceNamespace.Parse(parts[0]), UseActiveVersion = true }; }
+    private static string FlowLabel(FlowSummary flow) => $"{flow.Namespace}/{flow.Name} · {flow.ActiveVersion ?? flow.Version ?? "—"}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

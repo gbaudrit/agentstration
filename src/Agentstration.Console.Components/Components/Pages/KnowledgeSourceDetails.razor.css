@@ -22,24 +22,158 @@
     color: inherit;
 }
 
-.knowledge-flow-link {
-    display: inline-grid;
-    gap: .15rem;
+.knowledge-flow-composition {
+    gap: 1rem;
+}
+
+.knowledge-choice {
+    display: grid !important;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center !important;
+    align-self: stretch !important;
+    gap: .7rem !important;
+    min-height: 3.65rem;
+    padding: .75rem .9rem;
+    border: 1px solid var(--border);
+    border-radius: .65rem;
+    background: var(--surface-2);
+    cursor: pointer;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.knowledge-choice:hover {
+    border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+    background: color-mix(in srgb, var(--primary-soft) 32%, var(--surface-2));
+}
+
+.knowledge-choice input {
+    width: 1.05rem !important;
+    min-height: 1.05rem !important;
+    margin: 0;
+    accent-color: var(--primary);
+}
+
+.knowledge-choice-icon {
+    display: grid;
+    place-items: center;
+    width: 1.95rem;
+    height: 1.95rem;
+    border-radius: .55rem;
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.knowledge-choice-icon ::deep .ui-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.knowledge-choice > span:last-child {
+    display: grid;
+    gap: .2rem;
+}
+
+.knowledge-choice strong {
+    color: var(--text);
+    font-size: .78rem;
+}
+
+.knowledge-choice small {
+    color: var(--muted);
+    font-size: .69rem;
+    font-weight: 400;
+    line-height: 1.4;
+}
+
+.knowledge-profile-card,
+.knowledge-flow-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .75rem;
+    min-width: 0;
+    padding: .9rem;
+    border: 1px solid var(--border);
+    border-radius: .7rem;
     color: var(--text);
     text-decoration: none;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
 }
 
-.knowledge-flow-link strong {
-    font-weight: 750;
+.knowledge-profile-card {
+    background: color-mix(in srgb, var(--primary-soft) 42%, var(--surface));
 }
 
-.knowledge-flow-link span {
+.knowledge-flow-card {
+    background: var(--surface-2);
+}
+
+.knowledge-profile-card:hover,
+.knowledge-flow-card:hover {
+    border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+    background: color-mix(in srgb, var(--primary-soft) 30%, var(--surface-2));
+    transform: translateY(-1px);
+}
+
+.knowledge-profile-card > span:nth-child(2),
+.knowledge-flow-card > span:nth-child(2) {
+    display: grid;
+    gap: .15rem;
+    min-width: 0;
+}
+
+.knowledge-profile-card small,
+.knowledge-flow-card small {
     color: var(--muted);
-    font: .72rem/1.35 var(--font-mono);
+    font-size: .68rem;
 }
 
-.knowledge-flow-link:hover strong {
+.knowledge-profile-card strong,
+.knowledge-profile-card code,
+.knowledge-flow-card strong,
+.knowledge-flow-card code {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.knowledge-profile-card strong,
+.knowledge-flow-card strong {
+    font-size: .82rem;
+}
+
+.knowledge-profile-card code,
+.knowledge-flow-card code {
+    color: var(--muted);
+    font-size: .67rem;
+}
+
+.knowledge-profile-card > ::deep .ui-icon,
+.knowledge-flow-card > ::deep .ui-icon {
+    width: 1rem;
+    height: 1rem;
+    color: var(--muted);
+}
+
+.knowledge-composition-icon {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: .55rem;
+    background: var(--primary-soft);
     color: var(--primary);
+}
+
+.knowledge-composition-icon ::deep .ui-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.knowledge-flow-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .75rem;
 }
 
 .knowledge-tool-link {
@@ -152,7 +286,8 @@
 }
 
 @media (max-width: 800px) {
-    .knowledge-acquisition-parameters {
+    .knowledge-acquisition-parameters,
+    .knowledge-flow-grid {
         grid-template-columns: 1fr;
     }
 }

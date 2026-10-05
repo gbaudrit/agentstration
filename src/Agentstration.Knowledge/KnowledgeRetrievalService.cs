@@ -50,7 +50,6 @@ public interface IKnowledgeRetrievalFlowGateway
 public sealed class KnowledgeRetrievalService(
     KnowledgeSourceManagementService sources,
     KnowledgeSnapshotService snapshots,
-    IKnowledgeFlowResolver flows,
     IKnowledgeRetrievalFlowGateway flowRuns,
     ICurrentRequestContext requestContext,
     IAuthorizationService authorization,
@@ -186,22 +185,24 @@ public sealed class KnowledgeRetrievalService(
             if (scopeRef != ResourceScopeRef.Workspace(context.WorkspaceId))
                 throw Error("knowledge_retrieval_source_scope_mismatch",
                     "The KnowledgeSource is not owned by the current Workspace.");
-            var target = source.Value.Definition.RetrievalFlow
-                ?? throw Error("knowledge_retrieval_flow_missing", "The KnowledgeSource has no retrieval Flow binding.");
-            ResolvedKnowledgeFlowBinding flow;
-            try { flow = await flows.ResolveAsync(scopeRef, source.Value.Namespace, target, cancellationToken); }
-            catch (KnowledgeSourceValidationException exception)
-            {
-                throw Error("knowledge_retrieval_flow_unavailable", exception.Message, exception);
-            }
-            ValidateFlow(flow, operation);
-
             KnowledgeSnapshotResource snapshot;
             try { snapshot = await snapshots.ResolveForRetrievalAsync(sourceId, snapshotName, cancellationToken); }
             catch (KnowledgeSnapshotException exception)
             {
                 throw Error(exception.Code, exception.Message, exception);
             }
+            ResolvedKnowledgeFlowBinding flow;
+            var profile = snapshot.Profile;
+            try
+            {
+                flow = profile?.RetrievalFlow
+                    ?? (await sources.ResolveCompositionAsync(source.Value, cancellationToken)).Retrieval;
+            }
+            catch (Exception exception) when (exception is KnowledgeSourceValidationException or KnowledgeSourceProfileValidationException)
+            {
+                throw Error("knowledge_retrieval_flow_unavailable", exception.Message, exception);
+            }
+            ValidateFlow(flow, operation);
             var artifactIds = snapshot.Artifacts.Select(value => value.ArtifactId).ToHashSet(StringComparer.Ordinal);
             if (requiredArtifactId is not null && !artifactIds.Contains(requiredArtifactId))
                 throw Error("knowledge_read_artifact_outside_snapshot",
@@ -224,6 +225,7 @@ public sealed class KnowledgeRetrievalService(
                 KnowledgeSourceId = ToolResourceIdentity.CatalogId(source.Value.Namespace, source.Value.Name),
                 KnowledgeSourceUid = source.Value.Uid,
                 KnowledgeSourceGeneration = source.Value.Generation,
+                Profile = profile,
                 Operation = operation.ToString().ToLowerInvariant(),
                 Snapshot = new()
                 {
@@ -290,6 +292,7 @@ public sealed class KnowledgeRetrievalService(
                 SnapshotName = snapshot.Name,
                 SnapshotUid = snapshot.Uid,
                 RetrievalFlow = flow,
+                Profile = profile,
                 FlowRunId = completed.RunId,
                 CorrelationId = effectiveCorrelationId,
                 Items = output.Items ?? [],

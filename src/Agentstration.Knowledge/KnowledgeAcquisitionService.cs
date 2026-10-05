@@ -52,7 +52,7 @@ public sealed class KnowledgeAcquisitionService(
     ICurrentRequestContext requestContext,
     IAuthorizationService authorization,
     ISecurityAuditWriter audit,
-    IKnowledgeFlowResolver flows,
+    KnowledgeSourceManagementService sources,
     IKnowledgeAcquisitionFlowGateway flowRuns,
     IKnowledgeArtifactReferenceValidator artifacts,
     TimeProvider timeProvider)
@@ -82,9 +82,11 @@ public sealed class KnowledgeAcquisitionService(
         {
             if (!source.Value.Definition.Enabled)
                 throw Error("knowledge_source_disabled", $"KnowledgeSource '{sourceId}' is disabled.");
-            var target = source.Value.Definition.IngestionFlow
-                ?? throw Error("knowledge_ingestion_flow_required", $"KnowledgeSource '{sourceId}' has no ingestion Flow.");
-            var resolved = await flows.ResolveAsync(source.Value.ScopeRef!.Value, source.Value.Namespace, target, cancellationToken);
+            ResolvedKnowledgeSourceComposition composition;
+            try { composition = await sources.ResolveCompositionAsync(source.Value, cancellationToken); }
+            catch (Exception exception) when (exception is KnowledgeSourceValidationException or KnowledgeSourceProfileValidationException)
+            { throw Error("knowledge_ingestion_profile_unavailable", exception.Message); }
+            var resolved = composition.Ingestion;
             if (!string.Equals(resolved.Contract, KnowledgeFlowContracts.Ingestion, StringComparison.Ordinal))
                 throw Error("knowledge_ingestion_contract_required",
                     $"Flow '{resolved.Namespace}/{resolved.Name}:{resolved.Version}' must declare contract '{KnowledgeFlowContracts.Ingestion}'.");
@@ -93,6 +95,13 @@ public sealed class KnowledgeAcquisitionService(
             var requestHash = Hash(JsonSerializer.SerializeToElement(new
             {
                 source = new { source.Value.Uid, source.Value.Generation },
+                profile = composition.Profile is null ? null : new
+                {
+                    composition.Profile.Uid,
+                    composition.Profile.Generation,
+                    composition.Profile.Version,
+                    composition.Profile.DefinitionHash
+                },
                 flow = new { resolved.Name, resolved.Namespace, resolved.Version },
                 parameters
             }));
@@ -129,6 +138,7 @@ public sealed class KnowledgeAcquisitionService(
                 KnowledgeSourceId = $"{source.Value.Namespace}/{source.Value.Name}",
                 KnowledgeSourceUid = source.Value.Uid,
                 KnowledgeSourceGeneration = source.Value.Generation,
+                Profile = composition.Profile,
                 SourceConfiguration = source.Value.Definition.AcquisitionConfiguration.Clone(),
                 Parameters = parameters.Clone(),
                 Caller = new(context.PrincipalId, context.TenantId, context.WorkspaceId),
@@ -148,6 +158,7 @@ public sealed class KnowledgeAcquisitionService(
                 KnowledgeSourceNamespace = source.Value.Namespace,
                 KnowledgeSourceGeneration = source.Value.Generation,
                 IngestionFlow = resolved,
+                Profile = composition.Profile,
                 FlowRunId = runId,
                 State = KnowledgeAcquisitionState.Pending,
                 CorrelationId = effectiveCorrelationId,
@@ -290,6 +301,7 @@ public sealed class KnowledgeAcquisitionService(
                 KnowledgeSourceId = $"{value.KnowledgeSourceNamespace}/{value.KnowledgeSourceName}",
                 KnowledgeSourceUid = value.KnowledgeSourceUid,
                 KnowledgeSourceGeneration = value.KnowledgeSourceGeneration,
+                Profile = value.Profile,
                 SourceConfiguration = value.SourceConfiguration.Clone(),
                 Parameters = value.Parameters.Clone(),
                 Caller = new(value.CreatedBy, value.TenantId, workspaceId),

@@ -1,0 +1,32 @@
+@page "/knowledge-source-profiles"
+@implements IDisposable
+@inject IKnowledgeSourceProfilesClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourceProfilesStrings> Localizer
+
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-knowledge-source-profiles">
+    <Actions><a class="button-primary" href="/knowledge-source-profiles/new">@T("Create")</a><a class="button-secondary" href="/knowledge-sources">@T("Sources")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
+</PageHeader>
+
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else if (error is not null) { <ErrorState Message="@error" /> }
+else if (profiles.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"><a class="button-primary" href="/knowledge-source-profiles/new">@T("Create")</a></EmptyState> }
+else
+{
+    <DataGrid TItem="KnowledgeSourceProfileResource" Items="profiles">
+        <Header><tr><th>@T("Profile")</th><th>@T("ActiveVersion")</th><th>@T("DraftVersion")</th><th>@T("State")</th><th></th></tr></Header>
+        <Row Context="profile"><tr><td><span class="resource-name-with-scope"><strong><a class="resource-name-link" href="@Url(profile)">@profile.Definition.DisplayName</a></strong><ResourceScopeBadge ScopeRef="profile.ScopeRef" Compact /></span><code>@profile.Namespace/@profile.Name</code></td><td><code>@(profile.ActiveVersion ?? "—")</code></td><td><code>@profile.Definition.Version</code></td><td><StatusBadge Text="@T(profile.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(profile.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" /></td><td><a class="text-button" href="@Url(profile)">@T("Open")</a></td></tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<KnowledgeSourceProfileResource> profiles = [];
+    private bool loading = true;
+    private string? error;
+    private string T(string key, params object[] args) => Localizer[key, args];
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync() { loading = true; error = null; try { profiles = await Client.GetAsync(cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
+    private static string Url(KnowledgeSourceProfileResource value) => value.Namespace.IsDefault ? $"/knowledge-source-profiles/{Uri.EscapeDataString(value.Name)}" : $"/knowledge-source-profiles/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString(value.Namespace.Value)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

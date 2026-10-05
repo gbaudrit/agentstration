@@ -54,6 +54,12 @@ public static class SecurityAuditActions
     public const string KnowledgeSourceEnabled = "knowledge-source.enabled";
     public const string KnowledgeSourceDisabled = "knowledge-source.disabled";
     public const string KnowledgeSourceDeleted = "knowledge-source.deleted";
+    public const string KnowledgeSourceProfileCreated = "knowledge-source-profile.created";
+    public const string KnowledgeSourceProfileUpdated = "knowledge-source-profile.updated";
+    public const string KnowledgeSourceProfileDeleted = "knowledge-source-profile.deleted";
+    public const string KnowledgeSourceProfileRevisionPublished = "knowledge-source-profile.revision-published";
+    public const string KnowledgeSourceProfileRevisionActivated = "knowledge-source-profile.revision-activated";
+    public const string KnowledgeSourceProfileApplied = "knowledge-source-profile.applied";
     public const string KnowledgeAcquisitionStarted = "knowledge-acquisition.started";
     public const string KnowledgeAcquisitionCancelled = "knowledge-acquisition.cancelled";
     public const string KnowledgeAcquisitionRetried = "knowledge-acquisition.retried";

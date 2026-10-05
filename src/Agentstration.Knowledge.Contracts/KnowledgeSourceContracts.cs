@@ -7,6 +7,8 @@ namespace Agentstration.Knowledge.Contracts;
 public static class KnowledgeResourceKinds
 {
     public const string KnowledgeSource = "KnowledgeSource";
+    public const string KnowledgeSourceProfile = "KnowledgeSourceProfile";
+    public const string KnowledgeSourceProfileRevision = "KnowledgeSourceProfileRevision";
     public const string KnowledgeSourceToolExposure = "KnowledgeSourceToolExposure";
     public const string KnowledgeAcquisition = "KnowledgeAcquisition";
     public const string KnowledgeSnapshot = "KnowledgeSnapshot";
@@ -59,6 +61,7 @@ public sealed record KnowledgeSourceProperties
     public string? Description { get; init; }
     public bool Enabled { get; init; } = true;
     public JsonElement AcquisitionConfiguration { get; init; } = JsonSerializer.SerializeToElement(new { });
+    public ResourceReference? Profile { get; init; }
     public KnowledgeFlowTarget? IngestionFlow { get; init; }
     public KnowledgeFlowTarget? RetrievalFlow { get; init; }
 }
@@ -83,7 +86,8 @@ public sealed record KnowledgeSourceReadiness(
     bool Enabled,
     ResolvedKnowledgeFlowBinding? Ingestion,
     ResolvedKnowledgeFlowBinding? Retrieval,
-    IReadOnlyList<string> Issues);
+    IReadOnlyList<string> Issues,
+    ResolvedKnowledgeSourceProfile? Profile = null);
 
 public sealed record KnowledgeSourceToolOperationExposure
 {
@@ -160,6 +164,9 @@ public sealed record KnowledgeIngestionInput
     public required Guid KnowledgeSourceUid { get; init; }
     [JsonPropertyName("knowledgeSourceGeneration")]
     public required long KnowledgeSourceGeneration { get; init; }
+    [JsonPropertyName("profile")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ResolvedKnowledgeSourceProfile? Profile { get; init; }
     [JsonPropertyName("sourceConfiguration")]
     public JsonElement SourceConfiguration { get; init; } = JsonSerializer.SerializeToElement(new { });
     [JsonPropertyName("parameters")]
@@ -179,6 +186,7 @@ public sealed record KnowledgeAcquisitionResource : Resource
     public required ResourceNamespace KnowledgeSourceNamespace { get; init; }
     public required long KnowledgeSourceGeneration { get; init; }
     public required ResolvedKnowledgeFlowBinding IngestionFlow { get; init; }
+    public ResolvedKnowledgeSourceProfile? Profile { get; init; }
     public required string FlowRunId { get; init; }
     public required KnowledgeAcquisitionState State { get; init; }
     public required string CorrelationId { get; init; }
@@ -233,6 +241,7 @@ public sealed record KnowledgeSnapshotResource : Resource, IImmutableResource
     public required Guid AcquisitionUid { get; init; }
     public required DateTimeOffset AcquiredAt { get; init; }
     public required ResolvedKnowledgeFlowBinding IngestionFlow { get; init; }
+    public ResolvedKnowledgeSourceProfile? Profile { get; init; }
     public required string IngestionFlowRunId { get; init; }
     public required string PublicationId { get; init; }
     public required string RequestHash { get; init; }
@@ -353,6 +362,9 @@ public sealed record KnowledgeRetrievalInput
     public required Guid KnowledgeSourceUid { get; init; }
     [JsonPropertyName("knowledgeSourceGeneration")]
     public required long KnowledgeSourceGeneration { get; init; }
+    [JsonPropertyName("profile")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ResolvedKnowledgeSourceProfile? Profile { get; init; }
     [JsonPropertyName("operation")]
     public required string Operation { get; init; }
     [JsonPropertyName("snapshot")]
@@ -403,6 +415,7 @@ public sealed record KnowledgeRetrievalResult
     public required string SnapshotName { get; init; }
     public required Guid SnapshotUid { get; init; }
     public required ResolvedKnowledgeFlowBinding RetrievalFlow { get; init; }
+    public ResolvedKnowledgeSourceProfile? Profile { get; init; }
     public required string FlowRunId { get; init; }
     public required string CorrelationId { get; init; }
     public IReadOnlyList<KnowledgeRetrievalItem> Items { get; init; } = [];

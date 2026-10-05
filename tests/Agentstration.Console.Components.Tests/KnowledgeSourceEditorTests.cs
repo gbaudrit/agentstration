@@ -29,6 +29,11 @@ public sealed class KnowledgeSourceEditorTests
             Assert.AreEqual("knowledge-source-display-name", fields[0].QuerySelector("input")?.GetAttribute("data-testid"));
             Assert.AreEqual("knowledge-source-name", fields[1].QuerySelector("input")?.GetAttribute("data-testid"));
             Assert.IsTrue(rendered.Find("[data-testid='knowledge-source-display-name']").HasAttribute("autofocus"));
+            var profile = rendered.Find("[data-testid='knowledge-source-profile']");
+            Assert.IsTrue(profile.HasAttribute("required"));
+            Assert.AreEqual("Select a profile", profile.QuerySelector("option")?.TextContent);
+            Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-editor-enabled-option'].knowledge-choice"));
+            Assert.IsFalse(rendered.Markup.Contains("Legacy direct Flow bindings", StringComparison.Ordinal));
         });
 
         rendered.Find("[data-testid='knowledge-source-display-name']").Change("Documentation Générale !");
@@ -88,7 +93,11 @@ public sealed class KnowledgeSourceEditorTests
             Assert.IsEmpty(rendered.FindAll("[data-testid='knowledge-acquisitions']"));
             Assert.AreEqual("/flows/knowledge-ingestion-builtin", rendered.Find("[data-testid='knowledge-ingestion-flow-link']").GetAttribute("href"));
             Assert.AreEqual("/flows/knowledge-retrieval-builtin", rendered.Find("[data-testid='knowledge-retrieval-flow-link']").GetAttribute("href"));
-            Assert.IsTrue(rendered.Find("[data-testid='knowledge-ingestion-flow-link']").ClassList.Contains("knowledge-flow-link"));
+            Assert.IsTrue(rendered.Find("[data-testid='knowledge-ingestion-flow-link']").ClassList.Contains("knowledge-flow-card"));
+            var profileLink = rendered.Find("[data-testid='knowledge-source-profile-link']");
+            Assert.AreEqual("/knowledge-source-profiles/web", profileLink.GetAttribute("href"));
+            StringAssert.Contains(profileLink.TextContent, "web");
+            StringAssert.Contains(profileLink.TextContent, "1.0.0");
             Assert.AreEqual("Delete", rendered.Find("[data-testid='knowledge-source-delete']").TextContent);
             Assert.IsEmpty(rendered.FindAll("a[href$='/edit']"));
         });
@@ -163,6 +172,10 @@ public sealed class KnowledgeSourceEditorTests
             Assert.AreEqual("agentstration-documentation", technicalName.GetAttribute("value"));
             Assert.IsTrue(technicalName.HasAttribute("readonly"));
             Assert.IsTrue(technicalName.HasAttribute("disabled"));
+            var profileOption = rendered.Find("[data-testid='knowledge-source-definition-profile'] option[value='default|web']");
+            Assert.AreEqual("Web (1.0.0)", profileOption.TextContent);
+            Assert.IsFalse(profileOption.TextContent.Contains("??", StringComparison.Ordinal));
+            Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-enabled-option'].knowledge-choice"));
         });
 
         rendered.Find("[data-testid='knowledge-source-definition-display-name']").Change("Updated documentation");
@@ -171,7 +184,18 @@ public sealed class KnowledgeSourceEditorTests
         {
             Assert.IsNotNull(client.UpdatedRequest);
             Assert.AreEqual("Updated documentation", client.UpdatedRequest.Properties.DisplayName);
+            Assert.AreEqual("web", client.UpdatedRequest.Properties.Profile?.Name);
+            Assert.IsNull(client.UpdatedRequest.Properties.IngestionFlow);
+            Assert.IsNull(client.UpdatedRequest.Properties.RetrievalFlow);
             StringAssert.Contains(rendered.Markup, "The Knowledge Source definition was saved.");
+        });
+
+        rendered.Find("[data-testid='knowledge-source-tools-tab']").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            var approval = rendered.Find("[data-testid='knowledge-source-approval-option']");
+            Assert.IsTrue(approval.ClassList.Contains("knowledge-choice"));
+            StringAssert.Contains(approval.TextContent, "Require approval for every generated Tool");
         });
 
         rendered.Find("[data-testid='knowledge-source-yaml-tab']").Click();
@@ -212,11 +236,44 @@ public sealed class KnowledgeSourceEditorTests
         });
     }
 
-    private static BunitContext CreateContext(IKnowledgeSourcesClient knowledge)
+    [TestMethod]
+    public void ProfileDetailsUseCardsChoicesAndTheFullWidthYamlEditor()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(new KnowledgeClientStub(), new KnowledgeSourceProfilesClientStub(ExistingProfile()));
+
+        var rendered = context.Render<KnowledgeSourceProfileDetails>(parameters => parameters
+            .Add(component => component.Name, "web"));
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(2, rendered.FindAll(".profile-flow-card"));
+            Assert.AreEqual("/flows/knowledge-ingestion-builtin", rendered.Find("[data-testid='profile-ingestion-flow']").GetAttribute("href"));
+            Assert.HasCount(3, rendered.FindAll(".profile-composition-stats article"));
+        });
+
+        rendered.FindAll("[role='tab']").Single(tab => tab.TextContent == "Definition").Click();
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='profile-enabled-option'].profile-choice")));
+
+        rendered.FindAll("[role='tab']").Single(tab => tab.TextContent == "Revisions").Click();
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='profile-activate-option'].profile-choice")));
+
+        rendered.FindAll("[role='tab']").Single(tab => tab.TextContent == "YAML").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            var editor = rendered.Find("[data-testid='knowledge-source-profile-yaml-editor']");
+            Assert.AreEqual("28", editor.GetAttribute("rows"));
+            Assert.IsNotNull(editor.Closest(".profile-yaml-field"));
+            Assert.IsTrue(rendered.FindAll("button").Any(button => button.TextContent == "Apply to form"));
+        });
+    }
+
+    private static BunitContext CreateContext(IKnowledgeSourcesClient knowledge, IKnowledgeSourceProfilesClient? profiles = null)
     {
         var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(knowledge);
+        context.Services.AddSingleton(profiles ?? new KnowledgeSourceProfilesClientStub());
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub());
         return context;
     }
@@ -230,9 +287,37 @@ public sealed class KnowledgeSourceEditorTests
         Definition = new()
         {
             DisplayName = "Agentstration documentation",
+            Profile = new("web")
+        }
+    };
+
+    private static KnowledgeSourceProfileResource ExistingProfile() => new()
+    {
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = KnowledgeResourceKinds.KnowledgeSourceProfile,
+        Metadata = new() { Name = "web" },
+        ScopeRef = ResourceScopeRef.Workspace(Guid.NewGuid()),
+        ActiveVersion = "1.0.0",
+        Definition = new()
+        {
+            DisplayName = "Web",
+            Version = "1.0.0",
             IngestionFlow = new() { Name = "knowledge-ingestion-builtin" },
             RetrievalFlow = new() { Name = "knowledge-retrieval-builtin" }
         }
+    };
+
+    private static ResolvedKnowledgeSourceProfile ExistingResolvedProfile() => new()
+    {
+        Name = "web",
+        Namespace = ResourceNamespace.Default,
+        Uid = Guid.NewGuid(),
+        Generation = 1,
+        Version = "1.0.0",
+        DefinitionHash = "profile-definition-hash",
+        ConfigurationSchema = JsonSerializer.SerializeToElement(new { type = "object" }),
+        IngestionFlow = new ResolvedKnowledgeFlowBinding("knowledge-ingestion-builtin", ResourceNamespace.Default, "1.0.0", true, IngestionInputSchema(), null, KnowledgeFlowContracts.Ingestion),
+        RetrievalFlow = new ResolvedKnowledgeFlowBinding("knowledge-retrieval-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Retrieval)
     };
 
     private static KnowledgeAcquisitionResource ExistingAcquisition() => new()
@@ -298,7 +383,8 @@ public sealed class KnowledgeSourceEditorTests
             Task.FromResult(new KnowledgeSourceReadiness(true, true,
                 new ResolvedKnowledgeFlowBinding("knowledge-ingestion-builtin", ResourceNamespace.Default, "1.0.0", true, IngestionInputSchema(), null, KnowledgeFlowContracts.Ingestion),
                 new ResolvedKnowledgeFlowBinding("knowledge-retrieval-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Retrieval),
-                []));
+                [],
+                ExistingResolvedProfile()));
         public Task<KnowledgeSourceToolExposureResource?> GetExposureAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(exposure);
         public Task<ResourceSnapshot<KnowledgeSourceToolExposureResource>> PublishExposureAsync(ResourceNamespace @namespace, string name, PublishKnowledgeSourceToolExposureRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<KnowledgeAcquisitionResource>> GetAcquisitionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(acquisitions ?? []);
@@ -357,5 +443,22 @@ public sealed class KnowledgeSourceEditorTests
         public Task<FlowVersionResponse> PublishDraftAsync(string flowId, PublishFlowDraftRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowRun> CreateDraftRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowDraftResponse> CreateDraftFromVersionAsync(string flowId, string version, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class KnowledgeSourceProfilesClientStub(KnowledgeSourceProfileResource? profile = null) : IKnowledgeSourceProfilesClient
+    {
+        public Task<IReadOnlyList<KnowledgeSourceProfileResource>> GetAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<KnowledgeSourceProfileResource>>([profile ?? ExistingProfile()]);
+        public Task<ResourceSnapshot<KnowledgeSourceProfileResource>> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ResourceSnapshot<KnowledgeSourceProfileResource>(profile ?? ExistingProfile(), "\"etag-profile\""));
+        public Task<IReadOnlyList<KnowledgeSourceProfileRevisionResource>> GetRevisionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<KnowledgeSourceProfileRevisionResource>>([]);
+        public Task<ResourceSnapshot<KnowledgeSourceProfileResource>> CreateAsync(CreateKnowledgeSourceProfileRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<KnowledgeSourceProfileResource>> UpdateAsync(ResourceNamespace @namespace, string name, PutKnowledgeSourceProfileRequest request, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<KnowledgeSourceProfileRevisionResource>> PublishAsync(ResourceNamespace @namespace, string name, PublishKnowledgeSourceProfileRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<KnowledgeSourceProfileResource>> ActivateAsync(ResourceNamespace @namespace, string name, ActivateKnowledgeSourceProfileRequest request, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<KnowledgeSourceProfileApplicationPlan> PreviewApplicationAsync(ResourceNamespace @namespace, string name, PreviewKnowledgeSourceProfileApplicationRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<KnowledgeSourceProfileRevisionResource>> ApplyAsync(ResourceNamespace @namespace, string name, PreviewKnowledgeSourceProfileApplicationRequest request, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task DeleteAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

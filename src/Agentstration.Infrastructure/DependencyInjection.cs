@@ -142,6 +142,7 @@ public static class DependencyInjection
         services.AddSingleton<ISecretVaultProvider, SharedKeyFileSecretVaultProvider>();
         services.AddSingleton<DescendantResourceUseAuthorizer>();
         services.AddSingleton<ParameterManagementService>();
+        services.AddSingleton<KnowledgeSourceProfileService>();
         services.AddSingleton<KnowledgeSourceManagementService>();
         services.AddSingleton<KnowledgeAcquisitionService>();
         services.AddSingleton<KnowledgeRetrievalService>();
@@ -176,6 +177,7 @@ public static class DependencyInjection
         services.AddScoped<IBootstrapResourceHandler, ToolSetBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, AgentBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, FlowBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, KnowledgeSourceProfileBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, KnowledgeSourceBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, KnowledgeSourceToolExposureBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, EntryBootstrapResourceHandler>();
@@ -215,6 +217,7 @@ public static class DependencyInjection
         services.AddSingleton<IPackResourceHandler, ToolSetPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, AgentPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, FlowPackResourceHandler>();
+        services.AddSingleton<IPackResourceHandler, KnowledgeSourceProfilePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, KnowledgeSourcePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, EntryPackResourceHandler>();
         services.AddSingleton<IPackWorkspaceResourceCatalog, WorkspacePackResourceCatalog>();
