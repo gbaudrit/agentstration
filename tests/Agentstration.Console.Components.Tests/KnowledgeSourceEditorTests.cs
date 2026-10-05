@@ -347,7 +347,16 @@ public sealed class KnowledgeSourceEditorTests
             var editor = rendered.Find("[data-testid='knowledge-source-profile-yaml-editor']");
             Assert.AreEqual("28", editor.GetAttribute("rows"));
             Assert.IsNotNull(editor.Closest(".profile-yaml-field"));
+            StringAssert.Contains(editor.GetAttribute("value") ?? editor.TextContent,
+                "agentstration.io/builtin: \"true\"");
             Assert.IsTrue(rendered.FindAll("button").Any(button => button.TextContent == "Apply to form"));
+        });
+
+        rendered.FindAll("button").Single(button => button.TextContent == "Apply to form").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(0, rendered.FindAll(".form-alert-danger"));
+            StringAssert.Contains(rendered.Markup, "The YAML definition was applied to the form without being saved.");
         });
     }
 
@@ -378,7 +387,14 @@ public sealed class KnowledgeSourceEditorTests
     {
         ApiVersion = ResourceApiVersions.CoreV1,
         Kind = KnowledgeResourceKinds.KnowledgeSourceProfile,
-        Metadata = new() { Name = "web" },
+        Metadata = new()
+        {
+            Name = "web",
+            Annotations = new Dictionary<string, string>
+            {
+                [ResourceProvenanceAnnotations.BuiltIn] = "true"
+            }
+        },
         ScopeRef = ResourceScopeRef.Workspace(Guid.NewGuid()),
         ActiveVersion = "1.0.0",
         Definition = new()
