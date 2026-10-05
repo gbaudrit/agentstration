@@ -75,7 +75,7 @@ public sealed class OfficialAssistantBootstrapProfileTests
             .ToArray();
         var outputsByFlow = flows.ToDictionary(
             flow => flow.Id,
-            flow => flow.Graph.GetOutputs().Select(output => output.Name).ToHashSet(StringComparer.Ordinal),
+            flow => flow.Graph.GetOutputs(),
             StringComparer.Ordinal);
 
         foreach (var flow in flows)
@@ -85,14 +85,27 @@ public sealed class OfficialAssistantBootstrapProfileTests
             Assert.IsTrue(
                 graph.Steps.OfType<OutputFlowStepDefinition>().All(output => output.Outcome is not null),
                 $"Every output in Flow '{flow.Id}' must declare its outcome.");
+            Assert.IsTrue(
+                graph.GetOutputs().Any(output => output.Outcome == FlowOutputOutcome.Error),
+                $"Flow '{flow.Id}' must declare an error output.");
+
+            foreach (var emitter in graph.Steps.Where(step => step is AgentFlowStepDefinition or ToolFlowStepDefinition))
+                Assert.IsTrue(
+                    graph.Transitions.Any(transition => transition.FromStep == emitter.Name && transition.Event == "error"),
+                    $"Step '{flow.Id}/{emitter.Name}' must connect its error output.");
 
             foreach (var call in graph.Steps.OfType<FlowCallStepDefinition>())
             {
                 var targetNamespace = call.Flow.Namespace ?? flow.Namespace;
                 var targetId = $"{targetNamespace.Value}/{call.Flow.ResourceId}";
-                Assert.IsTrue(outputsByFlow.TryGetValue(targetId, out var outputNames), $"FlowCall '{flow.Id}/{call.Name}' targets unknown Flow '{targetId}'.");
+                Assert.IsTrue(outputsByFlow.TryGetValue(targetId, out var outputs), $"FlowCall '{flow.Id}/{call.Name}' targets unknown Flow '{targetId}'.");
+                var outputNames = outputs.Select(output => output.Name).ToHashSet(StringComparer.Ordinal);
                 foreach (var transition in graph.Transitions.Where(transition => transition.FromStep == call.Name))
                     Assert.IsTrue(outputNames.Contains(transition.Event), $"Transition '{flow.Id}/{transition.Id}' uses undeclared output '{transition.Event}' from '{targetId}'.");
+                foreach (var errorOutput in outputs.Where(output => output.Outcome == FlowOutputOutcome.Error))
+                    Assert.IsTrue(
+                        graph.Transitions.Any(transition => transition.FromStep == call.Name && transition.Event == errorOutput.Name),
+                        $"FlowCall '{flow.Id}/{call.Name}' must connect error output '{errorOutput.Name}' from '{targetId}'.");
             }
         }
     }
