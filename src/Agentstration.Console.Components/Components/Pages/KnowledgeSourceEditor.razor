@@ -23,10 +23,9 @@ else
                 <label><span>@T("Namespace")</span><input @bind="sourceNamespace" maxlength="128" /></label>
             }
             <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="description" maxlength="2000"></textarea></label>
-            <label><span>@T("Profile")</span><select @bind="profileKey" required data-testid="knowledge-source-profile"><option value="">@T("SelectProfile")</option>@foreach (var profile in profiles) { <option value="@Key(profile.Namespace, profile.Name)">@profile.Definition.DisplayName (@profile.ActiveVersion ?? T("Draft"))</option> }</select></label>
-            <label class="checkbox-row"><input type="checkbox" @bind="enabled" /><span>@T("Enabled")</span></label>
+            <label><span>@T("Profile")</span><select @bind="profileKey" required data-testid="knowledge-source-profile"><option value="">@T("SelectProfile")</option>@foreach (var profile in profiles) { <option value="@Key(profile.Namespace, profile.Name)">@ProfileOptionLabel(profile)</option> }</select></label>
+            <label class="knowledge-choice form-field-wide" data-testid="knowledge-source-editor-enabled-option"><input type="checkbox" @bind="enabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span></label>
         </div>
-        <p class="resource-hint">@T("FlowCompatibilityHelp")</p>
         <div class="form-actions"><button class="button-primary" type="submit" disabled="@busy">@(busy ? T("Saving") : T("Save"))</button></div>
     </EditForm>
 }
@@ -101,6 +100,7 @@ else
     }
 
     private static string Key(ResourceNamespace ns, string name) => $"{ns.Value}|{name}";
+    private string ProfileOptionLabel(KnowledgeSourceProfileResource value) => $"{value.Definition.DisplayName} ({value.ActiveVersion ?? T("Draft")})";
     private static string ReferenceKey(ResourceReference? reference, ResourceNamespace owner) => reference is null ? string.Empty : Key(reference.Namespace ?? owner, reference.Name);
     private static ResourceReference? Reference(string key)
     {

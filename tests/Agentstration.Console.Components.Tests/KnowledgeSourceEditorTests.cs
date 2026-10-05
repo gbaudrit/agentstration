@@ -32,6 +32,7 @@ public sealed class KnowledgeSourceEditorTests
             var profile = rendered.Find("[data-testid='knowledge-source-profile']");
             Assert.IsTrue(profile.HasAttribute("required"));
             Assert.AreEqual("Select a profile", profile.QuerySelector("option")?.TextContent);
+            Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-editor-enabled-option'].knowledge-choice"));
             Assert.IsFalse(rendered.Markup.Contains("Legacy direct Flow bindings", StringComparison.Ordinal));
         });
 
@@ -174,6 +175,7 @@ public sealed class KnowledgeSourceEditorTests
             var profileOption = rendered.Find("[data-testid='knowledge-source-definition-profile'] option[value='default|web']");
             Assert.AreEqual("Web (1.0.0)", profileOption.TextContent);
             Assert.IsFalse(profileOption.TextContent.Contains("??", StringComparison.Ordinal));
+            Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-enabled-option'].knowledge-choice"));
         });
 
         rendered.Find("[data-testid='knowledge-source-definition-display-name']").Change("Updated documentation");
@@ -186,6 +188,14 @@ public sealed class KnowledgeSourceEditorTests
             Assert.IsNull(client.UpdatedRequest.Properties.IngestionFlow);
             Assert.IsNull(client.UpdatedRequest.Properties.RetrievalFlow);
             StringAssert.Contains(rendered.Markup, "The Knowledge Source definition was saved.");
+        });
+
+        rendered.Find("[data-testid='knowledge-source-tools-tab']").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            var approval = rendered.Find("[data-testid='knowledge-source-approval-option']");
+            Assert.IsTrue(approval.ClassList.Contains("knowledge-choice"));
+            StringAssert.Contains(approval.TextContent, "Require approval for every generated Tool");
         });
 
         rendered.Find("[data-testid='knowledge-source-yaml-tab']").Click();

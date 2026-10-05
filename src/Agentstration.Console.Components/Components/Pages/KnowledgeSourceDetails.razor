@@ -60,9 +60,8 @@ else if (source is not null && readiness is not null)
                 <ResourceIdentityFields @bind-DisplayName="definitionDisplayName" @bind-TechnicalName="definitionTechnicalName" IsNew="false" DisplayNameTestId="knowledge-source-definition-display-name" TechnicalNameTestId="knowledge-source-definition-name" />
                 <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="definitionDescription" maxlength="2000"></textarea></label>
                 <label><span>@T("Profile")</span><select @bind="definitionProfileKey" required data-testid="knowledge-source-definition-profile"><option value="">@T("SelectProfile")</option>@foreach (var profile in profiles) { <option value="@Key(profile.Namespace, profile.Name)">@ProfileOptionLabel(profile)</option> }</select><small>@T("ProfileSelectionHelp")</small></label>
-                <label class="checkbox-row"><input type="checkbox" @bind="definitionEnabled" /><span>@T("Enabled")</span></label>
+                <label class="knowledge-choice form-field-wide" data-testid="knowledge-source-enabled-option"><input type="checkbox" @bind="definitionEnabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span></label>
             </div>
-            <p class="resource-hint">@T("FlowCompatibilityHelp")</p>
             <div class="form-actions"><button class="button-primary" type="submit" disabled="@busy" data-testid="knowledge-source-definition-save">@(busy ? T("Saving") : T("Save"))</button></div>
         </EditForm>
     }
@@ -127,7 +126,7 @@ else if (source is not null && readiness is not null)
         <div class="panel-header"><div><p class="eyebrow">@T("Governance")</p><h2>@T("ToolExposure")</h2><p>@T("ExposureExplanation")</p></div>@if (exposure is not null) { <a class="button-secondary" href="@ToolSetUrl">@T("OpenToolSet")</a> }</div>
         @if (exposure is null)
         {
-            <div class="form-grid"><label><span>@T("Version")</span><input @bind="version" /></label><label class="checkbox-row"><input type="checkbox" @bind="requiresApproval" /><span>@T("RequireApproval")</span></label></div>
+            <div class="form-grid"><label><span>@T("Version")</span><input @bind="version" /></label><label class="knowledge-choice" data-testid="knowledge-source-approval-option"><input type="checkbox" @bind="requiresApproval" /><span class="knowledge-choice-icon"><UiIcon Name="shield" /></span><span><strong>@T("RequireApproval")</strong><small>@T("RequireApprovalHelp")</small></span></label></div>
             <div class="form-actions"><button class="button-primary" type="button" @onclick="PublishAsync" disabled="@(!readiness.Ready || busy)">@(busy ? T("Publishing") : T("PublishExposure"))</button></div>
             @if (!readiness.Ready) { <p class="inline-warning">@T("ReadyRequired")</p> }
         }
