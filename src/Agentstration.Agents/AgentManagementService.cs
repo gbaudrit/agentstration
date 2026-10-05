@@ -219,6 +219,29 @@ public sealed class AgentManagementService(
         }
     }
 
+    public async Task<StoredResource<AgentRevision>> EnsureExecutionRevisionAsync(
+        ResourceNamespace @namespace,
+        string agentName,
+        long generation,
+        CancellationToken cancellationToken)
+    {
+        var agent = await GetAgentAsync(@namespace, agentName, cancellationToken)
+            ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
+        var existing = await agentQueries.FindRevisionAsync(agent.Value.Uid, generation, cancellationToken);
+        if (existing is not null) return existing;
+        if (agent.Value.Generation != generation)
+            throw new ArgumentException($"Agent generation '{generation}' has no immutable revision.", nameof(generation));
+        var runtimeProfile = agent.Value.Definition.RuntimeProfile.Resolve(
+            agent.Value.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
+        return await CreateRevisionAsync(@namespace, agentName, new AgentDeploymentSpec
+        {
+            Environment = "worker",
+            RuntimeProfileName = runtimeProfile.Name,
+            RuntimeProfileNamespace = runtimeProfile.Namespace,
+            HostingMode = AgentHostingMode.DedicatedProcess
+        }, cancellationToken);
+    }
+
     private static bool Matches(AgentRevision revision, AgentResource agent, ResolvedAgentDefinition definition) =>
         revision.AgentUid == agent.Uid
         && revision.AgentVersion == agent.Generation

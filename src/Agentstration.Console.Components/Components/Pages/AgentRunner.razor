@@ -80,6 +80,7 @@ else
 
     @if (state.Run is not null)
     {
+        <RuntimePlacementSummary TargetKind="RuntimeAssignmentTargetKind.RuntimeRun" RunId="@state.Run.Id" />
         <section class="panel runner-inspector" data-testid="agent-run-details" data-run-id="@state.Run.Id" data-run-state="@state.State">
             <div class="runner-tabs" role="tablist">
                 @foreach (var tab in Tabs)

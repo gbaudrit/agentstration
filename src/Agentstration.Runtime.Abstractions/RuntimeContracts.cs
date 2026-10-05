@@ -154,6 +154,7 @@ public sealed record ResolvedRuntimeAgent(
     string State,
     string? Error)
 {
+    public ResourceNamespace AgentNamespace { get; init; } = ResourceNamespace.Default;
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
 }

@@ -29,6 +29,7 @@ using Agentstration.ResourcePlanning;
 using Agentstration.ResourcePlanning.Storage.PostgreSql;
 using Agentstration.ResourcePlanning.Storage.Sqlite;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Contracts;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Local;
 using Agentstration.Runtime.MicrosoftAgentFramework;
@@ -334,6 +335,7 @@ public static class DependencyInjection
         services.AddSingleton<RuntimeWorkerExecutionService>();
         services.AddSingleton<IRuntimeWorkerOperationGateway, RuntimeWorkerOperationGateway>();
         services.AddSingleton<RuntimeWorkerDispatchService>();
+        services.AddSingleton<IRuntimeObservabilityQueryService, Runtime.RuntimeObservabilityQueryService>();
         services.TryAddSingleton(new ToolExecutionCaptureOptions());
         services.AddSingleton<IToolExecutionEventSink, RuntimeToolExecutionEventSink>();
         services.AddSingleton<IToolExecutionEventSink, FlowToolExecutionEventSink>();

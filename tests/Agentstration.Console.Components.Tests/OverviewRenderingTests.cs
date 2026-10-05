@@ -115,7 +115,7 @@ public sealed class OverviewRenderingTests
             var details = rendered.FindAll(".overview-metric-grid .metric-card small")
                 .Select(detail => detail.TextContent.Trim())
                 .ToArray();
-            CollectionAssert.Contains(details, "Prêts / souhaités");
+            StringAssert.Contains(rendered.Markup, "Instances d’agent actives");
             Assert.IsTrue(details.Any(detail => detail.EndsWith(" en attente d’une saisie", StringComparison.Ordinal)));
             Assert.IsTrue(details.Any(detail => detail.EndsWith(" échec(s) lors de la dernière exécution", StringComparison.Ordinal)));
             Assert.IsTrue(details.Any(detail => detail.EndsWith(" indisponible(s)", StringComparison.Ordinal)));

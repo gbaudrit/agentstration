@@ -13,6 +13,7 @@ public static class RuntimeApiModule
     {
         endpoints.MapAgentstrationRuntimeApi();
         endpoints.MapAwpRuntimeWorkerEndpoints();
+        RuntimeObservabilityEndpoints.Map(endpoints);
         RuntimeProfileEndpoints.Map(endpoints.MapGroup("/api/runtimeprofiles"));
         RouteAndExecuteEndpoint.Map(endpoints.MapGroup("/api"));
         return endpoints;

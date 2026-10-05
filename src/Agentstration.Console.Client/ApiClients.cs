@@ -45,6 +45,14 @@ public interface IRuntimeApiClient
     IAsyncEnumerable<RuntimeRunEvent> ObserveRunAsync(string runId, long afterSequence, CancellationToken cancellationToken);
     Task<RuntimeRun> CancelRunAsync(string runId, CancellationToken cancellationToken);
     Task<RuntimeRun> RetryRunAsync(string runId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support Agent instance observability.");
+    Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> GetRuntimeWorkersAsync(CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support Runtime Worker inventory.");
+    Task<RuntimeWorkerDetailsResponse> GetRuntimeWorkerAsync(Guid workerId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support Runtime Worker details.");
+    Task<RuntimeAssignmentPlacementResponse?> GetPlacementAsync(RuntimeAssignmentTargetKind targetKind, string runId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support Runtime placement.");
 }
 
 public interface IAgentRunnerRuntimeClient : IRuntimeApiClient

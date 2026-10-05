@@ -91,6 +91,7 @@ public sealed class RuntimeWorkerDispatchService(
         var registration = RequiredRegistration(workerId, sessionId);
         if (availableCapacity > registration.MaximumConcurrentAssignments)
             throw new RuntimeWorkerDispatchException("invalid_request", "Available capacity cannot exceed the registered Worker capacity.");
+        _ = Touch(workerId, sessionId);
         if (availableCapacity == 0) return null;
 
         var deadline = timeProvider.GetUtcNow().AddSeconds(maximumWaitSeconds);
@@ -117,6 +118,10 @@ public sealed class RuntimeWorkerDispatchService(
             if (registrations.TryUpdate(workerId, refreshed, registration)) return refreshed;
         }
     }
+
+    public IReadOnlyList<RuntimeWorkerRegistration> ListRegistrations() => registrations.Values
+        .OrderBy(value => value.RegisteredAt)
+        .ToArray();
 
     private async Task<ClaimedRuntimeWorkerAssignment?> TryClaimAsync(
         RuntimeWorkerId workerId,

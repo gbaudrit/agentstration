@@ -23,12 +23,12 @@ public sealed class MainLayoutNavigationTests
             ("Design", [("Agents", "/agents"), ("Flows", "/flows"), ("Entries", "/entries"), ("Resource plans", "/resource-plans"), ("Model profiles", "/modelprofiles")]),
             ("Automate", [("Triggers", "/triggers")]),
             ("Operate", [("Conversations", "/conversations"), ("Tasks", "/tasks")]),
-            ("Observe", [("Deployments", "/deployments"), ("Agent runs", "/agent-runs"), ("Flow runs", "/flow-runs"), ("Run events", "/run-events")]),
+            ("Observe", [("Agent instances", "/agent-instances"), ("Agent runs", "/agent-runs"), ("Flow runs", "/flow-runs"), ("Run events", "/run-events")]),
             ("Workplace", [("Configuration", "/workspaces")]),
             ("Resources", [("Packs", "/packs"), ("Sources", "/settings/sources"), ("Source registries", "/settings/source-registries")]),
             ("Integrations", [("MCP & Tools", "/tools"), ("Extensions", "/extensions"), ("Model providers", "/modelproviders"), ("Source providers", "/sourceproviders")]),
             ("Configuration", [("Runtime profiles", "/runtimeprofiles"), ("Secrets", "/secrets"), ("Resource scopes", "/settings/resource-scopes")]),
-            ("System", [("Organization", "/settings/organization"), ("Bootstrap", "/settings/bootstrap"), ("Cleanup", "/cleanup"), ("Settings", "/settings")]));
+            ("System", [("Runtime Workers", "/settings/runtime-workers"), ("Organization", "/settings/organization"), ("Bootstrap", "/settings/bootstrap"), ("Cleanup", "/cleanup"), ("Settings", "/settings")]));
 
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/settings/profile']").Count);
         Assert.AreEqual("Profile", rendered.Find(".topbar-actions a[href='/settings/profile']").GetAttribute("aria-label"));
@@ -63,7 +63,7 @@ public sealed class MainLayoutNavigationTests
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/conversations']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/settings/resource-scopes']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/cleanup']").Count);
-        Assert.AreEqual(1, rendered.FindAll(".side-nav a[href='/deployments']").Count);
+        Assert.AreEqual(1, rendered.FindAll(".side-nav a[href='/agent-instances']").Count);
     }
 
     private static readonly IReadOnlySet<string> AllNavigationPermissions = new HashSet<string>(

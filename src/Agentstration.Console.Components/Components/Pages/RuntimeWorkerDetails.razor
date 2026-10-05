@@ -1,0 +1,37 @@
+@page "/settings/runtime-workers/{WorkerId:guid}"
+@implements IDisposable
+@inject IRuntimeApiClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimeWorkerStrings> Localizer
+
+<PageTitle>@T("WorkerDetails") · Agentstration</PageTitle>
+@if (details is null) { <LoadingState Message="@T("Loading")" /> }
+else
+{
+    <PageHeader Title="@details.Worker.DisplayName" Description="@T("DetailsDescription")" TestId="runtime-worker-details">
+        <Metadata><StatusBadge Text="@T($"Presence.{details.Worker.Presence}")" Status="@PlatformDashboardService.ToStatus(details.Worker.Presence.ToString())" /><span><code>@details.Worker.WorkerId</code></span></Metadata>
+    </PageHeader>
+    <dl class="resource-details resource-section"><dt>@T("Session")</dt><dd><code>@(details.Worker.SessionId?.ToString("D") ?? "—")</code></dd><dt>@T("Version")</dt><dd>@(details.Worker.SoftwareVersion ?? "—")</dd><dt>@T("Protocol")</dt><dd>@details.Worker.ProtocolVersion</dd><dt>@T("Capacity")</dt><dd>@(details.Worker.MaximumConcurrentAssignments?.ToString() ?? "—")</dd><dt>@T("LastSeen")</dt><dd>@(details.Worker.LastSeenAt?.LocalDateTime.ToString("g") ?? "—")</dd></dl>
+    <h2>@T("Assignments")</h2>
+    @if (details.RecentAssignments.Count == 0) { <p>@T("NoAssignments")</p> }
+    else
+    {
+        <DataGrid TItem="RuntimeAssignmentPlacementResponse" Items="details.RecentAssignments">
+            <Header><tr><th>@T("Run")</th><th>@T("State")</th><th>@T("Runtime")</th><th>@T("Attempts")</th><th>@T("Updated")</th></tr></Header>
+            <Row Context="item"><tr><td><a class="text-button" href="@RunUrl(item)">@item.RunId</a><br /><small>@T($"TargetKind.{item.TargetKind}")</small></td><td>@T($"AssignmentState.{item.State}")</td><td>@item.RuntimeCapability · @item.RuntimeCapabilityVersion</td><td>@item.Attempts.Count</td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td></tr></Row>
+        </DataGrid>
+        @foreach (var assignment in details.RecentAssignments.Where(item => item.Attempts.Count > 0))
+        {
+            <details class="resource-section"><summary>@T("RunAttempts", assignment.RunId, assignment.Attempts.Count)</summary><ol class="operations-list">@foreach (var attempt in assignment.Attempts.OrderByDescending(item => item.AcquiredAt)) { <li><span>@T($"AttemptState.{attempt.State}") · @attempt.AcquiredAt.LocalDateTime.ToString("g")</span><small>@T("AttemptDetails", attempt.WorkerSessionId, attempt.LastHeartbeatAt.LocalDateTime.ToString("g"), attempt.LeaseExpiresAt.LocalDateTime.ToString("g"), attempt.FencingGeneration, attempt.ErrorCode ?? "—")</small></li> }</ol></details>
+        }
+    }
+}
+
+@code {
+    [Parameter] public Guid WorkerId { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private RuntimeWorkerDetailsResponse? details;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    protected override async Task OnParametersSetAsync() => details = await Client.GetRuntimeWorkerAsync(WorkerId, cancellation.Token);
+    private static string RunUrl(RuntimeAssignmentPlacementResponse item) => item.TargetKind == nameof(RuntimeAssignmentTargetKind.FlowRun) ? $"/flow-runs/{Uri.EscapeDataString(item.RunId)}" : $"/runs/{Uri.EscapeDataString(item.RunId)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

@@ -93,7 +93,9 @@ public sealed record AwpWorkerEnrollmentView(
     string ProtocolVersion,
     AwpWorkerEnrollmentState State,
     DateTimeOffset AnnouncedAt,
-    DateTimeOffset? CredentialIssuedAt);
+    DateTimeOffset? CredentialIssuedAt,
+    Guid? ActiveSessionId = null,
+    DateTimeOffset? ActiveSessionStartedAt = null);
 public sealed record AwpWorkerPairingCode(Guid WorkerId, string Code, DateTimeOffset ExpiresAt);
 public sealed record ClaimAwpWorkerRequest(Guid WorkerId, string Code);
 public sealed record AwpWorkerCredential(Guid WorkerId, Guid CredentialId, string InstanceId, string Secret);

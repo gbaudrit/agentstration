@@ -447,6 +447,9 @@ public sealed class RuntimeRunTests
 
         var dispatched = await client.GetFromJsonAsync<RuntimeRun>($"/api/runtime/runs/{created.Id}");
         var eventHistory = await client.GetFromJsonAsync<RuntimeRunEvent[]>($"/api/runtime/runs/{created.Id}/eventHistory?afterSequence=0");
+        var placement = await client.GetFromJsonAsync<RuntimeAssignmentPlacementResponse>(
+            $"/api/runtime/placements/runtimeRun/{created.Id}");
+        var instances = await client.GetFromJsonAsync<AgentInstanceResponse[]>("/api/runtime/agent-instances");
         var workAfter = await client.GetFromJsonAsync<WorkItemPageResponse>("/api/work/workitems?top=100");
         var assignment = await factory.Services.GetRequiredService<RuntimeWorkerAssignmentService>()
             .GetByTargetAsync(new(current.WorkspaceId), RuntimeAssignmentTargetKind.RuntimeRun, created.Id, default);
@@ -458,6 +461,22 @@ public sealed class RuntimeRunTests
         Assert.IsNotNull(deployments);
         Assert.IsTrue(deployments.Value.Any(deployment => deployment.AgentName == "sql-expert" && deployment.OperationalState == OperationalState.Ready));
         Assert.IsNotNull(eventHistory);
+        Assert.IsNotNull(placement);
+        Assert.AreEqual(assignment.Value.Id.Value, placement.AssignmentId);
+        Assert.IsNotNull(instances);
+        Assert.IsEmpty(instances, "Pending assignments must not be presented as live Agent instances.");
+        var claim = await factory.Services.GetRequiredService<RuntimeWorkerAssignmentService>().ClaimNextAsync(
+            new RuntimeWorkerId(Guid.NewGuid()), new RuntimeWorkerSessionId(Guid.NewGuid()),
+            "microsoft-agent-framework", new HashSet<string>(StringComparer.Ordinal) { "1.0" },
+            new HashSet<string>(StringComparer.Ordinal) { "1.0" }, 1, default);
+        Assert.IsNotNull(claim);
+        _ = await factory.Services.GetRequiredService<RuntimeWorkerAssignmentService>()
+            .OpenTurnAsync(claim.Ownership, created.Id, null, "agent", default);
+        var activeInstances = await client.GetFromJsonAsync<AgentInstanceResponse[]>("/api/runtime/agent-instances");
+        Assert.IsNotNull(activeInstances);
+        Assert.HasCount(1, activeInstances);
+        Assert.AreEqual(agent.Metadata.Name, activeInstances[0].AgentName);
+        Assert.AreEqual(claim.Ownership.WorkerId.Value, activeInstances[0].WorkerId);
         Assert.IsFalse(eventHistory.Any(item => item.Kind is RuntimeRunEventKind.ResponseDelta or RuntimeRunEventKind.RunCompleted));
         Assert.AreEqual(workBefore!.Value.Count, workAfter!.Value.Count);
     }

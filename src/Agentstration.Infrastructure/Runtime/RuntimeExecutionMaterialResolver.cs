@@ -214,6 +214,8 @@ public sealed class RuntimeExecutionMaterialResolver(
         RuntimeAgentReference reference,
         CancellationToken cancellationToken)
     {
+        _ = await agentManagement.EnsureExecutionRevisionAsync(
+            reference.Namespace, reference.ResourceId, reference.Version, cancellationToken);
         var resolved = await agents.ResolveAsync(reference, cancellationToken);
         return await CreateAgentMaterialAsync(participantId, resolved, cancellationToken);
     }
@@ -232,11 +234,8 @@ public sealed class RuntimeExecutionMaterialResolver(
             && (!long.TryParse(reference.Version, out generation) || generation < 1))
             throw new RuntimeExecutionMaterialException("agent_version_invalid",
                 $"Agent version '{reference.Version}' is not a positive generation number.");
-        var prepared = await agentManagement.PrepareLocalRuntimeAsync(
+        _ = await agentManagement.EnsureExecutionRevisionAsync(
             @namespace, agent.Value.Metadata.Name, generation, cancellationToken);
-        if (prepared.Value.OperationalState != OperationalState.Ready)
-            throw new RuntimeExecutionMaterialException("agent_not_ready",
-                prepared.Value.LastError ?? $"Agent '{@namespace}/{reference.Id}' could not be prepared for execution.");
         var resolved = await agents.ResolveAsync(new RuntimeAgentReference(reference.Id, generation)
         {
             Namespace = @namespace
@@ -277,6 +276,10 @@ public sealed class RuntimeExecutionMaterialResolver(
             resolved.Definition.EffectiveInstructions,
             resolved.ModelProfileName,
             resolved.ModelProfileNamespace,
-            toolMaterials);
+            toolMaterials)
+        {
+            AgentNamespace = resolved.AgentNamespace,
+            RuntimeProfileName = resolved.RuntimeProfileName
+        };
     }
 }

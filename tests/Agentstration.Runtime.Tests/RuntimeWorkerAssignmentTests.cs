@@ -322,6 +322,51 @@ public sealed class RuntimeWorkerAssignmentTests
     }
 
     [TestMethod]
+    public async Task IdleClaimPollingRefreshesObservableWorkerPresence()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        var workerId = new RuntimeWorkerId(Guid.NewGuid());
+        var sessionId = new RuntimeWorkerSessionId(Guid.NewGuid());
+        var registered = await fixture.Dispatch.RegisterAsync(workerId, sessionId, "worker-1.0", 2,
+        [
+            new RuntimeWorkerCapabilityRegistration(
+                "microsoft-agent-framework", "1.0", new HashSet<string>(StringComparer.Ordinal) { "1.0" }, "maf-1.0")
+        ], default);
+        fixture.Clock.Advance(TimeSpan.FromSeconds(20));
+
+        Assert.IsNull(await fixture.Dispatch.ClaimAsync(workerId, sessionId, 0, 0, default));
+
+        var observed = fixture.Dispatch.ListRegistrations().Single();
+        Assert.AreEqual(registered.RegisteredAt, observed.RegisteredAt);
+        Assert.AreEqual(fixture.Clock.GetUtcNow(), observed.LastSeenAt);
+    }
+
+    [TestMethod]
+    public async Task AssignmentQueryFiltersByWorkspaceWorkerAndState()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        await fixture.CreateAssignmentAsync();
+        var workerId = Guid.NewGuid();
+        var claim = await fixture.ClaimAsync(workerId, Guid.NewGuid())
+            ?? throw new AssertFailedException("Expected an assignment claim.");
+
+        var visible = await fixture.Assignments.ListAsync(new RuntimeWorkerAssignmentQuery
+        {
+            WorkspaceId = Workspace,
+            WorkerId = new RuntimeWorkerId(workerId),
+            States = new HashSet<RuntimeAssignmentState> { RuntimeAssignmentState.Assigned }
+        }, default);
+        var anotherWorkspace = await fixture.Assignments.ListAsync(new RuntimeWorkerAssignmentQuery
+        {
+            WorkspaceId = new WorkspaceId(Guid.NewGuid())
+        }, default);
+
+        Assert.HasCount(1, visible);
+        Assert.AreEqual(claim.Assignment.Id, visible[0].Value.Id);
+        Assert.IsEmpty(anotherWorkspace);
+    }
+
+    [TestMethod]
     public async Task AvailabilitySignalClosesLostWakeWindowAndCoalescesDuplicatePulses()
     {
         var signal = new RuntimeAssignmentAvailabilitySignal();

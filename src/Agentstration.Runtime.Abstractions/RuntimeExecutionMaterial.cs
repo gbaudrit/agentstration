@@ -34,7 +34,11 @@ public sealed record RuntimeExecutionAgentMaterial(
     string Instructions,
     string ModelProfileName,
     ResourceNamespace ModelProfileNamespace,
-    IReadOnlyList<RuntimeExecutionToolMaterial> Tools);
+    IReadOnlyList<RuntimeExecutionToolMaterial> Tools)
+{
+    public ResourceNamespace AgentNamespace { get; init; } = ResourceNamespace.Default;
+    public string RuntimeProfileName { get; init; } = string.Empty;
+}
 
 public abstract record RuntimeExecutionMaterial(
     string MaterialId,

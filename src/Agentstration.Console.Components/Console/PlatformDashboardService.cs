@@ -4,6 +4,7 @@ using Agentstration.Flows;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Contracts;
 using Agentstration.Triggers;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.State;
@@ -37,7 +38,7 @@ public sealed class PlatformDashboardService(
     public PlatformDashboardLoad Start(CancellationToken cancellationToken)
     {
         var agentsTask = LoadAsync("Agents", management.GetAgentsAsync, Array.Empty<AgentSummary>(), cancellationToken);
-        var deploymentsTask = LoadAsync("Deployments", management.GetDeploymentsAsync, Array.Empty<DeploymentSummary>(), cancellationToken);
+        var instancesTask = LoadAsync("Agent instances", runtime.GetAgentInstancesAsync, Array.Empty<AgentInstanceResponse>(), cancellationToken);
         var runtimeRunsTask = LoadAsync("Agents Run", token => runtime.GetRunsAsync(null, token), Array.Empty<RuntimeRun>(), cancellationToken);
         var workTask = LoadAsync("Work Tasks", token => work.GetTaskSummaryAsync(null, token), new WorkTaskOperationsCountersResponse(0, 0, 0, 0, 0), cancellationToken);
         var flowsTask = LoadAsync("Flows", flow.GetFlowsAsync, Array.Empty<FlowSummary>(), cancellationToken);
@@ -45,20 +46,13 @@ public sealed class PlatformDashboardService(
         var triggersTask = LoadAsync("Triggers", management.GetTriggersAsync, Array.Empty<TriggerResource>(), cancellationToken);
         var providersTask = LoadAsync("Model providers", modelProviders.GetModelProvidersAsync, Array.Empty<ModelProviderResponse>(), cancellationToken);
         var extensionsTask = LoadAsync("Extensions", extensions.GetExtensionsAsync, Array.Empty<ExtensionResponse>(), cancellationToken);
-        var snapshotTask = BuildSnapshotAsync(agentsTask, deploymentsTask, runtimeRunsTask, workTask, flowsTask, flowRunsTask, triggersTask, providersTask, extensionsTask);
+        var snapshotTask = BuildSnapshotAsync(agentsTask, instancesTask, runtimeRunsTask, workTask, flowsTask, flowRunsTask, triggersTask, providersTask, extensionsTask);
 
         return new(
             ToMetricAsync(agentsTask, agents => new(FormatCount(agents.Count), null, UiStatus.Info)),
             ToMetricAsync(flowsTask, flows => new(FormatCount(flows.Count), null, UiStatus.Info)),
             ToMetricAsync(extensionsTask, configured => new(FormatCount(configured.Count), null, UiStatus.Info)),
-            ToMetricAsync(deploymentsTask, deployments =>
-            {
-                var desired = deployments.Where(IsDesiredRunning).ToArray();
-                var ready = desired.Count(IsReady);
-                return new($"{FormatCount(ready)}/{FormatCount(desired.Length)}", null,
-                    ready == desired.Length && desired.Length > 0 ? UiStatus.Success : UiStatus.Warning,
-                    "Metric.ReadyDesired");
-            }),
+            ToMetricAsync(instancesTask, instances => new(FormatCount(instances.Count), null, UiStatus.Info)),
             ToMetricAsync(runtimeRunsTask, runs => new(
                 FormatCount(runs.Count(run => run.Status.State == RuntimeRunState.Running)), null, UiStatus.Info)),
             ToMetricAsync(workTask, tasks => new(FormatCount(tasks.Running), null, UiStatus.Info)),
@@ -121,7 +115,7 @@ public sealed class PlatformDashboardService(
 
     private static async Task<PlatformSnapshot> BuildSnapshotAsync(
         Task<SourceLoad<IReadOnlyList<AgentSummary>>> agentsTask,
-        Task<SourceLoad<IReadOnlyList<DeploymentSummary>>> deploymentsTask,
+        Task<SourceLoad<IReadOnlyList<AgentInstanceResponse>>> instancesTask,
         Task<SourceLoad<IReadOnlyList<RuntimeRun>>> runtimeRunsTask,
         Task<SourceLoad<WorkTaskOperationsCountersResponse>> workTask,
         Task<SourceLoad<IReadOnlyList<FlowSummary>>> flowsTask,
@@ -131,10 +125,10 @@ public sealed class PlatformDashboardService(
         Task<SourceLoad<IReadOnlyList<ExtensionResponse>>> extensionsTask)
     {
 
-        await Task.WhenAll(agentsTask, deploymentsTask, runtimeRunsTask, workTask, flowsTask, flowRunsTask, triggersTask, providersTask, extensionsTask);
+        await Task.WhenAll(agentsTask, instancesTask, runtimeRunsTask, workTask, flowsTask, flowRunsTask, triggersTask, providersTask, extensionsTask);
 
         var agents = await agentsTask;
-        var deployments = await deploymentsTask;
+        var instances = await instancesTask;
         var runtimeRuns = await runtimeRunsTask;
         var tasks = await workTask;
         var flows = await flowsTask;
@@ -143,9 +137,6 @@ public sealed class PlatformDashboardService(
         var providers = await providersTask;
         var extensions = await extensionsTask;
 
-        var desiredDeployments = deployments.Value.Where(IsDesiredRunning).ToArray();
-        var readyDeployments = desiredDeployments.Count(IsReady);
-        var deploymentAttention = desiredDeployments.Where(NeedsAttention).Select(ToAttentionItem).ToArray();
         var failedTriggerItems = triggers.Value.Where(trigger => trigger.Observed.LastOutcome == TriggerLastOutcome.Failed).ToArray();
         var failedTriggers = failedTriggerItems.Length;
         var runningFlowRuns = flowRuns.Value.Count(run => run.Status == FlowRunStatus.Running);
@@ -153,7 +144,6 @@ public sealed class PlatformDashboardService(
         var unavailableProviders = providers.Value.Where(provider => ModelManagementUi.Status(provider.Properties.Status) is UiStatus.Warning or UiStatus.Danger).ToArray();
 
         var attention = new List<ComponentHealth>();
-        attention.AddRange(deploymentAttention);
         if (tasks.Value.ActionRequired > 0)
             attention.Add(new("tasks-action-required", "Action required", $"{tasks.Value.ActionRequired} awaiting input", UiStatus.Warning, "/tasks?hasPendingAction=true"));
         if (tasks.Value.Failed > 0)
@@ -175,7 +165,7 @@ public sealed class PlatformDashboardService(
         var sources = new[]
         {
             agents.ToSource($"{agents.Value.Count} agents", "/agents"),
-            deployments.ToSource($"{deployments.Value.Count} deployments", "/deployments"),
+            instances.ToSource($"{instances.Value.Count} active Agent instances", "/agent-instances"),
             runtimeRuns.ToSource($"{runtimeRuns.Value.Count} runs", "/agent-runs"),
             tasks.ToSource("Available", "/tasks"),
             flows.ToSource($"{flows.Value.Count} flows", "/flows"),
@@ -187,14 +177,12 @@ public sealed class PlatformDashboardService(
         attention.AddRange(sources.Where(source => source.Severity == UiStatus.Danger));
 
         var unavailableSources = sources.Count(source => source.Severity == UiStatus.Danger);
-        var attentionCount = deploymentAttention.Length + tasks.Value.ActionRequired + tasks.Value.Failed + waitingFlowRuns.Length + failedTriggers + unavailableProviders.Length + unavailableSources;
+        var attentionCount = tasks.Value.ActionRequired + tasks.Value.Failed + waitingFlowRuns.Length + failedTriggers + unavailableProviders.Length + unavailableSources;
         var status = unavailableSources > 0
             ? "Partially unavailable"
-            : attentionCount > 0
+                : attentionCount > 0
                 ? "Attention required"
-                : desiredDeployments.Length == 0
-                    ? "No active deployments"
-                    : "Operational";
+                : "Operational";
 
         return new PlatformSnapshot
         {
@@ -202,8 +190,8 @@ public sealed class PlatformDashboardService(
             DefinedAgents = agents.Value.Count,
             DefinedFlows = flows.Value.Count,
             ConfiguredExtensions = extensions.Value.Count,
-            ReadyDeployments = readyDeployments,
-            DesiredDeployments = desiredDeployments.Length,
+            ReadyDeployments = instances.Value.Count,
+            DesiredDeployments = instances.Value.Count,
             RunningRuntimeRuns = runtimeRuns.Value.Count(run => run.Status.State == RuntimeRunState.Running),
             RunningTasks = tasks.Value.Running,
             ActionRequiredTasks = tasks.Value.ActionRequired,

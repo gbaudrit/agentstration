@@ -22,12 +22,12 @@ public partial class MainLayout
         new("Group.Design", [new("Nav.Agents", "/agents", "agent", "agent"), new("Nav.Flows", "/flows", "workflow", "flow"), new("Nav.Entries", "/entries", "entry", "work"), new("Nav.ResourcePlans", "/resource-plans", "layers", "work", ["resources/read"]), new("Nav.ModelProfiles", "/modelprofiles", "layers", "model")]),
         new("Group.Automate", [new("Nav.Triggers", "/triggers", "clock", "work")]),
         new("Group.Operate", [new("Nav.Conversations", "/conversations", "message-circle", "work", ["runs/read"]), new("Nav.Tasks", "/tasks", "tasks", "work")]),
-        new("Group.Observe", [new("Nav.Deployments", "/deployments", "server", "runtime"), new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
+        new("Group.Observe", [new("Nav.AgentInstances", "/agent-instances", "server", "runtime"), new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
         new("Group.Workplace", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work")]),
         new("Group.Resources", [new("Nav.Packs", "/packs", "package"), new("Nav.Sources", "/settings/sources", "books"), new("Nav.SourceRegistries", "/settings/source-registries", "database")]),
         new("Group.Integrations", [new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.SourceProviders", "/sourceproviders", "database", "source")]),
         new("Group.Configuration", [new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key"), new("Nav.ResourceScopes", "/settings/resource-scopes", "layers", RequiredPermissions: ["resources/read"])]),
-        new("Group.System", [new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "cloud-upload"), new("Nav.Cleanup", "/cleanup", "trash", RequiredPermissions: ["resources/delete", "runs/delete"]), new("Nav.Settings", "/settings", "settings")])
+        new("Group.System", [new("Nav.RuntimeWorkers", "/settings/runtime-workers", "server"), new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "cloud-upload"), new("Nav.Cleanup", "/cleanup", "trash", RequiredPermissions: ["resources/delete", "runs/delete"]), new("Nav.Settings", "/settings", "settings")])
     ];
 
     private static readonly CommandDefinition[] CommandDefinitions =
@@ -42,7 +42,7 @@ public partial class MainLayout
         new("Nav.Entries", "/entries", "entry", "Group.Design", "workplace entry entrée"),
         new("Command.CreateEntry", "/entries/new", "plus", "Command", "new nouvelle workplace entry entrée"),
         new("Nav.ResourcePlans", "/resource-plans", "layers", "Group.Design", "planning plans resources ressources review revue", ["resources/read"]),
-        new("Nav.Deployments", "/deployments", "server", "Group.Observe", "agent runtime deployments déploiements"),
+        new("Nav.AgentInstances", "/agent-instances", "server", "Group.Observe", "agent runtime instances workers exécution"),
         new("Nav.AgentRuns", "/agent-runs", "play-circle", "Group.Observe", "agent execution history exécution historique"),
         new("Nav.FlowRuns", "/flow-runs", "flow-run", "Group.Observe", "workflow executions flux exécutions"),
         new("Nav.Tasks", "/tasks", "tasks", "Group.Operate", "work tasks supervision tâches"),
@@ -74,6 +74,7 @@ public partial class MainLayout
         new("Nav.Cleanup", "/cleanup", "trash", "Group.System", "cleanup clean delete purge nettoyage suppression", ["resources/delete", "runs/delete"]),
         new("Nav.Organization", "/settings/organization", "building", "Group.System", "tenant organization organisation"),
         new("Nav.Bootstrap", "/settings/bootstrap", "cloud-upload", "Group.System", "bootstrap profiles configuration profils configuration"),
+        new("Nav.RuntimeWorkers", "/settings/runtime-workers", "server", "Group.System", "runtime workers AWP sessions capacity capacité"),
         new("Command.OrganizationWorkspaces", "/settings/organization/workspaces", "layout-grid", "Group.System", "tenant workspaces espaces"),
         new("Command.OrganizationMembers", "/settings/organization/members", "users", "Group.System", "users memberships roles membres rôles")
     ];

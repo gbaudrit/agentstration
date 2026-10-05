@@ -314,7 +314,9 @@ public sealed class AwpWorkerIdentityService(
         value.Definition.ProtocolVersion,
         value.Definition.State,
         value.Definition.AnnouncedAt,
-        value.Definition.Credentials.Count == 0 ? null : value.Definition.Credentials.Max(credential => credential.IssuedAt));
+        value.Definition.Credentials.Count == 0 ? null : value.Definition.Credentials.Max(credential => credential.IssuedAt),
+        value.Definition.ActiveSessionId,
+        value.Definition.ActiveSessionStartedAt);
 
     private ISecretVaultProvider Vault() =>
         vaultProviders.Single(value => string.Equals(value.ProviderType, "local", StringComparison.OrdinalIgnoreCase));

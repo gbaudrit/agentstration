@@ -28,6 +28,7 @@ else
     <PageHeader Title="@T("FlowRun")" Description="@run.Id">
         <Actions>@if (!run.Status.IsTerminal()) { <button class="button-danger" @onclick="CancelAsync">@T("Cancel")</button> }<a class="button-secondary" href="/tool-governance/flow/@Uri.EscapeDataString(run.Id)">@T("ToolGovernance")</a><a class="button-secondary" href="@ConsoleResourceUrls.Flow(run.FlowId)">@T("FlowDefinition")</a></Actions>
     </PageHeader>
+    <RuntimePlacementSummary TargetKind="RuntimeAssignmentTargetKind.FlowRun" RunId="@run.Id" />
     <nav class="section-tabs flow-run-page-tabs" role="tablist" aria-label="@T("RunViewsAriaLabel")">
         @foreach (var tab in AvailableTabs)
         {

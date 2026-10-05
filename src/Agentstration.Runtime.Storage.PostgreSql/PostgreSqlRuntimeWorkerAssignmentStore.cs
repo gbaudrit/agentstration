@@ -97,6 +97,28 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         return document is null ? null : Deserialize(document);
     }
 
+    public async Task<IReadOnlyList<StoredRuntimeWorkerAssignment>> ListAsync(
+        RuntimeWorkerAssignmentQuery query,
+        CancellationToken cancellationToken)
+    {
+        if (query.Skip < 0 || query.Take is < 1 or > 500)
+            throw new ArgumentOutOfRangeException(nameof(query), "Assignment query paging is invalid.");
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = context.WorkerAssignments.AsNoTracking().AsQueryable();
+        if (query.WorkspaceId is { } workspaceId)
+            documents = documents.Where(value => value.WorkspaceId == workspaceId.Value);
+        if (query.WorkerId is { } workerId)
+            documents = documents.Where(value => value.ActiveWorkerId == workerId.Value);
+        if (query.States is { Count: > 0 })
+        {
+            var states = query.States.Select(value => value.ToString()).ToArray();
+            documents = documents.Where(value => states.Contains(value.State));
+        }
+        return (await documents.OrderByDescending(value => value.UpdatedAt)
+            .Skip(query.Skip).Take(query.Take).ToArrayAsync(cancellationToken))
+            .Select(Deserialize).ToArray();
+    }
+
     public async Task<StoredRuntimeWorkerAssignment?> ClaimNextAsync(
         RuntimeWorkerClaimRequest request,
         byte[] ownershipTokenDigest,

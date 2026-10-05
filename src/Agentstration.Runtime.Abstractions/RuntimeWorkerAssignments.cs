@@ -55,6 +55,15 @@ public sealed record RuntimeWorkerAssignment
 
 public sealed record StoredRuntimeWorkerAssignment(RuntimeWorkerAssignment Value, string ETag);
 
+public sealed record RuntimeWorkerAssignmentQuery
+{
+    public WorkspaceId? WorkspaceId { get; init; }
+    public RuntimeWorkerId? WorkerId { get; init; }
+    public IReadOnlySet<RuntimeAssignmentState>? States { get; init; }
+    public int Skip { get; init; }
+    public int Take { get; init; } = 200;
+}
+
 public sealed record RuntimeWorkerClaimRequest
 {
     public required RuntimeAssignmentAttemptId AttemptId { get; init; }
@@ -177,6 +186,9 @@ public interface IRuntimeWorkerAssignmentStore
         RuntimeAssignmentTargetKind targetKind,
         string targetRunId,
         CancellationToken cancellationToken) => Task.FromResult<StoredRuntimeWorkerAssignment?>(null);
+    Task<IReadOnlyList<StoredRuntimeWorkerAssignment>> ListAsync(
+        RuntimeWorkerAssignmentQuery query,
+        CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<StoredRuntimeWorkerAssignment>>([]);
     Task<StoredRuntimeWorkerAssignment?> ClaimNextAsync(
         RuntimeWorkerClaimRequest request,
         byte[] ownershipTokenDigest,
