@@ -173,3 +173,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 145. [ADR-0145 — Resource Plan Agent bindings are explicit](0145-resource-plan-agent-bindings-are-explicit.md)
 146. [ADR-0146 — Resource Plan profile choices are durable review drafts](0146-resource-plan-binding-choices-are-durable-review-drafts.md)
 147. [ADR-0147 — The official Assistant is a Workspace-owned composition](0147-official-assistant-is-a-workspace-owned-composition.md)
+148. [ADR-0148 — Flow termination uses named outputs](0148-flow-termination-uses-named-outputs.md)
