@@ -1,0 +1,49 @@
+.artifact-details-grid dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.artifact-content-panel {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.artifact-content-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3, .75rem);
+}
+
+.artifact-content-status {
+    margin: var(--space-4, 1rem) 0 var(--space-2, .5rem);
+    color: var(--muted);
+    font-size: .78rem;
+}
+
+.artifact-content-scroll {
+    width: 100%;
+    max-width: 100%;
+    max-height: min(65vh, 46rem);
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: .7rem;
+    background: var(--surface-2);
+    scrollbar-gutter: stable;
+}
+
+.artifact-content-view {
+    width: max-content;
+    min-width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 1rem;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: .78rem/1.55 var(--font-mono);
+    white-space: pre;
+}
+
+@media(max-width: 620px) {
+    .artifact-content-scroll { max-height: 58vh; }
+}
