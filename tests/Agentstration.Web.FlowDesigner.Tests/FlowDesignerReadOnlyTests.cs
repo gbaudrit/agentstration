@@ -28,7 +28,7 @@ namespace Agentstration.Web.FlowDesigner.Tests;
 public sealed class FlowDesignerReadOnlyTests
 {
     [TestMethod]
-    public void CanvasLeavesTheMouseWheelToPageScrollingAndKeepsExplicitZoomControls()
+    public void CanvasLeavesTheMouseWheelToPageScrollingAndSupportsExplicitAndCtrlWheelZoom()
     {
         using var culture = new CultureScope("en-US");
         using var context = CreateContext();
@@ -43,6 +43,56 @@ public sealed class FlowDesignerReadOnlyTests
         Assert.IsFalse(diagram.Options.Zoom.Enabled);
         rendered.FindAll(".flow-zoom-controls button").Single(button => button.TextContent.Trim() == "+").Click();
         Assert.AreEqual(1.15, diagram.Zoom, 0.001);
+        rendered.Instance.ApplyCtrlWheelZoom(-120);
+        Assert.AreEqual(1.30, diagram.Zoom, 0.001);
+    }
+
+    [TestMethod]
+    public void CanvasHidesErrorTransitionsUntilTheirSourceOrTransitionIsSelectedOrAllAreRequested()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+        var document = new FlowDesignerDocument(
+            [
+                new("agent", "agent", "Agent", new(20, 20), "sample-agent", ["success", "error"]),
+                new("output", "output", "Output", new(300, 20), null, []),
+                new("failure", "failure", "Failure", new(300, 220), null, [])
+            ],
+            [
+                new("agent-success-output", "agent", "output", "success"),
+                new("agent-error-failure", "agent", "failure", "error")
+            ]);
+        var rendered = context.Render<FlowCanvas>(parameters => parameters
+            .Add(component => component.Document, document)
+            .Add(component => component.Revision, 1));
+
+        CollectionAssert.AreEquivalent(
+            new[] { "agent-success-output" },
+            GetDiagram(rendered.Instance).Links.Select(link => link.Id).ToArray());
+
+        rendered.Render(parameters => parameters
+            .Add(component => component.Document, document)
+            .Add(component => component.Revision, 1)
+            .Add(component => component.SelectedStepName, "agent"));
+        Assert.AreEqual(2, GetDiagram(rendered.Instance).Links.Count);
+
+        rendered.Render(parameters => parameters
+            .Add(component => component.Document, document)
+            .Add(component => component.Revision, 1)
+            .Add(component => component.SelectedStepName, (string?)null)
+            .Add(component => component.SelectedTransitionId, "agent-error-failure"));
+        Assert.IsTrue(GetDiagram(rendered.Instance).Links.Any(link => link.Id == "agent-error-failure" && link.Selected));
+
+        rendered.Render(parameters => parameters
+            .Add(component => component.Document, document)
+            .Add(component => component.Revision, 1)
+            .Add(component => component.SelectedTransitionId, (string?)null)
+            .Add(component => component.ShowAllErrorTransitions, true));
+        Assert.AreEqual(2, GetDiagram(rendered.Instance).Links.Count);
     }
 
     [TestMethod]
@@ -131,7 +181,7 @@ public sealed class FlowDesignerReadOnlyTests
         Assert.AreEqual("Steps", rendered.Find("#palette-steps-heading").TextContent);
         Assert.AreEqual("View", rendered.Find("#palette-view-heading").TextContent);
         Assert.HasCount(9, rendered.FindAll(".step-palette-group:first-child button .ui-icon"));
-        Assert.HasCount(3, rendered.FindAll(".palette-view button .ui-icon"));
+        Assert.HasCount(4, rendered.FindAll(".palette-view button .ui-icon"));
 
         var readOnlyCanvas = rendered.FindComponent<FlowCanvas>();
         var readOnlyDiagram = GetDiagram(readOnlyCanvas.Instance);

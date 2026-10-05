@@ -75,12 +75,14 @@ else
                     <button disabled="@ReadOnly" @onclick="() => LayoutAsync(false)"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="layout-distribute-horizontal" /></span><span>@T("HorizontalLayout")</span></button>
                     <button disabled="@ReadOnly" @onclick="() => LayoutAsync(true)"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="layout-distribute-vertical" /></span><span>@T("VerticalLayout")</span></button>
                     <button @onclick="Center"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="focus-centered" /></span><span>@T("Center")</span></button>
+                    <button aria-pressed="@showAllErrorTransitions" @onclick="ToggleErrorTransitions"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="alert-triangle" /></span><span>@T(showAllErrorTransitions ? "HideErrorTransitions" : "ShowErrorTransitions")</span></button>
                 </section>
             </aside>
 
             <div class="flow-canvas-wrap">
                 <FlowCanvas @ref="canvas" Document="Editor.State.Diagram" Revision="Editor.State.LocalRevision" FitRevision="layoutRevision"
-                            IsReadOnly="ReadOnly" EntryStep="@Editor.State.Resource.Definition.EntryStep" SelectedTransitionId="@Editor.State.Selection.TransitionId" SelectedStepChanged="SelectStepAsync"
+                            IsReadOnly="ReadOnly" EntryStep="@Editor.State.Resource.Definition.EntryStep" SelectedStepName="@Editor.State.Selection.StepName"
+                            SelectedTransitionId="@Editor.State.Selection.TransitionId" ShowAllErrorTransitions="showAllErrorTransitions" SelectedStepChanged="SelectStepAsync"
                             SelectedTransitionChanged="SelectTransitionAsync"
                             StepMoved="MoveStepAsync" StepRemoved="RemoveStepAsync" TransitionCreated="CreateTransitionAsync"
                             TransitionReconnected="ReconnectTransitionAsync"
@@ -341,6 +343,7 @@ else
     private string transitionTo = string.Empty;
     private string transitionEvent = "completed";
     private string publishVersion = "1.0.0";
+    private bool showAllErrorTransitions;
     private string runInput = "{\n  \"prompt\": \"How can I optimize this SQL query?\"\n}";
     private string? error;
     private bool saving;
@@ -451,6 +454,7 @@ else
         layoutRevision++;
     }
     private void Center() => canvas?.Center();
+    private void ToggleErrorTransitions() => showAllErrorTransitions = !showAllErrorTransitions;
     private void EditorChanged(object? sender, EventArgs args) => _ = InvokeAsync(StateHasChanged);
     private void SourceChanged(string source) { if (ReadOnly) return; sourceText = source; Editor.SetSource(source, Editor.State.SourceError); }
 

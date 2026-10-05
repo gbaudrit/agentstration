@@ -1,7 +1,8 @@
-@implements IDisposable
+@implements IAsyncDisposable
 @inject IStringLocalizer<FlowDesignerStrings> Localizer
+@inject IJSRuntime JSRuntime
 
-<div class="flow-diagram-canvas" role="application" aria-label="@Localizer["FlowDiagram"]">
+<div @ref="canvasElement" class="flow-diagram-canvas" role="application" aria-label="@Localizer["FlowDiagram"]">
     <div class="flow-zoom-controls" role="group" aria-label="@Localizer["DiagramZoomControls"]">
         <button type="button" @onclick="ZoomOut" aria-label="@Localizer["ZoomOut"]">−</button>
         <span aria-live="polite">@ZoomPercent%</span>
@@ -24,8 +25,15 @@
     });
     private long renderedRevision = -1;
     private long renderedFitRevision = -1;
+    private string? renderedSelectedStepName;
+    private string? renderedSelectedErrorTransitionId;
+    private bool renderedShowAllErrorTransitions;
     private bool rebuilding;
     private bool fitAfterRender;
+    private ElementReference canvasElement;
+    private DotNetObjectReference<FlowCanvas>? dotNetReference;
+    private IJSObjectReference? canvasModule;
+    private IJSObjectReference? wheelRegistration;
     private int ZoomPercent => (int)Math.Round(diagram.Zoom * 100);
 
     [Parameter, EditorRequired] public FlowDesignerDocument Document { get; set; } = new([], []);
@@ -33,7 +41,9 @@
     [Parameter] public long FitRevision { get; set; }
     [Parameter] public bool IsReadOnly { get; set; }
     [Parameter] public string? EntryStep { get; set; }
+    [Parameter] public string? SelectedStepName { get; set; }
     [Parameter] public string? SelectedTransitionId { get; set; }
+    [Parameter] public bool ShowAllErrorTransitions { get; set; }
     [Parameter] public EventCallback<string?> SelectedStepChanged { get; set; }
     [Parameter] public EventCallback<string?> SelectedTransitionChanged { get; set; }
     [Parameter] public EventCallback<MoveStepCommand> StepMoved { get; set; }
@@ -58,9 +68,18 @@
 
     protected override void OnParametersSet()
     {
-        if (Revision != renderedRevision)
+        var selectedErrorTransitionId = Document.Links.Any(link => link.Id == SelectedTransitionId && IsErrorTransition(link))
+            ? SelectedTransitionId
+            : null;
+        if (Revision != renderedRevision ||
+            renderedSelectedStepName != SelectedStepName ||
+            renderedSelectedErrorTransitionId != selectedErrorTransitionId ||
+            renderedShowAllErrorTransitions != ShowAllErrorTransitions)
         {
             renderedRevision = Revision;
+            renderedSelectedStepName = SelectedStepName;
+            renderedSelectedErrorTransitionId = selectedErrorTransitionId;
+            renderedShowAllErrorTransitions = ShowAllErrorTransitions;
             Rebuild();
         }
         if (FitRevision != renderedFitRevision)
@@ -68,24 +87,46 @@
             renderedFitRevision = FitRevision;
             fitAfterRender = true;
         }
-        SynchronizeTransitionSelection();
+        SynchronizeSelection();
     }
 
-    private void SynchronizeTransitionSelection()
+    private void SynchronizeSelection()
     {
-        foreach (var selected in diagram.GetSelectedModels().OfType<Blazor.Diagrams.Core.Models.Base.BaseLinkModel>().ToArray())
+        foreach (var selected in diagram.GetSelectedModels().ToArray())
         {
-            if (selected.Id != SelectedTransitionId)
+            var keepSelected = selected switch
+            {
+                FlowDiagramNode node => SelectedTransitionId is null && node.Source.Name == SelectedStepName,
+                Blazor.Diagrams.Core.Models.Base.BaseLinkModel link => link.Id == SelectedTransitionId,
+                _ => false
+            };
+            if (!keepSelected)
                 diagram.UnselectModel(selected);
         }
 
-        if (SelectedTransitionId is not { } id) return;
-        var link = diagram.Links.FirstOrDefault(candidate => candidate.Id == id);
-        if (link is not null && !link.Selected)
-            diagram.SelectModel(link, unselectOthers: true);
+        if (SelectedTransitionId is { } id)
+        {
+            var link = diagram.Links.FirstOrDefault(candidate => candidate.Id == id);
+            if (link is not null && !link.Selected)
+                diagram.SelectModel(link, unselectOthers: true);
+            return;
+        }
+
+        var selectedNode = diagram.Nodes.OfType<FlowDiagramNode>().FirstOrDefault(candidate => candidate.Source.Name == SelectedStepName);
+        if (selectedNode is not null && !selectedNode.Selected)
+            diagram.SelectModel(selectedNode, unselectOthers: true);
     }
 
-    protected override void OnAfterRender(bool firstRender) => TryFit();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        TryFit();
+        if (!firstRender) return;
+
+        canvasModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Agentstration.Web.FlowDesigner/js/flow-canvas.js?v=20261005-1");
+        dotNetReference = DotNetObjectReference.Create(this);
+        wheelRegistration = await canvasModule.InvokeAsync<IJSObjectReference>("attachCtrlWheelZoom", canvasElement, dotNetReference);
+    }
 
     public void Center()
     {
@@ -96,6 +137,13 @@
     public void ZoomIn() => SetZoom(diagram.Zoom + 0.15);
 
     public void ZoomOut() => SetZoom(diagram.Zoom - 0.15);
+
+    [JSInvokable]
+    public void ApplyCtrlWheelZoom(double deltaY)
+    {
+        if (deltaY == 0) return;
+        SetZoom(diagram.Zoom + (deltaY < 0 ? 0.15 : -0.15));
+    }
 
     private void SetZoom(double zoom) => diagram.SetZoom(Math.Clamp(zoom, 0.25, 2.5));
 
@@ -113,7 +161,11 @@
             DetachExistingLink(link);
         diagram.Links.Clear();
         diagram.Nodes.Clear();
-        var projection = FlowDiagramMapper.Project(Document);
+        var visibleDocument = Document with
+        {
+            Links = Document.Links.Where(IsTransitionVisible).ToArray()
+        };
+        var projection = FlowDiagramMapper.Project(visibleDocument);
         foreach (var node in projection.Nodes)
         {
             node.Locked = IsReadOnly;
@@ -129,6 +181,15 @@
         }
         rebuilding = false;
     }
+
+    private bool IsTransitionVisible(FlowDesignerLink link) =>
+        !IsErrorTransition(link) ||
+        ShowAllErrorTransitions ||
+        link.From == SelectedStepName ||
+        link.Id == SelectedTransitionId;
+
+    private static bool IsErrorTransition(FlowDesignerLink link) =>
+        string.Equals(link.Event, "error", StringComparison.Ordinal);
 
     private void OnDiagramMetricsChanged(Blazor.Diagrams.Core.Models.Base.Model _)
     {
@@ -268,7 +329,7 @@
         _ = TransitionRemoved.InvokeAsync(link.Id);
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         diagram.ContainerChanged -= OnContainerChanged;
         diagram.ZoomChanged -= OnZoomChanged;
@@ -283,5 +344,20 @@
         }
         foreach (var link in diagram.Links)
             DetachExistingLink(link);
+
+        try
+        {
+            if (wheelRegistration is not null)
+                await wheelRegistration.InvokeVoidAsync("dispose");
+            if (wheelRegistration is not null)
+                await wheelRegistration.DisposeAsync();
+            if (canvasModule is not null)
+                await canvasModule.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+            // The browser circuit can close before the component is disposed.
+        }
+        dotNetReference?.Dispose();
     }
 }

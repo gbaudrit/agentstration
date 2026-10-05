@@ -28,6 +28,7 @@
   <data name="Step.flow"><value>Flow</value></data>
   <data name="Step.tool"><value>Tool</value></data>
   <data name="HorizontalLayout"><value>Horizontal layout</value></data><data name="VerticalLayout"><value>Vertical layout</value></data><data name="Center"><value>Center</value></data>
+  <data name="ShowErrorTransitions"><value>Show error paths</value></data><data name="HideErrorTransitions"><value>Hide error paths</value></data>
   <data name="Inspector"><value>Inspector</value></data><data name="SelectStep"><value>Select a step to edit it.</value></data>
   <data name="DisplayName"><value>Display name</value></data><data name="TechnicalName"><value>Technical name</value></data><data name="Type"><value>Type</value></data>
   <data name="StepDetails"><value>Step</value></data><data name="StepDisplayName"><value>Step display name</value></data><data name="StepId"><value>Step ID</value></data>

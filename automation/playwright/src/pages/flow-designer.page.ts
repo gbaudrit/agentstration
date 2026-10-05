@@ -32,7 +32,7 @@ export class FlowDesignerPage {
     await expect(links.first()).toBeVisible();
   }
 
-  public async expectCanvasFitsViewportAndWheelDoesNotZoom(): Promise<void> {
+  public async expectCanvasFitsViewportAndWheelZoomContract(): Promise<void> {
     const canvas = this.page.locator('.flow-canvas-wrap');
     await expect(canvas).toBeVisible();
     const bounds = await canvas.boundingBox();
@@ -46,6 +46,12 @@ export class FlowDesignerPage {
     await canvas.hover();
     await this.page.mouse.wheel(0, 480);
     await expect(zoom).toHaveText(initialZoom ?? '');
+
+    await canvas.hover();
+    await this.page.keyboard.down('Control');
+    await this.page.mouse.wheel(0, -480);
+    await this.page.keyboard.up('Control');
+    await expect(zoom).not.toHaveText(initialZoom ?? '');
   }
 
   public async selectFirstInspectorTransition(): Promise<void> {
