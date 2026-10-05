@@ -38,6 +38,32 @@ public sealed class FlowEditorStoreTests
     }
 
     [TestMethod]
+    public async Task AddingStepWithTransitionIsOneUndoableChange()
+    {
+        var now = DateTimeOffset.Parse("2026-08-04T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [new InputFlowStepDefinition { Name = "input" }, new AgentFlowStepDefinition { Name = "agent", Agent = new("sample") }],
+            Transitions = [new("input-agent", "input", "completed", "agent")]
+        };
+        var draft = new FlowDraft { WorkspaceId = WorkspaceId, Id = "editor-draft", FlowId = new("editor"), DisplayName = "Editor", Definition = definition, CreatedAt = now, UpdatedAt = now };
+        var store = new FlowEditorStore();
+        store.Load(new FlowDraftResponse(draft, "\"etag-1\""), "entryStep: input");
+
+        await store.DispatchAsync(new AddStepCommand(
+            new FailureFlowStepDefinition { Name = "failure" },
+            new(300, 200),
+            new("agent-error-failure", "agent", "error", "failure")));
+
+        Assert.IsTrue(store.State.Resource!.Definition.Steps.Any(step => step.Name == "failure"));
+        Assert.IsTrue(store.State.Resource.Definition.Transitions.Any(transition => transition.Id == "agent-error-failure"));
+        store.Undo();
+        Assert.IsFalse(store.State.Resource.Definition.Steps.Any(step => step.Name == "failure"));
+        Assert.IsFalse(store.State.Resource.Definition.Transitions.Any(transition => transition.Id == "agent-error-failure"));
+    }
+
+    [TestMethod]
     public void AutoLayoutUsesGraphLayersAndSeparatesBranches()
     {
         var definition = new FlowGraphDefinition

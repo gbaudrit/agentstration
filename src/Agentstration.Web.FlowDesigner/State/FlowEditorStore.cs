@@ -44,9 +44,23 @@ public sealed record FlowEditorState
 
 public interface IFlowEditorCommand { FlowGraphDefinition Apply(FlowGraphDefinition definition); }
 public sealed record ReplaceDefinitionCommand(FlowGraphDefinition Definition) : IFlowEditorCommand { public FlowGraphDefinition Apply(FlowGraphDefinition definition) => Definition; }
-public sealed record AddStepCommand(FlowStepDefinition Step, FlowNodePosition Position) : IFlowEditorCommand
+public sealed record AddStepCommand(
+    FlowStepDefinition Step,
+    FlowNodePosition Position,
+    FlowTransitionDefinition? Transition = null) : IFlowEditorCommand
 {
-    public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with { Steps = [.. definition.Steps, Step], Designer = definition.Designer with { NodePositions = new Dictionary<string, FlowNodePosition>(definition.Designer.NodePositions, StringComparer.Ordinal) { [Step.Name] = Position } } };
+    public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with
+    {
+        Steps = [.. definition.Steps, Step],
+        Transitions = Transition is null ? definition.Transitions : [.. definition.Transitions, Transition],
+        Designer = definition.Designer with
+        {
+            NodePositions = new Dictionary<string, FlowNodePosition>(definition.Designer.NodePositions, StringComparer.Ordinal)
+            {
+                [Step.Name] = Position
+            }
+        }
+    };
 }
 public sealed record RemoveStepCommand(string Name) : IFlowEditorCommand
 {

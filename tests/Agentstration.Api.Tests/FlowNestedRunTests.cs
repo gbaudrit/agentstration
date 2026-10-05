@@ -120,8 +120,10 @@ public sealed partial class FlowTests
     {
         var graph = FlowDraftTemplates.Create(template);
         var output = graph.Steps.OfType<OutputFlowStepDefinition>().Single(step => step.Outcome is not FlowOutputOutcome.Error);
+        var error = graph.Steps.OfType<OutputFlowStepDefinition>().Single(step => step.Outcome == FlowOutputOutcome.Error);
 
         Assert.AreEqual("${transition.output}", output.OutputMapping?.GetString());
+        Assert.AreEqual("error", error.Name);
     }
 
     [TestMethod]

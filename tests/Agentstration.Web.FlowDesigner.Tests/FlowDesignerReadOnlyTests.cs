@@ -497,6 +497,46 @@ public sealed class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
+    public void AddingFailureStepConnectsTheFirstAvailableErrorOutput()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new AgentFlowStepDefinition { Name = "agent", Agent = new("welcome-agent") },
+                new OutputFlowStepDefinition { Name = "output" }
+            ],
+            Transitions =
+            [
+                new("input-agent", "input", "completed", "agent"),
+                new("agent-output", "agent", "success", "output")
+            ]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "parent"));
+        rendered.FindAll(".step-palette button").Single(button => button.TextContent.Trim() == "Failure").Click();
+
+        var updated = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition;
+        var failure = updated.Steps.OfType<FailureFlowStepDefinition>().Single();
+        var transition = updated.Transitions.Single(item => item.Event == "error");
+        Assert.AreEqual("agent", transition.FromStep);
+        Assert.AreEqual(failure.Name, transition.ToStep);
+        Assert.AreEqual($"agent-error-{failure.Name}", transition.Id);
+    }
+
+    [TestMethod]
     public void AddingAndSelectingAgentUsesTechnicalReferenceAndResourceDisplayName()
     {
         using var culture = new CultureScope("en-US");

@@ -533,7 +533,21 @@ else
             _ => new FailureFlowStepDefinition { Name = name, DisplayName = "Failure" }
         };
         if (step is FlowCallStepDefinition flowCall) await LoadFlowVersionsAsync(flowCall.Flow);
-        await DispatchAsync(new AddStepCommand(step, new(40 + index * 180, 250))); Editor.SelectStep(name);
+        var errorTransition = step is FailureFlowStepDefinition
+            ? FirstAvailableErrorTransition(Editor.State.Resource.Definition, name)
+            : null;
+        await DispatchAsync(new AddStepCommand(step, new(40 + index * 180, 250), errorTransition));
+        Editor.SelectStep(name);
+    }
+
+    private static FlowTransitionDefinition? FirstAvailableErrorTransition(FlowGraphDefinition definition, string targetStep)
+    {
+        var source = definition.Steps.FirstOrDefault(step =>
+            step.OutputEvents().Contains("error", StringComparer.Ordinal) &&
+            !definition.Transitions.Any(transition => transition.FromStep == step.Name && transition.Event == "error"));
+        return source is null
+            ? null
+            : new($"{source.Name}-error-{targetStep}", source.Name, "error", targetStep);
     }
 
     private async Task AddTransitionAsync() { if (!string.IsNullOrWhiteSpace(transitionFrom) && !string.IsNullOrWhiteSpace(transitionTo)) await CreateTransitionAsync(new($"{transitionFrom}-{transitionEvent}-{transitionTo}", transitionFrom, transitionEvent, transitionTo)); }

@@ -68,6 +68,13 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             if (!NamePattern().IsMatch(step.Name)) issues.Add(Error("step_name_invalid", "Step names must contain letters, digits, '-' or '_'.", step.Name, property: "name"));
             if (!steps.TryAdd(step.Name, step)) issues.Add(Error("step_name_duplicate", $"Step '{step.Name}' is duplicated.", step.Name));
             await ValidateStepAsync(step, definition.Transitions, context, issues, cancellationToken);
+            if (step.OutputEvents().Contains("error", StringComparer.Ordinal)
+                && !definition.Transitions.Any(transition => transition.FromStep == step.Name && transition.Event == "error"))
+                issues.Add(Error(
+                    "error_transition_required",
+                    $"Step '{step.Name}' requires a transition for its 'error' output.",
+                    step.Name,
+                    property: "transitions"));
         }
 
         if (!steps.ContainsKey(definition.EntryStep)) issues.Add(Error("entry_step_unknown", "The entry step does not exist.", property: "entryStep"));
