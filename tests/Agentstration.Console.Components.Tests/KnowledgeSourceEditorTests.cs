@@ -253,15 +253,20 @@ public sealed class KnowledgeSourceEditorTests
             var profileOption = rendered.Find("[data-testid='knowledge-source-definition-profile'] option[value='default|web']");
             Assert.AreEqual("Web (1.0.0)", profileOption.TextContent);
             Assert.IsFalse(profileOption.TextContent.Contains("??", StringComparison.Ordinal));
+            Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-definition-configuration']"));
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-enabled-option'].knowledge-choice"));
         });
 
         rendered.Find("[data-testid='knowledge-source-definition-display-name']").Change("Updated documentation");
+        rendered.Find("[data-testid='knowledge-source-definition-configuration']")
+            .Change("{\"url\":\"https://docs.agentstration.io\"}");
         rendered.Find("[data-testid='knowledge-source-definition-save']").Click();
         rendered.WaitForAssertion(() =>
         {
             Assert.IsNotNull(client.UpdatedRequest);
             Assert.AreEqual("Updated documentation", client.UpdatedRequest.Properties.DisplayName);
+            Assert.AreEqual("https://docs.agentstration.io",
+                client.UpdatedRequest.Properties.AcquisitionConfiguration.GetProperty("url").GetString());
             Assert.AreEqual("web", client.UpdatedRequest.Properties.Profile?.Name);
             Assert.IsNull(client.UpdatedRequest.Properties.IngestionFlow);
             Assert.IsNull(client.UpdatedRequest.Properties.RetrievalFlow);
