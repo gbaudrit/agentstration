@@ -169,7 +169,10 @@ public sealed partial class ApiClientTests
                     "microsoft-agent-framework", "1.0", "1.0", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, [])
             };
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(payload) };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
         var client = new RuntimeApiClient(httpClient);
 
         _ = await client.GetRuntimeWorkersAsync(default);
