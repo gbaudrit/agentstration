@@ -202,7 +202,7 @@ public sealed partial class FlowTests
         graph = graph with
         {
             Transitions = graph.Transitions
-                .Select(transition => transition.FromStep == "analyze" ? transition with { Event = "failed" } : transition)
+                .Select(transition => transition.Id == "call-output" ? transition with { Event = "failed" } : transition)
                 .ToArray()
         };
 
@@ -251,9 +251,15 @@ public sealed partial class FlowTests
         var steps = new List<FlowStepDefinition> { new InputFlowStepDefinition { Name = "input", Schema = schema } };
         if (call is not null) steps.Add(call);
         steps.Add(new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement(new { result = call is null ? "${input.article}" : $"${{steps.{call.Name}.output}}" }) });
+        if (call is not null) steps.Add(new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error });
         var transitions = call is null
             ? new[] { new FlowTransitionDefinition("input-output", "input", "completed", "output") }
-            : new[] { new FlowTransitionDefinition("input-call", "input", "completed", call.Name), new FlowTransitionDefinition("call-output", call.Name, "completed", "output") };
+            : new[]
+            {
+                new FlowTransitionDefinition("input-call", "input", "completed", call.Name),
+                new FlowTransitionDefinition("call-output", call.Name, "completed", "output"),
+                new FlowTransitionDefinition("call-error", call.Name, "error", "error")
+            };
         return new FlowGraphDefinition { EntryStep = "input", InputSchema = schema, OutputSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { result = new { } } }), Steps = steps, Transitions = transitions };
     }
 
