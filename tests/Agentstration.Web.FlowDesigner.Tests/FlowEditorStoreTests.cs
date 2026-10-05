@@ -44,23 +44,23 @@ public sealed class FlowEditorStoreTests
         var definition = new FlowGraphDefinition
         {
             EntryStep = "input",
-            Steps = [new InputFlowStepDefinition { Name = "input" }, new AgentFlowStepDefinition { Name = "agent", Agent = new("sample") }],
-            Transitions = [new("input-agent", "input", "completed", "agent")]
+            Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }],
+            Transitions = []
         };
         var draft = new FlowDraft { WorkspaceId = WorkspaceId, Id = "editor-draft", FlowId = new("editor"), DisplayName = "Editor", Definition = definition, CreatedAt = now, UpdatedAt = now };
         var store = new FlowEditorStore();
         store.Load(new FlowDraftResponse(draft, "\"etag-1\""), "entryStep: input");
 
         await store.DispatchAsync(new AddStepCommand(
-            new FailureFlowStepDefinition { Name = "failure" },
+            new AgentFlowStepDefinition { Name = "agent", Agent = new("sample") },
             new(300, 200),
-            new("agent-error-failure", "agent", "error", "failure")));
+            new("agent-error-error", "agent", "error", "error")));
 
-        Assert.IsTrue(store.State.Resource!.Definition.Steps.Any(step => step.Name == "failure"));
-        Assert.IsTrue(store.State.Resource.Definition.Transitions.Any(transition => transition.Id == "agent-error-failure"));
+        Assert.IsTrue(store.State.Resource!.Definition.Steps.Any(step => step.Name == "agent"));
+        Assert.IsTrue(store.State.Resource.Definition.Transitions.Any(transition => transition.Id == "agent-error-error"));
         store.Undo();
-        Assert.IsFalse(store.State.Resource.Definition.Steps.Any(step => step.Name == "failure"));
-        Assert.IsFalse(store.State.Resource.Definition.Transitions.Any(transition => transition.Id == "agent-error-failure"));
+        Assert.IsFalse(store.State.Resource.Definition.Steps.Any(step => step.Name == "agent"));
+        Assert.IsFalse(store.State.Resource.Definition.Transitions.Any(transition => transition.Id == "agent-error-error"));
     }
 
     [TestMethod]

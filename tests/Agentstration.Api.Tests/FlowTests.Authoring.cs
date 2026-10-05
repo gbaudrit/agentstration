@@ -316,6 +316,7 @@ public sealed partial class FlowTests
                 new InputFlowStepDefinition { Name = "input" },
                 new AgentFlowStepDefinition { Name = "agent", Agent = new("sample-agent") },
                 new ToolFlowStepDefinition { Name = "tool", Tool = new("sample-tool") },
+                new FlowCallStepDefinition { Name = "child", Flow = new("sample-flow") },
                 new OutputFlowStepDefinition { Name = "output" },
                 new FailureFlowStepDefinition { Name = "failure" }
             ],
@@ -331,7 +332,7 @@ public sealed partial class FlowTests
         var missing = await validator.ValidateAsync(graph, new FlowValidationContext(false), default);
 
         CollectionAssert.AreEquivalent(
-            new[] { "agent", "tool" },
+            new[] { "agent", "tool", "child" },
             missing.Issues.Where(issue => issue.Code == "error_transition_required").Select(issue => issue.StepId).ToArray());
 
         var connected = await validator.ValidateAsync(graph with
@@ -340,7 +341,8 @@ public sealed partial class FlowTests
             [
                 .. graph.Transitions,
                 new("agent-error", "agent", "error", "failure"),
-                new("tool-error", "tool", "error", "failure")
+                new("tool-error", "tool", "error", "failure"),
+                new("child-error", "child", "error", "failure")
             ]
         }, new FlowValidationContext(false), default);
 

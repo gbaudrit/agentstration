@@ -180,7 +180,7 @@ public sealed class FlowDesignerReadOnlyTests
         Assert.AreEqual(@namespace, backend.LoadedTarget?.Namespace);
         Assert.AreEqual("Steps", rendered.Find("#palette-steps-heading").TextContent);
         Assert.AreEqual("View", rendered.Find("#palette-view-heading").TextContent);
-        Assert.HasCount(9, rendered.FindAll(".step-palette-group:first-child button .ui-icon"));
+        Assert.HasCount(8, rendered.FindAll(".step-palette-group:first-child button .ui-icon"));
         Assert.HasCount(4, rendered.FindAll(".palette-view button .ui-icon"));
 
         var readOnlyCanvas = rendered.FindComponent<FlowCanvas>();
@@ -497,7 +497,7 @@ public sealed class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
-    public void AddingFailureStepConnectsTheFirstAvailableErrorOutput()
+    public void AddingAgentStepConnectsItsErrorOutputToTheFirstErrorTerminal()
     {
         using var culture = new CultureScope("en-US");
         using var context = CreateContext();
@@ -507,14 +507,10 @@ public sealed class FlowDesignerReadOnlyTests
             Steps =
             [
                 new InputFlowStepDefinition { Name = "input" },
-                new AgentFlowStepDefinition { Name = "agent", Agent = new("welcome-agent") },
-                new OutputFlowStepDefinition { Name = "output" }
+                new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success },
+                new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }
             ],
-            Transitions =
-            [
-                new("input-agent", "input", "completed", "agent"),
-                new("agent-output", "agent", "success", "output")
-            ]
+            Transitions = [new("input-completed", "input", "completed", "completed")]
         };
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
         context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
@@ -526,14 +522,15 @@ public sealed class FlowDesignerReadOnlyTests
 
         var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
             .Add(component => component.ResourceId, "parent"));
-        rendered.FindAll(".step-palette button").Single(button => button.TextContent.Trim() == "Failure").Click();
+        rendered.FindAll(".step-palette button").Single(button => button.TextContent.Trim() == "Agent").Click();
 
         var updated = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition;
-        var failure = updated.Steps.OfType<FailureFlowStepDefinition>().Single();
+        var agent = updated.Steps.OfType<AgentFlowStepDefinition>().Single();
         var transition = updated.Transitions.Single(item => item.Event == "error");
-        Assert.AreEqual("agent", transition.FromStep);
-        Assert.AreEqual(failure.Name, transition.ToStep);
-        Assert.AreEqual($"agent-error-{failure.Name}", transition.Id);
+        Assert.AreEqual(agent.Name, transition.FromStep);
+        Assert.AreEqual("error", transition.ToStep);
+        Assert.AreEqual($"{agent.Name}-error-error", transition.Id);
+        Assert.IsFalse(rendered.FindAll(".step-palette button").Any(button => button.TextContent.Trim() == "Failure"));
     }
 
     [TestMethod]
