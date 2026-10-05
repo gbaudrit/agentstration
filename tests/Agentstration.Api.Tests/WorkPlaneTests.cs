@@ -6,6 +6,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Application.Work;
 using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Resources;
@@ -16,6 +17,7 @@ using Agentstration.Work.Storage.Sqlite;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -1007,6 +1009,11 @@ public sealed class WorkPlaneTests
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IFlowRunQueue>();
+                services.AddSingleton<IFlowRunQueue, InProcessFlowTestQueue>();
+            });
         });
         using var client = factory.CreateClient();
         var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces");
@@ -1055,6 +1062,28 @@ public sealed class WorkPlaneTests
 
     private static WorkItem CreatePending(string type = "analysis", string? requester = "requester-1") =>
         WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, type, "Perform the requested work", Now, requesterIdentity: requester);
+
+    private sealed class InProcessFlowTestQueue(IServiceProvider services) : IFlowRunQueue
+    {
+        public ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken)
+        {
+            _ = Task.Run(async () =>
+            {
+                using var scope = services.CreateScope();
+                await scope.ServiceProvider.GetRequiredService<FlowRunService>()
+                    .ExecuteAsync(item, CancellationToken.None);
+            }, CancellationToken.None);
+            return ValueTask.CompletedTask;
+        }
+
+        public async IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.CompletedTask;
+            cancellationToken.ThrowIfCancellationRequested();
+            yield break;
+        }
+    }
 
     private static WorkItem Running()
     {

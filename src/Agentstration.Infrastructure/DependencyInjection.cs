@@ -29,9 +29,10 @@ using Agentstration.ResourcePlanning;
 using Agentstration.ResourcePlanning.Storage.PostgreSql;
 using Agentstration.ResourcePlanning.Storage.Sqlite;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.AgentFramework;
+using Agentstration.Runtime.Contracts;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Local;
+using Agentstration.Runtime.MicrosoftAgentFramework;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Runtime.Storage.PostgreSql;
 using Agentstration.Runtime.Storage.Sqlite;
@@ -69,7 +70,9 @@ public static class DependencyInjection
         AgentstrationStorageOptions? storageOptions = null,
         bool enableHostedServices = true,
         SourceVerificationIndexOptions? sourceVerificationIndexOptions = null,
-        SourceRegistryTransportOptions? sourceRegistryTransportOptions = null)
+        SourceRegistryTransportOptions? sourceRegistryTransportOptions = null,
+        RuntimeWorkerLeaseOptions? runtimeWorkerLeaseOptions = null,
+        RuntimeWorkerDispatchOptions? runtimeWorkerDispatchOptions = null)
     {
         services.AddSingleton(TimeProvider.System);
         services.TryAddSingleton<LocalBootstrapOptions>();
@@ -184,7 +187,7 @@ public static class DependencyInjection
         services.AddSingleton<Agentstration.Runtime.Abstractions.IAgentRuntimeFactory>(services =>
             services.GetRequiredService<AgentFrameworkRuntimeFactory>());
         services.AddSingleton<IRuntimeRegistry, RuntimeRegistry>();
-        services.AddSingleton<IRuntimeRunQueue, LocalRuntimeRunQueue>();
+        services.AddSingleton<IRuntimeRunQueue, AwpRuntimeRunQueue>();
         services.AddSingleton<IRuntimeRunCancellationRegistry, LocalRuntimeRunCancellationRegistry>();
         services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
         services.AddSingleton<IAgentDeploymentProvisioner, InProcessAgentProvisioner>();
@@ -323,6 +326,16 @@ public static class DependencyInjection
         }
         services.AddSingleton<RuntimeRunStateManager>();
         services.AddSingleton<RuntimeRunService>();
+        services.TryAddSingleton(runtimeWorkerLeaseOptions ?? new RuntimeWorkerLeaseOptions());
+        services.TryAddSingleton(runtimeWorkerDispatchOptions ?? new RuntimeWorkerDispatchOptions());
+        services.AddSingleton<RuntimeAssignmentAvailabilitySignal>();
+        services.AddSingleton<IRuntimeAssignmentProjection, AwpAssignmentProjection>();
+        services.AddSingleton<RuntimeWorkerAssignmentService>();
+        services.AddSingleton<IRuntimeExecutionMaterialResolver, RuntimeExecutionMaterialResolver>();
+        services.AddSingleton<RuntimeWorkerExecutionService>();
+        services.AddSingleton<IRuntimeWorkerOperationGateway, RuntimeWorkerOperationGateway>();
+        services.AddSingleton<RuntimeWorkerDispatchService>();
+        services.AddSingleton<IRuntimeObservabilityQueryService, Runtime.RuntimeObservabilityQueryService>();
         services.TryAddSingleton(new ToolExecutionCaptureOptions());
         services.AddSingleton<IToolExecutionEventSink, RuntimeToolExecutionEventSink>();
         services.AddSingleton<IToolExecutionEventSink, FlowToolExecutionEventSink>();
@@ -387,7 +400,7 @@ public static class DependencyInjection
         services.AddSingleton<EntryAdministrationService>();
         services.AddSingleton<IWorkplaceContext, CurrentWorkplaceContext>();
         services.AddSingleton<DashboardAdministrationService>();
-        services.AddSingleton<IFlowRunQueue, LocalFlowRunQueue>();
+        services.AddSingleton<IFlowRunQueue, AwpFlowRunQueue>();
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
         services.AddSingleton<IFlowRunExecutionScope, WorkspaceFlowRunExecutionScope>();
         services.AddSingleton<IWorkExecutionScopeAccessor, CurrentWorkExecutionScopeAccessor>();

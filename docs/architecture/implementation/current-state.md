@@ -45,6 +45,7 @@ src/
   Agentstration.ResourceManagement.Storage.Sqlite/
   Agentstration.ResourcePlanning*/ Resource Plan contracts, lifecycle, API and relational storage
   ../aep/                            autonomous AEP SDK, CLI, Inspector, samples and tests
+  ../awp/src/Agentstration.Awp.Abstractions/ provider-neutral AWP v1 wire contracts
   Agentstration.Extensions.Ollama/   autonomous AEP-to-Ollama service
   Agentstration.Extensions.LlamaCpp/ autonomous AEP-to-llama.cpp service
   Agentstration.Extensions.LocalAI/  autonomous AEP-to-LocalAI service
@@ -54,7 +55,7 @@ src/
   Agentstration.Runtime.Abstractions/
   Agentstration.Runtime.Core/       Runtime Run lifecycle, observation, cancellation
   Agentstration.Runtime.Contracts/  Public Runtime Run HTTP contracts
-  Agentstration.Runtime.AgentFramework/
+  Agentstration.Runtime.MicrosoftAgentFramework/
   Agentstration.Runtime.Local/
   Agentstration.Runtime.Profiles/  Runtime-profile administration
   Agentstration.Runtime.Storage.Sqlite/
@@ -63,6 +64,7 @@ src/
   Agentstration.Work.Storage.Abstractions/
   Agentstration.Work.Storage.Sqlite/
 tests/
+  Agentstration.Awp.Tests/
   Agentstration.Api.Tests/
   Agentstration.Application.Tests/
   Agentstration.ArchitectureTests/
@@ -104,7 +106,8 @@ Extensions.LlamaCpp -> Aep.AspNetCore + native HTTP
 Extensions.LocalAI -> Aep.AspNetCore + native HTTP
 Extensions.Git -> Aep.AspNetCore + bounded Git process
 AppHost -> provider extensions (configured local inference endpoints)
-Runtime.AgentFramework -> runtime abstractions + ModelProviders + Microsoft Agent Framework
+Awp.Abstractions -> BCL JSON contracts only
+Runtime.MicrosoftAgentFramework -> runtime abstractions + ModelProviders + Microsoft Agent Framework
 Application -> Work + Work storage abstractions
 Flows.Application -> Flows + Flows.Storage.Abstractions
 Flows.Storage.Sqlite -> Flows.Storage.Abstractions + EF Core SQLite
@@ -118,7 +121,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 
 `Agentstration.Web/Program.cs` is deliberately limited to creating the builder, applying the standalone composition, initializing it, and running it. `StandaloneHostComposition` remains in the executable project and is the single place that selects storage and identity providers, registers concrete adapters and workers, configures observability, orders startup initialization, and assembles `Agentstration.Api` with the Console libraries. The independently runnable `Agentstration.Console.Web` hosts the same Console routes and shared static assets with interactive server rendering, its own antiforgery/culture pipeline, liveness/readiness endpoints, and separately configurable Management, Work, Flow, and Runtime origins. It intentionally contains no authoritative server implementation. Its dedicated signed workload client verifies local credentials through private identity operations and establishes an opaque BFF cookie backed by server-side session state. Active Principal and selected Tenant/Workspace state are revalidated by the authoritative server on every authenticated browser request. Server-side Console clients use short-lived, audience-bound API delegation; the API checks current authentication and authorization for each call. External OIDC login remains dependent on #204, so `Agentstration.Web` remains the functional standalone fallback. See ADR-0111, ADR-0112, ADR-0115, and ADR-0116.
 
-Management abstractions and kind constants are owned by their resource families; the former compatibility assembly has been removed. Identity, authorization and PAT contracts are owned by `Identity.Contracts`, provider-neutral audit contracts by `Security.Contracts`, Extension registration and AEP contracts by `Extensions.Contracts`, and all Source and Source Registry contracts, policies, provenance and provider ports by `Sources.Contracts`. Generic Bootstrap documents, planning and handler ports are owned by `ResourceManagement.Contracts`; composed application and HTTP contracts live in the narrow `Bootstrap.Contracts` façade. Validation and use cases live in plural resource-family modules. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
+Management abstractions and kind constants are owned by their resource families; the former compatibility assembly has been removed. Identity, authorization and PAT contracts are owned by `Identity.Contracts`, provider-neutral audit contracts by `Security.Contracts`, Extension registration and AEP contracts by `Extensions.Contracts`, and all Source and Source Registry contracts, policies, provenance and provider ports by `Sources.Contracts`. Generic Bootstrap documents, planning and handler ports are owned by `ResourceManagement.Contracts`; composed application and HTTP contracts live in the narrow `Bootstrap.Contracts` façade. Validation and use cases live in plural resource-family modules. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.MicrosoftAgentFramework`. Foundry is absent from every central project.
 
 The optional Foundry AEP extension is process-stateless with respect to projects: contribution-scoped Value Requirements place project and inference endpoints, authentication mode and identity inputs on each Model Provider. Standard values bind Parameters or Secrets; the secured API credential binds only a Secret and is redeemed through a one-use AEP grant for each bounded operation. Operator configuration retains only timeouts, size/count limits and the private-network allowlist, so one extension can isolate concurrent providers without making Azure part of local startup. See ADR-0134.
 
@@ -132,7 +135,7 @@ The optional Foundry AEP extension is process-stateless with respect to projects
 | Pack distribution | local ZIP importer, retained source artifacts, Pack Projects, workspace-resource Composer with dependency closure, deterministic builds, direct current-Workspace installation, logical Model Profile/Model Provider/Runtime Profile/Secret bindings retained by Pack identity, coordinated six-kind lifecycle, differential updates, provenance, compensation, and modification-safe uninstall | broader contained-resource authoring, fully scoped cross-Workspace install, dependency resolution, three-way merge, signatures, Gallery, and publisher verification |
 | Control storage | SQLite by default or optional PostgreSQL in seven module-owned schemas, with optimistic concurrency and versioned migrations | richer relational projections and supported export/import |
 | Resource Planning | durable Workspace-scoped Resource Plans, deterministic materialization with explicit per-Agent Model and Runtime Profile bindings, reviewable ChangeSets, validation, governed application through canonical services, planning Tools, specialist Flows, and Console review UX | an official installable Pack |
-| Runtime plane | durable Run resources and events, SSE observation, cancellation/retry, MAF `ChatClientAgent`, in-process/shared-host provisioning, registry, reconciliation | provider-native token/tool streaming, sessions, dedicated hosts, containers, remote and Foundry adapters |
+| Runtime plane | durable Run resources and events, SSE observation, cancellation/retry, durable Worker assignments with renewable leases and fencing, authenticated AWP Worker registration, bounded pull-based claim and heartbeat transport, MAF `ChatClientAgent`, in-process/shared-host provisioning, registry, reconciliation, and provider-neutral AWP v1 wire contracts | autonomous AWP client/Workers, governed execution-material operations, provider-native token/tool streaming, dedicated hosts, containers, remote and Foundry adapters |
 | Model providers | SQLite-backed extension registrations and provider bindings with ETag CRUD and usage protection, explicit configuration/Aspire refresh, dynamic AEP health/model discovery, persisted logical profiles, and provider-neutral `IChatClient` resolution | additional AEP extensions, cached discovery |
 | Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API | durable dispatch, retry/recovery, requester authorization, artifact storage |
 | Work storage | independent SQLite snapshots, indexed query fields, optimistic version concurrency | migrations and richer projections |
@@ -270,7 +273,7 @@ Console save-and-apply / explicit Runtime reconcile
   -> on failure, keep the previous healthy generation running
 ```
 
-Management never constructs an `AIAgent`, resolves credentials, injects a model client, instantiates tools, or executes an agent. `ResolvedAgentSpec` is the provider-neutral boundary for the direct Agent definition, model profile, and tools; concrete MAF materialization remains in `Agentstration.Runtime.AgentFramework`.
+Management never constructs an `AIAgent`, resolves credentials, injects a model client, instantiates tools, or executes an agent. `ResolvedAgentSpec` is the provider-neutral boundary for the direct Agent definition, model profile, and tools; concrete MAF materialization remains in `Agentstration.Runtime.MicrosoftAgentFramework`.
 
 Local activation is idempotent. During the short overlap needed for a safe replacement, routing selects the highest ready `AgentVersion` for each logical agent, so an older ready deployment cannot win because of storage enumeration order.
 
@@ -289,6 +292,8 @@ Console / API / future Work or Flow adapter
 
 An interactive console Run is owned entirely by the Runtime Plane and does not create a Work Item. Runtime Run storage is independent from Management and Work storage.
 
+The Runtime store also owns durable Worker assignments exposed through the authenticated AWP dispatch path. A Worker registers its current process session, bounded capacity, Runtime capability versions and execution-material compatibility, then performs an immediate or bounded long-poll claim. The in-memory wake signal is only an optimization: each request rechecks durable eligibility, and reconnecting Workers register again after an API restart. Claim and capacity enforcement remain atomic in SQLite and PostgreSQL. A claim creates an AssignmentAttempt bound to one Worker process session, a cryptographically random opaque token whose digest alone is stored, a monotonically increasing fencing generation, and a renewable server-time lease. Heartbeat, cancellation, terminal outcome and expiry are conditional durable transitions. Registering a replacement session interrupts former-session assignments as `worker_lost`; ownership is not transferred. The authoritative server independently reaps expired leases with the same no-retry/no-recovery policy. AWP Workers authenticate with a dedicated signed-request scheme and receive no human or general Management authority. Until complete execution externalization is delivered, the existing local queue remains the active execution path and does not create these assignments.
+
 ### AEP model-provider flow
 
 ```text
@@ -303,7 +308,7 @@ Agent modelProfile.resourceId
    -> persisted Management provider (AEP URL + contribution id + options)
    -> generic AEP model provider
    -> AepChatClient : Microsoft.Extensions.AI.IChatClient
-   -> Runtime.AgentFramework
+   -> Runtime.MicrosoftAgentFramework
    -> MAF AIAgent
    -> AEP HTTP/JSON or SSE
    -> selected AEP extension
@@ -329,7 +334,7 @@ Agent tool reference: Agentstration.Tools/tools/{name}
   -> AEP descriptor mapping OR direct MCP tools/list
   -> MCP tools/list supplies input/output schemas and annotations
   -> official McpClientTool (Microsoft.Extensions.AI AITool)
-  -> Runtime.AgentFramework -> MAF agent tool invocation -> MCP tools/call
+  -> Runtime.MicrosoftAgentFramework -> MAF agent tool invocation -> MCP tools/call
 ```
 
 AEP owns extension identity, presentation metadata, server declarations, and the mapping from a lightweight contribution to MCP. It deliberately carries no tool schema, invocation payload, result, or operational MCP error. MCP remains authoritative for `tools/list`, schema/annotations, `tools/call`, results, and protocol failures. Agentstration owns persistent `ToolProviderResource` and `ToolResource` documents, discovery state, assignment by canonical resource ID, enablement, and approval policy. Direct external MCP is a ToolProvider and does not pass through AEP. The catalog is independent of MAF; the Runtime adapter consumes its provider-neutral `IAgentTool` and reuses the official SDK's native `AITool` when available. A governed tool marked `requiresApproval` is exposed as an `ApprovalRequiredAIFunction`; MAF's external request then follows the durable `InputRequest` suspension and resume path.
@@ -435,6 +440,8 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 55. **Delivered generic Console Entry interaction increment:** the owner-Workspace route reuses canonical discovery, the shared Entry renderer, durable Interaction/Task state, continuation and pending-action contracts, cancellation, artifacts, realtime refresh, and replay. An initial palette query is submitted only when the Entry contract is unambiguous and otherwise remains a prefilled value. See ADR-0141.
 56. **Delivered Console conversation browsing increment:** a permission-aware navigation destination projects the current Principal's bounded durable Interaction list in the selected Workspace, filters it through canonical executable Console Entry discovery, and resumes the owner-scoped generic interaction route without copying conversation state. See ADR-0142.
 57. **Delivered durable instance initialization increment:** startup mutations are coordinated by a versioned instance-scoped lease with expiry and fencing, readiness follows durable completion, built-in Workspace resources are provisioned before activation, and catalog reads remain side-effect free. See ADR-0143.
+58. **Delivered durable Runtime Worker assignment increment:** SQLite and PostgreSQL persist atomic compatible claims, AssignmentAttempts, opaque-token digests, Worker/session ownership, renewable server-time leases, fencing generations, cancellation intent and idempotent terminal Event IDs. A control-plane reaper interrupts expired attempts and terminally fails their Runs as `worker_lost` without retry or recovery. See ADR-0156.
+59. **Delivered pull-based AWP dispatch increment:** authenticated Worker sessions register independent capacity and compatibility, discover pre-existing durable work through immediate or bounded long-poll claims, renew ownership through AWP heartbeat, and interrupt former-session assignments without transferring ownership. Process-local wake signals are best-effort only; durable assignment state remains authoritative. See ADR-0156.
 
 ## ADR catalog
 

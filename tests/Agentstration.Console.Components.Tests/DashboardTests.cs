@@ -56,8 +56,8 @@ public sealed class DashboardTests
         Assert.AreEqual(2, snapshot.DefinedAgents);
         Assert.AreEqual(3, snapshot.DefinedFlows);
         Assert.AreEqual(2, snapshot.ConfiguredExtensions);
-        Assert.AreEqual(1, snapshot.ReadyDeployments);
-        Assert.AreEqual(2, snapshot.DesiredDeployments);
+        Assert.AreEqual(0, snapshot.ReadyDeployments);
+        Assert.AreEqual(0, snapshot.DesiredDeployments);
         Assert.AreEqual(2, snapshot.RunningTasks);
         Assert.AreEqual(3, snapshot.ActionRequiredTasks);
         Assert.AreEqual(4, snapshot.FailedTasks);
@@ -66,11 +66,11 @@ public sealed class DashboardTests
         Assert.AreEqual(1, snapshot.FailedTriggers);
         Assert.AreEqual(1, snapshot.ReadyModelProviders);
         Assert.AreEqual(1, snapshot.UnavailableModelProviders);
-        Assert.AreEqual(10, snapshot.AttentionCount);
+        Assert.AreEqual(9, snapshot.AttentionCount);
         Assert.AreEqual("Attention required", snapshot.Status);
         Assert.IsTrue(snapshot.Sources.All(source => source.Severity == UiStatus.Success));
         Assert.IsTrue(snapshot.AttentionItems.All(item => !string.IsNullOrWhiteSpace(item.Url)));
-        Assert.IsTrue(snapshot.AttentionItems.Any(item => item.Url == "/deployments#deployment-default-deployment-failed"));
+        Assert.IsFalse(snapshot.AttentionItems.Any(item => item.Url?.StartsWith("/deployments", StringComparison.Ordinal) == true));
         Assert.IsTrue(snapshot.AttentionItems.Any(item => item.Url == "/tasks?hasPendingAction=true"));
         Assert.IsTrue(snapshot.AttentionItems.Any(item => item.Url == "/tasks?status=Failed"));
         Assert.IsTrue(snapshot.AttentionItems.Any(item => item.Url == "/triggers/failed-trigger"));
@@ -94,14 +94,14 @@ public sealed class DashboardTests
 
         Assert.AreEqual("Partially unavailable", snapshot.Status);
         Assert.AreEqual(2, snapshot.RunningTasks);
-        Assert.AreEqual(1, snapshot.AttentionCount);
+        Assert.AreEqual(2, snapshot.AttentionCount);
         var source = snapshot.Sources.Single(item => item.Name == "Agents Run");
         Assert.AreEqual(UiStatus.Danger, source.Severity);
         Assert.AreEqual("/agent-runs", source.Url);
     }
 
     [TestMethod]
-    public async Task DashboardTreatsNoActiveDeploymentsAsHealthy()
+    public async Task DashboardTreatsNoActiveAgentInstancesAsOperational()
     {
         var fake = new MockApiClient(new FixedTimeProvider(Now));
         var service = new PlatformDashboardService(
@@ -115,7 +115,7 @@ public sealed class DashboardTests
 
         var snapshot = await service.GetAsync(CancellationToken.None);
 
-        Assert.AreEqual("No active deployments", snapshot.Status);
+        Assert.AreEqual("Operational", snapshot.Status);
         Assert.AreEqual(UiStatus.Success, PlatformDashboardService.ToStatus(snapshot.Status));
     }
 
@@ -178,7 +178,7 @@ public sealed class DashboardTests
         work.Complete(new(0, 0, 0, 0, 0));
         var status = await ((IPlatformStatusProvider)service).GetStatusAsync(CancellationToken.None);
 
-        Assert.AreEqual(PlatformStatusKind.NoActiveDeployments, status.Kind);
+        Assert.AreEqual(PlatformStatusKind.Operational, status.Kind);
         Assert.AreEqual(UiStatus.Success, status.Status);
     }
 

@@ -1,0 +1,35 @@
+@page "/settings/runtime-workers"
+@implements IDisposable
+@inject IRuntimeApiClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimeWorkerStrings> Localizer
+
+<PageTitle>@T("RuntimeWorkers") · Agentstration</PageTitle>
+<PageHeader Title="@T("RuntimeWorkers")" Description="@T("Description")" TestId="runtime-workers" />
+@if (items is null) { <LoadingState Message="@T("Loading")" /> }
+else if (items.Count == 0) { <EmptyState Title="@T("Empty")" Message="@T("EmptyMessage")" /> }
+else
+{
+    <DataGrid TItem="RuntimeWorkerSummaryResponse" Items="items">
+        <Header><tr><th>@T("Worker")</th><th>@T("Presence")</th><th>@T("Session")</th><th>@T("Version")</th><th>@T("Capacity")</th><th>@T("Capabilities")</th><th>@T("LastSeen")</th></tr></Header>
+        <Row Context="item"><tr>
+            <td><a class="resource-name-link" href="@WorkerUrl(item)">@item.DisplayName</a><br /><small><code>@item.WorkerId</code></small></td>
+            <td><StatusBadge Text="@T($"Presence.{item.Presence}")" Status="@PlatformDashboardService.ToStatus(item.Presence.ToString())" /><br /><small>@T($"Enrollment.{item.EnrollmentState}")</small></td>
+            <td>@(item.SessionId?.ToString("D") ?? "—")</td><td>@(item.SoftwareVersion ?? "—")</td>
+            <td>@(item.MaximumConcurrentAssignments?.ToString() ?? "—")<br /><small>@T("ActiveAssignments", item.ActiveAssignments)</small></td>
+            <td>@string.Join(", ", item.Capabilities.Select(FormatCapability))</td>
+            <td>@(item.LastSeenAt?.LocalDateTime.ToString("g") ?? "—")</td>
+        </tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<RuntimeWorkerSummaryResponse>? items;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    protected override async Task OnInitializedAsync() => items = await Client.GetRuntimeWorkersAsync(cancellation.Token);
+    private static string FormatCapability(RuntimeWorkerCapabilityResponse capability) =>
+        $"{capability.RuntimeKind} {capability.CapabilityVersion} · material {string.Join('/', capability.ExecutionMaterialVersions)}"
+        + (string.IsNullOrWhiteSpace(capability.RuntimeImplementationVersion) ? string.Empty : $" · {capability.RuntimeImplementationVersion}");
+    private static string WorkerUrl(RuntimeWorkerSummaryResponse worker) => $"/settings/runtime-workers/{worker.WorkerId:D}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

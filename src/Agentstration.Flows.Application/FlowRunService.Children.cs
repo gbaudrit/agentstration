@@ -2,11 +2,30 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Flows.Storage.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Flows.Application;
 
 public sealed partial class FlowRunService
 {
+    public async Task<StoredFlowRun> CreateOrGetAssignedChildAsync(
+        WorkspaceId workspaceId,
+        string parentRunId,
+        string stepDefinitionId,
+        JsonElement input,
+        CancellationToken cancellationToken)
+    {
+        var parent = await repository.GetRunAsync(workspaceId, parentRunId, cancellationToken)
+            ?? throw new FlowRunNotFoundException(parentRunId);
+        var call = parent.Value.DefinitionSnapshot.Graph?.Steps
+            .OfType<FlowCallStepDefinition>()
+            .SingleOrDefault(value => string.Equals(value.Name, stepDefinitionId, StringComparison.Ordinal))
+            ?? throw new FlowValidationException("child_flow_step_invalid", "The assigned StepDefinition is not a Flow call.");
+        var attempt = Math.Max(1, parent.Value.Steps.Single(value => value.StepName == stepDefinitionId).Attempt);
+        var childRunId = ChildFlowRunId(parent.Value, stepDefinitionId, attempt);
+        return await EnsureChildFlowRunAsync(parent.Value, call, input, childRunId, cancellationToken);
+    }
+
     private static string ChildFlowRunId(FlowRun parent, string stepName, int attempt)
     {
         var identity = $"{parent.WorkspaceId}:{parent.Id}:{stepName}:{attempt}";

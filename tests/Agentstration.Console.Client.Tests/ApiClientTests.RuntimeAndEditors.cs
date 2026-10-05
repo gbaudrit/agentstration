@@ -155,6 +155,38 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task RuntimeClientReadsWorkerInventoryAgentInstancesAndPlacement()
+    {
+        var requested = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested.Add(request.RequestUri!.PathAndQuery);
+            object payload = request.RequestUri.AbsolutePath switch
+            {
+                "/api/runtime/workers" => Array.Empty<RuntimeWorkerSummaryResponse>(),
+                "/api/runtime/agent-instances" => Array.Empty<AgentInstanceResponse>(),
+                _ => new RuntimeAssignmentPlacementResponse(Guid.NewGuid(), "RuntimeRun", "run-1", "Assigned",
+                    "microsoft-agent-framework", "1.0", "1.0", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, [])
+            };
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(payload) };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
+        var client = new RuntimeApiClient(httpClient);
+
+        _ = await client.GetRuntimeWorkersAsync(default);
+        _ = await client.GetAgentInstancesAsync(default);
+        var placement = await client.GetPlacementAsync(RuntimeAssignmentTargetKind.RuntimeRun, "run-1", default);
+
+        Assert.IsNotNull(placement);
+        CollectionAssert.AreEqual(new[]
+        {
+            "/api/runtime/workers", "/api/runtime/agent-instances", "/api/runtime/placements/RuntimeRun/run-1"
+        }, requested);
+    }
+
+    [TestMethod]
     public void AgentRunnerRestoresToolCallsFromTheDurableRunProjection()
     {
         var persistedToolCall = new RuntimeToolCall

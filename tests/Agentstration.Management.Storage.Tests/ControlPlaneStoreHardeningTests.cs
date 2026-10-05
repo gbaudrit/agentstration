@@ -325,9 +325,12 @@ public sealed class ControlPlaneStoreHardeningTests
             ProvisioningState = ProvisioningState.Succeeded,
             Definition = Definition(agent.Value.Uid) with { AgentVersion = 4 }
         }, default);
-        var missingDeployment = await Assert.ThrowsExactlyAsync<RuntimeAgentResolutionException>(() =>
-            resolver.ResolveAsync(new RuntimeAgentReference("sql-expert", 4) { Namespace = packNamespace }, default));
-        Assert.AreEqual("deployment_not_found", missingDeployment.Code);
+        var undeployedRevision = await resolver.ResolveAsync(
+            new RuntimeAgentReference("sql-expert", 4) { Namespace = packNamespace }, default);
+        Assert.AreEqual(string.Empty, undeployedRevision.DeploymentId);
+        Assert.AreEqual(packNamespace, undeployedRevision.AgentNamespace);
+        Assert.AreEqual(4, undeployedRevision.Generation);
+        Assert.IsTrue(undeployedRevision.Ready);
     }
 
     [TestMethod]

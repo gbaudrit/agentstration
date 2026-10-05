@@ -138,6 +138,9 @@ public sealed class MockApiClient(TimeProvider timeProvider, IReadOnlyList<FlowR
         return Task.FromResult<IReadOnlyList<RuntimeRun>>(values);
     }
 
+    public Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<AgentInstanceResponse>>([]);
+
     public Task<IReadOnlyList<RuntimeRunEvent>> GetRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

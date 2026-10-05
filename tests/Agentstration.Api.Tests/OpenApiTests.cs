@@ -65,7 +65,7 @@ public sealed class OpenApiTests
             {
                 "health", "api/auth/bootstrap", "api/auth/local/login", "api/auth/oidc/login", "login", "bootstrap", "access-denied",
                 "api/aep/enrollments/announce", "api/aep/enrollments/claim", "api/aep/enrollments/ready",
-                "api/aep/secrets/redeem"
+                "api/aep/secrets/redeem", "api/awp/enrollment/announce", "api/awp/enrollment/claim"
             },
             anonymous);
     }

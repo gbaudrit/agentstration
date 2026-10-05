@@ -773,13 +773,17 @@ public sealed class PackTests
         Assert.AreEqual(HttpStatusCode.Accepted, runResponse.StatusCode, await runResponse.Content.ReadAsStringAsync());
         var run = await runResponse.Content.ReadFromJsonAsync<FlowRun>();
         Assert.IsNotNull(run);
-        for (var attempt = 0; attempt < 50 && !run.Status.IsTerminal(); attempt++)
-        {
-            await Task.Delay(100);
-            run = await client.GetFromJsonAsync<FlowRun>($"/api/flowRuns/{run.Id}");
-            Assert.IsNotNull(run);
-        }
-        Assert.AreEqual(FlowRunStatus.Succeeded, run.Status, run.Error?.Details ?? run.Error?.Message);
+        Assert.AreEqual(FlowRunStatus.Pending, run.Status);
+        var assignment = await factory.Services.GetRequiredService<RuntimeWorkerAssignmentService>()
+            .GetByTargetAsync(run.WorkspaceId, RuntimeAssignmentTargetKind.FlowRun, run.Id, default);
+        Assert.IsNotNull(assignment);
+        Assert.AreEqual(RuntimeAssignmentState.Pending, assignment.Value.State);
+        var material = await factory.Services.GetRequiredService<IRuntimeExecutionMaterialResolver>()
+            .ResolveAsync(assignment.Value, default);
+        var flowMaterial = Assert.IsInstanceOfType<RuntimeRootFlowExecutionMaterial>(material);
+        var materialAgent = flowMaterial.Agents.Single();
+        Assert.AreEqual("who-am-i-judge", materialAgent.AgentName);
+        Assert.IsGreaterThan(0, materialAgent.Generation);
 
         using var forkResponse = await client.PostAsJsonAsync(
             "/api/packs/agentstration/who-am-i/fork",

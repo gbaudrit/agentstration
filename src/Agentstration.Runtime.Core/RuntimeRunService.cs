@@ -120,8 +120,7 @@ public sealed class RuntimeRunService(
         try
         {
             var resolved = await agents.ResolveAsync(new RuntimeAgentReference(agentResourceId, generation) { Namespace = @namespace }, cancellationToken);
-            var registered = runtimes.TryGet(resolved.DeploymentId, out _);
-            var ready = resolved.Ready && registered;
+            var ready = resolved.Ready;
             return new AgentRuntimeReadiness(
                 agentResourceId,
                 generation,
@@ -129,7 +128,7 @@ public sealed class RuntimeRunService(
                 ready ? "Ready" : resolved.State,
                 resolved.DeploymentId,
                 resolved.RevisionId,
-                ready ? null : resolved.Error ?? (registered ? $"Deployment is {resolved.State}." : "Runtime instance is not provisioned yet."),
+                ready ? null : resolved.Error ?? $"Agent revision is {resolved.State}.",
                 resolved.RuntimeProfileName,
                 resolved.ModelProfileName);
         }
@@ -143,6 +142,7 @@ public sealed class RuntimeRunService(
     {
         var stored = await GetRequiredAsync(workspaceId, runId, cancellationToken);
         if (stored.Value.Status.State.IsTerminal()) return stored;
+        await queue.RequestCancellationAsync(new RuntimeRunQueueItem(stored.Value.Scope, runId), cancellationToken);
         cancellations.Cancel(new RuntimeRunKey(workspaceId, runId));
         StoredRuntimeRun cancelled;
         try

@@ -1,3 +1,4 @@
+using Agentstration.Runtime.Api.Api;
 using Agentstration.Web;
 using Agentstration.Web.Api.Management;
 using Agentstration.Web.Api.Models;
@@ -11,6 +12,8 @@ public static class RuntimeApiModule
     public static IEndpointRouteBuilder MapRuntimeApi(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapAgentstrationRuntimeApi();
+        endpoints.MapAwpRuntimeWorkerEndpoints();
+        RuntimeObservabilityEndpoints.Map(endpoints);
         RuntimeProfileEndpoints.Map(endpoints.MapGroup("/api/runtimeprofiles"));
         RouteAndExecuteEndpoint.Map(endpoints.MapGroup("/api"));
         return endpoints;

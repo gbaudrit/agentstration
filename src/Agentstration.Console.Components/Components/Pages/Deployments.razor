@@ -1,34 +1,49 @@
+@page "/agent-instances"
 @page "/deployments"
 @implements IDisposable
-@inject IManagementApiClient Client
+@inject IRuntimeApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DeploymentStrings> Localizer
 
-<PageTitle>@T("Deployments") · Agentstration</PageTitle>
-<PageHeader Title="@T("AgentDeployments")" Description="@T("Deployments.Description")" TestId="resource-deployments" />
+<PageTitle>@T("AgentInstances") · Agentstration</PageTitle>
+<PageHeader Title="@T("AgentInstances")" Description="@T("AgentInstances.Description")" TestId="runtime-agent-instances" />
 @if (items is null)
 {
-    <LoadingState Message="@T("LoadingDeployments")" />
+    <LoadingState Message="@T("LoadingInstances")" />
 }
 else if (items.Count == 0)
 {
-    <EmptyState Title="@T("NoDeployments")" Message="@T("NoDeploymentsMessage")" />
+    <EmptyState Title="@T("NoInstances")" Message="@T("NoInstancesMessage")" />
 }
 else
 {
-    <DataGrid TItem="DeploymentSummary" Items="items">
-        <Header><tr><th>@T("Deployment")</th><th>@T("Agent")</th><th>@T("Status")</th><th>@T("Hosting")</th><th>@T("RuntimeProfile")</th><th>@T("Revision")</th><th>@T("Updated")</th><th>@T("Error")</th></tr></Header>
-        <Row Context="item"><tr id="@DeploymentAnchor(item)"><td><span class="resource-name-with-scope"><code>@item.Id</code><ResourceScopeBadge Kind="@ResourceScopeKind.Workspace" Compact /></span><small>@item.Namespace</small></td><td>@item.Agent</td><td><StatusBadge Text="@StatusText(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" /><br /><small>@T("DesiredState", StateText(item.DesiredState))</small></td><td>@HostingText(item.HostingMode)<br /><small>@item.Environment</small></td><td>@item.RuntimeProfile</td><td><code>@(item.ObservedRevision ?? item.Revision)</code></td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td><td>@(item.Error ?? "—")</td></tr></Row>
+    <DataGrid TItem="AgentInstanceResponse" Items="items">
+        <Header><tr><th>@T("Agent")</th><th>@T("Run")</th><th>@T("Execution")</th><th>@T("Worker")</th><th>@T("RuntimeProfile")</th><th>@T("Started")</th><th>@T("LastActivity")</th><th>@T("Lease")</th></tr></Header>
+        <Row Context="item"><tr id="@InstanceAnchor(item)">
+            <td><a class="resource-name-link" href="@AgentUrl(item)">@item.AgentName</a><br /><small><code>@item.AgentNamespace.Value</code> · @T("Generation", item.AgentGeneration)</small></td>
+            <td><a class="text-button" href="@RunUrl(item)">@item.RunId</a><br /><small>@T($"RunKind.{item.RunKind}")</small></td>
+            <td>@(item.ParticipantId ?? "—")<br /><small>@T("Turns", item.TurnCount)</small></td>
+            <td><a class="text-button" href="@WorkerUrl(item)">@Short(item.WorkerId)</a><br /><small>@Short(item.WorkerSessionId)</small></td>
+            <td>@item.RuntimeProfile<br /><small><code>@item.RevisionId</code></small></td>
+            <td>@item.StartedAt.LocalDateTime.ToString("g")</td>
+            <td>@item.LastActivityAt.LocalDateTime.ToString("g")</td>
+            <td>@item.LeaseExpiresAt.LocalDateTime.ToString("T")</td>
+        </tr></Row>
     </DataGrid>
 }
 
 @code {
     private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<DeploymentSummary>? items;
+    private IReadOnlyList<AgentInstanceResponse>? items;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
-    private string StatusText(string status) => T($"Status.{status}");
-    private string StateText(string state) => T($"State.{state}");
-    private string HostingText(string mode) => T($"Hosting.{mode}");
-    private static string DeploymentAnchor(DeploymentSummary item) => $"deployment-{Uri.EscapeDataString(item.Namespace)}-{Uri.EscapeDataString(item.Id)}";
-    protected override async Task OnInitializedAsync() => items = await Client.GetDeploymentsAsync(cancellation.Token);
+    protected override async Task OnInitializedAsync() => items = await Client.GetAgentInstancesAsync(cancellation.Token);
+    private static string InstanceAnchor(AgentInstanceResponse item) => $"agent-instance-{Uri.EscapeDataString(item.InstanceId)}";
+    private static string WorkerUrl(AgentInstanceResponse item) => $"/settings/runtime-workers/{item.WorkerId:D}";
+    private static string RunUrl(AgentInstanceResponse item) => item.RunKind == nameof(RuntimeAssignmentTargetKind.FlowRun)
+        ? $"/flow-runs/{Uri.EscapeDataString(item.RunId)}"
+        : $"/runs/{Uri.EscapeDataString(item.RunId)}";
+    private static string AgentUrl(AgentInstanceResponse item) => item.AgentNamespace.IsDefault
+        ? $"/agents/{Uri.EscapeDataString(item.AgentName)}"
+        : $"/namespaces/{Uri.EscapeDataString(item.AgentNamespace.Value)}/agents/{Uri.EscapeDataString(item.AgentName)}";
+    private static string Short(Guid value) => value.ToString("N")[..8];
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

@@ -44,6 +44,13 @@ var initialBootstrapProfiles = builder.Configuration
     .GetChildren()
     .Select(profile => profile.Value ?? string.Empty)
     .ToArray();
+if (!int.TryParse(builder.Configuration["Agentstration:RuntimeWorkers:Count"] ?? "1",
+        System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture,
+        out var runtimeWorkerCount)
+    || runtimeWorkerCount is < 1 or > 16)
+{
+    throw new InvalidOperationException("Agentstration:RuntimeWorkers:Count must be between 1 and 16.");
+}
 
 var ollamaEndpoint = builder.Configuration["Ollama:Endpoint"] ?? "http://localhost:11434";
 if (!Uri.TryCreate(ollamaEndpoint, UriKind.Absolute, out var parsedOllamaEndpoint)
@@ -124,6 +131,8 @@ var sharedKeys = usePairingCode
         developmentExtensions.Select(extension => extension.ResourceName).ToArray());
 var bffWorkloadCredential = BffDevelopmentWorkloadCredential.Provision(
     Path.Combine(slotDataPath, "bff-workload", "console-bff"));
+var runtimeWorkerCredentials = AwpDevelopmentWorkerCredentials.Provision(
+    Path.Combine(slotDataPath, "awp-workers"), instanceId, runtimeWorkerCount);
 
 var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-console")
     .WithEnvironment("Agentstration__Slot", slot)
@@ -139,6 +148,9 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithEnvironment("Agentstration__BffWorkloadTrust__Credentials__0__WorkloadId", "console-bff")
     .WithEnvironment("Agentstration__BffWorkloadTrust__Credentials__0__CredentialId", "primary")
     .WithEnvironment("Agentstration__BffWorkloadTrust__Credentials__0__SharedKeyFile", bffWorkloadCredential)
+    .WithEnvironment("Agentstration__AwpWorkerTrust__Enabled", "true")
+    .WithEnvironment("Agentstration__AwpWorkerTrust__InstanceId", instanceId)
+    .WithEnvironment("Agentstration__AwpWorkerTrust__MaximumBodyBytes", "2097152")
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
 console.WithEnvironment("Agentstration__Extensions__DiscoverOnStartup", "false");
@@ -172,6 +184,14 @@ else
     console.WithSqliteStorage(slotDataPath);
 for (var index = 0; index < initialBootstrapProfiles.Length; index++)
     console.WithEnvironment($"Agentstration__Bootstrap__InitialProfiles__{index}", initialBootstrapProfiles[index]);
+for (var index = 0; index < runtimeWorkerCredentials.Count; index++)
+{
+    var credential = runtimeWorkerCredentials[index];
+    console
+        .WithEnvironment($"Agentstration__AwpWorkerTrust__Credentials__{index}__WorkerId", credential.WorkerId.ToString("D"))
+        .WithEnvironment($"Agentstration__AwpWorkerTrust__Credentials__{index}__CredentialId", credential.CredentialId.ToString("D"))
+        .WithEnvironment($"Agentstration__AwpWorkerTrust__Credentials__{index}__SharedKeyFile", credential.SharedKeyFile);
+}
 console
     .WithEnvironment("Agentstration__Aep__SecretAccess__PublicBaseUrl", console.GetEndpoint("http"))
     .WithEnvironment("Agentstration__ManagementApi__BaseAddress", console.GetEndpoint("http"))
@@ -182,6 +202,22 @@ console
     .WithEnvironment("Agentstration__WorkApi__ForwardSessionCookie", "true")
     .WithEnvironment("Agentstration__FlowApi__BaseAddress", console.GetEndpoint("http"))
     .WithEnvironment("Agentstration__FlowApi__ForwardSessionCookie", "true");
+
+for (var index = 0; index < runtimeWorkerCredentials.Count; index++)
+{
+    var credential = runtimeWorkerCredentials[index];
+    builder.AddProject<Projects.Agentstration_Runtime_Worker_MicrosoftAgentFramework>($"runtime-worker-{index + 1}")
+        .WithEnvironment("Agentstration__Slot", slot)
+        .WithEnvironment("Agentstration__RuntimeWorker__AuthorityUrl", console.GetEndpoint("http"))
+        .WithEnvironment("Agentstration__RuntimeWorker__WorkerId", credential.WorkerId.ToString("D"))
+        .WithEnvironment("Agentstration__RuntimeWorker__CredentialId", credential.CredentialId.ToString("D"))
+        .WithEnvironment("Agentstration__RuntimeWorker__InstanceId", instanceId)
+        .WithEnvironment("Agentstration__RuntimeWorker__SharedKeyFile", credential.SharedKeyFile)
+        .WithEnvironment("Agentstration__RuntimeWorker__AllowInsecureHttp", "true")
+        .WithHttpHealthCheck("/health")
+        .WithDynamicHostPorts(dynamicApplicationPorts)
+        .WaitFor(console);
+}
 
 var workplace = builder.AddProject<Projects.Agentstration_Workplace_Web>("agentstration-workplace")
     .WithEnvironment("Agentstration__Slot", slot)

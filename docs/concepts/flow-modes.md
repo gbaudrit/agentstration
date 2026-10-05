@@ -97,7 +97,7 @@ Choose Workflow when ordering, branching, transformations, and failure paths mus
 
 ## Orchestration
 
-An Orchestration declares at least two distinct Agent participants and one typed strategy. Participants are provider-neutral references. Microsoft Agent Framework objects, executor identifiers, manager traffic, and internal handoff tools stay inside `Agentstration.Runtime.AgentFramework`.
+An Orchestration declares at least two distinct Agent participants and one typed strategy. Participants are provider-neutral references. Microsoft Agent Framework objects, executor identifiers, manager traffic, and internal handoff tools stay inside `Agentstration.Runtime.MicrosoftAgentFramework`.
 
 Every successful orchestration returns a normalized result:
 

@@ -91,6 +91,25 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
         return await ReadRunAsync(response, cancellationToken);
     }
 
+    public Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(CancellationToken cancellationToken) =>
+        ReadArrayAsync<AgentInstanceResponse>("api/runtime/agent-instances", cancellationToken);
+
+    public Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> GetRuntimeWorkersAsync(CancellationToken cancellationToken) =>
+        ReadArrayAsync<RuntimeWorkerSummaryResponse>("api/runtime/workers", cancellationToken);
+
+    public Task<RuntimeWorkerDetailsResponse> GetRuntimeWorkerAsync(Guid workerId, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<RuntimeWorkerDetailsResponse>(httpClient, $"api/runtime/workers/{workerId:D}", cancellationToken);
+
+    public async Task<RuntimeAssignmentPlacementResponse?> GetPlacementAsync(RuntimeAssignmentTargetKind targetKind,
+        string runId, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(
+            $"api/runtime/placements/{targetKind}/{Uri.EscapeDataString(runId)}", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<RuntimeAssignmentPlacementResponse>(cancellationToken);
+    }
+
     public Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(string agentName, long generation, CancellationToken cancellationToken) =>
         GetAgentReadinessAsync(ResourceNamespace.Default, agentName, generation, cancellationToken);
 
@@ -123,6 +142,9 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
         return await response.Content.ReadFromJsonAsync<RuntimeRun>(cancellationToken)
             ?? throw new AgentstrationApiException("Runtime returned an empty run response.", Guid.NewGuid().ToString("N"));
     }
+
+    private async Task<IReadOnlyList<T>> ReadArrayAsync<T>(string path, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<T[]>(httpClient, path, cancellationToken);
 
 }
 
