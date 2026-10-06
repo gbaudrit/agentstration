@@ -9,4 +9,13 @@
   <data name="Status.Open" xml:space="preserve"><value>Ouvert</value></data><data name="Status.Sealed" xml:space="preserve"><value>Scellé</value></data><data name="Status.Persisting" xml:space="preserve"><value>Persistance en cours</value></data><data name="Status.Persisted" xml:space="preserve"><value>Persisté</value></data><data name="Status.Expired" xml:space="preserve"><value>Expiré</value></data><data name="Status.Discarded" xml:space="preserve"><value>Abandonné</value></data><data name="Status.Purging" xml:space="preserve"><value>Purge en cours</value></data><data name="Status.Purged" xml:space="preserve"><value>Purgé</value></data><data name="Status.Failed" xml:space="preserve"><value>Échec</value></data>
   <data name="SizeMegabytes" xml:space="preserve"><value>{0:0.00} Mo</value></data>
   <data name="ExactBytes" xml:space="preserve"><value>{0:N0} octets</value></data>
+  <data name="Download" xml:space="preserve"><value>Télécharger</value></data>
+  <data name="MaterializeContent" xml:space="preserve"><value>Matérialiser le contenu</value></data>
+  <data name="MaterializingContent" xml:space="preserve"><value>Matérialisation…</value></data>
+  <data name="OpenMaterializedArtifact" xml:space="preserve"><value>Ouvrir l’artefact matérialisé</value></data>
+  <data name="MaterializationStatus" xml:space="preserve"><value>Storage Read Flow : {0}</value></data>
+  <data name="MaterializationNotFound" xml:space="preserve"><value>Le Flow Run de lecture du stockage est introuvable.</value></data>
+  <data name="MaterializationOutputMissing" xml:space="preserve"><value>Le Storage Read Flow s’est terminé sans retourner d’artefact temporaire.</value></data>
+  <data name="MaterializationFailed" xml:space="preserve"><value>Le Storage Read Flow s’est terminé avec l’état {0}.</value></data>
+  <data name="MaterializationStillRunning" xml:space="preserve"><value>Le Storage Read Flow est toujours en cours. Ouvrez son Flow Run pour suivre sa progression.</value></data>
 </root>

@@ -60,6 +60,8 @@ public sealed partial class ApiClientTests
 
         Assert.AreEqual("/api/artifacts/staged/11111111111111111111111111111111/content?offset=10&length=512", requests[1]);
         Assert.AreEqual("preview", System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(content.ContentBase64)));
+        Assert.AreEqual("/api/artifacts/staged/11111111111111111111111111111111/download",
+            client.GetDownloadUrl(artifact.ArtifactId));
     }
 
     [TestMethod]
@@ -78,6 +80,33 @@ public sealed partial class ApiClientTests
 
         Assert.IsNull(result);
         Assert.AreEqual("/api/artifacts/flow-run-artifacts/22222222222222222222222222222222", requestPath);
+    }
+
+    [TestMethod]
+    public async Task ArtifactClientStartsAndTracksDurableMaterialization()
+    {
+        var id = FlowRunArtifactId.Parse("22222222222222222222222222222222");
+        var requests = new List<HttpRequestMessage>();
+        using var http = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add(Clone(request));
+            return new HttpResponseMessage(request.Method == HttpMethod.Post ? HttpStatusCode.Accepted : HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new FlowRunArtifactMaterialization(
+                    "flowrun-read-1", "Succeeded", StagedArtifactId.Parse("11111111111111111111111111111111")))
+            };
+        })) { BaseAddress = new Uri("http://localhost/") };
+        var client = new ArtifactsApiClient(http);
+
+        var started = await client.StartMaterializationAsync(id);
+        var completed = await client.GetMaterializationAsync(id, started.FlowRunId);
+
+        Assert.AreEqual(HttpMethod.Post, requests[0].Method);
+        Assert.AreEqual("/api/artifacts/flow-run-artifacts/22222222222222222222222222222222/materializations",
+            requests[0].RequestUri!.AbsolutePath);
+        Assert.AreEqual("/api/artifacts/flow-run-artifacts/22222222222222222222222222222222/materializations/flowrun-read-1",
+            requests[1].RequestUri!.AbsolutePath);
+        Assert.IsNotNull(completed?.StagedArtifactId);
     }
 
     private static HttpRequestMessage Clone(HttpRequestMessage request)

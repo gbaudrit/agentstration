@@ -209,6 +209,8 @@ public sealed class ArtifactManagementService(
         if (stored.Value.ArtifactStatus is StagedArtifactStatus.Open or StagedArtifactStatus.Purged or StagedArtifactStatus.Purging or StagedArtifactStatus.Failed)
             throw Error("staged_artifact_not_readable", $"StagedArtifact '{id}' is not readable in state '{stored.Value.ArtifactStatus}'.");
         var current = Current();
+        if (offset == 0)
+            await AuditAsync("staged-artifact.content-read", current, id.ToString(), cancellationToken);
         var binding = await RequireBindingAsync(stored.Value, cancellationToken);
         return await staging.ReadAsync(binding.Value, stored.Value.Backend, offset, length,
             Command(current, $"staged-artifact:{id}:read", stored.Value.Producer.CorrelationId,
@@ -417,6 +419,20 @@ public sealed class ArtifactManagementService(
         return await store.GetExactAsync<FlowRunArtifactResource>(ScopedResourceAddress.Create(
             ResourceScopeRef.Workspace(current.WorkspaceId), ResourceNamespace.Default,
             ArtifactResourceKinds.FlowRunArtifact, id.ToString()), cancellationToken);
+    }
+
+    public async Task<StoredResource<FlowRunArtifactResource>?> GetFlowRunArtifactForContentReadAsync(
+        FlowRunArtifactId id,
+        bool auditAccess,
+        CancellationToken cancellationToken)
+    {
+        var current = await RequireAsync(AuthorizationPermissions.ArtifactsReadContent, cancellationToken);
+        var stored = await store.GetExactAsync<FlowRunArtifactResource>(ScopedResourceAddress.Create(
+            ResourceScopeRef.Workspace(current.WorkspaceId), ResourceNamespace.Default,
+            ArtifactResourceKinds.FlowRunArtifact, id.ToString()), cancellationToken);
+        if (stored is not null && auditAccess)
+            await AuditAsync("flow-run-artifact.content-materialization-requested", current, id.ToString(), cancellationToken);
+        return stored;
     }
 
     public async Task PurgeAsync(StagedArtifactId id, CancellationToken cancellationToken)

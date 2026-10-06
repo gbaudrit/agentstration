@@ -22,6 +22,7 @@ internal static class ArtifactEndpoints
         artifacts.MapGet("/staged/{id}", GetStagedAsync).WithSummary("Inspect a staged Artifact").Produces<StagedArtifactView>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapPost("/staged/{id}/content", WriteAsync).WithSummary("Write a bounded staged Artifact chunk").Produces<StagedArtifactView>().RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         artifacts.MapGet("/staged/{id}/content", ReadAsync).WithSummary("Read a bounded staged Artifact chunk").Produces<ArtifactContentChunk>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        artifacts.MapGet("/staged/{id}/download", DownloadAsync).WithSummary("Download governed staged Artifact content").RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapPost("/staged/{id}/seal", SealAsync).WithSummary("Seal and verify a staged Artifact").Produces<StagedArtifactView>().RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         artifacts.MapPost("/staged/{id}/leases", CreateLeaseAsync).WithSummary("Create a scoped staged Artifact lease").Produces<StagedArtifactView>().RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         artifacts.MapPost("/staged/{id}/handoffs", HandoffAsync).WithSummary("Transfer or delegate a staged Artifact").Produces<ArtifactHandoffResult>().RequireAuthorization(AgentstrationPolicies.CanWriteResources);
@@ -30,6 +31,8 @@ internal static class ArtifactEndpoints
         artifacts.MapDelete("/staged/{id}", PurgeAsync).WithSummary("Purge staged Artifact content").Produces(StatusCodes.Status204NoContent).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
         artifacts.MapGet("/flow-run-artifacts", ListFlowRunArtifactsAsync).WithSummary("List durable FlowRunArtifacts").Produces<IEnumerable<FlowRunArtifactResource>>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapGet("/flow-run-artifacts/{id}", GetFlowRunArtifactAsync).WithSummary("Get a durable FlowRunArtifact").Produces<FlowRunArtifactResource>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        artifacts.MapPost("/flow-run-artifacts/{id}/materializations", StartMaterializationAsync).WithSummary("Materialize durable Artifact content through a Storage Read Flow").Produces<FlowRunArtifactMaterialization>(StatusCodes.Status202Accepted).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        artifacts.MapGet("/flow-run-artifacts/{id}/materializations/{flowRunId}", GetMaterializationAsync).WithSummary("Get durable Artifact materialization status").Produces<FlowRunArtifactMaterialization>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapPost("/staged/{id}/flow-run-artifacts", CompleteAsync).WithSummary("Complete a durable FlowRunArtifact from a storage receipt").Produces<FlowRunArtifactResource>(StatusCodes.Status201Created).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     }
 
@@ -82,6 +85,14 @@ internal static class ArtifactEndpoints
         ArtifactManagementService service, CancellationToken token) => ExecuteAsync(async () =>
         Results.Ok(await service.ReadAsync(StagedArtifactId.Parse(id), offset, length, ParseLease(leaseId), token)));
 
+    private static Task<IResult> DownloadAsync(string id, string? leaseId,
+        ArtifactManagementService service, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var artifactId = StagedArtifactId.Parse(id);
+        var stored = await service.GetStagedAsync(artifactId, ParseLease(leaseId), ArtifactLeaseOperation.Read, token);
+        return stored is null ? Results.NotFound() : new ArtifactDownloadResult(service, stored.Value, ParseLease(leaseId));
+    });
+
     private static Task<IResult> SealAsync(string id, ArtifactManagementService service, CancellationToken token) => ExecuteAsync(async () =>
         Results.Ok(ArtifactViews.Staged((await service.SealAsync(StagedArtifactId.Parse(id), token)).Value)));
 
@@ -117,6 +128,23 @@ internal static class ArtifactEndpoints
         return stored is null ? Results.NotFound() : Results.Ok(stored.Value);
     });
 
+    private static Task<IResult> StartMaterializationAsync(string id, MaterializeFlowRunArtifactRequest body,
+        HttpResponse response, IArtifactContentMaterializationGateway gateway, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var artifactId = FlowRunArtifactId.Parse(id);
+        var materialization = await gateway.StartAsync(artifactId, body, token);
+        var location = $"/api/artifacts/flow-run-artifacts/{artifactId}/materializations/{Uri.EscapeDataString(materialization.FlowRunId)}";
+        response.Headers.Location = location;
+        return Results.Accepted(location, materialization);
+    });
+
+    private static Task<IResult> GetMaterializationAsync(string id, string flowRunId,
+        IArtifactContentMaterializationGateway gateway, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var materialization = await gateway.GetAsync(FlowRunArtifactId.Parse(id), flowRunId, token);
+        return materialization is null ? Results.NotFound() : Results.Ok(materialization);
+    });
+
     private static Task<IResult> CompleteAsync(string id, CompleteFlowRunArtifactRequest body,
         HttpResponse response, ArtifactManagementService service, CancellationToken token) => ExecuteAsync(async () =>
     {
@@ -144,4 +172,29 @@ internal static class ArtifactEndpoints
         Status = status,
         Detail = detail
     });
+
+    private sealed class ArtifactDownloadResult(
+        ArtifactManagementService service,
+        StagedArtifactResource artifact,
+        ArtifactLeaseId? leaseId) : IResult
+    {
+        public async Task ExecuteAsync(HttpContext context)
+        {
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            context.Response.ContentType = artifact.MediaType;
+            context.Response.ContentLength = artifact.Length;
+            context.Response.Headers.ContentDisposition = $"attachment; filename*=UTF-8''{Uri.EscapeDataString(artifact.FileName)}";
+            long offset = 0;
+            while (offset < artifact.Length)
+            {
+                var length = checked((int)Math.Min(ArtifactManagementService.MaximumChunkBytes, artifact.Length - offset));
+                var chunk = await service.ReadAsync(artifact.ArtifactId, offset, length, leaseId, context.RequestAborted);
+                var content = Convert.FromBase64String(chunk.ContentBase64);
+                if (content.Length == 0)
+                    throw new ArtifactValidationException("staged_artifact_download_no_progress", "The Artifact backend returned no content before the expected end.");
+                await context.Response.Body.WriteAsync(content, context.RequestAborted);
+                offset += content.Length;
+            }
+        }
+    }
 }

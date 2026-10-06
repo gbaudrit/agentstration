@@ -91,6 +91,7 @@ else if (artifact is not null)
                 <div class="artifact-content-actions">
                     <button class="button-secondary" type="button" disabled="@busy" data-testid="staged-artifact-read-preview" @onclick="() => ReadContentAsync(false)">@T("ReadPreview")</button>
                     <button class="button-primary" type="button" disabled="@(busy || !CanReadFullContent)" data-testid="staged-artifact-read-full" @onclick="() => ReadContentAsync(true)">@T("ReadFullContent")</button>
+                    <a class="button-secondary" href="@Client.GetDownloadUrl(ArtifactId)" download data-testid="staged-artifact-download">@T("Download")</a>
                 </div>
 
                 @if (!CanReadFullContent)

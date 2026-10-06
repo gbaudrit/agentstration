@@ -23,3 +23,10 @@
 .durable-content-notice .button-secondary {
     width: max-content;
 }
+
+.artifact-content-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3, .75rem);
+    align-items: center;
+}

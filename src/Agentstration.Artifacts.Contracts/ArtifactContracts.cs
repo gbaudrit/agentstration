@@ -194,6 +194,19 @@ public sealed record CompleteFlowRunArtifactRequest(
     string ProducerFlowStepId,
     ArtifactStorageReceipt Receipt);
 
+public sealed record MaterializeFlowRunArtifactRequest(
+    string? FlowName = null,
+    string? FlowNamespace = null,
+    string? FlowVersion = null,
+    string? IdempotencyKey = null);
+
+public sealed record FlowRunArtifactMaterialization(
+    string FlowRunId,
+    string Status,
+    StagedArtifactId? StagedArtifactId = null,
+    string? ErrorCode = null,
+    string? ErrorMessage = null);
+
 public sealed record ArtifactContentChunk(long Offset, string ContentBase64, bool EndOfContent);
 
 public sealed record StagedArtifactView(

@@ -362,6 +362,7 @@ public static class DependencyInjection
         services.AddSingleton<IArtifactDurableStore>(_ => new FileSystemDurableArtifactStore(Path.Combine(dataDirectory, "durable-artifacts")));
         services.AddSingleton<IArtifactStagingToolExecutor, ToolSetArtifactStagingExecutor>();
         services.AddSingleton<ArtifactManagementService>();
+        services.AddSingleton<IArtifactContentMaterializationGateway, ArtifactContentMaterializationGateway>();
         services.AddSingleton<ArtifactPlatformResourceProvisioner>();
         services.AddSingleton<KnowledgePlatformResourceProvisioner>();
         services.AddHttpClient<IKnowledgeHttpContentFetcher, SafeKnowledgeHttpContentFetcher>(client =>
