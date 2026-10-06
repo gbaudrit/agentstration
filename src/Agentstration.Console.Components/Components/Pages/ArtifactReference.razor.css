@@ -1,0 +1,48 @@
+.artifact-reference {
+    display: grid;
+    width: max-content;
+    max-width: 100%;
+    gap: .22rem;
+    color: var(--text);
+    text-decoration: none;
+}
+
+.artifact-reference strong {
+    overflow: hidden;
+    color: inherit;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.artifact-reference small {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: .38rem;
+    color: var(--muted);
+    font-size: .68rem;
+}
+
+.artifact-reference small span {
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.artifact-reference code {
+    overflow: hidden;
+    color: var(--muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+a.artifact-reference:hover strong,
+a.artifact-reference:focus-visible strong {
+    color: var(--primary);
+}
+
+a.artifact-reference:focus-visible {
+    border-radius: .35rem;
+    outline: 2px solid color-mix(in srgb, var(--primary) 35%, transparent);
+    outline-offset: 3px;
+}

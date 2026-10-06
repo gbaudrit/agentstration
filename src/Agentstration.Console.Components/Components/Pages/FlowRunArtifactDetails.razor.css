@@ -1,0 +1,8 @@
+.durable-artifact-details-grid dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.durable-content-notice .button-secondary {
+    width: max-content;
+}

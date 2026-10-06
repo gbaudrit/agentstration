@@ -11,6 +11,7 @@ public interface IArtifactsClient
     Task<StagedArtifactView> ExtendRetentionAsync(StagedArtifactId id, DateTimeOffset expiresAt, CancellationToken cancellationToken = default);
     Task PurgeAsync(StagedArtifactId id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<FlowRunArtifactResource>> GetDurableAsync(CancellationToken cancellationToken = default);
+    Task<FlowRunArtifactResource?> GetDurableAsync(FlowRunArtifactId id, CancellationToken cancellationToken = default);
 }
 
 public sealed class ArtifactsApiClient(HttpClient httpClient) : IArtifactsClient
@@ -49,5 +50,15 @@ public sealed class ArtifactsApiClient(HttpClient httpClient) : IArtifactsClient
         ApiResponse.ReadAsync<IReadOnlyList<FlowRunArtifactResource>>(httpClient,
             "api/artifacts/flow-run-artifacts", cancellationToken);
 
+    public async Task<FlowRunArtifactResource?> GetDurableAsync(FlowRunArtifactId id,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(DurablePath(id), cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<FlowRunArtifactResource>(cancellationToken);
+    }
+
     private static string Path(StagedArtifactId id) => $"api/artifacts/staged/{id}";
+    private static string DurablePath(FlowRunArtifactId id) => $"api/artifacts/flow-run-artifacts/{id}";
 }

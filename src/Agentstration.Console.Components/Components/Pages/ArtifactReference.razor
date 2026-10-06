@@ -1,0 +1,22 @@
+@if (Href is not null)
+{
+    <a class="artifact-reference" href="@Href" title="@Identifier">
+        <strong>@Name</strong>
+        <small><span>@IdentifierLabel</span><code>@ShortIdentifier</code></small>
+    </a>
+}
+else
+{
+    <span class="artifact-reference" title="@Identifier">
+        <strong>@Name</strong>
+        <small><span>@IdentifierLabel</span><code>@ShortIdentifier</code></small>
+    </span>
+}
+
+@code {
+    [Parameter] public string? Href { get; set; }
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Identifier { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string IdentifierLabel { get; set; } = string.Empty;
+    private string ShortIdentifier => Identifier.Length <= 14 ? Identifier : $"{Identifier[..14]}…";
+}
