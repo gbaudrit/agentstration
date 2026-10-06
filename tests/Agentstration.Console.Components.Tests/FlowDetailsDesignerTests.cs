@@ -318,9 +318,16 @@ public sealed class FlowDetailsDesignerTests
             var version = request.Version ?? "1.0.0";
             return Task.FromResult(new FlowRun
             {
-                WorkspaceId = new WorkspaceId(Guid.NewGuid()), Id = "flowrun-manual", FlowId = new FlowId(flowId), FlowVersion = version,
-                Status = FlowRunStatus.Pending, Trigger = request.Trigger, Scope = new FlowRunScope(Guid.NewGuid(), new WorkspaceId(Guid.NewGuid()), Guid.NewGuid()),
-                Input = request.Input.Clone(), CreatedAt = Now, DefinitionSnapshot = new FlowVersion(new WorkspaceId(Guid.NewGuid()), new FlowId(flowId), version, null, definition, new Dictionary<string, string>(), Now, Graph)
+                WorkspaceId = new WorkspaceId(Guid.NewGuid()),
+                Id = "flowrun-manual",
+                FlowId = new FlowId(flowId),
+                FlowVersion = version,
+                Status = FlowRunStatus.Pending,
+                Trigger = request.Trigger,
+                Scope = new FlowRunScope(Guid.NewGuid(), new WorkspaceId(Guid.NewGuid()), Guid.NewGuid()),
+                Input = request.Input.Clone(),
+                CreatedAt = Now,
+                DefinitionSnapshot = new FlowVersion(new WorkspaceId(Guid.NewGuid()), new FlowId(flowId), version, null, definition, new Dictionary<string, string>(), Now, Graph)
             });
         }
         public Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
