@@ -1,0 +1,102 @@
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using System.Text
+@inject Microsoft.Extensions.Localization.IStringLocalizer<JsonSchemaInputStrings> Localizer
+
+<section class="schema-input-editor" data-testid="schema-input-editor">
+    <div class="schema-input-toolbar" role="group" aria-label="@Localizer["EditorMode"]">
+        @if (analysis.CanRender) { <button type="button" data-testid="schema-form-mode" class="@(rawMode ? "button-secondary" : "button-primary")" disabled="@Disabled" @onclick="ShowForm">@Localizer["FormMode"]</button> }
+        <button type="button" data-testid="schema-raw-mode" class="@(rawMode || !analysis.CanRender ? "button-primary" : "button-secondary")" disabled="@Disabled" @onclick="ShowRaw">@Localizer["RawMode"]</button>
+    </div>
+    @if (!analysis.CanRender)
+    {
+        <p class="inline-warning" role="status">@Localizer[$"Fallback.{analysis.FallbackReason ?? "UnsupportedSchema"}"]</p>
+    }
+    @if (rawMode || !analysis.CanRender)
+    {
+        <label><span>@Localizer["JsonValue"]</span><textarea class="form-code-editor runner-json" rows="11" value="@rawText" readonly="@ReadOnly" disabled="@Disabled" aria-invalid="@(!state.IsValid)" @oninput="ChangeRawAsync"></textarea></label>
+        @foreach (var issue in state.Issues) { <span class="field-validation-error" role="alert">@IssueText(issue)</span> }
+    }
+    else if (analysis.Root is not null)
+    {
+        <JsonSchemaField Schema="analysis.Root" Value="document" ValueChanged="ChangeDocumentAsync" Disabled="@(Disabled || ReadOnly)" Issues="state.Issues" />
+    }
+</section>
+
+@code {
+    [Parameter] public JsonElement? Schema { get; set; }
+    [Parameter] public JsonElement Value { get; set; } = JsonSerializer.SerializeToElement(new { });
+    [Parameter] public EventCallback<JsonElement> ValueChanged { get; set; }
+    [Parameter] public EventCallback<JsonSchemaInputValidationState> ValidationChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    private JsonSchemaInputAnalysis analysis = new(null, "MissingSchema");
+    private JsonObject document = [];
+    private string rawText = "{}", schemaKey = string.Empty, valueKey = string.Empty;
+    private bool rawMode;
+    private bool initialized;
+    private bool canInitializeRawTemplate;
+    private JsonSchemaInputValidationState state = new(true, JsonSerializer.SerializeToElement(new { }), [], false);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var nextSchemaKey = Schema?.GetRawText() ?? string.Empty;
+        var nextValueKey = Value.ValueKind == JsonValueKind.Undefined ? "{}" : Value.GetRawText();
+        if (nextSchemaKey == schemaKey && nextValueKey == valueKey) return;
+        schemaKey = nextSchemaKey;
+        analysis = JsonSchemaInputModel.Analyze(Schema);
+        if (!TryObject(nextValueKey, out var nextDocument)) nextDocument = [];
+        document = nextDocument;
+        var firstParameters = !initialized;
+        var initializeEmpty = firstParameters && document.Count == 0;
+        if (initializeEmpty && analysis.Root is not null) document = JsonSchemaInputModel.ApplyDefaults(document, analysis.Root);
+        if (firstParameters) canInitializeRawTemplate = initializeEmpty;
+        rawText = document.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        valueKey = document.ToJsonString();
+        if (!analysis.CanRender) rawMode = true;
+        initialized = true;
+        await PublishAsync(initializeEmpty);
+    }
+
+    private async Task ChangeDocumentAsync(JsonNode? value) { canInitializeRawTemplate = false; document = value as JsonObject ?? []; rawText = document.ToJsonString(new JsonSerializerOptions { WriteIndented = true }); valueKey = document.ToJsonString(); await PublishAsync(true); }
+    private async Task ChangeRawAsync(ChangeEventArgs args)
+    {
+        rawText = args.Value?.ToString() ?? string.Empty;
+        if (TryObject(rawText, out var parsed)) { document = parsed; valueKey = document.ToJsonString(); await PublishAsync(true); return; }
+        state = new(false, null, [new("$", "InvalidJson")], !analysis.CanRender, analysis.FallbackReason);
+        await ValidationChanged.InvokeAsync(state);
+    }
+    private async Task ShowRaw()
+    {
+        if (canInitializeRawTemplate && analysis.Root is not null)
+        {
+            var template = JsonSchemaInputModel.CreateTemplate(analysis.Root);
+            foreach (var property in document) template[property.Key] = property.Value?.DeepClone();
+            document = template;
+            canInitializeRawTemplate = false;
+            valueKey = document.ToJsonString();
+            await PublishAsync(true);
+        }
+        rawText = document.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        rawMode = true;
+    }
+    private void ShowForm() { if (TryObject(rawText, out _)) rawMode = false; }
+    private async Task PublishAsync(bool notifyValue)
+    {
+        var value = JsonSerializer.SerializeToElement(document);
+        IReadOnlyList<JsonSchemaInputIssue> issues = analysis.Root is null
+            ? Encoding.UTF8.GetByteCount(value.GetRawText()) > JsonSchemaInputModel.MaximumValueBytes ? [new("$", "ValueTooLarge", JsonSchemaInputModel.MaximumValueBytes.ToString(System.Globalization.CultureInfo.InvariantCulture))] : []
+            : JsonSchemaInputModel.Validate(value, analysis.Root);
+        state = new(issues.Count == 0, value, issues, !analysis.CanRender, analysis.FallbackReason);
+        if (notifyValue) await ValueChanged.InvokeAsync(value);
+        await ValidationChanged.InvokeAsync(state);
+    }
+    private string IssueText(JsonSchemaInputIssue issue)
+    {
+        var message = issue is { Code: "MinimumLength", Constraint: "1" }
+            ? Localizer["Validation.MinimumLength.One"]
+            : Localizer[$"Validation.{issue.Code}", issue.Constraint ?? string.Empty];
+        return $"{issue.Path}: {message}";
+    }
+    private static bool TryObject(string json, out JsonObject value) { try { value = JsonNode.Parse(json) as JsonObject ?? throw new JsonException(); return true; } catch (JsonException) { value = []; return false; } }
+}

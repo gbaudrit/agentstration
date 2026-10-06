@@ -1,0 +1,36 @@
+.schema-input-editor {
+    display: grid;
+    gap: .75rem;
+}
+
+.schema-input-toolbar {
+    display: flex;
+    gap: .5rem;
+}
+
+.field-validation-error {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .45rem .65rem;
+    border-left: 3px solid var(--color-danger, #c83b48);
+    border-radius: .35rem;
+    background: color-mix(in srgb, var(--color-danger, #c83b48) 9%, transparent);
+    color: var(--color-danger, #c83b48);
+    font-size: .8rem;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.field-validation-error::before {
+    content: "!";
+    display: inline-grid;
+    flex: 0 0 1rem;
+    width: 1rem;
+    height: 1rem;
+    place-items: center;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    font-size: .68rem;
+    font-weight: 700;
+}

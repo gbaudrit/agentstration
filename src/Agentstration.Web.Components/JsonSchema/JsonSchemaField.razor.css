@@ -1,0 +1,80 @@
+.schema-object-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+}
+
+.schema-field {
+    display: grid;
+    gap: .35rem;
+}
+
+.schema-field-object,
+.schema-field-array {
+    grid-column: 1 / -1;
+}
+
+.schema-field label {
+    display: grid;
+    gap: .35rem;
+}
+
+.schema-field fieldset {
+    display: grid;
+    gap: .75rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: .5rem;
+}
+
+.schema-array-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: .75rem;
+    align-items: end;
+}
+
+.schema-toggle {
+    display: flex !important;
+    align-items: center;
+    gap: .5rem !important;
+}
+
+.schema-long-text {
+    min-height: 9rem;
+    resize: vertical;
+}
+
+.field-validation-error {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .45rem .65rem;
+    border: 1px solid color-mix(in srgb, var(--color-danger, #c83b48) 42%, transparent);
+    border-left: 4px solid var(--color-danger, #c83b48);
+    border-radius: .45rem;
+    background: color-mix(in srgb, var(--color-danger, #c83b48) 11%, var(--surface, white));
+    color: var(--color-danger, #c83b48);
+    font-size: .8rem;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.field-validation-error::before {
+    content: "!";
+    display: inline-grid;
+    flex: 0 0 1rem;
+    width: 1rem;
+    height: 1rem;
+    place-items: center;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    font-size: .68rem;
+    font-weight: 700;
+}
+
+@media (max-width: 700px) {
+    .schema-array-item {
+        grid-template-columns: 1fr;
+    }
+}

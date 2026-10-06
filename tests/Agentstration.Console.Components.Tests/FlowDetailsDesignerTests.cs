@@ -20,6 +20,29 @@ namespace Agentstration.Web.Tests;
 public sealed class FlowDetailsDesignerTests
 {
     [TestMethod]
+    public void ManualRunUsesPublishedSchemaAndSubmitsValidatedInput()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FlowClientStub();
+        context.Services.AddSingleton<IFlowApiClient>(client);
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
+        var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
+
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Runs"].Value).Click();
+        rendered.Find(".toolbar .button-primary").Click();
+        rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Find("[data-testid='flow-run-submit']").HasAttribute("disabled")));
+        rendered.Find("[data-schema-path='$.request'] input").Input("Explain the plan");
+        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='flow-run-submit']").HasAttribute("disabled")));
+        rendered.Find("[data-testid='flow-run-submit']").Click();
+
+        rendered.WaitForAssertion(() => Assert.IsNotNull(client.LastRunRequest));
+        Assert.AreEqual("Explain the plan", client.LastRunRequest!.Input.GetProperty("request").GetString());
+        Assert.AreEqual("1.0.0", client.LastRunRequest.Version);
+        Assert.AreEqual("local", client.LastRunRequest.DeploymentResourceId);
+    }
+
+    [TestMethod]
     public void NamespacedFlowOrdersDefinitionSecondAndExposesReadOnlyYamlLast()
     {
         using var context = new BunitContext();
@@ -239,7 +262,8 @@ public sealed class FlowDetailsDesignerTests
     private sealed class FlowClientStub : IFlowApiClient
     {
         public static readonly DateTimeOffset Now = DateTimeOffset.Parse("2026-08-15T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
-        private static readonly FlowGraphDefinition Graph = new() { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] };
+        private static readonly JsonElement InputSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { request = new { type = "string", description = "Request to process" } }, required = new[] { "request" }, additionalProperties = false });
+        private static readonly FlowGraphDefinition Graph = new() { EntryStep = "input", InputSchema = InputSchema, Steps = [new InputFlowStepDefinition { Name = "input", Schema = InputSchema }], Transitions = [] };
         private readonly FlowDefinition definition;
         private readonly FlowRun? run;
         private readonly FlowRunCausalityPageResponse? causality;
@@ -258,6 +282,7 @@ public sealed class FlowDetailsDesignerTests
         public string? LastDraftETag { get; private set; }
         public int DraftLoadCount { get; private set; }
         public bool SimulateDraftConflict { get; init; }
+        public CreateFlowRunRequest? LastRunRequest { get; private set; }
 
         public Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken)
         {
@@ -287,7 +312,17 @@ public sealed class FlowDetailsDesignerTests
         public Task<InputRequest> RespondToFlowRunInputAsync(string runId, string inputId, JsonElement value, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<FlowRunEvent>>([]);
-        public Task<FlowRun> CreateFlowRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<FlowRun> CreateFlowRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken)
+        {
+            LastRunRequest = request;
+            var version = request.Version ?? "1.0.0";
+            return Task.FromResult(new FlowRun
+            {
+                WorkspaceId = new WorkspaceId(Guid.NewGuid()), Id = "flowrun-manual", FlowId = new FlowId(flowId), FlowVersion = version,
+                Status = FlowRunStatus.Pending, Trigger = request.Trigger, Scope = new FlowRunScope(Guid.NewGuid(), new WorkspaceId(Guid.NewGuid()), Guid.NewGuid()),
+                Input = request.Input.Clone(), CreatedAt = Now, DefinitionSnapshot = new FlowVersion(new WorkspaceId(Guid.NewGuid()), new FlowId(flowId), version, null, definition, new Dictionary<string, string>(), Now, Graph)
+            });
+        }
         public Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public async IAsyncEnumerable<FlowRun> ObserveFlowRunAsync(string runId, [EnumeratorCancellation] CancellationToken cancellationToken) { await Task.CompletedTask; yield break; }
         public Task<FlowDraftResponse> CreateDraftAsync(CreateFlowDraftRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
