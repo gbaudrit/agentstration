@@ -6,41 +6,287 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
 
 <PageTitle>@(artifact?.FileName ?? Id) · Agentstration</PageTitle>
-<PageHeader Title="@(artifact?.FileName ?? Id)" Description="@T("DetailsDescription")" TestId="staged-artifact-details"><Actions><a class="button-secondary" href="/artifacts">@T("Back")</a></Actions></PageHeader>
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (error is not null) { <ErrorState Message="@error" /> }
+<PageHeader Title="@(artifact?.FileName ?? Id)" Description="@T("DetailsDescription")" TestId="staged-artifact-details">
+    <Actions>
+        @if (artifact is not null)
+        {
+            <button class="button-danger" type="button" disabled="@(busy || !PurgeEligible)" title="@(!PurgeEligible ? T("PurgeIneligible") : null)" data-testid="staged-artifact-delete" @onclick="() => confirmPurge = true">@T("Delete")</button>
+        }
+        <a class="button-secondary" href="/artifacts">@T("Back")</a>
+    </Actions>
+</PageHeader>
+
+@if (confirmPurge)
+{
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-artifact-title">
+        <h2 id="delete-artifact-title">@T("DeleteTitle")</h2>
+        <p>@T("PurgeHelp")</p>
+        <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => confirmPurge = false">@T("Cancel")</button><button class="button-danger" type="button" disabled="@busy" @onclick="PurgeAsync">@T("ConfirmDelete")</button></div>
+    </section>
+}
+
+@if (loading)
+{
+    <LoadingState Message="@T("Loading")" />
+}
+else if (error is not null)
+{
+    <ErrorState Message="@error" />
+}
 else if (artifact is not null)
 {
-    @if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")" role="status">@message</div> }
-    <section class="metric-grid"><MetricCard Label="@T("State")" Value="@T($"Status.{artifact.Status}")" Detail="@artifact.MediaType" Status="@(artifact.Status == StagedArtifactStatus.Failed ? UiStatus.Warning : UiStatus.Info)" /><MetricCard Label="@T("Size")" Value="@artifact.Length.ToString()" Detail="@(artifact.Sha256 ?? T("NotSealed"))" /><MetricCard Label="@T("Expires")" Value="@artifact.ExpiresAt.ToLocalTime().ToString("g")" Detail="@T("LeaseCount", artifact.Leases.Count)" /></section>
-    <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Provenance")</p><h2>@T("Producer")</h2></div></div><dl class="resource-details"><dt>@T("ProducerKind")</dt><dd>@artifact.Producer.Kind</dd><dt>@T("ProducerId")</dt><dd><code>@artifact.Producer.Id</code></dd><dt>@T("FlowRun")</dt><dd>@(artifact.Producer.FlowRunId ?? "—")</dd><dt>@T("FlowStep")</dt><dd>@(artifact.Producer.FlowStepId ?? "—")</dd><dt>@T("Agent")</dt><dd>@(artifact.Producer.AgentId ?? "—")</dd><dt>@T("ToolCall")</dt><dd>@(artifact.Producer.ToolCallId ?? "—")</dd><dt>@T("Correlation")</dt><dd>@(artifact.Producer.CorrelationId ?? "—")</dd><dt>@T("StagingService")</dt><dd>@artifact.BindingNamespace/@artifact.BindingName · @artifact.ToolSetNamespace/@artifact.ToolSetName:@artifact.ToolSetVersion</dd></dl></section>
-    <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Retention")</p><h2>@T("RetentionAndLeases")</h2><p>@T("RetentionHelp")</p></div></div><label><span>@T("NewExpiration")</span><input type="datetime-local" value="@expiration" @onchange="SetExpiration" /></label><div class="form-actions"><button class="button-primary" type="button" disabled="@busy" @onclick="ExtendAsync">@T("ExtendRetention")</button></div>@if (artifact.Leases.Count == 0) { <p class="muted">@T("NoLeases")</p> } else { <DataGrid TItem="ArtifactLease" Items="artifact.Leases"><Header><tr><th>@T("Consumer")</th><th>@T("Operations")</th><th>@T("Expires")</th><th>@T("State")</th></tr></Header><Row Context="lease"><tr><td>@lease.ConsumerKind · <code>@lease.ConsumerId</code></td><td>@string.Join(", ", lease.Operations)</td><td>@lease.ExpiresAt.ToLocalTime().ToString("g")</td><td>@(lease.RevokedAt is null ? T("Active") : T("Revoked"))</td></tr></Row></DataGrid> }</section>
-    <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("ProtectedContent")</p><h2>@T("ContentPreview")</h2><p>@T("ContentHelp")</p></div></div>@if (content is null) { <button class="button-secondary" type="button" disabled="@busy" @onclick="ReadContentAsync">@T("ReadContent")</button> } else { <pre class="code-block">@content</pre> }</section>
-    @if (artifact.FailureCode is not null) { <section class="panel form-section"><h2>@T("Failure")</h2><p><code>@artifact.FailureCode</code> — @artifact.FailureMessage</p></section> }
-    <section class="panel danger-zone"><div><h2>@T("Purge")</h2><p>@T(PurgeEligible ? "PurgeHelp" : "PurgeIneligible")</p></div>@if (!confirmPurge) { <button class="button-danger" type="button" disabled="@(!PurgeEligible)" @onclick="() => confirmPurge = true">@T("Purge")</button> } else { <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => confirmPurge = false">@T("Cancel")</button><button class="button-danger" type="button" disabled="@busy" @onclick="PurgeAsync">@T("ConfirmPurge")</button></div> }</section>
+    @if (message is not null)
+    {
+        <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")" role="status">@message</div>
+    }
+
+    <ResourceTabs Label="@T("DetailsSections")">
+        @foreach (var tab in Enum.GetValues<DetailsTab>())
+        {
+            <button id="@TabId(tab)" type="button" role="tab"
+                    aria-selected="@(activeTab == tab ? "true" : "false")"
+                    aria-controls="staged-artifact-tab-panel"
+                    class="@(activeTab == tab ? "active" : null)"
+                    data-testid="@TabId(tab)"
+                    @onclick="() => activeTab = tab">@T($"Tab.{tab}")</button>
+        }
+    </ResourceTabs>
+
+    <main id="staged-artifact-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
+        @if (activeTab == DetailsTab.Overview)
+        {
+            <section class="metric-grid artifact-overview-metrics">
+                <MetricCard Label="@T("State")" Value="@T($"Status.{artifact.Status}")" Detail="@artifact.MediaType" Status="@(artifact.Status == StagedArtifactStatus.Failed ? UiStatus.Warning : UiStatus.Info)" />
+                <MetricCard Label="@T("Size")" Value="@SizeInMegabytes(artifact.Length)" Detail="@ExactSize(artifact.Length)" />
+                <MetricCard Label="@T("Expires")" Value="@artifact.ExpiresAt.ToLocalTime().ToString("g")" Detail="@T("LeaseCount", artifact.Leases.Count)" />
+            </section>
+
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">@T("Provenance")</p><h2>@T("Producer")</h2></div></div>
+                <dl class="resource-details artifact-details-grid">
+                    <dt>@T("ProducerKind")</dt><dd>@artifact.Producer.Kind</dd>
+                    <dt>@T("ProducerId")</dt><dd>@if (ProducerUrl(artifact.Producer) is { } producerUrl) { <a class="text-button" href="@producerUrl"><code>@artifact.Producer.Id</code></a> } else { <code>@artifact.Producer.Id</code> }</dd>
+                    <dt>SHA-256</dt><dd><code>@(artifact.Sha256 ?? T("NotSealed"))</code></dd>
+                    <dt>@T("FlowRun")</dt><dd>@if (artifact.Producer.FlowRunId is { } flowRunId) { <a class="text-button" href="@FlowRunUrl(flowRunId)" data-testid="artifact-producer-flow-run">@flowRunId</a> } else { <text>—</text> }</dd>
+                    <dt>@T("FlowStep")</dt><dd>@(artifact.Producer.FlowStepId ?? "—")</dd>
+                    <dt>@T("Agent")</dt><dd>@if (artifact.Producer.AgentId is { } agentId) { <a class="text-button" href="@AgentUrl(agentId)">@agentId</a> } else { <text>—</text> }</dd>
+                    <dt>@T("ToolCall")</dt><dd>@if (ToolCallUrl(artifact.Producer) is { } toolCallUrl) { <a class="text-button" href="@toolCallUrl">@artifact.Producer.ToolCallId</a> } else { <text>@(artifact.Producer.ToolCallId ?? "—")</text> }</dd>
+                    <dt>@T("Correlation")</dt><dd>@(artifact.Producer.CorrelationId ?? "—")</dd>
+                    <dt>@T("StagingService")</dt><dd>@artifact.BindingNamespace/@artifact.BindingName · <a class="text-button" href="@ToolSetUrl(artifact)">@artifact.ToolSetNamespace/@artifact.ToolSetName:@artifact.ToolSetVersion</a></dd>
+                </dl>
+            </section>
+
+            @if (artifact.FailureCode is not null)
+            {
+                <section class="panel form-section"><h2>@T("Failure")</h2><p><code>@artifact.FailureCode</code> — @artifact.FailureMessage</p></section>
+            }
+        }
+        else if (activeTab == DetailsTab.Content)
+        {
+            <section class="panel form-section artifact-content-panel" data-testid="staged-artifact-content-panel">
+                <div class="panel-header">
+                    <div><p class="eyebrow">@T("ProtectedContent")</p><h2>@T("ArtifactContent")</h2><p>@T("ContentHelp", MaximumDisplayBytes)</p></div>
+                </div>
+
+                <div class="artifact-content-actions">
+                    <button class="button-secondary" type="button" disabled="@busy" data-testid="staged-artifact-read-preview" @onclick="() => ReadContentAsync(false)">@T("ReadPreview")</button>
+                    <button class="button-primary" type="button" disabled="@(busy || !CanReadFullContent)" data-testid="staged-artifact-read-full" @onclick="() => ReadContentAsync(true)">@T("ReadFullContent")</button>
+                </div>
+
+                @if (!CanReadFullContent)
+                {
+                    <p class="inline-warning" data-testid="staged-artifact-full-content-limit">@T("FullContentTooLarge", artifact.Length, MaximumDisplayBytes)</p>
+                }
+
+                @if (content is not null)
+                {
+                    <p class="artifact-content-status" data-testid="staged-artifact-content-status">
+                        @T(contentComplete ? "CompleteContentLoaded" : "PreviewContentLoaded", contentBytes, artifact.Length)
+                    </p>
+                    <div class="artifact-content-scroll" data-testid="staged-artifact-content-scroll">
+                        <pre class="artifact-content-view" data-testid="staged-artifact-content">@content</pre>
+                    </div>
+                }
+            </section>
+        }
+        else
+        {
+            <section class="panel form-section artifact-retention-panel">
+                <div class="panel-header"><div><p class="eyebrow">@T("Retention")</p><h2>@T("RetentionAndLeases")</h2><p>@T("RetentionHelp")</p></div></div>
+                <div class="artifact-retention-summary">
+                    <div><span>@T("CurrentExpiration")</span><strong><time datetime="@artifact.ExpiresAt.ToString("O")">@artifact.ExpiresAt.ToLocalTime().ToString("g")</time></strong></div>
+                    <div><span>@T("ConsumerLeases")</span><strong>@artifact.Leases.Count</strong></div>
+                </div>
+                <div class="artifact-retention-editor">
+                    <label><span>@T("NewExpiration")</span><input type="datetime-local" value="@expiration" @onchange="SetExpiration" aria-describedby="retention-help" /></label>
+                    <button class="button-primary" type="button" disabled="@(busy || !CanExtendRetention)" @onclick="ExtendAsync">@T("ExtendRetention")</button>
+                </div>
+                <small id="retention-help" class="artifact-retention-help">@T(CanExtendRetention ? "RetentionReady" : "RetentionMustExtend")</small>
+                @if (artifact.Leases.Count == 0)
+                {
+                    <p class="artifact-empty-leases">@T("NoLeases")</p>
+                }
+                else
+                {
+                    <DataGrid TItem="ArtifactLease" Items="artifact.Leases">
+                        <Header><tr><th>@T("Consumer")</th><th>@T("Operations")</th><th>@T("Expires")</th><th>@T("State")</th></tr></Header>
+                        <Row Context="lease"><tr><td>@lease.ConsumerKind · <code>@lease.ConsumerId</code></td><td>@string.Join(", ", lease.Operations)</td><td>@lease.ExpiresAt.ToLocalTime().ToString("g")</td><td>@(lease.RevokedAt is null ? T("Active") : T("Revoked"))</td></tr></Row>
+                    </DataGrid>
+                }
+            </section>
+        }
+    </main>
 }
 
 @code {
+    private const int PreviewBytes = 8 * 1024;
+    private const int ReadChunkBytes = 256 * 1024;
+    private const int MaximumDisplayBytes = 4 * 1024 * 1024;
+
     [Parameter] public string Id { get; set; } = string.Empty;
     private readonly CancellationTokenSource cancellation = new();
     private StagedArtifactView? artifact;
-    private bool loading = true, busy, failed, confirmPurge;
+    private DetailsTab activeTab;
+    private bool loading = true, busy, failed, confirmPurge, contentComplete;
+    private int contentBytes;
     private string expiration = string.Empty;
     private string? error, message, content;
     private StagedArtifactId ArtifactId => StagedArtifactId.Parse(Id);
+    private bool CanReadFullContent => artifact is not null && artifact.Length is >= 0 and <= MaximumDisplayBytes;
+    private bool CanExtendRetention => artifact is not null && TryGetExpiration(out var value) && value > artifact.ExpiresAt;
     private bool PurgeEligible => artifact is not null
         && artifact.Status is not (StagedArtifactStatus.Open or StagedArtifactStatus.Persisting or StagedArtifactStatus.Purging or StagedArtifactStatus.Purged)
         && !artifact.Leases.Any(value => value.RevokedAt is null && value.ExpiresAt > TimeProvider.GetUtcNow());
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    protected override async Task OnParametersSetAsync() { loading = true; error = null; try { artifact = await Client.GetStagedAsync(ArtifactId, cancellation.Token); if (artifact is null) error = T("NotFound"); else expiration = artifact.ExpiresAt.ToLocalTime().ToString("yyyy-MM-ddTHH:mm"); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
+    private string SizeInMegabytes(long value) => T("SizeMegabytes", value / 1024d / 1024d);
+    private string ExactSize(long value) => T("ExactBytes", value);
+    private static string FlowRunUrl(string id) => $"/flow-runs/{Uri.EscapeDataString(id)}";
+    private static string AgentUrl(string id) => $"/agents/{Uri.EscapeDataString(id)}";
+    private static string? ProducerUrl(ArtifactProducer producer) => producer.FlowRunId is not null
+        ? FlowRunUrl(producer.FlowRunId)
+        : producer.RuntimeRunId is not null ? $"/runs/{Uri.EscapeDataString(producer.RuntimeRunId)}" : null;
+    private static string? ToolCallUrl(ArtifactProducer producer) => producer.FlowRunId is not null && producer.ToolCallId is not null
+        ? $"/tool-governance/flow/{Uri.EscapeDataString(producer.FlowRunId)}?toolCallId={Uri.EscapeDataString(producer.ToolCallId)}"
+        : producer.RuntimeRunId is not null && producer.ToolCallId is not null
+            ? $"/tool-governance/runtime/{Uri.EscapeDataString(producer.RuntimeRunId)}?toolCallId={Uri.EscapeDataString(producer.ToolCallId)}"
+            : null;
+    private static string ToolSetUrl(StagedArtifactView value) => value.ToolSetNamespace.IsDefault
+        ? $"/tools/sets/{Uri.EscapeDataString(value.ToolSetName)}"
+        : $"/tools/sets/{Uri.EscapeDataString(value.ToolSetName)}?namespace={Uri.EscapeDataString(value.ToolSetNamespace.Value)}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        error = null;
+        content = null;
+        contentBytes = 0;
+        contentComplete = false;
+        try
+        {
+            artifact = await Client.GetStagedAsync(ArtifactId, cancellation.Token);
+            if (artifact is null) error = T("NotFound");
+            else expiration = artifact.ExpiresAt.ToLocalTime().ToString("yyyy-MM-ddTHH:mm");
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { loading = false; }
+    }
+
     private void SetExpiration(ChangeEventArgs value) => expiration = value.Value?.ToString() ?? string.Empty;
-    private async Task ExtendAsync() { if (busy || artifact is null) return; busy = true; failed = false; message = null; try { var parsed = DateTime.SpecifyKind(DateTime.Parse(expiration, System.Globalization.CultureInfo.InvariantCulture), DateTimeKind.Local); artifact = await Client.ExtendRetentionAsync(ArtifactId, new DateTimeOffset(parsed), cancellation.Token); message = T("RetentionExtended"); } catch (Exception exception) { failed = true; message = exception.Message; } finally { busy = false; } }
-    private async Task ReadContentAsync() { if (busy || artifact is null) return; busy = true; failed = false; message = null; try { var chunk = await Client.ReadContentAsync(ArtifactId, 0, 8192, cancellation.Token); var bytes = Convert.FromBase64String(chunk.ContentBase64); content = IsTextMediaType(artifact.MediaType) ? System.Text.Encoding.UTF8.GetString(bytes) : $"{T("BinaryPreview", bytes.Length)}\n{chunk.ContentBase64}"; if (!chunk.EndOfContent) content += $"\n{T("PreviewTruncated")}"; } catch (Exception exception) { failed = true; message = exception.Message; } finally { busy = false; } }
-    private async Task PurgeAsync() { if (busy) return; busy = true; failed = false; message = null; try { await Client.PurgeAsync(ArtifactId, cancellation.Token); Navigation.NavigateTo("/artifacts"); } catch (Exception exception) { failed = true; message = exception.Message; busy = false; } }
+
+    private bool TryGetExpiration(out DateTimeOffset value)
+    {
+        if (DateTime.TryParse(expiration, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var parsed))
+        {
+            value = new DateTimeOffset(DateTime.SpecifyKind(parsed, DateTimeKind.Local));
+            return true;
+        }
+
+        value = default;
+        return false;
+    }
+
+    private async Task ExtendAsync()
+    {
+        if (busy || artifact is null || !TryGetExpiration(out var requestedExpiration) || requestedExpiration <= artifact.ExpiresAt) return;
+        busy = true;
+        failed = false;
+        message = null;
+        try
+        {
+            artifact = await Client.ExtendRetentionAsync(ArtifactId, requestedExpiration, cancellation.Token);
+            expiration = artifact.ExpiresAt.ToLocalTime().ToString("yyyy-MM-ddTHH:mm");
+            message = T("RetentionExtended");
+        }
+        catch (Exception exception) { failed = true; message = exception.Message; }
+        finally { busy = false; }
+    }
+
+    private async Task ReadContentAsync(bool full)
+    {
+        if (busy || artifact is null || (full && !CanReadFullContent)) return;
+        busy = true;
+        failed = false;
+        message = null;
+        try
+        {
+            var maximum = full ? checked((int)artifact.Length) : checked((int)Math.Min(PreviewBytes, artifact.Length));
+            using var output = new MemoryStream(maximum);
+            long offset = 0;
+            var endOfContent = artifact.Length == 0;
+            while (output.Length < maximum && !endOfContent)
+            {
+                var requested = Math.Min(ReadChunkBytes, maximum - checked((int)output.Length));
+                var chunk = await Client.ReadContentAsync(ArtifactId, offset, requested, cancellation.Token);
+                if (chunk.Offset != offset) throw new InvalidOperationException(T("ContentReadOffsetMismatch", offset, chunk.Offset));
+                var bytes = Convert.FromBase64String(chunk.ContentBase64);
+                if (bytes.Length == 0 && !chunk.EndOfContent) throw new InvalidOperationException(T("ContentReadNoProgress"));
+                if (bytes.Length > requested) throw new InvalidOperationException(T("ContentReadTooLarge", requested));
+                await output.WriteAsync(bytes, cancellation.Token);
+                offset += bytes.Length;
+                endOfContent = chunk.EndOfContent;
+            }
+
+            if ((endOfContent && output.Length != artifact.Length)
+                || (full && !endOfContent))
+                throw new InvalidOperationException(T("ContentLengthMismatch", artifact.Length, output.Length));
+
+            var value = output.ToArray();
+            contentBytes = value.Length;
+            contentComplete = endOfContent && output.Length == artifact.Length;
+            content = IsTextMediaType(artifact.MediaType)
+                ? System.Text.Encoding.UTF8.GetString(value)
+                : $"{T("BinaryContent", value.Length)}\n{Convert.ToBase64String(value)}";
+        }
+        catch (Exception exception) { failed = true; message = exception.Message; }
+        finally { busy = false; }
+    }
+
+    private async Task PurgeAsync()
+    {
+        if (busy) return;
+        busy = true;
+        failed = false;
+        message = null;
+        try
+        {
+            await Client.PurgeAsync(ArtifactId, cancellation.Token);
+            Navigation.NavigateTo("/artifacts");
+        }
+        catch (Exception exception) { failed = true; message = exception.Message; busy = false; }
+    }
+
     private static bool IsTextMediaType(string mediaType) => mediaType.StartsWith("text/", StringComparison.OrdinalIgnoreCase)
         || mediaType.Contains("json", StringComparison.OrdinalIgnoreCase)
         || mediaType.Contains("xml", StringComparison.OrdinalIgnoreCase)
         || mediaType.Contains("yaml", StringComparison.OrdinalIgnoreCase)
         || mediaType.Contains("javascript", StringComparison.OrdinalIgnoreCase);
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private static string TabId(DetailsTab tab) => $"staged-artifact-{tab.ToString().ToLowerInvariant()}-tab";
+    private enum DetailsTab { Overview, Content, Retention }
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
 }

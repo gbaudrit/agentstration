@@ -62,6 +62,24 @@ public sealed partial class ApiClientTests
         Assert.AreEqual("preview", System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(content.ContentBase64)));
     }
 
+    [TestMethod]
+    public async Task ArtifactClientGetsOneDurableArtifactByIdentity()
+    {
+        var id = FlowRunArtifactId.Parse("22222222222222222222222222222222");
+        string? requestPath = null;
+        using var http = new HttpClient(new StubHandler(request =>
+        {
+            requestPath = request.RequestUri!.PathAndQuery;
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        })) { BaseAddress = new Uri("http://localhost/") };
+        var client = new ArtifactsApiClient(http);
+
+        var result = await client.GetDurableAsync(id);
+
+        Assert.IsNull(result);
+        Assert.AreEqual("/api/artifacts/flow-run-artifacts/22222222222222222222222222222222", requestPath);
+    }
+
     private static HttpRequestMessage Clone(HttpRequestMessage request)
     {
         var copy = new HttpRequestMessage(request.Method, request.RequestUri);

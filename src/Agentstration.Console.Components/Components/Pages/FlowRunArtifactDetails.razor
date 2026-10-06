@@ -1,0 +1,125 @@
+@page "/artifacts/durable/{Id}"
+@implements IDisposable
+@inject IArtifactsClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
+
+<PageTitle>@(artifact is null ? Id : ArtifactName(artifact)) · Agentstration</PageTitle>
+<PageHeader Title="@(artifact is null ? Id : ArtifactName(artifact))" Description="@T("DurableDetailsDescription")" TestId="durable-artifact-details">
+    <Actions><a class="button-secondary" href="/artifacts">@T("Back")</a></Actions>
+</PageHeader>
+
+@if (loading)
+{
+    <LoadingState Message="@T("Loading")" />
+}
+else if (error is not null)
+{
+    <ErrorState Message="@error" />
+}
+else if (artifact is not null)
+{
+    <ResourceTabs Label="@T("DetailsSections")">
+        @foreach (var tab in Enum.GetValues<DetailsTab>())
+        {
+            <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="durable-artifact-tab-panel" class="@(activeTab == tab ? "active" : null)" data-testid="@TabId(tab)" @onclick="() => activeTab = tab">@T($"Tab.{tab}")</button>
+        }
+    </ResourceTabs>
+
+    <main id="durable-artifact-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
+        @if (activeTab == DetailsTab.Overview)
+        {
+            <section class="metric-grid">
+                <MetricCard Label="@T("MediaType")" Value="@artifact.Receipt.MediaType" Detail="@T("Durable")" Status="UiStatus.Success" />
+                <MetricCard Label="@T("Size")" Value="@SizeInMegabytes(artifact.Receipt.Length)" Detail="@ExactSize(artifact.Receipt.Length)" />
+                <MetricCard Label="@T("Created")" Value="@artifact.CreatedAt.ToLocalTime().ToString("g")" Detail="@T("Immutable")" />
+            </section>
+
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">@T("Provenance")</p><h2>@T("Producer")</h2></div></div>
+                <dl class="resource-details durable-artifact-details-grid">
+                    <dt>@T("FlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId)">@artifact.ProducerFlowRunId</a></dd>
+                    <dt>@T("FlowStep")</dt><dd><code>@artifact.ProducerFlowStepId</code></dd>
+                    <dt>@T("SourceArtifact")</dt><dd><a class="text-button" href="@StagedUrl(artifact.SourceArtifactId)">@artifact.SourceArtifactId</a></dd>
+                </dl>
+            </section>
+
+            <section class="panel form-section durable-content-notice">
+                <div class="panel-header"><div><p class="eyebrow">@T("ProtectedContent")</p><h2>@T("DurableContentTitle")</h2><p>@T("DurableContentHelp")</p></div></div>
+                <a class="button-secondary" href="@StagedUrl(artifact.SourceArtifactId)">@T("OpenSourceArtifact")</a>
+            </section>
+        }
+        else
+        {
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">@T("Storage")</p><h2>@T("StorageReceipt")</h2><p>@T("StorageReceiptHelp")</p></div></div>
+                <dl class="resource-details durable-artifact-details-grid">
+                    <dt>@T("StorageFlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(artifact.Receipt.StorageFlowRunId)">@artifact.Receipt.StorageFlowRunId</a></dd>
+                    <dt>@T("MediaType")</dt><dd>@artifact.Receipt.MediaType</dd>
+                    <dt>@T("Size")</dt><dd>@SizeInMegabytes(artifact.Receipt.Length) · @ExactSize(artifact.Receipt.Length)</dd>
+                    <dt>SHA-256</dt><dd><code>@artifact.Receipt.Sha256</code></dd>
+                </dl>
+            </section>
+
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">@T("Provenance")</p><h2>@T("StorageProvenance")</h2></div></div>
+                @if (VisibleProvenance(artifact).Count == 0)
+                {
+                    <p class="muted">@T("NoStorageProvenance")</p>
+                }
+                else
+                {
+                    <dl class="resource-details durable-artifact-details-grid">
+                        @foreach (var entry in VisibleProvenance(artifact))
+                        {
+                            <dt>@entry.Key</dt><dd><code>@entry.Value</code></dd>
+                        }
+                    </dl>
+                }
+            </section>
+        }
+    </main>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = string.Empty;
+    private readonly CancellationTokenSource cancellation = new();
+    private FlowRunArtifactResource? artifact;
+    private DetailsTab activeTab;
+    private bool loading = true;
+    private string? error;
+    private FlowRunArtifactId ArtifactId => FlowRunArtifactId.Parse(Id);
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            artifact = await Client.GetDurableAsync(ArtifactId, cancellation.Token);
+            if (artifact is null) error = T("DurableNotFound");
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { loading = false; }
+    }
+
+    private static string ArtifactName(FlowRunArtifactResource value) => value.Receipt.Provenance.TryGetValue("fileName", out var fileName)
+        && !string.IsNullOrWhiteSpace(fileName) ? fileName : value.ArtifactId.ToString();
+    private static IReadOnlyList<KeyValuePair<string, string>> VisibleProvenance(FlowRunArtifactResource value)
+    {
+        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "provider", "fileName", "correlationId" };
+        return value.Receipt.Provenance.Where(entry => allowed.Contains(entry.Key)).OrderBy(entry => entry.Key, StringComparer.Ordinal).ToArray();
+    }
+    private static string FlowRunUrl(string id) => $"/flow-runs/{Uri.EscapeDataString(id)}";
+    private static string StagedUrl(StagedArtifactId id) => $"/artifacts/staged/{id}";
+    private string SizeInMegabytes(long value) => T("SizeMegabytes", value / 1024d / 1024d);
+    private string ExactSize(long value) => T("ExactBytes", value);
+    private static string TabId(DetailsTab tab) => $"durable-artifact-{tab.ToString().ToLowerInvariant()}-tab";
+    private enum DetailsTab { Overview, Storage }
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}
