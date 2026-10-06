@@ -30,7 +30,7 @@ else if (artifact is not null)
         {
             <section class="metric-grid">
                 <MetricCard Label="@T("MediaType")" Value="@artifact.Receipt.MediaType" Detail="@T("Durable")" Status="UiStatus.Success" />
-                <MetricCard Label="@T("Size")" Value="@Size(artifact.Receipt.Length)" Detail="@artifact.Receipt.Sha256" />
+                <MetricCard Label="@T("Size")" Value="@SizeInMegabytes(artifact.Receipt.Length)" Detail="@ExactSize(artifact.Receipt.Length)" />
                 <MetricCard Label="@T("Created")" Value="@artifact.CreatedAt.ToLocalTime().ToString("g")" Detail="@T("Immutable")" />
             </section>
 
@@ -55,7 +55,7 @@ else if (artifact is not null)
                 <dl class="resource-details durable-artifact-details-grid">
                     <dt>@T("StorageFlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(artifact.Receipt.StorageFlowRunId)">@artifact.Receipt.StorageFlowRunId</a></dd>
                     <dt>@T("MediaType")</dt><dd>@artifact.Receipt.MediaType</dd>
-                    <dt>@T("Size")</dt><dd>@Size(artifact.Receipt.Length)</dd>
+                    <dt>@T("Size")</dt><dd>@SizeInMegabytes(artifact.Receipt.Length) · @ExactSize(artifact.Receipt.Length)</dd>
                     <dt>SHA-256</dt><dd><code>@artifact.Receipt.Sha256</code></dd>
                 </dl>
             </section>
@@ -112,7 +112,8 @@ else if (artifact is not null)
     }
     private static string FlowRunUrl(string id) => $"/flow-runs/{Uri.EscapeDataString(id)}";
     private static string StagedUrl(StagedArtifactId id) => $"/artifacts/staged/{id}";
-    private static string Size(long value) => value < 1024 ? $"{value} B" : value < 1024 * 1024 ? $"{value / 1024d:F1} KB" : $"{value / 1024d / 1024d:F1} MB";
+    private string SizeInMegabytes(long value) => T("SizeMegabytes", value / 1024d / 1024d);
+    private string ExactSize(long value) => T("ExactBytes", value);
     private static string TabId(DetailsTab tab) => $"durable-artifact-{tab.ToString().ToLowerInvariant()}-tab";
     private enum DetailsTab { Overview, Storage }
 

@@ -1,6 +1,7 @@
 .artifact-reference {
     display: grid;
-    width: max-content;
+    width: min(28rem, 100%);
+    min-width: 0;
     max-width: 100%;
     gap: .22rem;
     color: var(--text);
@@ -15,7 +16,8 @@
 }
 
 .artifact-reference small {
-    display: flex;
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
     min-width: 0;
     align-items: center;
     gap: .38rem;
@@ -30,10 +32,11 @@
 }
 
 .artifact-reference code {
-    overflow: hidden;
+    min-width: 0;
     color: var(--muted);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    word-break: break-word;
 }
 
 a.artifact-reference:hover strong,

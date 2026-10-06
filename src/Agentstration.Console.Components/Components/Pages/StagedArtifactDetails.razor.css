@@ -113,3 +113,19 @@
     .artifact-retention-editor { grid-template-columns: 1fr; }
     .artifact-retention-editor button { width: 100%; justify-content: center; }
 }
+.metric-grid ::deep .metric-card,
+.metric-grid ::deep .metric-card > div,
+.metric-grid ::deep .metric-card small {
+    min-width: 0;
+}
+
+.metric-grid ::deep .metric-card strong,
+.metric-grid ::deep .metric-card small {
+    overflow-wrap: anywhere;
+}
+
+.artifact-details-grid code {
+    overflow-wrap: anywhere;
+    white-space: normal;
+    word-break: break-word;
+}

@@ -2,14 +2,14 @@
 {
     <a class="artifact-reference" href="@Href" title="@Identifier">
         <strong>@Name</strong>
-        <small><span>@IdentifierLabel</span><code>@ShortIdentifier</code></small>
+        <small><span>@IdentifierLabel</span><code>@Identifier</code></small>
     </a>
 }
 else
 {
     <span class="artifact-reference" title="@Identifier">
         <strong>@Name</strong>
-        <small><span>@IdentifierLabel</span><code>@ShortIdentifier</code></small>
+        <small><span>@IdentifierLabel</span><code>@Identifier</code></small>
     </span>
 }
 
@@ -18,5 +18,4 @@ else
     [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string Identifier { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string IdentifierLabel { get; set; } = string.Empty;
-    private string ShortIdentifier => Identifier.Length <= 14 ? Identifier : $"{Identifier[..14]}…";
 }

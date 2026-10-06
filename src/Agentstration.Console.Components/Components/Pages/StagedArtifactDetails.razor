@@ -57,7 +57,7 @@ else if (artifact is not null)
         {
             <section class="metric-grid">
                 <MetricCard Label="@T("State")" Value="@T($"Status.{artifact.Status}")" Detail="@artifact.MediaType" Status="@(artifact.Status == StagedArtifactStatus.Failed ? UiStatus.Warning : UiStatus.Info)" />
-                <MetricCard Label="@T("Size")" Value="@artifact.Length.ToString("N0")" Detail="@(artifact.Sha256 ?? T("NotSealed"))" />
+                <MetricCard Label="@T("Size")" Value="@SizeInMegabytes(artifact.Length)" Detail="@ExactSize(artifact.Length)" />
                 <MetricCard Label="@T("Expires")" Value="@artifact.ExpiresAt.ToLocalTime().ToString("g")" Detail="@T("LeaseCount", artifact.Leases.Count)" />
             </section>
 
@@ -66,6 +66,7 @@ else if (artifact is not null)
                 <dl class="resource-details artifact-details-grid">
                     <dt>@T("ProducerKind")</dt><dd>@artifact.Producer.Kind</dd>
                     <dt>@T("ProducerId")</dt><dd><code>@artifact.Producer.Id</code></dd>
+                    <dt>SHA-256</dt><dd><code>@(artifact.Sha256 ?? T("NotSealed"))</code></dd>
                     <dt>@T("FlowRun")</dt><dd>@(artifact.Producer.FlowRunId ?? "—")</dd>
                     <dt>@T("FlowStep")</dt><dd>@(artifact.Producer.FlowStepId ?? "—")</dd>
                     <dt>@T("Agent")</dt><dd>@(artifact.Producer.AgentId ?? "—")</dd>
@@ -157,6 +158,8 @@ else if (artifact is not null)
         && artifact.Status is not (StagedArtifactStatus.Open or StagedArtifactStatus.Persisting or StagedArtifactStatus.Purging or StagedArtifactStatus.Purged)
         && !artifact.Leases.Any(value => value.RevokedAt is null && value.ExpiresAt > TimeProvider.GetUtcNow());
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string SizeInMegabytes(long value) => T("SizeMegabytes", value / 1024d / 1024d);
+    private string ExactSize(long value) => T("ExactBytes", value);
 
     protected override async Task OnParametersSetAsync()
     {

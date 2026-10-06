@@ -131,10 +131,36 @@ public sealed class ArtifactAdministrationComponentTests
         Assert.IsNotNull(rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']"));
         Assert.IsNotNull(rendered.Find("a[href='/flow-runs/flow-run-1']"));
         StringAssert.Contains(rendered.Markup, "index.html");
+        StringAssert.Contains(
+            rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']").TextContent,
+            client.Artifact.ArtifactId.ToString());
 
         rendered.FindAll("button").Single(value => value.TextContent.Contains("Durable", StringComparison.Ordinal)).Click();
         Assert.IsNotNull(rendered.Find($"a[href='/artifacts/durable/{client.Durable.ArtifactId}']"));
         StringAssert.Contains(rendered.Markup, "index.html");
+        StringAssert.Contains(
+            rendered.Find($"a[href='/artifacts/durable/{client.Durable.ArtifactId}']").TextContent,
+            client.Durable.ArtifactId.ToString());
+    }
+
+    [TestMethod]
+    public void StagedArtifactDisplaysMegabytesAndKeepsTheExactByteCount()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        var client = new ArtifactClient("preview", declaredLength: 19_343);
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddSingleton<IArtifactsClient>(client);
+
+        var rendered = context.Render<Agentstration.Web.Components.Pages.StagedArtifactDetails>(parameters =>
+            parameters.Add(value => value.Id, client.Artifact.ArtifactId.ToString()));
+
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Markup, "0.02 MB");
+            StringAssert.Contains(rendered.Markup, "19,343 bytes");
+        });
     }
 
     [TestMethod]
