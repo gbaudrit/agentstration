@@ -10,6 +10,38 @@ namespace Agentstration.Application.Tests;
 public sealed class FlowToolStepTests
 {
     [TestMethod]
+    public void YamlInputSchemaPreservesBooleanAndNumericConstraintTypes()
+    {
+        const string yaml = """
+            entryStep: input
+            inputSchema:
+              type: object
+              properties:
+                prompt:
+                  type: string
+                  minLength: 1
+                  maxLength: 16000
+              required:
+              - prompt
+              additionalProperties: false
+            steps:
+            - type: input
+              name: input
+            transitions: []
+            """;
+
+        var graph = new FlowDraftService(null!, null!, null!, TimeProvider.System).ParseSource(yaml, "yaml");
+        var schema = graph.InputSchema!.Value;
+        var prompt = schema.GetProperty("properties").GetProperty("prompt");
+
+        Assert.AreEqual(JsonValueKind.Number, prompt.GetProperty("minLength").ValueKind);
+        Assert.AreEqual(1, prompt.GetProperty("minLength").GetInt32());
+        Assert.AreEqual(JsonValueKind.Number, prompt.GetProperty("maxLength").ValueKind);
+        Assert.AreEqual(16000, prompt.GetProperty("maxLength").GetInt32());
+        Assert.AreEqual(JsonValueKind.False, schema.GetProperty("additionalProperties").ValueKind);
+    }
+
+    [TestMethod]
     public async Task ToolStepRoundTripsAndValidatesMappedSchema()
     {
         var schema = JsonSerializer.SerializeToElement(new

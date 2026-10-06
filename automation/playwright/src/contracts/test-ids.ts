@@ -1,6 +1,8 @@
 export const TestIds = {
   common: {
     iconPicker: 'icon-picker',
+    schemaInputEditor: 'schema-input-editor',
+    schemaRawMode: 'schema-raw-mode',
   },
   console: {
     shell: 'console-shell',
@@ -175,6 +177,9 @@ export const TestIds = {
   flowObservability: {
     flows: 'flow-observability-flows',
     flowDetails: 'flow-observability-flow-details',
+    runOpen: 'flow-run-open',
+    runDialog: 'flow-run-dialog',
+    runSubmit: 'flow-run-submit',
     designer: 'flow-observability-designer',
     designerSave: 'flow-designer-save',
     designerValidate: 'flow-designer-validate',

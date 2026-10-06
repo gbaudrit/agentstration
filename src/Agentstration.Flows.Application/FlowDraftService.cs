@@ -14,7 +14,10 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly JsonSerializerOptions IndentedJsonOptions = new(JsonOptions) { WriteIndented = true };
     private static readonly ISerializer YamlSerializer = new SerializerBuilder().WithNamingConvention(CamelCaseNamingConvention.Instance).DisableAliases().Build();
-    private static readonly IDeserializer YamlDeserializer = new DeserializerBuilder().WithNamingConvention(CamelCaseNamingConvention.Instance).Build();
+    private static readonly IDeserializer YamlDeserializer = new DeserializerBuilder()
+        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+        .WithAttemptingUnquotedStringTypeDeserialization()
+        .Build();
 
     public async Task<StoredFlowDraft> CreateAsync(WorkspaceId workspaceId, CreateFlowDraftCommand command, CancellationToken cancellationToken)
     {

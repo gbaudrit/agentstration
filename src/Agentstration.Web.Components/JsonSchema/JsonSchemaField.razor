@@ -1,0 +1,136 @@
+@using System.Globalization
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@inject Microsoft.Extensions.Localization.IStringLocalizer<JsonSchemaInputStrings> Localizer
+
+<div class="schema-field schema-field-@Schema.Kind.ToString().ToLowerInvariant()" data-schema-path="@Schema.Path">
+    @if (Schema.Kind == JsonSchemaInputKind.Map)
+    {
+        @if (Schema.Path != "$") { <h4>@Label</h4>@Help }
+        <div class="schema-object-fields">
+            @foreach (var property in Schema.Properties)
+            {
+                <JsonSchemaField Schema="property" Value="@ObjectValue(property.Name)" ValueChanged="value => ChangePropertyAsync(property, value)" Disabled="Disabled" Issues="Issues" />
+            }
+        </div>
+    }
+    else if (Schema.Kind == JsonSchemaInputKind.List)
+    {
+        <fieldset disabled="@Disabled"><legend>@Label @RequiredMark @RulesTooltip</legend>@Help
+            @foreach (var item in ArrayItems.Select((value, index) => (value, index)))
+            {
+                <div class="schema-array-item"><JsonSchemaField Schema="@(Schema.Items! with { Path = $"{Schema.Path}[{item.index}]", Name = $"{Schema.Name} {item.index + 1}" })" Value="item.value" ValueChanged="value => ChangeArrayItemAsync(item.index, value)" Disabled="Disabled" Issues="Issues" /><button type="button" class="button-secondary" @onclick="() => RemoveArrayItemAsync(item.index)">@Localizer["RemoveItem"]</button></div>
+            }
+            <button type="button" class="button-secondary" @onclick="AddArrayItemAsync" disabled="@(Disabled || ArrayItems.Count >= EffectiveMaximumItems)">@Localizer["AddItem"]</button>
+        </fieldset>
+    }
+    else if (Schema.Kind == JsonSchemaInputKind.Toggle)
+    {
+        <label class="schema-toggle"><input type="checkbox" checked="@BooleanValue" disabled="@Disabled" @onchange="ChangeBooleanAsync" /><span>@Label @RequiredMark @RulesTooltip</span></label>@Help
+    }
+    else if (Schema.AllowedValues.Count > 0)
+    {
+        <label><span>@Label @RequiredMark @RulesTooltip</span><select value="@SerializedValue" disabled="@Disabled" @onchange="ChangeEnumAsync"><option value="">@Localizer["NotSet"]</option>@foreach (var option in Schema.AllowedValues) { <option value="@option.GetRawText()">@Display(option)</option> }</select></label>@Help
+    }
+    else if (Schema.Kind == JsonSchemaInputKind.Text)
+    {
+        <label><span>@Label @RequiredMark @RulesTooltip</span>
+            @if (UsesMultilineText)
+            {
+                <textarea class="schema-long-text" rows="6" value="@StringValue" disabled="@Disabled" minlength="@Schema.MinimumLength" maxlength="@Schema.MaximumLength" @oninput="ChangeStringAsync"></textarea>
+            }
+            else
+            {
+                <input type="@(string.Equals(Schema.Format, "uri", StringComparison.OrdinalIgnoreCase) ? "url" : "text")" value="@StringValue" disabled="@Disabled" minlength="@Schema.MinimumLength" maxlength="@Schema.MaximumLength" @oninput="ChangeStringAsync" />
+            }
+        </label>@Help
+    }
+    else if (Schema.Kind is JsonSchemaInputKind.WholeNumber or JsonSchemaInputKind.DecimalNumber)
+    {
+        <label><span>@Label @RequiredMark @RulesTooltip</span><input type="number" value="@NumberValue" disabled="@Disabled" step="@(Schema.Kind == JsonSchemaInputKind.WholeNumber ? "1" : "any")" min="@Schema.Minimum" max="@Schema.Maximum" @oninput="ChangeNumberAsync" /></label>@Help
+    }
+    else
+    {
+        <label><span>@Label @RequiredMark</span><input value="null" readonly /></label>@Help
+    }
+    @foreach (var issue in FieldIssues)
+    {
+        <span class="field-validation-error" role="alert">@IssueText(issue)</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public JsonSchemaInputNode Schema { get; set; } = null!;
+    [Parameter] public JsonNode? Value { get; set; }
+    [Parameter] public EventCallback<JsonNode?> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public IReadOnlyList<JsonSchemaInputIssue> Issues { get; set; } = [];
+    private string Label => Schema.Title ?? Schema.Name;
+    private string RequiredMark => Schema.Required ? Localizer["RequiredMarker"] : string.Empty;
+    private string StringValue => Value is JsonValue value && value.TryGetValue<string>(out var text) ? text : string.Empty;
+    private string NumberValue => Value?.ToJsonString() ?? string.Empty;
+    private bool UsesMultilineText => Schema.MaximumLength is >= 1000;
+    private bool BooleanValue => Value is JsonValue value && value.TryGetValue<bool>(out var result) && result;
+    private string SerializedValue => Value?.ToJsonString() ?? string.Empty;
+    private IReadOnlyList<JsonNode?> ArrayItems => Value is JsonArray array ? array.ToArray() : [];
+    private int EffectiveMaximumItems => Math.Min(Schema.MaximumItems ?? JsonSchemaInputModel.MaximumRenderedItems, JsonSchemaInputModel.MaximumRenderedItems);
+    private RenderFragment Help => builder => { if (!string.IsNullOrWhiteSpace(Schema.Description)) builder.AddMarkupContent(0, $"<small>{System.Net.WebUtility.HtmlEncode(Schema.Description)}</small>"); else if (Schema.Examples.Count > 0) builder.AddContent(1, Localizer["Example", Display(Schema.Examples[0])]); };
+    private RenderFragment RulesTooltip => builder =>
+    {
+        if (RulesText is not { } rules) return;
+        builder.OpenComponent<HelpTooltip>(0);
+        builder.AddAttribute(1, nameof(HelpTooltip.Text), rules);
+        builder.AddAttribute(2, nameof(HelpTooltip.AlignStart), true);
+        builder.CloseComponent();
+    };
+    private string? RulesText
+    {
+        get
+        {
+            var rules = new List<string>();
+            if (Schema.Required) rules.Add(Localizer["Rule.Required"]);
+            if (Schema.Kind == JsonSchemaInputKind.Text)
+            {
+                if (Schema.MinimumLength is { } minimum && Schema.MaximumLength is { } maximum)
+                    rules.Add(Localizer["Rule.LengthRange", minimum.ToString("N0", CultureInfo.CurrentCulture), maximum.ToString("N0", CultureInfo.CurrentCulture)]);
+                else if (Schema.MinimumLength is { } minimumOnly)
+                    rules.Add(minimumOnly == 1 ? Localizer["Rule.MinimumLength.One"] : Localizer["Rule.MinimumLength", minimumOnly.ToString("N0", CultureInfo.CurrentCulture)]);
+                else if (Schema.MaximumLength is { } maximumOnly)
+                    rules.Add(Localizer["Rule.MaximumLength", maximumOnly.ToString("N0", CultureInfo.CurrentCulture)]);
+                if (Schema.Pattern is not null) rules.Add(Localizer["Rule.Pattern", Schema.Pattern]);
+                if (string.Equals(Schema.Format, "uri", StringComparison.OrdinalIgnoreCase)) rules.Add(Localizer["Rule.Uri"]);
+            }
+            if (Schema.Kind is JsonSchemaInputKind.WholeNumber or JsonSchemaInputKind.DecimalNumber)
+            {
+                if (Schema.Minimum is { } minimum) rules.Add(Localizer["Rule.Minimum", minimum]);
+                if (Schema.Maximum is { } maximum) rules.Add(Localizer["Rule.Maximum", maximum]);
+            }
+            if (Schema.Kind == JsonSchemaInputKind.List)
+            {
+                if (Schema.MinimumItems is { } minimum) rules.Add(Localizer["Rule.MinimumItems", minimum]);
+                if (Schema.MaximumItems is { } maximum) rules.Add(Localizer["Rule.MaximumItems", maximum]);
+            }
+            if (!Schema.Required && rules.Count > 0) rules.Insert(0, Localizer["Rule.Optional"]);
+            return rules.Count == 0 ? null : string.Join(" ", rules);
+        }
+    }
+    private IEnumerable<JsonSchemaInputIssue> FieldIssues => Issues.Where(issue => issue.Path == Schema.Path);
+    private string IssueText(JsonSchemaInputIssue issue) => issue is { Code: "MinimumLength", Constraint: "1" }
+        ? Localizer["Validation.MinimumLength.One"]
+        : Localizer[$"Validation.{issue.Code}", issue.Constraint ?? string.Empty];
+    private JsonNode? ObjectValue(string name) => Value is JsonObject value && value.TryGetPropertyValue(name, out var child) ? child : null;
+    private async Task ChangePropertyAsync(JsonSchemaInputNode property, JsonNode? value) { var root = Value is JsonObject current ? (JsonObject)current.DeepClone() : []; if (value is null && !property.Required) root.Remove(property.Name); else root[property.Name] = value?.DeepClone(); await ValueChanged.InvokeAsync(root); }
+    private Task ChangeStringAsync(ChangeEventArgs args)
+    {
+        var text = args.Value?.ToString() ?? string.Empty;
+        return ValueChanged.InvokeAsync(text.Length == 0 && !Schema.Required ? null : JsonValue.Create(text));
+    }
+    private Task ChangeBooleanAsync(ChangeEventArgs args) => ValueChanged.InvokeAsync(JsonValue.Create(args.Value is bool value && value));
+    private Task ChangeEnumAsync(ChangeEventArgs args) => ValueChanged.InvokeAsync(string.IsNullOrEmpty(args.Value?.ToString()) ? null : JsonNode.Parse(args.Value!.ToString()!));
+    private Task ChangeNumberAsync(ChangeEventArgs args) { var text = args.Value?.ToString(); if (string.IsNullOrWhiteSpace(text)) return ValueChanged.InvokeAsync(null); JsonNode? node = Schema.Kind == JsonSchemaInputKind.WholeNumber && long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer) ? JsonValue.Create(integer) : decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) ? JsonValue.Create(number) : JsonValue.Create(text); return ValueChanged.InvokeAsync(node); }
+    private async Task ChangeArrayItemAsync(int index, JsonNode? value) { var array = Value is JsonArray current ? (JsonArray)current.DeepClone() : []; array[index] = value?.DeepClone(); await ValueChanged.InvokeAsync(array); }
+    private async Task AddArrayItemAsync() { var array = Value is JsonArray current ? (JsonArray)current.DeepClone() : []; array.Add(NewValue(Schema.Items!)); await ValueChanged.InvokeAsync(array); }
+    private async Task RemoveArrayItemAsync(int index) { var array = Value is JsonArray current ? (JsonArray)current.DeepClone() : []; array.RemoveAt(index); await ValueChanged.InvokeAsync(array); }
+    private static JsonNode? NewValue(JsonSchemaInputNode schema) => schema.Default is { } value ? JsonNode.Parse(value.GetRawText()) : schema.Kind switch { JsonSchemaInputKind.Map => new JsonObject(), JsonSchemaInputKind.List => new JsonArray(), JsonSchemaInputKind.Text => JsonValue.Create(string.Empty), JsonSchemaInputKind.WholeNumber => JsonValue.Create(0), JsonSchemaInputKind.DecimalNumber => JsonValue.Create(0m), JsonSchemaInputKind.Toggle => JsonValue.Create(false), _ => null };
+    private static string Display(JsonElement value) => value.ValueKind == JsonValueKind.String ? value.GetString()! : value.GetRawText();
+}
