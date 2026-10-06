@@ -12,7 +12,7 @@
   <data name="ReadOnly"><value>Lecture seule</value></data>
   <data name="Mode.Designer"><value>Designer</value></data><data name="Mode.Definition"><value>Définition</value></data><data name="Mode.Split"><value>Vue partagée</value></data>
   <data name="Undo"><value>Annuler</value></data><data name="Redo"><value>Rétablir</value></data>
-  <data name="Validate"><value>Valider</value></data><data name="RunDraft"><value>Exécuter le brouillon</value></data>
+  <data name="Validate"><value>Valider</value></data><data name="RunDraft"><value>Exécuter le brouillon</value></data><data name="RunningDraft"><value>Démarrage de l’exécution du brouillon…</value></data>
   <data name="Save"><value>Enregistrer</value></data><data name="Version"><value>Version</value></data><data name="PublishVersion"><value>Version à publier</value></data><data name="Publish"><value>Publier</value></data><data name="Publishing"><value>Publication…</value></data>
   <data name="ActionFailed"><value>Action impossible</value></data><data name="DismissError"><value>Fermer le message d’erreur</value></data>
   <data name="PublishVersionExists"><value>La version {0} est déjà publiée. Choisissez une autre version.</value></data><data name="InvalidSourceBeforePublish"><value>Corrigez les erreurs de la définition YAML avant de publier.</value></data>

@@ -323,7 +323,7 @@ else
 
     @if (showRun)
     {
-        <div class="dialog-backdrop"><section class="dialog run-dialog"><h2>@T("RunDraftRevision", Editor.State.Resource.DraftRevision?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")</h2><label>@T("InputJson")<textarea rows="10" @bind="runInput"></textarea></label><div class="dialog-actions"><button class="button-secondary" @onclick="() => showRun = false">@T("Cancel")</button><button class="button-primary" @onclick="RunDraftAsync">@T("RunDraft")</button></div></section></div>
+        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true" aria-labelledby="run-draft-title" data-testid="flow-designer-run-dialog"><h2 id="run-draft-title">@T("RunDraftRevision", Editor.State.Resource.DraftRevision?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")</h2><div class="flow-run-input"><h3>@T("InputJson")</h3><JsonSchemaInputEditor Schema="Editor.State.Resource.Definition.InputSchema" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunInputValidation" Disabled="runningDraft" /></div>@if (runError is not null) { <p class="error-panel" role="alert">@runError</p> }<div class="dialog-actions"><button class="button-secondary" disabled="@runningDraft" @onclick="() => showRun = false">@T("Cancel")</button><button class="button-primary" disabled="@(runningDraft || !runInputValid)" data-testid="flow-designer-run-submit" @onclick="RunDraftAsync">@(runningDraft ? T("RunningDraft") : T("RunDraft"))</button></div></section></div>
     }
 }
 
@@ -344,11 +344,14 @@ else
     private string transitionEvent = "completed";
     private string publishVersion = "1.0.0";
     private bool showAllErrorTransitions;
-    private string runInput = "{\n  \"prompt\": \"How can I optimize this SQL query?\"\n}";
+    private JsonElement runInput = JsonSerializer.SerializeToElement(new { prompt = "How can I optimize this SQL query?" });
     private string? error;
+    private string? runError;
     private bool saving;
     private bool publishing;
     private bool showRun;
+    private bool runningDraft;
+    private bool runInputValid = true;
     private bool loadingAgents;
     private long layoutRevision;
     private int toolPickerRevision;
@@ -495,8 +498,27 @@ else
         catch (Exception exception) { error = exception.Message; }
         finally { publishing = false; }
     }
-    private void OpenRun() { if (ReadOnly) return; showRun = true; error = null; }
-    private async Task RunDraftAsync() { if (ReadOnly) return; try { await SaveAsync(); using var json = JsonDocument.Parse(runInput); var run = await Backend.RunDraftAsync(Target, new(json.RootElement.Clone(), Trigger: FlowRunTrigger.Manual), cancellation.Token); Navigation.NavigateTo($"/flow-runs/{run.Id}"); } catch (Exception exception) { error = exception.Message; } }
+    private void OpenRun() { if (ReadOnly) return; showRun = true; error = null; runError = null; runInputValid = true; runInput = ParseInput("{}"); }
+    private Task UpdateRunInputValidation(JsonSchemaInputValidationState value) { runInputValid = value.IsValid; return Task.CompletedTask; }
+    private async Task RunDraftAsync()
+    {
+        if (ReadOnly || !runInputValid || runningDraft) return;
+        try
+        {
+            runningDraft = true;
+            runError = null;
+            await SaveAsync();
+            if (error is not null) return;
+            var run = await Backend.RunDraftAsync(Target, new(runInput.Clone(), Trigger: FlowRunTrigger.Manual), cancellation.Token);
+            Navigation.NavigateTo($"/flow-runs/{run.Id}");
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            runError = exception.Message;
+        }
+        finally { runningDraft = false; }
+    }
+    private static JsonElement ParseInput(string value) { try { using var document = JsonDocument.Parse(value); return document.RootElement.ValueKind == JsonValueKind.Object ? document.RootElement.Clone() : JsonSerializer.SerializeToElement(new { }); } catch (JsonException) { return JsonSerializer.SerializeToElement(new { }); } }
     private async Task ApplySourceAsync(string source)
     {
         if (ReadOnly) return;

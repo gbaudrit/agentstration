@@ -14,7 +14,7 @@
   <data name="Mode.Definition"><value>Definition</value></data>
   <data name="Mode.Split"><value>Split</value></data>
   <data name="Undo"><value>Undo</value></data><data name="Redo"><value>Redo</value></data>
-  <data name="Validate"><value>Validate</value></data><data name="RunDraft"><value>Run draft</value></data>
+  <data name="Validate"><value>Validate</value></data><data name="RunDraft"><value>Run draft</value></data><data name="RunningDraft"><value>Starting draft run…</value></data>
   <data name="Save"><value>Save</value></data><data name="Version"><value>Version</value></data>
   <data name="PublishVersion"><value>Publish version</value></data><data name="Publish"><value>Publish</value></data><data name="Publishing"><value>Publishing…</value></data>
   <data name="ActionFailed"><value>Action could not be completed</value></data><data name="DismissError"><value>Dismiss error</value></data>

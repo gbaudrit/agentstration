@@ -5,6 +5,7 @@ using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components.State;
+using Agentstration.Web.Components.JsonSchema;
 using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.FlowDesigner.Components;
 using Agentstration.Web.FlowDesigner.Diagramming;
@@ -196,6 +197,35 @@ public sealed class FlowDesignerReadOnlyTests
         var applyYaml = rendered.FindAll("button").Single(button => button.TextContent.Trim() == "Apply and save");
         Assert.IsTrue(applyYaml.HasAttribute("disabled"));
         Assert.HasCount(0, rendered.FindAll(".source-editor .muted"));
+    }
+
+    [TestMethod]
+    public void DraftRunUsesTheDraftInputSchemaEditorAndBlocksInvalidInput()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var schema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { prompt = new { type = "string" } },
+            required = new[] { "prompt" }
+        });
+        var definition = new FlowGraphDefinition { EntryStep = "input", InputSchema = schema, Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "sample"));
+        rendered.FindAll("button").Single(button => button.TextContent.Trim() == "Run draft").Click();
+
+        var editor = rendered.FindComponent<JsonSchemaInputEditor>();
+        Assert.AreEqual(schema.GetRawText(), editor.Instance.Schema?.GetRawText());
+        Assert.HasCount(1, rendered.FindAll("[data-testid='flow-designer-run-dialog']"));
+        Assert.IsTrue(rendered.Find("[data-testid='flow-designer-run-submit']").HasAttribute("disabled"));
     }
 
     [TestMethod]
