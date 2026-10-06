@@ -124,6 +124,12 @@
     overflow-wrap: anywhere;
 }
 
+.artifact-overview-metrics ::deep .metric-card:last-child strong {
+    font-size: clamp(.98rem, 1.25vw, 1.25rem);
+    letter-spacing: -.025em;
+    white-space: nowrap;
+}
+
 .artifact-details-grid code {
     overflow-wrap: anywhere;
     white-space: normal;

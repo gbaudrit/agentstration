@@ -55,7 +55,7 @@ else if (artifact is not null)
     <main id="staged-artifact-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
         @if (activeTab == DetailsTab.Overview)
         {
-            <section class="metric-grid">
+            <section class="metric-grid artifact-overview-metrics">
                 <MetricCard Label="@T("State")" Value="@T($"Status.{artifact.Status}")" Detail="@artifact.MediaType" Status="@(artifact.Status == StagedArtifactStatus.Failed ? UiStatus.Warning : UiStatus.Info)" />
                 <MetricCard Label="@T("Size")" Value="@SizeInMegabytes(artifact.Length)" Detail="@ExactSize(artifact.Length)" />
                 <MetricCard Label="@T("Expires")" Value="@artifact.ExpiresAt.ToLocalTime().ToString("g")" Detail="@T("LeaseCount", artifact.Leases.Count)" />
@@ -65,14 +65,14 @@ else if (artifact is not null)
                 <div class="panel-header"><div><p class="eyebrow">@T("Provenance")</p><h2>@T("Producer")</h2></div></div>
                 <dl class="resource-details artifact-details-grid">
                     <dt>@T("ProducerKind")</dt><dd>@artifact.Producer.Kind</dd>
-                    <dt>@T("ProducerId")</dt><dd><code>@artifact.Producer.Id</code></dd>
+                    <dt>@T("ProducerId")</dt><dd>@if (ProducerUrl(artifact.Producer) is { } producerUrl) { <a class="text-button" href="@producerUrl"><code>@artifact.Producer.Id</code></a> } else { <code>@artifact.Producer.Id</code> }</dd>
                     <dt>SHA-256</dt><dd><code>@(artifact.Sha256 ?? T("NotSealed"))</code></dd>
-                    <dt>@T("FlowRun")</dt><dd>@(artifact.Producer.FlowRunId ?? "—")</dd>
+                    <dt>@T("FlowRun")</dt><dd>@if (artifact.Producer.FlowRunId is { } flowRunId) { <a class="text-button" href="@FlowRunUrl(flowRunId)" data-testid="artifact-producer-flow-run">@flowRunId</a> } else { <text>—</text> }</dd>
                     <dt>@T("FlowStep")</dt><dd>@(artifact.Producer.FlowStepId ?? "—")</dd>
-                    <dt>@T("Agent")</dt><dd>@(artifact.Producer.AgentId ?? "—")</dd>
-                    <dt>@T("ToolCall")</dt><dd>@(artifact.Producer.ToolCallId ?? "—")</dd>
+                    <dt>@T("Agent")</dt><dd>@if (artifact.Producer.AgentId is { } agentId) { <a class="text-button" href="@AgentUrl(agentId)">@agentId</a> } else { <text>—</text> }</dd>
+                    <dt>@T("ToolCall")</dt><dd>@if (ToolCallUrl(artifact.Producer) is { } toolCallUrl) { <a class="text-button" href="@toolCallUrl">@artifact.Producer.ToolCallId</a> } else { <text>@(artifact.Producer.ToolCallId ?? "—")</text> }</dd>
                     <dt>@T("Correlation")</dt><dd>@(artifact.Producer.CorrelationId ?? "—")</dd>
-                    <dt>@T("StagingService")</dt><dd>@artifact.BindingNamespace/@artifact.BindingName · @artifact.ToolSetNamespace/@artifact.ToolSetName:@artifact.ToolSetVersion</dd>
+                    <dt>@T("StagingService")</dt><dd>@artifact.BindingNamespace/@artifact.BindingName · <a class="text-button" href="@ToolSetUrl(artifact)">@artifact.ToolSetNamespace/@artifact.ToolSetName:@artifact.ToolSetVersion</a></dd>
                 </dl>
             </section>
 
@@ -160,6 +160,19 @@ else if (artifact is not null)
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string SizeInMegabytes(long value) => T("SizeMegabytes", value / 1024d / 1024d);
     private string ExactSize(long value) => T("ExactBytes", value);
+    private static string FlowRunUrl(string id) => $"/flow-runs/{Uri.EscapeDataString(id)}";
+    private static string AgentUrl(string id) => $"/agents/{Uri.EscapeDataString(id)}";
+    private static string? ProducerUrl(ArtifactProducer producer) => producer.FlowRunId is not null
+        ? FlowRunUrl(producer.FlowRunId)
+        : producer.RuntimeRunId is not null ? $"/runs/{Uri.EscapeDataString(producer.RuntimeRunId)}" : null;
+    private static string? ToolCallUrl(ArtifactProducer producer) => producer.FlowRunId is not null && producer.ToolCallId is not null
+        ? $"/tool-governance/flow/{Uri.EscapeDataString(producer.FlowRunId)}?toolCallId={Uri.EscapeDataString(producer.ToolCallId)}"
+        : producer.RuntimeRunId is not null && producer.ToolCallId is not null
+            ? $"/tool-governance/runtime/{Uri.EscapeDataString(producer.RuntimeRunId)}?toolCallId={Uri.EscapeDataString(producer.ToolCallId)}"
+            : null;
+    private static string ToolSetUrl(StagedArtifactView value) => value.ToolSetNamespace.IsDefault
+        ? $"/tools/sets/{Uri.EscapeDataString(value.ToolSetName)}"
+        : $"/tools/sets/{Uri.EscapeDataString(value.ToolSetName)}?namespace={Uri.EscapeDataString(value.ToolSetNamespace.Value)}";
 
     protected override async Task OnParametersSetAsync()
     {

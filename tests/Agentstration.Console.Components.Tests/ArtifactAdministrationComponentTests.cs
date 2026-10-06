@@ -164,6 +164,27 @@ public sealed class ArtifactAdministrationComponentTests
     }
 
     [TestMethod]
+    public void StagedArtifactProvenanceLinksToGovernedResources()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        var client = new ArtifactClient("preview");
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddSingleton<IArtifactsClient>(client);
+
+        var rendered = context.Render<Agentstration.Web.Components.Pages.StagedArtifactDetails>(parameters =>
+            parameters.Add(value => value.Id, client.Artifact.ArtifactId.ToString()));
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsTrue(rendered.FindAll("a[href='/flow-runs/flow-run-1']").Count >= 2);
+            Assert.IsNotNull(rendered.Find("a[href='/tools/sets/filesystem']"));
+            Assert.IsNotNull(rendered.Find(".artifact-overview-metrics"));
+        });
+    }
+
+    [TestMethod]
     public void DurableArtifactHasGovernedMetadataDetails()
     {
         using var culture = new TestCultureScope("en-US");
