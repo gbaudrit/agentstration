@@ -10,7 +10,7 @@
 }
 
 .schema-field-locked {
-    width: min(100%, 28rem);
+    width: 100%;
 }
 
 .schema-field-locked .schema-toggle {
