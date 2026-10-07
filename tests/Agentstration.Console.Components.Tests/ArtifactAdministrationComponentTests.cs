@@ -126,21 +126,20 @@ public sealed class ArtifactAdministrationComponentTests
         context.Services.AddSingleton<IArtifactsClient>(client);
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Artifacts>();
-        rendered.WaitForElement("[data-testid='staged-artifact-row']");
+        rendered.WaitForElement("[data-testid='durable-artifact-row']");
+        Assert.IsNotNull(rendered.Find($"a[href='/artifacts/durable/{client.Durable.ArtifactId}']"));
+        StringAssert.Contains(rendered.Markup, "index.html");
+        StringAssert.Contains(
+            rendered.Find($"a[href='/artifacts/durable/{client.Durable.ArtifactId}']").TextContent,
+            client.Durable.ArtifactId.ToString());
 
+        rendered.FindAll("button").Single(value => value.TextContent.Contains("Local copies", StringComparison.Ordinal)).Click();
         Assert.IsNotNull(rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']"));
         Assert.IsNotNull(rendered.Find("a[href='/flow-runs/flow-run-1']"));
         StringAssert.Contains(rendered.Markup, "index.html");
         StringAssert.Contains(
             rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']").TextContent,
             client.Artifact.ArtifactId.ToString());
-
-        rendered.FindAll("button").Single(value => value.TextContent.Contains("Stored", StringComparison.Ordinal)).Click();
-        Assert.IsNotNull(rendered.Find($"a[href='/artifacts/durable/{client.Durable.ArtifactId}']"));
-        StringAssert.Contains(rendered.Markup, "index.html");
-        StringAssert.Contains(
-            rendered.Find($"a[href='/artifacts/durable/{client.Durable.ArtifactId}']").TextContent,
-            client.Durable.ArtifactId.ToString());
     }
 
     [TestMethod]
@@ -154,15 +153,15 @@ public sealed class ArtifactAdministrationComponentTests
         context.Services.AddSingleton<IArtifactsClient>(client);
 
         var list = context.Render<Agentstration.Web.Components.Pages.Artifacts>();
-        list.WaitForElement("[data-testid='staged-artifact-row']");
-        StringAssert.Contains(list.Markup, "Disponibles");
-        StringAssert.Contains(list.Markup, "Conservés");
+        list.WaitForElement("[data-testid='durable-artifact-row']");
+        StringAssert.Contains(list.Markup, "Liste");
+        StringAssert.Contains(list.Markup, "Copies locales");
 
         var details = context.Render<Agentstration.Web.Components.Pages.FlowRunArtifactDetails>(parameters =>
             parameters.Add(value => value.Id, client.Durable.ArtifactId.ToString()));
         details.WaitForElement("[data-testid='durable-artifact-content-tab']");
         details.Find("[data-testid='durable-artifact-content-tab']").Click();
-        StringAssert.Contains(details.Markup, "copie de consultation");
+        StringAssert.Contains(details.Markup, "copie locale");
         Assert.IsFalse(details.Markup.Contains("matérialis", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -225,7 +224,7 @@ public sealed class ArtifactAdministrationComponentTests
         Assert.IsNotNull(rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']"));
 
         rendered.Find("[data-testid='durable-artifact-content-tab']").Click();
-        StringAssert.Contains(rendered.Markup, "viewing copy");
+        StringAssert.Contains(rendered.Markup, "local copy");
         rendered.WaitForAssertion(() =>
         {
             Assert.IsNotNull(rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']"));

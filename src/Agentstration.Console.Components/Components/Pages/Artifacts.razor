@@ -4,7 +4,7 @@
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
 <PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-artifacts"><Actions><a class="button-secondary" href="/knowledge-sources">@T("KnowledgeSources")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions></PageHeader>
-<ResourceTabs Label="@T("Sections")"><button type="button" class="@(showDurable ? null : "active")" @onclick="() => showDurable = false">@T("Staged") <span>@staged.Count</span></button><button type="button" class="@(showDurable ? "active" : null)" @onclick="() => showDurable = true">@T("Durable") <span>@durable.Count</span></button></ResourceTabs>
+<ResourceTabs Label="@T("Sections")"><button type="button" class="@(showDurable ? "active" : null)" @onclick="() => showDurable = true">@T("Durable") <span>@durable.Count</span></button><button type="button" class="@(showDurable ? null : "active")" @onclick="() => showDurable = false">@T("Staged") <span>@staged.Count</span></button></ResourceTabs>
 
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else if (error is not null) { <ErrorState Message="@error" /> }
@@ -51,7 +51,7 @@ else
 @code {
     private IReadOnlyList<StagedArtifactView> staged = [];
     private IReadOnlyList<FlowRunArtifactResource> durable = [];
-    private bool loading = true, showDurable;
+    private bool loading = true, showDurable = true;
     private string? error;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     protected override Task OnInitializedAsync() => LoadAsync();
