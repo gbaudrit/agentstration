@@ -90,8 +90,14 @@ internal static class ArtifactEndpoints
         ArtifactManagementService service, CancellationToken token) => ExecuteAsync(async () =>
     {
         var artifactId = StagedArtifactId.Parse(id);
-        var stored = await service.GetStagedAsync(artifactId, ParseLease(leaseId), ArtifactLeaseOperation.Read, token);
-        return stored is null ? Results.NotFound() : new ArtifactDownloadResult(service, stored.Value, ParseLease(leaseId));
+        var parsedLeaseId = ParseLease(leaseId);
+        var stored = await service.GetStagedAsync(artifactId, parsedLeaseId, ArtifactLeaseOperation.Read, token);
+        return stored is null
+            ? Results.NotFound()
+            : Results.Stream(
+                stream => WriteDownloadAsync(stream, service, stored.Value, parsedLeaseId, token),
+                stored.Value.MediaType,
+                stored.Value.FileName);
     });
 
     private static Task<IResult> SealAsync(string id, ArtifactManagementService service, CancellationToken token) => ExecuteAsync(async () =>
@@ -181,28 +187,23 @@ internal static class ArtifactEndpoints
         Detail = detail
     });
 
-    private sealed class ArtifactDownloadResult(
+    private static async Task WriteDownloadAsync(
+        Stream stream,
         ArtifactManagementService service,
         StagedArtifactResource artifact,
-        ArtifactLeaseId? leaseId) : IResult
+        ArtifactLeaseId? leaseId,
+        CancellationToken token)
     {
-        public async Task ExecuteAsync(HttpContext context)
+        long offset = 0;
+        while (offset < artifact.Length)
         {
-            context.Response.StatusCode = StatusCodes.Status200OK;
-            context.Response.ContentType = artifact.MediaType;
-            context.Response.ContentLength = artifact.Length;
-            context.Response.Headers.ContentDisposition = $"attachment; filename*=UTF-8''{Uri.EscapeDataString(artifact.FileName)}";
-            long offset = 0;
-            while (offset < artifact.Length)
-            {
-                var length = checked((int)Math.Min(ArtifactManagementService.MaximumChunkBytes, artifact.Length - offset));
-                var chunk = await service.ReadAsync(artifact.ArtifactId, offset, length, leaseId, context.RequestAborted);
-                var content = Convert.FromBase64String(chunk.ContentBase64);
-                if (content.Length == 0)
-                    throw new ArtifactValidationException("staged_artifact_download_no_progress", "The Artifact backend returned no content before the expected end.");
-                await context.Response.Body.WriteAsync(content, context.RequestAborted);
-                offset += content.Length;
-            }
+            var length = checked((int)Math.Min(ArtifactManagementService.MaximumChunkBytes, artifact.Length - offset));
+            var chunk = await service.ReadAsync(artifact.ArtifactId, offset, length, leaseId, token);
+            var content = Convert.FromBase64String(chunk.ContentBase64);
+            if (content.Length == 0)
+                throw new ArtifactValidationException("staged_artifact_download_no_progress", "The Artifact backend returned no content before the expected end.");
+            await stream.WriteAsync(content, token);
+            offset += content.Length;
         }
     }
 }

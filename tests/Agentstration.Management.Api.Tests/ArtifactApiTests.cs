@@ -70,6 +70,7 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         using var download = await client.GetAsync($"/api/artifacts/staged/{created.ArtifactId}/download?leaseId={lease.Id}");
         Assert.AreEqual(HttpStatusCode.OK, download.StatusCode);
         Assert.AreEqual("attachment", download.Content.Headers.ContentDisposition?.DispositionType);
+        Assert.AreEqual("notes.txt", download.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
         Assert.AreEqual("notes.txt", download.Content.Headers.ContentDisposition?.FileNameStar);
         CollectionAssert.AreEqual(content, await download.Content.ReadAsByteArrayAsync());
     }
