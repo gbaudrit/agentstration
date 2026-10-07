@@ -11,6 +11,7 @@ using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol.Client;
 
@@ -19,6 +20,54 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task ToolSimulationUsesGovernedPreviewWithoutExecutingOrCreatingAFlowRun()
+    {
+        var pipeline = new RecordingToolExecutionPipeline();
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IToolExecutionPipeline>();
+            services.AddSingleton<IToolExecutionPipeline>(pipeline);
+        }));
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        var contract = await CreatePublishedFlowAsync(factory.Services, requestContext, "preview-flow");
+        using var client = factory.CreateClient();
+        using var definition = await client.PostAsJsonAsync("/api/tooldefinitions", new CreateToolDefinitionRequest(
+            "preview.run",
+            Properties("Preview", "preview-flow", contract.Input, contract.Output)));
+        Assert.AreEqual(HttpStatusCode.Created, definition.StatusCode);
+
+        using var invalid = await client.PostAsJsonAsync(
+            "/api/tools/agentstration.preview.run/run",
+            new RunToolRequest(JsonSerializer.SerializeToElement(new { })));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+        Assert.AreEqual(0, pipeline.Simulations);
+
+        using var response = await client.PostAsJsonAsync(
+            "/api/tools/agentstration.preview.run/run",
+            new RunToolRequest(JsonSerializer.SerializeToElement(new { message = "check" })));
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<RunToolResponse>();
+        Assert.IsNotNull(result);
+        Assert.AreEqual(ToolRunMode.Simulate, result.Mode);
+        Assert.AreEqual("simulated", result.Status);
+        Assert.IsFalse(result.ProviderInvoked);
+        Assert.AreEqual(1, pipeline.Simulations);
+        Assert.AreEqual(0, pipeline.Executions);
+
+        using var execution = await client.PostAsJsonAsync(
+            "/api/tools/agentstration.preview.run/run",
+            new RunToolRequest(JsonSerializer.SerializeToElement(new { message = "execute" }), ToolRunMode.Execute));
+        Assert.AreEqual(HttpStatusCode.OK, execution.StatusCode);
+        var executionResult = await execution.Content.ReadFromJsonAsync<RunToolResponse>();
+        Assert.IsNotNull(executionResult);
+        Assert.AreEqual(ToolRunMode.Execute, executionResult.Mode);
+        Assert.IsTrue(executionResult.ProviderInvoked);
+        Assert.AreEqual(1, pipeline.Executions);
+    }
+
     [TestMethod]
     public async Task ToolDefinitionCrudMaterializesInternalProviderAndGovernedTool()
     {
@@ -76,6 +125,27 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
         Assert.IsNull(await store.GetAsync<ToolDefinitionResource>(new(ToolResourceKinds.ToolDefinition, "notification.send"), default));
         Assert.IsNull(await store.GetAsync<ToolResource>(new(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName("notification.send")), default));
+    }
+
+    private sealed class RecordingToolExecutionPipeline : IToolExecutionPipeline
+    {
+        public int Simulations { get; private set; }
+        public int Executions { get; private set; }
+
+        public ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
+        {
+            Executions++;
+            return ValueTask.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(new { ok = true }));
+        }
+
+        public ValueTask<ToolExecutionSimulation> SimulateAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
+        {
+            Simulations++;
+            Assert.AreEqual(ToolExecutionOwnerKind.Console, context.OwnerKind);
+            Assert.IsNotNull(context.WorkspaceId);
+            Assert.IsNotNull(context.PrincipalId);
+            return ValueTask.FromResult(new ToolExecutionSimulation([]));
+        }
     }
 
     [TestMethod]
@@ -141,6 +211,17 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
             Properties("Review document", "echo-tool-flow", contract.Input, contract.Output)), null, true, default);
 
         var http = factory.CreateClient();
+        using var consoleExecution = await http.PostAsJsonAsync(
+            "/api/tools/agentstration.document.review/run",
+            new RunToolRequest(JsonSerializer.SerializeToElement(new { message = "via console" }), ToolRunMode.Execute));
+        Assert.AreEqual(HttpStatusCode.OK, consoleExecution.StatusCode);
+        var consoleResult = await consoleExecution.Content.ReadFromJsonAsync<RunToolResponse>();
+        Assert.IsNotNull(consoleResult);
+        Assert.IsTrue(consoleResult.ProviderInvoked);
+        Assert.IsNotNull(consoleResult.Receipt?.WorkItemId);
+        Assert.IsNotNull(consoleResult.Receipt?.FlowRunId);
+        Assert.AreEqual("via console", consoleResult.Output?.GetProperty("message").GetString());
+
         var transport = new HttpClientTransport(
             new HttpClientTransportOptions { Endpoint = new Uri(http.BaseAddress!, "mcp"), Name = "agentstration-test" },
             http,

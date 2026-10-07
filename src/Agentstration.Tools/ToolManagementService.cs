@@ -14,8 +14,10 @@ public sealed class ToolManagementService(IResourceStore store, IEnumerable<IToo
 {
     public static string ToolProviderId(string name) => name;
     public static string ToolId(string name) => name;
-    public Task<StoredResource<ToolResource>?> GetToolAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ToolResource>(new ResourceKey(ToolResourceKinds.Tool, name), cancellationToken);
-    public Task<StoredResource<ToolProviderResource>?> GetProviderAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ToolProviderResource>(new ResourceKey(ToolResourceKinds.ToolProvider, name), cancellationToken);
+    public Task<StoredResource<ToolResource>?> GetToolAsync(string name, CancellationToken cancellationToken) => GetToolAsync(name, default, cancellationToken);
+    public Task<StoredResource<ToolResource>?> GetToolAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken) => store.GetAsync<ToolResource>(new ResourceKey(ToolResourceKinds.Tool, name, @namespace), cancellationToken);
+    public Task<StoredResource<ToolProviderResource>?> GetProviderAsync(string name, CancellationToken cancellationToken) => GetProviderAsync(name, default, cancellationToken);
+    public Task<StoredResource<ToolProviderResource>?> GetProviderAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken) => store.GetAsync<ToolProviderResource>(new ResourceKey(ToolResourceKinds.ToolProvider, name, @namespace), cancellationToken);
     public Task<IReadOnlyList<StoredResource<ToolResource>>> ListToolsAsync(CancellationToken cancellationToken) => store.ListAllAsync<ToolResource>(ToolResourceKinds.Tool, cancellationToken);
     public Task<IReadOnlyList<StoredResource<ToolProviderResource>>> ListProvidersAsync(CancellationToken cancellationToken) => store.ListAllAsync<ToolProviderResource>(ToolResourceKinds.ToolProvider, cancellationToken);
 
@@ -149,8 +151,11 @@ public sealed class ToolManagementService(IResourceStore store, IEnumerable<IToo
     }
 
     public async Task<StoredResource<ToolResource>> SetToolEnabledAsync(string name, bool enabled, string? ifMatch, CancellationToken cancellationToken)
+        => await SetToolEnabledAsync(name, default, enabled, ifMatch, cancellationToken);
+
+    public async Task<StoredResource<ToolResource>> SetToolEnabledAsync(string name, ResourceNamespace @namespace, bool enabled, string? ifMatch, CancellationToken cancellationToken)
     {
-        var stored = await GetToolAsync(name, cancellationToken) ?? throw new ResourceNotFoundException(new(ToolResourceKinds.Tool, name));
+        var stored = await GetToolAsync(name, @namespace, cancellationToken) ?? throw new ResourceNotFoundException(new(ToolResourceKinds.Tool, name, @namespace));
         return await store.PutAsync(stored.Value with { Generation = checked(stored.Value.Generation + 1), Definition = stored.Value.Definition with { Enabled = enabled } }, ifMatch ?? stored.ETag, false, cancellationToken);
     }
 

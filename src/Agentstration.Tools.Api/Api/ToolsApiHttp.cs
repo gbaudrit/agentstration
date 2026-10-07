@@ -1,6 +1,8 @@
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Tools;
+using Agentstration.Tools.Mcp;
+using Agentstration.Runtime.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Agentstration.Web.Api.Models;
@@ -19,6 +21,9 @@ internal static class ToolsApiHttp
         catch (ToolDefinitionValidationException exception) { return Problem(exception.Code, "Invalid ToolDefinition", 422, exception.Message); }
         catch (ToolExecutionHookValidationException exception) { return Problem("tool-execution-hook-invalid", "Invalid Tool execution hook", 422, exception.Message); }
         catch (ToolProviderDiscoveryFailedException exception) { return Problem("tool-provider-unavailable", "Tool provider unavailable", 503, exception.Message); }
+        catch (ToolInputValidationException exception) { return Problem(exception.Code, "Invalid Tool input", 422, exception.Message); }
+        catch (ToolRunException exception) { return Problem(exception.Code, "Tool run failed", exception.StatusCode, exception.Message); }
+        catch (ToolExecutionHookException exception) { return Problem("tool-governance-failed", "Tool governance failed", 503, exception.Message); }
         catch (ArgumentException exception) { return Problem("validation-failed", "Invalid request", 400, exception.Message); }
     }
 

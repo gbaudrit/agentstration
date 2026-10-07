@@ -16,6 +16,28 @@ namespace Agentstration.Runtime.Tests;
 public sealed class ToolExecutionLifecycleTests
 {
     [TestMethod]
+    public async Task SimulationValidatesWithoutInvokingProviderOrPublishingLifecycleEvents()
+    {
+        var events = new RecordingSink();
+        var invoker = new RecordingSimulationInvoker();
+        var calls = new List<string>();
+        var pipeline = new ToolExecutionPipeline(
+            invoker,
+            [SequenceHook("policy", 0, calls)],
+            [events],
+            new AdvancingTimeProvider());
+
+        var result = await pipeline.SimulateAsync(Context() with { OwnerKind = ToolExecutionOwnerKind.Console }, default);
+
+        Assert.AreEqual(1, invoker.Validations);
+        Assert.AreEqual(0, invoker.Invocations);
+        Assert.HasCount(1, result.GovernanceEvaluations);
+        Assert.AreEqual(ToolExecutionHookEvaluationKind.Allowed, result.GovernanceEvaluations[0].Decision);
+        CollectionAssert.AreEqual(new[] { "before:policy" }, calls);
+        Assert.IsEmpty(events.Events);
+    }
+
+    [TestMethod]
     public async Task PipelinePublishesStartedAndCompletedWithoutPersistingProviderResult()
     {
         var events = new RecordingSink();
@@ -689,6 +711,24 @@ public sealed class ToolExecutionLifecycleTests
     {
         public ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
             invoke(context, cancellationToken);
+    }
+
+    private sealed class RecordingSimulationInvoker : IToolInvoker
+    {
+        public int Validations { get; private set; }
+        public int Invocations { get; private set; }
+
+        public ValueTask ValidateAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
+        {
+            Validations++;
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
+        {
+            Invocations++;
+            return ValueTask.FromResult<JsonElement?>(null);
+        }
     }
 
     private static IToolExecutionHook SequenceHook(string id, int order, List<string> calls) => new DelegateHook(

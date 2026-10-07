@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Agentstration.Resources;
 using Agentstration.Tools;
 
@@ -15,3 +17,32 @@ public sealed record PutToolDefinitionRequest(ToolDefinitionProperties Propertie
 public sealed record SetToolDefinitionEnabledRequest(bool Enabled);
 public sealed record CreateToolExecutionHookRequest(string Name, ToolExecutionHookProperties Properties, string? Namespace = null);
 public sealed record PutToolExecutionHookRequest(ToolExecutionHookProperties Properties);
+
+[JsonConverter(typeof(JsonStringEnumConverter<ToolRunMode>))]
+public enum ToolRunMode { Simulate, Execute }
+
+public sealed record RunToolRequest(
+    JsonElement Arguments,
+    ToolRunMode Mode = ToolRunMode.Simulate);
+
+public sealed record ToolRunCheck(
+    string Code,
+    string Status,
+    string Message);
+
+public sealed record ToolRunReceipt(
+    string? WorkItemId = null,
+    string? FlowRunId = null,
+    string? CorrelationId = null);
+
+public sealed record RunToolResponse(
+    ToolRunMode Mode,
+    string Status,
+    string ToolName,
+    string ToolNamespace,
+    string ProviderName,
+    bool ProviderInvoked,
+    bool RequiresApproval,
+    IReadOnlyList<ToolRunCheck> Checks,
+    JsonElement? Output = null,
+    ToolRunReceipt? Receipt = null);

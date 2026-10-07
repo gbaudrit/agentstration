@@ -43,6 +43,11 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
 
     public async ValueTask<JsonElement?> ExecuteAsync(
         ToolExecutionContext context,
+        CancellationToken cancellationToken = default) =>
+        (await ExecuteDetailedAsync(context, cancellationToken)).Output;
+
+    public async ValueTask<ToolInvocationResult> ExecuteDetailedAsync(
+        ToolExecutionContext context,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -52,7 +57,7 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
         ArgumentException.ThrowIfNullOrWhiteSpace(context.ToolName);
         var startedAt = timeProvider.GetUtcNow();
         await PublishAsync(new ToolExecutionStarted(context, startedAt), cancellationToken);
-        JsonElement? result;
+        ToolInvocationResult result;
         DateTimeOffset? completionTimestamp = null;
         var enteredHooks = new List<IToolExecutionHook>();
         var evaluations = new List<ToolExecutionHookEvaluation>();
@@ -127,7 +132,7 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
                     ToolExecutionHookEvaluationKind.Allowed));
             }
             await PublishGovernanceAsync(context, evaluations, cancellationToken);
-            result = await invoker.InvokeAsync(context, cancellationToken);
+            result = await invoker.InvokeDetailedAsync(context, cancellationToken);
             terminalHooksInvoked = true;
             var succeededAt = timeProvider.GetUtcNow();
             completionTimestamp = succeededAt;
@@ -187,6 +192,47 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
         return result;
     }
 
+    public async ValueTask<ToolExecutionSimulation> SimulateAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateContext(context);
+        var hooks = await ResolveHooksAsync(context, cancellationToken);
+        var evaluations = new List<ToolExecutionHookEvaluation>(hooks.Count);
+        foreach (var hook in hooks)
+        {
+            ToolExecutionHookDecision decision;
+            try
+            {
+                decision = await hook.BeforeInvokeAsync(context, cancellationToken)
+                    ?? throw new InvalidOperationException("A Tool execution hook returned no decision.");
+            }
+            catch (Exception exception) when (exception is not ToolExecutionDeniedException and not OperationCanceledException)
+            {
+                throw new ToolExecutionHookException(hook.Id, "simulate", exception);
+            }
+            if (decision.Kind == ToolExecutionHookDecisionKind.Deny)
+            {
+                evaluations.Add(new ToolExecutionHookEvaluation(
+                    hook.Identity,
+                    ToolExecutionHookEvaluationKind.Denied,
+                    decision.Code ?? "tool_execution_denied"));
+                throw new ToolExecutionDeniedException(
+                    hook.Id,
+                    decision.Code ?? "tool_execution_denied",
+                    decision.Message ?? $"Tool execution was denied by hook '{hook.Id}'.");
+            }
+            if (decision.Kind != ToolExecutionHookDecisionKind.Allow)
+                throw new ToolExecutionHookException(
+                    hook.Id,
+                    "simulate",
+                    new InvalidOperationException($"Unsupported Tool execution hook decision '{decision.Kind}'."));
+            evaluations.Add(new ToolExecutionHookEvaluation(hook.Identity, ToolExecutionHookEvaluationKind.Allowed));
+        }
+        await invoker.ValidateAsync(context, cancellationToken);
+        return new ToolExecutionSimulation(evaluations);
+    }
+
     private static IReadOnlyList<IToolExecutionHook> OrderHooks(IEnumerable<IToolExecutionHook> hooks)
     {
         ArgumentNullException.ThrowIfNull(hooks);
@@ -197,6 +243,31 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
         if (duplicate is not null)
             throw new InvalidOperationException($"Tool execution hook id '{duplicate.Key}' is registered more than once.");
         return ordered;
+    }
+
+    private async ValueTask<IReadOnlyList<IToolExecutionHook>> ResolveHooksAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var resolvedHooks = await hookResolver.ResolveAsync(context, cancellationToken)
+                ?? throw new InvalidOperationException("The Tool execution hook resolver returned no collection.");
+            return OrderHooks(localHooks.Concat(resolvedHooks));
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw new ToolExecutionHookException("hook-resolver", "resolve", exception);
+        }
+    }
+
+    private static void ValidateContext(ToolExecutionContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentException.ThrowIfNullOrWhiteSpace(context.ToolCallId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(context.InvocationId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(context.ToolId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(context.ToolName);
     }
 
     private static async ValueTask NotifyHooksAsync(

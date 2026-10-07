@@ -50,7 +50,7 @@ public interface IToolDefinitionFlowResolver
         CancellationToken cancellationToken);
 }
 
-public enum ToolDefinitionCallerKind { Mcp, Agent, Flow }
+public enum ToolDefinitionCallerKind { Mcp, Agent, Flow, Console }
 
 public sealed record ToolDefinitionInvocation(
     Guid TenantId,

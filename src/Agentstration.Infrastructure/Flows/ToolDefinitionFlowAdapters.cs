@@ -103,7 +103,12 @@ public sealed class ToolDefinitionExecutor(
         var target = stored.Value.Definition.Flow;
         var flowNamespace = target.Namespace ?? stored.Value.Namespace;
         var scope = new FlowRunScope(invocation.TenantId, invocation.WorkspaceId, invocation.PrincipalId);
-        var origin = invocation.CallerKind == ToolDefinitionCallerKind.Agent ? FlowInvocationOrigin.Agent : FlowInvocationOrigin.Mcp;
+        var origin = invocation.CallerKind switch
+        {
+            ToolDefinitionCallerKind.Agent => FlowInvocationOrigin.Agent,
+            ToolDefinitionCallerKind.Console => FlowInvocationOrigin.Console,
+            _ => FlowInvocationOrigin.Mcp
+        };
         var callerId = invocation.CallerId ?? invocation.PrincipalId.ToString("D");
         RootFlowSubmission submission;
         try
