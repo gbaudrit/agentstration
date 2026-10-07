@@ -222,6 +222,21 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   coveredDistribution('sources', `${consolePages}/Sources.razor`, ['/settings/sources', '/settings/sources/{Publisher}/{Name}'], ['publisher', 'name'], 'import-source'),
   planned('knowledge-sources', `${consolePages}/KnowledgeSources.razor`, ['/knowledge-sources'], 640),
   planned('knowledge-source-details', `${consolePages}/KnowledgeSourceDetails.razor`, ['/knowledge-sources/{Name}'], 640, ['name']),
+  {
+    id: 'artifacts', host: 'console', source: `${consolePages}/Artifacts.razor`, routes: ['/artifacts'], fixtureKeys: [],
+    pageObject: 'src/pages/artifact-administration.page.ts', journey: 'inspect-artifact-content',
+    specification: 'tests/artifact-content.spec.ts', coverage: 'covered',
+  },
+  {
+    id: 'staged-artifact-details', host: 'console', source: `${consolePages}/StagedArtifactDetails.razor`,
+    routes: ['/artifacts/staged/{Id}'], fixtureKeys: ['id'], pageObject: 'src/pages/artifact-administration.page.ts',
+    journey: 'inspect-artifact-content', specification: 'tests/artifact-content.spec.ts', coverage: 'covered',
+  },
+  {
+    id: 'flow-run-artifact-details', host: 'console', source: `${consolePages}/FlowRunArtifactDetails.razor`,
+    routes: ['/artifacts/durable/{Id}'], fixtureKeys: ['id'], pageObject: 'src/pages/artifact-administration.page.ts',
+    journey: 'inspect-artifact-content', specification: 'tests/artifact-content.spec.ts', coverage: 'covered',
+  },
   coveredDistribution('bootstrap-profiles', `${consolePages}/BootstrapProfiles.razor`, ['/settings/bootstrap']),
   coveredDistribution('packs', `${consolePages}/Packs.razor`, ['/packs']),
   coveredDistribution('pack-composer', `${consolePages}/PackComposer.razor`, ['/pack-projects/new'], [], 'create-pack-project'),
