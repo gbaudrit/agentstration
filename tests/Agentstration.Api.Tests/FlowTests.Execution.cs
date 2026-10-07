@@ -269,14 +269,173 @@ public sealed partial class FlowTests
         Assert.AreEqual(TestScope, tool.Request.Scope);
     }
 
+    [TestMethod]
+    public async Task GraphStepCanCaptureItsResultWithoutChangingFlowOutput()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new ToolFlowStepDefinition
+                {
+                    Name = "notify",
+                    Tool = new("notification.send"),
+                    ArtifactOutput = new()
+                    {
+                        FileName = "notification.txt",
+                        MediaType = "text/plain",
+                        ContentMapping = JsonSerializer.SerializeToElement("${step.output.message}")
+                    }
+                },
+                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.notify.output}") }
+            ],
+            Transitions =
+            [
+                new("input-notify", "input", "completed", "notify"),
+                new("notify-output", "notify", "completed", "output")
+            ]
+        };
+        var now = TimeProvider.System.GetUtcNow();
+        var draft = new FlowDraft { WorkspaceId = TestScope.WorkspaceId, Id = "artifact-draft", FlowId = new("artifact-run"), DisplayName = "Artifact run", Definition = graph, CreatedAt = now, UpdatedAt = now };
+        var capture = new RecordingFlowStepArtifactCapture();
+        var expressions = new FlowExpressionParser();
+        var runs = new FlowRunService(
+            fixture.Repository,
+            new TestFlowRunQueue(),
+            new TestCancellationRegistry(),
+            new TestAgentExecutor(),
+            new UnsupportedFlowOrchestrationEngine(),
+            expressions,
+            expressions,
+            new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(),
+            TimeProvider.System,
+            configuredToolExecutor: new RecordingFlowToolExecutor(
+                JsonSerializer.SerializeToElement(new { message = "sent", ignored = true })),
+            configuredArtifactCapture: capture);
+        using var input = JsonDocument.Parse("{}");
+
+        var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", "artifact-correlation", input.RootElement, TestScope, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
+
+        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
+        Assert.AreEqual("sent", completed.Output?.GetProperty("message").GetString());
+        Assert.AreEqual("sent", capture.Request!.Content.GetString());
+        Assert.AreEqual("notify", capture.Request.StepName);
+        Assert.AreEqual(1, capture.Request.Attempt);
+        Assert.AreEqual("artifact-correlation", capture.Request.CorrelationId);
+        Assert.AreEqual("tool", capture.Request.Provenance["invocationKind"]);
+        Assert.AreEqual("notification.send", capture.Request.Provenance["toolName"]);
+        Assert.AreEqual("7", capture.Request.Provenance["toolGeneration"]);
+        var reference = completed.Steps.Single(step => step.StepName == "notify").Artifacts.Single();
+        Assert.AreEqual("artifact-1", reference.ArtifactId);
+        Assert.AreEqual("notification.txt", reference.FileName);
+        Assert.AreEqual("artifact-1", capture.CleanedArtifact?.ArtifactId);
+    }
+
+    [TestMethod]
+    public async Task AgentStepCaptureIncludesTheExactAgentRevision()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new AgentFlowStepDefinition
+                {
+                    Name = "answer",
+                    Agent = new("assistant"),
+                    ArtifactOutput = new()
+                    {
+                        FileName = "answer.json",
+                        Clean = FlowStepArtifactCleanupMode.Never
+                    }
+                },
+                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.answer.output}") }
+            ],
+            Transitions =
+            [
+                new("input-answer", "input", "completed", "answer"),
+                new("answer-output", "answer", "completed", "output")
+            ]
+        };
+        var now = TimeProvider.System.GetUtcNow();
+        var draft = new FlowDraft { WorkspaceId = TestScope.WorkspaceId, Id = "agent-artifact-draft", FlowId = new("agent-artifact-run"), DisplayName = "Agent Artifact run", Definition = graph, CreatedAt = now, UpdatedAt = now };
+        var capture = new RecordingFlowStepArtifactCapture();
+        var expressions = new FlowExpressionParser();
+        var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(),
+            new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions,
+            new NullFlowRunEventSink(), new TestFlowRunExecutionScope(), TimeProvider.System,
+            configuredArtifactCapture: capture);
+        using var input = JsonDocument.Parse("{}");
+
+        var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", "agent-artifact",
+            input.RootElement, TestScope, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
+
+        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
+        Assert.AreEqual("done", completed.Output?.GetString());
+        Assert.AreEqual("agent", capture.Request!.Provenance["invocationKind"]);
+        Assert.AreEqual("/agents/assistant", capture.Request.Provenance["agentResourceId"]);
+        Assert.AreEqual("3", capture.Request.Provenance["agentVersion"]);
+        Assert.IsNull(capture.CleanedArtifact);
+    }
+
     private sealed class RecordingFlowToolExecutor : IFlowToolExecutor
     {
+        private readonly JsonElement? output;
+
+        public RecordingFlowToolExecutor(JsonElement? output = null) => this.output = output?.Clone();
+
         public FlowToolExecutionRequest? Request { get; private set; }
 
-        public Task<JsonElement?> ExecuteAsync(FlowToolExecutionRequest request, CancellationToken cancellationToken)
+        public Task<FlowToolExecutionResult> ExecuteAsync(FlowToolExecutionRequest request, CancellationToken cancellationToken)
         {
             Request = request;
-            return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement("sent"));
+            return Task.FromResult(new FlowToolExecutionResult(
+                output?.Clone() ?? JsonSerializer.SerializeToElement("sent"),
+                request.Tool.ResourceId,
+                request.Tool.ResolveNamespace(request.OwnerFlowId.Namespace),
+                Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                7,
+                "test-provider",
+                ResourceNamespace.Default,
+                "Mcp",
+                "notification.send"));
+        }
+    }
+
+    private sealed class RecordingFlowStepArtifactCapture : IFlowStepArtifactCapture
+    {
+        public FlowStepArtifactCaptureRequest? Request { get; private set; }
+        public FlowStepArtifactReference? CleanedArtifact { get; private set; }
+
+        public Task<FlowStepArtifactReference> CaptureAsync(
+            FlowStepArtifactCaptureRequest request,
+            CancellationToken cancellationToken)
+        {
+            Request = request;
+            return Task.FromResult(new FlowStepArtifactReference(
+                "artifact-1",
+                request.Definition.FileName!,
+                request.Definition.MediaType));
+        }
+
+        public Task CleanupAsync(
+            FlowRunScope scope,
+            string flowRunId,
+            string stepName,
+            FlowStepArtifactReference artifact,
+            CancellationToken cancellationToken)
+        {
+            CleanedArtifact = artifact;
+            return Task.CompletedTask;
         }
     }
 

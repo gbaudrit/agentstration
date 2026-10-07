@@ -27,6 +27,100 @@ namespace Agentstration.Management.Tests;
 public sealed class ArtifactApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
+    public async Task FlowStepCaptureCreatesASealedArtifactAndReusesItOnRetry()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var capture = factory.Services.GetRequiredService<IFlowStepArtifactCapture>();
+        var request = new FlowStepArtifactCaptureRequest(
+            new(context.TenantId, new(context.WorkspaceId), context.PrincipalId),
+            "flowrun-capture-1",
+            "flowrun-capture-1",
+            null,
+            "fetch",
+            1,
+            "capture-correlation",
+            new() { FileName = "response.txt", MediaType = "text/plain" },
+            JsonSerializer.SerializeToElement("captured result"),
+            new Dictionary<string, string> { ["invocationKind"] = "tool", ["toolGeneration"] = "7" });
+
+        var first = await capture.CaptureAsync(request, default);
+        var retry = await capture.CaptureAsync(request, default);
+
+        Assert.AreEqual(first, retry);
+        var service = factory.Services.GetRequiredService<ArtifactManagementService>();
+        var stored = await service.GetStagedAsync(StagedArtifactId.Parse(first.ArtifactId), null,
+            ArtifactLeaseOperation.Read, default);
+        Assert.IsNotNull(stored);
+        Assert.AreEqual(StagedArtifactStatus.Sealed, stored.Value.ArtifactStatus);
+        Assert.AreEqual("flowrun-capture-1", stored.Value.Producer.FlowRunId);
+        Assert.AreEqual("fetch", stored.Value.Producer.FlowStepId);
+        Assert.AreEqual("tool", stored.Value.Producer.Provenance["invocationKind"]);
+        Assert.AreEqual("7", stored.Value.Producer.Provenance["toolGeneration"]);
+        var content = await service.ReadAsync(stored.Value.ArtifactId, 0, 64, null, default);
+        Assert.AreEqual("captured result", Encoding.UTF8.GetString(Convert.FromBase64String(content.ContentBase64)));
+        Assert.AreEqual(1, (await service.ListStagedAsync(default)).Count(candidate =>
+            candidate.Value.Producer.Id == "flow-step:flowrun-capture-1:fetch:1"));
+
+        var binaryBytes = new byte[] { 0, 1, 2, 127, 255 };
+        var binary = await capture.CaptureAsync(request with
+        {
+            FlowRunId = "flowrun-capture-binary",
+            RootFlowRunId = "flowrun-capture-binary",
+            Definition = new()
+            {
+                FileName = "response.bin",
+                MediaType = "application/octet-stream",
+                ContentEncoding = FlowStepArtifactContentEncoding.Base64
+            },
+            Content = JsonSerializer.SerializeToElement(Convert.ToBase64String(binaryBytes))
+        }, default);
+        var binaryContent = await service.ReadAsync(StagedArtifactId.Parse(binary.ArtifactId), 0, 64, null, default);
+        CollectionAssert.AreEqual(binaryBytes, Convert.FromBase64String(binaryContent.ContentBase64));
+
+        var defaultName = await capture.CaptureAsync(request with
+        {
+            FlowRunId = "flowrun-capture-default-name",
+            RootFlowRunId = "flowrun-capture-default-name",
+            Definition = new() { MediaType = "application/json" },
+            Content = JsonSerializer.SerializeToElement(new { value = true })
+        }, default);
+        Assert.AreEqual("fetch.json", defaultName.FileName);
+
+        var tooLarge = await Assert.ThrowsExactlyAsync<FlowValidationException>(() => capture.CaptureAsync(
+            request with
+            {
+                FlowRunId = "flowrun-capture-large",
+                RootFlowRunId = "flowrun-capture-large",
+                Definition = request.Definition with { MaximumBytes = 3 }
+            }, default));
+        Assert.AreEqual("flow_step_artifact_too_large", tooLarge.Code);
+
+        var otherWorkspaceId = Guid.NewGuid();
+        var otherWorkspace = new Workspace(otherWorkspaceId, context.TenantId,
+            $"capture-{otherWorkspaceId:N}", "Flow step capture isolation", WorkspaceStatus.Initializing,
+            DateTimeOffset.UtcNow);
+        await factory.Services.GetRequiredService<IIdentityStore>().AddWorkspaceAsync(otherWorkspace, default);
+        await factory.Services.GetRequiredService<IWorkspaceProvisioner>().ProvisionAsync(otherWorkspace, default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>()
+            .Push(context with { WorkspaceId = otherWorkspaceId }))
+            Assert.IsNull(await service.GetStagedAsync(stored.Value.ArtifactId, null, ArtifactLeaseOperation.Inspect, default));
+
+        var restricted = context with
+        {
+            Restriction = new AuthorizationRestriction(Guid.NewGuid(), context.WorkspaceId,
+                new HashSet<string>(StringComparer.Ordinal) { AuthorizationPermissions.ArtifactsInspect })
+        };
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(restricted))
+        {
+            var denied = await Assert.ThrowsExactlyAsync<FlowValidationException>(() => capture.CaptureAsync(
+                request with { FlowRunId = "flowrun-capture-denied", RootFlowRunId = "flowrun-capture-denied" }, default));
+            Assert.AreEqual("flow_step_artifact_access_denied", denied.Code);
+        }
+    }
+
+    [TestMethod]
     public async Task StagedArtifactApiUsesDefaultBindingWithoutExposingBackendReference()
     {
         await using var factory = Factory();

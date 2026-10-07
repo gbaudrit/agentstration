@@ -34,6 +34,62 @@ public abstract record FlowStepDefinition
     public required string Name { get; init; }
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
+    public FlowStepArtifactOutputDefinition? ArtifactOutput { get; init; }
+}
+
+public sealed record FlowStepArtifactOutputDefinition
+{
+    public string? FileName { get; init; }
+    public string MediaType { get; init; } = "application/json";
+    public FlowStepArtifactContentEncoding ContentEncoding { get; init; }
+    public JsonElement? ContentMapping { get; init; }
+    public long? MaximumBytes { get; init; }
+    public ResourceReference? StagingBinding { get; init; }
+    public FlowCallReference? StorageFlow { get; init; }
+    public FlowStepArtifactCleanupMode Clean { get; init; }
+}
+
+[JsonConverter(typeof(FlowStepArtifactCleanupModeJsonConverter))]
+public enum FlowStepArtifactCleanupMode
+{
+    Auto,
+    Always,
+    Never
+}
+
+public sealed class FlowStepArtifactCleanupModeJsonConverter : JsonConverter<FlowStepArtifactCleanupMode>
+{
+    public override FlowStepArtifactCleanupMode Read(ref Utf8JsonReader reader, Type typeToConvert,
+        JsonSerializerOptions options) => reader.TokenType switch
+    {
+        JsonTokenType.True => FlowStepArtifactCleanupMode.Always,
+        JsonTokenType.False => FlowStepArtifactCleanupMode.Never,
+        JsonTokenType.String when reader.GetString()?.Equals("auto", StringComparison.OrdinalIgnoreCase) == true =>
+            FlowStepArtifactCleanupMode.Auto,
+        JsonTokenType.String when bool.TryParse(reader.GetString(), out var clean) =>
+            clean ? FlowStepArtifactCleanupMode.Always : FlowStepArtifactCleanupMode.Never,
+        _ => throw new JsonException("Artifact output clean must be 'auto', true, or false.")
+    };
+
+    public override void Write(Utf8JsonWriter writer, FlowStepArtifactCleanupMode value,
+        JsonSerializerOptions options)
+    {
+        if (value == FlowStepArtifactCleanupMode.Auto) writer.WriteStringValue("auto");
+        else writer.WriteBooleanValue(value == FlowStepArtifactCleanupMode.Always);
+    }
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<FlowStepArtifactContentEncoding>))]
+public enum FlowStepArtifactContentEncoding
+{
+    [JsonStringEnumMemberName("auto")]
+    Auto,
+    [JsonStringEnumMemberName("json")]
+    Json,
+    [JsonStringEnumMemberName("utf8")]
+    Utf8,
+    [JsonStringEnumMemberName("base64")]
+    Base64
 }
 
 public sealed record InputFlowStepDefinition : FlowStepDefinition

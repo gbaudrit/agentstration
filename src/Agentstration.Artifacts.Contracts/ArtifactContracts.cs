@@ -74,6 +74,7 @@ public sealed record ArtifactProducer
     public string? AgentId { get; init; }
     public string? ToolCallId { get; init; }
     public string? CorrelationId { get; init; }
+    public IReadOnlyDictionary<string, string> Provenance { get; init; } = new Dictionary<string, string>();
 }
 
 public sealed record ArtifactBackendResolution

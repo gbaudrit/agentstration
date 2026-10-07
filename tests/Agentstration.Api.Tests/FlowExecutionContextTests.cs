@@ -16,10 +16,29 @@ public sealed partial class FlowTests
         Assert.IsTrue(parser.Parse("${execution.parentFlowRunId}").IsValid);
         Assert.IsTrue(parser.Parse("${execution.stepName}").IsValid);
         Assert.IsTrue(parser.Parse("${execution.correlationId}").IsValid);
+        Assert.IsTrue(parser.Parse("${step.displayName}").IsValid);
 
         var unknown = parser.Parse("${execution.workspaceId}");
         Assert.IsFalse(unknown.IsValid);
         StringAssert.Contains(unknown.Error, "unknown execution context property");
+    }
+
+    [TestMethod]
+    public async Task StepDisplayNameExpressionFallsBackToTheTechnicalName()
+    {
+        var parser = new FlowExpressionParser();
+        var expression = parser.Parse("${step.displayName}").Expression!;
+        var input = JsonSerializer.SerializeToElement(new { });
+        var outputs = new Dictionary<string, JsonElement?>();
+
+        var fallback = await parser.EvaluateAsync(expression,
+            new(input, outputs, Execution: new("run", "run", null, "capture", null)), default);
+        var displayName = await parser.EvaluateAsync(expression,
+            new(input, outputs, Execution: new("run", "run", null, "capture", null, "Capture result")),
+            default);
+
+        Assert.AreEqual("capture", fallback?.GetString());
+        Assert.AreEqual("Capture result", displayName?.GetString());
     }
 
     [TestMethod]

@@ -9,6 +9,13 @@ public sealed record FlowRunScope(Guid TenantId, WorkspaceId WorkspaceId, Guid P
 public readonly record struct FlowRunKey(WorkspaceId WorkspaceId, string RunId);
 public sealed record FlowRunEvent(WorkspaceId WorkspaceId, string RunId, long Sequence, FlowRunEventType Type, string? StepId, JsonElement? Payload, DateTimeOffset Timestamp);
 public sealed record FlowStepRunUsage(int? InputTokens = null, int? OutputTokens = null);
+public sealed record FlowStepArtifactReference(
+    string ArtifactId,
+    string FileName,
+    string MediaType,
+    string Kind = "staged",
+    string? StorageFlowRunId = null,
+    string? LocalArtifactId = null);
 public sealed record FlowParticipantTurnResult(int Turn, string Content);
 public sealed record FlowParticipantResult(
     string ParticipantId,
@@ -60,6 +67,8 @@ public sealed record FlowStepRun
     public IReadOnlyList<string> ChildFlowRunIds { get; init; } = [];
     public int? RepeatIteration { get; init; }
     public FlowToolRouteResolution? ToolRoute { get; init; }
+    public IReadOnlyList<FlowStepArtifactReference> Artifacts { get; init; } = [];
+    public string? ArtifactStorageFlowRunId { get; init; }
 }
 
 public sealed record FlowRun

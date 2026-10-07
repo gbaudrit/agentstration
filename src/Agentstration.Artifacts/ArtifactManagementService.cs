@@ -73,6 +73,23 @@ public sealed class ArtifactManagementService(
             .ToArray();
     }
 
+    public async Task<StoredResource<StagedArtifactResource>?> GetStagedByProducerIdForWriteAsync(
+        string producerId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(producerId);
+        var current = await RequireAsync(AuthorizationPermissions.ArtifactsWrite, cancellationToken);
+        var matches = (await store.ListAllAsync<StagedArtifactResource>(ArtifactResourceKinds.StagedArtifact, cancellationToken))
+            .Where(value => value.Value.WorkspaceId.Value == current.WorkspaceId
+                && string.Equals(value.Value.Producer.Id, producerId, StringComparison.Ordinal))
+            .Take(2)
+            .ToArray();
+        if (matches.Length > 1)
+            throw Error("staged_artifact_producer_ambiguous",
+                $"More than one StagedArtifact exists for producer identity '{producerId}'.");
+        return matches.SingleOrDefault();
+    }
+
     public async Task<StoredResource<StagedArtifactResource>?> GetStagedAsync(
         StagedArtifactId id,
         ArtifactLeaseId? leaseId,

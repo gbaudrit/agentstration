@@ -189,3 +189,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 161. [ADR-0161 — Knowledge Sources resolve reusable versioned profiles](0161-knowledge-sources-resolve-versioned-profiles.md)
 162. [ADR-0162 — Core Knowledge Source Profiles are protected local defaults](0162-core-knowledge-source-profiles-are-protected-local-defaults.md)
 163. [ADR-0163 — Data Sources own governed acquisition](0163-data-sources-own-governed-acquisition.md)
+164. [ADR-0164 — Flow steps optionally capture results as governed Artifacts](0164-flow-steps-optionally-capture-results-as-artifacts.md)
