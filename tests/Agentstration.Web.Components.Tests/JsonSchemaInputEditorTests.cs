@@ -193,6 +193,8 @@ public sealed class JsonSchemaInputEditorTests
         Assert.IsTrue(dryRun.HasAttribute("checked"));
         Assert.IsTrue(dryRun.HasAttribute("disabled"));
         StringAssert.Contains(rendered.Find("[data-schema-path='$.dryRun']").ClassName, "schema-field-locked");
+        Assert.HasCount(1, rendered.FindAll("[data-schema-path='$.dryRun'] .schema-toggle-switch"));
+        StringAssert.Contains(rendered.Find("[data-schema-path='$.dryRun'] .schema-toggle-copy").TextContent, "dryRun");
         Assert.IsTrue(value.GetProperty("dryRun").GetBoolean());
 
         rendered.Find("[data-testid='schema-raw-mode']").Click();

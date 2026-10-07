@@ -26,7 +26,14 @@
     }
     else if (Schema.Kind == JsonSchemaInputKind.Toggle)
     {
-        <label class="schema-toggle"><input type="checkbox" checked="@BooleanValue" disabled="@FieldDisabled" @onchange="ChangeBooleanAsync" /><span>@Label @RequiredMark @RulesTooltip</span></label>@Help
+        <label class="schema-toggle">
+            <input class="schema-toggle-input" type="checkbox" checked="@BooleanValue" disabled="@FieldDisabled" @onchange="ChangeBooleanAsync" />
+            <span class="schema-toggle-switch" aria-hidden="true"></span>
+            <span class="schema-toggle-copy">
+                <span class="schema-toggle-title">@Label @RequiredMark @RulesTooltip</span>
+                @Help
+            </span>
+        </label>
     }
     else if (Schema.AllowedValues.Count > 0)
     {
