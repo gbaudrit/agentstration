@@ -140,6 +140,9 @@ public sealed class ArtifactAdministrationComponentTests
         StringAssert.Contains(
             rendered.Find(".artifact-status .metric-help").GetAttribute("aria-label"),
             "finalized, verified, and ready");
+        StringAssert.Contains(
+            rendered.Find(".artifact-status .metric-help").GetAttribute("class"),
+            "metric-help-right");
         StringAssert.Contains(rendered.Markup, "index.html");
         StringAssert.Contains(
             rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']").TextContent,

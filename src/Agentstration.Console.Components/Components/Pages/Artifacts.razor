@@ -22,7 +22,7 @@ else if (!showDurable)
                     <td>
                         <span class="artifact-status">
                             <StatusBadge Text="@T($"Status.{item.Status}")" Status="@Tone(item.Status)" />
-                            <HelpTooltip Text="@T($"StatusHelp.{item.Status}")" />
+                            <HelpTooltip Text="@T($"StatusHelp.{item.Status}")" OpenToRight />
                         </span>
                     </td>
                     <td>@Size(item.Length)</td>

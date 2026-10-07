@@ -1,5 +1,6 @@
-<span class="metric-help" tabindex="0" aria-label="@Text">?<span class="metric-tooltip" role="tooltip">@Text</span></span>
+<span class="metric-help @(OpenToRight ? "metric-help-right" : null)" tabindex="0" aria-label="@Text">?<span class="metric-tooltip" role="tooltip">@Text</span></span>
 
 @code {
     [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
+    [Parameter] public bool OpenToRight { get; set; }
 }
