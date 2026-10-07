@@ -56,7 +56,7 @@ else if (artifact is not null)
         @if (activeTab == DetailsTab.Overview)
         {
             <section class="metric-grid artifact-overview-metrics">
-                <MetricCard Label="@T("State")" Value="@T($"Status.{artifact.Status}")" Detail="@artifact.MediaType" Status="@(artifact.Status == StagedArtifactStatus.Failed ? UiStatus.Warning : UiStatus.Info)" />
+                <MetricCard Label="@T("State")" Value="@T($"Status.{artifact.Status}")" Detail="@artifact.MediaType" HelpText="@T($"StatusHelp.{artifact.Status}")" Status="@Tone(artifact.Status)" />
                 <MetricCard Label="@T("Size")" Value="@SizeInMegabytes(artifact.Length)" Detail="@ExactSize(artifact.Length)" />
                 <MetricCard Label="@T("Expires")" Value="@artifact.ExpiresAt.ToLocalTime().ToString("g")" Detail="@T("LeaseCount", artifact.Leases.Count)" />
             </section>
@@ -91,6 +91,7 @@ else if (artifact is not null)
                 <div class="artifact-content-actions">
                     <button class="button-secondary" type="button" disabled="@busy" data-testid="staged-artifact-read-preview" @onclick="() => ReadContentAsync(false)">@T("ReadPreview")</button>
                     <button class="button-primary" type="button" disabled="@(busy || !CanReadFullContent)" data-testid="staged-artifact-read-full" @onclick="() => ReadContentAsync(true)">@T("ReadFullContent")</button>
+                    <a class="button-secondary" href="@Client.GetDownloadUrl(ArtifactId)" download data-enhance-nav="false" data-testid="staged-artifact-download">@T("Download")</a>
                 </div>
 
                 @if (!CanReadFullContent)
@@ -173,6 +174,13 @@ else if (artifact is not null)
     private static string ToolSetUrl(StagedArtifactView value) => value.ToolSetNamespace.IsDefault
         ? $"/tools/sets/{Uri.EscapeDataString(value.ToolSetName)}"
         : $"/tools/sets/{Uri.EscapeDataString(value.ToolSetName)}?namespace={Uri.EscapeDataString(value.ToolSetNamespace.Value)}";
+    private static UiStatus Tone(StagedArtifactStatus status) => status switch
+    {
+        StagedArtifactStatus.Sealed or StagedArtifactStatus.Persisted => UiStatus.Success,
+        StagedArtifactStatus.Failed or StagedArtifactStatus.Expired => UiStatus.Warning,
+        StagedArtifactStatus.Purged or StagedArtifactStatus.Discarded => UiStatus.Neutral,
+        _ => UiStatus.Info
+    };
 
     protected override async Task OnParametersSetAsync()
     {

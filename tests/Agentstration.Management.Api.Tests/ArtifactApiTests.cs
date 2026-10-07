@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -66,6 +67,23 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
             $"/api/artifacts/staged/{created.ArtifactId}/content?offset=0&length=64&leaseId={lease.Id}", JsonOptions());
         Assert.IsNotNull(read);
         CollectionAssert.AreEqual(content, Convert.FromBase64String(read.ContentBase64));
+
+        using var download = await client.GetAsync($"/api/artifacts/staged/{created.ArtifactId}/download?leaseId={lease.Id}");
+        Assert.AreEqual(HttpStatusCode.OK, download.StatusCode);
+        Assert.AreEqual("attachment", download.Content.Headers.ContentDisposition?.DispositionType);
+        Assert.AreEqual("notes.txt", download.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+        Assert.AreEqual("notes.txt", download.Content.Headers.ContentDisposition?.FileNameStar);
+        CollectionAssert.AreEqual(content, await download.Content.ReadAsByteArrayAsync());
+
+        using var rangeRequest = new HttpRequestMessage(HttpMethod.Get,
+            $"/api/artifacts/staged/{created.ArtifactId}/download?leaseId={lease.Id}");
+        rangeRequest.Headers.Range = new RangeHeaderValue(4, 11);
+        using var partialDownload = await client.SendAsync(rangeRequest);
+        Assert.AreEqual(HttpStatusCode.PartialContent, partialDownload.StatusCode);
+        Assert.AreEqual("bytes", partialDownload.Content.Headers.ContentRange?.Unit);
+        Assert.AreEqual(4, partialDownload.Content.Headers.ContentRange?.From);
+        Assert.AreEqual(11, partialDownload.Content.Headers.ContentRange?.To);
+        CollectionAssert.AreEqual(content[4..12], await partialDownload.Content.ReadAsByteArrayAsync());
     }
 
     [TestMethod]
@@ -103,6 +121,45 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         Assert.IsNotNull(staged);
         var chunk = await service.ReadAsync(staged.ArtifactId, 0, 64, null, default);
         CollectionAssert.AreEqual(bytes, Convert.FromBase64String(chunk.ContentBase64));
+
+        using var client = factory.CreateClient();
+        var durableId = FlowRunArtifactId.Parse(first.Value.GetProperty("flowRunArtifactId").GetString()!);
+        var restricted = context with
+        {
+            Restriction = new AuthorizationRestriction(Guid.NewGuid(), context.WorkspaceId,
+                new HashSet<string>(StringComparer.Ordinal) { AuthorizationPermissions.ArtifactsInspect })
+        };
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(restricted))
+        {
+            Assert.IsNotNull(await service.GetFlowRunArtifactAsync(durableId, default));
+            _ = await Assert.ThrowsAsync<AuthorizationDeniedException>(async () =>
+                await factory.Services.GetRequiredService<IArtifactContentMaterializationGateway>().StartAsync(
+                    durableId, new(), default));
+        }
+        using var startedResponse = await client.PostAsJsonAsync(
+            $"/api/artifacts/flow-run-artifacts/{durableId}/materializations",
+            new MaterializeFlowRunArtifactRequest(IdempotencyKey: "materialize-once"));
+        Assert.AreEqual(HttpStatusCode.Accepted, startedResponse.StatusCode,
+            await startedResponse.Content.ReadAsStringAsync());
+        var started = await startedResponse.Content.ReadFromJsonAsync<FlowRunArtifactMaterialization>(JsonOptions());
+        Assert.IsNotNull(started);
+        await factory.Services.GetRequiredService<FlowRunService>().ExecuteAsync(new FlowRunQueueItem(
+            started.FlowRunId,
+            new FlowRunScope(context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId)), default);
+        var completed = await client.GetFromJsonAsync<FlowRunArtifactMaterialization>(startedResponse.Headers.Location, JsonOptions());
+        Assert.IsNotNull(completed);
+        Assert.AreEqual(FlowRunStatus.Succeeded.ToString(), completed.Status, completed.ErrorMessage);
+        Assert.IsNotNull(completed.StagedArtifactId);
+        Assert.IsTrue(completed.StagedArtifactAvailable);
+        var materializedChunk = await service.ReadAsync(completed.StagedArtifactId.Value, 0, 64, null, default);
+        CollectionAssert.AreEqual(bytes, Convert.FromBase64String(materializedChunk.ContentBase64));
+        var history = await client.GetFromJsonAsync<IReadOnlyList<FlowRunArtifactMaterialization>>(
+            $"/api/artifacts/flow-run-artifacts/{durableId}/materializations?maximum=50", JsonOptions());
+        Assert.IsNotNull(history);
+        Assert.AreEqual(1, history.Count);
+        Assert.AreEqual(started.FlowRunId, history[0].FlowRunId);
+        Assert.AreEqual(completed.StagedArtifactId, history[0].StagedArtifactId);
+        Assert.IsTrue(history[0].StagedArtifactAvailable);
 
         var flows = factory.Services.GetRequiredService<FlowService>();
         var workspaceId = new WorkspaceId(context.WorkspaceId);

@@ -126,21 +126,55 @@ public sealed class ArtifactAdministrationComponentTests
         context.Services.AddSingleton<IArtifactsClient>(client);
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Artifacts>();
-        rendered.WaitForElement("[data-testid='staged-artifact-row']");
-
-        Assert.IsNotNull(rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']"));
-        Assert.IsNotNull(rendered.Find("a[href='/flow-runs/flow-run-1']"));
-        StringAssert.Contains(rendered.Markup, "index.html");
-        StringAssert.Contains(
-            rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']").TextContent,
-            client.Artifact.ArtifactId.ToString());
-
-        rendered.FindAll("button").Single(value => value.TextContent.Contains("Durable", StringComparison.Ordinal)).Click();
+        rendered.WaitForElement("[data-testid='durable-artifact-row']");
         Assert.IsNotNull(rendered.Find($"a[href='/artifacts/durable/{client.Durable.ArtifactId}']"));
         StringAssert.Contains(rendered.Markup, "index.html");
         StringAssert.Contains(
             rendered.Find($"a[href='/artifacts/durable/{client.Durable.ArtifactId}']").TextContent,
             client.Durable.ArtifactId.ToString());
+
+        rendered.FindAll("button").Single(value => value.TextContent.Contains("Local copies", StringComparison.Ordinal)).Click();
+        Assert.IsNotNull(rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']"));
+        Assert.IsNotNull(rendered.Find("a[href='/flow-runs/flow-run-1']"));
+        StringAssert.Contains(rendered.Markup, "Ready");
+        StringAssert.Contains(
+            rendered.Find(".artifact-status .metric-help").GetAttribute("aria-label"),
+            "finalized, verified, and ready");
+        StringAssert.Contains(
+            rendered.Find(".artifact-status .metric-help").GetAttribute("class"),
+            "metric-help-left");
+        StringAssert.Contains(rendered.Markup, "index.html");
+        StringAssert.Contains(
+            rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']").TextContent,
+            client.Artifact.ArtifactId.ToString());
+    }
+
+    [TestMethod]
+    public void ArtifactTerminologyExplainsAvailabilityInFrench()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = new BunitContext();
+        var client = new ArtifactClient("aperçu");
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddSingleton<IArtifactsClient>(client);
+
+        var list = context.Render<Agentstration.Web.Components.Pages.Artifacts>();
+        list.WaitForElement("[data-testid='durable-artifact-row']");
+        StringAssert.Contains(list.Markup, "Liste");
+        StringAssert.Contains(list.Markup, "Copies locales");
+        list.FindAll("button").Single(value => value.TextContent.Contains("Copies locales", StringComparison.Ordinal)).Click();
+        StringAssert.Contains(list.Markup, "Prête");
+        StringAssert.Contains(
+            list.Find(".artifact-status .metric-help").GetAttribute("aria-label"),
+            "finalisée, vérifiée et prête");
+
+        var details = context.Render<Agentstration.Web.Components.Pages.FlowRunArtifactDetails>(parameters =>
+            parameters.Add(value => value.Id, client.Durable.ArtifactId.ToString()));
+        details.WaitForElement("[data-testid='durable-artifact-content-tab']");
+        details.Find("[data-testid='durable-artifact-content-tab']").Click();
+        StringAssert.Contains(details.Markup, "copie locale");
+        Assert.IsFalse(details.Markup.Contains("matérialis", StringComparison.OrdinalIgnoreCase));
     }
 
     [TestMethod]
@@ -181,6 +215,10 @@ public sealed class ArtifactAdministrationComponentTests
             Assert.IsTrue(rendered.FindAll("a[href='/flow-runs/flow-run-1']").Count >= 2);
             Assert.IsNotNull(rendered.Find("a[href='/tools/sets/filesystem']"));
             Assert.IsNotNull(rendered.Find(".artifact-overview-metrics"));
+            StringAssert.Contains(rendered.Markup, "Ready");
+            StringAssert.Contains(
+                rendered.Find(".artifact-overview-metrics .metric-help").GetAttribute("aria-label"),
+                "finalized, verified, and ready");
         });
     }
 
@@ -199,8 +237,21 @@ public sealed class ArtifactAdministrationComponentTests
 
         rendered.WaitForElement("[data-testid='durable-artifact-overview-tab']");
         StringAssert.Contains(rendered.Markup, "index.html");
-        StringAssert.Contains(rendered.Markup, "Storage Read Flow");
         Assert.IsNotNull(rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']"));
+
+        rendered.Find("[data-testid='durable-artifact-content-tab']").Click();
+        StringAssert.Contains(rendered.Markup, "local copy");
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsNotNull(rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']"));
+            Assert.IsNotNull(rendered.Find("[data-testid='durable-artifact-download']"));
+            Assert.AreEqual("false", rendered.Find("[data-testid='durable-artifact-download']").GetAttribute("data-enhance-nav"));
+            Assert.IsNotNull(rendered.Find("[data-testid='durable-artifact-materialization-history']"));
+            Assert.IsNotNull(rendered.Find("a[href='/flow-runs/flowrun-materialize-1']"));
+            Assert.IsNotNull(rendered.Find("[data-testid='durable-artifact-history-download']"));
+            Assert.AreEqual("false", rendered.Find("[data-testid='durable-artifact-history-download']").GetAttribute("data-enhance-nav"));
+            Assert.AreEqual(0, rendered.FindAll("[data-testid='durable-artifact-materialize']").Count);
+        });
 
         rendered.Find("[data-testid='durable-artifact-storage-tab']").Click();
         StringAssert.Contains(rendered.Markup, "Immutable storage receipt");
@@ -269,6 +320,8 @@ public sealed class ArtifactAdministrationComponentTests
                 offset + count >= content.Length));
         }
 
+        public string GetDownloadUrl(StagedArtifactId id) => $"/api/artifacts/staged/{id}/download";
+
         public Task<StagedArtifactView> ExtendRetentionAsync(StagedArtifactId id, DateTimeOffset expiresAt, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
@@ -280,5 +333,21 @@ public sealed class ArtifactAdministrationComponentTests
 
         public Task<FlowRunArtifactResource?> GetDurableAsync(FlowRunArtifactId id, CancellationToken cancellationToken = default) =>
             Task.FromResult<FlowRunArtifactResource?>(id == Durable.ArtifactId ? Durable : null);
+
+        public Task<FlowRunArtifactMaterialization> StartMaterializationAsync(FlowRunArtifactId id,
+            CancellationToken cancellationToken = default) => Task.FromResult(new FlowRunArtifactMaterialization(
+                "flowrun-materialize-1", "Succeeded", Artifact.ArtifactId, StagedArtifactAvailable: true,
+                StagedArtifactExpiresAt: Artifact.ExpiresAt));
+
+        public Task<IReadOnlyList<FlowRunArtifactMaterialization>> GetMaterializationsAsync(FlowRunArtifactId id,
+            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<FlowRunArtifactMaterialization>>([
+                new("flowrun-materialize-1", "Succeeded", Artifact.ArtifactId, StagedArtifactAvailable: true,
+                    StagedArtifactExpiresAt: Artifact.ExpiresAt)
+            ]);
+
+        public Task<FlowRunArtifactMaterialization?> GetMaterializationAsync(FlowRunArtifactId id, string flowRunId,
+            CancellationToken cancellationToken = default) => Task.FromResult<FlowRunArtifactMaterialization?>(new(
+                flowRunId, "Succeeded", Artifact.ArtifactId, StagedArtifactAvailable: true,
+                StagedArtifactExpiresAt: Artifact.ExpiresAt));
     }
 }

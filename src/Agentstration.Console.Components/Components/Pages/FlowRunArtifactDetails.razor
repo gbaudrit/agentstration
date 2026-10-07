@@ -43,9 +43,67 @@ else if (artifact is not null)
                 </dl>
             </section>
 
-            <section class="panel form-section durable-content-notice">
+        }
+        else if (activeTab == DetailsTab.Content)
+        {
+            <section class="panel form-section durable-content-notice" data-testid="durable-artifact-content-panel">
                 <div class="panel-header"><div><p class="eyebrow">@T("ProtectedContent")</p><h2>@T("DurableContentTitle")</h2><p>@T("DurableContentHelp")</p></div></div>
-                <a class="button-secondary" href="@StagedUrl(artifact.SourceArtifactId)">@T("OpenSourceArtifact")</a>
+                @if (materializationError is not null)
+                {
+                    <div class="form-alert form-alert-danger" role="alert">@materializationError</div>
+                }
+                <div class="artifact-content-actions">
+                    @if (materializedArtifactId is { } stagedId)
+                    {
+                        <a class="button-secondary" href="@StagedUrl(stagedId)" data-testid="durable-artifact-open-materialized">@T("OpenMaterializedArtifact")</a>
+                        <a class="button-secondary" href="@Client.GetDownloadUrl(stagedId)" download data-enhance-nav="false" data-testid="durable-artifact-download">@T("Download")</a>
+                    }
+                    else
+                    {
+                        <button class="button-primary" type="button" disabled="@materializing" data-testid="durable-artifact-materialize" @onclick="MaterializeAsync">
+                            @(materializing ? T("MaterializingContent") : T("MaterializeContent"))
+                        </button>
+                    }
+                </div>
+                @if (materialization is not null)
+                {
+                    <p class="muted" data-testid="durable-artifact-materialization-status">@T("MaterializationStatus", MaterializationStatus(materialization.Status)) · <a class="text-button" href="@FlowRunUrl(materialization.FlowRunId)">@materialization.FlowRunId</a></p>
+                }
+            </section>
+
+            <section class="panel form-section" data-testid="durable-artifact-materialization-history">
+                <div class="panel-header"><div><p class="eyebrow">@T("Materialization")</p><h2>@T("MaterializationHistory")</h2><p>@T("MaterializationHistoryHelp")</p></div></div>
+                @if (materializations.Count == 0)
+                {
+                    <p class="muted">@T("NoMaterializations")</p>
+                }
+                else
+                {
+                    <DataGrid TItem="FlowRunArtifactMaterialization" Items="materializations">
+                        <Header><tr><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Artifact")</th><th>@T("Expires")</th><th><span class="sr-only">@T("Actions")</span></th></tr></Header>
+                        <Row Context="item"><tr>
+                            <td>@MaterializationStatus(item.Status)</td>
+                            <td><a class="text-button" href="@FlowRunUrl(item.FlowRunId)"><code>@item.FlowRunId</code></a></td>
+                            <td>
+                                @if (item is { StagedArtifactAvailable: true, StagedArtifactId: { } stagedArtifactId })
+                                {
+                                    <a class="text-button" href="@StagedUrl(stagedArtifactId)"><code>@stagedArtifactId</code></a>
+                                }
+                                else
+                                {
+                                    <span class="muted">@T("MaterializationUnavailable")</span>
+                                }
+                            </td>
+                            <td>@FormatDate(item.StagedArtifactExpiresAt)</td>
+                            <td>
+                                @if (item is { StagedArtifactAvailable: true, StagedArtifactId: { } downloadableArtifactId })
+                                {
+                                    <a class="icon-button" href="@Client.GetDownloadUrl(downloadableArtifactId)" download data-enhance-nav="false" aria-label="@T("DownloadMaterializedArtifact")" title="@T("DownloadMaterializedArtifact")" data-testid="durable-artifact-history-download"><UiIcon Name="download" /></a>
+                                }
+                            </td>
+                        </tr></Row>
+                    </DataGrid>
+                }
             </section>
         }
         else
@@ -84,9 +142,13 @@ else if (artifact is not null)
     [Parameter] public string Id { get; set; } = string.Empty;
     private readonly CancellationTokenSource cancellation = new();
     private FlowRunArtifactResource? artifact;
+    private FlowRunArtifactMaterialization? materialization;
+    private IReadOnlyList<FlowRunArtifactMaterialization> materializations = [];
+    private StagedArtifactId? materializedArtifactId;
     private DetailsTab activeTab;
-    private bool loading = true;
+    private bool loading = true, materializing;
     private string? error;
+    private string? materializationError;
     private FlowRunArtifactId ArtifactId => FlowRunArtifactId.Parse(Id);
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
 
@@ -98,6 +160,12 @@ else if (artifact is not null)
         {
             artifact = await Client.GetDurableAsync(ArtifactId, cancellation.Token);
             if (artifact is null) error = T("DurableNotFound");
+            else
+            {
+                materializations = await Client.GetMaterializationsAsync(ArtifactId, cancellation.Token);
+                materialization = materializations.FirstOrDefault();
+                RestoreMaterializedArtifact();
+            }
         }
         catch (Exception exception) { error = exception.Message; }
         finally { loading = false; }
@@ -115,7 +183,53 @@ else if (artifact is not null)
     private string SizeInMegabytes(long value) => T("SizeMegabytes", value / 1024d / 1024d);
     private string ExactSize(long value) => T("ExactBytes", value);
     private static string TabId(DetailsTab tab) => $"durable-artifact-{tab.ToString().ToLowerInvariant()}-tab";
-    private enum DetailsTab { Overview, Storage }
+    private async Task MaterializeAsync()
+    {
+        if (materializing || artifact is null) return;
+        materializing = true;
+        materializationError = null;
+        try
+        {
+            materialization = await Client.StartMaterializationAsync(ArtifactId, cancellation.Token);
+            for (var attempt = 0; attempt < 60 && !IsTerminal(materialization.Status); attempt++)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellation.Token);
+                materialization = await Client.GetMaterializationAsync(ArtifactId, materialization.FlowRunId, cancellation.Token)
+                    ?? throw new InvalidOperationException(T("MaterializationNotFound"));
+            }
+            if (materialization.StagedArtifactId is { } stagedId)
+                materializedArtifactId = materialization.StagedArtifactAvailable ? stagedId : null;
+            else if (string.Equals(materialization.Status, "Succeeded", StringComparison.OrdinalIgnoreCase))
+                materializationError = T("MaterializationOutputMissing");
+            else if (IsTerminal(materialization.Status))
+                materializationError = materialization.ErrorMessage ?? T("MaterializationFailed", materialization.Status);
+            else
+                materializationError = T("MaterializationStillRunning");
+            var completedFlowRunId = materialization.FlowRunId;
+            materializations = await Client.GetMaterializationsAsync(ArtifactId, cancellation.Token);
+            materialization = materializations.FirstOrDefault(value => value.FlowRunId == completedFlowRunId) ?? materialization;
+            RestoreMaterializedArtifact();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { materializationError = exception.Message; }
+        finally { materializing = false; }
+    }
+
+    private void RestoreMaterializedArtifact() => materializedArtifactId = materializations.FirstOrDefault(value =>
+        value is { StagedArtifactAvailable: true, StagedArtifactId: not null })?.StagedArtifactId;
+
+    private static string FormatDate(DateTimeOffset? value) => value is null
+        ? "—"
+        : value.Value.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture);
+
+    private string MaterializationStatus(string status)
+    {
+        var localized = Localizer[$"MaterializationStatus.{status}"];
+        return localized.ResourceNotFound ? status : localized.Value;
+    }
+
+    private static bool IsTerminal(string status) => status is "Succeeded" or "Failed" or "Cancelled" or "TimedOut";
+    private enum DetailsTab { Overview, Content, Storage }
 
     public void Dispose()
     {
