@@ -261,8 +261,8 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         var readFlow = await flows.GetAsync(workspaceId, new(ArtifactPlatformResourceProvisioner.StorageReadFlowName), default);
         Assert.AreEqual("1.0.0", writeFlow?.Value.ActiveVersion);
         Assert.AreEqual("1.0.0", readFlow?.Value.ActiveVersion);
-        Assert.AreEqual(ArtifactFlowContracts.StorageWrite, writeFlow?.Value.Metadata["artifact.contract"]);
-        Assert.AreEqual(ArtifactFlowContracts.StorageRead, readFlow?.Value.Metadata["artifact.contract"]);
+        Assert.AreEqual(ArtifactFlowContracts.StorageWrite, writeFlow?.Value.Metadata[FlowMetadataKeys.Contract]);
+        Assert.AreEqual(ArtifactFlowContracts.StorageRead, readFlow?.Value.Metadata[FlowMetadataKeys.Contract]);
         Assert.AreEqual("true", writeFlow?.Value.Metadata[ResourceProvenanceAnnotations.BuiltIn]);
         Assert.AreEqual("true", readFlow?.Value.Metadata[ResourceProvenanceAnnotations.BuiltIn]);
     }

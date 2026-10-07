@@ -33,7 +33,7 @@ public sealed class KnowledgeFlowResolver(FlowService flows) : IKnowledgeFlowRes
                 target.UseActiveVersion,
                 resolved.Graph?.InputSchema?.Clone(),
                 resolved.Graph?.OutputSchema?.Clone(),
-                resolved.Metadata.GetValueOrDefault(KnowledgeFlowContracts.MetadataKey),
+                resolved.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract),
                 Capabilities(resolved.Metadata.GetValueOrDefault(KnowledgeFlowContracts.CapabilitiesMetadataKey)));
         }
         catch (Exception exception) when (exception is FlowNotFoundException or FlowValidationException or ArgumentException)
@@ -215,7 +215,9 @@ public sealed class KnowledgeFlowActivationGuard : IFlowVersionActivationGuard
     {
         _ = workspaceId;
         cancellationToken.ThrowIfCancellationRequested();
-        if (!version.Metadata.TryGetValue(KnowledgeFlowContracts.MetadataKey, out var contract))
+        if (!version.Metadata.TryGetValue(FlowMetadataKeys.Contract, out var contract))
+            return Task.CompletedTask;
+        if (!contract.StartsWith("knowledge.", StringComparison.Ordinal))
             return Task.CompletedTask;
         if (string.Equals(contract, KnowledgeFlowContracts.Retrieval, StringComparison.Ordinal))
         {

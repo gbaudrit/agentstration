@@ -192,9 +192,9 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         Assert.IsNotNull(ingestionFlow);
         Assert.IsNotNull(retrievalFlow);
         Assert.AreEqual(KnowledgePlatformResourceProvisioner.IngestionFlowVersion, ingestionFlow.Value.ActiveVersion);
-        Assert.AreEqual(KnowledgeFlowContracts.Ingestion, ingestionFlow.Value.Metadata[KnowledgeFlowContracts.MetadataKey]);
+        Assert.AreEqual(KnowledgeFlowContracts.Ingestion, ingestionFlow.Value.Metadata[FlowMetadataKeys.Contract]);
         Assert.AreEqual(KnowledgePlatformResourceProvisioner.RetrievalFlowVersion, retrievalFlow.Value.ActiveVersion);
-        Assert.AreEqual(KnowledgeFlowContracts.Retrieval, retrievalFlow.Value.Metadata[KnowledgeFlowContracts.MetadataKey]);
+        Assert.AreEqual(KnowledgeFlowContracts.Retrieval, retrievalFlow.Value.Metadata[FlowMetadataKeys.Contract]);
         Assert.AreEqual("true", ingestionFlow.Value.Metadata[ResourceProvenanceAnnotations.BuiltIn]);
         Assert.AreEqual("true", retrievalFlow.Value.Metadata[ResourceProvenanceAnnotations.BuiltIn]);
         Assert.IsTrue(ingestionFlow.Value.Graph!.Steps.OfType<ToolRouteFlowStepDefinition>().Any());
@@ -1522,7 +1522,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
             new Dictionary<string, string>
             {
-                [KnowledgeFlowContracts.MetadataKey] = KnowledgeFlowContracts.Retrieval,
+                [FlowMetadataKeys.Contract] = KnowledgeFlowContracts.Retrieval,
                 [KnowledgeFlowContracts.CapabilitiesMetadataKey] = capabilities ?? string.Join(',',
                     KnowledgeFlowContracts.Search, KnowledgeFlowContracts.Query, KnowledgeFlowContracts.Read)
             },
@@ -1579,7 +1579,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         await flows.CreateAsync(workspaceId, new CreateFlowCommand(
             name, null, "1.0.0", true,
             new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
-            new Dictionary<string, string> { [KnowledgeFlowContracts.MetadataKey] = KnowledgeFlowContracts.Ingestion },
+            new Dictionary<string, string> { [FlowMetadataKeys.Contract] = KnowledgeFlowContracts.Ingestion },
             new FlowGraphDefinition
             {
                 EntryStep = "input",

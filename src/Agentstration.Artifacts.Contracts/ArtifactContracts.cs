@@ -24,6 +24,7 @@ public static class ArtifactFlowContracts
 {
     public const string StorageWrite = "artifact.storage.write/v1";
     public const string StorageRead = "artifact.storage.read/v1";
+    public const string Transform = "artifact.transform/v1";
 }
 
 public readonly record struct StagedArtifactId(Guid Value)

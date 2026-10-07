@@ -353,7 +353,7 @@ public sealed class ArtifactPlatformResourceProvisioner(IResourceStore store, Fl
                     ["systemManaged"] = "true",
                     ["systemKind"] = "ArtifactStorageFlow",
                     [ResourceProvenanceAnnotations.BuiltIn] = "true",
-                    ["artifact.contract"] = contract
+                    [FlowMetadataKeys.Contract] = contract
                 }, graph, displayName), cancellationToken);
             _ = await flows.PublishVersionAsync(workspaceId, id, DefaultToolSetVersion, true, cancellationToken,
                 "Built-in local-first Artifact storage contract implementation.");

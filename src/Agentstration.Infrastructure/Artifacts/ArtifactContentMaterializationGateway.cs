@@ -42,7 +42,7 @@ public sealed class ArtifactContentMaterializationGateway(
                 string.IsNullOrWhiteSpace(request.FlowVersion), flowNamespace);
             var resolvedFlow = await flows.ResolveAsync(new WorkspaceId(current.WorkspaceId), requestedFlow,
                 flowNamespace, cancellationToken);
-            if (!resolvedFlow.Metadata.TryGetValue("artifact.contract", out var contract)
+            if (!resolvedFlow.Metadata.TryGetValue(FlowMetadataKeys.Contract, out var contract)
                 || !string.Equals(contract, ArtifactFlowContracts.StorageRead, StringComparison.Ordinal))
                 throw Error("artifact_storage_read_flow_contract_invalid",
                     $"Flow '{resolvedFlow.FlowId}' does not implement '{ArtifactFlowContracts.StorageRead}'.");

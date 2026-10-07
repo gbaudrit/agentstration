@@ -8,7 +8,7 @@ definition:
   version: 1.0.0
   enabled: true
   metadata:
-    knowledge.contract: knowledge.ingestion/v1
+    flow.contract: knowledge.ingestion/v1
   spec: { flowKind: direct, target: { kind: agent, id: unused-graph-target } }
   graph:
     entryStep: input

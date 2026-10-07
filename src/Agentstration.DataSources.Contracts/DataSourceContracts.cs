@@ -14,8 +14,7 @@ public static class DataSourceResourceKinds
 
 public static class DataSourceFlowContracts
 {
-    public const string MetadataKey = "dataSource.contract";
-    public const string Acquisition = "data.source.acquisition/v1";
+    public const string Acquisition = "datasource.acquisition/v1";
 }
 
 public sealed record DataSourceFlowTarget
