@@ -124,7 +124,9 @@ public static partial class ToolInputSchemaValidator
             }
         }
         if (string.Equals(Text(schema, "format"), "uri", StringComparison.OrdinalIgnoreCase)
-            && (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || string.IsNullOrWhiteSpace(uri.Scheme)))
+            && (!Uri.IsWellFormedUriString(value, UriKind.Absolute)
+                || !Uri.TryCreate(value, UriKind.Absolute, out var uri)
+                || string.IsNullOrWhiteSpace(uri.Scheme)))
             throw Error("tool_argument_format_invalid", path, $"Value at '{path}' must be an absolute URI.");
     }
 

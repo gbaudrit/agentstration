@@ -30,7 +30,10 @@ public sealed partial class ApiClientTests
                     false,
                     []))
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
 
         var response = await new ToolsApiClient(httpClient).RunToolAsync(
             new ResourceNamespace("shared.tools"),
