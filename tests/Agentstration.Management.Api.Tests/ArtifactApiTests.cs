@@ -138,8 +138,16 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         Assert.IsNotNull(completed);
         Assert.AreEqual(FlowRunStatus.Succeeded.ToString(), completed.Status, completed.ErrorMessage);
         Assert.IsNotNull(completed.StagedArtifactId);
+        Assert.IsTrue(completed.StagedArtifactAvailable);
         var materializedChunk = await service.ReadAsync(completed.StagedArtifactId.Value, 0, 64, null, default);
         CollectionAssert.AreEqual(bytes, Convert.FromBase64String(materializedChunk.ContentBase64));
+        var history = await client.GetFromJsonAsync<IReadOnlyList<FlowRunArtifactMaterialization>>(
+            $"/api/artifacts/flow-run-artifacts/{durableId}/materializations?maximum=50", JsonOptions());
+        Assert.IsNotNull(history);
+        Assert.AreEqual(1, history.Count);
+        Assert.AreEqual(started.FlowRunId, history[0].FlowRunId);
+        Assert.AreEqual(completed.StagedArtifactId, history[0].StagedArtifactId);
+        Assert.IsTrue(history[0].StagedArtifactAvailable);
 
         var flows = factory.Services.GetRequiredService<FlowService>();
         var workspaceId = new WorkspaceId(context.WorkspaceId);

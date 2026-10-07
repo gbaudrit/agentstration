@@ -18,4 +18,15 @@
   <data name="MaterializationOutputMissing" xml:space="preserve"><value>Le Storage Read Flow s’est terminé sans retourner d’artefact temporaire.</value></data>
   <data name="MaterializationFailed" xml:space="preserve"><value>Le Storage Read Flow s’est terminé avec l’état {0}.</value></data>
   <data name="MaterializationStillRunning" xml:space="preserve"><value>Le Storage Read Flow est toujours en cours. Ouvrez son Flow Run pour suivre sa progression.</value></data>
+  <data name="Materialization" xml:space="preserve"><value>Matérialisation</value></data>
+  <data name="MaterializationHistory" xml:space="preserve"><value>Historique des matérialisations</value></data>
+  <data name="MaterializationHistoryHelp" xml:space="preserve"><value>Les exécutions précédentes du Storage Read Flow restent visibles. Un artefact temporaire non expiré peut être rouvert sans relancer le Flow.</value></data>
+  <data name="NoMaterializations" xml:space="preserve"><value>Cet artefact durable n’a pas encore été matérialisé.</value></data>
+  <data name="MaterializationUnavailable" xml:space="preserve"><value>Indisponible ou expiré</value></data>
+  <data name="MaterializationStatus.Pending" xml:space="preserve"><value>En attente</value></data>
+  <data name="MaterializationStatus.Running" xml:space="preserve"><value>En cours</value></data>
+  <data name="MaterializationStatus.Succeeded" xml:space="preserve"><value>Réussie</value></data>
+  <data name="MaterializationStatus.Failed" xml:space="preserve"><value>Échec</value></data>
+  <data name="MaterializationStatus.Cancelled" xml:space="preserve"><value>Annulée</value></data>
+  <data name="MaterializationStatus.TimedOut" xml:space="preserve"><value>Expirée</value></data>
 </root>

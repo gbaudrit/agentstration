@@ -16,8 +16,13 @@ public sealed class ArtifactContentMaterializationGateway(
     RootFlowSubmissionService submissions,
     FlowService flows,
     FlowRunService runs,
-    ICurrentRequestContext requestContext) : IArtifactContentMaterializationGateway
+    ICurrentRequestContext requestContext,
+    TimeProvider timeProvider) : IArtifactContentMaterializationGateway
 {
+    private const int PageSize = 200;
+    private const int MaximumScannedRuns = 2000;
+    private const int MaximumHistory = 100;
+
     public async Task<FlowRunArtifactMaterialization> StartAsync(
         FlowRunArtifactId artifactId,
         MaterializeFlowRunArtifactRequest request,
@@ -77,7 +82,34 @@ public sealed class ArtifactContentMaterializationGateway(
             new FlowRunScope(current.TenantId, new WorkspaceId(current.WorkspaceId), current.PrincipalId), cancellationToken);
         if (stored is null) return null;
         if (!MatchesArtifact(stored.Value.Input, artifactId)) return null;
-        return Snapshot(stored.Value, artifactId);
+        return await SnapshotAsync(stored.Value, artifactId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<FlowRunArtifactMaterialization>> ListAsync(
+        FlowRunArtifactId artifactId,
+        int maximum,
+        CancellationToken cancellationToken)
+    {
+        _ = await artifacts.GetFlowRunArtifactForContentReadAsync(artifactId, false, cancellationToken)
+            ?? throw Error("flow_run_artifact_not_found", $"FlowRunArtifact '{artifactId}' was not found.");
+        maximum = Math.Clamp(maximum, 1, MaximumHistory);
+        var current = Current();
+        var scope = new FlowRunScope(current.TenantId, new WorkspaceId(current.WorkspaceId), current.PrincipalId);
+        var materializations = new List<FlowRunArtifactMaterialization>(maximum);
+        for (var skip = 0; skip < MaximumScannedRuns && materializations.Count < maximum; skip += PageSize)
+        {
+            var page = await runs.ListAsync(null, null, skip, PageSize, scope, cancellationToken);
+            foreach (var run in page.Items.Select(value => value.Value).Where(value =>
+                         string.Equals(value.CausationId, artifactId.ToString(), StringComparison.Ordinal)
+                         && string.Equals(value.CorrelationId, $"artifact-read:{artifactId}", StringComparison.Ordinal)
+                         && MatchesArtifact(value.Input, artifactId)))
+            {
+                materializations.Add(await SnapshotAsync(run, artifactId, cancellationToken));
+                if (materializations.Count == maximum) break;
+            }
+            if (!page.HasMore) break;
+        }
+        return materializations;
     }
 
     private RequestContext Current() => requestContext.IsInitialized
@@ -102,6 +134,26 @@ public sealed class ArtifactContentMaterializationGateway(
             catch (FormatException) { }
         }
         return new(run.Id, run.Status.ToString(), stagedArtifactId, run.Error?.Code, run.Error?.Message);
+    }
+
+    private async Task<FlowRunArtifactMaterialization> SnapshotAsync(
+        FlowRun run,
+        FlowRunArtifactId artifactId,
+        CancellationToken cancellationToken)
+    {
+        var snapshot = Snapshot(run, artifactId);
+        if (snapshot.StagedArtifactId is not { } stagedArtifactId) return snapshot;
+        var staged = await artifacts.GetStagedAsync(
+            stagedArtifactId, null, ArtifactLeaseOperation.Inspect, cancellationToken);
+        var available = staged is not null
+            && staged.Value.ExpiresAt > timeProvider.GetUtcNow()
+            && staged.Value.PurgedAt is null
+            && staged.Value.ArtifactStatus is StagedArtifactStatus.Sealed or StagedArtifactStatus.Persisted;
+        return snapshot with
+        {
+            StagedArtifactAvailable = available,
+            StagedArtifactExpiresAt = staged?.Value.ExpiresAt
+        };
     }
 
     private static ArtifactValidationException Error(string code, string message) => new(code, message);

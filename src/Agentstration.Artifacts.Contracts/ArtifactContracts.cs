@@ -205,7 +205,9 @@ public sealed record FlowRunArtifactMaterialization(
     string Status,
     StagedArtifactId? StagedArtifactId = null,
     string? ErrorCode = null,
-    string? ErrorMessage = null);
+    string? ErrorMessage = null,
+    bool StagedArtifactAvailable = false,
+    DateTimeOffset? StagedArtifactExpiresAt = null);
 
 public sealed record ArtifactContentChunk(long Offset, string ContentBase64, bool EndOfContent);
 

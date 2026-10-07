@@ -13,4 +13,9 @@ public interface IArtifactContentMaterializationGateway
         FlowRunArtifactId artifactId,
         string flowRunId,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<FlowRunArtifactMaterialization>> ListAsync(
+        FlowRunArtifactId artifactId,
+        int maximum,
+        CancellationToken cancellationToken);
 }

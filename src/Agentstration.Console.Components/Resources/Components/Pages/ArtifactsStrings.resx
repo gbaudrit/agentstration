@@ -18,4 +18,15 @@
   <data name="MaterializationOutputMissing" xml:space="preserve"><value>The Storage Read Flow completed without returning a staged artifact.</value></data>
   <data name="MaterializationFailed" xml:space="preserve"><value>The Storage Read Flow ended with status {0}.</value></data>
   <data name="MaterializationStillRunning" xml:space="preserve"><value>The Storage Read Flow is still running. Open its Flow Run to follow progress.</value></data>
+  <data name="Materialization" xml:space="preserve"><value>Materialization</value></data>
+  <data name="MaterializationHistory" xml:space="preserve"><value>Materialization history</value></data>
+  <data name="MaterializationHistoryHelp" xml:space="preserve"><value>Previous Storage Read Flow executions remain visible. An unexpired staged artifact can be reopened without running the Flow again.</value></data>
+  <data name="NoMaterializations" xml:space="preserve"><value>This durable artifact has not been materialized yet.</value></data>
+  <data name="MaterializationUnavailable" xml:space="preserve"><value>Unavailable or expired</value></data>
+  <data name="MaterializationStatus.Pending" xml:space="preserve"><value>Pending</value></data>
+  <data name="MaterializationStatus.Running" xml:space="preserve"><value>Running</value></data>
+  <data name="MaterializationStatus.Succeeded" xml:space="preserve"><value>Succeeded</value></data>
+  <data name="MaterializationStatus.Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="MaterializationStatus.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="MaterializationStatus.TimedOut" xml:space="preserve"><value>Timed out</value></data>
 </root>

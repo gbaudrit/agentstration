@@ -203,11 +203,13 @@ public sealed class ArtifactAdministrationComponentTests
 
         rendered.Find("[data-testid='durable-artifact-content-tab']").Click();
         StringAssert.Contains(rendered.Markup, "Storage Read Flow");
-        rendered.Find("[data-testid='durable-artifact-materialize']").Click();
         rendered.WaitForAssertion(() =>
         {
             Assert.IsNotNull(rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']"));
             Assert.IsNotNull(rendered.Find("[data-testid='durable-artifact-download']"));
+            Assert.IsNotNull(rendered.Find("[data-testid='durable-artifact-materialization-history']"));
+            Assert.IsNotNull(rendered.Find("a[href='/flow-runs/flowrun-materialize-1']"));
+            Assert.AreEqual(0, rendered.FindAll("[data-testid='durable-artifact-materialize']").Count);
         });
 
         rendered.Find("[data-testid='durable-artifact-storage-tab']").Click();
@@ -293,10 +295,18 @@ public sealed class ArtifactAdministrationComponentTests
 
         public Task<FlowRunArtifactMaterialization> StartMaterializationAsync(FlowRunArtifactId id,
             CancellationToken cancellationToken = default) => Task.FromResult(new FlowRunArtifactMaterialization(
-                "flowrun-materialize-1", "Succeeded", Artifact.ArtifactId));
+                "flowrun-materialize-1", "Succeeded", Artifact.ArtifactId, StagedArtifactAvailable: true,
+                StagedArtifactExpiresAt: Artifact.ExpiresAt));
+
+        public Task<IReadOnlyList<FlowRunArtifactMaterialization>> GetMaterializationsAsync(FlowRunArtifactId id,
+            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<FlowRunArtifactMaterialization>>([
+                new("flowrun-materialize-1", "Succeeded", Artifact.ArtifactId, StagedArtifactAvailable: true,
+                    StagedArtifactExpiresAt: Artifact.ExpiresAt)
+            ]);
 
         public Task<FlowRunArtifactMaterialization?> GetMaterializationAsync(FlowRunArtifactId id, string flowRunId,
             CancellationToken cancellationToken = default) => Task.FromResult<FlowRunArtifactMaterialization?>(new(
-                flowRunId, "Succeeded", Artifact.ArtifactId));
+                flowRunId, "Succeeded", Artifact.ArtifactId, StagedArtifactAvailable: true,
+                StagedArtifactExpiresAt: Artifact.ExpiresAt));
     }
 }

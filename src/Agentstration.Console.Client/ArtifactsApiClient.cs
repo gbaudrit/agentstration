@@ -14,6 +14,7 @@ public interface IArtifactsClient
     Task<IReadOnlyList<FlowRunArtifactResource>> GetDurableAsync(CancellationToken cancellationToken = default);
     Task<FlowRunArtifactResource?> GetDurableAsync(FlowRunArtifactId id, CancellationToken cancellationToken = default);
     Task<FlowRunArtifactMaterialization> StartMaterializationAsync(FlowRunArtifactId id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<FlowRunArtifactMaterialization>> GetMaterializationsAsync(FlowRunArtifactId id, CancellationToken cancellationToken = default);
     Task<FlowRunArtifactMaterialization?> GetMaterializationAsync(FlowRunArtifactId id, string flowRunId, CancellationToken cancellationToken = default);
 }
 
@@ -81,6 +82,14 @@ public sealed class ArtifactsApiClient(HttpClient httpClient) : IArtifactsClient
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<FlowRunArtifactMaterialization>(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<FlowRunArtifactMaterialization>> GetMaterializationsAsync(FlowRunArtifactId id,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync($"{DurablePath(id)}/materializations?maximum=50", cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<FlowRunArtifactMaterialization>>(cancellationToken) ?? [];
     }
 
     private static string Path(StagedArtifactId id) => $"api/artifacts/staged/{id}";

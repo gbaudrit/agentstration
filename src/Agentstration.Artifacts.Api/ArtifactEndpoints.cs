@@ -32,6 +32,7 @@ internal static class ArtifactEndpoints
         artifacts.MapGet("/flow-run-artifacts", ListFlowRunArtifactsAsync).WithSummary("List durable FlowRunArtifacts").Produces<IEnumerable<FlowRunArtifactResource>>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapGet("/flow-run-artifacts/{id}", GetFlowRunArtifactAsync).WithSummary("Get a durable FlowRunArtifact").Produces<FlowRunArtifactResource>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapPost("/flow-run-artifacts/{id}/materializations", StartMaterializationAsync).WithSummary("Materialize durable Artifact content through a Storage Read Flow").Produces<FlowRunArtifactMaterialization>(StatusCodes.Status202Accepted).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        artifacts.MapGet("/flow-run-artifacts/{id}/materializations", ListMaterializationsAsync).WithSummary("List durable Artifact materializations").Produces<IEnumerable<FlowRunArtifactMaterialization>>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapGet("/flow-run-artifacts/{id}/materializations/{flowRunId}", GetMaterializationAsync).WithSummary("Get durable Artifact materialization status").Produces<FlowRunArtifactMaterialization>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapPost("/staged/{id}/flow-run-artifacts", CompleteAsync).WithSummary("Complete a durable FlowRunArtifact from a storage receipt").Produces<FlowRunArtifactResource>(StatusCodes.Status201Created).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     }
@@ -143,6 +144,13 @@ internal static class ArtifactEndpoints
     {
         var materialization = await gateway.GetAsync(FlowRunArtifactId.Parse(id), flowRunId, token);
         return materialization is null ? Results.NotFound() : Results.Ok(materialization);
+    });
+
+    private static Task<IResult> ListMaterializationsAsync(string id, int? maximum,
+        IArtifactContentMaterializationGateway gateway, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var materializations = await gateway.ListAsync(FlowRunArtifactId.Parse(id), maximum ?? 50, token);
+        return Results.Ok(materializations);
     });
 
     private static Task<IResult> CompleteAsync(string id, CompleteFlowRunArtifactRequest body,
