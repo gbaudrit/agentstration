@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.DataSources.Api/Agentstration.DataSources.Api.csproj" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../Agentstration.Artifacts.Api/Agentstration.Artifacts.Api.csproj" />
     <ProjectReference Include="../Agentstration.Agents.Api/Agentstration.Agents.Api.csproj" />

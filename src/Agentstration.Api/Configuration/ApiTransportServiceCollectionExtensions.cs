@@ -1,6 +1,7 @@
 using Agentstration.Agents.Api;
 using Agentstration.Artifacts.Api;
 using Agentstration.Bootstrap.Api;
+using Agentstration.DataSources.Api;
 using Agentstration.Extensions.Api;
 using Agentstration.Flows.Api;
 using Agentstration.Flows.Application;
@@ -35,6 +36,7 @@ public static class ApiTransportServiceCollectionExtensions
         services.AddArtifactsApi();
         services.AddIdentityApi(configuration, environment);
         services.AddKnowledgeApi();
+        services.AddDataSourcesApi();
         services.AddBootstrapApi();
         services.AddAgentsApi();
         services.AddExtensionsApi();

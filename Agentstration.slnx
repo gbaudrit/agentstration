@@ -69,6 +69,11 @@
     <Project Path="src/Agentstration.Knowledge.Contracts/Agentstration.Knowledge.Contracts.csproj" />
     <Project Path="src/Agentstration.Knowledge/Agentstration.Knowledge.csproj" />
   </Folder>
+  <Folder Name="/src/DataSources/">
+    <Project Path="src/Agentstration.DataSources.Api/Agentstration.DataSources.Api.csproj" />
+    <Project Path="src/Agentstration.DataSources.Contracts/Agentstration.DataSources.Contracts.csproj" />
+    <Project Path="src/Agentstration.DataSources/Agentstration.DataSources.csproj" />
+  </Folder>
   <Folder Name="/src/Models/">
     <Project Path="src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <Project Path="src/Agentstration.Models/Agentstration.Models.csproj" />

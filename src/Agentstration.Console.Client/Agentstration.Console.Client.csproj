@@ -10,6 +10,7 @@
     <ProjectReference Include="../Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Knowledge.Contracts/Agentstration.Knowledge.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.DataSources.Contracts/Agentstration.DataSources.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Models.Contracts/Agentstration.Models.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Models/Agentstration.Models.csproj" />
     <ProjectReference Include="../Agentstration.Packs.Contracts/Agentstration.Packs.Contracts.csproj" />
