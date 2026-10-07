@@ -16,6 +16,7 @@ import { inspectPlatformHealth, type InspectPlatformHealthInput } from './inspec
 import { exerciseResourceNaming, type ExerciseResourceNamingInput } from './exercise-resource-naming.journey.js';
 import { exerciseFoundrySecretBinding, type ExerciseFoundrySecretBindingInput } from './exercise-foundry-secret-binding.journey.js';
 import { exerciseBootstrapProvenance, type ExerciseBootstrapProvenanceInput } from './exercise-bootstrap-provenance.journey.js';
+import { inspectArtifactContent, type InspectArtifactContentInput } from './inspect-artifact-content.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -37,4 +38,5 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'exercise-resource-naming': (context, input) => exerciseResourceNaming(context, input as unknown as ExerciseResourceNamingInput),
   'exercise-foundry-secret-binding': (context, input) => exerciseFoundrySecretBinding(context, input as unknown as ExerciseFoundrySecretBindingInput),
   'exercise-bootstrap-provenance': (context, input) => exerciseBootstrapProvenance(context, input as unknown as ExerciseBootstrapProvenanceInput),
+  'inspect-artifact-content': (context, input) => inspectArtifactContent(context, input as unknown as InspectArtifactContentInput),
 };
