@@ -6,7 +6,7 @@ namespace Agentstration.Runtime.Tests;
 [TestClass]
 public sealed class ToolInputSchemaValidatorTests
 {
-    private static readonly JsonElement Schema = JsonSerializer.SerializeToElement(new
+    private static JsonElement CreateSchema() => JsonSerializer.SerializeToElement(new
     {
         type = "object",
         properties = new
@@ -22,20 +22,20 @@ public sealed class ToolInputSchemaValidatorTests
     [TestMethod]
     public void OptionalConstrainedFieldsMayBeOmitted()
     {
-        ToolInputSchemaValidator.Validate(Schema, JsonSerializer.SerializeToElement(new { prompt = "hello" }));
+        ToolInputSchemaValidator.Validate(CreateSchema(), JsonSerializer.SerializeToElement(new { prompt = "hello" }));
     }
 
     [TestMethod]
     public void PresentFieldsMustRespectPatternAndFormat()
     {
         var pattern = Assert.ThrowsExactly<ToolInputValidationException>(() => ToolInputSchemaValidator.Validate(
-            Schema,
+            CreateSchema(),
             JsonSerializer.SerializeToElement(new { prompt = "hello", reference = "invalid" })));
         Assert.AreEqual("tool_argument_pattern_invalid", pattern.Code);
         Assert.AreEqual("$.reference", pattern.Path);
 
         var format = Assert.ThrowsExactly<ToolInputValidationException>(() => ToolInputSchemaValidator.Validate(
-            Schema,
+            CreateSchema(),
             JsonSerializer.SerializeToElement(new { prompt = "hello", callback = "/relative" })));
         Assert.AreEqual("tool_argument_format_invalid", format.Code);
         Assert.AreEqual("$.callback", format.Path);
@@ -45,8 +45,8 @@ public sealed class ToolInputSchemaValidatorTests
     public void UnknownAndMissingFieldsAreRejected()
     {
         Assert.AreEqual("tool_argument_required", Assert.ThrowsExactly<ToolInputValidationException>(() =>
-            ToolInputSchemaValidator.Validate(Schema, JsonSerializer.SerializeToElement(new { }))).Code);
+            ToolInputSchemaValidator.Validate(CreateSchema(), JsonSerializer.SerializeToElement(new { }))).Code);
         Assert.AreEqual("tool_argument_unknown", Assert.ThrowsExactly<ToolInputValidationException>(() =>
-            ToolInputSchemaValidator.Validate(Schema, JsonSerializer.SerializeToElement(new { prompt = "hello", extra = true }))).Code);
+            ToolInputSchemaValidator.Validate(CreateSchema(), JsonSerializer.SerializeToElement(new { prompt = "hello", extra = true }))).Code);
     }
 }
