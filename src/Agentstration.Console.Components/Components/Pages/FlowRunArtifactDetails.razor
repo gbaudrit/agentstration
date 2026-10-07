@@ -56,7 +56,7 @@ else if (artifact is not null)
                     @if (materializedArtifactId is { } stagedId)
                     {
                         <a class="button-secondary" href="@StagedUrl(stagedId)" data-testid="durable-artifact-open-materialized">@T("OpenMaterializedArtifact")</a>
-                        <a class="button-secondary" href="@Client.GetDownloadUrl(stagedId)" download data-testid="durable-artifact-download">@T("Download")</a>
+                        <a class="button-secondary" href="@Client.GetDownloadUrl(stagedId)" download data-enhance-nav="false" data-testid="durable-artifact-download">@T("Download")</a>
                     }
                     else
                     {
@@ -80,7 +80,7 @@ else if (artifact is not null)
                 else
                 {
                     <DataGrid TItem="FlowRunArtifactMaterialization" Items="materializations">
-                        <Header><tr><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Artifact")</th><th>@T("Expires")</th></tr></Header>
+                        <Header><tr><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Artifact")</th><th>@T("Expires")</th><th><span class="sr-only">@T("Actions")</span></th></tr></Header>
                         <Row Context="item"><tr>
                             <td>@MaterializationStatus(item.Status)</td>
                             <td><a class="text-button" href="@FlowRunUrl(item.FlowRunId)"><code>@item.FlowRunId</code></a></td>
@@ -95,6 +95,12 @@ else if (artifact is not null)
                                 }
                             </td>
                             <td>@FormatDate(item.StagedArtifactExpiresAt)</td>
+                            <td>
+                                @if (item is { StagedArtifactAvailable: true, StagedArtifactId: { } downloadableArtifactId })
+                                {
+                                    <a class="icon-button" href="@Client.GetDownloadUrl(downloadableArtifactId)" download data-enhance-nav="false" aria-label="@T("DownloadMaterializedArtifact")" title="@T("DownloadMaterializedArtifact")" data-testid="durable-artifact-history-download"><UiIcon Name="download" /></a>
+                                }
+                            </td>
                         </tr></Row>
                     </DataGrid>
                 }

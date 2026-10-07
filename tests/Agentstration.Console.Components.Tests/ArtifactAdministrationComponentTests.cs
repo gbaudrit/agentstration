@@ -207,8 +207,11 @@ public sealed class ArtifactAdministrationComponentTests
         {
             Assert.IsNotNull(rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']"));
             Assert.IsNotNull(rendered.Find("[data-testid='durable-artifact-download']"));
+            Assert.AreEqual("false", rendered.Find("[data-testid='durable-artifact-download']").GetAttribute("data-enhance-nav"));
             Assert.IsNotNull(rendered.Find("[data-testid='durable-artifact-materialization-history']"));
             Assert.IsNotNull(rendered.Find("a[href='/flow-runs/flowrun-materialize-1']"));
+            Assert.IsNotNull(rendered.Find("[data-testid='durable-artifact-history-download']"));
+            Assert.AreEqual("false", rendered.Find("[data-testid='durable-artifact-history-download']").GetAttribute("data-enhance-nav"));
             Assert.AreEqual(0, rendered.FindAll("[data-testid='durable-artifact-materialize']").Count);
         });
 

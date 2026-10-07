@@ -23,6 +23,8 @@
   <data name="MaterializationHistoryHelp" xml:space="preserve"><value>Les exécutions précédentes du Storage Read Flow restent visibles. Un artefact temporaire non expiré peut être rouvert sans relancer le Flow.</value></data>
   <data name="NoMaterializations" xml:space="preserve"><value>Cet artefact durable n’a pas encore été matérialisé.</value></data>
   <data name="MaterializationUnavailable" xml:space="preserve"><value>Indisponible ou expiré</value></data>
+  <data name="Actions" xml:space="preserve"><value>Actions</value></data>
+  <data name="DownloadMaterializedArtifact" xml:space="preserve"><value>Télécharger cet artefact matérialisé</value></data>
   <data name="MaterializationStatus.Pending" xml:space="preserve"><value>En attente</value></data>
   <data name="MaterializationStatus.Running" xml:space="preserve"><value>En cours</value></data>
   <data name="MaterializationStatus.Succeeded" xml:space="preserve"><value>Réussie</value></data>
