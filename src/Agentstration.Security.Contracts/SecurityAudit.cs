@@ -48,6 +48,17 @@ public static class SecurityAuditActions
     public const string SourceRegistryDeleted = "source-registry.deleted";
     public const string SourceRegistryRefreshed = "source-registry.refreshed";
     public const string SourceRegistrySourceImported = "source-registry.source-imported";
+    public const string DataSourceCreated = "data-source.created";
+    public const string DataSourceUpdated = "data-source.updated";
+    public const string DataSourceDeleted = "data-source.deleted";
+    public const string DataSourceProfileCreated = "data-source-profile.created";
+    public const string DataSourceProfileUpdated = "data-source-profile.updated";
+    public const string DataSourceProfileDeleted = "data-source-profile.deleted";
+    public const string DataSourceProfileRevisionPublished = "data-source-profile.revision-published";
+    public const string DataSourceProfileRevisionActivated = "data-source-profile.revision-activated";
+    public const string DataSourceAcquisitionStarted = "data-source-acquisition.started";
+    public const string DataSourceAcquisitionCancelled = "data-source-acquisition.cancelled";
+    public const string DataSourceAcquisitionRetried = "data-source-acquisition.retried";
     public const string KnowledgeSourceCreated = "knowledge-source.created";
     public const string KnowledgeSourceToolExposurePublished = "knowledge-source.tool-exposure-published";
     public const string KnowledgeSourceUpdated = "knowledge-source.updated";

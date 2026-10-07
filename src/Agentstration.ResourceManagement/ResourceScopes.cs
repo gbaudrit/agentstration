@@ -59,9 +59,11 @@ public static class ResourceScopePolicy
         "SourceRegistryRegistration" or "SourceRegistryObservedState" or "SourceRegistryRefreshRecord" => InstanceOnly,
         "Source" or "SourceVersion" or "SourceConfiguration" or "SourceObservedState" or "SourceImportRecord"
             or "SourceChannelSnapshot" or "SourceChannelObservedState" or "SourceChannelRefreshRecord" => InstanceTenantWorkspace,
-        "Vault" or "Secret" or "Parameter" => InstanceTenantWorkspace,
+        "Vault" or "Secret" or "Parameter" or "DataSource" or "DataSourceProfile"
+            or "DataSourceProfileRevision" => InstanceTenantWorkspace,
         "ToolProvider" or "Tool" or "ToolCategory" or "ToolDefinition" or "ToolExecutionHook"
-            or "KnowledgeSource" or "KnowledgeSourceProfile" or "KnowledgeSourceProfileRevision" => WorkspaceOnly,
+            or "KnowledgeSource" or "KnowledgeSourceProfile" or "KnowledgeSourceProfileRevision"
+            or "DataSourceAcquisition" => WorkspaceOnly,
         "Agent" or "AgentRevision" or "AgentDeployment" or "Trigger" => WorkspaceOnly,
         "InstalledPack" or "ExtensionRegistration" => InstanceTenantWorkspace,
         "PackProject" or "PackProjectBuild" => WorkspaceOnly,

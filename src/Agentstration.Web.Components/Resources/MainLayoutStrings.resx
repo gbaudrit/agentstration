@@ -18,4 +18,6 @@
   <data name="Command.CreateToolCategory" xml:space="preserve"><value>Create Tool category</value></data>
   <data name="Nav.KnowledgeSources" xml:space="preserve"><value>Knowledge Sources</value></data>
   <data name="Nav.Artifacts" xml:space="preserve"><value>Artifacts</value></data>
+  <data name="Nav.DataSources" xml:space="preserve"><value>Data Sources</value></data>
+  <data name="Nav.DataSourceProfiles" xml:space="preserve"><value>Data Source Profiles</value></data>
 </root>
