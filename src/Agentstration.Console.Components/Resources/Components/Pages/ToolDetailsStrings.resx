@@ -47,6 +47,8 @@
   <data name="Simulation"><value>Simulation</value></data>
   <data name="RealExecution"><value>Real execution</value></data>
   <data name="SimulationHelp"><value>Default safe mode. The input, tool mapping and governance are checked without calling the provider or creating an execution resource.</value></data>
+  <data name="SimulationOptionHelp"><value>Validate without invoking the tool</value></data>
+  <data name="ExecutionOptionHelp"><value>Invoke the tool and obtain its output</value></data>
   <data name="RealExecutionHelp"><value>The provider will be called and the tool may produce external effects. Flow-backed tools may create a Work Item and Flow Run.</value></data>
   <data name="ToolDisabledHelp"><value>Enable this tool before simulating or executing it.</value></data>
   <data name="ToolUnavailableHelp"><value>This tool is no longer available from its provider.</value></data>
@@ -61,6 +63,18 @@
   <data name="ProviderInvoked"><value>Provider invoked</value></data>
   <data name="Output"><value>Output</value></data>
   <data name="OpenFlowRun"><value>Open Flow Run</value></data>
+  <data name="RunInput"><value>Input</value></data>
+  <data name="ToolOutput"><value>Tool output</value></data>
+  <data name="NoOutput"><value>The tool completed without returning output.</value></data>
+  <data name="SimulationNoOutputTitle"><value>No tool output in simulation mode</value></data>
+  <data name="SimulationNoOutputHelp"><value>The checks passed, but the tool was not invoked. Switch to real execution to obtain its output.</value></data>
+  <data name="SwitchToExecution"><value>Switch to real execution</value></data>
+  <data name="VerificationDetails"><value>Verification details</value></data>
+  <data name="RunCheckTitle.tool_resolved"><value>Tool available</value></data>
+  <data name="RunCheckTitle.input_valid"><value>Input valid</value></data>
+  <data name="RunCheckTitle.approval"><value>Approval</value></data>
+  <data name="RunCheckTitle.no_execution"><value>No execution</value></data>
+  <data name="RunCheckTitle.execution"><value>Execution</value></data>
   <data name="RunCheck.tool_resolved"><value>The tool and its provider were resolved.</value></data>
   <data name="RunCheck.input_valid"><value>The input matches the tool contract.</value></data>
   <data name="RunCheck.approval.required"><value>Real execution requires approval.</value></data>

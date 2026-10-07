@@ -102,13 +102,36 @@ public sealed class ToolDetailsComponentTests
 
         Assert.AreEqual("true", rendered.Find("#tool-execution-tab").GetAttribute("aria-selected"));
         Assert.IsNotNull(rendered.Find("[data-testid='schema-input-editor']"));
-        StringAssert.Contains(rendered.Find("[data-testid='tool-run-simulate-mode']").ClassName, "button-primary");
+        StringAssert.Contains(rendered.Find("[data-testid='tool-run-simulate-mode']").ClassName, "selected");
         rendered.Find("[data-testid='tool-run-submit']").Click();
 
         rendered.WaitForAssertion(() => Assert.HasCount(1, client.RunRequests));
         Assert.AreEqual(ToolRunMode.Simulate, client.RunRequests[0].Mode);
         Assert.IsNotNull(rendered.Find("[data-testid='tool-run-result']"));
         StringAssert.Contains(rendered.Find("[data-testid='tool-run-result']").TextContent, "Provider invokedNo");
+        StringAssert.Contains(rendered.Find("[data-testid='tool-run-result']").TextContent, "No tool output in simulation mode");
+        Assert.HasCount(0, rendered.FindAll("[data-testid='tool-run-output']"));
+    }
+
+    [TestMethod]
+    public void RealExecutionPutsToolOutputBeforeTechnicalDetails()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(new ToolSchema
+        {
+            Input = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{},"additionalProperties":false}""")
+        });
+        var client = context.Services.GetRequiredService<ToolClient>();
+        var rendered = context.Render<ToolDetails>(parameters => parameters.Add(page => page.Name, "create-notification"));
+
+        rendered.Find("#tool-execution-tab").Click();
+        rendered.Find("[data-testid='tool-run-execute-mode']").Click();
+        rendered.Find("[data-testid='tool-run-submit']").Click();
+
+        rendered.WaitForAssertion(() => Assert.HasCount(1, client.RunRequests));
+        Assert.AreEqual(ToolRunMode.Execute, client.RunRequests[0].Mode);
+        StringAssert.Contains(rendered.Find("[data-testid='tool-run-output']").TextContent, "created");
+        Assert.IsNotNull(rendered.Find(".tool-run-diagnostics"));
     }
 
     private static BunitContext CreateContext(ToolSchema schema, string? description = "Create one durable notification.")
@@ -163,13 +186,14 @@ public sealed class ToolDetailsComponentTests
             RunRequests.Add(request);
             return Task.FromResult(new RunToolResponse(
                 request.Mode,
-                "simulated",
+                request.Mode == ToolRunMode.Simulate ? "simulated" : "completed",
                 name,
                 @namespace.Value,
                 "provider",
+                request.Mode == ToolRunMode.Execute,
                 false,
-                false,
-                [new ToolRunCheck("no_execution", "passed", "No provider call was made.")]));
+                [new ToolRunCheck(request.Mode == ToolRunMode.Simulate ? "no_execution" : "execution", "passed", "Completed.")],
+                request.Mode == ToolRunMode.Execute ? JsonSerializer.SerializeToElement(new { status = "created" }) : null));
         }
     }
 

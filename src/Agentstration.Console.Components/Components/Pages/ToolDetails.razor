@@ -59,10 +59,17 @@ else
             <section class="panel tool-runner" aria-labelledby="tool-runner-heading" data-testid="tool-runner">
                 <div class="panel-header"><div><h2 id="tool-runner-heading">@T("RunTool")</h2><p class="muted">@T("RunToolHelp")</p></div></div>
                 <div class="tool-run-mode" role="group" aria-label="@T("RunMode")">
-                    <button type="button" class="@(runMode == ToolRunMode.Simulate ? "button-primary" : "button-secondary")" aria-pressed="@(runMode == ToolRunMode.Simulate)" data-testid="tool-run-simulate-mode" @onclick="() => SelectMode(ToolRunMode.Simulate)">@T("Simulation")</button>
-                    <button type="button" class="@(runMode == ToolRunMode.Execute ? "button-primary" : "button-secondary")" aria-pressed="@(runMode == ToolRunMode.Execute)" data-testid="tool-run-execute-mode" @onclick="() => SelectMode(ToolRunMode.Execute)">@T("RealExecution")</button>
+                    <button type="button" class="tool-run-mode-option @(runMode == ToolRunMode.Simulate ? "selected" : null)" aria-pressed="@(runMode == ToolRunMode.Simulate)" data-testid="tool-run-simulate-mode" @onclick="() => SelectMode(ToolRunMode.Simulate)">
+                        <span><strong>@T("Simulation")</strong><small>@T("SimulationOptionHelp")</small></span><span class="tool-run-mode-mark" aria-hidden="true">✓</span>
+                    </button>
+                    <button type="button" class="tool-run-mode-option execution @(runMode == ToolRunMode.Execute ? "selected" : null)" aria-pressed="@(runMode == ToolRunMode.Execute)" data-testid="tool-run-execute-mode" @onclick="() => SelectMode(ToolRunMode.Execute)">
+                        <span><strong>@T("RealExecution")</strong><small>@T("ExecutionOptionHelp")</small></span><span class="tool-run-mode-mark" aria-hidden="true">✓</span>
+                    </button>
                 </div>
-                <p class="tool-run-mode-help @(runMode == ToolRunMode.Simulate ? "simulation" : "execution")">@T(runMode == ToolRunMode.Simulate ? "SimulationHelp" : "RealExecutionHelp")</p>
+                @if (runMode == ToolRunMode.Execute)
+                {
+                    <p class="tool-run-mode-help execution">@T("RealExecutionHelp")</p>
+                }
                 @if (!tool.Definition.Enabled || tool.Definition.Discovery?.Available != true)
                 {
                     <p class="inline-warning" role="status">@T(!tool.Definition.Enabled ? "ToolDisabledHelp" : "ToolUnavailableHelp")</p>
@@ -71,7 +78,10 @@ else
                 {
                     <p class="inline-warning" role="status">@T("ApprovalRequiredHelp")</p>
                 }
-                <JsonSchemaInputEditor Schema="tool.Definition.Schema?.Input" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunValidation" Disabled="submitting" />
+                <div class="tool-run-input">
+                    <h3>@T("RunInput")</h3>
+                    <JsonSchemaInputEditor Schema="tool.Definition.Schema?.Input" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunValidation" Disabled="submitting" />
+                </div>
                 @if (runError is not null)
                 {
                     <p class="error-panel" role="alert">@runError</p>
@@ -84,20 +94,41 @@ else
             {
                 <section class="panel tool-run-result" aria-labelledby="tool-run-result-heading" data-testid="tool-run-result">
                     <div class="panel-header"><h2 id="tool-run-result-heading">@T("RunResult")</h2><StatusBadge Text="@T($"RunStatus.{runResult.Status}")" Status="@(runResult.Status == "denied" ? UiStatus.Warning : UiStatus.Success)" /></div>
-                    <dl class="resource-details">
-                        <dt>@T("RunMode")</dt><dd>@T(runResult.Mode == ToolRunMode.Simulate ? "Simulation" : "RealExecution")</dd>
-                        <dt>@T("ProviderInvoked")</dt><dd>@BooleanLabel(runResult.ProviderInvoked)</dd>
-                        <dt>@T("Provider")</dt><dd><code>@runResult.ProviderName</code></dd>
-                    </dl>
-                    <ul class="tool-run-checks">@foreach (var check in runResult.Checks) { <li class="@check.Status"><strong>@check.Code</strong><span>@RunCheckMessage(check)</span></li> }</ul>
-                    @if (runResult.Output is { } output)
+                    @if (runResult.Mode == ToolRunMode.Simulate && runResult.Status == "simulated")
                     {
-                        <h3>@T("Output")</h3><pre>@JsonSerializer.Serialize(output, IndentedJson)</pre>
+                        <div class="tool-run-result-message simulation">
+                            <span class="tool-run-result-icon" aria-hidden="true">✓</span>
+                            <div><h3>@T("SimulationNoOutputTitle")</h3><p>@T("SimulationNoOutputHelp")</p></div>
+                            <button type="button" class="button-secondary" @onclick="() => SelectMode(ToolRunMode.Execute)">@T("SwitchToExecution")</button>
+                        </div>
+                    }
+                    else if (runResult.Mode == ToolRunMode.Execute)
+                    {
+                        <div class="tool-output" data-testid="tool-run-output">
+                            <h3>@T("ToolOutput")</h3>
+                            @if (runResult.Output is { } output)
+                            {
+                                <pre>@JsonSerializer.Serialize(output, IndentedJson)</pre>
+                            }
+                            else
+                            {
+                                <p class="muted">@T("NoOutput")</p>
+                            }
+                        </div>
                     }
                     @if (runResult.Receipt?.FlowRunId is { Length: > 0 } flowRunId)
                     {
                         <a class="button-secondary" href="@($"/flow-runs/{Uri.EscapeDataString(flowRunId)}")">@T("OpenFlowRun")</a>
                     }
+                    <div class="tool-run-facts">
+                        <span><small>@T("RunMode")</small><strong>@T(runResult.Mode == ToolRunMode.Simulate ? "Simulation" : "RealExecution")</strong></span>
+                        <span><small>@T("ProviderInvoked")</small><strong>@BooleanLabel(runResult.ProviderInvoked)</strong></span>
+                        <span><small>@T("Provider")</small><code>@runResult.ProviderName</code></span>
+                    </div>
+                    <details class="tool-run-diagnostics">
+                        <summary>@T("VerificationDetails")</summary>
+                        <ul class="tool-run-checks">@foreach (var check in runResult.Checks) { <li class="@check.Status"><strong>@RunCheckTitle(check)</strong><span>@RunCheckMessage(check)</span></li> }</ul>
+                    </details>
                 </section>
             }
         }
@@ -128,6 +159,12 @@ else
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string AvailabilityLabel(bool available) => T(available ? "Available" : "Unavailable");
     private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
+
+    private string RunCheckTitle(ToolRunCheck check)
+    {
+        var localized = Localizer[$"RunCheckTitle.{check.Code}"];
+        return localized.ResourceNotFound ? check.Code : localized.Value;
+    }
 
     private string RunCheckMessage(ToolRunCheck check)
     {

@@ -47,6 +47,8 @@
   <data name="Simulation"><value>Simulation</value></data>
   <data name="RealExecution"><value>Exécution réelle</value></data>
   <data name="SimulationHelp"><value>Mode sûr sélectionné par défaut. Les entrées, le rattachement de l’outil et la gouvernance sont vérifiés sans appeler le fournisseur ni créer de ressource d’exécution.</value></data>
+  <data name="SimulationOptionHelp"><value>Valider sans appeler l’outil</value></data>
+  <data name="ExecutionOptionHelp"><value>Appeler l’outil et obtenir son résultat</value></data>
   <data name="RealExecutionHelp"><value>Le fournisseur sera appelé et l’outil pourra produire des effets externes. Un outil basé sur un Flow peut créer un Work Item et un Flow Run.</value></data>
   <data name="ToolDisabledHelp"><value>Activez cet outil avant de le simuler ou de l’exécuter.</value></data>
   <data name="ToolUnavailableHelp"><value>Cet outil n’est plus disponible auprès de son fournisseur.</value></data>
@@ -61,6 +63,18 @@
   <data name="ProviderInvoked"><value>Fournisseur appelé</value></data>
   <data name="Output"><value>Sortie</value></data>
   <data name="OpenFlowRun"><value>Ouvrir le Flow Run</value></data>
+  <data name="RunInput"><value>Entrées</value></data>
+  <data name="ToolOutput"><value>Résultat du Tool</value></data>
+  <data name="NoOutput"><value>Le Tool s’est terminé sans retourner de résultat.</value></data>
+  <data name="SimulationNoOutputTitle"><value>Pas de résultat du Tool en mode Simulation</value></data>
+  <data name="SimulationNoOutputHelp"><value>Les vérifications ont réussi, mais le Tool n’a pas été appelé. Passez en exécution réelle pour obtenir son résultat.</value></data>
+  <data name="SwitchToExecution"><value>Passer en exécution réelle</value></data>
+  <data name="VerificationDetails"><value>Détails des vérifications</value></data>
+  <data name="RunCheckTitle.tool_resolved"><value>Tool disponible</value></data>
+  <data name="RunCheckTitle.input_valid"><value>Entrées valides</value></data>
+  <data name="RunCheckTitle.approval"><value>Approbation</value></data>
+  <data name="RunCheckTitle.no_execution"><value>Aucune exécution</value></data>
+  <data name="RunCheckTitle.execution"><value>Exécution</value></data>
   <data name="RunCheck.tool_resolved"><value>L’outil et son fournisseur ont été trouvés.</value></data>
   <data name="RunCheck.input_valid"><value>Les données saisies respectent le contrat de l’outil.</value></data>
   <data name="RunCheck.approval.required"><value>L’exécution réelle nécessite une approbation.</value></data>
