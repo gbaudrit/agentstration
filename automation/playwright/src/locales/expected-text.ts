@@ -36,6 +36,14 @@ export interface ExpectedText {
     groups: readonly string[];
     labels: readonly string[];
   };
+  toolExecution: {
+    overview: string;
+    execution: string;
+    simulation: string;
+    realExecution: string;
+    runTool: string;
+    input: string;
+  };
 }
 
 export const ExpectedTextByLocale = {
@@ -82,6 +90,14 @@ export const ExpectedTextByLocale = {
       groups: ['Build / Configure', 'Operate', 'Supervise'],
       labels: ['Defined agents', 'Defined flows', 'Extensions', 'Model providers', 'Enabled triggers', 'Agent runs', 'Flow runs', 'Tasks running', 'Ready deployments', 'Needs attention', 'Notifications'],
     },
+    toolExecution: {
+      overview: 'Overview',
+      execution: 'Execution',
+      simulation: 'Simulation',
+      realExecution: 'Real execution',
+      runTool: 'Run this tool',
+      input: 'Input',
+    },
   },
   'fr-FR': {
     navigation: {
@@ -125,6 +141,14 @@ export const ExpectedTextByLocale = {
     platformOverview: {
       groups: ['Créer / Configurer', 'Exploiter', 'Superviser'],
       labels: ['Agents définis', 'Flows définis', 'Extensions', 'Fournisseurs de modèles', 'Déclencheurs actifs', 'Exécutions d’agents', 'Exécutions de Flows', 'Tâches en cours', 'Déploiements prêts', 'Nécessite votre attention', 'Notifications'],
+    },
+    toolExecution: {
+      overview: 'Vue d’ensemble',
+      execution: 'Exécution',
+      simulation: 'Simulation',
+      realExecution: 'Exécution réelle',
+      runTool: 'Exécuter cet outil',
+      input: 'Entrées',
     },
   },
 } as const satisfies Record<SupportedTestLocale, ExpectedText>;

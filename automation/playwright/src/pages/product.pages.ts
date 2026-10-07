@@ -20,6 +20,7 @@ import { PlatformHealthPage } from './platform-health.page.js';
 import { ResourceNamingPage } from './resource-naming.page.js';
 import { FoundrySecretBindingPage } from './foundry-secret-binding.page.js';
 import { PlatformOverviewPage } from './platform-overview.page.js';
+import { ToolExecutionPage } from './tool-execution.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -42,6 +43,7 @@ export class ProductPages {
   public readonly resourceNaming: ResourceNamingPage;
   public readonly foundrySecretBinding: FoundrySecretBindingPage;
   public readonly platformOverview: PlatformOverviewPage;
+  public readonly toolExecution: ToolExecutionPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -64,6 +66,7 @@ export class ProductPages {
     this.resourceNaming = new ResourceNamingPage(page);
     this.foundrySecretBinding = new FoundrySecretBindingPage(page);
     this.platformOverview = new PlatformOverviewPage(page);
+    this.toolExecution = new ToolExecutionPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

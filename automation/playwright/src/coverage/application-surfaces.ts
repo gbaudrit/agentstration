@@ -201,7 +201,11 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   partialResourceAdministration('vaults', `${consolePages}/Vaults.razor`, ['/vaults'], 418),
   partialResourceAdministration('vault-editor', `${consolePages}/VaultEditor.razor`, ['/vaults/new', '/vaults/{Name}'], 419, ['name']),
   partialResourceAdministration('tools', `${consolePages}/Tools.razor`, ['/tools'], 420),
-  planned('tool-details', `${consolePages}/ToolDetails.razor`, ['/tools/{Name}'], 421, ['name']),
+  {
+    id: 'tool-details', host: 'console', source: `${consolePages}/ToolDetails.razor`, routes: ['/tools/{Name}'], fixtureKeys: ['name'],
+    pageObject: 'src/pages/tool-execution.page.ts', journey: 'exercise-tool-execution',
+    specification: 'tests/tool-execution.spec.ts', coverage: 'covered',
+  },
   partialResourceAdministration('tool-providers', `${consolePages}/ToolProviders.razor`, ['/tools/providers'], 422),
   partialResourceAdministration('tool-provider-editor', `${consolePages}/ToolProviderEditor.razor`, ['/tools/providers/new', '/tools/providers/{Name}'], 423, ['name']),
   partialResourceAdministration('tool-definitions', `${consolePages}/ToolDefinitions.razor`, ['/tools/definitions'], 424),
