@@ -6,6 +6,7 @@ using Agentstration.Artifacts.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
+using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Knowledge;
@@ -16,7 +17,9 @@ using Agentstration.Runtime.Abstractions;
 using Agentstration.Security.Contracts;
 using Agentstration.Tools;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol.Client;
 
@@ -25,6 +28,157 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task WorkspacesReceiveProtectedPublishedBuiltInKnowledgeSourceProfilesIdempotently()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var service = factory.Services.GetRequiredService<KnowledgeSourceProfileService>();
+        var expected = new Dictionary<string, string>
+        {
+            [KnowledgeSourceProfileBuiltIns.Web] = KnowledgePlatformResourceProvisioner.WebIngestionFlowName,
+            [KnowledgeSourceProfileBuiltIns.Rest] = KnowledgePlatformResourceProvisioner.RestIngestionFlowName,
+            [KnowledgeSourceProfileBuiltIns.ArtifactImport] = KnowledgePlatformResourceProvisioner.ArtifactImportIngestionFlowName
+        };
+        var before = new Dictionary<string, (Guid Uid, long Generation, string ETag)>();
+        foreach (var item in expected)
+        {
+            var stored = await service.GetAsync(ResourceNamespace.Default, item.Key, default);
+            Assert.IsNotNull(stored);
+            Assert.AreEqual(KnowledgePlatformResourceProvisioner.ProfileVersion, stored.Value.ActiveVersion);
+            Assert.AreEqual(item.Value, stored.Value.Definition.IngestionFlow.Name);
+            Assert.AreEqual("true", stored.Value.Metadata.Annotations[ResourceProvenanceAnnotations.BuiltIn]);
+            Assert.AreEqual(KnowledgeSourceProfileBuiltIns.Origin,
+                stored.Value.Metadata.Annotations[ResourceProvenanceAnnotations.Origin]);
+            Assert.AreEqual(KnowledgeSourceProfileBuiltIns.Owner,
+                stored.Value.Metadata.Annotations[ResourceProvenanceAnnotations.Owner]);
+            var revisions = await service.ListRevisionsAsync(ResourceNamespace.Default, item.Key, default);
+            Assert.HasCount(1, revisions);
+            Assert.AreEqual(KnowledgePlatformResourceProvisioner.ProfileVersion, revisions[0].Value.Version);
+            before[item.Key] = (stored.Value.Uid, stored.Value.Generation, stored.ETag);
+        }
+
+        await factory.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>()
+            .EnsureAsync(context.TenantId, context.WorkspaceId, default);
+        foreach (var item in before)
+        {
+            var stored = await service.GetAsync(ResourceNamespace.Default, item.Key, default);
+            Assert.IsNotNull(stored);
+            Assert.AreEqual(item.Value.Uid, stored.Value.Uid);
+            Assert.AreEqual(item.Value.Generation, stored.Value.Generation);
+            Assert.AreEqual(item.Value.ETag, stored.ETag);
+        }
+
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        var webBeforeRepair = await service.GetAsync(ResourceNamespace.Default, KnowledgeSourceProfileBuiltIns.Web, default);
+        var webRevisionsBeforeRepair = await service.ListRevisionsAsync(ResourceNamespace.Default,
+            KnowledgeSourceProfileBuiltIns.Web, default);
+        await store.DeleteExactAsync(ScopedResourceAddress.Create(ResourceScopeRef.Workspace(context.WorkspaceId),
+            ResourceNamespace.Default, KnowledgeResourceKinds.KnowledgeSourceProfileRevision,
+            webRevisionsBeforeRepair.Single().Value.Name), webRevisionsBeforeRepair.Single().ETag, default);
+        _ = await store.PutExactAsync(ResourceScopeRef.Workspace(context.WorkspaceId),
+            webBeforeRepair!.Value with { ActiveVersion = null }, webBeforeRepair.ETag, false, default);
+        await factory.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>()
+            .EnsureAsync(context.TenantId, context.WorkspaceId, default);
+        var webAfterRepair = await service.GetAsync(ResourceNamespace.Default, KnowledgeSourceProfileBuiltIns.Web, default);
+        Assert.AreEqual(KnowledgePlatformResourceProvisioner.ProfileVersion, webAfterRepair!.Value.ActiveVersion);
+        Assert.HasCount(1, await service.ListRevisionsAsync(ResourceNamespace.Default,
+            KnowledgeSourceProfileBuiltIns.Web, default));
+
+        var secondWorkspaceId = Guid.NewGuid();
+        var secondWorkspace = new Workspace(secondWorkspaceId, context.TenantId,
+            $"knowledge-{secondWorkspaceId:N}", "Knowledge Workspace", WorkspaceStatus.Initializing,
+            factory.Services.GetRequiredService<TimeProvider>().GetUtcNow());
+        await factory.Services.GetRequiredService<IIdentityStore>().AddWorkspaceAsync(secondWorkspace, default);
+        await factory.Services.GetRequiredService<IWorkspaceProvisioner>().ProvisionAsync(secondWorkspace, default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            var secondProfile = await factory.Services.GetRequiredService<IResourceStore>()
+                .GetExactAsync<KnowledgeSourceProfileResource>(ScopedResourceAddress.Create(
+                    ResourceScopeRef.Workspace(secondWorkspaceId), ResourceNamespace.Default,
+                    KnowledgeResourceKinds.KnowledgeSourceProfile, KnowledgeSourceProfileBuiltIns.Web), default);
+            Assert.IsNotNull(secondProfile);
+            Assert.AreNotEqual(before[KnowledgeSourceProfileBuiltIns.Web].Uid, secondProfile.Value.Uid);
+        }
+
+        using var client = factory.CreateClient();
+        var web = await service.GetAsync(ResourceNamespace.Default, KnowledgeSourceProfileBuiltIns.Web, default);
+        using var update = new HttpRequestMessage(HttpMethod.Put,
+            $"/api/knowledgesourceprofiles/{KnowledgeSourceProfileBuiltIns.Web}")
+        {
+            Content = JsonContent.Create(new PutKnowledgeSourceProfileRequest(web!.Value.Definition with
+            {
+                Description = "Administrator mutation"
+            }))
+        };
+        update.Headers.TryAddWithoutValidation("If-Match", web.ETag);
+        using var updateResponse = await client.SendAsync(update);
+        Assert.AreEqual(HttpStatusCode.Conflict, updateResponse.StatusCode);
+        var updateProblem = await updateResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        StringAssert.EndsWith(updateProblem!.Type, "knowledge_source_profile_builtin_protected");
+
+        using var delete = new HttpRequestMessage(HttpMethod.Delete,
+            $"/api/knowledgesourceprofiles/{KnowledgeSourceProfileBuiltIns.Web}");
+        delete.Headers.TryAddWithoutValidation("If-Match", web.ETag);
+        using var deleteResponse = await client.SendAsync(delete);
+        Assert.AreEqual(HttpStatusCode.Conflict, deleteResponse.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task WebBuiltInProfileAcquiresStagesAndPersistsOneResourceThroughItsSpecializedFlow()
+    {
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IKnowledgeHttpContentFetcher>();
+            services.AddSingleton<IKnowledgeHttpContentFetcher>(new StubKnowledgeHttpFetcher(
+                new KnowledgeHttpFetchResult(new("https://example.test/docs/index.html"), "index.html", "text/html",
+                    "<html><body>Agentstration knowledge</body></html>"u8.ToArray())));
+        }));
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var source = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(
+            new KnowledgeSourceResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSource,
+                Metadata = new() { Name = "web-profile-source" },
+                ScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId),
+                Definition = new()
+                {
+                    DisplayName = "Web profile source",
+                    Profile = new(KnowledgeSourceProfileBuiltIns.Web),
+                    AcquisitionConfiguration = JsonSerializer.SerializeToElement(new
+                    {
+                        url = "https://example.test/docs/index.html"
+                    })
+                }
+            }, default);
+        var acquisitions = factory.Services.GetRequiredService<KnowledgeAcquisitionService>();
+        var started = await acquisitions.StartAsync(new(source.Value.Name),
+            JsonSerializer.SerializeToElement(new { }), "web-profile", "web-profile", default);
+        var runs = factory.Services.GetRequiredService<FlowRunService>();
+        var executionScope = new FlowRunScope(context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId);
+        await runs.ExecuteAsync(new(started.Value.FlowRunId, executionScope), default);
+        var parent = await runs.GetAsync(executionScope.WorkspaceId, started.Value.FlowRunId, default);
+        var childRunId = parent!.Value.Steps.Single(step => step.StepName == "persist").ChildFlowRunId;
+        Assert.IsNotNull(childRunId);
+        await runs.ExecuteAsync(new(childRunId, executionScope), default);
+        await runs.ExecuteAsync(new(started.Value.FlowRunId, executionScope), default);
+        var completed = await acquisitions.GetAsync(started.Value.Name, ResourceNamespace.Default, default);
+        Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, completed.Value.State, completed.Value.ErrorMessage);
+        var artifact = completed.Value.Manifest?.Artifacts.Single();
+        Assert.IsNotNull(artifact);
+        Assert.AreEqual(KnowledgeArtifactDisposition.Publishable, artifact.Disposition);
+        var durable = await factory.Services.GetRequiredService<ArtifactManagementService>()
+            .GetFlowRunArtifactAsync(FlowRunArtifactId.Parse(artifact.ArtifactId), default);
+        Assert.IsNotNull(durable);
+        Assert.AreEqual("text/html", durable.Value.Receipt.MediaType);
+        Assert.AreEqual(KnowledgePlatformResourceProvisioner.WebIngestionFlowName,
+            completed.Value.IngestionFlow.Name);
+        Assert.AreEqual(KnowledgeSourceProfileBuiltIns.Web, completed.Value.Profile?.Name);
+    }
+
     [TestMethod]
     public async Task BuiltInKnowledgeFlowsAreProvisionedAndExecuteThroughGovernedToolSetRoutes()
     {
@@ -97,6 +251,32 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         var completed = await acquisitions.GetAsync(started.Value.Name, ResourceNamespace.Default, default);
         Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, completed.Value.State, completed.Value.ErrorMessage);
         Assert.AreEqual(durableId.ToString(), completed.Value.Manifest?.Artifacts.Single().ArtifactId);
+
+        var profileSource = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(
+            new KnowledgeSourceResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSource,
+                Metadata = new() { Name = "builtin-artifact-profile" },
+                ScopeRef = scope,
+                Definition = new()
+                {
+                    DisplayName = "Built-in Artifact profile",
+                    Profile = new(KnowledgeSourceProfileBuiltIns.ArtifactImport),
+                    AcquisitionConfiguration = JsonSerializer.SerializeToElement(new
+                    {
+                        artifactIds = new[] { durableId.ToString() }
+                    })
+                }
+            }, default);
+        var profileAcquisition = await acquisitions.StartAsync(new(profileSource.Value.Name),
+            JsonSerializer.SerializeToElement(new { }), "builtin-profile-acquisition", "builtin-profile-acquisition", default);
+        await factory.Services.GetRequiredService<FlowRunService>().ExecuteAsync(new(profileAcquisition.Value.FlowRunId,
+            new(context.TenantId, workspaceId, context.PrincipalId)), default);
+        var profileCompleted = await acquisitions.GetAsync(profileAcquisition.Value.Name, ResourceNamespace.Default, default);
+        Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, profileCompleted.Value.State, profileCompleted.Value.ErrorMessage);
+        Assert.AreEqual(durableId.ToString(), profileCompleted.Value.Manifest?.Artifacts.Single().ArtifactId);
+        Assert.AreEqual(KnowledgeSourceProfileBuiltIns.ArtifactImport, profileCompleted.Value.Profile?.Name);
 
         _ = await CreateActiveSnapshotAsync(factory.Services, context, source.Value, durable.Value, "builtin-snapshot");
         var retrieval = factory.Services.GetRequiredService<KnowledgeRetrievalService>();
@@ -912,7 +1092,13 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
                 SecurityAuditActions.KnowledgeSourceDeleted
             },
             actions);
-        Assert.IsTrue(audit.Where(value => actions.Contains(value.Action, StringComparer.Ordinal))
+        var sourceActions = new[]
+        {
+            SecurityAuditActions.KnowledgeSourceCreated,
+            SecurityAuditActions.KnowledgeSourceDisabled,
+            SecurityAuditActions.KnowledgeSourceDeleted
+        };
+        Assert.IsTrue(audit.Where(value => sourceActions.Contains(value.Action, StringComparer.Ordinal))
             .All(value => !string.IsNullOrWhiteSpace(value.CorrelationId)));
     }
 
@@ -1240,6 +1426,12 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             IngestionFlow = new() { Name = ingestion },
             RetrievalFlow = new() { Name = retrieval }
         };
+
+    private sealed class StubKnowledgeHttpFetcher(KnowledgeHttpFetchResult result) : IKnowledgeHttpContentFetcher
+    {
+        public Task<KnowledgeHttpFetchResult> FetchAsync(KnowledgeHttpFetchRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(result);
+    }
 
     private static async Task CreatePublishedFlowAsync(
         IServiceProvider services,

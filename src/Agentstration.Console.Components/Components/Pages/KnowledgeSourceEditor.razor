@@ -24,6 +24,7 @@ else
             }
             <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="description" maxlength="2000"></textarea></label>
             <label><span>@T("Profile")</span><select @bind="profileKey" required data-testid="knowledge-source-profile"><option value="">@T("SelectProfile")</option>@foreach (var profile in profiles) { <option value="@Key(profile.Namespace, profile.Name)">@ProfileOptionLabel(profile)</option> }</select></label>
+            <label class="form-field-wide"><span>@T("SourceConfiguration")</span><textarea class="runner-json" rows="8" @bind="acquisitionConfigurationJson" data-testid="knowledge-source-configuration"></textarea><small>@T("SourceConfigurationHelp")</small></label>
             <label class="knowledge-choice form-field-wide" data-testid="knowledge-source-editor-enabled-option"><input type="checkbox" @bind="enabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span></label>
         </div>
         <div class="form-actions"><button class="button-primary" type="submit" disabled="@busy">@(busy ? T("Saving") : T("Save"))</button></div>
@@ -36,11 +37,11 @@ else
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<KnowledgeSourceProfileResource> profiles = [];
     private string technicalName = string.Empty, sourceNamespace = "default", displayName = string.Empty,
-        description = string.Empty, profileKey = string.Empty;
+        description = string.Empty, profileKey = string.Empty, acquisitionConfigurationJson = "{}";
     private KnowledgeFlowTarget? legacyIngestionFlow, legacyRetrievalFlow;
     private string? etag, message;
-    private System.Text.Json.JsonElement acquisitionConfiguration = System.Text.Json.JsonSerializer.SerializeToElement(new { });
     private bool enabled, busy, loading = true;
+    private static readonly System.Text.Json.JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace ExistingNamespace => ResourceNamespace.Parse(Namespace);
     private string DetailsUrl => ExistingNamespace.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(Name!)}" : $"/knowledge-sources/{Uri.EscapeDataString(Name!)}?namespace={Uri.EscapeDataString(ExistingNamespace.Value)}";
@@ -62,7 +63,8 @@ else
                 displayName = snapshot.Value.Definition.DisplayName;
                 description = snapshot.Value.Definition.Description ?? string.Empty;
                 enabled = snapshot.Value.Definition.Enabled;
-                acquisitionConfiguration = snapshot.Value.Definition.AcquisitionConfiguration.Clone();
+                acquisitionConfigurationJson = System.Text.Json.JsonSerializer.Serialize(
+                    snapshot.Value.Definition.AcquisitionConfiguration, IndentedJson);
                 legacyIngestionFlow = snapshot.Value.Definition.IngestionFlow;
                 legacyRetrievalFlow = snapshot.Value.Definition.RetrievalFlow;
                 profileKey = ReferenceKey(snapshot.Value.Definition.Profile, snapshot.Value.Namespace);
@@ -79,12 +81,18 @@ else
         message = null;
         try
         {
+            using var configuration = System.Text.Json.JsonDocument.Parse(acquisitionConfigurationJson);
+            if (configuration.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
+            {
+                message = T("SourceConfigurationObjectRequired");
+                return;
+            }
             var properties = new KnowledgeSourceProperties
             {
                 DisplayName = displayName.Trim(),
                 Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
                 Enabled = enabled,
-                AcquisitionConfiguration = acquisitionConfiguration.Clone(),
+                AcquisitionConfiguration = configuration.RootElement.Clone(),
                 Profile = Reference(profileKey),
                 IngestionFlow = string.IsNullOrWhiteSpace(profileKey) && !IsNew ? legacyIngestionFlow : null,
                 RetrievalFlow = string.IsNullOrWhiteSpace(profileKey) && !IsNew ? legacyRetrievalFlow : null
@@ -94,6 +102,10 @@ else
                 : await Client.UpdateAsync(ExistingNamespace, Name!, new PutKnowledgeSourceRequest(properties), etag!, cancellation.Token);
             var ns = saved.Value.Namespace;
             Navigation.NavigateTo(ns.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}" : $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}?namespace={Uri.EscapeDataString(ns.Value)}");
+        }
+        catch (System.Text.Json.JsonException exception)
+        {
+            message = T("InvalidSourceConfigurationJson", exception.LineNumber ?? 0, exception.BytePositionInLine ?? 0);
         }
         catch (Exception exception) { message = exception.Message; }
         finally { busy = false; }

@@ -187,7 +187,8 @@ internal static class KnowledgeSourceProfileEndpoints
         catch (KnowledgeSourceProfileValidationException exception)
         {
             var status = exception.Code is "knowledge_source_profile_in_use"
-                or "knowledge_source_profile_revision_immutable" ? 409 : 422;
+                or "knowledge_source_profile_revision_immutable"
+                or "knowledge_source_profile_builtin_protected" ? 409 : 422;
             return Problem(exception.Code, "Invalid Knowledge Source Profile", status, exception.Message);
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or FormatException)

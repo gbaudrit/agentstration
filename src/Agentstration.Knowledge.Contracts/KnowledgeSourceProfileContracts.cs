@@ -3,6 +3,17 @@ using Agentstration.Resources;
 
 namespace Agentstration.Knowledge.Contracts;
 
+public static class KnowledgeSourceProfileBuiltIns
+{
+    public const string Web = "web-builtin";
+    public const string Rest = "rest-builtin";
+    public const string ArtifactImport = "artifact-import-builtin";
+    public const string Origin = "core";
+    public const string Owner = "agentstration.knowledge";
+
+    public static bool IsReserved(string name) => name is Web or Rest or ArtifactImport;
+}
+
 public sealed record KnowledgeSourceProfileToolBinding
 {
     public required string Name { get; init; }

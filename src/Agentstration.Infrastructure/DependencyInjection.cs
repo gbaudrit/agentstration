@@ -364,6 +364,11 @@ public static class DependencyInjection
         services.AddSingleton<ArtifactManagementService>();
         services.AddSingleton<ArtifactPlatformResourceProvisioner>();
         services.AddSingleton<KnowledgePlatformResourceProvisioner>();
+        services.AddHttpClient<IKnowledgeHttpContentFetcher, SafeKnowledgeHttpContentFetcher>(client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Agentstration-Knowledge/1.0");
+        }).ConfigurePrimaryHttpMessageHandler(SafeKnowledgeHttpContentFetcher.CreatePrimaryHandler);
         services.AddSingleton(new StagedArtifactCleanupOptions());
         if (enableHostedServices) services.AddHostedService<StagedArtifactCleanupWorker>();
         services.AddSingleton<LocalWorkExecutionGateway>();
@@ -406,6 +411,8 @@ public static class DependencyInjection
         AddInternalTool<ArtifactStorageWriteMcpTool>(services);
         AddInternalTool<ArtifactStorageReadMcpTool>(services);
         AddInternalTool<KnowledgeIngestionImportMcpTool>(services);
+        AddInternalTool<KnowledgeWebFetchMcpTool>(services);
+        AddInternalTool<KnowledgeRestGetMcpTool>(services);
         AddInternalTool<KnowledgeRetrievalSearchMcpTool>(services);
         AddInternalTool<KnowledgeRetrievalQueryMcpTool>(services);
         AddInternalTool<KnowledgeRetrievalReadMcpTool>(services);
