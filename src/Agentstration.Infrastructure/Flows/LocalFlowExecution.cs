@@ -412,7 +412,7 @@ public sealed class ManagedFlowToolExecutor(
     IResourceStore store,
     IToolExecutionPipeline pipeline) : IFlowToolExecutor
 {
-    public async Task<JsonElement?> ExecuteAsync(
+    public async Task<FlowToolExecutionResult> ExecuteAsync(
         FlowToolExecutionRequest request,
         CancellationToken cancellationToken)
     {
@@ -433,6 +433,12 @@ public sealed class ManagedFlowToolExecutor(
             throw Error("tool_approval_required", $"Tool resource '{tool.Address}' requires approval and cannot be invoked without an approval response.");
         var providerId = tool.Definition.Provider?.Name
             ?? throw Error("tool_mapping_invalid", $"Tool resource '{tool.Address}' has no ToolProvider mapping.");
+        var providerNamespace = tool.Definition.Provider!.Namespace ?? tool.Metadata.Namespace;
+        var provider = await store.GetAsync<ToolProviderResource>(
+            new ResourceKey(ToolResourceKinds.ToolProvider, providerId, providerNamespace),
+            cancellationToken)
+            ?? throw Error("tool_provider_not_found",
+                $"ToolProvider resource '{providerNamespace}/{providerId}' was not found.");
         var externalId = tool.Definition.ExternalId
             ?? throw Error("tool_mapping_invalid", $"Tool resource '{tool.Address}' has no external Tool identity.");
         var schema = tool.Definition.Schema?.Input
@@ -462,7 +468,16 @@ public sealed class ManagedFlowToolExecutor(
                 CorrelationId = request.CorrelationId,
                 Arguments = request.Arguments.Clone()
             }, cancellationToken);
-            return result?.Clone();
+            return new(
+                result?.Clone(),
+                tool.Metadata.Name,
+                tool.Metadata.Namespace,
+                tool.Uid,
+                tool.Generation,
+                providerId,
+                providerNamespace,
+                provider.Value.Definition.ProviderType.ToString(),
+                externalId);
         }
         catch (ToolExecutionDeniedException exception)
         {

@@ -93,6 +93,41 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task FlowCallCanCaptureTheCompletedChildResultWithExactProvenance()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        await CreatePublishedGraphAsync(fixture, "child", ChildGraph());
+        var graph = ParentGraph() with
+        {
+            Steps = ParentGraph().Steps.Select(step => step is FlowCallStepDefinition call
+                ? call with { ArtifactOutput = new() { FileName = "child-result.json" } }
+                : step).ToArray()
+        };
+        var parent = await CreatePublishedGraphAsync(fixture, "parent-capture", graph);
+        var capture = new RecordingFlowStepArtifactCapture();
+        var runs = Service(fixture, new TestFlowRunQueue(), artifactCapture: capture);
+        using var input = JsonDocument.Parse("""{"article":"new item"}""");
+
+        var pending = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual,
+            "tester", "child-capture", input.RootElement, TestScope, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
+        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
+        var childId = waiting.Steps.Single(step => step.StepName == "analyze").ChildFlowRunId!;
+        await runs.ExecuteAsync(new(childId, TestScope), default);
+        await runs.ExecuteAsync(new(waiting.Id, TestScope), default);
+
+        var completed = (await runs.GetAsync(TestScope.WorkspaceId, waiting.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
+        Assert.AreEqual("new item", capture.Request!.Content.GetProperty("summary").GetString());
+        Assert.AreEqual("subFlow", capture.Request.Provenance["invocationKind"]);
+        Assert.AreEqual(childId, capture.Request.Provenance["childFlowRunId"]);
+        Assert.AreEqual("child", capture.Request.Provenance["childFlowName"]);
+        Assert.AreEqual("1.0.0", capture.Request.Provenance["childFlowVersion"]);
+        Assert.AreEqual("artifact-1", completed.Steps.Single(step => step.StepName == "analyze")
+            .Artifacts.Single().ArtifactId);
+    }
+
+    [TestMethod]
     public async Task FlowCallPassesTheIncomingTransitionOutputToTheChild()
     {
         await using var fixture = await FlowFixture.CreateAsync();
@@ -377,7 +412,8 @@ public sealed partial class FlowTests
         TestFlowRunQueue queue,
         FlowRunExecutionOptions? options = null,
         IFlowOrchestrationEngine? orchestration = null,
-        IFlowAgentExecutor? agents = null)
+        IFlowAgentExecutor? agents = null,
+        IFlowStepArtifactCapture? artifactCapture = null)
     {
         var expressions = new FlowExpressionParser();
         return new FlowRunService(
@@ -391,7 +427,8 @@ public sealed partial class FlowTests
             new NullFlowRunEventSink(),
             new TestFlowRunExecutionScope(),
             TimeProvider.System,
-            options);
+            options,
+            configuredArtifactCapture: artifactCapture);
     }
 
     private static async Task<Agentstration.Flows.Storage.Abstractions.StoredFlow> CreatePublishedGraphAsync(

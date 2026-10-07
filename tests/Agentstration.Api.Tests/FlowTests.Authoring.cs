@@ -306,6 +306,55 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task ArtifactOutputIsValidatedAndRoundTripsAsPartOfExecutableSteps()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition
+                {
+                    Name = "input",
+                    ArtifactOutput = new() { FileName = "not-allowed.json" }
+                },
+                new ToolFlowStepDefinition
+                {
+                    Name = "fetch",
+                    Tool = new("http.get"),
+                    ArtifactOutput = new()
+                    {
+                        FileName = "response.json",
+                        ContentMapping = JsonSerializer.SerializeToElement("${steps.fetch.output.body}")
+                    }
+                },
+                new OutputFlowStepDefinition { Name = "output" }
+            ],
+            Transitions =
+            [
+                new("to-fetch", "input", "completed", "fetch"),
+                new("to-output", "fetch", "completed", "output")
+            ]
+        };
+
+        var result = await new FlowGraphValidator(new ExistingResourceResolver())
+            .ValidateAsync(graph, new FlowValidationContext(false), default);
+
+        Assert.IsTrue(result.Issues.Any(issue => issue.Code == "step_artifact_output_unsupported" && issue.StepId == "input"));
+        Assert.IsFalse(result.Issues.Any(issue => issue.Code.StartsWith("step_artifact_", StringComparison.Ordinal) && issue.StepId == "fetch"));
+        var json = JsonSerializer.Serialize(graph, JsonOptions);
+        var restored = JsonSerializer.Deserialize<FlowGraphDefinition>(json, JsonOptions)!;
+        var artifact = restored.Steps.OfType<ToolFlowStepDefinition>().Single().ArtifactOutput!;
+        Assert.AreEqual("response.json", artifact.FileName);
+        Assert.AreEqual("application/json", artifact.MediaType);
+        Assert.AreEqual("${steps.fetch.output.body}", artifact.ContentMapping!.Value.GetString());
+        var yaml = FlowDraftService.ToYaml(graph);
+        var yamlRestored = new FlowDraftService(null!, null!, null!, TimeProvider.System).ParseSource(yaml, "yaml");
+        StringAssert.Contains(yaml, "artifactOutput:");
+        Assert.AreEqual(FlowDefinitionHash.Compute(graph), FlowDefinitionHash.Compute(yamlRestored));
+    }
+
+    [TestMethod]
     public async Task DraftRunExecutesTypedGraphAndPersistsDifferentialEvents()
     {
         await using var fixture = await FlowFixture.CreateAsync();

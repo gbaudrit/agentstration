@@ -34,6 +34,30 @@ public abstract record FlowStepDefinition
     public required string Name { get; init; }
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
+    public FlowStepArtifactOutputDefinition? ArtifactOutput { get; init; }
+}
+
+public sealed record FlowStepArtifactOutputDefinition
+{
+    public string? FileName { get; init; }
+    public string MediaType { get; init; } = "application/json";
+    public FlowStepArtifactContentEncoding ContentEncoding { get; init; }
+    public JsonElement? ContentMapping { get; init; }
+    public long? MaximumBytes { get; init; }
+    public ResourceReference? StagingBinding { get; init; }
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<FlowStepArtifactContentEncoding>))]
+public enum FlowStepArtifactContentEncoding
+{
+    [JsonStringEnumMemberName("auto")]
+    Auto,
+    [JsonStringEnumMemberName("json")]
+    Json,
+    [JsonStringEnumMemberName("utf8")]
+    Utf8,
+    [JsonStringEnumMemberName("base64")]
+    Base64
 }
 
 public sealed record InputFlowStepDefinition : FlowStepDefinition

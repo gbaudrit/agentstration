@@ -42,7 +42,9 @@ public sealed partial class FlowRunService
             JsonElement? output;
             string eventName;
             FlowAgentExecutionResult? agentResult = null;
+            FlowToolExecutionResult? toolResult = null;
             FlowToolRouteResolution? toolRouteResolution = null;
+            FlowRun? childResult = null;
             FlowRunError? stepError = null;
             switch (step)
             {
@@ -90,7 +92,7 @@ public sealed partial class FlowRunService
                         : await ResolveJsonAsync(tool.ArgumentsMapping.Value, context, runToken);
                     try
                     {
-                        output = await toolExecutor.ExecuteAsync(new FlowToolExecutionRequest(
+                        toolResult = await toolExecutor.ExecuteAsync(new FlowToolExecutionRequest(
                             stored.Value.Scope,
                             stored.Value.Id,
                             stored.Value.FlowId,
@@ -99,6 +101,7 @@ public sealed partial class FlowRunService
                             stored.Value.CorrelationId!,
                             tool.Tool,
                             arguments), runToken);
+                        output = toolResult.Output?.Clone();
                         eventName = "completed";
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
@@ -130,7 +133,7 @@ public sealed partial class FlowRunService
                             resolvedRoute.ToolGeneration,
                             resolvedRoute.ProviderName,
                             resolvedRoute.ProviderNamespace);
-                        output = await toolExecutor.ExecuteAsync(new FlowToolExecutionRequest(
+                        toolResult = await toolExecutor.ExecuteAsync(new FlowToolExecutionRequest(
                             stored.Value.Scope,
                             stored.Value.Id,
                             stored.Value.FlowId,
@@ -139,6 +142,7 @@ public sealed partial class FlowRunService
                             stored.Value.CorrelationId!,
                             resolvedRoute.Tool,
                             routeArguments), runToken);
+                        output = toolResult.Output?.Clone();
                         eventName = "completed";
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
@@ -170,6 +174,7 @@ public sealed partial class FlowRunService
                         return;
                     }
                     output = child.Value.Output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
+                    childResult = child.Value;
                     eventName = child.Value.Status switch
                     {
                         FlowRunStatus.Succeeded => "completed",
@@ -211,6 +216,7 @@ public sealed partial class FlowRunService
                         return;
                     }
                     output = repeatChild.Value.Output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
+                    childResult = repeatChild.Value;
                     eventName = repeatChild.Value.Status switch
                     {
                         FlowRunStatus.Succeeded => "completed",
@@ -262,12 +268,32 @@ public sealed partial class FlowRunService
                     throw new FlowValidationException("flow_step_type_unsupported", $"Step '{step.Name}' has an unsupported type.");
             }
             outputs[step.Name] = output?.Clone();
+            IReadOnlyList<FlowStepArtifactReference> artifacts = [];
+            if (stepError is null && step.ArtifactOutput is not null)
+            {
+                var content = await ResolveArtifactContentAsync(step.ArtifactOutput, output,
+                    ExecutionContext(stored.Value, step.Name, outputs, output), runToken);
+                var stepRun = stored.Value.Steps.Single(item => item.StepName == step.Name);
+                var captured = await artifactCapture.CaptureAsync(new(
+                    stored.Value.Scope,
+                    stored.Value.Id,
+                    stored.Value.RootFlowRunId ?? stored.Value.Id,
+                    stored.Value.ParentFlowRunId,
+                    step.Name,
+                    stepRun.Attempt,
+                    stored.Value.CorrelationId,
+                    step.ArtifactOutput,
+                    content,
+                    ArtifactProvenance(stored.Value, step, stepRun.Attempt, agentResult, toolResult,
+                        toolRouteResolution, childResult)), runToken);
+                artifacts = [captured];
+            }
             var transition = await SelectTransitionAsync(graph, step.Name, eventName,
                 ExecutionContext(stored.Value, step.Name, outputs), runToken);
             if (stepError is not null) stored = await FinishFailedStepAsync(stored, step.Name, output, transition?.Id, stepError, runToken, toolRouteResolution);
-            else if (agentResult is not null) stored = await FinishAgentStepAsync(stored, agentResult, runToken, transition?.Id, step.Name);
-            else if (toolRouteResolution is not null) stored = await FinishToolRouteStepAsync(stored, step.Name, output, transition?.Id, toolRouteResolution, runToken);
-            else stored = await FinishGraphStepAsync(stored, step.Name, output, transition?.Id, runToken);
+            else if (agentResult is not null) stored = await FinishAgentStepAsync(stored, agentResult, runToken, transition?.Id, step.Name, artifacts);
+            else if (toolRouteResolution is not null) stored = await FinishToolRouteStepAsync(stored, step.Name, output, transition?.Id, toolRouteResolution, runToken, artifacts);
+            else stored = await FinishGraphStepAsync(stored, step.Name, output, transition?.Id, runToken, artifacts);
             if (step is OutputFlowStepDefinition) break;
             if (transition is null && stepError is not null)
                 throw new FlowValidationException(stepError.Code, stepError.Details ?? stepError.Message);
@@ -307,7 +333,8 @@ public sealed partial class FlowRunService
                 run.CorrelationId));
 
     private async Task<StoredFlowRun> FinishToolRouteStepAsync(StoredFlowRun stored, string name,
-        JsonElement? output, string? transition, FlowToolRouteResolution resolution, CancellationToken token)
+        JsonElement? output, string? transition, FlowToolRouteResolution resolution, CancellationToken token,
+        IReadOnlyList<FlowStepArtifactReference>? artifacts = null)
     {
         var now = timeProvider.GetUtcNow();
         var steps = stored.Value.Steps.Select(step => step.StepName == name ? step with
@@ -320,6 +347,7 @@ public sealed partial class FlowRunService
             ToolRoute = resolution,
             Tools = [CatalogId(resolution.ToolNamespace, resolution.ToolName)],
             Provider = CatalogId(resolution.ProviderNamespace, resolution.ProviderName),
+            Artifacts = artifacts ?? [],
             Logs = [.. step.Logs, $"{name} resolved {resolution.ToolSetNamespace}/{resolution.ToolSetName}:{resolution.ToolSetVersion} to {resolution.ToolNamespace}/{resolution.ToolName}."]
         } : step).ToArray();
         var updated = await SaveAsync(stored, stored.Value with { Steps = steps }, token);
@@ -331,6 +359,68 @@ public sealed partial class FlowRunService
     private static string CatalogId(ResourceNamespace @namespace, string name) =>
         @namespace.IsDefault ? name : $"{@namespace.Value}/{name}";
 
+    private static IReadOnlyDictionary<string, string> ArtifactProvenance(
+        FlowRun run,
+        FlowStepDefinition step,
+        int attempt,
+        FlowAgentExecutionResult? agent,
+        FlowToolExecutionResult? tool,
+        FlowToolRouteResolution? route,
+        FlowRun? child)
+    {
+        var provenance = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["invocationKind"] = step switch
+            {
+                AgentFlowStepDefinition => "agent",
+                ToolFlowStepDefinition or ToolRouteFlowStepDefinition => "tool",
+                FlowCallStepDefinition or RepeatFlowStepDefinition => "subFlow",
+                OutputFlowStepDefinition => "flow",
+                _ => step.Type()
+            },
+            ["flowName"] = run.FlowId.Value,
+            ["flowNamespace"] = run.FlowId.Namespace.Value,
+            ["flowVersion"] = run.FlowVersion,
+            ["rootFlowRunId"] = run.RootFlowRunId ?? run.Id,
+            ["stepAttempt"] = attempt.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        };
+        if (run.ParentFlowRunId is not null) provenance["parentFlowRunId"] = run.ParentFlowRunId;
+        if (agent is not null)
+        {
+            provenance["agentResourceId"] = agent.AgentResourceId;
+            provenance["agentVersion"] = agent.AgentVersion.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (agent.ModelProfileResourceId is not null) provenance["modelProfileResourceId"] = agent.ModelProfileResourceId;
+            if (agent.Provider is not null) provenance["provider"] = agent.Provider;
+        }
+        if (tool is not null)
+        {
+            provenance["toolName"] = tool.ToolName;
+            provenance["toolNamespace"] = tool.ToolNamespace.Value;
+            provenance["toolUid"] = tool.ToolUid.ToString("D");
+            provenance["toolGeneration"] = tool.ToolGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            provenance["toolExternalId"] = tool.ExternalToolId;
+            provenance["providerName"] = tool.ProviderName;
+            provenance["providerNamespace"] = tool.ProviderNamespace.Value;
+            provenance["providerType"] = tool.ProviderType;
+        }
+        if (route is not null)
+        {
+            provenance["toolSetName"] = route.ToolSetName;
+            provenance["toolSetNamespace"] = route.ToolSetNamespace.Value;
+            provenance["toolSetVersion"] = route.ToolSetVersion;
+            provenance["toolRoute"] = route.Route;
+        }
+        if (child is not null)
+        {
+            provenance["childFlowRunId"] = child.Id;
+            provenance["childFlowName"] = child.FlowId.Value;
+            provenance["childFlowNamespace"] = child.FlowId.Namespace.Value;
+            provenance["childFlowVersion"] = child.FlowVersion;
+            if (child.DefinitionHash is not null) provenance["childFlowDefinitionHash"] = child.DefinitionHash;
+        }
+        return provenance;
+    }
+
     private static FlowTransitionDefinition? SelectedIncomingTransition(
         FlowGraphDefinition graph,
         FlowRun run,
@@ -341,10 +431,11 @@ public sealed partial class FlowRunService
                 step.StepName == transition.FromStep
                 && step.SelectedTransition == transition.Id));
 
-    private async Task<StoredFlowRun> FinishGraphStepAsync(StoredFlowRun stored, string name, JsonElement? output, string? transition, CancellationToken token)
+    private async Task<StoredFlowRun> FinishGraphStepAsync(StoredFlowRun stored, string name, JsonElement? output, string? transition,
+        CancellationToken token, IReadOnlyList<FlowStepArtifactReference>? artifacts = null)
     {
         var now = timeProvider.GetUtcNow();
-        var steps = stored.Value.Steps.Select(step => step.StepName == name ? step with { Status = FlowStepRunStatus.Succeeded, ResolvedInput = step.ResolvedInput?.Clone() ?? stored.Value.Input.Clone(), Output = output?.Clone(), SelectedTransition = transition, CompletedAt = now, Logs = [.. step.Logs, $"{name} completed."] } : step).ToArray();
+        var steps = stored.Value.Steps.Select(step => step.StepName == name ? step with { Status = FlowStepRunStatus.Succeeded, ResolvedInput = step.ResolvedInput?.Clone() ?? stored.Value.Input.Clone(), Output = output?.Clone(), SelectedTransition = transition, CompletedAt = now, Artifacts = artifacts ?? [], Logs = [.. step.Logs, $"{name} completed."] } : step).ToArray();
         var updated = await SaveAsync(stored, stored.Value with { Steps = steps }, token);
         await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.StepRunCompleted, name, JsonSerializer.SerializeToElement(new { transition }), token);
         return updated;
@@ -443,6 +534,27 @@ public sealed partial class FlowRunService
             var result = new List<JsonElement>(); foreach (var item in value.EnumerateArray()) result.Add(await ResolveJsonAsync(item, context, token)); return JsonSerializer.SerializeToElement(result);
         }
         return value.Clone();
+    }
+
+    private async Task<JsonElement> ResolveArtifactContentAsync(
+        FlowStepArtifactOutputDefinition definition,
+        JsonElement? output,
+        FlowExecutionContext context,
+        CancellationToken token)
+    {
+        if (definition.ContentMapping is null)
+            return output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
+        var mapping = definition.ContentMapping.Value;
+        if (mapping.ValueKind == JsonValueKind.String
+            && mapping.GetString() is { } expression
+            && expression.StartsWith("${", StringComparison.Ordinal)
+            && expression.EndsWith('}'))
+        {
+            return (await EvaluateExpressionAsync(expression, context, token))?.Clone()
+                ?? throw new FlowValidationException("flow_step_artifact_result_missing",
+                    "The configured Artifact result selector did not resolve a value.");
+        }
+        return await ResolveJsonAsync(mapping, context, token);
     }
 
     private static FlowCallStepDefinition RepeatCall(RepeatFlowStepDefinition repeat) => new()

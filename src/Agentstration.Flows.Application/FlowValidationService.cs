@@ -75,6 +75,7 @@ public interface IFlowResourceReferenceResolver
 public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver resources) : IFlowDefinitionValidator
 {
     public const int MaximumRepeatIterations = 1000;
+    public const long MaximumStepArtifactBytes = 64 * 1024 * 1024;
 
     [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$", RegexOptions.CultureInvariant)]
     private static partial Regex NamePattern();
@@ -120,6 +121,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
 
     private async Task ValidateStepAsync(FlowStepDefinition step, FlowValidationContext context, List<FlowValidationIssue> issues, CancellationToken token)
     {
+        ValidateArtifactOutput(step, issues);
         switch (step)
         {
             case AgentFlowStepDefinition agent:
@@ -175,6 +177,42 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 ValidateJsonExpressions(output.OutputMapping, issues, step.Name, "outputMapping");
                 break;
         }
+    }
+
+    private static void ValidateArtifactOutput(FlowStepDefinition step, List<FlowValidationIssue> issues)
+    {
+        var artifact = step.ArtifactOutput;
+        if (artifact is null) return;
+        if (step is not (AgentFlowStepDefinition or ToolFlowStepDefinition or ToolRouteFlowStepDefinition
+            or FlowCallStepDefinition or RepeatFlowStepDefinition or OutputFlowStepDefinition))
+        {
+            issues.Add(Error("step_artifact_output_unsupported",
+                $"Step type '{step.Type()}' cannot save its result as an Artifact.", step.Name, property: "artifactOutput"));
+            return;
+        }
+
+        if (artifact.FileName is { } fileName
+            && (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 255
+                || fileName.Contains('/') || fileName.Contains('\\')))
+            issues.Add(Error("step_artifact_file_name_invalid",
+                "Artifact output fileName must be a simple file name of at most 255 characters.",
+                step.Name, property: "artifactOutput.fileName"));
+        if (string.IsNullOrWhiteSpace(artifact.MediaType)
+            || artifact.MediaType.Length > 255
+            || !artifact.MediaType.Contains('/', StringComparison.Ordinal))
+            issues.Add(Error("step_artifact_media_type_invalid",
+                "Artifact output mediaType must be a valid non-empty media type.",
+                step.Name, property: "artifactOutput.mediaType"));
+        if (artifact.MaximumBytes is <= 0 or > MaximumStepArtifactBytes)
+            issues.Add(Error("step_artifact_maximum_bytes_invalid",
+                $"Artifact output maximumBytes must be between 1 and {MaximumStepArtifactBytes}.",
+                step.Name, property: "artifactOutput.maximumBytes"));
+        if (artifact.StagingBinding is { } binding
+            && (string.IsNullOrWhiteSpace(binding.Name) || binding.Name.Contains('/', StringComparison.Ordinal)))
+            issues.Add(Error("step_artifact_staging_binding_invalid",
+                "Artifact output stagingBinding must use a logical binding name.",
+                step.Name, property: "artifactOutput.stagingBinding"));
+        ValidateJsonExpressions(artifact.ContentMapping, issues, step.Name, "artifactOutput.contentMapping");
     }
 
     private async Task ValidateToolRouteAsync(

@@ -486,6 +486,7 @@ public static class DependencyInjection
         services.AddSingleton<IExpressionValidator>(provider => provider.GetRequiredService<FlowExpressionParser>());
         services.AddSingleton<IExpressionEvaluator>(provider => provider.GetRequiredService<FlowExpressionParser>());
         services.AddSingleton<IFlowDefinitionValidator, FlowGraphValidator>();
+        services.AddSingleton<IFlowStepArtifactCapture, FlowStepArtifactCapture>();
         services.AddSingleton<FlowDraftService>();
         services.AddSingleton<FlowRunService>();
         services.AddSingleton<RootFlowSubmissionService>();

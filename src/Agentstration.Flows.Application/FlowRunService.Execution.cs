@@ -244,7 +244,8 @@ public sealed partial class FlowRunService
         return updated;
     }
 
-    private async Task<StoredFlowRun> FinishAgentStepAsync(StoredFlowRun stored, FlowAgentExecutionResult execution, CancellationToken token, string? selectedTransition = null, string stepName = "Agent")
+    private async Task<StoredFlowRun> FinishAgentStepAsync(StoredFlowRun stored, FlowAgentExecutionResult execution, CancellationToken token, string? selectedTransition = null, string stepName = "Agent",
+        IReadOnlyList<FlowStepArtifactReference>? artifacts = null)
     {
         var now = timeProvider.GetUtcNow();
         var steps = stored.Value.Steps.Select(step => step.StepName == stepName ? step with
@@ -259,6 +260,7 @@ public sealed partial class FlowRunService
             ModelProfileResourceId = execution.ModelProfileResourceId,
             Provider = execution.Provider,
             Usage = execution.Usage,
+            Artifacts = artifacts ?? [],
             Tools = execution.Tools,
             Logs = [.. step.Logs, .. execution.Logs, "Agent completed."]
         } : step).ToArray();

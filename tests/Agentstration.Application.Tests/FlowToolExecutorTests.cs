@@ -13,9 +13,11 @@ namespace Agentstration.Application.Tests;
 public sealed class FlowToolExecutorTests
 {
     [TestMethod]
-    public async Task ExecutorBuildsStableFlowRunIdentitiesAndPassesTheResolvedArguments()
+    [DataRow(ToolProviderType.Mcp)]
+    [DataRow(ToolProviderType.Aep)]
+    public async Task ExecutorBuildsStableFlowRunIdentitiesAndPassesTheResolvedArguments(ToolProviderType providerType)
     {
-        var store = await StoreAsync();
+        var store = await StoreAsync(providerType);
         var pipeline = new RecordingPipeline();
         var executor = new ManagedFlowToolExecutor(store, pipeline);
         var request = Request(JsonSerializer.SerializeToElement(new { message = "hello" }), 1);
@@ -24,7 +26,13 @@ public sealed class FlowToolExecutorTests
         await executor.ExecuteAsync(request, default);
         await executor.ExecuteAsync(request with { Attempt = 2 }, default);
 
-        Assert.AreEqual("sent", output?.GetString());
+        Assert.AreEqual("sent", output.Output?.GetString());
+        Assert.AreEqual("notification.send", output.ToolName);
+        Assert.AreEqual(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), output.ToolUid);
+        Assert.AreEqual(4L, output.ToolGeneration);
+        Assert.AreEqual("internal", output.ProviderName);
+        Assert.AreEqual(providerType.ToString(), output.ProviderType);
+        Assert.AreEqual("notification_send", output.ExternalToolId);
         Assert.HasCount(3, pipeline.Contexts);
         var first = pipeline.Contexts[0];
         Assert.AreEqual(ToolExecutionOwnerKind.FlowRun, first.OwnerKind);
@@ -73,9 +81,22 @@ public sealed class FlowToolExecutorTests
         new("notification.send"),
         arguments);
 
-    private static async Task<MemoryStore> StoreAsync()
+    private static async Task<MemoryStore> StoreAsync(ToolProviderType providerType = ToolProviderType.Mcp)
     {
         var store = new MemoryStore();
+        await store.PutAsync(new ToolProviderResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolProvider,
+            Metadata = new ResourceMetadata { Name = "internal" },
+            Definition = new ToolProviderProperties
+            {
+                DisplayName = "Test provider",
+                ProviderType = providerType,
+                Mcp = providerType == ToolProviderType.Mcp ? new McpToolProviderConfiguration { Internal = true } : null,
+                Aep = providerType == ToolProviderType.Aep ? new AepToolProviderConfiguration { ExtensionId = "extension-1" } : null
+            }
+        }, null, true, default);
         await store.PutAsync(Tool(), null, true, default);
         return store;
     }
@@ -84,6 +105,8 @@ public sealed class FlowToolExecutorTests
     {
         ApiVersion = ResourceApiVersions.CoreV1,
         Kind = ToolResourceKinds.Tool,
+        Uid = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        Generation = 4,
         Metadata = new ResourceMetadata { Name = "notification.send" },
         Definition = new ToolResourceProperties
         {
