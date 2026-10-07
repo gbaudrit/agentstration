@@ -330,6 +330,31 @@ public sealed class McpToolInvoker(
         return new ToolInvocationResult(await providers.InvokeAsync(provider, tool, context.Arguments, cancellationToken), null);
     }
 
+    public async ValueTask<ToolInvocationResult> SimulateDetailedAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
+    {
+        var (tool, provider) = await ResolveAsync(context, cancellationToken);
+        var arguments = context.Arguments ?? JsonSerializer.SerializeToElement(new { });
+        ToolInputSchemaValidator.Validate(tool.Definition.Schema?.Input, arguments);
+        if (provider.Definition.Mcp?.Internal != true)
+            return new ToolInvocationResult(await providers.InvokeAsync(provider, tool, arguments, cancellationToken), null);
+
+        if (context.TenantId is not { } tenantId || context.WorkspaceId is not { } workspaceId || context.PrincipalId is not { } principalId)
+            throw new ToolResolutionException("tool_execution_scope_required", "An internal Tool invocation requires trusted Tenant, Workspace, and Principal scope.");
+        var externalId = tool.Definition.ExternalId ?? tool.Name;
+        var callerKind = CallerKind(context);
+        var callerId = context.AgentId is not null ? $"agent:{context.AgentId}" : context.RunId is not null ? $"flow:{context.RunId}" : context.OwnerKind == ToolExecutionOwnerKind.Console ? $"console:{principalId:D}" : null;
+        var invocation = new InternalMcpToolInvocation(tenantId, workspaceId, principalId, context.ToolCallId, context.CorrelationId,
+            arguments, callerKind, callerId, context.RunId, context.FlowStepId);
+        var builtIn = builtInTools?.Value.SingleOrDefault(value => string.Equals(value.Definition.Name, externalId, StringComparison.Ordinal));
+        if (builtIn is not null)
+            return new ToolInvocationResult(await builtIn.ExecuteAsync(invocation, cancellationToken), null);
+        if (internalTools is null)
+            throw new ToolResolutionException("internal_tool_executor_unavailable", "The Agentstration ToolDefinition executor is unavailable.");
+        return new ToolInvocationResult(await internalTools.Value.SimulateAsync(new ToolDefinitionInvocation(
+            tenantId, workspaceId, principalId, tool.Namespace, externalId, context.ToolCallId, context.CorrelationId,
+            arguments, callerKind, callerId), cancellationToken), null);
+    }
+
     private async ValueTask<(ToolResource Tool, ToolProviderResource Provider)> ResolveAsync(
         ToolExecutionContext context,
         CancellationToken cancellationToken)

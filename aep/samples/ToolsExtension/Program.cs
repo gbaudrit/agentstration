@@ -29,6 +29,12 @@ public sealed class Program
 public static class SampleTools
 {
     [McpServerTool(Name = "text_repeat"), Description("Repeat text between one and five times.")]
-    public static string Repeat(string text, [Description("Number of repetitions, from one to five.")] int count = 1) =>
-        string.Join(" ", Enumerable.Repeat(text, Math.Clamp(count, 1, 5)));
+    public static string Repeat(
+        string text,
+        [Description("Number of repetitions, from one to five.")] int count = 1,
+        [Description("Runs the Tool without side effects.")] bool dryRun = false)
+    {
+        _ = dryRun;
+        return string.Join(" ", Enumerable.Repeat(text, Math.Clamp(count, 1, 5)));
+    }
 }

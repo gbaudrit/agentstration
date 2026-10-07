@@ -351,7 +351,8 @@ public sealed record ToolInvocationResult(
     IReadOnlyDictionary<string, string>? Receipt);
 
 public sealed record ToolExecutionSimulation(
-    IReadOnlyList<ToolExecutionHookEvaluation> GovernanceEvaluations);
+    IReadOnlyList<ToolExecutionHookEvaluation> GovernanceEvaluations,
+    JsonElement? Output = null);
 
 public abstract record ToolExecutionLifecycleEvent(
     ToolExecutionContext Context,
@@ -511,6 +512,14 @@ public interface IToolInvoker
         ToolExecutionContext context,
         CancellationToken cancellationToken = default) =>
         new(await InvokeAsync(context, cancellationToken), null);
+
+    async ValueTask<ToolInvocationResult> SimulateDetailedAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default)
+    {
+        await ValidateAsync(context, cancellationToken);
+        return await InvokeDetailedAsync(context, cancellationToken);
+    }
 }
 
 public interface IRuntimeRegistry

@@ -92,7 +92,7 @@ public sealed class ToolDetailsComponentTests
         using var culture = new CultureScope("en-US");
         using var context = CreateContext(new ToolSchema
         {
-            Input = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{},"additionalProperties":false}""")
+            Input = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"dryRun":{"type":"boolean"}},"additionalProperties":false}""")
         });
         var client = context.Services.GetRequiredService<ToolClient>();
         var rendered = context.Render<ToolDetails>(parameters => parameters.Add(page => page.Name, "create-notification"));
@@ -108,9 +108,8 @@ public sealed class ToolDetailsComponentTests
         rendered.WaitForAssertion(() => Assert.HasCount(1, client.RunRequests));
         Assert.AreEqual(ToolRunMode.Simulate, client.RunRequests[0].Mode);
         Assert.IsNotNull(rendered.Find("[data-testid='tool-run-result']"));
-        StringAssert.Contains(rendered.Find("[data-testid='tool-run-result']").TextContent, "Provider invokedNo");
-        StringAssert.Contains(rendered.Find("[data-testid='tool-run-result']").TextContent, "No tool output in simulation mode");
-        Assert.HasCount(0, rendered.FindAll("[data-testid='tool-run-output']"));
+        StringAssert.Contains(rendered.Find("[data-testid='tool-run-result']").TextContent, "Provider invokedYes");
+        StringAssert.Contains(rendered.Find("[data-testid='tool-run-output']").TextContent, "dryRun");
     }
 
     [TestMethod]
@@ -132,6 +131,23 @@ public sealed class ToolDetailsComponentTests
         Assert.AreEqual(ToolRunMode.Execute, client.RunRequests[0].Mode);
         StringAssert.Contains(rendered.Find("[data-testid='tool-run-output']").TextContent, "created");
         Assert.IsNotNull(rendered.Find(".tool-run-diagnostics"));
+    }
+
+    [TestMethod]
+    public void SimulationIsDisabledWhenDryRunIsNotDeclared()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(new ToolSchema
+        {
+            Input = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{},"additionalProperties":false}""")
+        });
+        var rendered = context.Render<ToolDetails>(parameters => parameters.Add(page => page.Name, "create-notification"));
+
+        rendered.Find("#tool-execution-tab").Click();
+
+        Assert.IsTrue(rendered.Find("[data-testid='tool-run-simulate-mode']").HasAttribute("disabled"));
+        StringAssert.Contains(rendered.Find("[data-testid='tool-run-execute-mode']").ClassName, "selected");
+        StringAssert.Contains(rendered.Find(".tool-run-mode-unavailable").TextContent, "does not declare a boolean dryRun");
     }
 
     private static BunitContext CreateContext(ToolSchema schema, string? description = "Create one durable notification.")
@@ -190,10 +206,12 @@ public sealed class ToolDetailsComponentTests
                 name,
                 @namespace.Value,
                 "provider",
-                request.Mode == ToolRunMode.Execute,
+                true,
                 false,
-                [new ToolRunCheck(request.Mode == ToolRunMode.Simulate ? "no_execution" : "execution", "passed", "Completed.")],
-                request.Mode == ToolRunMode.Execute ? JsonSerializer.SerializeToElement(new { status = "created" }) : null));
+                [new ToolRunCheck(request.Mode == ToolRunMode.Simulate ? "dry_run" : "execution", "passed", "Completed.")],
+                request.Mode == ToolRunMode.Execute
+                    ? JsonSerializer.SerializeToElement(new { status = "created" })
+                    : JsonSerializer.SerializeToElement(new { dryRun = true })));
         }
     }
 

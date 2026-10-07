@@ -59,7 +59,7 @@ else
             <section class="panel tool-runner" aria-labelledby="tool-runner-heading" data-testid="tool-runner">
                 <div class="panel-header"><div><h2 id="tool-runner-heading">@T("RunTool")</h2><p class="muted">@T("RunToolHelp")</p></div></div>
                 <div class="tool-run-mode" role="group" aria-label="@T("RunMode")">
-                    <button type="button" class="tool-run-mode-option @(runMode == ToolRunMode.Simulate ? "selected" : null)" aria-pressed="@(runMode == ToolRunMode.Simulate)" data-testid="tool-run-simulate-mode" @onclick="() => SelectMode(ToolRunMode.Simulate)">
+                    <button type="button" class="tool-run-mode-option @(runMode == ToolRunMode.Simulate ? "selected" : null)" aria-pressed="@(runMode == ToolRunMode.Simulate)" disabled="@(!CanSimulate)" data-testid="tool-run-simulate-mode" @onclick="() => SelectMode(ToolRunMode.Simulate)">
                         <span><strong>@T("Simulation")</strong><small>@T("SimulationOptionHelp")</small></span><span class="tool-run-mode-mark" aria-hidden="true">✓</span>
                     </button>
                     <button type="button" class="tool-run-mode-option execution @(runMode == ToolRunMode.Execute ? "selected" : null)" aria-pressed="@(runMode == ToolRunMode.Execute)" data-testid="tool-run-execute-mode" @onclick="() => SelectMode(ToolRunMode.Execute)">
@@ -69,6 +69,14 @@ else
                 @if (runMode == ToolRunMode.Execute)
                 {
                     <p class="tool-run-mode-help execution">@T("RealExecutionHelp")</p>
+                }
+                else
+                {
+                    <p class="tool-run-mode-help">@T("SimulationHelp")</p>
+                }
+                @if (!CanSimulate)
+                {
+                    <p class="tool-run-mode-unavailable" role="status">@T("SimulationUnavailableHelp")</p>
                 }
                 @if (!tool.Definition.Enabled || tool.Definition.Discovery?.Available != true)
                 {
@@ -94,15 +102,7 @@ else
             {
                 <section class="panel tool-run-result" aria-labelledby="tool-run-result-heading" data-testid="tool-run-result">
                     <div class="panel-header"><h2 id="tool-run-result-heading">@T("RunResult")</h2><StatusBadge Text="@T($"RunStatus.{runResult.Status}")" Status="@(runResult.Status == "denied" ? UiStatus.Warning : UiStatus.Success)" /></div>
-                    @if (runResult.Mode == ToolRunMode.Simulate && runResult.Status == "simulated")
-                    {
-                        <div class="tool-run-result-message simulation">
-                            <span class="tool-run-result-icon" aria-hidden="true">✓</span>
-                            <div><h3>@T("SimulationNoOutputTitle")</h3><p>@T("SimulationNoOutputHelp")</p></div>
-                            <button type="button" class="button-secondary" @onclick="() => SelectMode(ToolRunMode.Execute)">@T("SwitchToExecution")</button>
-                        </div>
-                    }
-                    else if (runResult.Mode == ToolRunMode.Execute)
+                    @if (runResult.Status != "denied")
                     {
                         <div class="tool-output" data-testid="tool-run-output">
                             <h3>@T("ToolOutput")</h3>
@@ -150,6 +150,7 @@ else
     private string? runError;
     private RunToolResponse? runResult;
     private ResourceNamespace ToolNamespace => ResourceNamespace.Parse(NamespaceValue);
+    private bool CanSimulate => ToolDryRunContract.IsSupported(tool?.Definition.Schema?.Input);
     private bool CanSubmit => tool is { Definition.Enabled: true }
         && tool.Definition.Discovery?.Available == true
         && runInputValid
@@ -180,7 +181,7 @@ else
         tool = value.Value;
         etag = value.ETag;
         activeTab = ToolDetailTab.Overview;
-        runMode = ToolRunMode.Simulate;
+        runMode = CanSimulate ? ToolRunMode.Simulate : ToolRunMode.Execute;
         runInput = JsonSerializer.SerializeToElement(new { });
         runInputValid = true;
         runError = null;
@@ -196,6 +197,7 @@ else
 
     private void SelectMode(ToolRunMode mode)
     {
+        if (mode == ToolRunMode.Simulate && !CanSimulate) return;
         runMode = mode;
         runError = null;
         runResult = null;

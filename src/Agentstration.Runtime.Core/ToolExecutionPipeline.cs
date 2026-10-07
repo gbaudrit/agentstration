@@ -229,8 +229,8 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
                     new InvalidOperationException($"Unsupported Tool execution hook decision '{decision.Kind}'."));
             evaluations.Add(new ToolExecutionHookEvaluation(hook.Identity, ToolExecutionHookEvaluationKind.Allowed));
         }
-        await invoker.ValidateAsync(context, cancellationToken);
-        return new ToolExecutionSimulation(evaluations);
+        var result = await invoker.SimulateDetailedAsync(context, cancellationToken);
+        return new ToolExecutionSimulation(evaluations, result.Output);
     }
 
     private static IReadOnlyList<IToolExecutionHook> OrderHooks(IEnumerable<IToolExecutionHook> hooks)

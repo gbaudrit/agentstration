@@ -43,7 +43,14 @@ public sealed class ToolRunnerService(
         if (!provider.Definition.Enabled)
             throw new ToolRunException("tool_provider_disabled", 409, $"ToolProvider '{provider.Address}' is disabled.");
 
-        ToolInputSchemaValidator.Validate(tool.Definition.Schema?.Input, request.Arguments);
+        var arguments = request.Arguments;
+        if (request.Mode == ToolRunMode.Simulate)
+        {
+            if (!ToolDryRunContract.IsSupported(tool.Definition.Schema?.Input))
+                throw new ToolRunException("tool_simulation_unavailable", 422, "This Tool does not declare a boolean 'dryRun' input parameter.");
+            arguments = ToolDryRunContract.Enable(arguments);
+        }
+        ToolInputSchemaValidator.Validate(tool.Definition.Schema?.Input, arguments);
         var callId = Guid.NewGuid().ToString("N");
         var context = new ToolExecutionContext
         {
@@ -60,7 +67,7 @@ public sealed class ToolRunnerService(
             WorkspaceId = new WorkspaceId(requestContext.WorkspaceId),
             PrincipalId = requestContext.PrincipalId,
             CorrelationId = callId,
-            Arguments = request.Arguments.Clone()
+            Arguments = arguments.Clone()
         };
 
         var checks = new List<ToolRunCheck>
@@ -82,13 +89,13 @@ public sealed class ToolRunnerService(
                     evaluation.Decision == ToolExecutionHookEvaluationKind.Allowed
                         ? $"Governance check '{evaluation.Hook.Id}' allows execution."
                         : $"Governance check '{evaluation.Hook.Id}' denies execution.")));
-                checks.Add(new("no_execution", "passed", "The provider was not invoked and no execution resource was created."));
-                return Response(ToolRunMode.Simulate, "simulated", false, checks);
+                checks.Add(new("dry_run", "passed", "The Tool completed with dryRun enabled and created no execution resource."));
+                return Response(ToolRunMode.Simulate, "simulated", true, checks, simulation.Output);
             }
             catch (ToolExecutionDeniedException exception)
             {
                 checks.Add(new(exception.Code, "denied", exception.Message));
-                checks.Add(new("no_execution", "passed", "The provider was not invoked and no execution resource was created."));
+                checks.Add(new("no_execution", "passed", "The Tool was not invoked and no execution resource was created."));
                 return Response(ToolRunMode.Simulate, "denied", false, checks);
             }
         }

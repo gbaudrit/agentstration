@@ -78,6 +78,7 @@ public sealed record ToolDefinitionInvocationResult(JsonElement? Output, ToolDef
 public interface IToolDefinitionExecutor
 {
     Task<ToolDefinitionInvocationResult> ExecuteAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken);
+    Task<JsonElement?> SimulateAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken);
 }
 
 public sealed class ToolDefinitionInvocationException(string code, string message, Exception? innerException = null)

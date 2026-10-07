@@ -3,12 +3,14 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
+using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
+using Agentstration.Work.Storage.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -20,6 +22,40 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task FlowBackedToolDryRunReturnsPreviewWithoutCreatingWorkOrFlowRun()
+    {
+        await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        var contract = await CreatePublishedFlowAsync(factory.Services, requestContext, "dry-run-flow");
+        await factory.Services.GetRequiredService<ToolDefinitionService>().PutAsync(Resource(
+            "dry-run.preview",
+            ResourceScopeRef.Workspace(requestContext.WorkspaceId),
+            Properties("Dry run preview", "dry-run-flow", contract.Input, contract.Output)), null, true, default);
+        var workspaceId = new WorkspaceId(requestContext.WorkspaceId);
+        var flowScope = new FlowRunScope(requestContext.TenantId, workspaceId, requestContext.PrincipalId);
+        var workRepository = factory.Services.GetRequiredService<IWorkItemRepository>();
+        var flowRepository = factory.Services.GetRequiredService<IFlowRepository>();
+        var workBefore = await workRepository.QueryAsync(new(workspaceId, requestContext.PrincipalId), default);
+        var runsBefore = await flowRepository.ListRunsAsync(flowScope, null, null, 0, 100, default);
+
+        using var response = await factory.CreateClient().PostAsJsonAsync(
+            "/api/tools/agentstration.dry-run.preview/run",
+            new RunToolRequest(JsonSerializer.SerializeToElement(new { message = "preview" })));
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<RunToolResponse>();
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.ProviderInvoked);
+        Assert.AreEqual(true, result.Output?.GetProperty("dryRun").GetBoolean());
+        Assert.AreEqual(true, result.Output?.GetProperty("inputAccepted").GetBoolean());
+        var workAfter = await workRepository.QueryAsync(new(workspaceId, requestContext.PrincipalId), default);
+        var runsAfter = await flowRepository.ListRunsAsync(flowScope, null, null, 0, 100, default);
+        Assert.AreEqual(workBefore.TotalCount, workAfter.TotalCount);
+        Assert.AreEqual(runsBefore.Items.Count, runsAfter.Items.Count);
+    }
+
     [TestMethod]
     public async Task ToolSimulationUsesGovernedPreviewWithoutExecutingOrCreatingAFlowRun()
     {
@@ -53,7 +89,8 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         Assert.IsNotNull(result);
         Assert.AreEqual(ToolRunMode.Simulate, result.Mode);
         Assert.AreEqual("simulated", result.Status);
-        Assert.IsFalse(result.ProviderInvoked);
+        Assert.IsTrue(result.ProviderInvoked);
+        Assert.AreEqual(true, result.Output?.GetProperty("dryRun").GetBoolean());
         Assert.AreEqual(1, pipeline.Simulations);
         Assert.AreEqual(0, pipeline.Executions);
 
@@ -144,7 +181,8 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
             Assert.AreEqual(ToolExecutionOwnerKind.Console, context.OwnerKind);
             Assert.IsNotNull(context.WorkspaceId);
             Assert.IsNotNull(context.PrincipalId);
-            return ValueTask.FromResult(new ToolExecutionSimulation([]));
+            Assert.AreEqual(true, context.Arguments?.GetProperty("dryRun").GetBoolean());
+            return ValueTask.FromResult(new ToolExecutionSimulation([], JsonSerializer.SerializeToElement(new { dryRun = true })));
         }
     }
 
@@ -327,7 +365,16 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         string name,
         ResourceNamespace? resourceNamespace = null)
     {
-        var input = JsonSerializer.SerializeToElement(new { type = "object", required = new[] { "message" }, properties = new { message = new { type = "string" } } });
+        var input = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            required = new[] { "message" },
+            properties = new
+            {
+                message = new { type = "string" },
+                dryRun = new { type = "boolean" }
+            }
+        });
         var output = input.Clone();
         var flows = services.GetRequiredService<FlowService>();
         var workspaceId = new WorkspaceId(context.WorkspaceId);

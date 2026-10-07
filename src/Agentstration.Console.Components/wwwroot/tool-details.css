@@ -61,6 +61,21 @@
     box-shadow: 0 0 0 1px #d88916;
 }
 
+.tool-run-mode-option:disabled {
+    border-color: var(--border);
+    background: color-mix(in srgb, var(--surface-2) 65%, var(--border));
+    color: var(--muted);
+    box-shadow: none;
+    cursor: not-allowed;
+    opacity: .62;
+}
+
+.tool-run-mode-unavailable {
+    margin: -8px 0 18px;
+    color: var(--muted);
+    font-size: .85rem;
+}
+
 .tool-run-mode-mark {
     display: none;
     flex: 0 0 24px;

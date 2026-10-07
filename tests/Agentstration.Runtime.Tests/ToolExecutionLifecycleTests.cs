@@ -16,7 +16,7 @@ namespace Agentstration.Runtime.Tests;
 public sealed class ToolExecutionLifecycleTests
 {
     [TestMethod]
-    public async Task SimulationValidatesWithoutInvokingProviderOrPublishingLifecycleEvents()
+    public async Task SimulationInvokesDryRunPathAndReturnsOutputWithoutPublishingLifecycleEvents()
     {
         var events = new RecordingSink();
         var invoker = new RecordingSimulationInvoker();
@@ -30,7 +30,8 @@ public sealed class ToolExecutionLifecycleTests
         var result = await pipeline.SimulateAsync(Context() with { OwnerKind = ToolExecutionOwnerKind.Console }, default);
 
         Assert.AreEqual(1, invoker.Validations);
-        Assert.AreEqual(0, invoker.Invocations);
+        Assert.AreEqual(1, invoker.Invocations);
+        Assert.AreEqual(true, result.Output?.GetProperty("dryRun").GetBoolean());
         Assert.HasCount(1, result.GovernanceEvaluations);
         Assert.AreEqual(ToolExecutionHookEvaluationKind.Allowed, result.GovernanceEvaluations[0].Decision);
         CollectionAssert.AreEqual(new[] { "before:policy" }, calls);
@@ -727,7 +728,7 @@ public sealed class ToolExecutionLifecycleTests
         public ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
         {
             Invocations++;
-            return ValueTask.FromResult<JsonElement?>(null);
+            return ValueTask.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(new { dryRun = true }));
         }
     }
 
