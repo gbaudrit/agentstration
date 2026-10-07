@@ -3,51 +3,58 @@
 @using System.Text.Json.Nodes
 @inject Microsoft.Extensions.Localization.IStringLocalizer<JsonSchemaInputStrings> Localizer
 
-<div class="schema-field schema-field-@Schema.Kind.ToString().ToLowerInvariant()" data-schema-path="@Schema.Path">
+<div class="schema-field schema-field-@Schema.Kind.ToString().ToLowerInvariant() @(IsLocked ? "schema-field-locked" : null)" data-schema-path="@Schema.Path">
     @if (Schema.Kind == JsonSchemaInputKind.Map)
     {
         @if (Schema.Path != "$") { <h4>@Label</h4>@Help }
         <div class="schema-object-fields">
             @foreach (var property in Schema.Properties)
             {
-                <JsonSchemaField Schema="property" Value="@ObjectValue(property.Name)" ValueChanged="value => ChangePropertyAsync(property, value)" Disabled="Disabled" Issues="Issues" />
+                <JsonSchemaField Schema="property" Value="@ObjectValue(property.Name)" ValueChanged="value => ChangePropertyAsync(property, value)" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="Issues" />
             }
         </div>
     }
     else if (Schema.Kind == JsonSchemaInputKind.List)
     {
-        <fieldset disabled="@Disabled"><legend>@Label @RequiredMark @RulesTooltip</legend>@Help
+        <fieldset disabled="@FieldDisabled"><legend>@Label @RequiredMark @RulesTooltip</legend>@Help
             @foreach (var item in ArrayItems.Select((value, index) => (value, index)))
             {
-                <div class="schema-array-item"><JsonSchemaField Schema="@(Schema.Items! with { Path = $"{Schema.Path}[{item.index}]", Name = $"{Schema.Name} {item.index + 1}" })" Value="item.value" ValueChanged="value => ChangeArrayItemAsync(item.index, value)" Disabled="Disabled" Issues="Issues" /><button type="button" class="button-secondary" @onclick="() => RemoveArrayItemAsync(item.index)">@Localizer["RemoveItem"]</button></div>
+                <div class="schema-array-item"><JsonSchemaField Schema="@(Schema.Items! with { Path = $"{Schema.Path}[{item.index}]", Name = $"{Schema.Name} {item.index + 1}" })" Value="item.value" ValueChanged="value => ChangeArrayItemAsync(item.index, value)" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="Issues" /><button type="button" class="button-secondary" disabled="@FieldDisabled" @onclick="() => RemoveArrayItemAsync(item.index)">@Localizer["RemoveItem"]</button></div>
             }
-            <button type="button" class="button-secondary" @onclick="AddArrayItemAsync" disabled="@(Disabled || ArrayItems.Count >= EffectiveMaximumItems)">@Localizer["AddItem"]</button>
+            <button type="button" class="button-secondary" @onclick="AddArrayItemAsync" disabled="@(FieldDisabled || ArrayItems.Count >= EffectiveMaximumItems)">@Localizer["AddItem"]</button>
         </fieldset>
     }
     else if (Schema.Kind == JsonSchemaInputKind.Toggle)
     {
-        <label class="schema-toggle"><input type="checkbox" checked="@BooleanValue" disabled="@Disabled" @onchange="ChangeBooleanAsync" /><span>@Label @RequiredMark @RulesTooltip</span></label>@Help
+        <label class="schema-toggle">
+            <input class="schema-toggle-input" type="checkbox" checked="@BooleanValue" disabled="@FieldDisabled" @onchange="ChangeBooleanAsync" />
+            <span class="schema-toggle-switch" aria-hidden="true"></span>
+            <span class="schema-toggle-copy">
+                <span class="schema-toggle-title">@Label @RequiredMark @RulesTooltip</span>
+                @Help
+            </span>
+        </label>
     }
     else if (Schema.AllowedValues.Count > 0)
     {
-        <label><span>@Label @RequiredMark @RulesTooltip</span><select value="@SerializedValue" disabled="@Disabled" @onchange="ChangeEnumAsync"><option value="">@Localizer["NotSet"]</option>@foreach (var option in Schema.AllowedValues) { <option value="@option.GetRawText()">@Display(option)</option> }</select></label>@Help
+        <label><span>@Label @RequiredMark @RulesTooltip</span><select value="@SerializedValue" disabled="@FieldDisabled" @onchange="ChangeEnumAsync"><option value="">@Localizer["NotSet"]</option>@foreach (var option in Schema.AllowedValues) { <option value="@option.GetRawText()">@Display(option)</option> }</select></label>@Help
     }
     else if (Schema.Kind == JsonSchemaInputKind.Text)
     {
         <label><span>@Label @RequiredMark @RulesTooltip</span>
             @if (UsesMultilineText)
             {
-                <textarea class="schema-long-text" rows="6" value="@StringValue" disabled="@Disabled" minlength="@Schema.MinimumLength" maxlength="@Schema.MaximumLength" @oninput="ChangeStringAsync"></textarea>
+                <textarea class="schema-long-text" rows="6" value="@StringValue" disabled="@FieldDisabled" minlength="@Schema.MinimumLength" maxlength="@Schema.MaximumLength" @oninput="ChangeStringAsync"></textarea>
             }
             else
             {
-                <input type="@(string.Equals(Schema.Format, "uri", StringComparison.OrdinalIgnoreCase) ? "url" : "text")" value="@StringValue" disabled="@Disabled" minlength="@Schema.MinimumLength" maxlength="@Schema.MaximumLength" @oninput="ChangeStringAsync" />
+                <input type="@(string.Equals(Schema.Format, "uri", StringComparison.OrdinalIgnoreCase) ? "url" : "text")" value="@StringValue" disabled="@FieldDisabled" minlength="@Schema.MinimumLength" maxlength="@Schema.MaximumLength" @oninput="ChangeStringAsync" />
             }
         </label>@Help
     }
     else if (Schema.Kind is JsonSchemaInputKind.WholeNumber or JsonSchemaInputKind.DecimalNumber)
     {
-        <label><span>@Label @RequiredMark @RulesTooltip</span><input type="number" value="@NumberValue" disabled="@Disabled" step="@(Schema.Kind == JsonSchemaInputKind.WholeNumber ? "1" : "any")" min="@Schema.Minimum" max="@Schema.Maximum" @oninput="ChangeNumberAsync" /></label>@Help
+        <label><span>@Label @RequiredMark @RulesTooltip</span><input type="number" value="@NumberValue" disabled="@FieldDisabled" step="@(Schema.Kind == JsonSchemaInputKind.WholeNumber ? "1" : "any")" min="@Schema.Minimum" max="@Schema.Maximum" @oninput="ChangeNumberAsync" /></label>@Help
     }
     else
     {
@@ -64,8 +71,11 @@
     [Parameter] public JsonNode? Value { get; set; }
     [Parameter] public EventCallback<JsonNode?> ValueChanged { get; set; }
     [Parameter] public bool Disabled { get; set; }
+    [Parameter] public IReadOnlySet<string> LockedPaths { get; set; } = new HashSet<string>(StringComparer.Ordinal);
     [Parameter] public IReadOnlyList<JsonSchemaInputIssue> Issues { get; set; } = [];
     private string Label => Schema.Title ?? Schema.Name;
+    private bool IsLocked => LockedPaths.Contains(Schema.Path);
+    private bool FieldDisabled => Disabled || IsLocked;
     private string RequiredMark => Schema.Required ? Localizer["RequiredMarker"] : string.Empty;
     private string StringValue => Value is JsonValue value && value.TryGetValue<string>(out var text) ? text : string.Empty;
     private string NumberValue => Value?.ToJsonString() ?? string.Empty;

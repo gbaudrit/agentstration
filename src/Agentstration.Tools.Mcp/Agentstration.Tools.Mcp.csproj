@@ -9,6 +9,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Agentstration.Tools/Agentstration.Tools.csproj" />
+    <ProjectReference Include="../Agentstration.Tools.Contracts/Agentstration.Tools.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>

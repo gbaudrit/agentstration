@@ -5,7 +5,32 @@
 
 .schema-input-toolbar {
     display: flex;
+    flex-wrap: wrap;
     gap: .5rem;
+}
+
+.schema-input-editor label {
+    display: grid;
+    min-width: 0;
+    gap: .45rem;
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.schema-input-editor textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 13rem;
+    padding: .75rem;
+    resize: vertical;
+    border: 1px solid var(--border);
+    border-radius: .5rem;
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-family: var(--font-mono);
+    line-height: 1.45;
 }
 
 .field-validation-error {

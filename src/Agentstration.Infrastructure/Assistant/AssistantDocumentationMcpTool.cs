@@ -101,7 +101,8 @@ public sealed class AssistantDocumentationMcpTool(AssistantDocumentationCatalog 
             properties = new
             {
                 query = new { type = "string", minLength = 2, maxLength = 200, description = "Concise Agentstration product or configuration question." },
-                maximumResults = new { type = "integer", minimum = 1, maximum = 5, @default = 3, description = "Maximum number of bounded documentation excerpts." }
+                maximumResults = new { type = "integer", minimum = 1, maximum = 5, @default = 3, description = "Maximum number of bounded documentation excerpts." },
+                dryRun = new { type = "boolean", description = "Runs the Tool without side effects." }
             },
             required = new[] { "query" },
             additionalProperties = false
@@ -123,7 +124,7 @@ public sealed class AssistantDocumentationMcpTool(AssistantDocumentationCatalog 
     {
         if (invocation.Arguments.ValueKind != JsonValueKind.Object)
             throw new ToolDefinitionInvocationException("assistant_documentation_arguments_invalid", "Documentation Tool arguments must be a JSON object.");
-        var allowed = new HashSet<string>(["query", "maximumResults"], StringComparer.Ordinal);
+        var allowed = new HashSet<string>(["query", "maximumResults", ToolDryRunContract.ParameterName], StringComparer.Ordinal);
         var unknown = invocation.Arguments.EnumerateObject().Select(value => value.Name).FirstOrDefault(value => !allowed.Contains(value));
         if (unknown is not null)
             throw new ToolDefinitionInvocationException("assistant_documentation_argument_unknown", $"Argument '{unknown}' is not declared by the Tool schema.");

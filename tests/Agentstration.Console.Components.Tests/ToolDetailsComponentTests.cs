@@ -86,11 +86,86 @@ public sealed class ToolDetailsComponentTests
         StringAssert.Contains(rendered.Find(".tool-capability").TextContent, "Create one durable notification.");
     }
 
+    [TestMethod]
+    public void ExecutionTabReusesSchemaEditorAndSimulatesByDefault()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(new ToolSchema
+        {
+            Input = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"dryRun":{"type":"boolean"}},"additionalProperties":false}""")
+        });
+        var client = context.Services.GetRequiredService<ToolClient>();
+        var rendered = context.Render<ToolDetails>(parameters => parameters.Add(page => page.Name, "create-notification"));
+
+        Assert.AreEqual("true", rendered.Find("#tool-overview-tab").GetAttribute("aria-selected"));
+        rendered.Find("#tool-execution-tab").Click();
+
+        Assert.AreEqual("true", rendered.Find("#tool-execution-tab").GetAttribute("aria-selected"));
+        Assert.IsNotNull(rendered.Find("[data-testid='schema-input-editor']"));
+        StringAssert.Contains(rendered.Find("[data-testid='tool-run-simulate-mode']").ClassName, "selected");
+        var dryRun = rendered.Find("[data-schema-path='$.dryRun'] input");
+        Assert.IsTrue(dryRun.HasAttribute("checked"));
+        Assert.IsTrue(dryRun.HasAttribute("disabled"));
+        StringAssert.Contains(rendered.Find("[data-testid='tool-run-dry-run-managed']").TextContent, "automatically");
+        rendered.Find("[data-testid='tool-run-submit']").Click();
+
+        rendered.WaitForAssertion(() => Assert.HasCount(1, client.RunRequests));
+        Assert.AreEqual(ToolRunMode.Simulate, client.RunRequests[0].Mode);
+        Assert.IsTrue(client.RunRequests[0].Arguments.GetProperty("dryRun").GetBoolean());
+        Assert.IsNotNull(rendered.Find("[data-testid='tool-run-result']"));
+        StringAssert.Contains(rendered.Find("[data-testid='tool-run-result']").TextContent, "Provider invokedYes");
+        StringAssert.Contains(rendered.Find("[data-testid='tool-run-output']").TextContent, "dryRun");
+
+        rendered.Find("[data-testid='tool-run-execute-mode']").Click();
+        dryRun = rendered.Find("[data-schema-path='$.dryRun'] input");
+        Assert.IsFalse(dryRun.HasAttribute("checked"));
+        Assert.IsFalse(dryRun.HasAttribute("disabled"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid='tool-run-dry-run-managed']"));
+    }
+
+    [TestMethod]
+    public void RealExecutionPutsToolOutputBeforeTechnicalDetails()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(new ToolSchema
+        {
+            Input = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{},"additionalProperties":false}""")
+        });
+        var client = context.Services.GetRequiredService<ToolClient>();
+        var rendered = context.Render<ToolDetails>(parameters => parameters.Add(page => page.Name, "create-notification"));
+
+        rendered.Find("#tool-execution-tab").Click();
+        rendered.Find("[data-testid='tool-run-execute-mode']").Click();
+        rendered.Find("[data-testid='tool-run-submit']").Click();
+
+        rendered.WaitForAssertion(() => Assert.HasCount(1, client.RunRequests));
+        Assert.AreEqual(ToolRunMode.Execute, client.RunRequests[0].Mode);
+        StringAssert.Contains(rendered.Find("[data-testid='tool-run-output']").TextContent, "created");
+        Assert.IsNotNull(rendered.Find(".tool-run-diagnostics"));
+    }
+
+    [TestMethod]
+    public void SimulationIsDisabledWhenDryRunIsNotDeclared()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(new ToolSchema
+        {
+            Input = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{},"additionalProperties":false}""")
+        });
+        var rendered = context.Render<ToolDetails>(parameters => parameters.Add(page => page.Name, "create-notification"));
+
+        rendered.Find("#tool-execution-tab").Click();
+
+        Assert.IsTrue(rendered.Find("[data-testid='tool-run-simulate-mode']").HasAttribute("disabled"));
+        StringAssert.Contains(rendered.Find("[data-testid='tool-run-execute-mode']").ClassName, "selected");
+        StringAssert.Contains(rendered.Find(".tool-run-mode-unavailable").TextContent, "does not declare a boolean dryRun");
+    }
+
     private static BunitContext CreateContext(ToolSchema schema, string? description = "Create one durable notification.")
     {
         var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
-        context.Services.AddSingleton<IToolsClient>(new ToolClient(new ToolResource
+        var client = new ToolClient(new ToolResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = "Tool",
@@ -99,14 +174,26 @@ public sealed class ToolDetailsComponentTests
             {
                 DisplayName = "Create notification",
                 Description = description,
-                Schema = schema
+                Schema = schema,
+                Provider = new ResourceReference("provider"),
+                ExternalId = "create-notification",
+                Discovery = new ToolDiscoveryState
+                {
+                    Available = true,
+                    FirstSeenAt = DateTimeOffset.UtcNow,
+                    LastSeenAt = DateTimeOffset.UtcNow
+                }
             }
-        }));
+        });
+        context.Services.AddSingleton(client);
+        context.Services.AddSingleton<IToolsClient>(client);
         return context;
     }
 
     private sealed class ToolClient(ToolResource tool) : IToolsClient
     {
+        public List<RunToolRequest> RunRequests { get; } = [];
+
         public Task<ResourceSnapshot<ToolResource>> GetToolAsync(string name, CancellationToken cancellationToken) =>
             Task.FromResult(new ResourceSnapshot<ToolResource>(tool, "\"etag\""));
 
@@ -120,6 +207,23 @@ public sealed class ToolDetailsComponentTests
         public Task<ResourceSnapshot<ToolProviderResource>> UpdateProviderAsync(string name, PutToolProviderRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ToolConnectionTestResponse> TestAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ToolDiscoveryDiffResponse> RefreshAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<RunToolResponse> RunToolAsync(ResourceNamespace @namespace, string name, RunToolRequest request, CancellationToken cancellationToken)
+        {
+            RunRequests.Add(request);
+            return Task.FromResult(new RunToolResponse(
+                request.Mode,
+                request.Mode == ToolRunMode.Simulate ? "simulated" : "completed",
+                name,
+                @namespace.Value,
+                "provider",
+                true,
+                false,
+                [new ToolRunCheck(request.Mode == ToolRunMode.Simulate ? "dry_run" : "execution", "passed", "Completed.")],
+                request.Mode == ToolRunMode.Execute
+                    ? JsonSerializer.SerializeToElement(new { status = "created" })
+                    : JsonSerializer.SerializeToElement(new { dryRun = true })));
+        }
     }
 
     private sealed class CultureScope : IDisposable

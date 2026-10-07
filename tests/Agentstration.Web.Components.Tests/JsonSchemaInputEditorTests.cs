@@ -175,6 +175,33 @@ public sealed class JsonSchemaInputEditorTests
     }
 
     [TestMethod]
+    public void LockedTopLevelValueIsVisibleButCannotBeChanged()
+    {
+        using var context = Context();
+        JsonElement value = default;
+        IReadOnlyDictionary<string, JsonElement> lockedValues = new Dictionary<string, JsonElement>
+        {
+            ["dryRun"] = Json("true")
+        };
+        var rendered = context.Render<JsonSchemaInputEditor>(parameters => parameters
+            .Add(component => component.Schema, Json("""{"type":"object","properties":{"dryRun":{"type":"boolean"},"prompt":{"type":"string"}},"additionalProperties":false}"""))
+            .Add(component => component.Value, Json("{}"))
+            .Add(component => component.LockedValues, lockedValues)
+            .Add(component => component.ValueChanged, next => value = next));
+
+        var dryRun = rendered.Find("[data-schema-path='$.dryRun'] input");
+        Assert.IsTrue(dryRun.HasAttribute("checked"));
+        Assert.IsTrue(dryRun.HasAttribute("disabled"));
+        StringAssert.Contains(rendered.Find("[data-schema-path='$.dryRun']").ClassName, "schema-field-locked");
+        Assert.HasCount(1, rendered.FindAll("[data-schema-path='$.dryRun'] .schema-toggle-switch"));
+        StringAssert.Contains(rendered.Find("[data-schema-path='$.dryRun'] .schema-toggle-copy").TextContent, "dryRun");
+        Assert.IsTrue(value.GetProperty("dryRun").GetBoolean());
+
+        rendered.Find("[data-testid='schema-raw-mode']").Click();
+        Assert.DoesNotContain("dryRun", rendered.Find("textarea").GetAttribute("value") ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
     public void NestedObjectsAndBoundedArraysRemainEditable()
     {
         using var context = Context();

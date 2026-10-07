@@ -267,7 +267,7 @@ public interface IToolCatalog
     ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(IEnumerable<string> toolIds, CancellationToken cancellationToken = default);
 }
 
-public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun }
+public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun, Console }
 
 public sealed record ToolExecutionScope
 {
@@ -334,7 +334,25 @@ public sealed record ToolExecutionCaptureOptions
 public interface IToolExecutionPipeline
 {
     ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default);
+
+    async ValueTask<ToolInvocationResult> ExecuteDetailedAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default) =>
+        new(await ExecuteAsync(context, cancellationToken), null);
+
+    ValueTask<ToolExecutionSimulation> SimulateAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default) =>
+        ValueTask.FromException<ToolExecutionSimulation>(new InvalidOperationException("Tool execution simulation is not supported."));
 }
+
+public sealed record ToolInvocationResult(
+    JsonElement? Output,
+    IReadOnlyDictionary<string, string>? Receipt);
+
+public sealed record ToolExecutionSimulation(
+    IReadOnlyList<ToolExecutionHookEvaluation> GovernanceEvaluations,
+    JsonElement? Output = null);
 
 public abstract record ToolExecutionLifecycleEvent(
     ToolExecutionContext Context,
@@ -486,6 +504,22 @@ public sealed class UnavailableToolExecutionPipeline : IToolExecutionPipeline
 public interface IToolInvoker
 {
     ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default);
+
+    ValueTask ValidateAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
+        ValueTask.CompletedTask;
+
+    async ValueTask<ToolInvocationResult> InvokeDetailedAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default) =>
+        new(await InvokeAsync(context, cancellationToken), null);
+
+    async ValueTask<ToolInvocationResult> SimulateDetailedAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default)
+    {
+        await ValidateAsync(context, cancellationToken);
+        return await InvokeDetailedAsync(context, cancellationToken);
+    }
 }
 
 public interface IRuntimeRegistry

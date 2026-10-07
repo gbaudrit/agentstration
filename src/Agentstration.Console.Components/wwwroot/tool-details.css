@@ -3,6 +3,293 @@
     margin-bottom: 18px;
 }
 
+.tool-detail-tabs {
+    margin-top: -8px;
+}
+
+.tool-runner {
+    max-width: 1040px;
+}
+
+.tool-runner .panel-header p {
+    margin: 6px 0 0;
+}
+
+.tool-run-mode {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.tool-run-mode-option {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 78px;
+    padding: 16px 18px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface-2);
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.tool-run-mode-option > span:first-child {
+    display: grid;
+    gap: 4px;
+}
+
+.tool-run-mode-option small {
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 400;
+    line-height: 1.4;
+}
+
+.tool-run-mode-option.selected {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+    box-shadow: 0 0 0 1px var(--primary);
+}
+
+.tool-run-mode-option.execution.selected {
+    border-color: #d88916;
+    background: color-mix(in srgb, #d88916 11%, var(--surface));
+    box-shadow: 0 0 0 1px #d88916;
+}
+
+.tool-run-mode-option:disabled {
+    border-color: var(--border);
+    background: color-mix(in srgb, var(--surface-2) 65%, var(--border));
+    color: var(--muted);
+    box-shadow: none;
+    cursor: not-allowed;
+    opacity: .62;
+}
+
+.tool-run-mode-unavailable {
+    margin: -8px 0 18px;
+    color: var(--muted);
+    font-size: .85rem;
+}
+
+.tool-run-mode-mark {
+    display: none;
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    font-size: .76rem;
+    font-weight: 800;
+}
+
+.tool-run-mode-option.selected .tool-run-mode-mark {
+    display: grid;
+}
+
+.tool-run-mode-option.execution.selected .tool-run-mode-mark {
+    background: #d88916;
+}
+
+.tool-run-mode-help {
+    margin: 0 0 18px;
+    padding: 12px 14px;
+    border-left: 3px solid var(--primary);
+    border-radius: 6px;
+    background: var(--primary-soft);
+    line-height: 1.5;
+}
+
+.tool-run-mode-help.execution {
+    border-left-color: #d88916;
+    background: color-mix(in srgb, #d88916 11%, var(--surface));
+}
+
+.tool-run-input {
+    display: grid;
+    gap: 12px;
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+}
+
+.tool-run-input h3 {
+    margin: 0;
+    font-size: .95rem;
+}
+
+.tool-run-input-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+}
+
+.tool-run-managed-input {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 3px 10px;
+    border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+    border-radius: 999px;
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-size: .75rem;
+    font-weight: 700;
+}
+
+.tool-runner .schema-input-editor label,
+.tool-runner .schema-input-editor textarea {
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.tool-runner .schema-input-editor label {
+    display: grid;
+    gap: 7px;
+}
+
+.tool-runner .schema-input-editor textarea {
+    min-height: 230px;
+}
+
+.tool-run-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+.tool-run-result {
+    max-width: 980px;
+}
+
+.tool-run-result-message {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    border: 1px solid color-mix(in srgb, #27a866 35%, var(--border));
+    border-radius: 9px;
+    background: color-mix(in srgb, #27a866 8%, var(--surface));
+}
+
+.tool-run-result-message h3,
+.tool-run-result-message p {
+    margin: 0;
+}
+
+.tool-run-result-message p {
+    margin-top: 4px;
+    color: var(--muted);
+    line-height: 1.45;
+}
+
+.tool-run-result-icon {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    border-radius: 50%;
+    background: #27a866;
+    color: white;
+    font-weight: 800;
+}
+
+.tool-output {
+    margin-bottom: 18px;
+}
+
+.tool-output h3 {
+    margin: 0 0 10px;
+}
+
+.tool-run-facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.tool-run-facts > span {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    padding: 11px 13px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+}
+
+.tool-run-facts small {
+    color: var(--muted);
+}
+
+.tool-run-facts code {
+    overflow-wrap: anywhere;
+}
+
+.tool-run-diagnostics {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+.tool-run-diagnostics summary {
+    width: fit-content;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: .82rem;
+    font-weight: 650;
+}
+
+.tool-run-checks {
+    display: grid;
+    gap: 9px;
+    margin: 18px 0;
+    padding: 0;
+    list-style: none;
+}
+
+.tool-run-checks li {
+    display: grid;
+    gap: 4px;
+    padding: 11px 13px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
+    border-radius: 7px;
+    background: var(--surface-2);
+}
+
+.tool-run-checks li.denied,
+.tool-run-checks li.required {
+    border-left-color: #e45562;
+}
+
+.tool-run-checks span {
+    color: var(--muted);
+    font-size: .8rem;
+}
+
+.tool-run-result pre {
+    max-height: 420px;
+    padding: 16px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 .tool-capability {
     border-left: 3px solid var(--primary);
 }
@@ -152,5 +439,27 @@
 
     .tool-field {
         padding: 15px;
+    }
+
+    .tool-run-mode {
+        grid-template-columns: 1fr;
+    }
+
+    .tool-run-actions > button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .tool-run-result-message {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .tool-run-result-message > button {
+        grid-column: 1 / -1;
+        justify-content: center;
+    }
+
+    .tool-run-facts {
+        grid-template-columns: 1fr;
     }
 }

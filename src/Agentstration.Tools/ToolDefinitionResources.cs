@@ -50,7 +50,7 @@ public interface IToolDefinitionFlowResolver
         CancellationToken cancellationToken);
 }
 
-public enum ToolDefinitionCallerKind { Mcp, Agent, Flow }
+public enum ToolDefinitionCallerKind { Mcp, Agent, Flow, Console }
 
 public sealed record ToolDefinitionInvocation(
     Guid TenantId,
@@ -78,6 +78,7 @@ public sealed record ToolDefinitionInvocationResult(JsonElement? Output, ToolDef
 public interface IToolDefinitionExecutor
 {
     Task<ToolDefinitionInvocationResult> ExecuteAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken);
+    Task<JsonElement?> SimulateAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken);
 }
 
 public sealed class ToolDefinitionInvocationException(string code, string message, Exception? innerException = null)
