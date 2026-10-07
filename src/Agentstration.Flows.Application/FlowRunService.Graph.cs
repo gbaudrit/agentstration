@@ -17,7 +17,8 @@ public sealed partial class FlowRunService
             .Where(step => step.Status is FlowStepRunStatus.Succeeded or FlowStepRunStatus.Failed)
             .ToDictionary(step => step.StepName, step => step.Output?.Clone(), StringComparer.Ordinal);
         var resumedChildStep = stored.Value.Steps.SingleOrDefault(step =>
-            step.Status == FlowStepRunStatus.Running && step.ChildFlowRunId is not null);
+            step.Status == FlowStepRunStatus.Running
+            && (step.ChildFlowRunId is not null || step.ArtifactStorageFlowRunId is not null));
         var currentName = resumedChildStep?.StepName ?? graph.EntryStep;
         var incomingTransition = resumedChildStep is null
             ? null
@@ -38,7 +39,8 @@ public sealed partial class FlowRunService
             var transitionOutput = incomingTransition is null
                 ? null
                 : outputs.GetValueOrDefault(incomingTransition.FromStep)?.Clone();
-            var context = ExecutionContext(stored.Value, step.Name, outputs, transitionOutput);
+            var context = ExecutionContext(stored.Value, step.Name, outputs, transitionOutput,
+                stepDisplayName: step.DisplayName);
             JsonElement? output;
             string eventName;
             FlowAgentExecutionResult? agentResult = null;
@@ -46,7 +48,57 @@ public sealed partial class FlowRunService
             FlowToolRouteResolution? toolRouteResolution = null;
             FlowRun? childResult = null;
             FlowRunError? stepError = null;
-            switch (step)
+            IReadOnlyList<FlowStepArtifactReference> artifacts = [];
+            var resumedArtifactStorage = stored.Value.Steps.Single(item => item.StepName == step.Name)
+                .ArtifactStorageFlowRunId is not null;
+            if (resumedArtifactStorage)
+            {
+                var stepRun = stored.Value.Steps.Single(item => item.StepName == step.Name);
+                var storageRunId = stepRun.ArtifactStorageFlowRunId!;
+                var storageCall = ArtifactStorageCall(step);
+                var storageRun = await repository.GetRunAsync(stored.Value.WorkspaceId, storageRunId, runToken);
+                if (storageRun is null)
+                {
+                    await WaitForArtifactStorageAsync(stored, step.Name, runToken);
+                    await EnsureChildFlowRunAsync(stored.Value, storageCall,
+                        ArtifactStorageInput(stored.Value, step.Name, stepRun.Artifacts.Single()),
+                        storageRunId, runToken);
+                    return;
+                }
+                ValidateChildIdentity(stored.Value, storageCall, storageRun.Value, storageRunId);
+                output = stepRun.Output?.Clone();
+                if (!storageRun.Value.Status.IsTerminal())
+                {
+                    await WaitForArtifactStorageAsync(stored, step.Name, runToken);
+                    return;
+                }
+                eventName = storageRun.Value.Status switch
+                {
+                    FlowRunStatus.Succeeded => "completed",
+                    FlowRunStatus.Failed => "failed",
+                    FlowRunStatus.TimedOut => "timedOut",
+                    FlowRunStatus.Cancelled => "cancelled",
+                    _ => throw new InvalidOperationException(
+                        $"Artifact storage Flow Run '{storageRunId}' has unsupported terminal status '{storageRun.Value.Status}'.")
+                };
+                if (storageRun.Value.Status == FlowRunStatus.Succeeded)
+                {
+                    var staged = stepRun.Artifacts.Single();
+                    var durableId = DurableArtifactId(storageRun.Value.Output, storageRunId);
+                    artifacts = [new(durableId, staged.FileName, staged.MediaType, "durable", storageRunId,
+                        staged.LocalArtifactId ?? staged.ArtifactId)];
+                }
+                else
+                {
+                    var storageError = storageRun.Value.Error;
+                    stepError = new FlowRunError(
+                        storageError?.Code ?? $"artifact_storage_flow_{eventName}",
+                        $"Artifact storage Flow Run '{storageRunId}' {eventName}.",
+                        storageError?.Details ?? storageError?.Message);
+                    artifacts = stepRun.Artifacts;
+                }
+            }
+            else switch (step)
             {
                 case InputFlowStepDefinition:
                     output = stored.Value.Input.Clone(); eventName = "completed"; break;
@@ -238,7 +290,8 @@ public sealed partial class FlowRunService
                     outputs[step.Name] = output.Value.Clone();
                     var until = await EvaluateExpressionAsync(
                         repeat.Until,
-                        ExecutionContext(stored.Value, step.Name, outputs, output),
+                        ExecutionContext(stored.Value, step.Name, outputs, output,
+                            stepDisplayName: step.DisplayName),
                         runToken);
                     if (until?.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
                         throw new FlowValidationException("flow_repeat_until_invalid", $"Repeat step '{step.Name}' until expression must return a boolean.");
@@ -250,7 +303,8 @@ public sealed partial class FlowRunService
                         ? output.Value.Clone()
                         : await ResolveJsonAsync(
                             repeat.NextInputMapping.Value,
-                            ExecutionContext(stored.Value, step.Name, outputs, output),
+                            ExecutionContext(stored.Value, step.Name, outputs, output,
+                                stepDisplayName: step.DisplayName),
                             runToken);
                     var nextIteration = iteration + 1;
                     var nextChildRunId = ChildFlowRunId(stored.Value, step.Name, repeatStepRun.Attempt, nextIteration);
@@ -268,11 +322,14 @@ public sealed partial class FlowRunService
                     throw new FlowValidationException("flow_step_type_unsupported", $"Step '{step.Name}' has an unsupported type.");
             }
             outputs[step.Name] = output?.Clone();
-            IReadOnlyList<FlowStepArtifactReference> artifacts = [];
-            if (stepError is null && step.ArtifactOutput is not null)
+            if (!resumedArtifactStorage && stepError is null && step.ArtifactOutput is not null)
             {
-                var content = await ResolveArtifactContentAsync(step.ArtifactOutput, output,
-                    ExecutionContext(stored.Value, step.Name, outputs, output), runToken);
+                var artifactContext = ExecutionContext(stored.Value, step.Name, outputs,
+                    currentStepOutput: output, stepDisplayName: step.DisplayName);
+                var artifactDefinition = await ResolveArtifactDefinitionAsync(
+                    step.ArtifactOutput, artifactContext, runToken);
+                var content = await ResolveArtifactContentAsync(artifactDefinition, output,
+                    artifactContext, runToken);
                 var stepRun = stored.Value.Steps.Single(item => item.StepName == step.Name);
                 var captured = await artifactCapture.CaptureAsync(new(
                     stored.Value.Scope,
@@ -282,14 +339,25 @@ public sealed partial class FlowRunService
                     step.Name,
                     stepRun.Attempt,
                     stored.Value.CorrelationId,
-                    step.ArtifactOutput,
+                    artifactDefinition,
                     content,
                     ArtifactProvenance(stored.Value, step, stepRun.Attempt, agentResult, toolResult,
                         toolRouteResolution, childResult)), runToken);
                 artifacts = [captured];
+                if (artifactDefinition.StorageFlow is not null)
+                {
+                    var storageRunId = ChildFlowRunId(stored.Value,
+                        $"{step.Name}:artifact-storage", stepRun.Attempt);
+                    stored = await SuspendForArtifactStorageAsync(stored, step.Name, output, captured,
+                        storageRunId, agentResult, toolRouteResolution, runToken);
+                    await EnsureChildFlowRunAsync(stored.Value, ArtifactStorageCall(step),
+                        ArtifactStorageInput(stored.Value, step.Name, captured), storageRunId, runToken);
+                    return;
+                }
             }
             var transition = await SelectTransitionAsync(graph, step.Name, eventName,
-                ExecutionContext(stored.Value, step.Name, outputs), runToken);
+                ExecutionContext(stored.Value, step.Name, outputs,
+                    stepDisplayName: step.DisplayName), runToken);
             if (stepError is not null) stored = await FinishFailedStepAsync(stored, step.Name, output, transition?.Id, stepError, runToken, toolRouteResolution);
             else if (agentResult is not null) stored = await FinishAgentStepAsync(stored, agentResult, runToken, transition?.Id, step.Name, artifacts);
             else if (toolRouteResolution is not null) stored = await FinishToolRouteStepAsync(stored, step.Name, output, transition?.Id, toolRouteResolution, runToken, artifacts);
@@ -302,6 +370,7 @@ public sealed partial class FlowRunService
             currentName = transition.ToStep;
         }
         if (finalOutput is null) throw new FlowValidationException("flow_output_missing", "The Flow completed without reaching an Output step.");
+        await CleanupStepArtifactsAsync(stored.Value, graph, stoppingToken);
         var now = timeProvider.GetUtcNow();
         var finalSteps = stored.Value.Steps.Select(step => step.Status == FlowStepRunStatus.NotStarted ? step with { Status = FlowStepRunStatus.Skipped, CompletedAt = now } : step).ToArray();
         await SaveAsync(stored, stored.Value with
@@ -317,11 +386,50 @@ public sealed partial class FlowRunService
         await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.FlowRunCompleted, null, null, stoppingToken);
     }
 
+    private async Task CleanupStepArtifactsAsync(
+        FlowRun run,
+        FlowGraphDefinition graph,
+        CancellationToken cancellationToken)
+    {
+        foreach (var stepRun in run.Steps)
+        {
+            var definition = graph.Steps.Single(step => step.Name == stepRun.StepName).ArtifactOutput;
+            if (definition is null
+                || definition.Clean == FlowStepArtifactCleanupMode.Never)
+                continue;
+
+            foreach (var artifact in stepRun.Artifacts)
+                await artifactCapture.CleanupAsync(run.Scope, run.Id, stepRun.StepName, artifact,
+                    cancellationToken);
+        }
+    }
+
+    private async Task TryCleanupStepArtifactsAsync(FlowRun run, CancellationToken cancellationToken)
+    {
+        if (run.DefinitionSnapshot.Graph is not { } graph) return;
+        try
+        {
+            await CleanupStepArtifactsAsync(run, graph, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Activity.Current?.AddEvent(new ActivityEvent("flow.artifact.cleanup.failed", tags:
+                new ActivityTagsCollection
+                {
+                    ["flow.run.id"] = run.Id,
+                    ["error.type"] = exception.GetType().FullName,
+                    ["error.message"] = exception.Message
+                }));
+        }
+    }
+
     private static FlowExecutionContext ExecutionContext(
         FlowRun run,
         string stepName,
         IReadOnlyDictionary<string, JsonElement?> outputs,
-        JsonElement? transitionOutput = null) => new(
+        JsonElement? transitionOutput = null,
+        JsonElement? currentStepOutput = null,
+        string? stepDisplayName = null) => new(
             run.Input,
             outputs,
             transitionOutput,
@@ -330,7 +438,9 @@ public sealed partial class FlowRunService
                 run.RootFlowRunId ?? run.Id,
                 run.ParentFlowRunId,
                 stepName,
-                run.CorrelationId));
+                run.CorrelationId,
+                stepDisplayName),
+            currentStepOutput);
 
     private async Task<StoredFlowRun> FinishToolRouteStepAsync(StoredFlowRun stored, string name,
         JsonElement? output, string? transition, FlowToolRouteResolution resolution, CancellationToken token,
@@ -358,6 +468,97 @@ public sealed partial class FlowRunService
 
     private static string CatalogId(ResourceNamespace @namespace, string name) =>
         @namespace.IsDefault ? name : $"{@namespace.Value}/{name}";
+
+    private static FlowCallStepDefinition ArtifactStorageCall(FlowStepDefinition step) => new()
+    {
+        Name = $"{step.Name}:artifact-storage",
+        DisplayName = $"Store Artifact from {step.DisplayName ?? step.Name}",
+        Flow = step.ArtifactOutput?.StorageFlow
+            ?? throw new FlowValidationException("flow_step_artifact_storage_flow_missing",
+                $"Step '{step.Name}' does not declare an Artifact storage Flow.")
+    };
+
+    private static JsonElement ArtifactStorageInput(
+        FlowRun run,
+        string stepName,
+        FlowStepArtifactReference artifact) => JsonSerializer.SerializeToElement(new
+        {
+            stagedArtifactId = artifact.ArtifactId,
+            producerFlowRunId = run.Id,
+            producerFlowStepId = stepName
+        });
+
+    private static string DurableArtifactId(JsonElement? output, string storageRunId)
+    {
+        if (output is not { ValueKind: JsonValueKind.Object } value
+            || !value.TryGetProperty("flowRunArtifactId", out var id)
+            || id.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(id.GetString()))
+            throw new FlowValidationException("flow_step_artifact_storage_result_invalid",
+                $"Artifact storage Flow Run '{storageRunId}' did not return a flowRunArtifactId.");
+        return id.GetString()!;
+    }
+
+    private async Task<StoredFlowRun> SuspendForArtifactStorageAsync(
+        StoredFlowRun stored,
+        string stepName,
+        JsonElement? output,
+        FlowStepArtifactReference artifact,
+        string storageRunId,
+        FlowAgentExecutionResult? agent,
+        FlowToolRouteResolution? route,
+        CancellationToken token)
+    {
+        var steps = stored.Value.Steps.Select(step => step.StepName == stepName ? step with
+        {
+            ResolvedInput = step.ResolvedInput?.Clone() ?? stored.Value.Input.Clone(),
+            Output = output?.Clone(),
+            AgentResourceId = agent?.AgentResourceId ?? step.AgentResourceId,
+            AgentVersion = agent?.AgentVersion ?? step.AgentVersion,
+            ModelProfileResourceId = agent?.ModelProfileResourceId ?? step.ModelProfileResourceId,
+            Provider = route is null ? agent?.Provider ?? step.Provider
+                : CatalogId(route.ProviderNamespace, route.ProviderName),
+            Usage = agent?.Usage ?? step.Usage,
+            Tools = route is null ? agent?.Tools ?? step.Tools
+                : [CatalogId(route.ToolNamespace, route.ToolName)],
+            ToolRoute = route ?? step.ToolRoute,
+            Artifacts = [artifact],
+            ArtifactStorageFlowRunId = storageRunId,
+            ChildFlowRunIds = step.ChildFlowRunIds.Contains(storageRunId, StringComparer.Ordinal)
+                ? step.ChildFlowRunIds
+                : [.. step.ChildFlowRunIds, storageRunId],
+            Logs = [.. step.Logs, .. agent?.Logs ?? [], $"{stepName} captured an Artifact and started storage Flow '{storageRunId}'."]
+        } : step).ToArray();
+        var suspended = await SaveAsync(stored, stored.Value with
+        {
+            Status = FlowRunStatus.WaitingForChild,
+            Steps = steps,
+            ExecutionLeaseId = null,
+            ExecutionLeaseExpiresAt = null
+        }, token);
+        await EmitAsync(suspended.Value.WorkspaceId, suspended.Value.Id,
+            FlowRunEventType.FlowRunWaitingForChild, stepName,
+            JsonSerializer.SerializeToElement(new { childFlowRunId = storageRunId, artifactStorage = true }), token);
+        return suspended;
+    }
+
+    private async Task WaitForArtifactStorageAsync(StoredFlowRun stored, string stepName, CancellationToken token)
+    {
+        var suspended = await SaveAsync(stored, stored.Value with
+        {
+            Status = FlowRunStatus.WaitingForChild,
+            ExecutionLeaseId = null,
+            ExecutionLeaseExpiresAt = null
+        }, token);
+        await EmitAsync(suspended.Value.WorkspaceId, suspended.Value.Id,
+            FlowRunEventType.FlowRunWaitingForChild, stepName,
+            JsonSerializer.SerializeToElement(new
+            {
+                childFlowRunId = suspended.Value.Steps.Single(value => value.StepName == stepName)
+                    .ArtifactStorageFlowRunId,
+                artifactStorage = true
+            }), token);
+    }
 
     private static IReadOnlyDictionary<string, string> ArtifactProvenance(
         FlowRun run,
@@ -555,6 +756,22 @@ public sealed partial class FlowRunService
                     "The configured Artifact result selector did not resolve a value.");
         }
         return await ResolveJsonAsync(mapping, context, token);
+    }
+
+    private async Task<FlowStepArtifactOutputDefinition> ResolveArtifactDefinitionAsync(
+        FlowStepArtifactOutputDefinition definition,
+        FlowExecutionContext context,
+        CancellationToken token)
+    {
+        var fileName = definition.FileName is null
+            ? null
+            : await ResolveStringAsync(definition.FileName, context, token)
+                ?? throw new FlowValidationException("flow_step_artifact_file_name_unresolved",
+                    "The configured Artifact file name did not resolve a value.");
+        var mediaType = await ResolveStringAsync(definition.MediaType, context, token)
+            ?? throw new FlowValidationException("flow_step_artifact_media_type_unresolved",
+                "The configured Artifact media type did not resolve a value.");
+        return definition with { FileName = fileName, MediaType = mediaType };
     }
 
     private static FlowCallStepDefinition RepeatCall(RepeatFlowStepDefinition repeat) => new()

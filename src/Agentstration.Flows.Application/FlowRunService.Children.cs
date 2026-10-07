@@ -177,7 +177,8 @@ public sealed partial class FlowRunService
         if (parent is null
             || parent.Value.Status != FlowRunStatus.WaitingForChild
             || parent.Value.Scope != child.Scope
-            || !parent.Value.Steps.Any(step => step.Status == FlowStepRunStatus.Running && step.ChildFlowRunId == child.Id))
+            || !parent.Value.Steps.Any(step => step.Status == FlowStepRunStatus.Running
+                && (step.ChildFlowRunId == child.Id || step.ArtifactStorageFlowRunId == child.Id)))
             return;
 
         StoredFlowRun resumed;
@@ -197,7 +198,8 @@ public sealed partial class FlowRunService
         try
         {
             await EmitAsync(resumed.Value.WorkspaceId, resumed.Value.Id, FlowRunEventType.FlowRunResumedFromChild,
-                resumed.Value.Steps.Single(step => step.ChildFlowRunId == child.Id).StepName,
+                resumed.Value.Steps.Single(step => step.ChildFlowRunId == child.Id
+                    || step.ArtifactStorageFlowRunId == child.Id).StepName,
                 JsonSerializer.SerializeToElement(new { childFlowRunId = child.Id, childStatus = child.Status }), cancellationToken);
         }
         finally

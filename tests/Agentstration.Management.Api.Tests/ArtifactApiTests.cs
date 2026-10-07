@@ -79,6 +79,15 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         var binaryContent = await service.ReadAsync(StagedArtifactId.Parse(binary.ArtifactId), 0, 64, null, default);
         CollectionAssert.AreEqual(binaryBytes, Convert.FromBase64String(binaryContent.ContentBase64));
 
+        var defaultName = await capture.CaptureAsync(request with
+        {
+            FlowRunId = "flowrun-capture-default-name",
+            RootFlowRunId = "flowrun-capture-default-name",
+            Definition = new() { MediaType = "application/json" },
+            Content = JsonSerializer.SerializeToElement(new { value = true })
+        }, default);
+        Assert.AreEqual("fetch.json", defaultName.FileName);
+
         var tooLarge = await Assert.ThrowsExactlyAsync<FlowValidationException>(() => capture.CaptureAsync(
             request with
             {

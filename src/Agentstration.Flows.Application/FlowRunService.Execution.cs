@@ -278,7 +278,7 @@ public sealed partial class FlowRunService
         var steps = stored.Value.Steps.Select(step => step.Status == FlowStepRunStatus.Running
             ? step with { Status = status == FlowRunStatus.Cancelled ? FlowStepRunStatus.Cancelled : FlowStepRunStatus.Failed, CompletedAt = now, Error = error }
             : step).ToArray();
-        await SaveAsync(stored, stored.Value with
+        var terminal = await SaveAsync(stored, stored.Value with
         {
             Status = status,
             CompletedAt = now,
@@ -287,6 +287,7 @@ public sealed partial class FlowRunService
             ExecutionLeaseId = null,
             ExecutionLeaseExpiresAt = null
         }, token);
+        await TryCleanupStepArtifactsAsync(terminal.Value, token);
         if (status is FlowRunStatus.Failed or FlowRunStatus.TimedOut)
             RunsFailed.Add(1, new KeyValuePair<string, object?>("flow.definition.state", stored.Value.DefinitionState.ToString()));
         RunDuration.Record(Math.Max(0, (now - stored.Value.CreatedAt).TotalSeconds), new KeyValuePair<string, object?>("flow.status", status.ToString()));

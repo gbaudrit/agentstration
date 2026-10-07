@@ -82,6 +82,16 @@ public interface IFlowStepArtifactCapture
     Task<FlowStepArtifactReference> CaptureAsync(
         FlowStepArtifactCaptureRequest request,
         CancellationToken cancellationToken);
+
+    Task CleanupAsync(
+        FlowRunScope scope,
+        string flowRunId,
+        string stepName,
+        FlowStepArtifactReference artifact,
+        CancellationToken cancellationToken) =>
+        Task.FromException(new FlowValidationException(
+            "flow_step_artifact_cleanup_unavailable",
+            "No governed Artifact cleanup service is configured for Flow Runs."));
 }
 
 public sealed class UnsupportedFlowStepArtifactCapture : IFlowStepArtifactCapture

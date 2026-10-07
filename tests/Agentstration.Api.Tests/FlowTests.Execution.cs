@@ -287,7 +287,7 @@ public sealed partial class FlowTests
                     {
                         FileName = "notification.txt",
                         MediaType = "text/plain",
-                        ContentMapping = JsonSerializer.SerializeToElement("${steps.notify.output}")
+                        ContentMapping = JsonSerializer.SerializeToElement("${step.output.message}")
                     }
                 },
                 new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.notify.output}") }
@@ -313,7 +313,8 @@ public sealed partial class FlowTests
             new NullFlowRunEventSink(),
             new TestFlowRunExecutionScope(),
             TimeProvider.System,
-            configuredToolExecutor: new RecordingFlowToolExecutor(),
+            configuredToolExecutor: new RecordingFlowToolExecutor(
+                JsonSerializer.SerializeToElement(new { message = "sent", ignored = true })),
             configuredArtifactCapture: capture);
         using var input = JsonDocument.Parse("{}");
 
@@ -322,7 +323,7 @@ public sealed partial class FlowTests
 
         var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
         Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual("sent", completed.Output?.GetString());
+        Assert.AreEqual("sent", completed.Output?.GetProperty("message").GetString());
         Assert.AreEqual("sent", capture.Request!.Content.GetString());
         Assert.AreEqual("notify", capture.Request.StepName);
         Assert.AreEqual(1, capture.Request.Attempt);
@@ -333,6 +334,7 @@ public sealed partial class FlowTests
         var reference = completed.Steps.Single(step => step.StepName == "notify").Artifacts.Single();
         Assert.AreEqual("artifact-1", reference.ArtifactId);
         Assert.AreEqual("notification.txt", reference.FileName);
+        Assert.AreEqual("artifact-1", capture.CleanedArtifact?.ArtifactId);
     }
 
     [TestMethod]
@@ -349,7 +351,11 @@ public sealed partial class FlowTests
                 {
                     Name = "answer",
                     Agent = new("assistant"),
-                    ArtifactOutput = new() { FileName = "answer.json" }
+                    ArtifactOutput = new()
+                    {
+                        FileName = "answer.json",
+                        Clean = FlowStepArtifactCleanupMode.Never
+                    }
                 },
                 new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.answer.output}") }
             ],
@@ -378,17 +384,22 @@ public sealed partial class FlowTests
         Assert.AreEqual("agent", capture.Request!.Provenance["invocationKind"]);
         Assert.AreEqual("/agents/assistant", capture.Request.Provenance["agentResourceId"]);
         Assert.AreEqual("3", capture.Request.Provenance["agentVersion"]);
+        Assert.IsNull(capture.CleanedArtifact);
     }
 
     private sealed class RecordingFlowToolExecutor : IFlowToolExecutor
     {
+        private readonly JsonElement? output;
+
+        public RecordingFlowToolExecutor(JsonElement? output = null) => this.output = output?.Clone();
+
         public FlowToolExecutionRequest? Request { get; private set; }
 
         public Task<FlowToolExecutionResult> ExecuteAsync(FlowToolExecutionRequest request, CancellationToken cancellationToken)
         {
             Request = request;
             return Task.FromResult(new FlowToolExecutionResult(
-                JsonSerializer.SerializeToElement("sent"),
+                output?.Clone() ?? JsonSerializer.SerializeToElement("sent"),
                 request.Tool.ResourceId,
                 request.Tool.ResolveNamespace(request.OwnerFlowId.Namespace),
                 Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
@@ -403,6 +414,7 @@ public sealed partial class FlowTests
     private sealed class RecordingFlowStepArtifactCapture : IFlowStepArtifactCapture
     {
         public FlowStepArtifactCaptureRequest? Request { get; private set; }
+        public FlowStepArtifactReference? CleanedArtifact { get; private set; }
 
         public Task<FlowStepArtifactReference> CaptureAsync(
             FlowStepArtifactCaptureRequest request,
@@ -413,6 +425,17 @@ public sealed partial class FlowTests
                 "artifact-1",
                 request.Definition.FileName!,
                 request.Definition.MediaType));
+        }
+
+        public Task CleanupAsync(
+            FlowRunScope scope,
+            string flowRunId,
+            string stepName,
+            FlowStepArtifactReference artifact,
+            CancellationToken cancellationToken)
+        {
+            CleanedArtifact = artifact;
+            return Task.CompletedTask;
         }
     }
 

@@ -29,6 +29,29 @@ public sealed class FlowStepArtifactCapture(ArtifactManagementService artifacts)
         }
     }
 
+    public async Task CleanupAsync(
+        FlowRunScope scope,
+        string flowRunId,
+        string stepName,
+        FlowStepArtifactReference artifact,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await artifacts.PurgeAsync(
+                StagedArtifactId.Parse(artifact.LocalArtifactId ?? artifact.ArtifactId),
+                cancellationToken);
+        }
+        catch (ArtifactValidationException exception)
+        {
+            throw new FlowValidationException(exception.Code, exception.Message);
+        }
+        catch (AuthorizationDeniedException exception)
+        {
+            throw new FlowValidationException("flow_step_artifact_access_denied", exception.Message);
+        }
+    }
+
     private async Task<FlowStepArtifactReference> CaptureCoreAsync(
         FlowStepArtifactCaptureRequest request,
         CancellationToken cancellationToken)

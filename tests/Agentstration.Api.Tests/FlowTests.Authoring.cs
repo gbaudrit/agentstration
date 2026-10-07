@@ -325,7 +325,11 @@ public sealed partial class FlowTests
                     ArtifactOutput = new()
                     {
                         FileName = "response.json",
-                        ContentMapping = JsonSerializer.SerializeToElement("${steps.fetch.output.body}")
+                        MediaType = "application/json",
+                        ContentMapping = JsonSerializer.SerializeToElement("${step.output.body}"),
+                        StorageFlow = new("artifact-storage-filesystem-write-builtin",
+                            FlowCallVersionStrategy.Active, Namespace: ResourceNamespace.Default),
+                        Clean = FlowStepArtifactCleanupMode.Always
                     }
                 },
                 new OutputFlowStepDefinition { Name = "output" }
@@ -347,10 +351,14 @@ public sealed partial class FlowTests
         var artifact = restored.Steps.OfType<ToolFlowStepDefinition>().Single().ArtifactOutput!;
         Assert.AreEqual("response.json", artifact.FileName);
         Assert.AreEqual("application/json", artifact.MediaType);
-        Assert.AreEqual("${steps.fetch.output.body}", artifact.ContentMapping!.Value.GetString());
+        Assert.AreEqual("${step.output.body}", artifact.ContentMapping!.Value.GetString());
+        Assert.AreEqual("artifact-storage-filesystem-write-builtin", artifact.StorageFlow!.ResourceId);
+        Assert.AreEqual(FlowCallVersionStrategy.Active, artifact.StorageFlow.VersionStrategy);
+        Assert.AreEqual(FlowStepArtifactCleanupMode.Always, artifact.Clean);
         var yaml = FlowDraftService.ToYaml(graph);
         var yamlRestored = new FlowDraftService(null!, null!, null!, TimeProvider.System).ParseSource(yaml, "yaml");
         StringAssert.Contains(yaml, "artifactOutput:");
+        StringAssert.Contains(yaml, "clean: true");
         Assert.AreEqual(FlowDefinitionHash.Compute(graph), FlowDefinitionHash.Compute(yamlRestored));
     }
 

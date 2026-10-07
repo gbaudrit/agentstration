@@ -121,7 +121,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
 
     private async Task ValidateStepAsync(FlowStepDefinition step, FlowValidationContext context, List<FlowValidationIssue> issues, CancellationToken token)
     {
-        ValidateArtifactOutput(step, issues);
+        await ValidateArtifactOutputAsync(step, context, issues, token);
         switch (step)
         {
             case AgentFlowStepDefinition agent:
@@ -179,7 +179,11 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         }
     }
 
-    private static void ValidateArtifactOutput(FlowStepDefinition step, List<FlowValidationIssue> issues)
+    private async Task ValidateArtifactOutputAsync(
+        FlowStepDefinition step,
+        FlowValidationContext context,
+        List<FlowValidationIssue> issues,
+        CancellationToken token)
     {
         var artifact = step.ArtifactOutput;
         if (artifact is null) return;
@@ -191,13 +195,20 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             return;
         }
 
-        if (artifact.FileName is { } fileName
-            && (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 255
-                || fileName.Contains('/') || fileName.Contains('\\')))
-            issues.Add(Error("step_artifact_file_name_invalid",
-                "Artifact output fileName must be a simple file name of at most 255 characters.",
-                step.Name, property: "artifactOutput.fileName"));
-        if (string.IsNullOrWhiteSpace(artifact.MediaType)
+        if (artifact.FileName is { } fileName)
+        {
+            if (fileName.StartsWith("${", StringComparison.Ordinal))
+                ValidateExpression(fileName, issues, step.Name, "artifactOutput.fileName");
+            else if (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 255
+                || fileName.Contains('/') || fileName.Contains('\\'))
+                issues.Add(Error("step_artifact_file_name_invalid",
+                    "Artifact output fileName must be a simple file name of at most 255 characters.",
+                    step.Name, property: "artifactOutput.fileName"));
+        }
+        if (!string.IsNullOrWhiteSpace(artifact.MediaType)
+            && artifact.MediaType.StartsWith("${", StringComparison.Ordinal))
+            ValidateExpression(artifact.MediaType, issues, step.Name, "artifactOutput.mediaType");
+        else if (string.IsNullOrWhiteSpace(artifact.MediaType)
             || artifact.MediaType.Length > 255
             || !artifact.MediaType.Contains('/', StringComparison.Ordinal))
             issues.Add(Error("step_artifact_media_type_invalid",
@@ -213,6 +224,20 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 "Artifact output stagingBinding must use a logical binding name.",
                 step.Name, property: "artifactOutput.stagingBinding"));
         ValidateJsonExpressions(artifact.ContentMapping, issues, step.Name, "artifactOutput.contentMapping");
+        if (artifact.StorageFlow is { } storageFlow)
+        {
+            await ValidateFlowCallAsync(new FlowCallStepDefinition
+            {
+                Name = step.Name,
+                Flow = storageFlow,
+                InputMapping = JsonSerializer.SerializeToElement(new
+                {
+                    stagedArtifactId = "staged-artifact",
+                    producerFlowRunId = "flow-run",
+                    producerFlowStepId = step.Name
+                })
+            }, context, issues, token);
+        }
     }
 
     private async Task ValidateToolRouteAsync(
@@ -461,14 +486,16 @@ public sealed record FlowExecutionContext(
     JsonElement Input,
     IReadOnlyDictionary<string, JsonElement?> StepOutputs,
     JsonElement? TransitionOutput = null,
-    FlowExecutionMetadata? Execution = null);
+    FlowExecutionMetadata? Execution = null,
+    JsonElement? CurrentStepOutput = null);
 
 public sealed record FlowExecutionMetadata(
     string FlowRunId,
     string RootFlowRunId,
     string? ParentFlowRunId,
     string StepName,
-    string? CorrelationId);
+    string? CorrelationId,
+    string? StepDisplayName = null);
 
 public interface IExpressionParser { ExpressionParseResult Parse(string expression); }
 public interface IExpressionValidator { ExpressionValidationResult Validate(ParsedExpression expression, FlowExpressionContext context); }
@@ -484,6 +511,10 @@ public sealed class FlowExpressionParser : IExpressionParser, IExpressionValidat
         if (path.StartsWith("execution", StringComparison.Ordinal)
             && !IsSupportedExecutionPath(path))
             return new(false, $"Expression references unknown execution context property '{path}'.");
+        if ((path.Equals("step", StringComparison.Ordinal) || path.StartsWith("step.", StringComparison.Ordinal))
+            && path is not "step.name" and not "step.displayName" and not "step.output"
+            && !path.StartsWith("step.output.", StringComparison.Ordinal))
+            return new(false, $"Expression references unknown current step property '{path}'.");
         if (path.StartsWith("steps.", StringComparison.Ordinal))
         {
             var segments = path.Split('.');
@@ -512,6 +543,10 @@ public sealed class FlowExpressionParser : IExpressionParser, IExpressionValidat
         var first = ComparisonParts(body)[0];
         if (!first.StartsWith("input", StringComparison.Ordinal)
             && !first.StartsWith("steps.", StringComparison.Ordinal)
+            && first is not "step.name"
+            && first is not "step.displayName"
+            && first is not "step.output"
+            && !first.StartsWith("step.output.", StringComparison.Ordinal)
             && !first.StartsWith("transition.output", StringComparison.Ordinal)
             && !first.StartsWith("execution.", StringComparison.Ordinal))
         {
@@ -542,6 +577,7 @@ public sealed class FlowExpressionParser : IExpressionParser, IExpressionValidat
         var offset = 1;
         if (segments[0] == "input") current = context.Input;
         else if (segments[0] == "execution") return ResolveExecution(path, context.Execution);
+        else if (segments[0] == "step") return ResolveCurrentStep(path, context);
         else if (segments[0] == "transition") { current = context.TransitionOutput; offset = 2; }
         else { if (segments.Length < 3 || !context.StepOutputs.TryGetValue(segments[1], out current)) return null; offset = segments[2] == "output" ? 3 : 2; }
         for (var index = offset; index < segments.Length; index++)
@@ -561,6 +597,25 @@ public sealed class FlowExpressionParser : IExpressionParser, IExpressionValidat
         "execution.correlationId" when execution?.CorrelationId is { } value => JsonSerializer.SerializeToElement(value),
         _ => null
     };
+
+    private static JsonElement? ResolveCurrentStep(string path, FlowExecutionContext context)
+    {
+        if (path == "step.name" && context.Execution is not null)
+            return JsonSerializer.SerializeToElement(context.Execution.StepName);
+        if (path == "step.displayName" && context.Execution is not null)
+            return JsonSerializer.SerializeToElement(
+                context.Execution.StepDisplayName ?? context.Execution.StepName);
+        if (path == "step.output") return context.CurrentStepOutput;
+        if (!path.StartsWith("step.output.", StringComparison.Ordinal)) return null;
+        JsonElement? current = context.CurrentStepOutput;
+        foreach (var segment in path["step.output.".Length..].Split('.'))
+        {
+            if (current is null || current.Value.ValueKind != JsonValueKind.Object
+                || !current.Value.TryGetProperty(segment, out var property)) return null;
+            current = property;
+        }
+        return current;
+    }
 
     private static bool IsSupportedExecutionPath(string path) => path is
         "execution.flowRunId"
