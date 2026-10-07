@@ -456,7 +456,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
             ["systemManaged"] = "true",
             ["systemKind"] = "KnowledgeFlow",
             [ResourceProvenanceAnnotations.BuiltIn] = "true",
-            [KnowledgeFlowContracts.MetadataKey] = contract
+            [FlowMetadataKeys.Contract] = contract
         };
         if (capabilities is not null) metadata[KnowledgeFlowContracts.CapabilitiesMetadataKey] = capabilities;
         var id = new FlowId(name);

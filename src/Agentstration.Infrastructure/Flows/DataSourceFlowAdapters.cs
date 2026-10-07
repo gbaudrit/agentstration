@@ -95,7 +95,7 @@ public sealed class DataSourceAcquisitionCompositionResolver(
                 target.UseActiveVersion,
                 resolvedFlow.Graph?.InputSchema?.Clone(),
                 resolvedFlow.Graph?.OutputSchema?.Clone(),
-                resolvedFlow.Metadata.GetValueOrDefault(DataSourceFlowContracts.MetadataKey)),
+                resolvedFlow.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract)),
             Tools = tools,
             Limits = Clone(profile.Definition.Limits),
             Policies = Clone(profile.Definition.Policies),
@@ -227,7 +227,9 @@ public sealed class DataSourceFlowActivationGuard : IFlowVersionActivationGuard
     {
         _ = workspaceId;
         cancellationToken.ThrowIfCancellationRequested();
-        if (!version.Metadata.TryGetValue(DataSourceFlowContracts.MetadataKey, out var contract))
+        if (!version.Metadata.TryGetValue(FlowMetadataKeys.Contract, out var contract))
+            return Task.CompletedTask;
+        if (!contract.StartsWith("datasource.", StringComparison.Ordinal))
             return Task.CompletedTask;
         if (!string.Equals(contract, DataSourceFlowContracts.Acquisition, StringComparison.Ordinal))
             throw new FlowValidationException("data_source_flow_contract_unknown",

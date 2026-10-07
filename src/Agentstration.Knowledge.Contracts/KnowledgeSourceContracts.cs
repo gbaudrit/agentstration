@@ -18,9 +18,9 @@ public static class KnowledgeResourceKinds
 
 public static class KnowledgeFlowContracts
 {
-    public const string MetadataKey = "knowledge.contract";
     public const string CapabilitiesMetadataKey = "knowledge.capabilities";
     public const string Ingestion = "knowledge.ingestion/v1";
+    public const string Projection = "knowledge.projection/v1";
     public const string Retrieval = "knowledge.retrieval/v1";
     public const string Search = "knowledge.search/v1";
     public const string Query = "knowledge.query/v1";

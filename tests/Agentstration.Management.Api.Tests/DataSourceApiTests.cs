@@ -424,7 +424,7 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         await flows.CreateAsync(workspace, new CreateFlowCommand(
             name, null, "1.0.0", true,
             new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
-            new Dictionary<string, string> { [DataSourceFlowContracts.MetadataKey] = DataSourceFlowContracts.Acquisition },
+            new Dictionary<string, string> { [FlowMetadataKeys.Contract] = DataSourceFlowContracts.Acquisition },
             new FlowGraphDefinition
             {
                 EntryStep = "input",
