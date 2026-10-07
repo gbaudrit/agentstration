@@ -65,6 +65,7 @@
   <data name="Output"><value>Sortie</value></data>
   <data name="OpenFlowRun"><value>Ouvrir le Flow Run</value></data>
   <data name="RunInput"><value>Entrées</value></data>
+  <data name="DryRunManaged"><value>dryRun activé automatiquement</value></data>
   <data name="ToolOutput"><value>Résultat du Tool</value></data>
   <data name="NoOutput"><value>Le Tool s’est terminé sans retourner de résultat.</value></data>
   <data name="VerificationDetails"><value>Détails des vérifications</value></data>

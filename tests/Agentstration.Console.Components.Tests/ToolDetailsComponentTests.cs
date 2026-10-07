@@ -103,13 +103,24 @@ public sealed class ToolDetailsComponentTests
         Assert.AreEqual("true", rendered.Find("#tool-execution-tab").GetAttribute("aria-selected"));
         Assert.IsNotNull(rendered.Find("[data-testid='schema-input-editor']"));
         StringAssert.Contains(rendered.Find("[data-testid='tool-run-simulate-mode']").ClassName, "selected");
+        var dryRun = rendered.Find("[data-schema-path='$.dryRun'] input");
+        Assert.IsTrue(dryRun.HasAttribute("checked"));
+        Assert.IsTrue(dryRun.HasAttribute("disabled"));
+        StringAssert.Contains(rendered.Find("[data-testid='tool-run-dry-run-managed']").TextContent, "automatically");
         rendered.Find("[data-testid='tool-run-submit']").Click();
 
         rendered.WaitForAssertion(() => Assert.HasCount(1, client.RunRequests));
         Assert.AreEqual(ToolRunMode.Simulate, client.RunRequests[0].Mode);
+        Assert.IsTrue(client.RunRequests[0].Arguments.GetProperty("dryRun").GetBoolean());
         Assert.IsNotNull(rendered.Find("[data-testid='tool-run-result']"));
         StringAssert.Contains(rendered.Find("[data-testid='tool-run-result']").TextContent, "Provider invokedYes");
         StringAssert.Contains(rendered.Find("[data-testid='tool-run-output']").TextContent, "dryRun");
+
+        rendered.Find("[data-testid='tool-run-execute-mode']").Click();
+        dryRun = rendered.Find("[data-schema-path='$.dryRun'] input");
+        Assert.IsFalse(dryRun.HasAttribute("checked"));
+        Assert.IsFalse(dryRun.HasAttribute("disabled"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid='tool-run-dry-run-managed']"));
     }
 
     [TestMethod]

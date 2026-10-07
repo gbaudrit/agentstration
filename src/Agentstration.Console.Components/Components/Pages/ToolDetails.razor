@@ -87,8 +87,14 @@ else
                     <p class="inline-warning" role="status">@T("ApprovalRequiredHelp")</p>
                 }
                 <div class="tool-run-input">
-                    <h3>@T("RunInput")</h3>
-                    <JsonSchemaInputEditor Schema="tool.Definition.Schema?.Input" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunValidation" Disabled="submitting" />
+                    <div class="tool-run-input-heading">
+                        <h3>@T("RunInput")</h3>
+                        @if (runMode == ToolRunMode.Simulate)
+                        {
+                            <span class="tool-run-managed-input" data-testid="tool-run-dry-run-managed">✓ @T("DryRunManaged")</span>
+                        }
+                    </div>
+                    <JsonSchemaInputEditor Schema="tool.Definition.Schema?.Input" Value="runInput" ValueChanged="ChangeRunInput" ValidationChanged="UpdateRunValidation" LockedValues="ManagedRunValues" Disabled="submitting" />
                 </div>
                 @if (runError is not null)
                 {
@@ -139,6 +145,10 @@ else
     [Parameter] public string Name { get; set; } = "";
     [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
     private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
+    private static readonly IReadOnlyDictionary<string, JsonElement> DryRunEnabled = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
+    {
+        [ToolDryRunContract.ParameterName] = JsonSerializer.SerializeToElement(true)
+    };
     private enum ToolDetailTab { Overview, Execution }
     private ToolResource? tool;
     private string? etag;
@@ -151,6 +161,7 @@ else
     private RunToolResponse? runResult;
     private ResourceNamespace ToolNamespace => ResourceNamespace.Parse(NamespaceValue);
     private bool CanSimulate => ToolDryRunContract.IsSupported(tool?.Definition.Schema?.Input);
+    private IReadOnlyDictionary<string, JsonElement>? ManagedRunValues => runMode == ToolRunMode.Simulate ? DryRunEnabled : null;
     private bool CanSubmit => tool is { Definition.Enabled: true }
         && tool.Definition.Discovery?.Available == true
         && runInputValid
@@ -182,7 +193,9 @@ else
         etag = value.ETag;
         activeTab = ToolDetailTab.Overview;
         runMode = CanSimulate ? ToolRunMode.Simulate : ToolRunMode.Execute;
-        runInput = JsonSerializer.SerializeToElement(new { });
+        runInput = CanSimulate
+            ? ToolDryRunContract.Enable(JsonSerializer.SerializeToElement(new { }))
+            : JsonSerializer.SerializeToElement(new { });
         runInputValid = true;
         runError = null;
         runResult = null;
@@ -199,9 +212,14 @@ else
     {
         if (mode == ToolRunMode.Simulate && !CanSimulate) return;
         runMode = mode;
+        if (CanSimulate)
+            runInput = ToolDryRunContract.Set(runInput, mode == ToolRunMode.Simulate);
         runError = null;
         runResult = null;
     }
+
+    private void ChangeRunInput(JsonElement value) =>
+        runInput = runMode == ToolRunMode.Simulate ? ToolDryRunContract.Enable(value) : value;
 
     private Task UpdateRunValidation(JsonSchemaInputValidationState validation)
     {

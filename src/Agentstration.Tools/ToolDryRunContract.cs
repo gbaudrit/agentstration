@@ -22,13 +22,16 @@ public static class ToolDryRunContract
     }
 
     public static JsonElement Enable(JsonElement arguments)
+        => Set(arguments, true);
+
+    public static JsonElement Set(JsonElement arguments, bool enabled)
     {
         if (arguments.ValueKind != JsonValueKind.Object)
             throw new ArgumentException("Tool arguments must be a JSON object to enable dry run.", nameof(arguments));
 
         var values = JsonNode.Parse(arguments.GetRawText())?.AsObject()
             ?? throw new ArgumentException("Tool arguments must be a JSON object to enable dry run.", nameof(arguments));
-        values[ParameterName] = true;
+        values[ParameterName] = enabled;
         return JsonSerializer.SerializeToElement(values);
     }
 

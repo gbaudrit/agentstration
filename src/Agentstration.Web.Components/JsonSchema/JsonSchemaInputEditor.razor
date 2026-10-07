@@ -19,7 +19,7 @@
     }
     else if (analysis.Root is not null)
     {
-        <JsonSchemaField Schema="analysis.Root" Value="document" ValueChanged="ChangeDocumentAsync" Disabled="@(Disabled || ReadOnly)" Issues="state.Issues" />
+        <JsonSchemaField Schema="analysis.Root" Value="document" ValueChanged="ChangeDocumentAsync" Disabled="@(Disabled || ReadOnly)" LockedPaths="lockedPaths" Issues="state.Issues" />
     }
 </section>
 
@@ -28,11 +28,13 @@
     [Parameter] public JsonElement Value { get; set; } = JsonSerializer.SerializeToElement(new { });
     [Parameter] public EventCallback<JsonElement> ValueChanged { get; set; }
     [Parameter] public EventCallback<JsonSchemaInputValidationState> ValidationChanged { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, JsonElement>? LockedValues { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public bool Disabled { get; set; }
     private JsonSchemaInputAnalysis analysis = new(null, "MissingSchema");
     private JsonObject document = [];
-    private string rawText = "{}", schemaKey = string.Empty, valueKey = string.Empty;
+    private string rawText = "{}", schemaKey = string.Empty, valueKey = string.Empty, lockedValuesKey = string.Empty;
+    private IReadOnlySet<string> lockedPaths = new HashSet<string>(StringComparer.Ordinal);
     private bool rawMode;
     private bool initialized;
     private bool canInitializeRawTemplate;
@@ -42,27 +44,34 @@
     {
         var nextSchemaKey = Schema?.GetRawText() ?? string.Empty;
         var nextValueKey = Value.ValueKind == JsonValueKind.Undefined ? "{}" : Value.GetRawText();
-        if (nextSchemaKey == schemaKey && nextValueKey == valueKey) return;
+        var nextLockedValuesKey = LockedValues is null
+            ? string.Empty
+            : string.Join('|', LockedValues.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => $"{item.Key}:{item.Value.GetRawText()}"));
+        if (nextSchemaKey == schemaKey && nextValueKey == valueKey && nextLockedValuesKey == lockedValuesKey) return;
         schemaKey = nextSchemaKey;
+        lockedValuesKey = nextLockedValuesKey;
+        lockedPaths = LockedValues?.Keys.Select(name => $"$.{name}").ToHashSet(StringComparer.Ordinal)
+            ?? new HashSet<string>(StringComparer.Ordinal);
         analysis = JsonSchemaInputModel.Analyze(Schema);
         if (!TryObject(nextValueKey, out var nextDocument)) nextDocument = [];
         document = nextDocument;
         var firstParameters = !initialized;
         var initializeEmpty = firstParameters && document.Count == 0;
         if (initializeEmpty && analysis.Root is not null) document = JsonSchemaInputModel.ApplyDefaults(document, analysis.Root);
+        ApplyLockedValues(document);
         if (firstParameters) canInitializeRawTemplate = initializeEmpty;
-        rawText = document.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        rawText = EditableDocument(document).ToJsonString(new JsonSerializerOptions { WriteIndented = true });
         valueKey = document.ToJsonString();
         if (!analysis.CanRender) rawMode = true;
         initialized = true;
         await PublishAsync(initializeEmpty);
     }
 
-    private async Task ChangeDocumentAsync(JsonNode? value) { canInitializeRawTemplate = false; document = value as JsonObject ?? []; rawText = document.ToJsonString(new JsonSerializerOptions { WriteIndented = true }); valueKey = document.ToJsonString(); await PublishAsync(true); }
+    private async Task ChangeDocumentAsync(JsonNode? value) { canInitializeRawTemplate = false; document = value as JsonObject ?? []; ApplyLockedValues(document); rawText = EditableDocument(document).ToJsonString(new JsonSerializerOptions { WriteIndented = true }); valueKey = document.ToJsonString(); await PublishAsync(true); }
     private async Task ChangeRawAsync(ChangeEventArgs args)
     {
         rawText = args.Value?.ToString() ?? string.Empty;
-        if (TryObject(rawText, out var parsed)) { document = parsed; valueKey = document.ToJsonString(); await PublishAsync(true); return; }
+        if (TryObject(rawText, out var parsed)) { document = parsed; ApplyLockedValues(document); rawText = EditableDocument(document).ToJsonString(new JsonSerializerOptions { WriteIndented = true }); valueKey = document.ToJsonString(); await PublishAsync(true); return; }
         state = new(false, null, [new("$", "InvalidJson")], !analysis.CanRender, analysis.FallbackReason);
         await ValidationChanged.InvokeAsync(state);
     }
@@ -73,11 +82,12 @@
             var template = JsonSchemaInputModel.CreateTemplate(analysis.Root);
             foreach (var property in document) template[property.Key] = property.Value?.DeepClone();
             document = template;
+            ApplyLockedValues(document);
             canInitializeRawTemplate = false;
             valueKey = document.ToJsonString();
             await PublishAsync(true);
         }
-        rawText = document.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        rawText = EditableDocument(document).ToJsonString(new JsonSerializerOptions { WriteIndented = true });
         rawMode = true;
     }
     private void ShowForm() { if (TryObject(rawText, out _)) rawMode = false; }
@@ -97,6 +107,19 @@
             ? Localizer["Validation.MinimumLength.One"]
             : Localizer[$"Validation.{issue.Code}", issue.Constraint ?? string.Empty];
         return $"{issue.Path}: {message}";
+    }
+    private void ApplyLockedValues(JsonObject target)
+    {
+        if (LockedValues is null) return;
+        foreach (var item in LockedValues)
+            target[item.Key] = JsonNode.Parse(item.Value.GetRawText());
+    }
+    private JsonObject EditableDocument(JsonObject source)
+    {
+        var editable = (JsonObject)source.DeepClone();
+        if (LockedValues is not null)
+            foreach (var name in LockedValues.Keys) editable.Remove(name);
+        return editable;
     }
     private static bool TryObject(string json, out JsonObject value) { try { value = JsonNode.Parse(json) as JsonObject ?? throw new JsonException(); return true; } catch (JsonException) { value = []; return false; } }
 }

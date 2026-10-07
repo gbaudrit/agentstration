@@ -8,7 +8,7 @@
 }
 
 .tool-runner {
-    max-width: 980px;
+    max-width: 1040px;
 }
 
 .tool-runner .panel-header p {
@@ -28,7 +28,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: 15px 17px;
+    min-height: 78px;
+    padding: 16px 18px;
     border: 1px solid var(--border);
     border-radius: 9px;
     background: var(--surface-2);
@@ -122,6 +123,27 @@
 .tool-run-input h3 {
     margin: 0;
     font-size: .95rem;
+}
+
+.tool-run-input-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+}
+
+.tool-run-managed-input {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 3px 10px;
+    border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+    border-radius: 999px;
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-size: .75rem;
+    font-weight: 700;
 }
 
 .tool-runner .schema-input-editor label,

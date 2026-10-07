@@ -9,6 +9,25 @@
     gap: .35rem;
 }
 
+.schema-field-locked {
+    width: fit-content;
+    min-width: min(100%, 16rem);
+    padding: .7rem .85rem;
+    border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+    border-radius: .55rem;
+    background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+}
+
+.schema-field-locked .schema-toggle {
+    color: var(--text);
+    font-weight: 650;
+}
+
+.schema-field-locked input:disabled {
+    accent-color: var(--primary);
+    opacity: 1;
+}
+
 .schema-field-object,
 .schema-field-array {
     grid-column: 1 / -1;
