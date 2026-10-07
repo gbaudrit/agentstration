@@ -142,7 +142,7 @@ public sealed class ArtifactAdministrationComponentTests
             "finalized, verified, and ready");
         StringAssert.Contains(
             rendered.Find(".artifact-status .metric-help").GetAttribute("class"),
-            "metric-help-right");
+            "metric-help-left");
         StringAssert.Contains(rendered.Markup, "index.html");
         StringAssert.Contains(
             rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']").TextContent,
