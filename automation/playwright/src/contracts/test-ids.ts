@@ -2,6 +2,7 @@ export const TestIds = {
   common: {
     iconPicker: 'icon-picker',
     schemaInputEditor: 'schema-input-editor',
+    schemaFormMode: 'schema-form-mode',
     schemaRawMode: 'schema-raw-mode',
   },
   console: {
@@ -79,6 +80,17 @@ export const TestIds = {
     triggers: 'resource-triggers',
     triggerDetails: 'resource-trigger-details',
     triggerEditor: 'resource-trigger-editor',
+  },
+  toolExecution: {
+    overviewTab: 'tool-overview-tab',
+    executionTab: 'tool-execution-tab',
+    runner: 'tool-runner',
+    simulateMode: 'tool-run-simulate-mode',
+    executeMode: 'tool-run-execute-mode',
+    dryRunManaged: 'tool-run-dry-run-managed',
+    submit: 'tool-run-submit',
+    result: 'tool-run-result',
+    output: 'tool-run-output',
   },
   secretGrants: {
     scopePicker: 'resource-scope-picker',
