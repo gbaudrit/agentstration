@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -73,6 +74,16 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         Assert.AreEqual("notes.txt", download.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
         Assert.AreEqual("notes.txt", download.Content.Headers.ContentDisposition?.FileNameStar);
         CollectionAssert.AreEqual(content, await download.Content.ReadAsByteArrayAsync());
+
+        using var rangeRequest = new HttpRequestMessage(HttpMethod.Get,
+            $"/api/artifacts/staged/{created.ArtifactId}/download?leaseId={lease.Id}");
+        rangeRequest.Headers.Range = new RangeHeaderValue(4, 11);
+        using var partialDownload = await client.SendAsync(rangeRequest);
+        Assert.AreEqual(HttpStatusCode.PartialContent, partialDownload.StatusCode);
+        Assert.AreEqual("bytes", partialDownload.Content.Headers.ContentRange?.Unit);
+        Assert.AreEqual(4, partialDownload.Content.Headers.ContentRange?.From);
+        Assert.AreEqual(11, partialDownload.Content.Headers.ContentRange?.To);
+        CollectionAssert.AreEqual(content[4..12], await partialDownload.Content.ReadAsByteArrayAsync());
     }
 
     [TestMethod]

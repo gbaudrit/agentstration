@@ -95,9 +95,10 @@ internal static class ArtifactEndpoints
         return stored is null
             ? Results.NotFound()
             : Results.Stream(
-                stream => WriteDownloadAsync(stream, service, stored.Value, parsedLeaseId, token),
+                new ArtifactReadStream(service, stored.Value, parsedLeaseId),
                 stored.Value.MediaType,
-                stored.Value.FileName);
+                stored.Value.FileName,
+                enableRangeProcessing: true);
     });
 
     private static Task<IResult> SealAsync(string id, ArtifactManagementService service, CancellationToken token) => ExecuteAsync(async () =>
@@ -187,23 +188,68 @@ internal static class ArtifactEndpoints
         Detail = detail
     });
 
-    private static async Task WriteDownloadAsync(
-        Stream stream,
+    private sealed class ArtifactReadStream(
         ArtifactManagementService service,
         StagedArtifactResource artifact,
-        ArtifactLeaseId? leaseId,
-        CancellationToken token)
+        ArtifactLeaseId? leaseId) : Stream
     {
-        long offset = 0;
-        while (offset < artifact.Length)
+        private long position;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => true;
+        public override bool CanWrite => false;
+        public override long Length => artifact.Length;
+
+        public override long Position
         {
-            var length = checked((int)Math.Min(ArtifactManagementService.MaximumChunkBytes, artifact.Length - offset));
-            var chunk = await service.ReadAsync(artifact.ArtifactId, offset, length, leaseId, token);
+            get => position;
+            set => Seek(value, SeekOrigin.Begin);
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (buffer.Length == 0 || position >= Length)
+                return 0;
+
+            var length = checked((int)Math.Min(
+                Math.Min(buffer.Length, ArtifactManagementService.MaximumChunkBytes),
+                Length - position));
+            var chunk = await service.ReadAsync(artifact.ArtifactId, position, length, leaseId, cancellationToken);
             var content = Convert.FromBase64String(chunk.ContentBase64);
             if (content.Length == 0)
                 throw new ArtifactValidationException("staged_artifact_download_no_progress", "The Artifact backend returned no content before the expected end.");
-            await stream.WriteAsync(content, token);
-            offset += content.Length;
+            if (content.Length > buffer.Length || position + content.Length > Length)
+                throw new ArtifactValidationException("staged_artifact_download_invalid_chunk", "The Artifact backend returned content outside the requested range.");
+
+            content.CopyTo(buffer);
+            position += content.Length;
+            return content.Length;
         }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            ReadArrayAsync(buffer.AsMemory(offset, count), cancellationToken);
+
+        private async Task<int> ReadArrayAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+            await ReadAsync(buffer, cancellationToken);
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            var target = origin switch
+            {
+                SeekOrigin.Begin => offset,
+                SeekOrigin.Current => checked(position + offset),
+                SeekOrigin.End => checked(Length + offset),
+                _ => throw new ArgumentOutOfRangeException(nameof(origin))
+            };
+            if (target < 0 || target > Length)
+                throw new IOException("Cannot seek outside the Artifact content bounds.");
+            position = target;
+            return position;
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void Flush() { }
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }
