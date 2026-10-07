@@ -136,6 +136,10 @@ public sealed class ArtifactAdministrationComponentTests
         rendered.FindAll("button").Single(value => value.TextContent.Contains("Local copies", StringComparison.Ordinal)).Click();
         Assert.IsNotNull(rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']"));
         Assert.IsNotNull(rendered.Find("a[href='/flow-runs/flow-run-1']"));
+        StringAssert.Contains(rendered.Markup, "Ready");
+        StringAssert.Contains(
+            rendered.Find(".artifact-status .metric-help").GetAttribute("aria-label"),
+            "finalized, verified, and ready");
         StringAssert.Contains(rendered.Markup, "index.html");
         StringAssert.Contains(
             rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']").TextContent,
@@ -156,6 +160,11 @@ public sealed class ArtifactAdministrationComponentTests
         list.WaitForElement("[data-testid='durable-artifact-row']");
         StringAssert.Contains(list.Markup, "Liste");
         StringAssert.Contains(list.Markup, "Copies locales");
+        list.FindAll("button").Single(value => value.TextContent.Contains("Copies locales", StringComparison.Ordinal)).Click();
+        StringAssert.Contains(list.Markup, "Prête");
+        StringAssert.Contains(
+            list.Find(".artifact-status .metric-help").GetAttribute("aria-label"),
+            "finalisée, vérifiée et prête");
 
         var details = context.Render<Agentstration.Web.Components.Pages.FlowRunArtifactDetails>(parameters =>
             parameters.Add(value => value.Id, client.Durable.ArtifactId.ToString()));
@@ -203,6 +212,10 @@ public sealed class ArtifactAdministrationComponentTests
             Assert.IsTrue(rendered.FindAll("a[href='/flow-runs/flow-run-1']").Count >= 2);
             Assert.IsNotNull(rendered.Find("a[href='/tools/sets/filesystem']"));
             Assert.IsNotNull(rendered.Find(".artifact-overview-metrics"));
+            StringAssert.Contains(rendered.Markup, "Ready");
+            StringAssert.Contains(
+                rendered.Find(".artifact-overview-metrics .metric-help").GetAttribute("aria-label"),
+                "finalized, verified, and ready");
         });
     }
 
