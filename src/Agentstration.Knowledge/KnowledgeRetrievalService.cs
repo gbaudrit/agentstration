@@ -212,9 +212,17 @@ public sealed class KnowledgeRetrievalService(
             {
                 var artifact = snapshot.Artifacts.Single(value => value.ArtifactId == requiredArtifactId);
                 var offset = request.GetProperty("offset").GetInt64();
-                if (offset > artifact.Length || request.GetProperty("length").GetInt64() > artifact.Length - offset)
+                if (offset >= artifact.Length)
                     throw Error("knowledge_read_range_outside_artifact",
                         "The requested range exceeds the selected Snapshot artifact length.");
+                var requestedLength = request.GetProperty("length").GetInt32();
+                var effectiveLength = checked((int)Math.Min(requestedLength, artifact.Length - offset));
+                request = JsonSerializer.SerializeToElement(new
+                {
+                    artifactId = requiredArtifactId,
+                    offset,
+                    length = effectiveLength
+                }, JsonOptions);
             }
 
             var retrievalId = $"retrieval-{Guid.NewGuid():N}";

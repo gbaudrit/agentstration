@@ -419,8 +419,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         var read = await retrieval.ReadAsync(new("builtin-knowledge"), new ReadKnowledgeRequest
         {
             ArtifactId = durableId.ToString(),
-            Offset = 0,
-            Length = content.Length
+            Offset = 0
         }, default);
         Assert.HasCount(1, read.Items);
         Assert.AreEqual("Agentstration builtin retrieval is deterministic.", read.Items[0].Content);
