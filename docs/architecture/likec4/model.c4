@@ -35,6 +35,18 @@ model {
             description 'Agent configuration, revisions, deployments, and provisioning transport'
           }
 
+          artifactsApi = component 'Artifacts.Api' {
+            description 'Staged and durable Artifact metadata, content materialization, and governed lifecycle transport'
+          }
+
+          dataSourcesApi = component 'DataSources.Api' {
+            description 'Data Source profiles, origins, governed acquisitions, and exact provenance transport'
+          }
+
+          knowledgeApi = component 'Knowledge.Api' {
+            description 'Knowledge Source projections, immutable Snapshots, retrieval, and source-specific Tool exposure transport'
+          }
+
           modelsApi = component 'Models.Api' {
             description 'Model Provider, Model Profile, discovery, and diagnostics transport'
           }
@@ -114,7 +126,7 @@ model {
       }
 
       resources = component 'Resource-family services' {
-        description 'Family-owned lifecycle services for Agents, Models, Entries, Triggers, Extensions, Sources, Secrets, and related resources'
+        description 'Family-owned lifecycle services for Agents, Models, Entries, Triggers, Extensions, Sources, Data Sources, Artifacts, Knowledge, Secrets, and related resources'
       }
 
       distribution = component 'Distribution and bootstrap' {
@@ -216,6 +228,9 @@ model {
   agentstration.server.transport -> agentstration.server.tools 'Delegates MCP and Tool use cases'
   agentstration.server.transport.apiHost -> agentstration.server.transport.apiAggregator 'Registers and maps'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.agentsApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.artifactsApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.dataSourcesApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.knowledgeApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.bootstrapApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.extensionsApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.executionApis.flowsApi 'Composes'

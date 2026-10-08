@@ -58,22 +58,27 @@ Fetch and crawl results never embed the acquired document. Each result returns o
 
 `content_read` accepts the reference, a zero-based byte offset, and an optional bounded byte count. It returns the same offset, base64 content, and an end-of-content flag. Callers advance the offset by the decoded byte count.
 
-## Ingestion Flow composition
+## Data Source acquisition Flow composition
 
-A typical site ingestion Flow is:
+A typical site acquisition Flow is:
 
 ```text
-Knowledge Source identifier and acquisition parameters
+Data Source identity, resolved profile evidence, and acquisition parameters
   -> route to the selected acquisition ToolSet
   -> web_crawl and select its opaque normalized corpus reference
   -> StagedArtifact create
   -> repeat content_read -> StagedArtifact write
   -> StagedArtifact seal
   -> content_delete
-  -> parsing, chunking, indexing, or a Storage Flow
+  -> Storage Flow
+  -> bounded publishable Artifact manifest
 ```
 
 The temporary Crawl4AI reference is not an Agentstration `StagedArtifact`. It is intentionally local to the extension and expires. A Flow must transfer content through the governed staging Tools before handing it to a remote Agent, another Flow, or durable storage. On retry, `content_delete` is safe to repeat; an expired reference requires acquisition to restart.
+
+The extension contributes the `crawl4ai-web` Data Source Profile bundle. The bundle contains the exact ToolSet, bounded chunk-transfer Flow, `datasource.acquisition/v1` Flow, and Data Source Profile needed by this composition. Bundle installation is host-owned and explicit today; automatic installation in the extension's scope during enrollment is tracked by [#696](https://github.com/gbaudrit/agentstration/issues/696).
+
+The resulting durable Artifact is independent of Knowledge. A Knowledge Source may later bind this Data Source and preserve the corpus unchanged through `knowledge-projection-builtin`, or apply an explicit `artifact.transform/v1` Flow before projection.
 
 ## Limits and destination policy
 
