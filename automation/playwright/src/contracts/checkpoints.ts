@@ -84,6 +84,10 @@ export const Checkpoints = {
     directRoute: 'platform-health-direct-route',
     afterNavigation: 'platform-health-after-navigation',
   },
+  platformOverview: {
+    content: 'platform-overview-content',
+    responsive: 'platform-overview-responsive',
+  },
   descendantSecrets: {
     vaultCreated: 'descendant-secrets-vault-created',
     vaultUnavailable: 'descendant-secrets-vault-unavailable',
@@ -105,6 +109,14 @@ export const Checkpoints = {
     parameterPersisted: 'resource-naming-parameter-persisted',
     immutable: 'resource-naming-immutable',
     conflict: 'resource-naming-conflict',
+  },
+  toolExecution: {
+    overview: 'tool-execution-overview',
+    simulationReady: 'tool-execution-simulation-ready',
+    simulationResult: 'tool-execution-simulation-result',
+    realResult: 'tool-execution-real-result',
+    simulationUnavailable: 'tool-execution-simulation-unavailable',
+    approvalRequired: 'tool-execution-approval-required',
   },
   foundrySecretBinding: {
     providerCreated: 'foundry-secret-binding-provider-created',

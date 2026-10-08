@@ -66,10 +66,13 @@ public static class Crawl4AiDataSourceProfileBundle
                 name: output
                 displayName: Chunk progress
                 outputMapping: { contentReference: "${input.contentReference}", stagedArtifactId: "${input.stagedArtifactId}", nextOffset: "${steps.read.output.structuredContent.nextOffset}", endOfContent: "${steps.read.output.structuredContent.endOfContent}" }
+              - { type: failure, name: failure, displayName: Transfer failed }
             transitions:
               - { id: input-read, fromStep: input, event: completed, toStep: read }
-              - { id: read-write, fromStep: read, event: completed, toStep: write }
-              - { id: write-output, fromStep: write, event: completed, toStep: output }
+              - { id: read-write, fromStep: read, event: success, toStep: write }
+              - { id: read-failure, fromStep: read, event: error, toStep: failure }
+              - { id: write-output, fromStep: write, event: success, toStep: output }
+              - { id: write-failure, fromStep: write, event: error, toStep: failure }
             outputSchema:
               type: object
               properties: { contentReference: { type: string }, stagedArtifactId: { type: string }, nextOffset: { type: integer }, endOfContent: { type: boolean } }
@@ -155,14 +158,20 @@ public static class Crawl4AiDataSourceProfileBundle
                 outputMapping:
                   artifacts:
                     - { artifactId: "${steps.persist.output.flowRunArtifactId}", kind: durable, disposition: publishable, name: "${input.dataSourceId}", mediaType: "${steps.seal.output.MediaType}", digest: "${steps.seal.output.Sha256}" }
+              - { type: failure, name: failure, displayName: Acquisition failed }
             transitions:
               - { id: input-crawl, fromStep: input, event: completed, toStep: crawl }
-              - { id: crawl-create, fromStep: crawl, event: completed, toStep: create }
-              - { id: create-transfer, fromStep: create, event: completed, toStep: transfer }
+              - { id: crawl-create, fromStep: crawl, event: success, toStep: create }
+              - { id: crawl-failure, fromStep: crawl, event: error, toStep: failure }
+              - { id: create-transfer, fromStep: create, event: success, toStep: transfer }
+              - { id: create-failure, fromStep: create, event: error, toStep: failure }
               - { id: transfer-seal, fromStep: transfer, event: completed, toStep: seal }
-              - { id: seal-persist, fromStep: seal, event: completed, toStep: persist }
+              - { id: seal-persist, fromStep: seal, event: success, toStep: persist }
+              - { id: seal-failure, fromStep: seal, event: error, toStep: failure }
               - { id: persist-cleanup, fromStep: persist, event: completed, toStep: cleanup }
-              - { id: cleanup-output, fromStep: cleanup, event: completed, toStep: output }
+              - { id: persist-failure, fromStep: persist, event: error, toStep: failure }
+              - { id: cleanup-output, fromStep: cleanup, event: success, toStep: output }
+              - { id: cleanup-failure, fromStep: cleanup, event: error, toStep: failure }
             outputSchema:
               type: object
               properties: { artifacts: { type: array, items: { type: object } } }

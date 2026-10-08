@@ -201,12 +201,14 @@ public sealed partial class FlowTests
         [
             new InputFlowStepDefinition { Name = "input" },
             new AgentFlowStepDefinition { Name = "read", Agent = new("chunk-agent"), InputMapping = JsonSerializer.SerializeToElement("${input}") },
-            new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.read.output}") }
+            new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.read.output}") },
+            new FailureFlowStepDefinition { Name = "failure", Code = "CHUNK_READ_FAILED", Message = "The chunk could not be read." }
         ],
         Transitions =
         [
             new("input-read", "input", "completed", "read"),
-            new("read-output", "read", "completed", "output")
+            new("read-output", "read", "success", "output"),
+            new("read-failure", "read", "error", "failure")
         ]
     };
 

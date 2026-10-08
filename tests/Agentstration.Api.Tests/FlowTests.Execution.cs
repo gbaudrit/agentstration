@@ -216,6 +216,35 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task GraphAgentFailureUsesErrorTransition()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "agent",
+            Steps =
+            [
+                new AgentFlowStepDefinition { Name = "agent", Agent = new("sql-expert") },
+                new FailureFlowStepDefinition { Name = "failure", Code = "HANDLED_AGENT_ERROR" }
+            ],
+            Transitions = [new("agent-error", "agent", "error", "failure")]
+        };
+        var now = TimeProvider.System.GetUtcNow();
+        var draft = new FlowDraft { WorkspaceId = TestScope.WorkspaceId, Id = "handled-failure-draft", FlowId = new("handled-failure-run"), DisplayName = "Handled failure", Definition = graph, CreatedAt = now, UpdatedAt = now };
+        var expressions = new FlowExpressionParser();
+        var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), new FailingAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(), new TestFlowRunExecutionScope(), TimeProvider.System);
+        using var input = JsonDocument.Parse("{}");
+
+        var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", "handled-failure-correlation", input.RootElement, TestScope, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
+
+        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Failed, completed.Status);
+        Assert.AreEqual("agent-error", completed.Steps.Single(step => step.StepName == "agent").SelectedTransition);
+        Assert.AreEqual("HANDLED_AGENT_ERROR", completed.Error?.Code);
+    }
+
+    [TestMethod]
     public async Task GraphToolStepMapsArgumentsAndExposesItsOutput()
     {
         await using var fixture = await FlowFixture.CreateAsync();
@@ -236,7 +265,7 @@ public sealed partial class FlowTests
             Transitions =
             [
                 new("input-notify", "input", "completed", "notify"),
-                new("notify-output", "notify", "completed", "output")
+                new("notify-output", "notify", "success", "output")
             ]
         };
         var now = TimeProvider.System.GetUtcNow();
@@ -290,12 +319,14 @@ public sealed partial class FlowTests
                         ContentMapping = JsonSerializer.SerializeToElement("${step.output.message}")
                     }
                 },
-                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.notify.output}") }
+                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.notify.output}") },
+                new FailureFlowStepDefinition { Name = "failure", Code = "NOTIFICATION_FAILED", Message = "The notification failed." }
             ],
             Transitions =
             [
                 new("input-notify", "input", "completed", "notify"),
-                new("notify-output", "notify", "completed", "output")
+                new("notify-output", "notify", "success", "output"),
+                new("notify-failure", "notify", "error", "failure")
             ]
         };
         var now = TimeProvider.System.GetUtcNow();
@@ -357,12 +388,14 @@ public sealed partial class FlowTests
                         Clean = FlowStepArtifactCleanupMode.Never
                     }
                 },
-                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.answer.output}") }
+                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.answer.output}") },
+                new FailureFlowStepDefinition { Name = "failure", Code = "ANSWER_FAILED", Message = "The answer failed." }
             ],
             Transitions =
             [
                 new("input-answer", "input", "completed", "answer"),
-                new("answer-output", "answer", "completed", "output")
+                new("answer-output", "answer", "success", "output"),
+                new("answer-failure", "answer", "error", "failure")
             ]
         };
         var now = TimeProvider.System.GetUtcNow();

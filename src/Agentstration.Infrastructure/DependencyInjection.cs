@@ -445,13 +445,11 @@ public static class DependencyInjection
         services.AddScoped<AepDataSourceProfileBundleInstaller>();
         services.AddSingleton<IKnowledgeProjectionInputResolver, KnowledgeProjectionInputResolver>();
         services.AddSingleton<IKnowledgeProjectionFlowGateway, KnowledgeProjectionFlowGateway>();
-        services.AddSingleton<IKnowledgeAcquisitionFlowGateway, KnowledgeAcquisitionFlowGateway>();
         services.AddSingleton<IKnowledgeRetrievalFlowGateway, KnowledgeRetrievalFlowGateway>();
         services.AddSingleton<IKnowledgeArtifactReferenceValidator, KnowledgeArtifactReferenceValidator>();
         services.AddSingleton<IKnowledgeSnapshotArtifactResolver, KnowledgeSnapshotArtifactResolver>();
         services.AddSingleton<KnowledgeSnapshotService>();
         if (enableHostedServices) services.AddHostedService<DataSourceAcquisitionRecoveryWorker>();
-        if (enableHostedServices) services.AddHostedService<KnowledgeSnapshotRecoveryWorker>();
         services.AddSingleton<KnowledgeSourceToolExposureService>();
         services.AddSingleton<IFlowVersionActivationGuard, ToolDefinitionFlowActivationGuard>();
         services.AddSingleton<IFlowVersionActivationGuard, KnowledgeFlowActivationGuard>();

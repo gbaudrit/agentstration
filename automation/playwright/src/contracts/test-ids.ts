@@ -1,6 +1,9 @@
 export const TestIds = {
   common: {
     iconPicker: 'icon-picker',
+    schemaInputEditor: 'schema-input-editor',
+    schemaFormMode: 'schema-form-mode',
+    schemaRawMode: 'schema-raw-mode',
   },
   console: {
     shell: 'console-shell',
@@ -100,6 +103,17 @@ export const TestIds = {
     durableMaterializationHistory: 'durable-artifact-materialization-history',
     durableHistoryDownload: 'durable-artifact-history-download',
   },
+  toolExecution: {
+    overviewTab: 'tool-overview-tab',
+    executionTab: 'tool-execution-tab',
+    runner: 'tool-runner',
+    simulateMode: 'tool-run-simulate-mode',
+    executeMode: 'tool-run-execute-mode',
+    dryRunManaged: 'tool-run-dry-run-managed',
+    submit: 'tool-run-submit',
+    result: 'tool-run-result',
+    output: 'tool-run-output',
+  },
   secretGrants: {
     scopePicker: 'resource-scope-picker',
     vaultName: 'vault-name',
@@ -197,6 +211,9 @@ export const TestIds = {
   flowObservability: {
     flows: 'flow-observability-flows',
     flowDetails: 'flow-observability-flow-details',
+    runOpen: 'flow-run-open',
+    runDialog: 'flow-run-dialog',
+    runSubmit: 'flow-run-submit',
     designer: 'flow-observability-designer',
     designerSave: 'flow-designer-save',
     designerValidate: 'flow-designer-validate',

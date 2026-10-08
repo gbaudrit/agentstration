@@ -173,7 +173,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             await projectionResponse.Content.ReadAsStringAsync());
         var projection = await projectionResponse.Content.ReadFromJsonAsync<KnowledgeProjectionResource>();
         Assert.IsNotNull(projection);
-        Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, projection.State, projection.ErrorMessage);
+        Assert.AreEqual(KnowledgeProjectionState.Succeeded, projection.State, projection.ErrorMessage);
         Assert.IsNotNull(projection.SnapshotName);
 
         using var secondProjectionResponse = await client.PostAsJsonAsync(
@@ -183,7 +183,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             await secondProjectionResponse.Content.ReadAsStringAsync());
         var secondProjection = await secondProjectionResponse.Content.ReadFromJsonAsync<KnowledgeProjectionResource>();
         Assert.IsNotNull(secondProjection);
-        Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, secondProjection.State, secondProjection.ErrorMessage);
+        Assert.AreEqual(KnowledgeProjectionState.Succeeded, secondProjection.State, secondProjection.ErrorMessage);
         Assert.IsNotNull(secondProjection.SnapshotName);
         Assert.AreNotEqual(projection.Name, secondProjection.Name);
         Assert.AreNotEqual(projection.SnapshotName, secondProjection.SnapshotName);
@@ -253,24 +253,6 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         Assert.AreEqual(KnowledgeFlowContracts.Projection, readiness.Projection?.Contract);
         Assert.AreEqual(KnowledgeFlowContracts.Retrieval, readiness.Retrieval?.Contract);
 
-        var removedShape = new KnowledgeSourceResource
-        {
-            ApiVersion = ResourceApiVersions.CoreV1,
-            Kind = KnowledgeResourceKinds.KnowledgeSource,
-            Metadata = new() { Name = "legacy-direct-acquisition" },
-            ScopeRef = scope,
-            Definition = new()
-            {
-                DisplayName = "Legacy direct acquisition",
-                Enabled = false,
-                Profile = new("web-builtin"),
-                AcquisitionConfiguration = JsonSerializer.SerializeToElement(new { url = "https://example.test" }),
-                IngestionFlow = new() { Name = KnowledgePlatformResourceProvisioner.WebAcquisitionFlowName }
-            }
-        };
-        var rejected = await Assert.ThrowsAsync<KnowledgeSourceValidationException>(() =>
-            sources.CreateAsync(removedShape, default));
-        Assert.AreEqual("knowledge_source_data_sources_invalid", rejected.Code);
     }
 
     private sealed class StubHttpFetcher(Func<HttpFetchRequest, HttpFetchResult> fetch) : IHttpContentFetcher

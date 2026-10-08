@@ -101,6 +101,10 @@ public sealed record FlowRun
     public required FlowRunScope Scope { get; init; }
     public required JsonElement Input { get; init; }
     public JsonElement? Output { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? OutputName { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public FlowOutputOutcome? OutputOutcome { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }

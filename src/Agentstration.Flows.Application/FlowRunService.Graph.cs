@@ -28,6 +28,9 @@ public sealed partial class FlowRunService
             .Select(step => step.StepName)
             .ToHashSet(StringComparer.Ordinal);
         JsonElement? finalOutput = null;
+        string? finalOutputName = null;
+        FlowOutputOutcome? finalOutputOutcome = null;
+        FlowRunError? finalError = null;
         for (var count = executed.Count; count < graph.Steps.Count; count++)
         {
             runToken.ThrowIfCancellationRequested();
@@ -122,11 +125,11 @@ public sealed partial class FlowRunService
                             new FlowTargetReference(FlowTargetKind.Agent, agentId, Namespace: agent.Agent.Namespace ?? stored.Value.FlowId.Namespace),
                             resolvedInput,
                             stored.Value.CorrelationId!), runToken);
-                        output = agentResult.Output.Clone(); eventName = "completed";
+                        output = agentResult.Output.Clone(); eventName = "success";
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
                     {
-                        output = JsonSerializer.SerializeToElement(new { error = exception.Message }); eventName = "failed";
+                        output = JsonSerializer.SerializeToElement(new { error = exception.Message }); eventName = "error";
                         stepError = new FlowRunError("agent_step_failed", "The Agent step failed.", exception.Message);
                     }
                     break;
@@ -154,12 +157,12 @@ public sealed partial class FlowRunService
                             tool.Tool,
                             arguments), runToken);
                         output = toolResult.Output?.Clone();
-                        eventName = "completed";
+                        eventName = "success";
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
                     {
                         output = JsonSerializer.SerializeToElement(new { error = exception.Message });
-                        eventName = "failed";
+                        eventName = "error";
                         stepError = exception is FlowValidationException validation
                             ? new FlowRunError(validation.Code, "The Tool step failed.", validation.Message)
                             : new FlowRunError("tool_step_failed", "The Tool step failed.", exception.Message);
@@ -195,12 +198,12 @@ public sealed partial class FlowRunService
                             resolvedRoute.Tool,
                             routeArguments), runToken);
                         output = toolResult.Output?.Clone();
-                        eventName = "completed";
+                        eventName = "success";
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
                     {
                         output = JsonSerializer.SerializeToElement(new { error = exception.Message });
-                        eventName = "failed";
+                        eventName = "error";
                         stepError = exception is FlowValidationException validation
                             ? new FlowRunError(validation.Code, "The ToolRoute step failed.", validation.Message)
                             : new FlowRunError("tool_route_step_failed", "The ToolRoute step failed.", exception.Message);
@@ -227,14 +230,14 @@ public sealed partial class FlowRunService
                     }
                     output = child.Value.Output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
                     childResult = child.Value;
-                    eventName = child.Value.Status switch
+                    eventName = child.Value.OutputName ?? (child.Value.Status switch
                     {
                         FlowRunStatus.Succeeded => "completed",
                         FlowRunStatus.Failed => "failed",
                         FlowRunStatus.TimedOut => "timedOut",
                         FlowRunStatus.Cancelled => "cancelled",
                         _ => throw new InvalidOperationException($"Child Flow Run '{childRunId}' has unsupported terminal status '{child.Value.Status}'.")
-                    };
+                    });
                     if (child.Value.Status != FlowRunStatus.Succeeded)
                     {
                         var childError = child.Value.Error;
@@ -315,9 +318,29 @@ public sealed partial class FlowRunService
                     output = terminal.OutputMapping is null
                         ? transitionOutput?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
                         : await ResolveJsonAsync(terminal.OutputMapping.Value, context, runToken);
-                    finalOutput = output; eventName = "completed"; break;
+                    finalOutput = output;
+                    finalOutputName = terminal.Outcome.HasValue ? terminal.Name : null;
+                    finalOutputOutcome = terminal.Outcome ?? FlowOutputOutcome.Success;
+                    eventName = terminal.Outcome.HasValue ? terminal.Name : "completed";
+                    if (terminal.Outcome == FlowOutputOutcome.Error)
+                    {
+                        var details = terminal.DetailsExpression is null
+                            ? null
+                            : await ResolveStringAsync(terminal.DetailsExpression, context, runToken);
+                        stepError = finalError = new FlowRunError(
+                            terminal.Code ?? "FLOW_FAILED",
+                            terminal.Message ?? "Flow execution failed.",
+                            details);
+                    }
+                    break;
                 case FailureFlowStepDefinition failure:
-                    throw new FlowValidationException(failure.Code, failure.Message);
+                    output = JsonSerializer.SerializeToElement(new { error = failure.Message, code = failure.Code });
+                    finalOutput = output;
+                    finalOutputName = null;
+                    finalOutputOutcome = FlowOutputOutcome.Error;
+                    eventName = failure.Name;
+                    stepError = finalError = new FlowRunError(failure.Code, failure.Message, failure.DetailsExpression);
+                    break;
                 default:
                     throw new FlowValidationException("flow_step_type_unsupported", $"Step '{step.Name}' has an unsupported type.");
             }
@@ -362,7 +385,7 @@ public sealed partial class FlowRunService
             else if (agentResult is not null) stored = await FinishAgentStepAsync(stored, agentResult, runToken, transition?.Id, step.Name, artifacts);
             else if (toolRouteResolution is not null) stored = await FinishToolRouteStepAsync(stored, step.Name, output, transition?.Id, toolRouteResolution, runToken, artifacts);
             else stored = await FinishGraphStepAsync(stored, step.Name, output, transition?.Id, runToken, artifacts);
-            if (step is OutputFlowStepDefinition) break;
+            if (step is OutputFlowStepDefinition or FailureFlowStepDefinition) break;
             if (transition is null && stepError is not null)
                 throw new FlowValidationException(stepError.Code, stepError.Details ?? stepError.Message);
             if (transition is null) throw new FlowValidationException("flow_transition_missing", $"No '{eventName}' transition leaves step '{step.Name}'.");
@@ -375,15 +398,32 @@ public sealed partial class FlowRunService
         var finalSteps = stored.Value.Steps.Select(step => step.Status == FlowStepRunStatus.NotStarted ? step with { Status = FlowStepRunStatus.Skipped, CompletedAt = now } : step).ToArray();
         await SaveAsync(stored, stored.Value with
         {
-            Status = FlowRunStatus.Succeeded,
+            Status = finalOutputOutcome == FlowOutputOutcome.Error ? FlowRunStatus.Failed : FlowRunStatus.Succeeded,
             Output = finalOutput.Value.Clone(),
+            OutputName = finalOutputName,
+            OutputOutcome = finalOutputOutcome,
+            Error = finalError,
             CompletedAt = now,
             Steps = finalSteps,
             ExecutionLeaseId = null,
             ExecutionLeaseExpiresAt = null
         }, stoppingToken);
-        RecordCompletion(stored.Value.CreatedAt, now, stored.Value.DefinitionState);
-        await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.FlowRunCompleted, null, null, stoppingToken);
+        if (finalOutputOutcome == FlowOutputOutcome.Error)
+        {
+            RunsFailed.Add(1, new KeyValuePair<string, object?>("flow.definition.state", stored.Value.DefinitionState.ToString()));
+            RunDuration.Record(Math.Max(0, (now - stored.Value.CreatedAt).TotalSeconds), new KeyValuePair<string, object?>("flow.status", FlowRunStatus.Failed.ToString()));
+        }
+        else
+        {
+            RecordCompletion(stored.Value.CreatedAt, now, stored.Value.DefinitionState);
+        }
+        await EmitAsync(
+            stored.Value.WorkspaceId,
+            stored.Value.Id,
+            finalOutputOutcome == FlowOutputOutcome.Error ? FlowRunEventType.FlowRunFailed : FlowRunEventType.FlowRunCompleted,
+            null,
+            JsonSerializer.SerializeToElement(new { outputName = finalOutputName, outcome = finalOutputOutcome }),
+            stoppingToken);
     }
 
     private async Task CleanupStepArtifactsAsync(

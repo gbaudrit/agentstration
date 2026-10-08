@@ -28,7 +28,91 @@ public sealed class FlowDiagramMapperTests
         Assert.AreEqual(FlowDiagramNode.RenderedWidth, projection.NodesByName["input"].Size!.Width);
         Assert.AreEqual(FlowDiagramNode.RenderedHeight, projection.NodesByName["input"].Size!.Height);
         Assert.AreEqual("done", projection.Links.Single().Id);
-        Assert.AreSame(projection.NodesByName["input"].Output, ((SinglePortAnchor)projection.Links.Single().Source).Port);
+        Assert.AreSame(projection.NodesByName["input"].Outputs.Single(), ((SinglePortAnchor)projection.Links.Single().Source).Port);
         Assert.AreSame(projection.NodesByName["output"].Input, ((SinglePortAnchor)projection.Links.Single().Target).Port);
+    }
+
+    [TestMethod]
+    public void PortsOnlyAllowOutputToInputConnectionsBetweenDifferentCompatibleNodes()
+    {
+        var input = new FlowDiagramNode(new("input", "input", "Input", new(0, 0), null, ["completed"]));
+        var transform = new FlowDiagramNode(new("transform", "transform", "Transform", new(200, 0), null, ["completed"]));
+        var output = new FlowDiagramNode(new("output", "output", "Output", new(400, 0), null, []));
+
+        Assert.IsTrue(input.Outputs.Single().CanAttachTo(transform.Input));
+        Assert.IsTrue(transform.Input.CanAttachTo(input.Outputs.Single()));
+        Assert.IsFalse(input.Outputs.Single().CanAttachTo(transform.Outputs.Single()));
+        Assert.IsFalse(transform.Input.CanAttachTo(transform.Outputs.Single()));
+        Assert.IsFalse(transform.Outputs.Single().CanAttachTo(input.Input));
+        Assert.IsEmpty(output.Outputs);
+
+        input.Locked = true;
+        Assert.IsFalse(input.Outputs.Single().CanAttachTo(transform.Input));
+    }
+
+    [TestMethod]
+    public void ProjectCreatesSemanticOutputPortsAndBindsLinksToTheirEvent()
+    {
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "condition",
+            Steps =
+            [
+                new ConditionFlowStepDefinition { Name = "condition", Left = "${input.ready}", Operator = "equals", Right = "true" },
+                new OutputFlowStepDefinition { Name = "accepted" },
+                new FailureFlowStepDefinition { Name = "rejected" }
+            ],
+            Transitions =
+            [
+                new("accepted", "condition", "true", "accepted"),
+                new("rejected", "condition", "false", "rejected")
+            ]
+        };
+
+        var projection = FlowDiagramMapper.Project(FlowDesignerDocument.From(definition));
+        var condition = projection.NodesByName["condition"];
+
+        CollectionAssert.AreEqual(new[] { "true", "false" }, condition.Outputs.Select(port => port.EventName).ToArray());
+        Assert.AreSame(condition.Outputs[0], ((SinglePortAnchor)projection.Links.Single(link => link.Id == "accepted").Source).Port);
+        Assert.AreSame(condition.Outputs[1], ((SinglePortAnchor)projection.Links.Single(link => link.Id == "rejected").Source).Port);
+    }
+
+    [TestMethod]
+    public void ProjectPreservesExistingFlowCallOutputEventsUntilResolvedOutputsAreAvailable()
+    {
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "child",
+            Steps =
+            [
+                new FlowCallStepDefinition { Name = "child", Flow = new("child-flow") },
+                new OutputFlowStepDefinition { Name = "approved" }
+            ],
+            Transitions = [new("approved", "child", "approved", "approved")]
+        };
+
+        var projection = FlowDiagramMapper.Project(FlowDesignerDocument.From(definition));
+
+        Assert.AreEqual("approved", projection.NodesByName["child"].Outputs.Single().EventName);
+        Assert.HasCount(1, projection.Links);
+    }
+
+    [TestMethod]
+    public void ProjectCreatesSuccessAndErrorPortsForAgentAndToolSteps()
+    {
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "agent",
+            Steps =
+            [
+                new AgentFlowStepDefinition { Name = "agent", Agent = new("assistant") },
+                new ToolFlowStepDefinition { Name = "tool", Tool = new("notification.send") }
+            ]
+        };
+
+        var document = FlowDesignerDocument.From(definition);
+
+        CollectionAssert.AreEqual(new[] { "success", "error" }, document.Nodes.Single(node => node.Name == "agent").OutputEvents.ToArray());
+        CollectionAssert.AreEqual(new[] { "success", "error" }, document.Nodes.Single(node => node.Name == "tool").OutputEvents.ToArray());
     }
 }

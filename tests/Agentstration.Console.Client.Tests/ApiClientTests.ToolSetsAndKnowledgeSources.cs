@@ -138,7 +138,7 @@ public sealed partial class ApiClientTests
         RetrievalFlow = new("retrieve", @namespace, "1.0.0", false, null, null,
             KnowledgeFlowContracts.Retrieval),
         ProjectionFlowRunId = "flowrun-projection-test",
-        State = KnowledgeAcquisitionState.Succeeded,
+        State = KnowledgeProjectionState.Succeeded,
         CorrelationId = "projection-test",
         CreatedBy = Guid.NewGuid(),
         TenantId = Guid.NewGuid(),

@@ -30,23 +30,11 @@ else if (source is not null && readiness is not null)
             <MetricCard Label="@T("ToolExposure")" Value="@(exposure is null ? T("NotPublished") : exposure.ToolSetVersion)" Detail="@(exposure is null ? T("ExposureHelp") : $"{exposure.ToolSet.Name} · {exposure.Operations.Count} {T("Operations")}")" Status="@(exposure is null ? UiStatus.Neutral : UiStatus.Success)" />
         </section>
         <section class="panel form-section knowledge-flow-composition">
-            <div class="panel-header"><div><p class="eyebrow">@T("FlowBindings")</p><h2>@T("ResolvedFlows")</h2><p>@T(readiness.Profile is null ? "ResolvedLegacyFlowsHelp" : "ResolvedProfileFlowsHelp")</p></div><button class="button-secondary" type="button" disabled="@busy" @onclick="ToggleEnabledAsync">@T(source.Definition.Enabled ? "DisableSource" : "EnableSource")</button></div>
-            @if (readiness.Profile is { } resolvedProfile)
-            {
-                <a class="knowledge-profile-card" href="@ProfileUrl(resolvedProfile)" data-testid="knowledge-source-profile-link">
-                    <span class="knowledge-composition-icon"><UiIcon Name="books" /></span>
-                    <span><small>@T("ResolvedProfile")</small><strong>@resolvedProfile.Name</strong><code>@resolvedProfile.Namespace · @resolvedProfile.Version</code></span>
-                    <UiIcon Name="arrow-right" />
-                </a>
-            }
+            <div class="panel-header"><div><p class="eyebrow">@T("FlowBindings")</p><h2>@T("ResolvedFlows")</h2><p>@T("ResolvedFlowsHelp")</p></div><button class="button-secondary" type="button" disabled="@busy" @onclick="ToggleEnabledAsync">@T(source.Definition.Enabled ? "DisableSource" : "EnableSource")</button></div>
             <div class="knowledge-flow-grid">
                 @if (readiness.Projection is { } projection)
                 {
                     <a class="knowledge-flow-card" href="@FlowUrl(projection)" data-testid="knowledge-projection-flow-link"><span class="knowledge-composition-icon"><UiIcon Name="workflow" /></span><span><small>@T("ProjectionFlow")</small><strong>@projection.Name</strong><code>@FlowIdentity(projection)</code></span><UiIcon Name="arrow-right" /></a>
-                }
-                @if (readiness.Ingestion is { } ingestion)
-                {
-                    <a class="knowledge-flow-card" href="@FlowUrl(ingestion)" data-testid="knowledge-ingestion-flow-link"><span class="knowledge-composition-icon"><UiIcon Name="workflow" /></span><span><small>@T("IngestionFlow")</small><strong>@ingestion.Name</strong><code>@FlowIdentity(ingestion)</code></span><UiIcon Name="arrow-right" /></a>
                 }
                 @if (readiness.Retrieval is { } retrieval)
                 {
@@ -61,24 +49,7 @@ else if (source is not null && readiness is not null)
     }
     else if (activeTab == DetailsTab.Definition)
     {
-        @if (IsProjected)
-        {
-            <KnowledgeSourceEditor Name="@Name" Embedded="true" Saved="SourceProjectionSaved" />
-        }
-        else
-        {
-        <EditForm Model="this" OnValidSubmit="SaveDefinitionAsync" class="panel form-section" data-testid="knowledge-source-definition-form">
-            <div class="panel-header"><div><p class="eyebrow">@T("Definition")</p><h2>@T("SourceDefinition")</h2><p>@T("DefinitionHelp")</p></div></div>
-            <div class="form-grid">
-                <ResourceIdentityFields @bind-DisplayName="definitionDisplayName" @bind-TechnicalName="definitionTechnicalName" IsNew="false" DisplayNameTestId="knowledge-source-definition-display-name" TechnicalNameTestId="knowledge-source-definition-name" />
-                <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="definitionDescription" maxlength="2000"></textarea></label>
-                <label><span>@T("Profile")</span><select @bind="definitionProfileKey" required data-testid="knowledge-source-definition-profile"><option value="">@T("SelectProfile")</option>@foreach (var profile in profiles) { <option value="@Key(profile.Namespace, profile.Name)">@ProfileOptionLabel(profile)</option> }</select><small>@T("ProfileSelectionHelp")</small></label>
-                <label class="form-field-wide"><span>@T("SourceConfiguration")</span><textarea class="runner-json" rows="8" @bind="definitionAcquisitionConfigurationJson" data-testid="knowledge-source-definition-configuration"></textarea><small>@T("SourceConfigurationHelp")</small></label>
-                <label class="knowledge-choice form-field-wide" data-testid="knowledge-source-enabled-option"><input type="checkbox" @bind="definitionEnabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span></label>
-            </div>
-            <div class="form-actions"><button class="button-primary" type="submit" disabled="@busy" data-testid="knowledge-source-definition-save">@(busy ? T("Saving") : T("Save"))</button></div>
-        </EditForm>
-        }
+        <KnowledgeSourceEditor Name="@Name" Embedded="true" Saved="SourceProjectionSaved" />
     }
     else if (activeTab == DetailsTab.Projections)
     {
@@ -88,7 +59,7 @@ else if (source is not null && readiness is not null)
             @if (projections.Count == 0) { <p class="muted">@T("NoProjections")</p> }
             else
             {
-                <DataGrid TItem="KnowledgeProjectionResource" Items="projections"><Header><tr><th>@T("Projection")</th><th>@T("State")</th><th>@T("Inputs")</th><th>@T("FlowRun")</th><th>@T("Snapshot")</th><th>@T("Created")</th></tr></Header><Row Context="item"><tr data-testid="knowledge-projection-row"><td><button class="text-button" type="button" title="@item.Name" @onclick="() => selectedProjection = item"><code>@ShortIdentifier(item.Name)</code></button></td><td><StatusBadge Text="@T($"AcquisitionState.{item.State}")" Status="@AcquisitionTone(item.State)" /></td><td>@item.Inputs.Count</td><td><a class="text-button" href="@($"/flow-runs/{Uri.EscapeDataString(item.ProjectionFlowRunId)}")"><code>@ShortIdentifier(item.ProjectionFlowRunId)</code></a></td><td>@if (item.SnapshotName is not null) { <code>@item.SnapshotName</code> }</td><td>@item.CreatedAt.ToLocalTime().ToString("g")</td></tr></Row></DataGrid>
+                <DataGrid TItem="KnowledgeProjectionResource" Items="projections"><Header><tr><th>@T("Projection")</th><th>@T("State")</th><th>@T("Inputs")</th><th>@T("FlowRun")</th><th>@T("Snapshot")</th><th>@T("Created")</th></tr></Header><Row Context="item"><tr data-testid="knowledge-projection-row"><td><button class="text-button" type="button" title="@item.Name" @onclick="() => selectedProjection = item"><code>@ShortIdentifier(item.Name)</code></button></td><td><StatusBadge Text="@T($"ProjectionState.{item.State}")" Status="@ProjectionTone(item.State)" /></td><td>@item.Inputs.Count</td><td><a class="text-button" href="@($"/flow-runs/{Uri.EscapeDataString(item.ProjectionFlowRunId)}")"><code>@ShortIdentifier(item.ProjectionFlowRunId)</code></a></td><td>@if (item.SnapshotName is not null) { <code>@item.SnapshotName</code> }</td><td>@item.CreatedAt.ToLocalTime().ToString("g")</td></tr></Row></DataGrid>
                 @if (selectedProjection is { } selected)
                 {
                     <section class="knowledge-projection-provenance" data-testid="knowledge-projection-provenance">
@@ -101,44 +72,6 @@ else if (source is not null && readiness is not null)
                     </section>
                 }
             }
-        </section>
-    }
-    else if (activeTab == DetailsTab.Acquisitions)
-    {
-        <section class="panel form-section" data-testid="knowledge-acquisitions">
-        <div class="panel-header"><div><p class="eyebrow">@T("Acquisition")</p><h2>@T("AcquisitionHistory")</h2><p>@T("AcquisitionHelp")</p></div><button class="button-primary" type="button" disabled="@(!CanStartAcquisition)" data-testid="knowledge-start-acquisition" @onclick="StartAcquisitionAsync">@T("StartAcquisition")</button></div>
-        <div class="knowledge-acquisition-parameters">
-            <label class="knowledge-parameters-editor"><span>@T("AcquisitionParameters")</span><textarea class="form-code-editor runner-json" rows="11" value="@acquisitionParameters" aria-invalid="@(acquisitionParametersError is null ? "false" : "true")" data-testid="knowledge-acquisition-parameters" @oninput="UpdateAcquisitionParameters"></textarea><small>@T("JsonObjectHelp")</small>@if (acquisitionParametersError is not null) { <span class="field-validation-error" role="alert">@acquisitionParametersError</span> }</label>
-            <aside class="knowledge-parameters-contract" aria-labelledby="knowledge-parameters-contract-title">
-                <div><p class="eyebrow">@T("PublishedContract")</p><h3 id="knowledge-parameters-contract-title">@T("ExpectedParameters")</h3></div>
-                @if (AcquisitionParametersSchema is null)
-                {
-                    <p class="muted">@T("ParameterSchemaUnavailable")</p>
-                }
-                else if (AcquisitionParameterFields.Count == 0)
-                {
-                    <p class="muted">@T("ParameterSchemaOpenObject")</p>
-                }
-                else
-                {
-                    <ul class="knowledge-parameter-fields" data-testid="knowledge-acquisition-contract-fields">
-                        @foreach (var field in AcquisitionParameterFields)
-                        {
-                            <li><div><code>@field.Name</code><StatusBadge Text="@T(field.Required ? "Required" : "Optional")" Status="@(field.Required ? UiStatus.Info : UiStatus.Neutral)" /></div><span>@T("ParameterType", field.Type)</span>@if (!string.IsNullOrWhiteSpace(field.Description)) { <small>@field.Description</small> }</li>
-                        }
-                    </ul>
-                }
-                @if (AcquisitionParametersSchemaJson is not null)
-                {
-                    <details><summary>@T("ViewParameterSchema")</summary><pre class="runner-json">@AcquisitionParametersSchemaJson</pre></details>
-                }
-            </aside>
-        </div>
-        @if (acquisitions.Count == 0) { <p class="muted">@T("NoAcquisitions")</p> }
-        else
-        {
-            <DataGrid TItem="KnowledgeAcquisitionResource" Items="acquisitions"><Header><tr><th>@T("Acquisition")</th><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Created")</th><th>@T("Artifacts")</th><th></th></tr></Header><Row Context="item"><tr data-testid="knowledge-acquisition-row"><td><span class="knowledge-acquisition-identity"><code title="@item.Name">@ShortIdentifier(item.Name)</code><small>@T("AttemptLabel", item.Attempt)</small></span></td><td><StatusBadge Text="@T($"AcquisitionState.{item.State}")" Status="@AcquisitionTone(item.State)" /></td><td><a class="text-button knowledge-flow-run-link" href="@($"/flow-runs/{Uri.EscapeDataString(item.FlowRunId)}")" title="@item.FlowRunId"><code>@ShortIdentifier(item.FlowRunId)</code></a></td><td>@item.CreatedAt.ToLocalTime().ToString("g")</td><td>@(item.Manifest?.Artifacts.Count ?? 0)</td><td>@if (IsRunning(item.State)) { <button class="text-button" type="button" @onclick="() => CancelAcquisitionAsync(item)">@T("CancelAcquisition")</button> } else if (CanRetry(item.State)) { <button class="text-button" type="button" @onclick="() => RetryAcquisitionAsync(item)">@T("Retry")</button> }@if (CanPublish(item)) { <button class="text-button" type="button" @onclick="() => PublishSnapshotAsync(item)">@T("PublishSnapshot")</button> }</td></tr></Row></DataGrid>
-        }
         </section>
     }
     else if (activeTab == DetailsTab.Snapshots)
@@ -154,8 +87,8 @@ else if (source is not null && readiness is not null)
                 <section class="knowledge-snapshot-details" data-testid="knowledge-snapshot-details">
                     <div><p class="eyebrow">@T("SnapshotDetails")</p><h3>@selectedSnapshotView.Snapshot.Name</h3><p>@T("SnapshotDetailsHelp")</p></div>
                     <dl class="resource-details knowledge-snapshot-provenance">
-                        <dt>@T("Acquisition")</dt><dd><code>@selectedSnapshotView.Snapshot.AcquisitionId</code></dd>
-                        <dt>@T("FlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(selectedSnapshotView.Snapshot.ProjectionFlowRunId ?? selectedSnapshotView.Snapshot.IngestionFlowRunId)">@(selectedSnapshotView.Snapshot.ProjectionFlowRunId ?? selectedSnapshotView.Snapshot.IngestionFlowRunId)</a></dd>
+                        <dt>@T("Projection")</dt><dd><code>@selectedSnapshotView.Snapshot.ProjectionId</code></dd>
+                        <dt>@T("FlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(selectedSnapshotView.Snapshot.ProjectionFlowRunId)">@selectedSnapshotView.Snapshot.ProjectionFlowRunId</a></dd>
                     </dl>
                     <DataGrid TItem="KnowledgeSnapshotArtifact" Items="selectedSnapshotView.Snapshot.Artifacts">
                         <Header><tr><th>@T("ArtifactId")</th><th>@T("MediaType")</th><th>@T("Size")</th><th>@T("ProducerFlow")</th><th>@T("StorageFlow")</th></tr></Header>
@@ -249,8 +182,6 @@ else if (source is not null && readiness is not null)
     private KnowledgeSourceResource? source;
     private KnowledgeSourceReadiness? readiness;
     private KnowledgeSourceToolExposureResource? exposure;
-    private IReadOnlyList<KnowledgeSourceProfileResource> profiles = [];
-    private IReadOnlyList<KnowledgeAcquisitionResource> acquisitions = [];
     private IReadOnlyList<KnowledgeProjectionResource> projections = [];
     private KnowledgeProjectionResource? selectedProjection;
     private IReadOnlyList<KnowledgeSnapshotView> snapshots = [];
@@ -258,23 +189,14 @@ else if (source is not null && readiness is not null)
     private KnowledgeRetrievalResult? retrievalResult;
     private bool loading = true, busy, failed, requiresApproval, confirmDelete;
     private DetailsTab activeTab;
-    private string version = "1.0.0", acquisitionParameters = "{}", projectionParameters = "{}", retrievalOperation = "search", retrievalText = string.Empty, retrievalSnapshot = string.Empty,
+    private string version = "1.0.0", projectionParameters = "{}", retrievalOperation = "search", retrievalText = string.Empty, retrievalSnapshot = string.Empty,
         rawYaml = string.Empty;
-    private string definitionTechnicalName = string.Empty, definitionDisplayName = string.Empty, definitionDescription = string.Empty,
-        definitionProfileKey = string.Empty, definitionAcquisitionConfigurationJson = "{}";
-    private KnowledgeFlowTarget? legacyIngestionFlow, legacyRetrievalFlow;
-    private bool definitionEnabled;
-    private static readonly System.Text.Json.JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
-    private string? etag, error, message, acquisitionParametersError, rawError;
+    private string? etag, error, message, rawError;
     private ResourceNamespace SourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
-    private bool IsProjected => source?.Definition.DataSources.Count > 0 || source?.Definition.ProjectionFlow is not null;
-    private IReadOnlyList<DetailsTab> VisibleTabs => IsProjected
-        ? [DetailsTab.Overview, DetailsTab.Definition, DetailsTab.Projections, DetailsTab.Snapshots, DetailsTab.Retrieval, DetailsTab.Tools, DetailsTab.Yaml]
-        : [DetailsTab.Overview, DetailsTab.Definition, DetailsTab.Acquisitions, DetailsTab.Snapshots, DetailsTab.Retrieval, DetailsTab.Tools, DetailsTab.Yaml];
+    private static readonly IReadOnlyList<DetailsTab> VisibleTabs = [DetailsTab.Overview, DetailsTab.Definition, DetailsTab.Projections, DetailsTab.Snapshots, DetailsTab.Retrieval, DetailsTab.Tools, DetailsTab.Yaml];
     private string ToolSetUrl => exposure is null ? "/tools/sets" : exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
         ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
         : $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}?namespace={Uri.EscapeDataString((exposure.ToolSet.Namespace ?? SourceNamespace).Value)}";
-    private bool CanStartAcquisition => readiness?.Ready == true && !busy && acquisitionParametersError is null && !acquisitions.Any(value => IsRunning(value.State));
     private bool CanStartProjection => readiness?.Ready == true && !busy;
     private KnowledgeSnapshotView? ActiveSnapshot => snapshots.FirstOrDefault(value => value.LifecycleState == KnowledgeSnapshotLifecycleState.Active);
     private KnowledgeSnapshotView? EffectiveRetrievalSnapshot => string.IsNullOrWhiteSpace(retrievalSnapshot)
@@ -283,11 +205,6 @@ else if (source is not null && readiness is not null)
     private IReadOnlyList<KnowledgeSnapshotArtifact> RetrievalArtifacts => EffectiveRetrievalSnapshot?.Snapshot.Artifacts ?? [];
     private bool CanRunRetrieval => !busy && !string.IsNullOrWhiteSpace(retrievalText)
         && (retrievalOperation != "read" || RetrievalArtifacts.Any(value => value.ArtifactId == retrievalText));
-    private System.Text.Json.JsonElement? AcquisitionParametersSchema => ParameterSchema(readiness?.Ingestion?.InputSchema);
-    private IReadOnlyList<AcquisitionParameterField> AcquisitionParameterFields => SchemaFields(AcquisitionParametersSchema);
-    private string? AcquisitionParametersSchemaJson => AcquisitionParametersSchema is { } schema
-        ? System.Text.Json.JsonSerializer.Serialize(schema, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })
-        : null;
     private string SnapshotsUrl => SourceNamespace.IsDefault
         ? $"/knowledge-sources/{Uri.EscapeDataString(Name)}?view=snapshots"
         : $"/knowledge-sources/{Uri.EscapeDataString(Name)}?namespace={Uri.EscapeDataString(SourceNamespace.Value)}&view=snapshots";
@@ -307,7 +224,6 @@ else if (source is not null && readiness is not null)
             var sourceSnapshot = await sourceTask;
             source = sourceSnapshot.Value;
             etag = sourceSnapshot.ETag;
-            LoadDefinition(source);
             readiness = await readinessTask;
             exposure = await exposureTask;
             projections = (await projectionsTask).OrderByDescending(value => value.CreatedAt).ToArray();
@@ -329,46 +245,9 @@ else if (source is not null && readiness is not null)
         catch (Exception exception) { error = exception.Message; }
         finally { loading = false; }
     }
-    private async Task SaveDefinitionAsync()
-    {
-        if (busy) return;
-        busy = true;
-        failed = false;
-        message = null;
-        try
-        {
-            var acquisitionConfiguration = ParseDefinitionConfiguration();
-            var properties = new KnowledgeSourceProperties
-            {
-                DisplayName = definitionDisplayName.Trim(),
-                Description = string.IsNullOrWhiteSpace(definitionDescription) ? null : definitionDescription.Trim(),
-                Enabled = definitionEnabled,
-                AcquisitionConfiguration = acquisitionConfiguration,
-                Profile = Reference(definitionProfileKey),
-                IngestionFlow = string.IsNullOrWhiteSpace(definitionProfileKey) ? legacyIngestionFlow : null,
-                RetrievalFlow = string.IsNullOrWhiteSpace(definitionProfileKey) ? legacyRetrievalFlow : null,
-                DataSources = source!.Definition.DataSources,
-                ProjectionFlow = source.Definition.ProjectionFlow
-            };
-            var saved = await Client.UpdateAsync(SourceNamespace, Name, new PutKnowledgeSourceRequest(properties), etag!, cancellation.Token);
-            source = saved.Value;
-            etag = saved.ETag;
-            readiness = await Client.GetReadinessAsync(SourceNamespace, Name, cancellation.Token);
-            LoadDefinition(source);
-            message = T("SourceSaved");
-        }
-        catch (System.Text.Json.JsonException exception)
-        {
-            failed = true;
-            message = T("InvalidSourceConfigurationJson", exception.LineNumber ?? 0, exception.BytePositionInLine ?? 0);
-        }
-        catch (Exception exception) { failed = true; message = exception.Message; }
-        finally { busy = false; }
-    }
     private void SourceProjectionSaved(KnowledgeSourceResource saved)
     {
         source = saved;
-        LoadDefinition(saved);
         message = T("SourceSaved");
         failed = false;
     }
@@ -394,7 +273,6 @@ else if (source is not null && readiness is not null)
             if (manifest.Metadata.Namespace != SourceNamespace) throw new ArgumentException(T("SourceNamespaceImmutable"));
             if (!string.Equals(manifest.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException(T("SourceNameImmutable"));
             source = source! with { Definition = manifest.Definition };
-            LoadDefinition(source);
             rawYaml = ResourceManifestSerializer.ToYaml(RawResource());
             message = T("YamlApplied");
             failed = false;
@@ -408,23 +286,30 @@ else if (source is not null && readiness is not null)
         await SaveDefinitionAsync();
         if (!failed) PrepareRawYaml();
     }
+    private async Task SaveDefinitionAsync()
+    {
+        if (busy) return;
+        busy = true;
+        failed = false;
+        message = null;
+        try
+        {
+            var saved = await Client.UpdateAsync(SourceNamespace, Name,
+                new PutKnowledgeSourceRequest(source!.Definition), etag!, cancellation.Token);
+            source = saved.Value;
+            etag = saved.ETag;
+            readiness = await Client.GetReadinessAsync(SourceNamespace, Name, cancellation.Token);
+            message = T("SourceSaved");
+        }
+        catch (Exception exception) { failed = true; message = exception.Message; }
+        finally { busy = false; }
+    }
     private RawKnowledgeSourceResource RawResource() => new()
     {
         ApiVersion = source!.ApiVersion,
         Kind = source.Kind,
         Metadata = source.Metadata,
-        Definition = new KnowledgeSourceProperties
-        {
-            DisplayName = definitionDisplayName.Trim(),
-            Description = string.IsNullOrWhiteSpace(definitionDescription) ? null : definitionDescription.Trim(),
-            Enabled = definitionEnabled,
-            AcquisitionConfiguration = ParseDefinitionConfiguration(),
-            Profile = Reference(definitionProfileKey),
-            IngestionFlow = string.IsNullOrWhiteSpace(definitionProfileKey) ? legacyIngestionFlow : null,
-            RetrievalFlow = string.IsNullOrWhiteSpace(definitionProfileKey) ? legacyRetrievalFlow : null,
-            DataSources = source!.Definition.DataSources,
-            ProjectionFlow = source.Definition.ProjectionFlow
-        }
+        Definition = source.Definition
     };
     private async Task PublishAsync()
     {
@@ -458,11 +343,6 @@ else if (source is not null && readiness is not null)
             ? snapshots.FirstOrDefault()
             : snapshots.FirstOrDefault(value => value.Snapshot.Name == selectedSnapshot.Snapshot.Name) ?? snapshots.FirstOrDefault();
     }
-    private Task StartAcquisitionAsync() => RunActionAsync(async () =>
-    {
-        using var document = System.Text.Json.JsonDocument.Parse(acquisitionParameters);
-        await Client.StartAcquisitionAsync(SourceNamespace, Name, new StartKnowledgeAcquisitionRequest { Parameters = document.RootElement.Clone() }, cancellationToken: cancellation.Token);
-    }, "AcquisitionStarted");
     private Task StartProjectionAsync() => RunActionAsync(async () =>
     {
         using var document = System.Text.Json.JsonDocument.Parse(projectionParameters);
@@ -470,18 +350,6 @@ else if (source is not null && readiness is not null)
         await Client.StartProjectionAsync(SourceNamespace, Name,
             new StartKnowledgeProjectionRequest { Parameters = document.RootElement.Clone() }, cancellation.Token);
     }, "ProjectionCompleted");
-    private void UpdateAcquisitionParameters(ChangeEventArgs arguments)
-    {
-        acquisitionParameters = arguments.Value?.ToString() ?? string.Empty;
-        acquisitionParametersError = ValidateJsonObject(acquisitionParameters);
-    }
-    private Task CancelAcquisitionAsync(KnowledgeAcquisitionResource value) => RunActionAsync(async () => { await Client.CancelAcquisitionAsync(SourceNamespace, value.Name, cancellation.Token); }, "AcquisitionCancelled");
-    private Task RetryAcquisitionAsync(KnowledgeAcquisitionResource value) => RunActionAsync(async () => { await Client.RetryAcquisitionAsync(SourceNamespace, value.Name, new RetryKnowledgeAcquisitionRequest(), cancellation.Token); }, "AcquisitionRetried");
-    private Task PublishSnapshotAsync(KnowledgeAcquisitionResource value) => RunActionAsync(async () =>
-    {
-        var ids = value.Manifest!.Artifacts.Where(item => item.Kind == KnowledgeArtifactKind.Durable && item.Disposition == KnowledgeArtifactDisposition.Publishable).Select(item => item.ArtifactId).ToArray();
-        await Client.PublishSnapshotAsync(SourceNamespace, value.Name, new PublishKnowledgeSnapshotRequest { ArtifactIds = ids, Activate = true }, cancellationToken: cancellation.Token);
-    }, "SnapshotPublished");
     private Task SelectSnapshotAsync(KnowledgeSnapshotView value) => RunActionAsync(async () => { await Client.SelectActiveSnapshotAsync(SourceNamespace, Name, value.Snapshot.Name, cancellation.Token); }, "SnapshotActivated");
     private void ChangeRetrievalOperation(ChangeEventArgs arguments)
     {
@@ -519,10 +387,7 @@ else if (source is not null && readiness is not null)
         try { await Client.DeleteAsync(SourceNamespace, Name, etag!, cancellation.Token); Navigation.NavigateTo("/knowledge-sources"); }
         catch (Exception exception) { failed = true; message = exception.Message; busy = false; }
     }
-    private static bool IsRunning(KnowledgeAcquisitionState state) => state is KnowledgeAcquisitionState.Pending or KnowledgeAcquisitionState.Running or KnowledgeAcquisitionState.WaitingForChild or KnowledgeAcquisitionState.WaitingForInput;
-    private static bool CanRetry(KnowledgeAcquisitionState state) => state is KnowledgeAcquisitionState.Failed or KnowledgeAcquisitionState.Cancelled or KnowledgeAcquisitionState.TimedOut;
-    private static bool CanPublish(KnowledgeAcquisitionResource value) => value.State == KnowledgeAcquisitionState.Succeeded && value.Manifest?.Artifacts.Any(item => item.Kind == KnowledgeArtifactKind.Durable && item.Disposition == KnowledgeArtifactDisposition.Publishable) == true;
-    private static UiStatus AcquisitionTone(KnowledgeAcquisitionState state) => state switch { KnowledgeAcquisitionState.Succeeded => UiStatus.Success, KnowledgeAcquisitionState.Failed or KnowledgeAcquisitionState.Cancelled or KnowledgeAcquisitionState.TimedOut => UiStatus.Warning, _ => UiStatus.Info };
+    private static UiStatus ProjectionTone(KnowledgeProjectionState state) => state switch { KnowledgeProjectionState.Succeeded => UiStatus.Success, KnowledgeProjectionState.Failed or KnowledgeProjectionState.Cancelled or KnowledgeProjectionState.TimedOut => UiStatus.Warning, _ => UiStatus.Info };
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
     private static string ShortIdentifier(string value) => value.Length > 28 ? $"{value[..28]}…" : value;
     private static string ShortMetricIdentifier(string value) => value.Length > 18 ? $"{value[..18]}…" : value;
@@ -546,10 +411,6 @@ else if (source is not null && readiness is not null)
     private static string ArtifactUrl(KnowledgeProjectionArtifact value) => value.Kind == KnowledgeArtifactKind.Durable
         ? $"/artifacts/durable/{Uri.EscapeDataString(value.ArtifactId)}"
         : $"/artifacts/staged/{Uri.EscapeDataString(value.ArtifactId)}";
-    private static string ProfileUrl(ResolvedKnowledgeSourceProfile value) => value.Namespace.IsDefault
-        ? $"/knowledge-source-profiles/{Uri.EscapeDataString(value.Name)}"
-        : $"/knowledge-source-profiles/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString(value.Namespace.Value)}";
-    private string ProfileOptionLabel(KnowledgeSourceProfileResource value) => $"{value.Definition.DisplayName} ({value.ActiveVersion ?? T("Draft")})";
     private string ToolUrl(ResourceReference value)
     {
         var address = value.Resolve(SourceNamespace, ToolResourceKinds.Tool);
@@ -558,70 +419,7 @@ else if (source is not null && readiness is not null)
             : $"/tools/{Uri.EscapeDataString(address.Name)}?namespace={Uri.EscapeDataString(address.Namespace.Value)}";
     }
     private string ToolNamespace(ResourceReference value) => value.Resolve(SourceNamespace, ToolResourceKinds.Tool).Namespace.Value;
-    private void LoadDefinition(KnowledgeSourceResource value)
-    {
-        definitionTechnicalName = value.Name;
-        definitionDisplayName = value.Definition.DisplayName;
-        definitionDescription = value.Definition.Description ?? string.Empty;
-        definitionEnabled = value.Definition.Enabled;
-        definitionAcquisitionConfigurationJson = System.Text.Json.JsonSerializer.Serialize(
-            value.Definition.AcquisitionConfiguration, IndentedJson);
-        legacyIngestionFlow = value.Definition.IngestionFlow;
-        legacyRetrievalFlow = value.Definition.RetrievalFlow;
-        definitionProfileKey = ReferenceKey(value.Definition.Profile, value.Namespace);
-    }
-    private static string Key(ResourceNamespace ns, string name) => $"{ns.Value}|{name}";
-    private static string ReferenceKey(ResourceReference? reference, ResourceNamespace owner) => reference is null ? string.Empty : Key(reference.Namespace ?? owner, reference.Name);
-    private static ResourceReference? Reference(string key)
-    {
-        var parts = key.Split('|', 2);
-        return parts.Length != 2 ? null : new ResourceReference(parts[1], null, ResourceNamespace.Parse(parts[0]));
-    }
-    private System.Text.Json.JsonElement ParseDefinitionConfiguration()
-    {
-        using var document = System.Text.Json.JsonDocument.Parse(definitionAcquisitionConfigurationJson);
-        if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
-            throw new ArgumentException(T("SourceConfigurationObjectRequired"));
-        return document.RootElement.Clone();
-    }
     private static string TabId(DetailsTab tab) => $"knowledge-source-{tab.ToString().ToLowerInvariant()}-tab";
-    private static System.Text.Json.JsonElement? ParameterSchema(System.Text.Json.JsonElement? inputSchema)
-    {
-        if (inputSchema is not { ValueKind: System.Text.Json.JsonValueKind.Object } schema
-            || !schema.TryGetProperty("properties", out var properties)
-            || properties.ValueKind != System.Text.Json.JsonValueKind.Object
-            || !properties.TryGetProperty("parameters", out var parameters)
-            || parameters.ValueKind != System.Text.Json.JsonValueKind.Object) return null;
-        return parameters;
-    }
-    private static IReadOnlyList<AcquisitionParameterField> SchemaFields(System.Text.Json.JsonElement? parameterSchema)
-    {
-        if (parameterSchema is not { ValueKind: System.Text.Json.JsonValueKind.Object } schema
-            || !schema.TryGetProperty("properties", out var properties)
-            || properties.ValueKind != System.Text.Json.JsonValueKind.Object) return [];
-        var required = schema.TryGetProperty("required", out var requiredValue) && requiredValue.ValueKind == System.Text.Json.JsonValueKind.Array
-            ? requiredValue.EnumerateArray().Where(value => value.ValueKind == System.Text.Json.JsonValueKind.String).Select(value => value.GetString()!).ToHashSet(StringComparer.Ordinal)
-            : [];
-        return properties.EnumerateObject().Select(property => new AcquisitionParameterField(
-            property.Name,
-            PropertyText(property.Value, "type") ?? "any",
-            PropertyText(property.Value, "description"),
-            required.Contains(property.Name))).ToArray();
-    }
-    private string? ValidateJsonObject(string value)
-    {
-        try
-        {
-            using var document = System.Text.Json.JsonDocument.Parse(value);
-            return document.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object ? null : T("JsonObjectRequired");
-        }
-        catch (System.Text.Json.JsonException exception) { return T("InvalidJson", exception.LineNumber ?? 0, exception.BytePositionInLine ?? 0); }
-    }
-    private static string? PropertyText(System.Text.Json.JsonElement value, string propertyName) =>
-        value.ValueKind == System.Text.Json.JsonValueKind.Object
-        && value.TryGetProperty(propertyName, out var property)
-        && property.ValueKind == System.Text.Json.JsonValueKind.String ? property.GetString() : null;
-    private readonly record struct AcquisitionParameterField(string Name, string Type, string? Description, bool Required);
     private sealed record RawKnowledgeSourceResource
     {
         public required string ApiVersion { get; init; }
@@ -629,6 +427,6 @@ else if (source is not null && readiness is not null)
         public required ResourceMetadata Metadata { get; init; }
         public required KnowledgeSourceProperties Definition { get; init; }
     }
-    private enum DetailsTab { Overview, Definition, Projections, Acquisitions, Snapshots, Retrieval, Tools, Yaml }
+    private enum DetailsTab { Overview, Definition, Projections, Snapshots, Retrieval, Tools, Yaml }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

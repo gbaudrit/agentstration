@@ -4,7 +4,7 @@
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
 <PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-knowledge-sources">
-    <Actions><a class="button-primary" href="/knowledge-sources/new">@T("CreateSource")</a><a class="button-secondary" href="/knowledge-source-profiles">@T("OpenProfiles")</a><a class="button-secondary" href="/artifacts">@T("OpenArtifacts")</a><a class="button-secondary" href="/tools/sets">@T("OpenToolSets")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
+    <Actions><a class="button-primary" href="/knowledge-sources/new">@T("CreateSource")</a><a class="button-secondary" href="/artifacts">@T("OpenArtifacts")</a><a class="button-secondary" href="/tools/sets">@T("OpenToolSets")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
 </PageHeader>
 
 @if (loading) { <LoadingState Message="@T("Loading")" /> }

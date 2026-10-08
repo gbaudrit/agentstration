@@ -15,7 +15,7 @@ else
 {
     <DataGrid TItem="ToolResource" Items="tools">
         <Header><tr><th>@T("Tool")</th><th>@T("Provider")</th><th>@T("Availability")</th><th>@T("Enabled")</th><th></th></tr></Header>
-        <Row Context="tool"><tr><td><span class="resource-name-with-scope"><strong>@tool.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span><code>@tool.Definition.ExternalId</code></td><td>@ResourceName(tool.Definition.Provider?.ResourceId)</td><td><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td>@BooleanLabel(tool.Definition.Enabled)</td><td><a class="text-button" href="@($"/tools/{Uri.EscapeDataString(tool.Name)}")">@T("Details")</a></td></tr></Row>
+        <Row Context="tool"><tr><td><span class="resource-name-with-scope"><strong>@tool.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span><code>@tool.Definition.ExternalId</code></td><td>@ResourceName(tool.Definition.Provider?.ResourceId)</td><td><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td>@BooleanLabel(tool.Definition.Enabled)</td><td><a class="text-button" href="@ToolUrl(tool)">@T("Details")</a></td></tr></Row>
     </DataGrid>
 }
 
@@ -27,4 +27,7 @@ else
     protected override Task OnInitializedAsync() => LoadAsync();
     private async Task LoadAsync() { loading = true; error = null; try { tools = await Client.GetToolsAsync(); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
     private static string ResourceName(string? id) => id ?? "—";
+    private static string ToolUrl(ToolResource tool) => tool.Namespace.IsDefault
+        ? $"/tools/{Uri.EscapeDataString(tool.Name)}"
+        : $"/tools/{Uri.EscapeDataString(tool.Name)}?namespace={Uri.EscapeDataString(tool.Namespace.Value)}";
 }

@@ -33,6 +33,14 @@ public interface IKnowledgeProjectionInputResolver
         CancellationToken cancellationToken);
 }
 
+public interface IKnowledgeArtifactReferenceValidator
+{
+    Task ValidateAsync(
+        Guid workspaceId,
+        IReadOnlyList<KnowledgeProjectionArtifact> references,
+        CancellationToken cancellationToken);
+}
+
 public sealed record KnowledgeProjectionFlowRunRequest(
     string RunId,
     ResolvedKnowledgeFlowBinding Flow,
@@ -45,7 +53,7 @@ public sealed record KnowledgeProjectionFlowRunRequest(
 
 public sealed record KnowledgeProjectionFlowRunResult(
     string RunId,
-    KnowledgeAcquisitionState State,
+    KnowledgeProjectionState State,
     JsonElement? Output,
     string? ErrorCode,
     string? ErrorMessage,
@@ -144,7 +152,7 @@ public sealed class KnowledgeProjectionService(
                 Inputs = resolvedInputs,
                 InputIssues = inputIssues,
                 ProjectionFlowRunId = $"flowrun-knowledge-{projectionId[11..]}",
-                State = KnowledgeAcquisitionState.Running,
+                State = KnowledgeProjectionState.Running,
                 CorrelationId = correlationId,
                 Parameters = request.Parameters.Clone(),
                 CreatedBy = context.PrincipalId,
@@ -177,7 +185,7 @@ public sealed class KnowledgeProjectionService(
                 var run = await flowRuns.ExecuteAsync(new(resource.ProjectionFlowRunId, projectionFlow, projectionInput,
                     context.PrincipalId.ToString("D"), correlationId, context.TenantId, context.WorkspaceId,
                     context.PrincipalId), cancellationToken);
-                if (run.State != KnowledgeAcquisitionState.Succeeded)
+                if (run.State != KnowledgeProjectionState.Succeeded)
                     throw Error(run.ErrorCode ?? "knowledge_projection_flow_failed",
                         run.ErrorMessage ?? $"Projection Flow ended with state '{run.State}'.");
                 var manifest = ParseManifest(run.Output, "projection");
@@ -192,7 +200,7 @@ public sealed class KnowledgeProjectionService(
                     Generation = 2,
                     Inputs = prepared,
                     InputIssues = inputIssues,
-                    State = KnowledgeAcquisitionState.Succeeded,
+                    State = KnowledgeProjectionState.Succeeded,
                     CompletedAt = run.CompletedAt ?? timeProvider.GetUtcNow(),
                     Manifest = manifest,
                     SnapshotName = snapshot.Value.Name,
@@ -211,7 +219,7 @@ public sealed class KnowledgeProjectionService(
                 var failed = stored.Value with
                 {
                     Generation = 2,
-                    State = KnowledgeAcquisitionState.Failed,
+                    State = KnowledgeProjectionState.Failed,
                     CompletedAt = timeProvider.GetUtcNow(),
                     ErrorCode = mapped.Code,
                     ErrorMessage = mapped.Message,
@@ -288,23 +296,16 @@ public sealed class KnowledgeProjectionService(
                 }, FlowContractJsonOptions);
                 var run = await flowRuns.ExecuteAsync(new(runId, flow, input, context.PrincipalId.ToString("D"),
                     correlationId, context.TenantId, context.WorkspaceId, context.PrincipalId), cancellationToken);
-                if (run.State != KnowledgeAcquisitionState.Succeeded)
+                if (run.State != KnowledgeProjectionState.Succeeded)
                     throw Error("knowledge_projection_transformation_failed",
                         $"Transformation for binding '{binding.Name}' failed: {run.ErrorMessage ?? run.State.ToString()}.");
                 var manifest = ParseManifest(run.Output, $"transformation '{binding.Name}'");
-                try
-                {
-                    await artifactReferences.ValidateAsync(context.WorkspaceId, manifest.Artifacts, cancellationToken);
-                }
-                catch (KnowledgeAcquisitionException exception)
-                {
-                    throw Error(exception.Code, exception.Message, exception);
-                }
+                await artifactReferences.ValidateAsync(context.WorkspaceId, manifest.Artifacts, cancellationToken);
                 result.Add(evidence with
                 {
                     TransformationFlow = flow,
                     TransformationFlowRunId = run.RunId,
-                    PreparedArtifacts = manifest.Artifacts.Select(ToProjectionArtifact).ToArray()
+                    PreparedArtifacts = manifest.Artifacts
                 });
             }
             catch (KnowledgeProjectionException exception) when (!binding.Required)
@@ -333,7 +334,7 @@ public sealed class KnowledgeProjectionService(
     private async Task<StoredResource<KnowledgeSnapshotResource>> PublishSnapshotAsync(
         KnowledgeSourceResource source,
         KnowledgeProjectionResource projection,
-        KnowledgeAcquisitionManifest manifest,
+        KnowledgeProjectionManifest manifest,
         RequestContext context,
         CancellationToken cancellationToken)
     {
@@ -383,12 +384,6 @@ public sealed class KnowledgeProjectionService(
             KnowledgeSourceName = source.Name,
             KnowledgeSourceNamespace = source.Namespace,
             KnowledgeSourceGeneration = source.Generation,
-            AcquisitionId = projection.Name,
-            AcquisitionUid = projection.Uid,
-            AcquiredAt = projection.Inputs.Max(value => value.AcquiredAt),
-            IngestionFlow = projection.ProjectionFlow,
-            IngestionFlowRunId = projection.ProjectionFlowRunId,
-            PublicationId = projection.Name,
             RequestHash = hash,
             PublishedAt = timeProvider.GetUtcNow(),
             PublishedBy = context.PrincipalId,
@@ -429,7 +424,7 @@ public sealed class KnowledgeProjectionService(
                 KnowledgeSourceUid = source.Uid,
                 ActiveSnapshotName = snapshot.Name,
                 ActiveSnapshotUid = snapshot.Uid,
-                LastPublicationId = projectionPublication(snapshot),
+                LastProjectionId = snapshot.ProjectionId,
                 LastPublishedAt = snapshot.PublishedAt,
                 LastAttemptAt = timeProvider.GetUtcNow()
             };
@@ -441,11 +436,9 @@ public sealed class KnowledgeProjectionService(
             catch (ResourceConcurrencyException) when (attempt < 2) { }
         }
         throw Error("knowledge_projection_activation_conflict", "The active Knowledge Snapshot changed concurrently.");
-
-        static string projectionPublication(KnowledgeSnapshotResource value) => value.ProjectionId ?? value.PublicationId;
     }
 
-    private static KnowledgeAcquisitionManifest ParseManifest(JsonElement? output, string role)
+    private static KnowledgeProjectionManifest ParseManifest(JsonElement? output, string role)
     {
         if (output is null || output.Value.ValueKind != JsonValueKind.Object
             || !output.Value.TryGetProperty("artifacts", out var artifacts) || artifacts.ValueKind != JsonValueKind.Array)
@@ -453,7 +446,7 @@ public sealed class KnowledgeProjectionService(
         var entries = artifacts.EnumerateArray().ToArray();
         if (entries.Length is < 1 or > MaximumArtifacts)
             throw Error("knowledge_projection_manifest_invalid", $"The {role} Flow must emit 1 to {MaximumArtifacts} artifacts.");
-        var result = new List<KnowledgeAcquisitionArtifact>(entries.Length);
+        var result = new List<KnowledgeProjectionArtifact>(entries.Length);
         foreach (var entry in entries)
         {
             if (entry.ValueKind != JsonValueKind.Object
@@ -478,12 +471,6 @@ public sealed class KnowledgeProjectionService(
             : throw Error("knowledge_projection_manifest_invalid", $"Every {role} artifact requires a valid {name}.");
     private static string? Optional(JsonElement value, string name) =>
         value.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.String ? property.GetString() : null;
-    private static KnowledgeProjectionArtifact ToProjectionArtifact(KnowledgeAcquisitionArtifact value) => new()
-    {
-        ArtifactId = value.ArtifactId, Kind = value.Kind, Disposition = value.Disposition,
-        Name = value.Name, MediaType = value.MediaType, Digest = value.Digest
-    };
-
     private static JsonSerializerOptions CreateFlowContractJsonOptions()
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);

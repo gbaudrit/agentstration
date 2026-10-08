@@ -15,8 +15,10 @@ import { exerciseDescendantSecrets, type ExerciseDescendantSecretsInput } from '
 import { inspectPlatformHealth, type InspectPlatformHealthInput } from './inspect-platform-health.journey.js';
 import { exerciseResourceNaming, type ExerciseResourceNamingInput } from './exercise-resource-naming.journey.js';
 import { exerciseFoundrySecretBinding, type ExerciseFoundrySecretBindingInput } from './exercise-foundry-secret-binding.journey.js';
+import { inspectPlatformOverview, type InspectPlatformOverviewInput } from './inspect-platform-overview.journey.js';
 import { exerciseBootstrapProvenance, type ExerciseBootstrapProvenanceInput } from './exercise-bootstrap-provenance.journey.js';
 import { inspectArtifactContent, type InspectArtifactContentInput } from './inspect-artifact-content.journey.js';
+import { exerciseToolExecution, type ExerciseToolExecutionInput } from './exercise-tool-execution.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -37,6 +39,8 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'inspect-platform-health': (context, input) => inspectPlatformHealth(context, input as unknown as InspectPlatformHealthInput),
   'exercise-resource-naming': (context, input) => exerciseResourceNaming(context, input as unknown as ExerciseResourceNamingInput),
   'exercise-foundry-secret-binding': (context, input) => exerciseFoundrySecretBinding(context, input as unknown as ExerciseFoundrySecretBindingInput),
+  'inspect-platform-overview': (context, input) => inspectPlatformOverview(context, input as unknown as InspectPlatformOverviewInput),
   'exercise-bootstrap-provenance': (context, input) => exerciseBootstrapProvenance(context, input as unknown as ExerciseBootstrapProvenanceInput),
   'inspect-artifact-content': (context, input) => inspectArtifactContent(context, input as unknown as InspectArtifactContentInput),
+  'exercise-tool-execution': async (context, input) => { await exerciseToolExecution(context, input as unknown as ExerciseToolExecutionInput); },
 };
