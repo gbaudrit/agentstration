@@ -776,6 +776,111 @@ public sealed class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
+    public void FlowCallNamedPortsAreResolvedAtInitialLoadWithoutSelectingTheNode()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new FlowCallStepDefinition { Name = "deliver", Flow = new("analysis", Namespace: new("pack.news")) },
+                new OutputFlowStepDefinition { Name = "done" }
+            ],
+            Transitions = [new("input-deliver", "input", "completed", "deliver")]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
+
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+        var store = context.Services.GetRequiredService<FlowEditorStore>();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var node = store.State.Diagram.Nodes.Single(item => item.Name == "deliver");
+            CollectionAssert.AreEqual(new[] { "approved", "rejected" }, node.OutputEvents.ToArray());
+            Assert.AreEqual(FlowOutputOutcome.Error, node.OutputOutcomes["rejected"]);
+        });
+    }
+
+    [TestMethod]
+    public async Task ChangingExactFlowVersionReplacesTheNamedPorts()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "child",
+            Steps = [new FlowCallStepDefinition { Name = "child", Flow = new("analysis", FlowCallVersionStrategy.Exact, "1.0.0", new("pack.news")) }, new OutputFlowStepDefinition { Name = "done" }]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
+        {
+            FlowVersions = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal)
+            {
+                ["pack.news|analysis"] =
+                [
+                    new("1.0.0", null, null, [new("accepted", null, FlowOutputOutcome.Success, null)]),
+                    new("2.0.0", null, null, [new("completed", null, FlowOutputOutcome.Success, null), new("failed", null, FlowOutputOutcome.Error, null)])
+                ]
+            }
+        });
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+        var store = context.Services.GetRequiredService<FlowEditorStore>();
+        rendered.WaitForAssertion(() => CollectionAssert.AreEqual(new[] { "accepted" }, store.State.Diagram.Nodes.Single(node => node.Name == "child").OutputEvents.ToArray()));
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.SelectedStepChanged.InvokeAsync("child"));
+
+        rendered.FindAll(".flow-inspector label").Single(element => element.TextContent.StartsWith("Exact version", StringComparison.Ordinal)).QuerySelector("select")!.Change("2.0.0");
+
+        rendered.WaitForAssertion(() => CollectionAssert.AreEqual(new[] { "completed", "failed" }, store.State.Diagram.Nodes.Single(node => node.Name == "child").OutputEvents.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task OutputInspectorPreservesStringMappingAndEditsSchemaAndErrorDetails()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new OutputFlowStepDefinition { Name = "result", Outcome = FlowOutputOutcome.Error, OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") }
+            ],
+            Transitions = [new("input-result", "input", "completed", "result")]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.SelectedStepChanged.InvokeAsync("result"));
+
+        rendered.Find("[data-testid='output-mapping']").Change("\"${transition.output}\"");
+        rendered.Find("[data-testid='output-schema']").Change("{\"type\":\"object\"}");
+        rendered.FindAll(".flow-inspector input").Single(element => element.ParentElement!.TextContent.Contains("Error details expression", StringComparison.Ordinal)).Change("${transition.output.details}");
+
+        var output = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps.OfType<OutputFlowStepDefinition>().Single();
+        Assert.AreEqual(JsonValueKind.String, output.OutputMapping?.ValueKind);
+        Assert.AreEqual("${transition.output}", output.OutputMapping?.GetString());
+        Assert.AreEqual("object", output.Schema?.GetProperty("type").GetString());
+        Assert.AreEqual("${transition.output.details}", output.DetailsExpression);
+    }
+
+    [TestMethod]
     public async Task SelectingCanvasTransitionShowsEditableMetadata()
     {
         using var culture = new CultureScope("en-US");
@@ -898,6 +1003,7 @@ public sealed class FlowDesignerReadOnlyTests
     {
         private readonly IReadOnlyList<string> publishedVersions;
         public IReadOnlyList<FlowDesignerAgent> Agents { get; init; } = [];
+        public IReadOnlyDictionary<string, IReadOnlyList<FlowDesignerFlowVersion>> FlowVersions { get; init; } = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal);
 
         public ResourceProviderStub(params string[] publishedVersions) => this.publishedVersions = publishedVersions;
 
@@ -906,11 +1012,14 @@ public sealed class FlowDesignerReadOnlyTests
         public Task<IReadOnlyList<FlowDesignerFlow>> GetFlowsAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<FlowDesignerFlow>>([new("analysis", "News analysis", new("pack.news"), "2.0.0")]);
         public Task<IReadOnlyList<FlowDesignerFlowVersion>> GetFlowVersionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
-            name == "sample" && @namespace.IsDefault
+            FlowVersions.TryGetValue($"{@namespace.Value}|{name}", out var configured)
+                ? Task.FromResult(configured)
+                : name == "sample" && @namespace.IsDefault
                 ? Task.FromResult<IReadOnlyList<FlowDesignerFlowVersion>>(publishedVersions.Select(version => new FlowDesignerFlowVersion(version, null, null)).ToArray())
                 : Task.FromResult<IReadOnlyList<FlowDesignerFlowVersion>>([new("2.0.0",
                 JsonSerializer.SerializeToElement(new { type = "object", properties = new { article = new { type = "string" } } }),
-                JsonSerializer.SerializeToElement(new { type = "object", properties = new { summary = new { type = "string" } } }))]);
+                JsonSerializer.SerializeToElement(new { type = "object", properties = new { summary = new { type = "string" } } }),
+                [new("approved", "Approved", FlowOutputOutcome.Success, null), new("rejected", "Rejected", FlowOutputOutcome.Error, null)])]);
         public Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<FlowDesignerTool>>([new(
                 "notification.send",

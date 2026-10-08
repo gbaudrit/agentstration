@@ -18,7 +18,8 @@ public sealed class FlowDiagramNode : NodeModel
         Size = new Size(RenderedWidth, RenderedHeight);
         Input = new FlowDiagramPort(this, PortAlignment.Left, FlowDiagramPortDirection.Input);
         Outputs = source.OutputEvents
-            .Select(eventName => new FlowDiagramPort(this, PortAlignment.Right, FlowDiagramPortDirection.Output, eventName))
+            .Select(eventName => new FlowDiagramPort(this, PortAlignment.Right, FlowDiagramPortDirection.Output, eventName,
+                source.OutputOutcomes.TryGetValue(eventName, out var outcome) ? outcome : null))
             .ToArray();
         AddPort(Input);
         foreach (var output in Outputs)
@@ -36,10 +37,12 @@ public sealed class FlowDiagramPort(
     FlowDiagramNode parent,
     PortAlignment alignment,
     FlowDiagramPortDirection direction,
-    string? eventName = null) : PortModel(parent, alignment)
+    string? eventName = null,
+    FlowOutputOutcome? outcome = null) : PortModel(parent, alignment)
 {
     public FlowDiagramPortDirection Direction { get; } = direction;
     public string? EventName { get; } = eventName;
+    public FlowOutputOutcome? Outcome { get; } = outcome;
 
     public override bool CanAttachTo(Blazor.Diagrams.Core.Models.Base.ILinkable other)
     {

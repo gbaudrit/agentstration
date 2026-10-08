@@ -159,6 +159,82 @@ public sealed class FlowEditorStoreTests
     }
 
     [TestMethod]
+    public void RenamingOutputUpdatesReferencesPositionAndEntryAtomically()
+    {
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "output",
+            Steps = [new OutputFlowStepDefinition { Name = "output" }, new InputFlowStepDefinition { Name = "input" }],
+            Transitions = [new("route", "input", "completed", "output")],
+            Designer = new FlowDesignerMetadata { NodePositions = new Dictionary<string, FlowNodePosition> { ["output"] = new(12, 24) } }
+        };
+        var renamed = new RenameStepCommand("output", "completed").Apply(definition);
+        Assert.AreEqual("completed", renamed.EntryStep);
+        Assert.AreEqual("completed", renamed.Transitions.Single().ToStep);
+        Assert.AreEqual(new FlowNodePosition(12, 24), renamed.Designer.NodePositions["completed"]);
+        Assert.IsFalse(renamed.Designer.NodePositions.ContainsKey("output"));
+    }
+
+    [TestMethod]
+    public void NamedFlowCallOutputsSurviveSavedStateReprojection()
+    {
+        var now = DateTimeOffset.Parse("2026-08-04T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "child",
+            Steps = [new FlowCallStepDefinition { Name = "child", Flow = new("nested") }, new OutputFlowStepDefinition { Name = "done" }],
+            Transitions = []
+        };
+        var draft = new FlowDraft { WorkspaceId = WorkspaceId, Id = "editor-draft", FlowId = new("editor"), DisplayName = "Editor", Definition = definition, CreatedAt = now, UpdatedAt = now };
+        var response = new FlowDraftResponse(draft, "\"etag-1\"");
+        var store = new FlowEditorStore();
+        store.Load(response, "entryStep: child");
+        store.SetFlowCallOutputs("child",
+        [
+            new("approved", "Approved", FlowOutputOutcome.Success, null),
+            new("rejected", "Rejected", FlowOutputOutcome.Error, null)
+        ]);
+
+        store.MarkSaved(response, "entryStep: child");
+
+        var node = store.State.Diagram.Nodes.Single(item => item.Name == "child");
+        CollectionAssert.AreEqual(new[] { "approved", "rejected" }, node.OutputEvents.ToArray());
+        Assert.AreEqual(FlowOutputOutcome.Error, node.OutputOutcomes["rejected"]);
+    }
+
+    [TestMethod]
+    public async Task RejectedRenameDoesNotDirtyTheStore()
+    {
+        var now = DateTimeOffset.Parse("2026-08-04T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        var definition = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "output" }] };
+        var draft = new FlowDraft { WorkspaceId = WorkspaceId, Id = "editor-draft", FlowId = new("editor"), DisplayName = "Editor", Definition = definition, CreatedAt = now, UpdatedAt = now };
+        var store = new FlowEditorStore();
+        store.Load(new FlowDraftResponse(draft, "\"etag-1\""), "entryStep: input");
+
+        await store.DispatchAsync(new RenameStepCommand("output", "input"));
+
+        Assert.IsFalse(store.State.IsDirty);
+        Assert.IsFalse(store.CanUndo);
+        Assert.AreEqual("output", store.State.Resource!.Definition.Steps.OfType<OutputFlowStepDefinition>().Single().Name);
+    }
+
+    [TestMethod]
+    public async Task AcceptedRenameMovesTheCurrentSelectionInTheSameStateChange()
+    {
+        var now = DateTimeOffset.Parse("2026-08-04T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        var definition = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "output" }] };
+        var draft = new FlowDraft { WorkspaceId = WorkspaceId, Id = "editor-draft", FlowId = new("editor"), DisplayName = "Editor", Definition = definition, CreatedAt = now, UpdatedAt = now };
+        var store = new FlowEditorStore();
+        store.Load(new FlowDraftResponse(draft, "\"etag-1\""), "entryStep: input");
+        store.SelectStep("output");
+
+        await store.DispatchAsync(new RenameStepCommand("output", "completed"));
+
+        Assert.AreEqual("completed", store.State.Selection.StepName);
+        Assert.AreEqual("completed", store.State.Resource!.Definition.Steps.OfType<OutputFlowStepDefinition>().Single().Name);
+    }
+
+    [TestMethod]
     public async Task PublishedNamespacedDocumentRejectsCommands()
     {
         var definition = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] };
