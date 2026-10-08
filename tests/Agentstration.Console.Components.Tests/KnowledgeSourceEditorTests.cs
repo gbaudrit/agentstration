@@ -230,6 +230,30 @@ public sealed class KnowledgeSourceEditorTests
     }
 
     [TestMethod]
+    public void DetailsExposesSnapshotArtifactsForConsultation()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var snapshot = ExistingSnapshot();
+        using var context = CreateContext(new KnowledgeClientStub(ExistingSource(), snapshots: [snapshot]));
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
+            .NavigateTo("/knowledge-sources/agentstration-documentation?view=snapshots");
+
+        var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
+            .Add(component => component.Name, "agentstration-documentation"));
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-snapshot-row']"));
+            Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-snapshot-details']"));
+            var artifactLink = rendered.Find("[data-testid='knowledge-snapshot-artifact-row'] td a");
+            Assert.AreEqual("/artifacts/durable/artifact-0123456789abcdef", artifactLink.GetAttribute("href"));
+            Assert.AreEqual("artifact-0123456789abcdef", artifactLink.GetAttribute("title"));
+            StringAssert.Contains(rendered.Find("[data-testid='knowledge-snapshot-details']").TextContent,
+                "application/json");
+        });
+    }
+
+    [TestMethod]
     public void DetailsEditsTheDefinitionAndShowsTheSavedYaml()
     {
         using var culture = new TestCultureScope("en-US");
@@ -475,7 +499,42 @@ public sealed class KnowledgeSourceEditorTests
         ]
     };
 
-    private sealed class KnowledgeClientStub(KnowledgeSourceResource? source = null, IReadOnlyList<KnowledgeAcquisitionResource>? acquisitions = null, KnowledgeSourceToolExposureResource? exposure = null) : IKnowledgeSourcesClient
+    private static KnowledgeSnapshotView ExistingSnapshot() => new(new KnowledgeSnapshotResource
+    {
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = KnowledgeResourceKinds.KnowledgeSnapshot,
+        Metadata = new() { Name = "snapshot-0123456789abcdef" },
+        ScopeRef = ResourceScopeRef.Workspace(Guid.NewGuid()),
+        KnowledgeSourceUid = Guid.NewGuid(),
+        KnowledgeSourceName = "agentstration-documentation",
+        KnowledgeSourceNamespace = ResourceNamespace.Default,
+        KnowledgeSourceGeneration = 1,
+        AcquisitionId = "acquisition-0123456789abcdef",
+        AcquisitionUid = Guid.NewGuid(),
+        AcquiredAt = DateTimeOffset.UtcNow,
+        IngestionFlow = new ResolvedKnowledgeFlowBinding("knowledge-ingestion-builtin", ResourceNamespace.Default,
+            "1.0.0", true, null, null, KnowledgeFlowContracts.Ingestion),
+        IngestionFlowRunId = "flowrun-ingestion-0123456789abcdef",
+        PublicationId = "publication-0123456789abcdef",
+        RequestHash = "request-hash",
+        PublishedAt = DateTimeOffset.UtcNow,
+        PublishedBy = Guid.NewGuid(),
+        Artifacts =
+        [
+            new KnowledgeSnapshotArtifact
+            {
+                ArtifactId = "artifact-0123456789abcdef",
+                ProducerFlowRunId = "flowrun-producer-0123456789abcdef",
+                ProducerFlowStepId = "fetch",
+                StorageFlowRunId = "flowrun-storage-0123456789abcdef",
+                MediaType = "application/json",
+                Length = 1536,
+                Sha256 = new string('a', 64)
+            }
+        ]
+    }, KnowledgeSnapshotLifecycleState.Active);
+
+    private sealed class KnowledgeClientStub(KnowledgeSourceResource? source = null, IReadOnlyList<KnowledgeAcquisitionResource>? acquisitions = null, KnowledgeSourceToolExposureResource? exposure = null, IReadOnlyList<KnowledgeSnapshotView>? snapshots = null) : IKnowledgeSourcesClient
     {
         public CreateKnowledgeSourceRequest? CreatedRequest { get; private set; }
         public PutKnowledgeSourceRequest? UpdatedRequest { get; private set; }
@@ -517,7 +576,7 @@ public sealed class KnowledgeSourceEditorTests
         public Task<ResourceSnapshot<KnowledgeAcquisitionResource>> StartAcquisitionAsync(ResourceNamespace @namespace, string name, StartKnowledgeAcquisitionRequest request, string? idempotencyKey = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<KnowledgeAcquisitionResource>> CancelAcquisitionAsync(ResourceNamespace @namespace, string acquisitionId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<KnowledgeAcquisitionResource>> RetryAcquisitionAsync(ResourceNamespace @namespace, string acquisitionId, RetryKnowledgeAcquisitionRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<IReadOnlyList<KnowledgeSnapshotView>> GetSnapshotsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<KnowledgeSnapshotView>>([]);
+        public Task<IReadOnlyList<KnowledgeSnapshotView>> GetSnapshotsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(snapshots ?? []);
         public Task<KnowledgeSnapshotView> SelectActiveSnapshotAsync(ResourceNamespace @namespace, string name, string snapshotName, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<KnowledgeSnapshotResource>> PublishSnapshotAsync(ResourceNamespace @namespace, string acquisitionId, PublishKnowledgeSnapshotRequest request, string? idempotencyKey = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<KnowledgeRetrievalResult> SearchAsync(ResourceNamespace @namespace, string name, SearchKnowledgeRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();

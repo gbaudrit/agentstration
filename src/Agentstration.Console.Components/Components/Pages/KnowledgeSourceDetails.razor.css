@@ -22,6 +22,39 @@
     color: inherit;
 }
 
+.knowledge-snapshot-link {
+    display: inline-flex;
+    max-width: 100%;
+}
+
+.knowledge-snapshot-link code {
+    overflow-wrap: anywhere;
+}
+
+.knowledge-snapshot-details {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: .7rem;
+    background: var(--surface-2);
+}
+
+.knowledge-snapshot-details h3,
+.knowledge-snapshot-details p {
+    margin-top: 0;
+}
+
+.knowledge-snapshot-provenance {
+    margin: 0;
+}
+
+.knowledge-snapshot-provenance dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 .knowledge-flow-composition {
     gap: 1rem;
 }

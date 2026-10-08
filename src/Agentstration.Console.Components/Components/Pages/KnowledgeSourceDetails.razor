@@ -147,7 +147,24 @@ else if (source is not null && readiness is not null)
         <section class="panel form-section" data-testid="knowledge-snapshots">
         <div class="panel-header"><div><p class="eyebrow">@T("Publication")</p><h2>@T("Snapshots")</h2><p>@T("SnapshotsHelp")</p></div></div>
         @if (snapshots.Count == 0) { <p class="muted">@T("NoSnapshots")</p> }
-        else { <DataGrid TItem="KnowledgeSnapshotView" Items="snapshots"><Header><tr><th>@T("Snapshot")</th><th>@T("State")</th><th>@T("Published")</th><th>@T("Artifacts")</th><th></th></tr></Header><Row Context="view"><tr><td><code>@view.Snapshot.Name</code></td><td><StatusBadge Text="@T($"SnapshotState.{view.LifecycleState}")" Status="@(view.LifecycleState == KnowledgeSnapshotLifecycleState.Active ? UiStatus.Success : UiStatus.Neutral)" /></td><td>@view.Snapshot.PublishedAt.ToLocalTime().ToString("g")</td><td>@view.Snapshot.Artifacts.Count</td><td>@if (view.LifecycleState != KnowledgeSnapshotLifecycleState.Active) { <button class="text-button" type="button" @onclick="() => SelectSnapshotAsync(view)">@T("MakeActive")</button> }</td></tr></Row></DataGrid> }
+        else
+        {
+            <DataGrid TItem="KnowledgeSnapshotView" Items="snapshots"><Header><tr><th>@T("Snapshot")</th><th>@T("State")</th><th>@T("Published")</th><th>@T("Artifacts")</th><th></th></tr></Header><Row Context="view"><tr data-testid="knowledge-snapshot-row"><td><button class="text-button knowledge-snapshot-link" type="button" title="@view.Snapshot.Name" aria-expanded="@(selectedSnapshot?.Snapshot.Name == view.Snapshot.Name ? "true" : "false")" @onclick="() => selectedSnapshot = view"><code>@view.Snapshot.Name</code></button></td><td><StatusBadge Text="@T($"SnapshotState.{view.LifecycleState}")" Status="@(view.LifecycleState == KnowledgeSnapshotLifecycleState.Active ? UiStatus.Success : UiStatus.Neutral)" /></td><td>@view.Snapshot.PublishedAt.ToLocalTime().ToString("g")</td><td><button class="text-button" type="button" @onclick="() => selectedSnapshot = view">@view.Snapshot.Artifacts.Count</button></td><td>@if (view.LifecycleState != KnowledgeSnapshotLifecycleState.Active) { <button class="text-button" type="button" @onclick="() => SelectSnapshotAsync(view)">@T("MakeActive")</button> }</td></tr></Row></DataGrid>
+            @if (selectedSnapshot is { } selectedSnapshotView)
+            {
+                <section class="knowledge-snapshot-details" data-testid="knowledge-snapshot-details">
+                    <div><p class="eyebrow">@T("SnapshotDetails")</p><h3>@selectedSnapshotView.Snapshot.Name</h3><p>@T("SnapshotDetailsHelp")</p></div>
+                    <dl class="resource-details knowledge-snapshot-provenance">
+                        <dt>@T("Acquisition")</dt><dd><code>@selectedSnapshotView.Snapshot.AcquisitionId</code></dd>
+                        <dt>@T("FlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(selectedSnapshotView.Snapshot.ProjectionFlowRunId ?? selectedSnapshotView.Snapshot.IngestionFlowRunId)">@(selectedSnapshotView.Snapshot.ProjectionFlowRunId ?? selectedSnapshotView.Snapshot.IngestionFlowRunId)</a></dd>
+                    </dl>
+                    <DataGrid TItem="KnowledgeSnapshotArtifact" Items="selectedSnapshotView.Snapshot.Artifacts">
+                        <Header><tr><th>@T("ArtifactId")</th><th>@T("MediaType")</th><th>@T("Size")</th><th>@T("ProducerFlow")</th><th>@T("StorageFlow")</th></tr></Header>
+                        <Row Context="artifact"><tr data-testid="knowledge-snapshot-artifact-row"><td><a class="text-button" href="@SnapshotArtifactUrl(artifact)" title="@artifact.ArtifactId"><code>@ShortIdentifier(artifact.ArtifactId)</code></a></td><td><code>@artifact.MediaType</code></td><td>@FormatSize(artifact.Length)</td><td><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId)" title="@artifact.ProducerFlowRunId"><code>@ShortIdentifier(artifact.ProducerFlowRunId)</code></a></td><td><a class="text-button" href="@FlowRunUrl(artifact.StorageFlowRunId)" title="@artifact.StorageFlowRunId"><code>@ShortIdentifier(artifact.StorageFlowRunId)</code></a></td></tr></Row>
+                    </DataGrid>
+                </section>
+            }
+        }
         </section>
     }
     else if (activeTab == DetailsTab.Retrieval)
@@ -206,6 +223,7 @@ else if (source is not null && readiness is not null)
     private IReadOnlyList<KnowledgeProjectionResource> projections = [];
     private KnowledgeProjectionResource? selectedProjection;
     private IReadOnlyList<KnowledgeSnapshotView> snapshots = [];
+    private KnowledgeSnapshotView? selectedSnapshot;
     private KnowledgeRetrievalResult? retrievalResult;
     private bool loading = true, busy, failed, requiresApproval, confirmDelete;
     private DetailsTab activeTab;
@@ -260,6 +278,7 @@ else if (source is not null && readiness is not null)
             projections = (await projectionsTask).OrderByDescending(value => value.CreatedAt).ToArray();
             selectedProjection = projections.FirstOrDefault();
             snapshots = (await snapshotsTask).OrderByDescending(value => value.Snapshot.PublishedAt).ToArray();
+            selectedSnapshot = snapshots.FirstOrDefault();
             activeTab = View?.ToLowerInvariant() switch
             {
                 "definition" => DetailsTab.Definition,
@@ -395,6 +414,9 @@ else if (source is not null && readiness is not null)
         projections = (await Client.GetProjectionsAsync(SourceNamespace, Name, cancellation.Token)).OrderByDescending(value => value.CreatedAt).ToArray();
         selectedProjection = projections.FirstOrDefault();
         snapshots = (await Client.GetSnapshotsAsync(SourceNamespace, Name, cancellation.Token)).OrderByDescending(value => value.Snapshot.PublishedAt).ToArray();
+        selectedSnapshot = selectedSnapshot is null
+            ? snapshots.FirstOrDefault()
+            : snapshots.FirstOrDefault(value => value.Snapshot.Name == selectedSnapshot.Snapshot.Name) ?? snapshots.FirstOrDefault();
     }
     private Task StartAcquisitionAsync() => RunActionAsync(async () =>
     {
@@ -447,6 +469,14 @@ else if (source is not null && readiness is not null)
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
     private static string Preview(string value) => value.Length <= 240 ? value : $"{value[..240]}…";
     private static string ShortIdentifier(string value) => value.Length > 28 ? $"{value[..28]}…" : value;
+    private static string FormatSize(long length) => length < 1024
+        ? $"{length:N0} B"
+        : length < 1024 * 1024
+            ? $"{length / 1024d:N1} KiB"
+            : $"{length / (1024d * 1024d):N1} MiB";
+    private static string FlowRunUrl(string flowRunId) => $"/flow-runs/{Uri.EscapeDataString(flowRunId)}";
+    private static string SnapshotArtifactUrl(KnowledgeSnapshotArtifact value) =>
+        $"/artifacts/durable/{Uri.EscapeDataString(value.ArtifactId)}";
     private static string FlowIdentity(ResolvedKnowledgeFlowBinding value) => $"{value.Namespace} · {value.Version}";
     private static string FlowUrl(ResolvedKnowledgeFlowBinding value) => value.Namespace.IsDefault
         ? $"/flows/{Uri.EscapeDataString(value.Name)}"

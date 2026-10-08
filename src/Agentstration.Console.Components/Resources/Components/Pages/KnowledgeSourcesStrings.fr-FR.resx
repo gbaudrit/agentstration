@@ -47,4 +47,10 @@
   <data name="Provenance" xml:space="preserve"><value>Provenance</value></data>
   <data name="ProjectionProvenanceHelp" xml:space="preserve"><value>Générations exactes des sources de données, acquisitions, transformations, Flow Runs et artefacts utilisés par cette projection.</value></data>
   <data name="Transformation" xml:space="preserve"><value>Transformation</value></data>
+  <data name="SnapshotDetails" xml:space="preserve"><value>Contenu du snapshot</value></data>
+  <data name="SnapshotDetailsHelp" xml:space="preserve"><value>Artefacts publiés par ce snapshot immuable. Ouvrez un artefact pour consulter ou matérialiser son contenu.</value></data>
+  <data name="MediaType" xml:space="preserve"><value>Type de média</value></data>
+  <data name="Size" xml:space="preserve"><value>Taille</value></data>
+  <data name="ProducerFlow" xml:space="preserve"><value>Flow producteur</value></data>
+  <data name="StorageFlow" xml:space="preserve"><value>Flow de stockage</value></data>
 </root>
