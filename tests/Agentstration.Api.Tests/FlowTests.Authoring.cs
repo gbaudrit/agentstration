@@ -306,6 +306,50 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task TypedGraphValidationRequiresEveryDeclaredErrorOutputToBeConnected()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new AgentFlowStepDefinition { Name = "agent", Agent = new("sample-agent") },
+                new ToolFlowStepDefinition { Name = "tool", Tool = new("sample-tool") },
+                new FlowCallStepDefinition { Name = "child", Flow = new("sample-flow") },
+                new OutputFlowStepDefinition { Name = "output" },
+                new FailureFlowStepDefinition { Name = "failure" }
+            ],
+            Transitions =
+            [
+                new("input-agent", "input", "completed", "agent"),
+                new("agent-tool", "agent", "success", "tool"),
+                new("tool-output", "tool", "success", "output")
+            ]
+        };
+        var validator = new FlowGraphValidator(new ExistingResourceResolver());
+
+        var missing = await validator.ValidateAsync(graph, new FlowValidationContext(false), default);
+
+        CollectionAssert.AreEquivalent(
+            new[] { "agent", "tool", "child" },
+            missing.Issues.Where(issue => issue.Code == "error_transition_required").Select(issue => issue.StepId).ToArray());
+
+        var connected = await validator.ValidateAsync(graph with
+        {
+            Transitions =
+            [
+                .. graph.Transitions,
+                new("agent-error", "agent", "error", "failure"),
+                new("tool-error", "tool", "error", "failure"),
+                new("child-error", "child", "error", "failure")
+            ]
+        }, new FlowValidationContext(false), default);
+
+        Assert.IsFalse(connected.Issues.Any(issue => issue.Code == "error_transition_required"));
+    }
+
+    [TestMethod]
     public async Task DraftRunExecutesTypedGraphAndPersistsDifferentialEvents()
     {
         await using var fixture = await FlowFixture.CreateAsync();
@@ -330,8 +374,8 @@ public sealed partial class FlowTests
                 new("t4", "condition", "false", "failure"),
                 new("t5", "router", "selected", "agent"),
                 new("t6", "router", "failed", "failure"),
-                new("t7", "agent", "completed", "output"),
-                new("t8", "agent", "failed", "failure")
+                new("t7", "agent", "success", "output"),
+                new("t8", "agent", "error", "failure")
             ]
         };
         var now = TimeProvider.System.GetUtcNow();

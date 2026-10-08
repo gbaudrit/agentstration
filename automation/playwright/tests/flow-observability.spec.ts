@@ -15,6 +15,10 @@ test('Flow definitions, immutable views, designer, and direct runner render from
   await pages.flowObservability.open(product.consoleUrl, '/namespaces/default/flows/universal-router', 'flowDetails');
   await pages.flowObservability.open(product.consoleUrl, '/flows/universal-router/designer', 'designer');
   await pages.flowObservability.open(product.consoleUrl, '/namespaces/default/flows/universal-router/designer', 'designer');
+  await pages.flowDesigner.createDraftAndOpen(product.consoleUrl);
+  await pages.flowDesigner.expectExistingLinksVisible();
+  await pages.flowDesigner.expectCanvasFitsViewportAndWheelZoomContract();
+  await pages.flowDesigner.selectFirstInspectorTransition();
   await pages.flowObservability.open(product.consoleUrl, '/agents/dotnet-expert/run', 'agentRunner');
 });
 

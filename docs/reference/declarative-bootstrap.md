@@ -187,3 +187,21 @@ An invalid or duplicate profile name, a missing selected profile, malformed YAML
 Each supported kind is implemented by an `IBootstrapResourceHandler`, which owns its business identity and calls the existing resource boundary. This avoids assuming that all resources use `kind + metadata.name` as their existence key.
 
 Workspace profiles support direct editable `ModelProvider`, `RuntimeProfile`, `ModelProfile`, `Agent`, `Flow`, and `Entry` manifests. They also support `PackInstallation` with a bounded local ZIP source beneath the profile directory; those contained resources retain normal Pack ownership and immutability.
+
+## Flow authoring requirements
+
+Bootstrap Flow manifests use named `output` steps for every terminal result. New manifests must not use the legacy `failure` step. Declare at least one successful output and one error output; `completed` and `error` are the recommended names. An error output declares `outcome: error` and should provide a stable code, message, and an `outputMapping` when the failure payload must be preserved.
+
+Every Agent and Tool step exposes `success` and `error`; both paths must be connected. Every Flow-call step must likewise connect each named error output declared by the called Flow, using that output name as the transition event. Put referenced Agents and child Flows earlier in lexical profile order than their consumers.
+
+```yaml
+steps:
+  - { type: agent, name: answer, agent: { resourceId: support-agent } }
+  - { type: output, name: completed, outcome: success, outputMapping: "${transition.output}" }
+  - { type: output, name: error, outcome: error, code: SUPPORT_FAILED, message: The support Agent failed., outputMapping: "${transition.output}" }
+transitions:
+  - { id: answer-completed, fromStep: answer, event: success, toStep: completed }
+  - { id: answer-error, fromStep: answer, event: error, toStep: error }
+```
+
+The empty Flow template already supplies both terminal outputs. In the visual Designer, adding an Agent, Tool, or Flow call automatically connects its conventional `error` event to the first error terminal when one exists. Bootstrap preview and Flow validation reject missing required error paths.

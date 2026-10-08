@@ -111,17 +111,43 @@ public sealed record ToolFlowStepDefinition : FlowStepDefinition
     public JsonElement? ArgumentsMapping { get; init; }
 }
 
-public sealed record OutputFlowStepDefinition : FlowStepDefinition
+[JsonConverter(typeof(JsonStringEnumConverter<FlowOutputOutcome>))]
+public enum FlowOutputOutcome
 {
-    public JsonElement? OutputMapping { get; init; }
+    [JsonStringEnumMemberName("success")]
+    Success,
+    [JsonStringEnumMemberName("error")]
+    Error
 }
 
+public sealed record OutputFlowStepDefinition : FlowStepDefinition
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public FlowOutputOutcome? Outcome { get; init; }
+    public JsonElement? OutputMapping { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? Schema { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Code { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Message { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DetailsExpression { get; init; }
+}
+
+/// <summary>Compatibility shape for persisted Flow definitions authored before named outputs.</summary>
 public sealed record FailureFlowStepDefinition : FlowStepDefinition
 {
     public string Code { get; init; } = "FLOW_FAILED";
     public string Message { get; init; } = "Flow execution failed.";
     public string? DetailsExpression { get; init; }
 }
+
+public sealed record FlowOutputDefinition(
+    string Name,
+    string? DisplayName,
+    FlowOutputOutcome Outcome,
+    JsonElement? Schema);
 
 public sealed record FlowTransitionDefinition(
     string Id,
@@ -181,6 +207,68 @@ public static class FlowStepDefinitionExtensions
         FailureFlowStepDefinition => "failure",
         _ => throw new ArgumentOutOfRangeException(nameof(step))
     };
+
+    public static IReadOnlyList<string> OutputEvents(this FlowStepDefinition step) => step switch
+    {
+        InputFlowStepDefinition => ["completed"],
+        AgentFlowStepDefinition => ["success", "error"],
+        RouterFlowStepDefinition => ["selected", "failed"],
+        ConditionFlowStepDefinition => ["true", "false"],
+        TransformFlowStepDefinition => ["completed"],
+        ToolFlowStepDefinition => ["success", "error"],
+        FlowCallStepDefinition => [],
+        OutputFlowStepDefinition or FailureFlowStepDefinition => [],
+        _ => throw new ArgumentOutOfRangeException(nameof(step))
+    };
+}
+
+public static class FlowGraphDefinitionExtensions
+{
+    public static IReadOnlyList<FlowOutputDefinition> GetOutputs(this FlowGraphDefinition definition) =>
+        definition.Steps
+            .Select(step => step switch
+            {
+                OutputFlowStepDefinition output => new FlowOutputDefinition(
+                    output.Name,
+                    output.DisplayName,
+                    output.Outcome ?? FlowOutputOutcome.Success,
+                    definition.ResolveOutputSchema(output, out _)?.Clone()),
+                FailureFlowStepDefinition failure => new FlowOutputDefinition(
+                    failure.Name,
+                    failure.DisplayName,
+                    FlowOutputOutcome.Error,
+                    null),
+                _ => null
+            })
+            .OfType<FlowOutputDefinition>()
+            .ToArray();
+
+    public static JsonElement? ResolveOutputSchema(
+        this FlowGraphDefinition definition,
+        OutputFlowStepDefinition output,
+        out bool ambiguous)
+    {
+        ambiguous = false;
+        if (output.Schema is { } declared) return declared;
+        if (output.Outcome is not FlowOutputOutcome.Error && definition.OutputSchema is { } legacy) return legacy;
+        if (output.OutputMapping is { } mapping
+            && (mapping.ValueKind != JsonValueKind.String
+                || !string.Equals(mapping.GetString(), "${transition.output}", StringComparison.Ordinal)))
+            return null;
+
+        var candidates = definition.Transitions
+            .Where(transition => transition.ToStep == output.Name)
+            .Select(transition => definition.Steps.FirstOrDefault(step => step.Name == transition.FromStep))
+            .Select(step => step is InputFlowStepDefinition input ? input.Schema ?? definition.InputSchema : null)
+            .Where(schema => schema is not null)
+            .Select(schema => schema!.Value)
+            .ToArray();
+        var distinct = new List<JsonElement>();
+        foreach (var candidate in candidates)
+            if (!distinct.Any(existing => JsonElement.DeepEquals(existing, candidate))) distinct.Add(candidate);
+        ambiguous = distinct.Count > 1;
+        return distinct.Count == 1 ? distinct[0] : null;
+    }
 }
 
 public static class FlowDefinitionHash

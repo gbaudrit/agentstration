@@ -1,7 +1,8 @@
-@implements IDisposable
+@implements IAsyncDisposable
 @inject IStringLocalizer<FlowDesignerStrings> Localizer
+@inject IJSRuntime JSRuntime
 
-<div class="flow-diagram-canvas" role="application" aria-label="@Localizer["FlowDiagram"]">
+<div @ref="canvasElement" class="flow-diagram-canvas" role="application" aria-label="@Localizer["FlowDiagram"]">
     <div class="flow-zoom-controls" role="group" aria-label="@Localizer["DiagramZoomControls"]">
         <button type="button" @onclick="ZoomOut" aria-label="@Localizer["ZoomOut"]">−</button>
         <span aria-live="polite">@ZoomPercent%</span>
@@ -17,13 +18,22 @@
     private readonly BlazorDiagram diagram = new(new BlazorDiagramOptions
     {
         AllowMultiSelection = true,
-        Zoom = { Enabled = true },
+        // Keep the browser wheel available for page scrolling. Zoom remains available
+        // through the explicit controls, which call SetZoom directly.
+        Zoom = { Enabled = false },
         Links = { RequireTarget = true }
     });
     private long renderedRevision = -1;
     private long renderedFitRevision = -1;
+    private string? renderedSelectedStepName;
+    private string? renderedSelectedErrorTransitionId;
+    private bool renderedShowAllErrorTransitions;
     private bool rebuilding;
     private bool fitAfterRender;
+    private ElementReference canvasElement;
+    private DotNetObjectReference<FlowCanvas>? dotNetReference;
+    private IJSObjectReference? canvasModule;
+    private IJSObjectReference? wheelRegistration;
     private int ZoomPercent => (int)Math.Round(diagram.Zoom * 100);
 
     [Parameter, EditorRequired] public FlowDesignerDocument Document { get; set; } = new([], []);
@@ -31,10 +41,15 @@
     [Parameter] public long FitRevision { get; set; }
     [Parameter] public bool IsReadOnly { get; set; }
     [Parameter] public string? EntryStep { get; set; }
+    [Parameter] public string? SelectedStepName { get; set; }
+    [Parameter] public string? SelectedTransitionId { get; set; }
+    [Parameter] public bool ShowAllErrorTransitions { get; set; }
     [Parameter] public EventCallback<string?> SelectedStepChanged { get; set; }
+    [Parameter] public EventCallback<string?> SelectedTransitionChanged { get; set; }
     [Parameter] public EventCallback<MoveStepCommand> StepMoved { get; set; }
     [Parameter] public EventCallback<string> StepRemoved { get; set; }
     [Parameter] public EventCallback<FlowTransitionDefinition> TransitionCreated { get; set; }
+    [Parameter] public EventCallback<ReconnectTransitionCommand> TransitionReconnected { get; set; }
     [Parameter] public EventCallback<string> TransitionRemoved { get; set; }
 
     protected override void OnInitialized()
@@ -53,9 +68,18 @@
 
     protected override void OnParametersSet()
     {
-        if (Revision != renderedRevision)
+        var selectedErrorTransitionId = Document.Links.Any(link => link.Id == SelectedTransitionId && IsErrorTransition(link))
+            ? SelectedTransitionId
+            : null;
+        if (Revision != renderedRevision ||
+            renderedSelectedStepName != SelectedStepName ||
+            renderedSelectedErrorTransitionId != selectedErrorTransitionId ||
+            renderedShowAllErrorTransitions != ShowAllErrorTransitions)
         {
             renderedRevision = Revision;
+            renderedSelectedStepName = SelectedStepName;
+            renderedSelectedErrorTransitionId = selectedErrorTransitionId;
+            renderedShowAllErrorTransitions = ShowAllErrorTransitions;
             Rebuild();
         }
         if (FitRevision != renderedFitRevision)
@@ -63,12 +87,45 @@
             renderedFitRevision = FitRevision;
             fitAfterRender = true;
         }
+        SynchronizeSelection();
     }
 
-    protected override Task OnAfterRenderAsync(bool firstRender)
+    private void SynchronizeSelection()
+    {
+        foreach (var selected in diagram.GetSelectedModels().ToArray())
+        {
+            var keepSelected = selected switch
+            {
+                FlowDiagramNode node => SelectedTransitionId is null && node.Source.Name == SelectedStepName,
+                Blazor.Diagrams.Core.Models.Base.BaseLinkModel link => link.Id == SelectedTransitionId,
+                _ => false
+            };
+            if (!keepSelected)
+                diagram.UnselectModel(selected);
+        }
+
+        if (SelectedTransitionId is { } id)
+        {
+            var link = diagram.Links.FirstOrDefault(candidate => candidate.Id == id);
+            if (link is not null && !link.Selected)
+                diagram.SelectModel(link, unselectOthers: true);
+            return;
+        }
+
+        var selectedNode = diagram.Nodes.OfType<FlowDiagramNode>().FirstOrDefault(candidate => candidate.Source.Name == SelectedStepName);
+        if (selectedNode is not null && !selectedNode.Selected)
+            diagram.SelectModel(selectedNode, unselectOthers: true);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         TryFit();
-        return Task.CompletedTask;
+        if (!firstRender) return;
+
+        canvasModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Agentstration.Web.FlowDesigner/js/flow-canvas.js?v=20261005-1");
+        dotNetReference = DotNetObjectReference.Create(this);
+        wheelRegistration = await canvasModule.InvokeAsync<IJSObjectReference>("attachCtrlWheelZoom", canvasElement, dotNetReference);
     }
 
     public void Center()
@@ -80,6 +137,13 @@
     public void ZoomIn() => SetZoom(diagram.Zoom + 0.15);
 
     public void ZoomOut() => SetZoom(diagram.Zoom - 0.15);
+
+    [JSInvokable]
+    public void ApplyCtrlWheelZoom(double deltaY)
+    {
+        if (deltaY == 0) return;
+        SetZoom(diagram.Zoom + (deltaY < 0 ? 0.15 : -0.15));
+    }
 
     private void SetZoom(double zoom) => diagram.SetZoom(Math.Clamp(zoom, 0.25, 2.5));
 
@@ -93,9 +157,15 @@
             node.Moved -= OnNodeMoved;
             node.SizeChanged -= OnDiagramMetricsChanged;
         }
+        foreach (var link in diagram.Links)
+            DetachExistingLink(link);
         diagram.Links.Clear();
         diagram.Nodes.Clear();
-        var projection = FlowDiagramMapper.Project(Document);
+        var visibleDocument = Document with
+        {
+            Links = Document.Links.Where(IsTransitionVisible).ToArray()
+        };
+        var projection = FlowDiagramMapper.Project(visibleDocument);
         foreach (var node in projection.Nodes)
         {
             node.Locked = IsReadOnly;
@@ -106,17 +176,39 @@
         foreach (var link in projection.Links)
         {
             link.Locked = IsReadOnly;
+            AttachExistingLink(link);
             diagram.Links.Add(link);
         }
         rebuilding = false;
     }
 
+    private bool IsTransitionVisible(FlowDesignerLink link) =>
+        !IsErrorTransition(link) ||
+        ShowAllErrorTransitions ||
+        link.From == SelectedStepName ||
+        link.Id == SelectedTransitionId;
+
+    private static bool IsErrorTransition(FlowDesignerLink link) =>
+        string.Equals(link.Event, "error", StringComparison.Ordinal);
+
     private void OnDiagramMetricsChanged(Blazor.Diagrams.Core.Models.Base.Model _)
     {
+        RefreshLinks();
         TryFit();
     }
 
-    private void OnContainerChanged() => TryFit();
+    private void RefreshLinks()
+    {
+        foreach (var link in diagram.Links)
+            link.Refresh();
+    }
+
+    private void OnContainerChanged()
+    {
+        foreach (var node in diagram.Nodes)
+            node.ReinitializePorts();
+        TryFit();
+    }
 
     private void TryFit()
     {
@@ -143,6 +235,8 @@
     {
         if (model is FlowDiagramNode node)
             _ = SelectedStepChanged.InvokeAsync(node.Source.Name);
+        else if (model is Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
+            _ = SelectedTransitionChanged.InvokeAsync(link.Id);
     }
 
     private void OnNodeMoved(Blazor.Diagrams.Core.Models.Base.MovableModel model)
@@ -168,24 +262,74 @@
 
     private void OnLinkAttached(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
     {
-        if (link.Source.Model is not PortModel source || link.Target.Model is not PortModel target) return;
-        var from = source.Parent as FlowDiagramNode;
-        var to = target.Parent as FlowDiagramNode;
-        if (from is null || to is null) return;
-        var id = $"{from.Source.Name}-completed-{to.Source.Name}";
-        _ = TransitionCreated.InvokeAsync(new FlowTransitionDefinition(id, from.Source.Name, "completed", to.Source.Name));
+        link.TargetAttached -= OnLinkAttached;
+        if (!TryEndpoints(link, out var from, out var to, out var eventName)) return;
+        var id = $"{from.Source.Name}-{eventName}-{to.Source.Name}";
+        _ = TransitionCreated.InvokeAsync(new FlowTransitionDefinition(id, from.Source.Name, eventName, to.Source.Name));
+    }
+
+    private void AttachExistingLink(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
+    {
+        link.SourceChanged += OnLinkEndpointChanged;
+        link.TargetChanged += OnLinkEndpointChanged;
+        if (IsReadOnly) return;
+
+        diagram.Controls.AddFor(link, ControlsType.OnSelection)
+            .Add(new ArrowHeadControl(source: true, LinkMarker.Circle))
+            .Add(new ArrowHeadControl(source: false, LinkMarker.Circle));
+    }
+
+    private void DetachExistingLink(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
+    {
+        link.TargetAttached -= OnLinkAttached;
+        link.SourceChanged -= OnLinkEndpointChanged;
+        link.TargetChanged -= OnLinkEndpointChanged;
+        diagram.Controls.RemoveFor(link);
+    }
+
+    private void OnLinkEndpointChanged(
+        Blazor.Diagrams.Core.Models.Base.BaseLinkModel link,
+        Blazor.Diagrams.Core.Anchors.Anchor oldAnchor,
+        Blazor.Diagrams.Core.Anchors.Anchor newAnchor)
+    {
+        if (rebuilding || IsReadOnly || !TryEndpoints(link, out var from, out var to, out var eventName)) return;
+        _ = TransitionReconnected.InvokeAsync(new(link.Id, from.Source.Name, to.Source.Name, eventName));
+    }
+
+    private static bool TryEndpoints(
+        Blazor.Diagrams.Core.Models.Base.BaseLinkModel link,
+        out FlowDiagramNode from,
+        out FlowDiagramNode to,
+        out string eventName)
+    {
+        from = default!;
+        to = default!;
+        eventName = string.Empty;
+        if (link.Source.Model is not FlowDiagramPort first || link.Target.Model is not FlowDiagramPort second)
+            return false;
+
+        var output = first.Direction == FlowDiagramPortDirection.Output ? first : second;
+        var input = first.Direction == FlowDiagramPortDirection.Input ? first : second;
+        if (output.Direction != FlowDiagramPortDirection.Output || input.Direction != FlowDiagramPortDirection.Input)
+            return false;
+
+        from = (FlowDiagramNode)output.Parent;
+        to = (FlowDiagramNode)input.Parent;
+        eventName = output.EventName ?? string.Empty;
+        return eventName.Length > 0 && output.CanAttachTo(input);
     }
 
     private void OnLinkRemoved(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
     {
         if (rebuilding || IsReadOnly) return;
+        DetachExistingLink(link);
         // Removing a node also removes its links. The step command owns those transitions.
         if (link.Source.Model is PortModel source && source.Parent is FlowDiagramNode from && !diagram.Nodes.Contains(from)) return;
         if (link.Target.Model is PortModel target && target.Parent is FlowDiagramNode to && !diagram.Nodes.Contains(to)) return;
         _ = TransitionRemoved.InvokeAsync(link.Id);
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         diagram.ContainerChanged -= OnContainerChanged;
         diagram.ZoomChanged -= OnZoomChanged;
@@ -198,5 +342,22 @@
             node.Moved -= OnNodeMoved;
             node.SizeChanged -= OnDiagramMetricsChanged;
         }
+        foreach (var link in diagram.Links)
+            DetachExistingLink(link);
+
+        try
+        {
+            if (wheelRegistration is not null)
+                await wheelRegistration.InvokeVoidAsync("dispose");
+            if (wheelRegistration is not null)
+                await wheelRegistration.DisposeAsync();
+            if (canvasModule is not null)
+                await canvasModule.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+            // The browser circuit can close before the component is disposed.
+        }
+        dotNetReference?.Dispose();
     }
 }

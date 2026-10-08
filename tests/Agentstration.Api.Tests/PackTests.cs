@@ -764,7 +764,10 @@ public sealed class PackTests
         using var flowVersion = JsonDocument.Parse(await flowVersionResponse.Content.ReadAsStreamAsync());
         var graph = flowVersion.RootElement.GetProperty("graph");
         Assert.AreEqual("input", graph.GetProperty("entryStep").GetString());
-        Assert.AreEqual(3, graph.GetProperty("steps").GetArrayLength());
+        Assert.AreEqual(4, graph.GetProperty("steps").GetArrayLength());
+        Assert.IsTrue(graph.GetProperty("steps").EnumerateArray().Any(step =>
+            step.GetProperty("name").GetString() == "error" &&
+            step.GetProperty("outcome").GetString() == "error"));
 
         using var input = JsonDocument.Parse("""{"prompt":"Start the game"}""");
         using var runResponse = await client.PostAsJsonAsync(

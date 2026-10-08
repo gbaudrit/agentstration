@@ -4,7 +4,9 @@ A Flow defines how work is routed and processed. Editable drafts can be validate
 
 The five Flow kinds are Direct, Routing, Workflow, Orchestration, and Composite. They do not provide the same execution semantics or current implementation level. See [Flow modes](flow-modes.md) for the decision guide, exact behavior, orchestration strategies, limits, and current restrictions.
 
-The typed graph supports Input, Agent, Flow, Router, Condition, Transform, Output, and Failure steps. A generic Flow card selects any accessible published Flow by active or exact version, maps its declared input schema, and exposes its output schema to later steps. Publication rejects missing versions, incompatible mappings, and direct or indirect dependency cycles. Durable child-Flow execution is delivered separately; graphs containing a Flow step are authorable but are not executable until that runtime increment is present.
+The typed graph supports Input, Agent, Flow, Router, Condition, Transform, and named Output steps. Each Output has a stable name, a `success` or `error` outcome, an optional schema, and an optional payload mapping. `completed` and `error` are convenient defaults rather than reserved names. A generic Flow card selects any accessible published Flow by active or exact version, maps its declared input schema, discovers all of its named outputs, and can route on the output name returned by the child run. Publication rejects missing versions, incompatible or ambiguous output schemas, incompatible mappings, and direct or indirect dependency cycles.
+
+Definitions published before named outputs remain executable: an Output without an outcome emits the historical `completed` event, and the historical Failure shape retains failed-run semantics. Existing immutable versions are read as stored rather than rewritten.
 
 Published Workplace Entries always resolve to an exact executable Flow, including Agent selections normalized through system-managed Direct Agent Flows.
 

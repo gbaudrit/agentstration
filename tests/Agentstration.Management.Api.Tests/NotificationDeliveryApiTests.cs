@@ -326,7 +326,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         Transitions =
         [
             new("input-tool", "input", "completed", "create-notification"),
-            new("tool-output", "create-notification", "completed", "output")
+            new("tool-output", "create-notification", "success", "output")
         ]
     };
 
