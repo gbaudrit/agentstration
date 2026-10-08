@@ -413,7 +413,7 @@ public sealed class KnowledgeSourceEditorTests
     public void ListMakesTheKnowledgeSourceNameClickable()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = CreateContext(new KnowledgeClientStub(ExistingSource()));
+        using var context = CreateContext(new KnowledgeClientStub(ProjectedSource()));
 
         var rendered = context.Render<KnowledgeSources>();
 
@@ -422,6 +422,17 @@ public sealed class KnowledgeSourceEditorTests
             var link = rendered.Find("[data-testid='knowledge-source-name-link']");
             Assert.AreEqual("Agentstration documentation", link.TextContent);
             Assert.AreEqual("/knowledge-sources/agentstration-documentation", link.GetAttribute("href"));
+            var headers = rendered.FindAll("th").Select(value => value.TextContent).ToArray();
+            CollectionAssert.Contains(headers, "Data Sources");
+            CollectionAssert.Contains(headers, "Projection Flow");
+            CollectionAssert.DoesNotContain(headers, "Profile");
+            CollectionAssert.DoesNotContain(headers, "Ingestion Flow");
+            var dataSource = rendered.Find("[data-testid='knowledge-source-data-source-link']");
+            Assert.AreEqual("documentation", dataSource.TextContent);
+            StringAssert.StartsWith(dataSource.GetAttribute("href"), "/data-sources/documentation?");
+            var projection = rendered.Find("[data-testid='knowledge-source-projection-flow-link']");
+            Assert.AreEqual("default/knowledge-projection-builtin:1.0.0", projection.TextContent);
+            Assert.AreEqual("/flows/knowledge-projection-builtin", projection.GetAttribute("href"));
         });
     }
 
