@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
@@ -126,6 +127,40 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             .GetFlowRunArtifactAsync(FlowRunArtifactId.Parse(artifact.ArtifactId), default);
         Assert.IsNotNull(durable);
         Assert.AreEqual("text/html", durable.Value.Receipt.MediaType);
+
+        var knowledgeSource = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(
+            new KnowledgeSourceResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSource,
+                Metadata = new() { Name = "web-knowledge" },
+                ScopeRef = scope,
+                Definition = new()
+                {
+                    DisplayName = "Web knowledge",
+                    DataSources =
+                    [
+                        new KnowledgeDataSourceBinding
+                        {
+                            Name = "origin",
+                            DataSource = new(source.Value.Name, scope)
+                        }
+                    ],
+                    ProjectionFlow = new() { Name = KnowledgePlatformResourceProvisioner.ProjectionFlowName },
+                    RetrievalFlow = new() { Name = KnowledgePlatformResourceProvisioner.RetrievalFlowName }
+                }
+            }, default);
+
+        using var client = factory.CreateClient();
+        using var projectionResponse = await client.PostAsJsonAsync(
+            $"/api/knowledgesources/{knowledgeSource.Value.Name}/projections",
+            new StartKnowledgeProjectionRequest());
+        Assert.AreEqual(HttpStatusCode.Created, projectionResponse.StatusCode,
+            await projectionResponse.Content.ReadAsStringAsync());
+        var projection = await projectionResponse.Content.ReadFromJsonAsync<KnowledgeProjectionResource>();
+        Assert.IsNotNull(projection);
+        Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, projection.State, projection.ErrorMessage);
+        Assert.IsNotNull(projection.SnapshotName);
     }
 
     [TestMethod]

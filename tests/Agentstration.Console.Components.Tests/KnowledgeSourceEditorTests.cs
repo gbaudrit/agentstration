@@ -197,6 +197,13 @@ public sealed class KnowledgeSourceEditorTests
             Assert.AreEqual("knowledge-source-projections-tab", rendered.Find("[role='tabpanel']").GetAttribute("aria-labelledby"));
         });
 
+        rendered.Find("[data-testid='knowledge-start-projection']").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsEmpty(rendered.FindAll(".form-alert-danger"));
+            Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-projection-row']"));
+        });
+
         rendered.Find("[data-testid='knowledge-source-snapshots-tab']").Click();
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-snapshots']")));
 
@@ -610,6 +617,7 @@ public sealed class KnowledgeSourceEditorTests
 
     private sealed class KnowledgeClientStub(KnowledgeSourceResource? source = null, IReadOnlyList<KnowledgeAcquisitionResource>? acquisitions = null, KnowledgeSourceToolExposureResource? exposure = null, IReadOnlyList<KnowledgeSnapshotView>? snapshots = null, KnowledgeRetrievalResult? retrievalResult = null) : IKnowledgeSourcesClient
     {
+        private readonly List<KnowledgeProjectionResource> projections = [];
         public CreateKnowledgeSourceRequest? CreatedRequest { get; private set; }
         public PutKnowledgeSourceRequest? UpdatedRequest { get; private set; }
         public Task<IReadOnlyList<KnowledgeSourceResource>> GetAsync(CancellationToken cancellationToken = default) =>
@@ -652,6 +660,35 @@ public sealed class KnowledgeSourceEditorTests
         public Task<ResourceSnapshot<KnowledgeAcquisitionResource>> StartAcquisitionAsync(ResourceNamespace @namespace, string name, StartKnowledgeAcquisitionRequest request, string? idempotencyKey = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<KnowledgeAcquisitionResource>> CancelAcquisitionAsync(ResourceNamespace @namespace, string acquisitionId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<KnowledgeAcquisitionResource>> RetryAcquisitionAsync(ResourceNamespace @namespace, string acquisitionId, RetryKnowledgeAcquisitionRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<KnowledgeProjectionResource>> GetProjectionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<KnowledgeProjectionResource>>(projections);
+        public Task<ResourceSnapshot<KnowledgeProjectionResource>> StartProjectionAsync(ResourceNamespace @namespace, string name, StartKnowledgeProjectionRequest request, CancellationToken cancellationToken = default)
+        {
+            var projection = new KnowledgeProjectionResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeProjection,
+                Metadata = new() { Name = "projection-0123456789abcdef", Namespace = @namespace },
+                ScopeRef = source?.ScopeRef,
+                KnowledgeSourceUid = source?.Uid ?? Guid.NewGuid(),
+                KnowledgeSourceName = name,
+                KnowledgeSourceNamespace = @namespace,
+                KnowledgeSourceGeneration = source?.Generation ?? 1,
+                ProjectionFlow = new("knowledge-projection-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Projection),
+                RetrievalFlow = new("knowledge-retrieval-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Retrieval),
+                ProjectionFlowRunId = "flowrun-knowledge-0123456789abcdef",
+                State = KnowledgeAcquisitionState.Succeeded,
+                CorrelationId = "projection-0123456789abcdef",
+                CreatedBy = Guid.NewGuid(),
+                TenantId = Guid.NewGuid(),
+                WorkspaceId = source?.ScopeRef?.TargetId ?? Guid.NewGuid(),
+                CreatedAt = DateTimeOffset.UtcNow,
+                CompletedAt = DateTimeOffset.UtcNow,
+                SnapshotName = "snapshot-0123456789abcdef"
+            };
+            projections.Add(projection);
+            return Task.FromResult(new ResourceSnapshot<KnowledgeProjectionResource>(projection, "\"projection-etag\""));
+        }
         public Task<IReadOnlyList<KnowledgeSnapshotView>> GetSnapshotsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(snapshots ?? []);
         public Task<KnowledgeSnapshotView> SelectActiveSnapshotAsync(ResourceNamespace @namespace, string name, string snapshotName, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<KnowledgeSnapshotResource>> PublishSnapshotAsync(ResourceNamespace @namespace, string acquisitionId, PublishKnowledgeSnapshotRequest request, string? idempotencyKey = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();

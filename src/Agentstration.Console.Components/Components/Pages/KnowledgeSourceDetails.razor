@@ -451,7 +451,6 @@ else if (source is not null && readiness is not null)
     }
     private async Task ReloadChildrenAsync()
     {
-        acquisitions = (await Client.GetAcquisitionsAsync(SourceNamespace, Name, cancellation.Token)).OrderByDescending(value => value.CreatedAt).ToArray();
         projections = (await Client.GetProjectionsAsync(SourceNamespace, Name, cancellation.Token)).OrderByDescending(value => value.CreatedAt).ToArray();
         selectedProjection = projections.FirstOrDefault();
         snapshots = (await Client.GetSnapshotsAsync(SourceNamespace, Name, cancellation.Token)).OrderByDescending(value => value.Snapshot.PublishedAt).ToArray();
