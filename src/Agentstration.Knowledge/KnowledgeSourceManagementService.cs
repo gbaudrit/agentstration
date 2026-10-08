@@ -36,7 +36,8 @@ public sealed class KnowledgeSourceManagementService(
     IKnowledgeFlowResolver flows,
     KnowledgeSourceProfileService profiles,
     ISecurityAuditWriter audit,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IKnowledgeProjectionInputResolver? projectionInputs = null)
 {
     public const int MaximumDisplayNameLength = 200;
     public const int MaximumDescriptionLength = 2_000;
@@ -224,7 +225,40 @@ public sealed class KnowledgeSourceManagementService(
             throw new KnowledgeSourceValidationException("knowledge_source_acquisition_configuration_too_large",
                 $"KnowledgeSource acquisitionConfiguration cannot exceed {MaximumAcquisitionConfigurationBytes} bytes.");
         ValidateTarget(resource.Definition.IngestionFlow, "ingestion");
+        ValidateTarget(resource.Definition.ProjectionFlow, "projection");
         ValidateTarget(resource.Definition.RetrievalFlow, "retrieval");
+        var projected = resource.Definition.DataSources.Count != 0 || resource.Definition.ProjectionFlow is not null;
+        if (projected)
+        {
+            if (resource.Definition.Profile is not null || resource.Definition.IngestionFlow is not null)
+                throw new KnowledgeSourceValidationException("knowledge_source_projection_legacy_conflict",
+                    "A projected KnowledgeSource cannot also declare a Knowledge Source profile or ingestion Flow.");
+            if (resource.Definition.DataSources.Count is < 1 or > KnowledgeProjectionService.MaximumInputs)
+                throw new KnowledgeSourceValidationException("knowledge_source_data_sources_invalid",
+                    $"A projected KnowledgeSource requires 1 to {KnowledgeProjectionService.MaximumInputs} Data Source bindings.");
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var binding in resource.Definition.DataSources)
+            {
+                if (string.IsNullOrWhiteSpace(binding.Name) || !names.Add(binding.Name))
+                    throw new KnowledgeSourceValidationException("knowledge_source_data_source_binding_invalid",
+                        "Data Source binding names must be non-empty and unique.");
+                if (string.IsNullOrWhiteSpace(binding.DataSource.Name))
+                    throw new KnowledgeSourceValidationException("knowledge_source_data_source_binding_invalid",
+                        $"Binding '{binding.Name}' requires a Data Source reference.");
+                if (binding.Configuration.ValueKind != JsonValueKind.Object)
+                    throw new KnowledgeSourceValidationException("knowledge_source_transformation_configuration_invalid",
+                        $"Binding '{binding.Name}' transformation configuration must be a JSON object.");
+                if (binding.MaximumAge is { } maximumAge && maximumAge <= TimeSpan.Zero)
+                    throw new KnowledgeSourceValidationException("knowledge_source_data_source_maximum_age_invalid",
+                        $"Binding '{binding.Name}' maximum age must be greater than zero.");
+                ValidateTarget(binding.TransformationFlow, "transformation");
+            }
+            if (resource.Definition.Enabled
+                && (resource.Definition.ProjectionFlow is null || resource.Definition.RetrievalFlow is null))
+                throw new KnowledgeSourceValidationException("knowledge_source_projection_bindings_required",
+                    "An enabled projected KnowledgeSource requires projection and retrieval Flow bindings.");
+            return;
+        }
         if (resource.Definition.Profile is not null
             && (resource.Definition.IngestionFlow is not null || resource.Definition.RetrievalFlow is not null))
             throw new KnowledgeSourceValidationException("knowledge_source_profile_flow_conflict",
@@ -244,6 +278,64 @@ public sealed class KnowledgeSourceManagementService(
         ResolvedKnowledgeFlowBinding? ingestion = null;
         ResolvedKnowledgeFlowBinding? retrieval = null;
         ResolvedKnowledgeSourceProfile? profile = null;
+        ResolvedKnowledgeFlowBinding? projection = null;
+        List<KnowledgeDataSourceBindingReadiness>? dataSources = null;
+        var projected = resource.Definition.DataSources.Count != 0 || resource.Definition.ProjectionFlow is not null;
+        if (projected)
+        {
+            if (resource.Definition.ProjectionFlow is null) issues.Add("Projection Flow is not configured.");
+            else
+            {
+                projection = await ResolveAsync(resource, resource.Definition.ProjectionFlow, "projection",
+                    issues, rejectInvalidBindings, cancellationToken);
+                if (projection is not null && !string.Equals(projection.Contract, KnowledgeFlowContracts.Projection, StringComparison.Ordinal))
+                    AddOrThrow("knowledge_source_projection_contract_invalid",
+                        $"Projection Flow must declare flow.contract '{KnowledgeFlowContracts.Projection}'.");
+            }
+            if (resource.Definition.RetrievalFlow is null) issues.Add("Retrieval Flow is not configured.");
+            else retrieval = await ResolveAsync(resource, resource.Definition.RetrievalFlow, "retrieval",
+                issues, rejectInvalidBindings, cancellationToken);
+            dataSources = [];
+            foreach (var binding in resource.Definition.DataSources)
+            {
+                KnowledgeDataSourceBindingReadiness readiness;
+                try
+                {
+                    readiness = projectionInputs is null
+                        ? new(binding.Name, null, null, true, null, null)
+                        : await projectionInputs.GetReadinessAsync(RequireScope(resource), resource.Namespace,
+                            binding, cancellationToken);
+                    if (binding.TransformationFlow is not null)
+                    {
+                        var transformation = await flows.ResolveAsync(RequireScope(resource), resource.Namespace,
+                            binding.TransformationFlow, cancellationToken);
+                        if (!string.Equals(transformation.Contract, KnowledgeFlowContracts.ArtifactTransformation, StringComparison.Ordinal))
+                            throw new KnowledgeSourceValidationException("knowledge_source_transformation_contract_invalid",
+                                $"Transformation Flow for binding '{binding.Name}' must declare flow.contract '{KnowledgeFlowContracts.ArtifactTransformation}'.");
+                        readiness = readiness with { Transformation = transformation };
+                    }
+                }
+                catch (Exception exception) when (!rejectInvalidBindings
+                    && exception is KnowledgeSourceValidationException or KnowledgeProjectionException
+                        or ResourceReferenceOutsideScopeException or ResourceReferenceAmbiguousException)
+                {
+                    readiness = new(binding.Name, null, null, false, exception.Message, null);
+                }
+                dataSources.Add(readiness);
+                if (!readiness.Ready && binding.Required) issues.Add(readiness.Issue ?? $"Binding '{binding.Name}' is not ready.");
+            }
+            if (!resource.Definition.Enabled) issues.Add("KnowledgeSource is disabled.");
+            return new(resource.Definition.Enabled && projection is not null && retrieval is not null
+                    && dataSources.Where((_, index) => resource.Definition.DataSources[index].Required).All(value => value.Ready),
+                resource.Definition.Enabled, null, retrieval, issues, null, projection, dataSources);
+
+            void AddOrThrow(string code, string message)
+            {
+                if (rejectInvalidBindings) throw new KnowledgeSourceValidationException(code, message);
+                issues.Add(message);
+                projection = null;
+            }
+        }
         if (resource.Definition.Profile is not null)
         {
             try

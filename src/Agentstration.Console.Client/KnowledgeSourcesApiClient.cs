@@ -24,6 +24,11 @@ public interface IKnowledgeSourcesClient
     Task<ResourceSnapshot<KnowledgeAcquisitionResource>> CancelAcquisitionAsync(ResourceNamespace @namespace, string acquisitionId, CancellationToken cancellationToken = default);
     Task<ResourceSnapshot<KnowledgeAcquisitionResource>> RetryAcquisitionAsync(ResourceNamespace @namespace, string acquisitionId,
         RetryKnowledgeAcquisitionRequest request, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<KnowledgeProjectionResource>> GetProjectionsAsync(ResourceNamespace @namespace, string name,
+        CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<KnowledgeProjectionResource>>([]);
+    Task<ResourceSnapshot<KnowledgeProjectionResource>> StartProjectionAsync(ResourceNamespace @namespace, string name,
+        StartKnowledgeProjectionRequest request, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This client does not support Knowledge projections.");
     Task<IReadOnlyList<KnowledgeSnapshotView>> GetSnapshotsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default);
     Task<KnowledgeSnapshotView> SelectActiveSnapshotAsync(ResourceNamespace @namespace, string name, string snapshotName, CancellationToken cancellationToken = default);
     Task<ResourceSnapshot<KnowledgeSnapshotResource>> PublishSnapshotAsync(ResourceNamespace @namespace, string acquisitionId,
@@ -133,6 +138,20 @@ public sealed class KnowledgeSourcesApiClient(HttpClient httpClient) : IKnowledg
         RetryKnowledgeAcquisitionRequest request,
         CancellationToken cancellationToken = default) => SendResourceAsync<KnowledgeAcquisitionResource>(
             HttpMethod.Post, AcquisitionPath(@namespace, acquisitionId, "retry"), request, null, null, cancellationToken);
+
+    public Task<IReadOnlyList<KnowledgeProjectionResource>> GetProjectionsAsync(
+        ResourceNamespace @namespace,
+        string name,
+        CancellationToken cancellationToken = default) =>
+        ApiResponse.ReadAsync<IReadOnlyList<KnowledgeProjectionResource>>(httpClient,
+            ChildPath(@namespace, name, "projections"), cancellationToken);
+
+    public Task<ResourceSnapshot<KnowledgeProjectionResource>> StartProjectionAsync(
+        ResourceNamespace @namespace,
+        string name,
+        StartKnowledgeProjectionRequest request,
+        CancellationToken cancellationToken = default) => SendResourceAsync<KnowledgeProjectionResource>(
+            HttpMethod.Post, ChildPath(@namespace, name, "projections"), request, null, null, cancellationToken);
 
     public Task<IReadOnlyList<KnowledgeSnapshotView>> GetSnapshotsAsync(
         ResourceNamespace @namespace,

@@ -62,6 +62,7 @@ public sealed class KnowledgeRetrievalService(
     public const int MaximumFilters = 20;
     public const int MaximumResults = 100;
     public const int MaximumOutputCharacters = 32_768;
+    public const int MaximumCitationExcerptCharacters = 4_000;
     public const int MaximumReadBytes = 1_048_576;
     public const int MaximumContinuationCharacters = 4_096;
     public const int MaximumCitations = 200;
@@ -195,7 +196,8 @@ public sealed class KnowledgeRetrievalService(
             var profile = snapshot.Profile;
             try
             {
-                flow = profile?.RetrievalFlow
+                flow = snapshot.RetrievalFlow
+                    ?? profile?.RetrievalFlow
                     ?? (await sources.ResolveCompositionAsync(source.Value, cancellationToken)).Retrieval;
             }
             catch (Exception exception) when (exception is KnowledgeSourceValidationException or KnowledgeSourceProfileValidationException)
@@ -211,9 +213,17 @@ public sealed class KnowledgeRetrievalService(
             {
                 var artifact = snapshot.Artifacts.Single(value => value.ArtifactId == requiredArtifactId);
                 var offset = request.GetProperty("offset").GetInt64();
-                if (offset > artifact.Length || request.GetProperty("length").GetInt64() > artifact.Length - offset)
+                if (offset >= artifact.Length)
                     throw Error("knowledge_read_range_outside_artifact",
                         "The requested range exceeds the selected Snapshot artifact length.");
+                var requestedLength = request.GetProperty("length").GetInt32();
+                var effectiveLength = checked((int)Math.Min(requestedLength, artifact.Length - offset));
+                request = JsonSerializer.SerializeToElement(new
+                {
+                    artifactId = requiredArtifactId,
+                    offset,
+                    length = effectiveLength
+                }, JsonOptions);
             }
 
             var retrievalId = $"retrieval-{Guid.NewGuid():N}";
@@ -350,7 +360,7 @@ public sealed class KnowledgeRetrievalService(
             || citations.Any(value => string.IsNullOrWhiteSpace(value.ArtifactId)
                 || !artifactIds.Contains(value.ArtifactId)
                 || value.Locator?.Length > 1_000
-                || value.Excerpt?.Length > 4_000
+                || value.Excerpt?.Length > MaximumCitationExcerptCharacters
                 || value.Start < 0
                 || value.End < value.Start))
             throw Error("knowledge_retrieval_output_outside_snapshot",

@@ -12,4 +12,56 @@
   <data name="DetailsSections" xml:space="preserve"><value>Knowledge Source sections</value></data><data name="Tab.Overview" xml:space="preserve"><value>Overview</value></data><data name="Tab.Definition" xml:space="preserve"><value>Definition</value></data><data name="Tab.Acquisitions" xml:space="preserve"><value>Acquisitions</value></data><data name="Tab.Snapshots" xml:space="preserve"><value>Snapshots</value></data><data name="Tab.Retrieval" xml:space="preserve"><value>Retrieval</value></data><data name="Tab.Tools" xml:space="preserve"><value>Tools</value></data><data name="Tab.Yaml" xml:space="preserve"><value>YAML</value></data><data name="Delete" xml:space="preserve"><value>Delete</value></data>
   <data name="DeleteSource" xml:space="preserve"><value>Delete Knowledge Source</value></data><data name="DeleteSourceHelp" xml:space="preserve"><value>Deletion is rejected while snapshots or other governed resources still reference this source.</value></data><data name="ConfirmDelete" xml:space="preserve"><value>Confirm deletion</value></data>
   <data name="OpenProfiles" xml:space="preserve"><value>Knowledge Source Profiles</value></data><data name="Profile" xml:space="preserve"><value>Profile</value></data><data name="SelectProfile" xml:space="preserve"><value>Select a profile</value></data><data name="Draft" xml:space="preserve"><value>Draft</value></data><data name="ResolvedProfile" xml:space="preserve"><value>Resolved active profile</value></data><data name="ResolvedProfileFlowsHelp" xml:space="preserve"><value>The active profile resolves the exact published Flow versions used by this source.</value></data><data name="ResolvedLegacyFlowsHelp" xml:space="preserve"><value>These exact published Flow versions come from the source's legacy direct bindings.</value></data><data name="ProfileSelectionHelp" xml:space="preserve"><value>The selected profile governs the ingestion and retrieval composition used by this source.</value></data><data name="EnabledHelp" xml:space="preserve"><value>Allow this source to run governed ingestion and retrieval through its active profile.</value></data><data name="RequireApprovalHelp" xml:space="preserve"><value>Require an explicit approval before each generated source Tool can run.</value></data>
+  <data name="ProjectionFlow" xml:space="preserve"><value>Projection Flow</value></data>
+  <data name="DataSources" xml:space="preserve"><value>Data Sources</value></data>
+  <data name="SelectProjectionFlow" xml:space="preserve"><value>Select a projection Flow</value></data>
+  <data name="SelectRetrievalFlow" xml:space="preserve"><value>Select a retrieval Flow</value></data>
+  <data name="ProjectionInputs" xml:space="preserve"><value>Projection inputs</value></data>
+  <data name="DataSourceBindings" xml:space="preserve"><value>Data Source bindings</value></data>
+  <data name="DataSourceBindingsHelp" xml:space="preserve"><value>Bind one or more governed Data Sources. Each input may optionally be prepared by a compatible transformation Flow.</value></data>
+  <data name="AddDataSource" xml:space="preserve"><value>Add a Data Source</value></data>
+  <data name="NoDataSourceBindings" xml:space="preserve"><value>Add at least one Data Source input.</value></data>
+  <data name="BindingName" xml:space="preserve"><value>Binding name</value></data>
+  <data name="DataSource" xml:space="preserve"><value>Data Source</value></data>
+  <data name="SelectDataSource" xml:space="preserve"><value>Select a Data Source</value></data>
+  <data name="DataSourceSelectionRequired" xml:space="preserve"><value>A Data Source must be selected.</value></data>
+  <data name="TransformationFlowOptional" xml:space="preserve"><value>Transformation Flow (optional)</value></data>
+  <data name="IdentityTransformation" xml:space="preserve"><value>No transformation · preserve artifacts</value></data>
+  <data name="RequiredInput" xml:space="preserve"><value>Required input</value></data>
+  <data name="RequiredInputHelp" xml:space="preserve"><value>Prevent projection when this input has no successful acquisition.</value></data>
+  <data name="MaximumAge" xml:space="preserve"><value>Maximum age (hh:mm:ss)</value></data>
+  <data name="MaximumAgeHelp" xml:space="preserve"><value>Optional. Hours may exceed 24. Older acquisitions are reported as stale and cannot be projected.</value></data>
+  <data name="MaximumAgeFormat" xml:space="preserve"><value>Maximum age must use the hh:mm:ss format; hours may exceed 24.</value></data>
+  <data name="TransformationConfiguration" xml:space="preserve"><value>Transformation configuration (JSON)</value></data>
+  <data name="TransformationConfigurationHelp" xml:space="preserve"><value>Provide a bounded JSON object passed only to this binding's transformation Flow.</value></data>
+  <data name="ProjectionEditorDescription" xml:space="preserve"><value>Project one or more governed Data Sources into an immutable knowledge snapshot.</value></data>
+  <data name="ProjectionEnabledHelp" xml:space="preserve"><value>Allow this source to run its governed processing and retrieval Flows.</value></data>
+  <data name="Remove" xml:space="preserve"><value>Remove</value></data>
+  <data name="Projection" xml:space="preserve"><value>Projection</value></data>
+  <data name="ProjectionHistory" xml:space="preserve"><value>Projection history</value></data>
+  <data name="ProjectionHelp" xml:space="preserve"><value>Project the latest successful Data Source acquisitions into one immutable Knowledge Snapshot.</value></data>
+  <data name="StartProjection" xml:space="preserve"><value>Run projection</value></data>
+  <data name="ProjectionParameters" xml:space="preserve"><value>Projection parameters (JSON)</value></data>
+  <data name="NoProjections" xml:space="preserve"><value>No projection has been run.</value></data>
+  <data name="Inputs" xml:space="preserve"><value>Inputs</value></data>
+  <data name="ProjectionCompleted" xml:space="preserve"><value>The projection completed and its Snapshot is active.</value></data>
+  <data name="Tab.Projections" xml:space="preserve"><value>Projections</value></data>
+  <data name="Provenance" xml:space="preserve"><value>Provenance</value></data>
+  <data name="ProjectionProvenanceHelp" xml:space="preserve"><value>Exact Data Source generations, acquisitions, transformations, Flow Runs, and artifacts used by this projection.</value></data>
+  <data name="Transformation" xml:space="preserve"><value>Transformation</value></data>
+  <data name="SnapshotDetails" xml:space="preserve"><value>Snapshot contents</value></data>
+  <data name="SnapshotDetailsHelp" xml:space="preserve"><value>Artifacts published by this immutable Snapshot. Open an artifact to consult or materialize its content.</value></data>
+  <data name="MediaType" xml:space="preserve"><value>Media type</value></data>
+  <data name="Size" xml:space="preserve"><value>Size</value></data>
+  <data name="ProducerFlow" xml:space="preserve"><value>Producer Flow</value></data>
+  <data name="StorageFlow" xml:space="preserve"><value>Storage Flow</value></data>
+  <data name="SelectArtifact" xml:space="preserve"><value>Select a Snapshot artifact</value></data>
+  <data name="OpenArtifact" xml:space="preserve"><value>Open artifact</value></data>
+  <data name="Operation.Search" xml:space="preserve"><value>Search</value></data>
+  <data name="Operation.Query" xml:space="preserve"><value>Ask a question</value></data>
+  <data name="Operation.Read" xml:space="preserve"><value>Read an artifact</value></data>
+  <data name="Results" xml:space="preserve"><value>Results</value></data>
+  <data name="Completed" xml:space="preserve"><value>Completed</value></data>
+  <data name="SynthesizedAnswer" xml:space="preserve"><value>Synthesized answer</value></data>
+  <data name="UnknownMediaType" xml:space="preserve"><value>Unknown media type</value></data>
 </root>

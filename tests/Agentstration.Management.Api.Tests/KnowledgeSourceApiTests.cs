@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Flows;
@@ -28,6 +30,125 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task ProjectionAggregatesPinnedDataSourceInputsAndPublishesOneSnapshot()
+    {
+        var projection = new ProjectionTestDouble();
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IKnowledgeProjectionInputResolver>();
+            services.RemoveAll<IKnowledgeProjectionFlowGateway>();
+            services.RemoveAll<IKnowledgeRetrievalFlowGateway>();
+            services.AddSingleton<IKnowledgeProjectionInputResolver>(projection);
+            services.AddSingleton<IKnowledgeProjectionFlowGateway>(projection);
+            services.AddSingleton<IKnowledgeRetrievalFlowGateway>(projection);
+        }));
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var output = await CreateDurableArtifactAsync(factory.Services, "projection-output", "projected-content");
+        projection.OutputArtifactId = output.ArtifactId.ToString();
+        await CreateKnowledgeContractFlowAsync(factory.Services, context,
+            "normalize-json", KnowledgeFlowContracts.ArtifactTransformation);
+
+        var source = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(
+            new KnowledgeSourceResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSource,
+                Metadata = new() { Name = "projected-docs" },
+                ScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId),
+                Definition = new()
+                {
+                    DisplayName = "Projected documentation",
+                    ProjectionFlow = new() { Name = KnowledgePlatformResourceProvisioner.ProjectionFlowName },
+                    RetrievalFlow = new() { Name = KnowledgePlatformResourceProvisioner.RetrievalFlowName },
+                    DataSources =
+                    [
+                        new() { Name = "website", DataSource = new("website", ResourceScopeRef.Tenant(context.TenantId)) },
+                        new()
+                        {
+                            Name = "release-notes",
+                            DataSource = new("release-notes", ResourceScopeRef.Workspace(context.WorkspaceId)),
+                            TransformationFlow = new() { Name = "normalize-json" }
+                        },
+                        new()
+                        {
+                            Name = "optional-feed",
+                            DataSource = new("optional-feed", ResourceScopeRef.Workspace(context.WorkspaceId)),
+                            TransformationFlow = new() { Name = "normalize-json" },
+                            Required = false
+                        }
+                    ]
+                }
+            }, default);
+
+        using var client = factory.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            $"/api/knowledgesources/{source.Value.Name}/projections",
+            new StartKnowledgeProjectionRequest
+            {
+                AcquisitionIds = new Dictionary<string, string>
+                {
+                    ["website"] = "acquisition-website-selected",
+                    ["release-notes"] = "acquisition-release-notes-selected"
+                }
+            });
+
+        Assert.AreEqual(HttpStatusCode.Created, response.StatusCode, await response.Content.ReadAsStringAsync());
+        var completed = await response.Content.ReadFromJsonAsync<KnowledgeProjectionResource>();
+        Assert.IsNotNull(completed);
+        Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, completed.State, completed.ErrorMessage);
+        Assert.HasCount(2, completed.Inputs);
+        Assert.AreEqual("acquisition-website-selected", completed.Inputs[0].AcquisitionId);
+        Assert.AreEqual(ResourceScopeKind.Tenant, completed.Inputs[0].DataSourceScopeRef.Kind);
+        Assert.IsNull(completed.Inputs[0].TransformationFlowRunId);
+        Assert.IsNotNull(completed.Inputs[1].TransformationFlowRunId);
+        Assert.AreEqual(KnowledgeFlowContracts.ArtifactTransformation,
+            completed.Inputs[1].TransformationFlow?.Contract);
+        Assert.HasCount(1, completed.InputIssues);
+        Assert.AreEqual("optional-feed", completed.InputIssues[0].BindingName);
+        Assert.AreEqual("knowledge_projection_transformation_failed", completed.InputIssues[0].Code);
+        Assert.IsNotNull(completed.SnapshotName);
+
+        var snapshot = await factory.Services.GetRequiredService<IResourceStore>()
+            .GetExactAsync<KnowledgeSnapshotResource>(ScopedResourceAddress.Create(
+                ResourceScopeRef.Workspace(context.WorkspaceId), ResourceNamespace.Default,
+                KnowledgeResourceKinds.KnowledgeSnapshot, completed.SnapshotName), default);
+        Assert.IsNotNull(snapshot);
+        Assert.AreEqual(completed.Name, snapshot.Value.ProjectionId);
+        Assert.AreEqual(completed.ProjectionFlowRunId, snapshot.Value.ProjectionFlowRunId);
+        Assert.HasCount(2, snapshot.Value.ProjectionInputs);
+        Assert.HasCount(1, snapshot.Value.Artifacts);
+        Assert.AreEqual(output.ArtifactId.ToString(), snapshot.Value.Artifacts[0].ArtifactId);
+        Assert.AreEqual(KnowledgePlatformResourceProvisioner.RetrievalFlowName,
+            snapshot.Value.RetrievalFlow?.Name);
+        Assert.HasCount(2, projection.ProjectionInput?.Inputs ?? []);
+        Assert.HasCount(2, projection.ProjectionInput?.Artifacts ?? []);
+        var projectionInput = projection.ProjectionRequestInput!.Value;
+        Assert.AreEqual("website", projectionInput.GetProperty("inputs")[0].GetProperty("bindingName").GetString());
+        var projectedArtifact = projectionInput.GetProperty("artifacts")[0];
+        Assert.AreEqual("input-website", projectedArtifact.GetProperty("artifactId").GetString());
+        Assert.AreEqual("durable", projectedArtifact.GetProperty("kind").GetString());
+        Assert.AreEqual("publishable", projectedArtifact.GetProperty("disposition").GetString());
+        Assert.IsFalse(projectedArtifact.TryGetProperty("ArtifactId", out _));
+
+        var history = await client.GetFromJsonAsync<KnowledgeProjectionResource[]>(
+            $"/api/knowledgesources/{source.Value.Name}/projections");
+        Assert.HasCount(1, history);
+        Assert.AreEqual(completed.Name, history![0].Name);
+
+        using var searchResponse = await client.PostAsJsonAsync(
+            $"/api/knowledgesources/{source.Value.Name}/search",
+            new SearchKnowledgeRequest { Query = "projected-content" });
+        Assert.AreEqual(HttpStatusCode.OK, searchResponse.StatusCode,
+            await searchResponse.Content.ReadAsStringAsync());
+        var search = await searchResponse.Content.ReadFromJsonAsync<KnowledgeRetrievalResult>();
+        Assert.IsNotNull(search);
+        Assert.AreEqual(completed.SnapshotName, search.SnapshotName);
+        Assert.AreEqual(KnowledgePlatformResourceProvisioner.RetrievalFlowName, search.RetrievalFlow.Name);
+        Assert.HasCount(1, search.Items);
+    }
+
     [TestMethod]
     public async Task WorkspacesReceiveProtectedPublishedBuiltInKnowledgeSourceProfilesIdempotently()
     {
@@ -217,7 +338,9 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             FlowRunId = "builtin-producer",
             FlowStepId = "output"
         }), default);
-        var content = "Agentstration builtin retrieval is deterministic."u8.ToArray();
+        var expectedContent = "Agentstration builtin retrieval is deterministic. Deterministic results remain bounded." +
+            new string('x', KnowledgeRetrievalService.MaximumCitationExcerptCharacters);
+        var content = Encoding.UTF8.GetBytes(expectedContent);
         _ = await artifacts.WriteAsync(staged.Value.ArtifactId, 0, content, default);
         _ = await artifacts.SealAsync(staged.Value.ArtifactId, default);
         var storedOutput = await factory.Services.GetRequiredService<ArtifactStorageWriteMcpTool>().ExecuteAsync(
@@ -282,9 +405,9 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         var retrieval = factory.Services.GetRequiredService<KnowledgeRetrievalService>();
         var result = await retrieval.SearchAsync(
             new("builtin-knowledge"), new SearchKnowledgeRequest { Query = "deterministic", Limit = 5 }, default);
-        Assert.HasCount(1, result.Items);
-        Assert.AreEqual(durableId.ToString(), result.Items[0].ArtifactId);
-        StringAssert.Contains(result.Items[0].Content, "deterministic");
+        Assert.HasCount(2, result.Items);
+        Assert.IsTrue(result.Items.All(value => value.ArtifactId == durableId.ToString()));
+        Assert.IsTrue(result.Items.All(value => value.Content?.Contains("deterministic", StringComparison.OrdinalIgnoreCase) == true));
         Assert.AreEqual(KnowledgePlatformResourceProvisioner.RetrievalFlowName, result.RetrievalFlow.Name);
 
         var query = await retrieval.QueryAsync(new("builtin-knowledge"), new QueryKnowledgeRequest
@@ -293,17 +416,19 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             MaximumItems = 5,
             MaximumOutputCharacters = 1_024
         }, default);
-        Assert.HasCount(1, query.Items);
+        Assert.HasCount(2, query.Items);
         StringAssert.Contains(query.Answer, "deterministic");
 
         var read = await retrieval.ReadAsync(new("builtin-knowledge"), new ReadKnowledgeRequest
         {
             ArtifactId = durableId.ToString(),
-            Offset = 0,
-            Length = content.Length
+            Offset = 0
         }, default);
         Assert.HasCount(1, read.Items);
-        Assert.AreEqual("Agentstration builtin retrieval is deterministic.", read.Items[0].Content);
+        Assert.AreEqual(expectedContent, read.Items[0].Content);
+        Assert.HasCount(1, read.Citations);
+        Assert.AreEqual(KnowledgeRetrievalService.MaximumCitationExcerptCharacters,
+            read.Citations[0].Excerpt?.Length);
     }
 
     [TestMethod]
@@ -1621,6 +1746,180 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
                 Sha256 = sealedArtifact.Value.Sha256!,
                 Provenance = new Dictionary<string, string> { ["backend"] = "test" }
             }), default)).Value;
+    }
+
+    private static async Task CreateKnowledgeContractFlowAsync(
+        IServiceProvider services,
+        RequestContext context,
+        string name,
+        string contract)
+    {
+        var inputSchema = contract == KnowledgeFlowContracts.ArtifactTransformation
+            ? JsonSerializer.SerializeToElement(new
+            {
+                type = "object",
+                properties = new
+                {
+                    bindingName = new { type = "string" },
+                    dataSource = new { type = "object" },
+                    artifacts = new { type = "array" },
+                    configuration = new { type = "object" },
+                    caller = new { type = "object" },
+                    correlationId = new { type = "string" },
+                    transformationId = new { type = "string" }
+                },
+                required = new[] { "bindingName", "dataSource", "artifacts", "configuration", "caller",
+                    "correlationId", "transformationId" }
+            })
+            : JsonSerializer.SerializeToElement(new
+            {
+                type = "object",
+                properties = new { artifacts = new { type = "array" } },
+                required = new[] { "artifacts" }
+            });
+        var outputSchema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { artifacts = new { type = "array" } },
+            required = new[] { "artifacts" }
+        });
+        var flows = services.GetRequiredService<FlowService>();
+        var workspaceId = new WorkspaceId(context.WorkspaceId);
+        await flows.CreateAsync(workspaceId, new CreateFlowCommand(
+            name, null, "1.0.0", true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
+            new Dictionary<string, string> { [FlowMetadataKeys.Contract] = contract },
+            new FlowGraphDefinition
+            {
+                EntryStep = "input",
+                InputSchema = inputSchema,
+                OutputSchema = outputSchema,
+                Steps =
+                [
+                    new InputFlowStepDefinition { Name = "input", Schema = inputSchema },
+                    new OutputFlowStepDefinition
+                    {
+                        Name = "output",
+                        OutputMapping = JsonSerializer.SerializeToElement(new { artifacts = "${input.artifacts}" })
+                    }
+                ],
+                Transitions = [new("input-output", "input", "completed", "output")]
+            }), default, default);
+        await flows.PublishVersionAsync(workspaceId, new(name), "1.0.0", true, default);
+    }
+
+    private sealed class ProjectionTestDouble : IKnowledgeProjectionInputResolver, IKnowledgeProjectionFlowGateway,
+        IKnowledgeRetrievalFlowGateway
+    {
+        private static readonly JsonSerializerOptions FlowContractJsonOptions = CreateFlowContractJsonOptions();
+        public string OutputArtifactId { get; set; } = string.Empty;
+        public KnowledgeProjectionFlowInput? ProjectionInput { get; private set; }
+        public JsonElement? ProjectionRequestInput { get; private set; }
+
+        public Task<KnowledgeDataSourceBindingReadiness> GetReadinessAsync(
+            ResourceScopeRef executionScope,
+            ResourceNamespace ownerNamespace,
+            KnowledgeDataSourceBinding binding,
+            CancellationToken cancellationToken) => Task.FromResult(new KnowledgeDataSourceBindingReadiness(
+                binding.Name, binding.DataSource.ScopeRef ?? executionScope, Guid.NewGuid(), true, null, null));
+
+        public Task<KnowledgeProjectionInputEvidence> ResolveAsync(
+            ResourceScopeRef executionScope,
+            ResourceNamespace ownerNamespace,
+            KnowledgeDataSourceBinding binding,
+            string? acquisitionId,
+            CancellationToken cancellationToken)
+        {
+            var artifact = new KnowledgeProjectionArtifact
+            {
+                ArtifactId = $"input-{binding.Name}",
+                Kind = KnowledgeArtifactKind.Durable,
+                Disposition = KnowledgeArtifactDisposition.Publishable,
+                Name = $"{binding.Name}.json",
+                MediaType = "application/json"
+            };
+            return Task.FromResult(new KnowledgeProjectionInputEvidence
+            {
+                BindingName = binding.Name,
+                DataSourceScopeRef = binding.DataSource.ScopeRef ?? executionScope,
+                DataSourceUid = Guid.NewGuid(),
+                DataSourceName = binding.DataSource.Name,
+                DataSourceNamespace = binding.DataSource.Namespace ?? ownerNamespace,
+                DataSourceGeneration = 3,
+                AcquisitionId = acquisitionId ?? $"acquisition-{binding.Name}-latest",
+                AcquisitionUid = Guid.NewGuid(),
+                AcquisitionFlowRunId = $"flowrun-{binding.Name}",
+                AcquiredAt = new DateTimeOffset(2026, 10, 8, 8, 0, 0, TimeSpan.Zero),
+                AcquisitionComposition = JsonSerializer.SerializeToElement(new
+                {
+                    profile = $"{binding.Name}-profile:1.0.0",
+                    flow = $"{binding.Name}-acquisition:1.0.0"
+                }),
+                AcquiredArtifacts = [artifact],
+                PreparedArtifacts = [artifact]
+            });
+        }
+
+        public Task<KnowledgeProjectionFlowRunResult> ExecuteAsync(
+            KnowledgeProjectionFlowRunRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (request.Flow.Contract == KnowledgeFlowContracts.Projection)
+            {
+                ProjectionRequestInput = request.Input.Clone();
+                ProjectionInput = request.Input.Deserialize<KnowledgeProjectionFlowInput>(FlowContractJsonOptions);
+            }
+            if (request.Flow.Contract == KnowledgeFlowContracts.ArtifactTransformation
+                && request.Input.Deserialize<KnowledgeArtifactTransformationInput>(FlowContractJsonOptions)?.BindingName == "optional-feed")
+                return Task.FromResult(new KnowledgeProjectionFlowRunResult(request.RunId,
+                    KnowledgeAcquisitionState.Failed, null, "optional_transform_failed",
+                    "The optional feed could not be normalized.",
+                    new DateTimeOffset(2026, 10, 8, 8, 0, 30, TimeSpan.Zero)));
+            var output = JsonSerializer.SerializeToElement(new
+            {
+                artifacts = new[]
+                {
+                    new
+                    {
+                        artifactId = OutputArtifactId,
+                        kind = "durable",
+                        disposition = "publishable",
+                        name = "projected-content.md",
+                        mediaType = "text/markdown"
+                    }
+                }
+            });
+            return Task.FromResult(new KnowledgeProjectionFlowRunResult(request.RunId,
+                KnowledgeAcquisitionState.Succeeded, output, null, null,
+                new DateTimeOffset(2026, 10, 8, 8, 1, 0, TimeSpan.Zero)));
+        }
+
+        private static JsonSerializerOptions CreateFlowContractJsonOptions()
+        {
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+            return options;
+        }
+
+        public Task<KnowledgeRetrievalFlowResult> ExecuteAsync(
+            KnowledgeRetrievalFlowRequest request,
+            CancellationToken cancellationToken) => Task.FromResult(new KnowledgeRetrievalFlowResult(
+                request.RunId,
+                JsonSerializer.SerializeToElement(new
+                {
+                    items = new[]
+                    {
+                        new
+                        {
+                            id = "projected-content",
+                            artifactId = OutputArtifactId,
+                            content = "projected-content",
+                            mediaType = "text/markdown",
+                            score = 1.0
+                        }
+                    },
+                    citations = Array.Empty<object>()
+                })));
     }
 
     private static async Task<KnowledgeSnapshotResource> CreateActiveSnapshotAsync(

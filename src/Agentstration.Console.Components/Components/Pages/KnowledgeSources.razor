@@ -13,8 +13,8 @@ else if (sources.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T(
 else
 {
     <DataGrid TItem="KnowledgeSourceResource" Items="sources">
-        <Header><tr><th>@T("KnowledgeSource")</th><th>@T("Profile")</th><th>@T("IngestionFlow")</th><th>@T("RetrievalFlow")</th><th>@T("State")</th><th></th></tr></Header>
-        <Row Context="source"><tr data-testid="knowledge-source-row"><td><span class="resource-name-with-scope"><strong><a class="resource-name-link" href="@DetailsUrl(source)" data-testid="knowledge-source-name-link">@source.Definition.DisplayName</a></strong><ResourceScopeBadge ScopeRef="source.ScopeRef" Compact /></span><code>@source.Namespace/@source.Name</code></td><td>@if (source.Definition.Profile is { } profile) { <a class="resource-name-link" href="@ProfileUrl(source, profile)">@profile.Name</a> } else { <span>—</span> }</td><td>@Flow(source.Definition.IngestionFlow)</td><td>@Flow(source.Definition.RetrievalFlow)</td><td><StatusBadge Text="@T(source.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(source.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" /></td><td><a class="text-button" href="@DetailsUrl(source)">@T("Inspect")</a></td></tr></Row>
+        <Header><tr><th>@T("KnowledgeSource")</th><th>@T("DataSources")</th><th>@T("ProjectionFlow")</th><th>@T("RetrievalFlow")</th><th>@T("State")</th><th></th></tr></Header>
+        <Row Context="source"><tr data-testid="knowledge-source-row"><td><span class="resource-name-with-scope"><strong><a class="resource-name-link" href="@DetailsUrl(source)" data-testid="knowledge-source-name-link">@source.Definition.DisplayName</a></strong><ResourceScopeBadge ScopeRef="source.ScopeRef" Compact /></span><code>@source.Namespace/@source.Name</code></td><td>@if (source.Definition.DataSources.Count > 0) { <span class="knowledge-source-inputs">@foreach (var binding in source.Definition.DataSources) { <a class="text-button" href="@DataSourceUrl(source, binding.DataSource)" data-testid="knowledge-source-data-source-link">@binding.DataSource.Name</a> }</span> } else { <span>—</span> }</td><td>@if (source.Definition.ProjectionFlow is { } projection) { <a class="text-button" href="@FlowUrl(source, projection)" data-testid="knowledge-source-projection-flow-link">@Flow(projection)</a> } else { <span>—</span> }</td><td>@if (source.Definition.RetrievalFlow is { } retrieval) { <a class="text-button" href="@FlowUrl(source, retrieval)">@Flow(retrieval)</a> } else { <span>—</span> }</td><td><StatusBadge Text="@T(source.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(source.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" /></td><td><a class="text-button" href="@DetailsUrl(source)">@T("Inspect")</a></td></tr></Row>
     </DataGrid>
 }
 
@@ -36,11 +36,19 @@ else
     private static string DetailsUrl(KnowledgeSourceResource value) => value.Namespace.IsDefault
         ? $"/knowledge-sources/{Uri.EscapeDataString(value.Name)}"
         : $"/knowledge-sources/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString(value.Namespace.Value)}";
-    private static string ProfileUrl(KnowledgeSourceResource source, ResourceReference profile)
+    private static string DataSourceUrl(KnowledgeSourceResource source, ResourceReference value)
     {
-        var ns = profile.Namespace ?? source.Namespace;
+        var ns = value.Namespace ?? source.Namespace;
+        var scope = value.ScopeRef ?? source.ScopeRef;
+        var query = $"namespace={Uri.EscapeDataString(ns.Value)}";
+        if (scope is not null) query += $"&scopeRef={Uri.EscapeDataString(scope.Value.Value)}";
+        return $"/data-sources/{Uri.EscapeDataString(value.Name)}?{query}";
+    }
+    private static string FlowUrl(KnowledgeSourceResource source, KnowledgeFlowTarget value)
+    {
+        var ns = value.Namespace ?? source.Namespace;
         return ns.IsDefault
-            ? $"/knowledge-source-profiles/{Uri.EscapeDataString(profile.Name)}"
-            : $"/knowledge-source-profiles/{Uri.EscapeDataString(profile.Name)}?namespace={Uri.EscapeDataString(ns.Value)}";
+            ? $"/flows/{Uri.EscapeDataString(value.Name)}"
+            : $"/namespaces/{Uri.EscapeDataString(ns.Value)}/flows/{Uri.EscapeDataString(value.Name)}";
     }
 }

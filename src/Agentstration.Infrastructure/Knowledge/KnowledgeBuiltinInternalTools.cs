@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -136,12 +137,15 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
         var artifact = await RequireArtifactAsync(invocation.WorkspaceId, evidence, cancellationToken);
         var bytes = await durable.ReadAsync(invocation.WorkspaceId, artifact.Receipt.OpaqueReference, offset, length, cancellationToken);
         var content = Decode(bytes.Span, artifact.Receipt.MediaType);
+        var excerpt = content.Length <= KnowledgeRetrievalService.MaximumCitationExcerptCharacters
+            ? content
+            : content[..KnowledgeRetrievalService.MaximumCitationExcerptCharacters];
         var end = checked(offset + bytes.Length);
         return JsonSerializer.SerializeToElement(new
         {
             items = new[] { new { id = $"{artifactId}:{offset}", artifactId, content, mediaType = artifact.Receipt.MediaType,
                 score = (double?)null, metadata = new Dictionary<string, string>() } },
-            citations = new[] { new { artifactId, locator = $"bytes={offset}-{end}", start = offset, end, excerpt = content } },
+            citations = new[] { new { artifactId, locator = $"bytes={offset}-{end}", start = offset, end, excerpt } },
             answer = (string?)null, continuationToken = (string?)null
         });
     }
@@ -161,11 +165,16 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
             var bytes = await durable.ReadAsync(invocation.WorkspaceId, artifact.Receipt.OpaqueReference, 0, length, cancellationToken);
             remaining -= bytes.Length;
             var content = Decode(bytes.Span, artifact.Receipt.MediaType);
-            var index = content.IndexOf(query, StringComparison.OrdinalIgnoreCase);
-            if (index < 0) continue;
-            var start = Math.Max(0, index - ExcerptRadius);
-            var end = Math.Min(content.Length, index + query.Length + ExcerptRadius);
-            result.Add(new(item.ArtifactId, artifact.Receipt.MediaType, content[start..end], start, end));
+            var searchOffset = 0;
+            while (result.Count < limit && searchOffset < content.Length)
+            {
+                var index = content.IndexOf(query, searchOffset, StringComparison.OrdinalIgnoreCase);
+                if (index < 0) break;
+                var start = Math.Max(0, index - ExcerptRadius);
+                var end = Math.Min(content.Length, index + query.Length + ExcerptRadius);
+                result.Add(new(item.ArtifactId, artifact.Receipt.MediaType, content[start..end], start, end));
+                searchOffset = index + query.Length;
+            }
         }
         return result;
     }
@@ -262,6 +271,13 @@ internal static class KnowledgeBuiltinSchemas
             "parameters", "caller", "correlationId", "acquisitionId" }, additionalProperties = false });
     public static JsonElement IngestionOutput { get; } = JsonSerializer.SerializeToElement(new { type = "object",
         properties = new { artifacts = new { type = "array" } }, required = new[] { "artifacts" }, additionalProperties = false });
+    public static JsonElement ProjectionInput { get; } = JsonSerializer.SerializeToElement(new { type = "object",
+        properties = new { knowledgeSourceId = new { type = "string" }, knowledgeSourceUid = new { type = "string" },
+            knowledgeSourceGeneration = new { type = "integer" }, inputs = new { type = "array" }, artifacts = new { type = "array" },
+            parameters = new { type = "object" }, caller = new { type = "object" }, correlationId = new { type = "string" },
+            projectionId = new { type = "string" } },
+        required = new[] { "knowledgeSourceId", "knowledgeSourceUid", "knowledgeSourceGeneration", "inputs", "artifacts",
+            "parameters", "caller", "correlationId", "projectionId" }, additionalProperties = false });
     public static JsonElement RetrievalInput { get; } = JsonSerializer.SerializeToElement(new { type = "object",
         properties = new { knowledgeSourceId = new { type = "string" }, knowledgeSourceUid = new { type = "string" },
             knowledgeSourceGeneration = new { type = "integer" }, operation = new { type = "string" }, snapshot = new { type = "object" },

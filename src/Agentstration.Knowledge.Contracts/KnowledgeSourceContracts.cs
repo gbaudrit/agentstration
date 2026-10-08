@@ -11,6 +11,7 @@ public static class KnowledgeResourceKinds
     public const string KnowledgeSourceProfileRevision = "KnowledgeSourceProfileRevision";
     public const string KnowledgeSourceToolExposure = "KnowledgeSourceToolExposure";
     public const string KnowledgeAcquisition = "KnowledgeAcquisition";
+    public const string KnowledgeProjection = "KnowledgeProjection";
     public const string KnowledgeSnapshot = "KnowledgeSnapshot";
     public const string KnowledgeSnapshotPublication = "KnowledgeSnapshotPublication";
     public const string KnowledgeSnapshotObservedState = "KnowledgeSnapshotObservedState";
@@ -21,6 +22,7 @@ public static class KnowledgeFlowContracts
     public const string CapabilitiesMetadataKey = "knowledge.capabilities";
     public const string Ingestion = "knowledge.ingestion/v1";
     public const string Projection = "knowledge.projection/v1";
+    public const string ArtifactTransformation = "artifact.transform/v1";
     public const string Retrieval = "knowledge.retrieval/v1";
     public const string Search = "knowledge.search/v1";
     public const string Query = "knowledge.query/v1";
@@ -64,6 +66,18 @@ public sealed record KnowledgeSourceProperties
     public ResourceReference? Profile { get; init; }
     public KnowledgeFlowTarget? IngestionFlow { get; init; }
     public KnowledgeFlowTarget? RetrievalFlow { get; init; }
+    public IReadOnlyList<KnowledgeDataSourceBinding> DataSources { get; init; } = [];
+    public KnowledgeFlowTarget? ProjectionFlow { get; init; }
+}
+
+public sealed record KnowledgeDataSourceBinding
+{
+    public required string Name { get; init; }
+    public required ResourceReference DataSource { get; init; }
+    public KnowledgeFlowTarget? TransformationFlow { get; init; }
+    public JsonElement Configuration { get; init; } = JsonSerializer.SerializeToElement(new { });
+    public bool Required { get; init; } = true;
+    public TimeSpan? MaximumAge { get; init; }
 }
 
 public sealed record KnowledgeSourceResource : Resource
@@ -87,7 +101,17 @@ public sealed record KnowledgeSourceReadiness(
     ResolvedKnowledgeFlowBinding? Ingestion,
     ResolvedKnowledgeFlowBinding? Retrieval,
     IReadOnlyList<string> Issues,
-    ResolvedKnowledgeSourceProfile? Profile = null);
+    ResolvedKnowledgeSourceProfile? Profile = null,
+    ResolvedKnowledgeFlowBinding? Projection = null,
+    IReadOnlyList<KnowledgeDataSourceBindingReadiness>? DataSources = null);
+
+public sealed record KnowledgeDataSourceBindingReadiness(
+    string Name,
+    ResourceScopeRef? DataSourceScopeRef,
+    Guid? DataSourceUid,
+    bool Ready,
+    string? Issue,
+    ResolvedKnowledgeFlowBinding? Transformation);
 
 public sealed record KnowledgeSourceToolOperationExposure
 {
@@ -216,6 +240,115 @@ public sealed record RetryKnowledgeAcquisitionRequest
     public string? CorrelationId { get; init; }
 }
 
+public sealed record StartKnowledgeProjectionRequest
+{
+    public IReadOnlyDictionary<string, string> AcquisitionIds { get; init; }
+        = new Dictionary<string, string>(StringComparer.Ordinal);
+    public JsonElement Parameters { get; init; } = JsonSerializer.SerializeToElement(new { });
+    public string? CorrelationId { get; init; }
+}
+
+public sealed record KnowledgeProjectionArtifact
+{
+    public required string ArtifactId { get; init; }
+    public required KnowledgeArtifactKind Kind { get; init; }
+    public required KnowledgeArtifactDisposition Disposition { get; init; }
+    public string? Name { get; init; }
+    public string? MediaType { get; init; }
+    public string? Digest { get; init; }
+}
+
+public sealed record KnowledgeProjectionInputEvidence
+{
+    public required string BindingName { get; init; }
+    public required ResourceScopeRef DataSourceScopeRef { get; init; }
+    public required Guid DataSourceUid { get; init; }
+    public required string DataSourceName { get; init; }
+    public required ResourceNamespace DataSourceNamespace { get; init; }
+    public required long DataSourceGeneration { get; init; }
+    public required string AcquisitionId { get; init; }
+    public required Guid AcquisitionUid { get; init; }
+    public required string AcquisitionFlowRunId { get; init; }
+    public required DateTimeOffset AcquiredAt { get; init; }
+    public JsonElement AcquisitionComposition { get; init; } = JsonSerializer.SerializeToElement(new { });
+    public IReadOnlyList<KnowledgeProjectionArtifact> AcquiredArtifacts { get; init; } = [];
+    public ResolvedKnowledgeFlowBinding? TransformationFlow { get; init; }
+    public string? TransformationFlowRunId { get; init; }
+    public IReadOnlyList<KnowledgeProjectionArtifact> PreparedArtifacts { get; init; } = [];
+}
+
+public sealed record KnowledgeProjectionResource : Resource
+{
+    public required Guid KnowledgeSourceUid { get; init; }
+    public required string KnowledgeSourceName { get; init; }
+    public required ResourceNamespace KnowledgeSourceNamespace { get; init; }
+    public required long KnowledgeSourceGeneration { get; init; }
+    public required ResolvedKnowledgeFlowBinding ProjectionFlow { get; init; }
+    public required ResolvedKnowledgeFlowBinding RetrievalFlow { get; init; }
+    public IReadOnlyList<KnowledgeProjectionInputEvidence> Inputs { get; init; } = [];
+    public IReadOnlyList<KnowledgeProjectionInputIssue> InputIssues { get; init; } = [];
+    public required string ProjectionFlowRunId { get; init; }
+    public required KnowledgeAcquisitionState State { get; init; }
+    public required string CorrelationId { get; init; }
+    public JsonElement Parameters { get; init; } = JsonSerializer.SerializeToElement(new { });
+    public required Guid CreatedBy { get; init; }
+    public required Guid TenantId { get; init; }
+    public required Guid WorkspaceId { get; init; }
+    public required DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset? CompletedAt { get; init; }
+    public KnowledgeAcquisitionManifest? Manifest { get; init; }
+    public string? SnapshotName { get; init; }
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+
+public sealed record KnowledgeProjectionInputIssue(string BindingName, string Code, string Message);
+
+public sealed record KnowledgeProjectionCaller(
+    [property: JsonPropertyName("principalId")] Guid PrincipalId,
+    [property: JsonPropertyName("tenantId")] Guid TenantId,
+    [property: JsonPropertyName("workspaceId")] Guid WorkspaceId);
+
+public sealed record KnowledgeProjectionFlowInput
+{
+    [JsonPropertyName("knowledgeSourceId")]
+    public required string KnowledgeSourceId { get; init; }
+    [JsonPropertyName("knowledgeSourceUid")]
+    public required Guid KnowledgeSourceUid { get; init; }
+    [JsonPropertyName("knowledgeSourceGeneration")]
+    public required long KnowledgeSourceGeneration { get; init; }
+    [JsonPropertyName("inputs")]
+    public required IReadOnlyList<KnowledgeProjectionInputEvidence> Inputs { get; init; }
+    [JsonPropertyName("artifacts")]
+    public required IReadOnlyList<KnowledgeProjectionArtifact> Artifacts { get; init; }
+    [JsonPropertyName("parameters")]
+    public JsonElement Parameters { get; init; } = JsonSerializer.SerializeToElement(new { });
+    [JsonPropertyName("caller")]
+    public required KnowledgeProjectionCaller Caller { get; init; }
+    [JsonPropertyName("correlationId")]
+    public required string CorrelationId { get; init; }
+    [JsonPropertyName("projectionId")]
+    public required string ProjectionId { get; init; }
+}
+
+public sealed record KnowledgeArtifactTransformationInput
+{
+    [JsonPropertyName("bindingName")]
+    public required string BindingName { get; init; }
+    [JsonPropertyName("dataSource")]
+    public required KnowledgeProjectionInputEvidence DataSource { get; init; }
+    [JsonPropertyName("artifacts")]
+    public required IReadOnlyList<KnowledgeProjectionArtifact> Artifacts { get; init; }
+    [JsonPropertyName("configuration")]
+    public JsonElement Configuration { get; init; } = JsonSerializer.SerializeToElement(new { });
+    [JsonPropertyName("caller")]
+    public required KnowledgeProjectionCaller Caller { get; init; }
+    [JsonPropertyName("correlationId")]
+    public required string CorrelationId { get; init; }
+    [JsonPropertyName("transformationId")]
+    public required string TransformationId { get; init; }
+}
+
 public enum KnowledgeSnapshotPublicationState { Pending, Succeeded, Failed }
 public enum KnowledgeSnapshotLifecycleState { Active, Superseded, Unavailable }
 
@@ -247,6 +380,12 @@ public sealed record KnowledgeSnapshotResource : Resource, IImmutableResource
     public required string RequestHash { get; init; }
     public required DateTimeOffset PublishedAt { get; init; }
     public required Guid PublishedBy { get; init; }
+    public string? ProjectionId { get; init; }
+    public Guid? ProjectionUid { get; init; }
+    public ResolvedKnowledgeFlowBinding? ProjectionFlow { get; init; }
+    public string? ProjectionFlowRunId { get; init; }
+    public IReadOnlyList<KnowledgeProjectionInputEvidence> ProjectionInputs { get; init; } = [];
+    public ResolvedKnowledgeFlowBinding? RetrievalFlow { get; init; }
     public IReadOnlyList<KnowledgeSnapshotArtifact> Artifacts { get; init; } = [];
 }
 

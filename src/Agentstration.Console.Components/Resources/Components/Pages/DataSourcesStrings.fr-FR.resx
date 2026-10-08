@@ -9,4 +9,28 @@
   <data name="CreateSource" xml:space="preserve"><value>Créer une source de données</value></data><data name="CreateProfile" xml:space="preserve"><value>Créer un profil de source de données</value></data><data name="DisplayName" xml:space="preserve"><value>Nom d’affichage</value></data><data name="TechnicalName" xml:space="preserve"><value>Nom technique</value></data><data name="Namespace" xml:space="preserve"><value>Espace de noms</value></data><data name="Description" xml:space="preserve"><value>Description</value></data><data name="Version" xml:space="preserve"><value>Version</value></data><data name="Flow" xml:space="preserve"><value>Flow d’acquisition</value></data><data name="Select" xml:space="preserve"><value>Sélectionner…</value></data><data name="Configuration" xml:space="preserve"><value>Configuration (JSON)</value></data><data name="Schema" xml:space="preserve"><value>Schéma de configuration (JSON)</value></data>
   <data name="ToolBindings" xml:space="preserve"><value>Bindings des Tools et fournisseurs (JSON)</value></data><data name="Limits" xml:space="preserve"><value>Limites d’exécution (JSON)</value></data><data name="Policies" xml:space="preserve"><value>Politiques réseau et d’exécution (JSON)</value></data><data name="CompatibilityRequirements" xml:space="preserve"><value>Exigences de compatibilité (JSON)</value></data>
   <data name="Overview" xml:space="preserve"><value>Vue d’ensemble</value></data><data name="Definition" xml:space="preserve"><value>Définition</value></data><data name="Acquisitions" xml:space="preserve"><value>Acquisitions</value></data><data name="Revisions" xml:space="preserve"><value>Révisions</value></data><data name="Yaml" xml:space="preserve"><value>YAML</value></data><data name="Manifest" xml:space="preserve"><value>Manifeste de la ressource</value></data><data name="Publish" xml:space="preserve"><value>Publier</value></data><data name="Activate" xml:space="preserve"><value>Activer</value></data><data name="StartAcquisition" xml:space="preserve"><value>Démarrer l’acquisition</value></data><data name="NoAcquisitions" xml:space="preserve"><value>Aucune acquisition n’a été lancée.</value></data><data name="NoRevisions" xml:space="preserve"><value>Aucune révision n’a été publiée.</value></data><data name="FlowRun" xml:space="preserve"><value>Exécution du Flow</value></data><data name="Created" xml:space="preserve"><value>Créée</value></data><data name="Parameters" xml:space="preserve"><value>Paramètres (JSON)</value></data><data name="Ready" xml:space="preserve"><value>Prête</value></data><data name="NotReady" xml:space="preserve"><value>Non prête</value></data><data name="ApplyYaml" xml:space="preserve"><value>Appliquer le YAML</value></data><data name="IdentityImmutable" xml:space="preserve"><value>L’identité et la portée de la ressource ne peuvent pas être modifiées depuis l’éditeur YAML.</value></data><data name="Published" xml:space="preserve"><value>Publiée</value></data><data name="DeleteConfirm" xml:space="preserve"><value>Cette ressource sera supprimée définitivement.</value></data>
+  <data name="Generation" xml:space="preserve"><value>Génération</value></data>
+  <data name="LastAcquisition" xml:space="preserve"><value>Dernière acquisition</value></data>
+  <data name="None" xml:space="preserve"><value>Aucune</value></data>
+  <data name="AcquisitionCount" xml:space="preserve"><value>{0} acquisition(s)</value></data>
+  <data name="AcquisitionHistory" xml:space="preserve"><value>Historique des acquisitions</value></data>
+  <data name="AcquisitionHelp" xml:space="preserve"><value>Exécutez le Flow d’acquisition gouverné et consultez ses exécutions précédentes.</value></data>
+  <data name="ParametersHelp" xml:space="preserve"><value>Fournissez un objet JSON accepté par le profil actif de la source de données.</value></data>
+  <data name="EnabledHelp" xml:space="preserve"><value>Autorise cette source de données à exécuter des acquisitions via son profil actif.</value></data>
+  <data name="AcquisitionState.Pending" xml:space="preserve"><value>En attente</value></data>
+  <data name="AcquisitionState.Running" xml:space="preserve"><value>En cours</value></data>
+  <data name="AcquisitionState.WaitingForInput" xml:space="preserve"><value>En attente d’une saisie</value></data>
+  <data name="AcquisitionState.WaitingForChild" xml:space="preserve"><value>En attente d’un Flow enfant</value></data>
+  <data name="AcquisitionState.Succeeded" xml:space="preserve"><value>Réussie</value></data>
+  <data name="AcquisitionState.Failed" xml:space="preserve"><value>Échec</value></data>
+  <data name="AcquisitionState.Cancelled" xml:space="preserve"><value>Annulée</value></data>
+  <data name="AcquisitionState.TimedOut" xml:space="preserve"><value>Expirée</value></data>
+  <data name="FlowBindings" xml:space="preserve"><value>Association de Flow</value></data>
+  <data name="AcquisitionFlow" xml:space="preserve"><value>Flow d’acquisition</value></data>
+  <data name="AcquisitionFlowHelp" xml:space="preserve"><value>Le profil actif de la source de données sélectionne le Flow utilisé pour acquérir et matérialiser cette source.</value></data>
+  <data name="RawResource" xml:space="preserve"><value>Ressource brute</value></data>
+  <data name="DataSourceYaml" xml:space="preserve"><value>YAML de la source de données</value></data>
+  <data name="DataSourceYamlHelp" xml:space="preserve"><value>Modifiez la ressource Data Source complète au format YAML.</value></data>
+  <data name="ResourceManifest" xml:space="preserve"><value>Manifeste de ressource</value></data>
+  <data name="SaveYaml" xml:space="preserve"><value>Enregistrer le YAML</value></data>
 </root>

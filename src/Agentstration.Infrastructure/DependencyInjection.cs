@@ -149,6 +149,7 @@ public static class DependencyInjection
         services.AddSingleton<KnowledgeSourceProfileService>();
         services.AddSingleton<KnowledgeSourceManagementService>();
         services.AddSingleton<KnowledgeAcquisitionService>();
+        services.AddSingleton<KnowledgeProjectionService>();
         services.AddSingleton<KnowledgeRetrievalService>();
         services.AddSingleton<IParameterResolver>(provider => provider.GetRequiredService<ParameterManagementService>());
         services.AddSingleton<SecretManagementService>();
@@ -444,6 +445,8 @@ public static class DependencyInjection
         services.AddSingleton<IDataSourceAcquisitionFlowGateway, DataSourceAcquisitionFlowGateway>();
         services.AddSingleton<IDataSourceArtifactReferenceValidator, DataSourceArtifactReferenceValidator>();
         services.AddSingleton<IKnowledgeAcquisitionFlowGateway, KnowledgeAcquisitionFlowGateway>();
+        services.AddSingleton<IKnowledgeProjectionInputResolver, KnowledgeProjectionInputResolver>();
+        services.AddSingleton<IKnowledgeProjectionFlowGateway, KnowledgeProjectionFlowGateway>();
         services.AddSingleton<IKnowledgeRetrievalFlowGateway, KnowledgeRetrievalFlowGateway>();
         services.AddSingleton<IKnowledgeArtifactReferenceValidator, KnowledgeArtifactReferenceValidator>();
         services.AddSingleton<IKnowledgeSnapshotArtifactResolver, KnowledgeSnapshotArtifactResolver>();
@@ -454,6 +457,7 @@ public static class DependencyInjection
         services.AddSingleton<KnowledgeSourceToolExposureService>();
         services.AddSingleton<IFlowVersionActivationGuard, ToolDefinitionFlowActivationGuard>();
         services.AddSingleton<IFlowVersionActivationGuard, KnowledgeFlowActivationGuard>();
+        services.AddSingleton<IFlowVersionActivationGuard, ArtifactTransformationFlowActivationGuard>();
         services.AddSingleton<IFlowVersionActivationGuard, DataSourceFlowActivationGuard>();
         services.AddSingleton<IFlowDeletionGuard, ToolDefinitionFlowDeletionGuard>();
         services.AddSingleton<IFlowDeletionGuard, KnowledgeFlowDeletionGuard>();

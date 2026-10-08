@@ -1,0 +1,171 @@
+.metric-grid ::deep .metric-card {
+    min-width: 0;
+}
+
+.metric-grid ::deep .metric-card strong {
+    overflow-wrap: anywhere;
+}
+
+.data-source-choice {
+    display: grid !important;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center !important;
+    gap: .7rem !important;
+    min-height: 3.65rem;
+    padding: .75rem .9rem;
+    border: 1px solid var(--border);
+    border-radius: .65rem;
+    background: var(--surface-2);
+    cursor: pointer;
+}
+
+.data-source-choice input {
+    width: 1.05rem !important;
+    min-height: 1.05rem !important;
+    margin: 0;
+    accent-color: var(--primary);
+}
+
+.data-source-choice-icon {
+    display: grid;
+    place-items: center;
+    width: 1.95rem;
+    height: 1.95rem;
+    border-radius: .55rem;
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.data-source-choice-icon ::deep .ui-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.data-source-choice > span:last-child,
+.data-source-parameters {
+    display: grid;
+    gap: .25rem;
+}
+
+.data-source-choice small,
+.data-source-parameters small {
+    color: var(--muted);
+    font-weight: 400;
+}
+
+.data-source-parameters {
+    width: min(48rem, 100%);
+    margin-bottom: 1rem;
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.data-source-parameters textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 9rem;
+    resize: vertical;
+}
+
+.data-source-flow-run {
+    display: inline-flex;
+    max-width: 100%;
+}
+
+.data-source-flow-run code {
+    color: inherit;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.data-source-flow-composition {
+    margin-top: 1.25rem;
+}
+
+.data-source-flow-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .75rem;
+    min-width: 0;
+    padding: .9rem;
+    border: 1px solid var(--border);
+    border-radius: .7rem;
+    background: var(--surface-2);
+    color: var(--text);
+    text-decoration: none;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.data-source-flow-card:hover {
+    border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+    background: color-mix(in srgb, var(--primary-soft) 30%, var(--surface-2));
+    transform: translateY(-1px);
+}
+
+.data-source-flow-card > span:nth-child(2) {
+    display: grid;
+    gap: .15rem;
+    min-width: 0;
+}
+
+.data-source-flow-card small {
+    color: var(--muted);
+    font-size: .68rem;
+}
+
+.data-source-flow-card strong,
+.data-source-flow-card code {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.data-source-flow-card strong {
+    font-size: .82rem;
+}
+
+.data-source-flow-card code {
+    color: var(--muted);
+    font-size: .67rem;
+}
+
+.data-source-flow-card > ::deep .ui-icon {
+    width: 1rem;
+    height: 1rem;
+    color: var(--muted);
+}
+
+.data-source-composition-icon {
+    display: grid;
+    place-items: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: .65rem;
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.data-source-composition-icon ::deep .ui-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.data-source-yaml-field {
+    display: grid;
+    min-width: 0;
+    gap: .45rem;
+    color: var(--text);
+}
+
+.data-source-yaml-field .form-code-editor {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: min(60vh, 640px);
+    max-height: none;
+    overflow: auto;
+    overflow-wrap: normal;
+    resize: vertical;
+    white-space: pre;
+}
