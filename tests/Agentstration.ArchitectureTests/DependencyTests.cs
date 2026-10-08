@@ -841,13 +841,13 @@ public sealed class DependencyTests
     {
         var expected = new[]
         {
-            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "KnowledgeSource", "KnowledgeSourceProfile", "KnowledgeSourceProfileRevision", "KnowledgeSourceToolExposure", "ModelProvider", "ModelProfile", "RuntimeProfile", "Parameter",
+            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "KnowledgeSource", "KnowledgeSourceToolExposure", "ModelProvider", "ModelProfile", "RuntimeProfile", "Parameter",
             "Secret", "Vault", "Tool", "ToolDefinition", "ToolProvider", "ToolExecutionHook", "ToolSet", "ToolSetVersion", "Trigger", "Source", "SourceVersion", "SourceProvider"
         };
         var actual = new[]
         {
             AgentResourceKinds.Agent, AgentResourceKinds.AgentRevision, AgentResourceKinds.AgentDeployment, FlowResourceKinds.Flow,
-            EntryResourceKinds.Entry, KnowledgeResourceKinds.KnowledgeSource, KnowledgeResourceKinds.KnowledgeSourceProfile, KnowledgeResourceKinds.KnowledgeSourceProfileRevision, KnowledgeResourceKinds.KnowledgeSourceToolExposure, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile, ParameterResourceKinds.Parameter,
+            EntryResourceKinds.Entry, KnowledgeResourceKinds.KnowledgeSource, KnowledgeResourceKinds.KnowledgeSourceToolExposure, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile, ParameterResourceKinds.Parameter,
             SecretResourceKinds.Secret, SecretResourceKinds.Vault, ToolResourceKinds.Tool, ToolResourceKinds.ToolDefinition,
             ToolResourceKinds.ToolProvider, ToolResourceKinds.ToolExecutionHook, ToolResourceKinds.ToolSet, ToolResourceKinds.ToolSetVersion, TriggerResourceKinds.Trigger, SourceResourceKinds.Source,
             SourceResourceKinds.SourceVersion, SourceResourceKinds.SourceProvider

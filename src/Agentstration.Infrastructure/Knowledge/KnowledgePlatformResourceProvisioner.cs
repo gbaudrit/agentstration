@@ -313,13 +313,16 @@ public sealed class KnowledgePlatformResourceProvisioner(
                             }
                         }
                     })
-                }
+                },
+                new FailureFlowStepDefinition { Name = "failure", Code = "acquisition_failed", Message = "Data Source acquisition failed.", DetailsExpression = "${transition.output}" }
             ],
             Transitions =
             [
                 new("input-fetch", "input", "completed", "fetch"),
-                new("fetch-persist", "fetch", "completed", "persist"),
-                new("persist-output", "persist", "completed", "output")
+                new("fetch-persist", "fetch", "success", "persist"),
+                new("fetch-failure", "fetch", "error", "failure"),
+                new("persist-output", "persist", "completed", "output"),
+                new("persist-failure", "persist", "error", "failure")
             ]
         };
         await CreateAndPublishFlowAsync(workspaceId, name, displayName,
@@ -353,12 +356,14 @@ public sealed class KnowledgePlatformResourceProvisioner(
                     Name = "output",
                     DisplayName = "Acquisition manifest",
                     OutputMapping = JsonSerializer.SerializeToElement("${steps.import.output}")
-                }
+                },
+                new FailureFlowStepDefinition { Name = "failure", Code = "artifact_import_failed", Message = "Artifact import failed.", DetailsExpression = "${transition.output}" }
             ],
             Transitions =
             [
                 new("input-import", "input", "completed", "import"),
-                new("import-output", "import", "completed", "output")
+                new("import-output", "import", "success", "output"),
+                new("import-failure", "import", "error", "failure")
             ]
         };
         await CreateAndPublishFlowAsync(workspaceId, ArtifactImportAcquisitionFlowName,
@@ -390,7 +395,8 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 Route("read", "Read Snapshot Artifact", KnowledgeFlowContracts.Read),
                 new OutputFlowStepDefinition { Name = "search-output", OutputMapping = JsonSerializer.SerializeToElement("${steps.search.output}") },
                 new OutputFlowStepDefinition { Name = "query-output", OutputMapping = JsonSerializer.SerializeToElement("${steps.query.output}") },
-                new OutputFlowStepDefinition { Name = "read-output", OutputMapping = JsonSerializer.SerializeToElement("${steps.read.output}") }
+                new OutputFlowStepDefinition { Name = "read-output", OutputMapping = JsonSerializer.SerializeToElement("${steps.read.output}") },
+                new FailureFlowStepDefinition { Name = "failure", Code = "knowledge_retrieval_failed", Message = "Knowledge retrieval failed.", DetailsExpression = "${transition.output}" }
             ],
             Transitions =
             [
@@ -399,9 +405,12 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 new("route-non-search", "is-search", "false", "is-query"),
                 new("route-query", "is-query", "true", "query"),
                 new("route-read", "is-query", "false", "read"),
-                new("search-output", "search", "completed", "search-output"),
-                new("query-output", "query", "completed", "query-output"),
-                new("read-output", "read", "completed", "read-output")
+                new("search-output", "search", "success", "search-output"),
+                new("search-failure", "search", "error", "failure"),
+                new("query-output", "query", "success", "query-output"),
+                new("query-failure", "query", "error", "failure"),
+                new("read-output", "read", "success", "read-output"),
+                new("read-failure", "read", "error", "failure")
             ]
         };
         await CreateAndPublishFlowAsync(workspaceId, RetrievalFlowName, "Knowledge retrieval · Built-in",

@@ -62,7 +62,7 @@ public static class ResourceScopePolicy
         "Vault" or "Secret" or "Parameter" or "DataSource" or "DataSourceProfile"
             or "DataSourceProfileRevision" => InstanceTenantWorkspace,
         "ToolProvider" or "Tool" or "ToolCategory" or "ToolDefinition" or "ToolExecutionHook"
-            or "KnowledgeSource" or "KnowledgeSourceProfile" or "KnowledgeSourceProfileRevision"
+            or "KnowledgeSource"
             or "DataSourceAcquisition" => WorkspaceOnly,
         "Agent" or "AgentRevision" or "AgentDeployment" or "Trigger" => WorkspaceOnly,
         "InstalledPack" or "ExtensionRegistration" => InstanceTenantWorkspace,

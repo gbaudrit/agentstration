@@ -48,84 +48,6 @@ public sealed class KnowledgeFlowResolver(FlowService flows) : IKnowledgeFlowRes
         : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }
 
-public sealed class KnowledgeAcquisitionFlowGateway(FlowRunService runs) : IKnowledgeAcquisitionFlowGateway
-{
-    public async Task<KnowledgeFlowRunSnapshot> StartAsync(
-        KnowledgeFlowRunRequest request,
-        CancellationToken cancellationToken)
-    {
-        var flowId = new FlowId(request.Flow.Name, request.Flow.Namespace);
-        var scope = Scope(request.WorkspaceId, request.TenantId, request.PrincipalId);
-        try
-        {
-            var stored = await runs.EnsureRootAsync(new EnsureRootFlowRunCommand(
-                request.RunId,
-                flowId,
-                request.Flow.Version,
-                "local",
-                FlowRunTrigger.Api,
-                FlowInvocationOrigin.Api,
-                request.CallerId,
-                null,
-                request.IdempotencyKey,
-                request.CorrelationId,
-                request.Input,
-                $"knowledge-acquisition:{request.RunId}",
-                request.Flow.UsesActiveVersion,
-                null,
-                null,
-                null,
-                null,
-                scope), cancellationToken);
-            return Snapshot(stored.Value);
-        }
-        catch (Exception exception) when (exception is FlowValidationException or FlowNotFoundException)
-        {
-            throw new KnowledgeAcquisitionException("knowledge_acquisition_flow_rejected", exception.Message);
-        }
-    }
-
-    public async Task<KnowledgeFlowRunSnapshot?> GetAsync(
-        Guid workspaceId,
-        string runId,
-        Guid tenantId,
-        Guid principalId,
-        CancellationToken cancellationToken)
-    {
-        var stored = await runs.GetAsync(runId, Scope(workspaceId, tenantId, principalId), cancellationToken);
-        return stored is null ? null : Snapshot(stored.Value);
-    }
-
-    public async Task<KnowledgeFlowRunSnapshot> CancelAsync(
-        Guid workspaceId,
-        string runId,
-        Guid tenantId,
-        Guid principalId,
-        CancellationToken cancellationToken) => Snapshot((await runs.CancelAsync(
-            runId, Scope(workspaceId, tenantId, principalId), cancellationToken)).Value);
-
-    private static FlowRunScope Scope(Guid workspaceId, Guid tenantId, Guid principalId) =>
-        new(tenantId, new WorkspaceId(workspaceId), principalId);
-
-    private static KnowledgeFlowRunSnapshot Snapshot(FlowRun run) => new(
-        run.Id,
-        run.Status switch
-        {
-            FlowRunStatus.Pending => KnowledgeAcquisitionState.Pending,
-            FlowRunStatus.Running => KnowledgeAcquisitionState.Running,
-            FlowRunStatus.WaitingForInput => KnowledgeAcquisitionState.WaitingForInput,
-            FlowRunStatus.WaitingForChild => KnowledgeAcquisitionState.WaitingForChild,
-            FlowRunStatus.Succeeded => KnowledgeAcquisitionState.Succeeded,
-            FlowRunStatus.Cancelled => KnowledgeAcquisitionState.Cancelled,
-            FlowRunStatus.TimedOut => KnowledgeAcquisitionState.TimedOut,
-            _ => KnowledgeAcquisitionState.Failed
-        },
-        run.Output?.Clone(),
-        run.Error?.Code,
-        run.Error?.Message,
-        run.CompletedAt);
-}
-
 public sealed class KnowledgeRetrievalFlowGateway(FlowRunService runs) : IKnowledgeRetrievalFlowGateway
 {
     public async Task<KnowledgeRetrievalFlowResult> ExecuteAsync(
@@ -234,16 +156,8 @@ public sealed class KnowledgeFlowActivationGuard : IFlowVersionActivationGuard
             RequireProperties(version.Graph.OutputSchema!.Value, ["artifacts"], "output");
             return Task.CompletedTask;
         }
-        if (!string.Equals(contract, KnowledgeFlowContracts.Ingestion, StringComparison.Ordinal))
-            throw new FlowValidationException("knowledge_flow_contract_unknown",
-                $"Knowledge Flow contract '{contract}' is not supported.");
-        RequireObjectSchema(version.Graph?.InputSchema, "input");
-        RequireProperties(version.Graph!.InputSchema!.Value,
-            ["knowledgeSourceId", "knowledgeSourceUid", "knowledgeSourceGeneration", "sourceConfiguration",
-                "parameters", "caller", "correlationId", "acquisitionId"], "input");
-        RequireObjectSchema(version.Graph.OutputSchema, "output");
-        RequireProperties(version.Graph.OutputSchema!.Value, ["artifacts"], "output");
-        return Task.CompletedTask;
+        throw new FlowValidationException("knowledge_flow_contract_unknown",
+            $"Knowledge Flow contract '{contract}' is not supported.");
     }
 
     private static void ValidateRetrieval(FlowVersion version)
@@ -333,7 +247,7 @@ public sealed class KnowledgeArtifactReferenceValidator(IResourceStore store)
 {
     public async Task ValidateAsync(
         Guid workspaceId,
-        IReadOnlyList<KnowledgeAcquisitionArtifact> references,
+        IReadOnlyList<KnowledgeProjectionArtifact> references,
         CancellationToken cancellationToken)
     {
         foreach (var reference in references)
@@ -351,12 +265,12 @@ public sealed class KnowledgeArtifactReferenceValidator(IResourceStore store)
                     _ => false
                 };
                 if (!exists)
-                    throw new KnowledgeAcquisitionException("knowledge_ingestion_artifact_not_found",
+                    throw new KnowledgeProjectionException("knowledge_projection_artifact_not_found",
                         $"Artifact '{reference.ArtifactId}' was not found in Workspace '{workspaceId:D}'.");
             }
             catch (FormatException exception)
             {
-                throw new KnowledgeAcquisitionException("knowledge_ingestion_artifact_invalid",
+                throw new KnowledgeProjectionException("knowledge_projection_artifact_invalid",
                     $"Artifact identity '{reference.ArtifactId}' is invalid: {exception.Message}");
             }
         }
@@ -412,43 +326,19 @@ public sealed class KnowledgeFlowDeletionGuard(
         var usage = sources.Select(value => value.Value).FirstOrDefault(value =>
             value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
             && targetId == workspaceId.Value
-            && (References(value, value.Definition.IngestionFlow, flowId)
-                || References(value, value.Definition.ProjectionFlow, flowId)
+            && (References(value, value.Definition.ProjectionFlow, flowId)
                 || References(value, value.Definition.RetrievalFlow, flowId)
                 || value.Definition.DataSources.Any(binding =>
                     References(value, binding.TransformationFlow, flowId))));
         if (usage is not null)
             throw new FlowValidationException("flow_in_use_by_knowledge_source",
                 $"Flow '{flowId}' is referenced by KnowledgeSource '{usage.Address}'.");
-        var profiles = await store.ListAllAsync<KnowledgeSourceProfileResource>(
-            KnowledgeResourceKinds.KnowledgeSourceProfile, cancellationToken);
-        var profileUsage = profiles.Select(value => value.Value).FirstOrDefault(value =>
-            value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
-            && targetId == workspaceId.Value
-            && (References(value, value.Definition.IngestionFlow, flowId)
-                || References(value, value.Definition.RetrievalFlow, flowId)
-                || value.Definition.StorageFlows.Any(storage => References(value, storage.Flow, flowId))));
-        if (profileUsage is not null)
-            throw new FlowValidationException("flow_in_use_by_knowledge_source_profile",
-                $"Flow '{flowId}' is referenced by KnowledgeSourceProfile '{profileUsage.Address}'.");
-        var revisions = await store.ListAllAsync<KnowledgeSourceProfileRevisionResource>(
-            KnowledgeResourceKinds.KnowledgeSourceProfileRevision, cancellationToken);
-        var revisionUsage = revisions.Select(value => value.Value).FirstOrDefault(value =>
-            value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
-            && targetId == workspaceId.Value
-            && (References(value.Resolution.IngestionFlow, flowId)
-                || References(value.Resolution.RetrievalFlow, flowId)
-                || value.Resolution.StorageFlows.Any(storage => References(storage, flowId))));
-        if (revisionUsage is not null)
-            throw new FlowValidationException("flow_in_use_by_knowledge_source_profile_revision",
-                $"Flow '{flowId}' is retained by KnowledgeSourceProfile revision '{revisionUsage.Address}'.");
         var snapshots = await store.ListAllAsync<KnowledgeSnapshotResource>(KnowledgeResourceKinds.KnowledgeSnapshot, cancellationToken);
         var retained = snapshots.Select(value => value.Value).FirstOrDefault(value =>
             value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
             && targetId == workspaceId.Value
-            && (References(value.IngestionFlow, flowId)
-                || value.ProjectionFlow is not null && References(value.ProjectionFlow, flowId)
-                || value.RetrievalFlow is not null && References(value.RetrievalFlow, flowId)
+            && (References(value.ProjectionFlow, flowId)
+                || References(value.RetrievalFlow, flowId)
                 || value.ProjectionInputs.Any(input => input.TransformationFlow is not null
                     && References(input.TransformationFlow, flowId))));
         if (retained is not null)
@@ -460,10 +350,6 @@ public sealed class KnowledgeFlowDeletionGuard(
         target is not null
         && string.Equals(target.Name, flowId.Value, StringComparison.Ordinal)
         && (target.Namespace ?? source.Namespace) == flowId.Namespace;
-
-    private static bool References(KnowledgeSourceProfileResource profile, KnowledgeFlowTarget target, FlowId flowId) =>
-        string.Equals(target.Name, flowId.Value, StringComparison.Ordinal)
-        && (target.Namespace ?? profile.Namespace) == flowId.Namespace;
 
     private static bool References(ResolvedKnowledgeFlowBinding binding, FlowId flowId) =>
         string.Equals(binding.Name, flowId.Value, StringComparison.Ordinal)
@@ -482,8 +368,7 @@ public sealed class KnowledgeSnapshotFlowRunDeletionGuard(
         var retained = snapshots.Select(value => value.Value).FirstOrDefault(value =>
             value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
             && targetId == workspaceId.Value
-            && (string.Equals(value.IngestionFlowRunId, runId, StringComparison.Ordinal)
-                || string.Equals(value.ProjectionFlowRunId, runId, StringComparison.Ordinal)
+            && (string.Equals(value.ProjectionFlowRunId, runId, StringComparison.Ordinal)
                 || value.ProjectionInputs.Any(input => string.Equals(input.AcquisitionFlowRunId, runId, StringComparison.Ordinal)
                     || string.Equals(input.TransformationFlowRunId, runId, StringComparison.Ordinal))
                 || value.Artifacts.Any(artifact => string.Equals(

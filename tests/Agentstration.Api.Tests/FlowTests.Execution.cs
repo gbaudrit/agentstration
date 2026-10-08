@@ -319,12 +319,14 @@ public sealed partial class FlowTests
                         ContentMapping = JsonSerializer.SerializeToElement("${step.output.message}")
                     }
                 },
-                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.notify.output}") }
+                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.notify.output}") },
+                new FailureFlowStepDefinition { Name = "failure", Code = "NOTIFICATION_FAILED", Message = "The notification failed." }
             ],
             Transitions =
             [
                 new("input-notify", "input", "completed", "notify"),
-                new("notify-output", "notify", "completed", "output")
+                new("notify-output", "notify", "success", "output"),
+                new("notify-failure", "notify", "error", "failure")
             ]
         };
         var now = TimeProvider.System.GetUtcNow();
@@ -386,12 +388,14 @@ public sealed partial class FlowTests
                         Clean = FlowStepArtifactCleanupMode.Never
                     }
                 },
-                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.answer.output}") }
+                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.answer.output}") },
+                new FailureFlowStepDefinition { Name = "failure", Code = "ANSWER_FAILED", Message = "The answer failed." }
             ],
             Transitions =
             [
                 new("input-answer", "input", "completed", "answer"),
-                new("answer-output", "answer", "completed", "output")
+                new("answer-output", "answer", "success", "output"),
+                new("answer-failure", "answer", "error", "failure")
             ]
         };
         var now = TimeProvider.System.GetUtcNow();

@@ -98,7 +98,7 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 AcquisitionIds = new Dictionary<string, string> { ["documentation"] = completed.Value.Name },
                 CorrelationId = "documentation-fixture-projection"
             }, default);
-        Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, projection.Value.State, projection.Value.ErrorMessage);
+        Assert.AreEqual(KnowledgeProjectionState.Succeeded, projection.Value.State, projection.Value.ErrorMessage);
         Assert.IsNotNull(projection.Value.SnapshotName);
         _ = await services.GetRequiredService<KnowledgeSourceToolExposureService>().PublishAsync(
             new("agentstration-documentation"), "1.0.0", false, default);

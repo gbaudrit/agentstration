@@ -198,12 +198,12 @@ public sealed partial class FlowRunService
                             resolvedRoute.Tool,
                             routeArguments), runToken);
                         output = toolResult.Output?.Clone();
-                        eventName = "completed";
+                        eventName = "success";
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
                     {
                         output = JsonSerializer.SerializeToElement(new { error = exception.Message });
-                        eventName = "failed";
+                        eventName = "error";
                         stepError = exception is FlowValidationException validation
                             ? new FlowRunError(validation.Code, "The ToolRoute step failed.", validation.Message)
                             : new FlowRunError("tool_route_step_failed", "The ToolRoute step failed.", exception.Message);
@@ -230,15 +230,14 @@ public sealed partial class FlowRunService
                     }
                     output = child.Value.Output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
                     childResult = child.Value;
-                    eventName = child.Value.OutputName ?? child.Value.Status switch
-                    childResult = child.Value;
+                    eventName = child.Value.OutputName ?? (child.Value.Status switch
                     {
                         FlowRunStatus.Succeeded => "completed",
                         FlowRunStatus.Failed => "failed",
                         FlowRunStatus.TimedOut => "timedOut",
                         FlowRunStatus.Cancelled => "cancelled",
                         _ => throw new InvalidOperationException($"Child Flow Run '{childRunId}' has unsupported terminal status '{child.Value.Status}'.")
-                    };
+                    });
                     if (child.Value.Status != FlowRunStatus.Succeeded)
                     {
                         var childError = child.Value.Error;

@@ -113,7 +113,7 @@ public sealed class ToolDefinitionExecutor(
                 knowledgeRetrieval, cancellationToken);
 
         var flowInput = MergeArguments(invocation.Arguments, stored.Value.Definition.FixedArguments);
-        var flowContract = await flowResolver.ResolveAsync(stored.Value.ScopeRef.Value, stored.Value.Namespace,
+        var flowContract = await flowResolver.ResolveAsync(stored.Value.ScopeRef!.Value, stored.Value.Namespace,
             stored.Value.Definition.Flow, cancellationToken);
         try { FlowRunService.ValidateInput(flowContract.InputSchema, flowInput); }
         catch (FlowValidationException exception)

@@ -24,11 +24,6 @@ public interface IKnowledgeFlowResolver
         CancellationToken cancellationToken);
 }
 
-internal sealed record ResolvedKnowledgeSourceComposition(
-    ResolvedKnowledgeFlowBinding Ingestion,
-    ResolvedKnowledgeFlowBinding Retrieval,
-    ResolvedKnowledgeSourceProfile? Profile);
-
 public sealed class KnowledgeSourceManagementService(
     IResourceStore store,
     IResourceScopeOperations scopeOperations,
@@ -294,7 +289,7 @@ public sealed class KnowledgeSourceManagementService(
         if (!resource.Definition.Enabled) issues.Add("KnowledgeSource is disabled.");
         return new(resource.Definition.Enabled && projection is not null && retrieval is not null
                 && dataSources.Where((_, index) => resource.Definition.DataSources[index].Required).All(value => value.Ready),
-            resource.Definition.Enabled, null, retrieval, issues, null, projection, dataSources);
+            resource.Definition.Enabled, retrieval, issues, projection, dataSources);
 
         void AddOrThrow(string code, string message)
         {
@@ -304,14 +299,14 @@ public sealed class KnowledgeSourceManagementService(
         }
     }
 
-    internal async Task<ResolvedKnowledgeSourceComposition> ResolveCompositionAsync(
+    internal async Task<ResolvedKnowledgeFlowBinding> ResolveRetrievalAsync(
         KnowledgeSourceResource resource,
         CancellationToken cancellationToken)
     {
         var readiness = await EvaluateReadinessAsync(resource, rejectInvalidBindings: true, cancellationToken);
         if (!readiness.Ready || readiness.Retrieval is null)
             throw new KnowledgeSourceValidationException("knowledge_source_not_ready", string.Join(' ', readiness.Issues));
-        return new(new("", ResourceNamespace.Default, "", false, null, null), readiness.Retrieval, null);
+        return readiness.Retrieval;
     }
 
     private async Task<ResolvedKnowledgeFlowBinding?> ResolveAsync(
@@ -372,7 +367,7 @@ public sealed class KnowledgeSourceManagementService(
                 Type = "Ready",
                 Status = readiness.Ready ? "True" : "False",
                 Reason = readiness.Ready ? "FlowBindingsResolved" : readiness.Enabled ? "FlowBindingsIncomplete" : "Disabled",
-                Message = readiness.Ready ? "The ingestion and retrieval Flow bindings are ready." : string.Join(' ', readiness.Issues),
+                Message = readiness.Ready ? "The projection and retrieval Flow bindings are ready." : string.Join(' ', readiness.Issues),
                 LastTransitionTime = timeProvider.GetUtcNow()
             }
         ]

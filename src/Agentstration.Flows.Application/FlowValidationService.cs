@@ -112,6 +112,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             if (!steps.ContainsKey(transition.ToStep)) issues.Add(Error("transition_target_unknown", $"Transition target '{transition.ToStep}' does not exist.", transitionId: transition.Id));
             if (steps.GetValueOrDefault(transition.FromStep) is { } source
                 && source is not FlowCallStepDefinition
+                && source is not RepeatFlowStepDefinition
                 && !source.OutputEvents().Contains(transition.Event, StringComparer.Ordinal))
                 issues.Add(Error("transition_event_invalid", $"Step '{source.Name}' does not emit event '{transition.Event}'.", source.Name, transition.Id, "event"));
             if (!string.IsNullOrWhiteSpace(transition.Condition)) ValidateExpression(transition.Condition, issues, transition.FromStep, transition.Id, "condition");
@@ -145,7 +146,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         List<FlowValidationIssue> issues,
         CancellationToken token)
     {
-        await ValidateArtifactOutputAsync(step, context, issues, token);
+        await ValidateArtifactOutputAsync(step, transitions, context, issues, token);
         switch (step)
         {
             case AgentFlowStepDefinition agent:
@@ -188,7 +189,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                     Description = repeat.Description,
                     Flow = repeat.Flow,
                     InputMapping = repeat.InputMapping
-                }, context, issues, token);
+                }, transitions, context, issues, token);
                 await ValidateRepeatNextInputAsync(repeat, context, issues, token);
                 break;
             case ToolFlowStepDefinition tool:
@@ -212,6 +213,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
 
     private async Task ValidateArtifactOutputAsync(
         FlowStepDefinition step,
+        IReadOnlyList<FlowTransitionDefinition> transitions,
         FlowValidationContext context,
         List<FlowValidationIssue> issues,
         CancellationToken token)
@@ -267,7 +269,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                     producerFlowRunId = "flow-run",
                     producerFlowStepId = step.Name
                 })
-            }, context, issues, token);
+            }, transitions, context, issues, token);
         }
     }
 

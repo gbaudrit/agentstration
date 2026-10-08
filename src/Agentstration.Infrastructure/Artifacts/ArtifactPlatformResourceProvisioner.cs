@@ -330,12 +330,14 @@ public sealed class ArtifactPlatformResourceProvisioner(IResourceStore store, Fl
                     Tool = new(AgentstrationToolProvider.ToolResourceName(externalToolId)),
                     ArgumentsMapping = arguments
                 },
-                new OutputFlowStepDefinition { Name = "output", DisplayName = "Storage result", OutputMapping = JsonSerializer.SerializeToElement("${steps.storage.output}") }
+                new OutputFlowStepDefinition { Name = "output", DisplayName = "Storage result", OutputMapping = JsonSerializer.SerializeToElement("${steps.storage.output}") },
+                new FailureFlowStepDefinition { Name = "failure", Code = "artifact_storage_failed", Message = "Artifact storage operation failed.", DetailsExpression = "${transition.output}" }
             ],
             Transitions =
             [
                 new("input-storage", "input", "completed", toolStep),
-                new("storage-output", toolStep, "completed", "output")
+                new("storage-output", toolStep, "success", "output"),
+                new("storage-failure", toolStep, "error", "failure")
             ]
         };
         var legacy = new WorkflowFlowDefinition("input",

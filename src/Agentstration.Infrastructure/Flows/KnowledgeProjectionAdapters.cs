@@ -189,14 +189,14 @@ public sealed class KnowledgeProjectionFlowGateway(FlowRunService runs) : IKnowl
         run.Id,
         run.Status switch
         {
-            FlowRunStatus.Pending => KnowledgeAcquisitionState.Pending,
-            FlowRunStatus.Running => KnowledgeAcquisitionState.Running,
-            FlowRunStatus.WaitingForInput => KnowledgeAcquisitionState.WaitingForInput,
-            FlowRunStatus.WaitingForChild => KnowledgeAcquisitionState.WaitingForChild,
-            FlowRunStatus.Succeeded => KnowledgeAcquisitionState.Succeeded,
-            FlowRunStatus.Cancelled => KnowledgeAcquisitionState.Cancelled,
-            FlowRunStatus.TimedOut => KnowledgeAcquisitionState.TimedOut,
-            _ => KnowledgeAcquisitionState.Failed
+            FlowRunStatus.Pending => KnowledgeProjectionState.Pending,
+            FlowRunStatus.Running => KnowledgeProjectionState.Running,
+            FlowRunStatus.WaitingForInput => KnowledgeProjectionState.WaitingForInput,
+            FlowRunStatus.WaitingForChild => KnowledgeProjectionState.WaitingForChild,
+            FlowRunStatus.Succeeded => KnowledgeProjectionState.Succeeded,
+            FlowRunStatus.Cancelled => KnowledgeProjectionState.Cancelled,
+            FlowRunStatus.TimedOut => KnowledgeProjectionState.TimedOut,
+            _ => KnowledgeProjectionState.Failed
         },
         run.Output?.Clone(),
         run.Error?.Code,

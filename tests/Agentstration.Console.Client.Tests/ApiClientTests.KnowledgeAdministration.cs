@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text.Json;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.Resources;
@@ -11,32 +10,6 @@ namespace Agentstration.Web.Tests;
 
 public sealed partial class ApiClientTests
 {
-    [TestMethod]
-    public async Task KnowledgeSourceClientPreservesConcurrencyAndAcquisitionIdempotency()
-    {
-        var requests = new List<HttpRequestMessage>();
-        using var http = new HttpClient(new StubHandler(request =>
-        {
-            requests.Add(Clone(request));
-            var response = request.RequestUri!.AbsolutePath.EndsWith("/acquisitions", StringComparison.Ordinal)
-                ? new HttpResponseMessage(HttpStatusCode.Accepted) { Content = JsonContent.Create(Acquisition()) }
-                : new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(Source()) };
-            response.Headers.ETag = EntityTagHeaderValue.Parse("\"knowledge-etag\"");
-            return response;
-        })) { BaseAddress = new Uri("http://localhost/") };
-        var client = new KnowledgeSourcesApiClient(http);
-
-        await client.UpdateAsync(new ResourceNamespace("shared"), "docs",
-            new PutKnowledgeSourceRequest(Source().Definition), "\"current\"");
-        await client.StartAcquisitionAsync(new ResourceNamespace("shared"), "docs",
-            new StartKnowledgeAcquisitionRequest { Parameters = JsonSerializer.SerializeToElement(new { seed = true }) }, "acquire-once");
-
-        Assert.AreEqual("/api/knowledgesources/docs?namespace=shared", requests[0].RequestUri!.PathAndQuery);
-        Assert.AreEqual("\"current\"", requests[0].Headers.GetValues("If-Match").Single());
-        Assert.AreEqual("/api/knowledgesources/docs/acquisitions?namespace=shared", requests[1].RequestUri!.PathAndQuery);
-        Assert.AreEqual("acquire-once", requests[1].Headers.GetValues("Idempotency-Key").Single());
-    }
-
     [TestMethod]
     public async Task ArtifactClientRequiresExplicitContentReadAndPreservesBoundedRange()
     {
@@ -131,17 +104,6 @@ public sealed partial class ApiClientTests
         Kind = KnowledgeResourceKinds.KnowledgeSource,
         Metadata = new ResourceMetadata { Name = "docs", Namespace = new ResourceNamespace("shared") },
         Definition = new KnowledgeSourceProperties { DisplayName = "Documentation", Enabled = true }
-    };
-
-    private static KnowledgeAcquisitionResource Acquisition() => new()
-    {
-        ApiVersion = ResourceApiVersions.CoreV1,
-        Kind = KnowledgeResourceKinds.KnowledgeAcquisition,
-        Metadata = new ResourceMetadata { Name = "acquisition" },
-        KnowledgeSourceUid = Guid.NewGuid(), KnowledgeSourceName = "docs", KnowledgeSourceNamespace = new ResourceNamespace("shared"),
-        KnowledgeSourceGeneration = 1, IngestionFlow = new("ingest", ResourceNamespace.Default, "1.0.0", true, null, null),
-        FlowRunId = "run", State = KnowledgeAcquisitionState.Pending, CorrelationId = "correlation", RequestHash = "hash",
-        CreatedBy = Guid.NewGuid(), TenantId = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow
     };
 
     private static StagedArtifactView Staged() => new(

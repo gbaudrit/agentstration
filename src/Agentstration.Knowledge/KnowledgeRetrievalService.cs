@@ -193,12 +193,10 @@ public sealed class KnowledgeRetrievalService(
                 throw Error(exception.Code, exception.Message, exception);
             }
             ResolvedKnowledgeFlowBinding flow;
-            var profile = snapshot.Profile;
             try
             {
                 flow = snapshot.RetrievalFlow
-                    ?? profile?.RetrievalFlow
-                    ?? (await sources.ResolveCompositionAsync(source.Value, cancellationToken)).Retrieval;
+                    ?? await sources.ResolveRetrievalAsync(source.Value, cancellationToken);
             }
             catch (KnowledgeSourceValidationException exception)
             {
@@ -235,7 +233,6 @@ public sealed class KnowledgeRetrievalService(
                 KnowledgeSourceId = ToolResourceIdentity.CatalogId(source.Value.Namespace, source.Value.Name),
                 KnowledgeSourceUid = source.Value.Uid,
                 KnowledgeSourceGeneration = source.Value.Generation,
-                Profile = profile,
                 Operation = operation.ToString().ToLowerInvariant(),
                 Snapshot = new()
                 {
@@ -302,7 +299,6 @@ public sealed class KnowledgeRetrievalService(
                 SnapshotName = snapshot.Name,
                 SnapshotUid = snapshot.Uid,
                 RetrievalFlow = flow,
-                Profile = profile,
                 FlowRunId = completed.RunId,
                 CorrelationId = effectiveCorrelationId,
                 Items = output.Items ?? [],
