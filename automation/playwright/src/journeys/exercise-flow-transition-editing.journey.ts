@@ -10,8 +10,7 @@ export interface ExerciseFlowTransitionEditingInput {
 export const exerciseFlowTransitionEditing: Journey<ExerciseFlowTransitionEditingInput> = async (context, input) => {
   await prepareConsoleJourney(context, input);
   const designer = context.pages.flowDesigner;
-  const name = await designer.createDraftAndOpen(context.consoleUrl);
-  await designer.addStep('Transform');
+  const name = await designer.createPositionedDraftAndOpen(context.consoleUrl);
 
   await designer.dragOutputToInput('transform', 'completed');
   await designer.expectTransition('transform —completed→ completed');
@@ -24,15 +23,18 @@ export const exerciseFlowTransitionEditing: Journey<ExerciseFlowTransitionEditin
   await designer.undo();
   await designer.expectSelectedTransition('transform', 'completed', 'completed', 'transform-completed-completed');
   await designer.redo();
-  await designer.expectSelectedTransition('input', 'completed', 'completed', 'transform-completed-completed');
+  await designer.expectSelectedTransition('transform', 'completed', 'error', 'transform-completed-completed');
 
   await designer.expectInvalidDropDoesNotChangeTransitionCount('transform');
-  await designer.save();
+  await designer.expectUnsupportedConnectionDoesNotChangeTransitionCount('transform', 'input');
+  await designer.expectValidationFeedback();
+  await designer.expectAutosaved();
   await designer.open(context.consoleUrl, 'default', name);
   await designer.selectTransition('transform —completed→ error');
   await designer.expectSelectedTransition('transform', 'completed', 'error', 'transform-completed-completed');
 
-  await designer.expectReadOnlyPublished('agentstration.assistant', 'assistant-diagnostics');
+  await designer.publishAsReadOnlyFixture(context.consoleUrl, name);
+  await designer.expectReadOnlyPublished(context.consoleUrl, 'default', name);
   await expect(context.pages.flowDesigner.designer).toBeVisible();
 };
 

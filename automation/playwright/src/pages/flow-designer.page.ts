@@ -14,42 +14,49 @@ export class FlowDesignerPage {
     return name;
   }
 
-  public async createDraftWithDefinition(consoleUrl: string, definition: string): Promise<string> {
-    const name = `transition-ux-${Date.now()}`;
+  public async createPositionedDraftAndOpen(consoleUrl: string): Promise<string> {
+    const name = `designer-links-smoke-${Date.now()}`;
     const response = await this.page.request.post(`${consoleUrl}/api/flows/drafts`, {
       data: { name, displayName: 'Transition editing UX', template: 'Empty' },
     });
-    expect(response.status(), await response.text()).toBe(201);
+    const responseBody = await response.text();
+    expect(response.status(), responseBody).toBe(201);
+    const created = JSON.parse(responseBody);
+    const draft = created.value;
+    draft.definition.steps.push({ type: 'transform', name: 'transform', displayName: 'Transform', mapping: {} });
+    draft.definition.transitions = [];
+    draft.definition.designer = {
+      preferredLayout: 'Horizontal',
+      nodePositions: {
+        input: { x: 80, y: 220 },
+        transform: { x: 400, y: 220 },
+        completed: { x: 720, y: 100 },
+        error: { x: 720, y: 380 },
+      },
+    };
+    const update = await this.page.request.put(`${consoleUrl}/api/flows/${encodeURIComponent(name)}/draft`, {
+      headers: { 'If-Match': created.eTag },
+      data: {
+        displayName: draft.displayName,
+        description: draft.description,
+        tags: draft.tags,
+        definition: draft.definition,
+      },
+    });
+    expect(update.status(), await update.text()).toBe(200);
     await this.open(consoleUrl, 'default', name);
-    await this.applyDefinition(definition);
-    return name;
-  }
-
-  public async applyDefinition(definition: string): Promise<void> {
-    const shell = this.page.locator('.flow-editor-shell.definition');
+    await expect(this.node('transform')).toBeVisible();
     await expect(async () => {
-      await this.page.getByRole('button', { name: 'Definition', exact: true }).click();
-      await expect(shell).toBeVisible({ timeout: 2_000 });
+      await this.node('transform').click();
+      await expect(this.page.getByRole('textbox', { name: 'Step ID' })).toHaveValue('transform', { timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
-    const editor = shell.getByRole('textbox', { name: 'Editor content' });
-    await editor.focus();
-    await this.page.keyboard.press('ControlOrMeta+A');
-    await this.page.keyboard.insertText(definition);
-    await shell.getByRole('button', { name: 'Apply and save' }).click();
-    await expect(shell.locator('.error-panel')).toHaveCount(0);
-    await this.page.getByRole('button', { name: 'Designer', exact: true }).click();
-    await expect(this.designer).toBeVisible();
+    return name;
   }
 
   public async dragOutputToInput(sourceName: string, targetName: string): Promise<void> {
     const source = this.node(sourceName).locator('.flow-port-handle.output').first();
     const target = this.node(targetName).locator('.flow-port-handle.input');
     await this.drag(source, target);
-  }
-
-  public async addStep(type: string): Promise<void> {
-    await this.page.getByRole('button', { name: type, exact: true }).click();
-    await expect(this.node(type.toLowerCase())).toBeVisible();
   }
 
   public async expectTransition(text: string): Promise<void> {
@@ -81,31 +88,7 @@ export class FlowDesignerPage {
     if (await controls.count() < 2) throw new Error('The selected transition does not expose two endpoint controls.');
     const to = await this.page.getByTestId(TestIds.flowObservability.transitionTo).inputValue();
     const linkTarget = await this.nearestControlToNodeInput(controls, to);
-    const sourceBox = await linkTarget.boundingBox();
-    if (!sourceBox) throw new Error('The selected transition endpoint is not measurable.');
-    await linkTarget.dispatchEvent('pointerdown', {
-      bubbles: true,
-      clientX: sourceBox.x + sourceBox.width / 2,
-      clientY: sourceBox.y + sourceBox.height / 2,
-      button: 0,
-      buttons: 1,
-      pointerId: 1,
-      pointerType: 'mouse',
-    });
-    const targetCenter = { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height / 2 };
-    await this.page.evaluate(({ x, y }) => {
-      const event = (type: string) => new PointerEvent(type, {
-        bubbles: true,
-        clientX: x,
-        clientY: y,
-        button: 0,
-        buttons: type === 'pointerup' ? 0 : 1,
-        pointerId: 1,
-        pointerType: 'mouse',
-      });
-      document.dispatchEvent(event('pointermove'));
-      document.dispatchEvent(event('pointerup'));
-    }, targetCenter);
+    await this.drag(linkTarget, target);
   }
 
   public async expectSelectedTransition(from: string, event: string, to: string, id: string): Promise<void> {
@@ -137,8 +120,49 @@ export class FlowDesignerPage {
     await expect(this.page.locator('.transition-list li')).toHaveCount(before);
   }
 
-  public async expectReadOnlyPublished(namespace: string, name: string): Promise<void> {
-    await this.open(this.page.url().split('/').slice(0, 3).join('/'), namespace, name);
+  public async expectUnsupportedConnectionDoesNotChangeTransitionCount(sourceName: string, targetName: string): Promise<void> {
+    const before = await this.page.locator('.transition-list li').count();
+    const source = this.node(sourceName).locator('.flow-port-handle.output').first();
+    const incompatibleTarget = this.node(targetName).locator('.flow-port-handle.output').first();
+    await this.drag(source, incompatibleTarget);
+    await expect(this.page.locator('.transition-list li')).toHaveCount(before);
+  }
+
+  public async expectValidationFeedback(): Promise<void> {
+    await this.validate();
+    await expect(this.page.locator('.validation-dock li').first()).toBeVisible();
+  }
+
+  public async expectAutosaved(): Promise<void> {
+    await expect(this.page.locator('.save-state.saved')).toBeVisible();
+  }
+
+  public async publishAsReadOnlyFixture(consoleUrl: string, name: string): Promise<void> {
+    const publish = await this.page.request.post(`${consoleUrl}/api/flows/${encodeURIComponent(name)}/publish`, {
+      data: { version: '1.0.0', activate: true },
+    });
+    expect(publish.status(), await publish.text()).toBe(201);
+
+    const current = await this.page.request.get(`${consoleUrl}/api/flows/${encodeURIComponent(name)}`);
+    const currentBody = await current.text();
+    expect(current.status(), currentBody).toBe(200);
+    const flow = JSON.parse(currentBody);
+    const update = await this.page.request.put(`${consoleUrl}/api/flows/${encodeURIComponent(name)}`, {
+      headers: { 'If-Match': current.headers()['etag'] },
+      data: {
+        description: flow.description,
+        version: flow.version,
+        enabled: flow.enabled,
+        definition: flow.definition,
+        metadata: { ...flow.metadata, 'agentstration.io/pack.name': 'flow-transition-ux-fixture' },
+        displayName: flow.displayName,
+      },
+    });
+    expect(update.status(), await update.text()).toBe(200);
+  }
+
+  public async expectReadOnlyPublished(consoleUrl: string, namespace: string, name: string): Promise<void> {
+    await this.open(consoleUrl, namespace, name);
     await expect(this.page.locator('.read-only-badge')).toBeVisible();
     await expect(this.page.locator('.flow-port-handle.locked')).toHaveCount(await this.page.locator('.flow-port-handle').count());
     await expect(this.page.locator('svg .diagram-control')).toHaveCount(0);
