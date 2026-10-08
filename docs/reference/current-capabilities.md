@@ -42,6 +42,12 @@ The official static Source registry is available as an optional instance-owned d
 
 The Console exposes these operations under **System > Source registries**. It supports registration CRUD, enablement, manual refresh, refresh history, Secret-reference selection, merged discovery filters, all observation evidence, and exact import confirmation. The official registration, local origin policy, publisher evidence, SourceVersion verification, and later Snapshot verification are presented separately on responsive desktop and mobile layouts.
 
+## Data Sources and Knowledge projection
+
+Data Sources govern acquisition from an origin independently of Knowledge. Instance-, tenant-, and Workspace-scoped Data Sources resolve a visible active Data Source Profile, then execute its exact `datasource.acquisition/v1` Flow in a consuming Workspace. The accepted acquisition retains source and profile generations, the immutable profile revision, resolved Flow and Tool/provider evidence, effective limits and policies, and a bounded durable Artifact manifest.
+
+Workspace-owned Knowledge Sources bind one to thirty-two visible Data Sources. Each binding may run an optional `artifact.transform/v1` Flow before one `knowledge.projection/v1` Flow receives every prepared input. Each successful projection creates and activates a distinct immutable Snapshot; failure retains the previous active Snapshot. The built-in projection preserves heterogeneous Artifacts unchanged, while the built-in `knowledge.retrieval/v1` Flow provides bounded local search, query, and read restricted to the selected Snapshot. See [Data Sources and Knowledge Sources](../concepts/data-sources-and-knowledge.md) and [Built-in Data Source Profiles](builtin-data-source-profiles.md).
+
 ## Schedule Triggers
 
 Agentstration can submit autonomous Work from a declarative Workspace-scoped `Trigger`. Trigger owns **when**, Work owns **what**, Flow owns **how**, and Runtime owns execution. Automation is not a second runtime.

@@ -111,6 +111,43 @@ sequenceDiagram
 
 Structural anchors: **Tool execution pipeline**, **Resource-family services**, **Flow engine**, and **Runtime execution**. Decisions: [ADR-0055](../../decisions/0055-agentstration-owns-tool-execution-boundary.md), [ADR-0056](../../decisions/0056-tool-execution-hooks-are-ordered-runtime-guards.md), [ADR-0058](../../decisions/0058-tool-governance-decisions-are-traced-per-physical-attempt.md), and [ADR-0059](../../decisions/0059-tool-arguments-require-explicit-bounded-retention.md).
 
+## Acquire, project, and retrieve Knowledge
+
+Data Sources own governed acquisition. Knowledge Sources consume the resulting durable Artifacts through a separate projection and expose only immutable Snapshot content to retrieval.
+
+```mermaid
+sequenceDiagram
+    participant Caller as Console or API caller
+    participant Data as Data Source services
+    participant Flow as Flow engine
+    participant Tools as Tool execution pipeline
+    participant Artifacts as Artifact services
+    participant Knowledge as Knowledge services
+    Caller->>Data: Start acquisition in a Workspace
+    Data->>Data: Resolve visible active profile revision
+    Data->>Data: Pin Flow, Tool, provider, limits, and policies
+    Data->>Flow: Run datasource.acquisition/v1
+    Flow->>Tools: Acquire and stage bounded content
+    Flow->>Artifacts: Persist through artifact.storage.write/v1
+    Flow-->>Data: Durable publishable Artifact manifest
+    Caller->>Knowledge: Start projection
+    Knowledge->>Data: Resolve selected or latest successful acquisitions
+    opt Binding declares artifact.transform/v1
+        Knowledge->>Flow: Transform one binding
+        Flow-->>Knowledge: Prepared Artifact manifest
+    end
+    Knowledge->>Flow: Run knowledge.projection/v1 once with all prepared inputs
+    Flow-->>Knowledge: Snapshot Artifact manifest
+    Knowledge->>Artifacts: Validate receipts, lineage, and integrity
+    Knowledge->>Knowledge: Publish and activate a new immutable Snapshot
+    Caller->>Knowledge: Search, query, or bounded read
+    Knowledge->>Flow: Run knowledge.retrieval/v1 against selected Snapshot
+    Flow-->>Knowledge: Bounded items, citations, content, or answer
+    Knowledge-->>Caller: Snapshot-bound result and Flow Run evidence
+```
+
+A projection failure leaves the previous active Snapshot unchanged. The built-in projection performs identity aggregation and preserves heterogeneous media; normalization requires an explicit transformation or specialized projection. The built-in retrieval implementation is deterministic and local-first rather than model-backed. Structural anchors: **Resource-family services**, **Flow engine**, **Tool execution pipeline**, and **Control-plane data**. Decisions: [ADR-0150](../../decisions/0150-artifacts-use-toolset-backed-staging-and-storage-flows.md), [ADR-0152](../../decisions/0152-knowledge-snapshots-are-immutable-publications.md), [ADR-0153](../../decisions/0153-knowledge-retrieval-is-a-snapshot-bound-flow-invocation.md), [ADR-0163](../../decisions/0163-data-sources-own-governed-acquisition.md), [ADR-0165](../../decisions/0165-flow-contracts-use-one-flow-owned-metadata-key.md), and [ADR-0166](../../decisions/0166-knowledge-sources-project-data-source-artifacts.md).
+
 ## Invoke AEP or MCP
 
 AEP owns extension identity and contribution discovery, plus model contribution invocation. MCP remains authoritative for external Tool schema discovery and Tool calls; a direct MCP provider bypasses AEP.
