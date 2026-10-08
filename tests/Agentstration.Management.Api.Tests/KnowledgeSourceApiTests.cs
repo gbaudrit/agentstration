@@ -161,6 +161,22 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         Assert.IsNotNull(projection);
         Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, projection.State, projection.ErrorMessage);
         Assert.IsNotNull(projection.SnapshotName);
+
+        using var secondProjectionResponse = await client.PostAsJsonAsync(
+            $"/api/knowledgesources/{knowledgeSource.Value.Name}/projections",
+            new StartKnowledgeProjectionRequest());
+        Assert.AreEqual(HttpStatusCode.Created, secondProjectionResponse.StatusCode,
+            await secondProjectionResponse.Content.ReadAsStringAsync());
+        var secondProjection = await secondProjectionResponse.Content.ReadFromJsonAsync<KnowledgeProjectionResource>();
+        Assert.IsNotNull(secondProjection);
+        Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, secondProjection.State, secondProjection.ErrorMessage);
+        Assert.IsNotNull(secondProjection.SnapshotName);
+        Assert.AreNotEqual(projection.Name, secondProjection.Name);
+        Assert.AreNotEqual(projection.SnapshotName, secondProjection.SnapshotName);
+
+        var snapshotService = factory.Services.GetRequiredService<KnowledgeSnapshotService>();
+        var publishedSnapshots = await snapshotService.ListAsync(new(knowledgeSource.Value.Name), default);
+        Assert.HasCount(2, publishedSnapshots);
     }
 
     [TestMethod]

@@ -360,6 +360,7 @@ public sealed class KnowledgeProjectionService(
         }).ToArray();
         var hash = Hash(JsonSerializer.SerializeToElement(new
         {
+            projection = new { projection.Uid, projection.Name, projection.ProjectionFlowRunId },
             source = new { source.Uid, source.Generation },
             inputs = projection.Inputs,
             flow = new { projection.ProjectionFlow.Name, projection.ProjectionFlow.Namespace, projection.ProjectionFlow.Version },
