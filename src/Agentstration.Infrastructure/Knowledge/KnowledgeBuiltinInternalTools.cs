@@ -64,9 +64,12 @@ public sealed class DataSourceArtifactImportMcpTool(
                 ?? throw Error("data_source_artifact_import_not_found", $"FlowRunArtifact '{id}' was not found in the current Workspace.");
             artifacts.Add(new
             {
-                artifactId = stored.Value.ArtifactId.ToString(), kind = "durable", disposition = "publishable",
+                artifactId = stored.Value.ArtifactId.ToString(),
+                kind = "durable",
+                disposition = "publishable",
                 name = stored.Value.Receipt.Provenance.GetValueOrDefault("fileName"),
-                mediaType = stored.Value.Receipt.MediaType, digest = stored.Value.Receipt.Sha256
+                mediaType = stored.Value.Receipt.MediaType,
+                digest = stored.Value.Receipt.Sha256
             });
         }
         return JsonSerializer.SerializeToElement(new { artifacts });
@@ -147,10 +150,24 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
         var end = checked(offset + bytes.Length);
         return JsonSerializer.SerializeToElement(new
         {
-            items = new[] { new { id = $"{artifactId}:{offset}", artifactId, content, mediaType = artifact.Receipt.MediaType,
-                score = (double?)null, metadata = new Dictionary<string, string>() } },
-            citations = new[] { new { artifactId, locator = $"bytes={offset}-{end}", start = offset, end, excerpt } },
-            answer = (string?)null, continuationToken = (string?)null
+            items = new[]
+            {
+                new
+                {
+                    id = $"{artifactId}:{offset}",
+                    artifactId,
+                    content,
+                    mediaType = artifact.Receipt.MediaType,
+                    score = (double?)null,
+                    metadata = new Dictionary<string, string>()
+                }
+            },
+            citations = new[]
+            {
+                new { artifactId, locator = $"bytes={offset}-{end}", start = offset, end, excerpt }
+            },
+            answer = (string?)null,
+            continuationToken = (string?)null
         });
     }
 
@@ -222,11 +239,25 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
 
     private static JsonElement Result(IReadOnlyList<Match> matches, string? answer) => JsonSerializer.SerializeToElement(new
     {
-        items = matches.Select((value, index) => new { id = $"{value.ArtifactId}:{index}", artifactId = value.ArtifactId,
-            content = value.Excerpt, mediaType = value.MediaType, score = 1d, metadata = new Dictionary<string, string>() }),
-        citations = matches.Select(value => new { artifactId = value.ArtifactId,
-            locator = $"characters={value.Start}-{value.End}", start = (long)value.Start, end = (long)value.End, excerpt = value.Excerpt }),
-        answer, continuationToken = (string?)null
+        items = matches.Select((value, index) => new
+        {
+            id = $"{value.ArtifactId}:{index}",
+            artifactId = value.ArtifactId,
+            content = value.Excerpt,
+            mediaType = value.MediaType,
+            score = 1d,
+            metadata = new Dictionary<string, string>()
+        }),
+        citations = matches.Select(value => new
+        {
+            artifactId = value.ArtifactId,
+            locator = $"characters={value.Start}-{value.End}",
+            start = (long)value.Start,
+            end = (long)value.End,
+            excerpt = value.Excerpt
+        }),
+        answer,
+        continuationToken = (string?)null
     });
 
     private static bool IsText(string mediaType) => mediaType.StartsWith("text/", StringComparison.OrdinalIgnoreCase)
