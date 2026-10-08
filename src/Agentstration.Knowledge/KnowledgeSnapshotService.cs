@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -44,107 +43,7 @@ public sealed class KnowledgeSnapshotService(
     ISecurityAuditWriter audit,
     TimeProvider timeProvider)
 {
-    private readonly ConcurrentDictionary<(Guid WorkspaceId, string PublicationName), SemaphoreSlim> publicationGates = new();
-
-    public const int MaximumIdempotencyKeyLength = 200;
-    public const int MaximumSnapshotArtifacts = KnowledgeAcquisitionService.MaximumManifestArtifacts;
-
-    public async Task<StoredResource<KnowledgeSnapshotResource>> PublishAsync(
-        string acquisitionId,
-        ResourceNamespace @namespace,
-        PublishKnowledgeSnapshotRequest request,
-        string? idempotencyKey,
-        CancellationToken cancellationToken)
-    {
-        var context = RequireContext();
-        await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsExecute, cancellationToken);
-        if (idempotencyKey?.Length > MaximumIdempotencyKeyLength)
-            throw Error("knowledge_snapshot_idempotency_key_too_long",
-                $"Idempotency keys cannot exceed {MaximumIdempotencyKeyLength} characters.");
-        var scopeRef = ResourceScopeRef.Workspace(context.WorkspaceId);
-        var acquisition = await RequireAcquisitionAsync(scopeRef, acquisitionId, @namespace, cancellationToken);
-        var artifactIds = SelectArtifactIds(acquisition.Value, request.ArtifactIds ?? []);
-        var requestHash = Hash(JsonSerializer.SerializeToElement(new
-        {
-            acquisition = acquisition.Value.Uid,
-            artifactIds,
-            request.Activate
-        }));
-        var publicationName = "publication-" + HashText(string.IsNullOrWhiteSpace(idempotencyKey)
-            ? $"{context.WorkspaceId:D}:{requestHash}"
-            : $"{context.WorkspaceId:D}:{acquisition.Value.KnowledgeSourceUid:D}:{idempotencyKey}")[..32];
-        var gate = publicationGates.GetOrAdd((context.WorkspaceId, publicationName), _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(cancellationToken);
-        try
-        {
-            var publicationAddress = Scoped(scopeRef, @namespace,
-                KnowledgeResourceKinds.KnowledgeSnapshotPublication, publicationName);
-            var publication = await store.GetExactAsync<KnowledgeSnapshotPublicationResource>(publicationAddress, cancellationToken);
-            if (publication is not null && !string.Equals(publication.Value.RequestHash, requestHash, StringComparison.Ordinal))
-                throw Error("knowledge_snapshot_idempotency_conflict",
-                    "The idempotency identity is already bound to another snapshot publication request.");
-            if (publication?.Value.PublicationState == KnowledgeSnapshotPublicationState.Succeeded)
-                return await RequireSnapshotAsync(scopeRef, publication.Value.SnapshotName!, @namespace, cancellationToken);
-
-            if (publication is null)
-            {
-                publication = await store.PutExactAsync(scopeRef, new KnowledgeSnapshotPublicationResource
-                {
-                    ApiVersion = ResourceApiVersions.CoreV1,
-                    Kind = KnowledgeResourceKinds.KnowledgeSnapshotPublication,
-                    Metadata = new() { Name = publicationName, Namespace = @namespace },
-                    ScopeRef = scopeRef,
-                    Generation = 1,
-                    Status = new() { ProvisioningState = ProvisioningState.Accepted },
-                    AcquisitionId = acquisition.Value.Name,
-                    AcquisitionUid = acquisition.Value.Uid,
-                    KnowledgeSourceUid = acquisition.Value.KnowledgeSourceUid,
-                    KnowledgeSourceName = acquisition.Value.KnowledgeSourceName,
-                    KnowledgeSourceNamespace = acquisition.Value.KnowledgeSourceNamespace,
-                    RequestHash = requestHash,
-                    IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
-                    ArtifactIds = artifactIds,
-                    Activate = request.Activate,
-                    PublicationState = KnowledgeSnapshotPublicationState.Pending,
-                    TenantId = context.TenantId,
-                    CreatedBy = context.PrincipalId,
-                    CreatedAt = timeProvider.GetUtcNow()
-                }, null, true, cancellationToken);
-            }
-            else if (publication.Value.PublicationState == KnowledgeSnapshotPublicationState.Failed)
-            {
-                publication = await store.PutExactAsync(scopeRef, publication.Value with
-                {
-                    Generation = checked(publication.Value.Generation + 1),
-                    PublicationState = KnowledgeSnapshotPublicationState.Pending,
-                    ErrorCode = null,
-                    ErrorMessage = null,
-                    CompletedAt = null,
-                    Status = new() { ProvisioningState = ProvisioningState.Accepted }
-                }, publication.ETag, false, cancellationToken);
-            }
-
-            try
-            {
-                var snapshot = await CompletePublicationAsync(publication, acquisition, context, cancellationToken);
-                await audit.WriteAsync(new(SecurityAuditActions.KnowledgeSnapshotPublished,
-                    ActorPrincipalId: context.PrincipalId, TenantId: context.TenantId,
-                    WorkspaceId: context.WorkspaceId, ReasonCode: snapshot.Value.Name), cancellationToken);
-                return snapshot;
-            }
-            catch (KnowledgeSnapshotException exception)
-            {
-                await audit.WriteAsync(new(SecurityAuditActions.KnowledgeSnapshotPublicationFailed,
-                    ActorPrincipalId: context.PrincipalId, TenantId: context.TenantId,
-                    WorkspaceId: context.WorkspaceId, ReasonCode: exception.Code), cancellationToken);
-                throw;
-            }
-        }
-        finally
-        {
-            gate.Release();
-        }
-    }
+    public const int MaximumSnapshotArtifacts = 256;
 
     public async Task<KnowledgeSnapshotView> GetAsync(
         KnowledgeSnapshotId id,

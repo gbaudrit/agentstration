@@ -1,7 +1,6 @@
 @page "/knowledge-sources/{Name}"
 @implements IDisposable
 @inject IKnowledgeSourcesClient Client
-@inject IKnowledgeSourceProfilesClient Profiles
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
 
@@ -302,19 +301,15 @@ else if (source is not null && readiness is not null)
             var sourceTask = Client.GetAsync(SourceNamespace, Name, cancellation.Token);
             var readinessTask = Client.GetReadinessAsync(SourceNamespace, Name, cancellation.Token);
             var exposureTask = Client.GetExposureAsync(SourceNamespace, Name, cancellation.Token);
-            var acquisitionsTask = Client.GetAcquisitionsAsync(SourceNamespace, Name, cancellation.Token);
             var projectionsTask = Client.GetProjectionsAsync(SourceNamespace, Name, cancellation.Token);
             var snapshotsTask = Client.GetSnapshotsAsync(SourceNamespace, Name, cancellation.Token);
-            var profilesTask = Profiles.GetAsync(cancellation.Token);
-            await Task.WhenAll(sourceTask, readinessTask, exposureTask, acquisitionsTask, projectionsTask, snapshotsTask, profilesTask);
+            await Task.WhenAll(sourceTask, readinessTask, exposureTask, projectionsTask, snapshotsTask);
             var sourceSnapshot = await sourceTask;
             source = sourceSnapshot.Value;
             etag = sourceSnapshot.ETag;
-            profiles = await profilesTask;
             LoadDefinition(source);
             readiness = await readinessTask;
             exposure = await exposureTask;
-            acquisitions = (await acquisitionsTask).OrderByDescending(value => value.CreatedAt).ToArray();
             projections = (await projectionsTask).OrderByDescending(value => value.CreatedAt).ToArray();
             selectedProjection = projections.FirstOrDefault();
             snapshots = (await snapshotsTask).OrderByDescending(value => value.Snapshot.PublishedAt).ToArray();
@@ -322,7 +317,6 @@ else if (source is not null && readiness is not null)
             activeTab = View?.ToLowerInvariant() switch
             {
                 "definition" => DetailsTab.Definition,
-                "acquisitions" => DetailsTab.Acquisitions,
                 "projections" => DetailsTab.Projections,
                 "snapshots" => DetailsTab.Snapshots,
                 "retrieval" => DetailsTab.Retrieval,

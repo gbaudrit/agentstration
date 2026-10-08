@@ -5,6 +5,7 @@
     <ProjectReference Include="../../src/Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
     <ProjectReference Include="../../src/Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions/Agentstration.Extensions.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj" Aliases="crawl4ai" />
     <ProjectReference Include="../../src/Agentstration.Models.Application/Agentstration.Models.Application.csproj" />
     <ProjectReference Include="../../src/Agentstration.Packs.Contracts/Agentstration.Packs.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.ResourceManagement.Storage.Sqlite/Agentstration.ResourceManagement.Storage.Sqlite.csproj" />

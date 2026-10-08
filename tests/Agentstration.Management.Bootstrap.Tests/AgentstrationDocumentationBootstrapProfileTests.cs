@@ -25,46 +25,27 @@ public sealed class AgentstrationDocumentationBootstrapProfileTests
 
         Assert.IsTrue(profile.Valid, profile.Error);
         Assert.AreEqual(BootstrapProfileScope.Workspace, profile.Scope);
-        Assert.AreEqual(8, profile.ResourceCount);
-        Assert.AreEqual(3, profile.Bindings.Count(value => value.TargetKind == BootstrapBindingTargetKind.Tool));
-        Assert.AreEqual(1, profile.Bindings.Count(value => value.TargetKind == BootstrapBindingTargetKind.ModelProfile));
-        Assert.AreEqual(1, profile.Bindings.Count(value => value.TargetKind == BootstrapBindingTargetKind.RuntimeProfile));
+        Assert.AreEqual(2, profile.ResourceCount);
+        Assert.AreEqual(0, profile.Bindings.Count(value => value.TargetKind == BootstrapBindingTargetKind.Tool));
+        Assert.IsEmpty(profile.Bindings);
 
         var loaded = (await catalog.LoadAsync([profile.Name], default)).Single();
         var resources = loaded.Resources.Select(value => value.Resource).ToArray();
-        Assert.HasCount(8, resources);
-        Assert.AreEqual(1, resources.Count(value => value.Kind == "ToolSet"));
-        Assert.AreEqual(3, resources.Count(value => value.Kind == "Flow"));
+        Assert.HasCount(2, resources);
+        Assert.AreEqual(1, resources.Count(value => value.Kind == "DataSource"));
         Assert.AreEqual(1, resources.Count(value => value.Kind == "KnowledgeSource"));
-        Assert.AreEqual(1, resources.Count(value => value.Kind == "KnowledgeSourceToolExposure"));
-        Assert.AreEqual(1, resources.Count(value => value.Kind == "Agent"));
-        Assert.AreEqual(1, resources.Count(value => value.Kind == "Entry"));
+
+        var dataSource = resources.Single(value => value.Kind == "DataSource");
+        Assert.AreEqual("crawl4ai-web", dataSource.Definition.GetProperty("profile").GetProperty("name").GetString());
+        var sourceConfiguration = dataSource.Definition.GetProperty("configuration");
+        Assert.AreEqual("https://docs.agentstration.io/", sourceConfiguration.GetProperty("url").GetString());
+        Assert.AreEqual(3, sourceConfiguration.GetProperty("maximumDepth").GetInt32());
+        Assert.AreEqual(25, sourceConfiguration.GetProperty("maximumPages").GetInt32());
 
         var source = resources.Single(value => value.Kind == "KnowledgeSource");
-        var acquisition = source.Definition.GetProperty("acquisitionConfiguration");
-        Assert.AreEqual("https://docs.agentstration.io/", acquisition.GetProperty("url").GetString());
-        Assert.AreEqual(3, acquisition.GetProperty("maximumDepth").GetInt32());
-        Assert.AreEqual(25, acquisition.GetProperty("maximumPages").GetInt32());
+        Assert.AreEqual("agentstration-documentation", source.Definition.GetProperty("dataSources")[0]
+            .GetProperty("dataSource").GetProperty("name").GetString());
 
-        var ingestion = resources.Single(value => value.Kind == "Flow"
-            && value.Metadata.Name == "agentstration-documentation-ingestion");
-        var steps = ingestion.Definition.GetProperty("graph").GetProperty("steps").EnumerateArray().ToArray();
-        var crawl = steps.Single(value => value.GetProperty("name").GetString() == "crawl");
-        Assert.AreEqual("web.crawl", crawl.GetProperty("capability").GetString());
-        Assert.AreEqual("${input.sourceConfiguration.url}",
-            crawl.GetProperty("argumentsMapping").GetProperty("startUrl").GetString());
-        var transfer = steps.Single(value => value.GetProperty("name").GetString() == "transfer");
-        Assert.AreEqual("${steps.crawl.output.structuredContent.corpus.reference}",
-            transfer.GetProperty("inputMapping").GetProperty("contentReference").GetString());
-        var persist = steps.Single(value => value.GetProperty("name").GetString() == "persist");
-        Assert.AreEqual("${execution.flowRunId}",
-            persist.GetProperty("inputMapping").GetProperty("producerFlowRunId").GetString());
-
-        var assistant = resources.Single(value => value.Kind == "Agent");
-        var toolSet = assistant.Definition.GetProperty("toolSets")[0];
-        Assert.AreEqual("agentstration-documentation",
-            toolSet.GetProperty("toolSet").GetProperty("name").GetString());
-        Assert.AreEqual("1.0.0", toolSet.GetProperty("version").GetString());
     }
 
     private static string FindRepositoryRoot()

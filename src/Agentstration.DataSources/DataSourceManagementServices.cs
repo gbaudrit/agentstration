@@ -456,13 +456,6 @@ public sealed class DataSourceManagementService(
         if (resource.Definition.Configuration.ValueKind != JsonValueKind.Object
             || Encoding.UTF8.GetByteCount(resource.Definition.Configuration.GetRawText()) > MaximumConfigurationBytes)
             throw Error("data_source_configuration_invalid", "Data Source configuration must be a bounded JSON object.");
-        if (resource.MigratedFrom is { } migration
-            && (string.IsNullOrWhiteSpace(migration.SourceKind)
-                || string.IsNullOrWhiteSpace(migration.Name)
-                || migration.Uid == Guid.Empty
-                || migration.Generation < 1))
-            throw Error("data_source_migration_input_invalid",
-                "Migration provenance requires a source kind, name, UID and positive generation.");
     }
 
     private Task AuditAsync(string action, ResourceScopeRef scope, string reason, CancellationToken cancellationToken)

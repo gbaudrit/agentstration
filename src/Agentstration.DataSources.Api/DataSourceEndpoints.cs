@@ -52,8 +52,7 @@ internal static class DataSourceEndpoints
             Kind = DataSourceResourceKinds.DataSource,
             Metadata = new ResourceMetadata { Name = body.Name, Namespace = ns },
             ScopeRef = body.ScopeRef,
-            Definition = body.Properties,
-            MigratedFrom = body.MigratedFrom
+            Definition = body.Properties
         }, cancellationToken);
         response.Headers.Location = Path(stored.Value);
         return Resource(stored, response, 201);

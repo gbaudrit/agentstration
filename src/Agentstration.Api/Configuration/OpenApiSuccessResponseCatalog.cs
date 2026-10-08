@@ -405,27 +405,6 @@ internal static class OpenApiSuccessResponseCatalog
                     : Json<IReadOnlyList<ParameterResource>>(200, "List Parameters");
             return Json<ParameterResource>(200, method == "PUT" ? "Update a Parameter" : "Get a Parameter");
         }
-        if (path.StartsWith("/api/knowledgesourceprofiles", StringComparison.OrdinalIgnoreCase))
-        {
-            if (path.EndsWith("/application-plan", StringComparison.OrdinalIgnoreCase))
-                return Json<KnowledgeSourceProfileApplicationPlan>(200, "Preview applying a Knowledge Source Profile revision");
-            if (path.EndsWith("/applications", StringComparison.OrdinalIgnoreCase))
-                return Json<KnowledgeSourceProfileRevisionResource>(201, "Apply a Knowledge Source Profile revision");
-            if (path.EndsWith("/active-revision", StringComparison.OrdinalIgnoreCase))
-                return Json<KnowledgeSourceProfileResource>(200, "Activate a Knowledge Source Profile revision");
-            if (path.Contains("/revisions/", StringComparison.OrdinalIgnoreCase))
-                return Json<KnowledgeSourceProfileRevisionResource>(200, "Get a published Knowledge Source Profile revision");
-            if (path.EndsWith("/revisions", StringComparison.OrdinalIgnoreCase))
-                return method == "POST"
-                    ? Json<KnowledgeSourceProfileRevisionResource>(201, "Publish a Knowledge Source Profile revision")
-                    : Json<IReadOnlyList<KnowledgeSourceProfileRevisionResource>>(200, "List published Knowledge Source Profile revisions");
-            if (path == "/api/knowledgesourceprofiles")
-                return method == "POST"
-                    ? Json<KnowledgeSourceProfileResource>(201, "Create a Knowledge Source Profile")
-                    : Json<IReadOnlyList<KnowledgeSourceProfileResource>>(200, "List Knowledge Source Profiles");
-            return Json<KnowledgeSourceProfileResource>(200,
-                method == "PUT" ? "Update a Knowledge Source Profile" : "Get a Knowledge Source Profile");
-        }
         if (path.StartsWith("/api/knowledgesources", StringComparison.OrdinalIgnoreCase))
         {
             if (path.EndsWith("/readiness", StringComparison.OrdinalIgnoreCase))

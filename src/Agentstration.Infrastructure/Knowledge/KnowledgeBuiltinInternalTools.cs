@@ -10,54 +10,58 @@ using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Knowledge;
 
+public static class DataSourceBuiltinToolNames
+{
+    public const string ArtifactImport = "artifact.import";
+}
+
 public static class KnowledgeBuiltinToolNames
 {
-    public const string IngestionImport = "knowledge.ingestion.import";
     public const string RetrievalSearch = "knowledge.retrieval.search";
     public const string RetrievalQuery = "knowledge.retrieval.query";
     public const string RetrievalRead = "knowledge.retrieval.read";
 }
 
-public sealed class KnowledgeIngestionImportMcpTool(
+public sealed class DataSourceArtifactImportMcpTool(
     IResourceStore resources,
     IAuthorizationService authorization) : IInternalMcpToolHandler
 {
     public InternalMcpToolDefinition Definition { get; } = new(
-        KnowledgeBuiltinToolNames.IngestionImport,
-        "Import durable Knowledge artifacts",
+        DataSourceBuiltinToolNames.ArtifactImport,
+        "Import durable Artifacts",
         "Builds a bounded acquisition manifest from existing governed durable Artifacts in the current Workspace.",
-        KnowledgeBuiltinSchemas.IngestionInput,
-        KnowledgeBuiltinSchemas.IngestionOutput,
-        InitialCategory: KnowledgeBuiltinSchemas.Category,
+        KnowledgeBuiltinSchemas.DataSourceArtifactImportInput,
+        KnowledgeBuiltinSchemas.ArtifactManifestOutput,
+        InitialCategory: KnowledgeBuiltinSchemas.DataSourceCategory,
         ExposeThroughMcp: false);
 
     public async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         await authorization.EnsurePermissionAsync(new(invocation.PrincipalId, invocation.TenantId, invocation.WorkspaceId.Value),
             AuthorizationPermissions.ArtifactsInspect, cancellationToken);
-        if (!invocation.Arguments.TryGetProperty("parameters", out var parameters)
-            || parameters.ValueKind != JsonValueKind.Object)
-            throw Error("knowledge_builtin_parameters_invalid", "The ingestion request requires an object parameters value.");
-        if (!parameters.TryGetProperty("artifactIds", out var artifactIds))
+        if (!invocation.Arguments.TryGetProperty("sourceConfiguration", out var configuration)
+            || configuration.ValueKind != JsonValueKind.Object)
+            throw Error("data_source_artifact_import_configuration_invalid", "The import request requires an object sourceConfiguration value.");
+        if (!configuration.TryGetProperty("artifactIds", out var artifactIds))
             return JsonSerializer.SerializeToElement(new { artifacts = Array.Empty<object>() });
         if (artifactIds.ValueKind != JsonValueKind.Array)
-            throw Error("knowledge_builtin_artifact_ids_invalid", "parameters.artifactIds must be an array.");
+            throw Error("data_source_artifact_import_ids_invalid", "sourceConfiguration.artifactIds must be an array.");
         var values = artifactIds.EnumerateArray().ToArray();
         if (values.Length > 100)
-            throw Error("knowledge_builtin_artifact_limit_exceeded", "At most 100 durable Artifacts can be imported per acquisition.");
+            throw Error("data_source_artifact_import_limit_exceeded", "At most 100 durable Artifacts can be imported per acquisition.");
 
         var artifacts = new List<object>(values.Length);
         foreach (var value in values)
         {
             if (value.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(value.GetString()))
-                throw Error("knowledge_builtin_artifact_id_invalid", "Every imported Artifact identity must be a non-empty string.");
+                throw Error("data_source_artifact_import_id_invalid", "Every imported Artifact identity must be a non-empty string.");
             FlowRunArtifactId id;
             try { id = FlowRunArtifactId.Parse(value.GetString()!); }
-            catch (FormatException exception) { throw Error("knowledge_builtin_artifact_id_invalid", exception.Message, exception); }
+            catch (FormatException exception) { throw Error("data_source_artifact_import_id_invalid", exception.Message, exception); }
             var stored = await resources.GetExactAsync<FlowRunArtifactResource>(ScopedResourceAddress.Create(
                 ResourceScopeRef.Workspace(invocation.WorkspaceId.Value), ResourceNamespace.Default,
                 ArtifactResourceKinds.FlowRunArtifact, id.ToString()), cancellationToken)
-                ?? throw Error("knowledge_builtin_artifact_not_found", $"FlowRunArtifact '{id}' was not found in the current Workspace.");
+                ?? throw Error("data_source_artifact_import_not_found", $"FlowRunArtifact '{id}' was not found in the current Workspace.");
             artifacts.Add(new
             {
                 artifactId = stored.Value.ArtifactId.ToString(), kind = "durable", disposition = "publishable",
@@ -256,20 +260,21 @@ public sealed class KnowledgeRetrievalReadMcpTool(IResourceStore resources, IArt
 
 internal static class KnowledgeBuiltinSchemas
 {
+    public static InitialToolCategory DataSourceCategory { get; } = new("data-source", "Data source",
+        "Built-in Data Source acquisition implementation Tools.");
     public static InitialToolCategory Category { get; } = new("knowledge-source", "Knowledge source",
-        "Built-in Knowledge ingestion and retrieval implementation Tools.");
-    public static JsonElement IngestionInput { get; } = JsonSerializer.SerializeToElement(new { type = "object",
-        properties = new { knowledgeSourceId = new { type = "string" }, parameters = new { type = "object" }, caller = new { type = "object" },
-            correlationId = new { type = "string" }, acquisitionId = new { type = "string" } },
-        required = new[] { "knowledgeSourceId", "parameters", "caller", "correlationId", "acquisitionId" }, additionalProperties = false });
-    public static JsonElement IngestionFlowInput { get; } = JsonSerializer.SerializeToElement(new { type = "object",
-        properties = new { knowledgeSourceId = new { type = "string" }, knowledgeSourceUid = new { type = "string" },
-            knowledgeSourceGeneration = new { type = "integer" }, sourceConfiguration = new { type = "object" },
+        "Built-in Knowledge retrieval implementation Tools.");
+    public static JsonElement DataSourceArtifactImportInput { get; } = JsonSerializer.SerializeToElement(new { type = "object",
+        properties = new { sourceConfiguration = new { type = "object" } },
+        required = new[] { "sourceConfiguration" }, additionalProperties = false });
+    public static JsonElement DataSourceAcquisitionFlowInput { get; } = JsonSerializer.SerializeToElement(new { type = "object",
+        properties = new { dataSourceId = new { type = "string" }, dataSourceUid = new { type = "string" },
+            dataSourceGeneration = new { type = "integer" }, profile = new { type = "object" }, sourceConfiguration = new { type = "object" },
             parameters = new { type = "object" }, caller = new { type = "object" },
             correlationId = new { type = "string" }, acquisitionId = new { type = "string" } },
-        required = new[] { "knowledgeSourceId", "knowledgeSourceUid", "knowledgeSourceGeneration", "sourceConfiguration",
+        required = new[] { "dataSourceId", "dataSourceUid", "dataSourceGeneration", "profile", "sourceConfiguration",
             "parameters", "caller", "correlationId", "acquisitionId" }, additionalProperties = false });
-    public static JsonElement IngestionOutput { get; } = JsonSerializer.SerializeToElement(new { type = "object",
+    public static JsonElement ArtifactManifestOutput { get; } = JsonSerializer.SerializeToElement(new { type = "object",
         properties = new { artifacts = new { type = "array" } }, required = new[] { "artifacts" }, additionalProperties = false });
     public static JsonElement ProjectionInput { get; } = JsonSerializer.SerializeToElement(new { type = "object",
         properties = new { knowledgeSourceId = new { type = "string" }, knowledgeSourceUid = new { type = "string" },

@@ -38,27 +38,16 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
                 new("1.0.0"), default);
         }
 
-        var migratedUid = Guid.NewGuid();
         using var createdSource = await client.PostAsJsonAsync("/api/datasources",
             new CreateDataSourceRequest("docs", new()
             {
                 DisplayName = "Documentation",
                 Profile = new("shared-http", instance),
                 Configuration = JsonSerializer.SerializeToElement(new { url = "https://docs.example.test" })
-            }, ScopeRef: workspace, MigratedFrom: new()
-            {
-                SourceKind = "KnowledgeSource",
-                ScopeRef = workspace,
-                Namespace = ResourceNamespace.Default,
-                Name = "legacy-docs",
-                Uid = migratedUid,
-                Generation = 4
-            }));
+            }, ScopeRef: workspace));
         Assert.AreEqual(HttpStatusCode.Created, createdSource.StatusCode);
         var source = await createdSource.Content.ReadFromJsonAsync<DataSourceResource>();
         Assert.AreEqual(workspace, source?.ScopeRef);
-        Assert.AreEqual(migratedUid, source?.MigratedFrom?.Uid);
-        Assert.AreEqual(4, source?.MigratedFrom?.Generation);
 
         var readiness = await client.GetFromJsonAsync<DataSourceReadiness>(
             $"/api/datasources/docs/readiness?scopeRef={Uri.EscapeDataString(workspace.Value)}");

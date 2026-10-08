@@ -175,8 +175,6 @@ internal static class KnowledgeSourceEndpoints
             var status = exception.Code == "knowledge_source_in_use_by_snapshot" ? 409 : 422;
             return Problem(exception.Code, "Invalid KnowledgeSource", status, exception.Message);
         }
-        catch (KnowledgeSourceProfileValidationException exception)
-        { return Problem(exception.Code, "Invalid KnowledgeSource profile", 422, exception.Message); }
         catch (ToolDefinitionValidationException exception)
         { return Problem(exception.Code, "Invalid KnowledgeSource Tool exposure", 422, exception.Message); }
         catch (ToolSetValidationException exception)

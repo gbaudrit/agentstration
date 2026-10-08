@@ -8,12 +8,11 @@ definition:
   displayName: Agentstration documentation
   description: Public Agentstration product and operator documentation.
   enabled: true
-  acquisitionConfiguration:
-    url: https://docs.agentstration.io/
-    maximumDepth: 3
-    maximumPages: 25
-  ingestionFlow:
-    name: agentstration-documentation-ingestion
+  dataSources:
+    - name: documentation
+      dataSource: { name: agentstration-documentation }
+  projectionFlow:
+    name: knowledge-projection-builtin
     version: 1.0.0
     useActiveVersion: false
   retrievalFlow:

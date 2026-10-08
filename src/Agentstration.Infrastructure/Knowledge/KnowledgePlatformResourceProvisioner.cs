@@ -2,6 +2,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Artifacts.Contracts;
+using Agentstration.DataSources;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
@@ -17,19 +19,16 @@ namespace Agentstration.Infrastructure.Knowledge;
 public sealed class KnowledgePlatformResourceProvisioner(
     IResourceStore store,
     FlowService flows,
-    KnowledgeSourceProfileService profiles,
+    DataSourceProfileService dataSourceProfiles,
     TimeProvider timeProvider)
 {
-    public const string IngestionToolSetName = "knowledge-ingestion-builtin";
     public const string RetrievalToolSetName = "knowledge-retrieval-builtin";
-    public const string IngestionFlowName = "knowledge-ingestion-builtin";
     public const string ProjectionFlowName = "knowledge-projection-builtin";
     public const string RetrievalFlowName = "knowledge-retrieval-builtin";
-    public const string WebIngestionFlowName = "knowledge-web-ingestion-builtin";
-    public const string RestIngestionFlowName = "knowledge-rest-ingestion-builtin";
-    public const string ArtifactImportIngestionFlowName = "knowledge-artifact-import-ingestion-builtin";
+    public const string WebAcquisitionFlowName = "data-source-web-acquisition-builtin";
+    public const string RestAcquisitionFlowName = "data-source-rest-acquisition-builtin";
+    public const string ArtifactImportAcquisitionFlowName = "data-source-artifact-import-acquisition-builtin";
     public const string ToolSetVersion = "1.0.0";
-    public const string IngestionFlowVersion = "1.1.0";
     public const string RetrievalFlowVersion = "1.0.0";
     public const string ProjectionFlowVersion = "1.0.0";
     public const string ProfileFlowVersion = "1.0.0";
@@ -39,9 +38,6 @@ public sealed class KnowledgePlatformResourceProvisioner(
     {
         if (workspaceScope is not { Kind: ResourceScopeKind.Workspace, TargetId: { } workspaceId })
             throw new InvalidOperationException("Built-in Knowledge resources require a Workspace scope.");
-        await EnsureToolSetAsync(workspaceScope, IngestionToolSetName,
-            "Knowledge ingestion · Built-in", "Local-first import of governed durable Artifacts.",
-            [(KnowledgeFlowContracts.Ingestion, KnowledgeBuiltinToolNames.IngestionImport)], cancellationToken);
         await EnsureToolSetAsync(workspaceScope, RetrievalToolSetName,
             "Knowledge retrieval · Built-in", "Local-first deterministic search, query, and read over Snapshot Artifacts.",
             [
@@ -49,70 +45,62 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 (KnowledgeFlowContracts.Query, KnowledgeBuiltinToolNames.RetrievalQuery),
                 (KnowledgeFlowContracts.Read, KnowledgeBuiltinToolNames.RetrievalRead)
             ], cancellationToken);
-        await EnsureIngestionFlowAsync(new WorkspaceId(workspaceId), cancellationToken);
         await EnsureProjectionFlowAsync(new WorkspaceId(workspaceId), cancellationToken);
         await EnsureRetrievalFlowAsync(new WorkspaceId(workspaceId), cancellationToken);
-        await EnsureHttpIngestionFlowAsync(new WorkspaceId(workspaceId), WebIngestionFlowName,
-            "Web resource ingestion · Built-in", KnowledgeWebFetchMcpTool.ToolName, cancellationToken);
-        await EnsureHttpIngestionFlowAsync(new WorkspaceId(workspaceId), RestIngestionFlowName,
-            "REST resource ingestion · Built-in", KnowledgeRestGetMcpTool.ToolName, cancellationToken);
+        await EnsureHttpAcquisitionFlowAsync(new WorkspaceId(workspaceId), WebAcquisitionFlowName,
+            "Web resource acquisition · Built-in", WebFetchMcpTool.ToolName, cancellationToken);
+        await EnsureHttpAcquisitionFlowAsync(new WorkspaceId(workspaceId), RestAcquisitionFlowName,
+            "REST resource acquisition · Built-in", RestGetMcpTool.ToolName, cancellationToken);
         await EnsureArtifactImportFlowAsync(new WorkspaceId(workspaceId), cancellationToken);
-        await EnsureProfilesAsync(workspaceScope, cancellationToken);
+        await EnsureDataSourceProfilesAsync(workspaceScope, cancellationToken);
     }
 
-    private async Task EnsureProfilesAsync(ResourceScopeRef scope, CancellationToken cancellationToken)
+    private async Task EnsureDataSourceProfilesAsync(ResourceScopeRef scope, CancellationToken cancellationToken)
     {
-        await profiles.EnsureBuiltInAsync(Profile(scope, KnowledgeSourceProfileBuiltIns.Web, "Web · Built-in",
-            "Fetches one bounded public HTTP(S) Web resource.", WebIngestionFlowName,
-            KnowledgeWebFetchMcpTool.ToolName, "web.fetch", UrlSchema()), cancellationToken);
-        await profiles.EnsureBuiltInAsync(Profile(scope, KnowledgeSourceProfileBuiltIns.Rest, "REST · Built-in",
-            "Fetches one bounded public unauthenticated HTTP(S) GET response.", RestIngestionFlowName,
-            KnowledgeRestGetMcpTool.ToolName, "rest.get", UrlSchema()), cancellationToken);
-        await profiles.EnsureBuiltInAsync(Profile(scope, KnowledgeSourceProfileBuiltIns.ArtifactImport,
-            "Artifact import · Built-in", "Imports selected governed durable Artifacts.", ArtifactImportIngestionFlowName,
-            KnowledgeBuiltinToolNames.IngestionImport, "artifact.import", ArtifactImportSchema()), cancellationToken);
+        await EnsureDataSourceProfileAsync(Profile(scope, "web-builtin", "Web · Built-in",
+            "Fetches one bounded public HTTP(S) Web resource.", WebAcquisitionFlowName,
+            WebFetchMcpTool.ToolName, "web.fetch", UrlSchema()), cancellationToken);
+        await EnsureDataSourceProfileAsync(Profile(scope, "rest-builtin", "REST · Built-in",
+            "Fetches one bounded public unauthenticated HTTP(S) GET response.", RestAcquisitionFlowName,
+            RestGetMcpTool.ToolName, "rest.get", UrlSchema()), cancellationToken);
+        await EnsureDataSourceProfileAsync(Profile(scope, "artifact-import-builtin",
+            "Artifact import · Built-in", "Imports selected governed durable Artifacts.", ArtifactImportAcquisitionFlowName,
+            DataSourceBuiltinToolNames.ArtifactImport, "artifact.import", ArtifactImportSchema()), cancellationToken);
     }
 
-    private static KnowledgeSourceProfileResource Profile(
+    private static DataSourceProfileResource Profile(
         ResourceScopeRef scope,
         string name,
         string displayName,
         string description,
-        string ingestionFlow,
+        string acquisitionFlow,
         string externalTool,
         string capability,
         JsonElement configurationSchema) => new()
     {
         ApiVersion = ResourceApiVersions.CoreV1,
-        Kind = KnowledgeResourceKinds.KnowledgeSourceProfile,
+        Kind = DataSourceResourceKinds.DataSourceProfile,
         Metadata = new ResourceMetadata
         {
             Name = name,
             Annotations = new Dictionary<string, string>
             {
                 [ResourceProvenanceAnnotations.BuiltIn] = "true",
-                [ResourceProvenanceAnnotations.Origin] = KnowledgeSourceProfileBuiltIns.Origin,
-                [ResourceProvenanceAnnotations.Owner] = KnowledgeSourceProfileBuiltIns.Owner
+                [ResourceProvenanceAnnotations.Origin] = "agentstration.core",
+                [ResourceProvenanceAnnotations.Owner] = "agentstration"
             }
         },
         ScopeRef = scope,
         Generation = 1,
         Status = Succeeded(),
-        Definition = new KnowledgeSourceProfileProperties
+        Definition = new DataSourceProfileProperties
         {
             DisplayName = displayName,
             Description = description,
             Version = ProfileVersion,
-            Publish = false,
-            Activate = true,
+            Enabled = true,
             ConfigurationSchema = configurationSchema,
-            IngestionFlow = new() { Name = ingestionFlow, Version = ProfileFlowVersion, UseActiveVersion = false },
-            RetrievalFlow = new() { Name = RetrievalFlowName, Version = RetrievalFlowVersion, UseActiveVersion = false },
-            StorageFlows =
-            [
-                new() { Role = "write", Flow = new() { Name = ArtifactPlatformResourceProvisioner.StorageWriteFlowName, Version = ArtifactPlatformResourceProvisioner.DefaultToolSetVersion, UseActiveVersion = false } },
-                new() { Role = "read", Flow = new() { Name = ArtifactPlatformResourceProvisioner.StorageReadFlowName, Version = ArtifactPlatformResourceProvisioner.DefaultToolSetVersion, UseActiveVersion = false } }
-            ],
+            AcquisitionFlow = new() { Name = acquisitionFlow, Version = ProfileFlowVersion, UseActiveVersion = false },
             ToolBindings =
             [
                 new()
@@ -135,6 +123,27 @@ public sealed class KnowledgePlatformResourceProvisioner(
             }
         }
     };
+
+    private async Task EnsureDataSourceProfileAsync(
+        DataSourceProfileResource desired,
+        CancellationToken cancellationToken)
+    {
+        var existing = await dataSourceProfiles.GetAsync(desired.Namespace, desired.Name, desired.ScopeRef, cancellationToken);
+        if (existing is null)
+            existing = await dataSourceProfiles.CreateAsync(desired, cancellationToken);
+        else if (!existing.Value.Metadata.Annotations.TryGetValue(ResourceProvenanceAnnotations.BuiltIn, out var builtIn)
+            || !string.Equals(builtIn, "true", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Reserved built-in Data Source Profile identity '{desired.Name}' is already in use.");
+
+        var revision = await dataSourceProfiles.GetRevisionAsync(desired.Namespace, desired.Name,
+            ProfileVersion, desired.ScopeRef, cancellationToken);
+        if (revision is null)
+            _ = await dataSourceProfiles.PublishAsync(desired.Namespace, desired.Name, desired.ScopeRef,
+                new(ProfileVersion), cancellationToken);
+        else if (!string.Equals(existing.Value.ActiveVersion, ProfileVersion, StringComparison.Ordinal))
+            _ = await dataSourceProfiles.ActivateAsync(desired.Namespace, desired.Name, desired.ScopeRef,
+                new(ProfileVersion), existing.ETag, cancellationToken);
+    }
 
     private static JsonElement UrlSchema() => JsonSerializer.SerializeToElement(new
     {
@@ -246,51 +255,15 @@ public sealed class KnowledgePlatformResourceProvisioner(
         }, scope, cancellationToken);
     }
 
-    private async Task EnsureIngestionFlowAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
-    {
-        var input = KnowledgeBuiltinSchemas.IngestionFlowInput;
-        var output = KnowledgeBuiltinSchemas.IngestionOutput;
-        var graph = new FlowGraphDefinition
-        {
-            EntryStep = "input",
-            InputSchema = input,
-            OutputSchema = output,
-            Steps =
-            [
-                new InputFlowStepDefinition { Name = "input", DisplayName = "Acquisition request", Schema = input },
-                new ToolRouteFlowStepDefinition
-                {
-                    Name = "ingest", DisplayName = "Route ingestion",
-                    ToolSet = new(IngestionToolSetName, ToolSetVersion),
-                    Capability = KnowledgeFlowContracts.Ingestion,
-                    Route = "default",
-                    ArgumentsMapping = JsonSerializer.SerializeToElement(new
-                    {
-                        knowledgeSourceId = "${input.knowledgeSourceId}",
-                        parameters = "${input.parameters}",
-                        caller = "${input.caller}",
-                        correlationId = "${input.correlationId}",
-                        acquisitionId = "${input.acquisitionId}"
-                    })
-                },
-                new OutputFlowStepDefinition { Name = "output", DisplayName = "Acquisition manifest",
-                    OutputMapping = JsonSerializer.SerializeToElement("${steps.ingest.output}") }
-            ],
-            Transitions = [new("input-ingest", "input", "completed", "ingest"), new("ingest-output", "ingest", "completed", "output")]
-        };
-        await CreateAndPublishFlowAsync(workspaceId, IngestionFlowName, "Knowledge ingestion · Built-in",
-            KnowledgeFlowContracts.Ingestion, null, IngestionFlowVersion, graph, cancellationToken);
-    }
-
-    private async Task EnsureHttpIngestionFlowAsync(
+    private async Task EnsureHttpAcquisitionFlowAsync(
         WorkspaceId workspaceId,
         string name,
         string displayName,
         string externalToolId,
         CancellationToken cancellationToken)
     {
-        var input = KnowledgeBuiltinSchemas.IngestionFlowInput;
-        var output = KnowledgeBuiltinSchemas.IngestionOutput;
+        var input = KnowledgeBuiltinSchemas.DataSourceAcquisitionFlowInput;
+        var output = KnowledgeBuiltinSchemas.ArtifactManifestOutput;
         var graph = new FlowGraphDefinition
         {
             EntryStep = "input",
@@ -350,13 +323,13 @@ public sealed class KnowledgePlatformResourceProvisioner(
             ]
         };
         await CreateAndPublishFlowAsync(workspaceId, name, displayName,
-            KnowledgeFlowContracts.Ingestion, null, ProfileFlowVersion, graph, cancellationToken);
+            DataSourceFlowContracts.Acquisition, null, ProfileFlowVersion, graph, cancellationToken);
     }
 
     private async Task EnsureArtifactImportFlowAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
     {
-        var input = KnowledgeBuiltinSchemas.IngestionFlowInput;
-        var output = KnowledgeBuiltinSchemas.IngestionOutput;
+        var input = KnowledgeBuiltinSchemas.DataSourceAcquisitionFlowInput;
+        var output = KnowledgeBuiltinSchemas.ArtifactManifestOutput;
         var graph = new FlowGraphDefinition
         {
             EntryStep = "input",
@@ -369,14 +342,10 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 {
                     Name = "import",
                     DisplayName = "Import durable Artifacts",
-                    Tool = new(AgentstrationToolProvider.ToolResourceName(KnowledgeBuiltinToolNames.IngestionImport)),
+                    Tool = new(AgentstrationToolProvider.ToolResourceName(DataSourceBuiltinToolNames.ArtifactImport)),
                     ArgumentsMapping = JsonSerializer.SerializeToElement(new
                     {
-                        knowledgeSourceId = "${input.knowledgeSourceId}",
-                        parameters = "${input.sourceConfiguration}",
-                        caller = "${input.caller}",
-                        correlationId = "${input.correlationId}",
-                        acquisitionId = "${input.acquisitionId}"
+                        sourceConfiguration = "${input.sourceConfiguration}"
                     })
                 },
                 new OutputFlowStepDefinition
@@ -392,8 +361,8 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 new("import-output", "import", "completed", "output")
             ]
         };
-        await CreateAndPublishFlowAsync(workspaceId, ArtifactImportIngestionFlowName,
-            "Artifact import ingestion · Built-in", KnowledgeFlowContracts.Ingestion, null,
+        await CreateAndPublishFlowAsync(workspaceId, ArtifactImportAcquisitionFlowName,
+            "Artifact import acquisition · Built-in", DataSourceFlowContracts.Acquisition, null,
             ProfileFlowVersion, graph, cancellationToken);
     }
 
@@ -444,7 +413,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
     private async Task EnsureProjectionFlowAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
     {
         var input = KnowledgeBuiltinSchemas.ProjectionInput;
-        var output = KnowledgeBuiltinSchemas.IngestionOutput;
+        var output = KnowledgeBuiltinSchemas.ArtifactManifestOutput;
         var graph = new FlowGraphDefinition
         {
             EntryStep = "input",
