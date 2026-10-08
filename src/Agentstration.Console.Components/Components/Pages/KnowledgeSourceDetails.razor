@@ -64,7 +64,7 @@ else if (source is not null && readiness is not null)
     {
         @if (IsProjected)
         {
-            <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("ProjectionInputs")</p><h2>@T("DataSourceBindings")</h2><p>@T("DataSourceBindingsHelp")</p></div><a class="button-primary knowledge-edit-action" href="@EditUrl"><span>@T("EditSource")</span><UiIcon Name="arrow-right" /></a></div></section>
+            <KnowledgeSourceEditor Name="@Name" Embedded="true" Saved="SourceProjectionSaved" />
         }
         else
         {
@@ -160,7 +160,7 @@ else if (source is not null && readiness is not null)
                     </dl>
                     <DataGrid TItem="KnowledgeSnapshotArtifact" Items="selectedSnapshotView.Snapshot.Artifacts">
                         <Header><tr><th>@T("ArtifactId")</th><th>@T("MediaType")</th><th>@T("Size")</th><th>@T("ProducerFlow")</th><th>@T("StorageFlow")</th></tr></Header>
-                        <Row Context="artifact"><tr data-testid="knowledge-snapshot-artifact-row"><td><a class="knowledge-artifact-link" href="@SnapshotArtifactUrl(artifact)" title="@artifact.ArtifactId"><span class="knowledge-artifact-icon"><UiIcon Name="document" /></span><span><strong>@ShortIdentifier(artifact.ArtifactId)</strong><small>@T("OpenArtifact")</small></span><UiIcon Name="arrow-right" /></a></td><td><code>@artifact.MediaType</code></td><td>@FormatSize(artifact.Length)</td><td><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId)" title="@artifact.ProducerFlowRunId"><code>@ShortIdentifier(artifact.ProducerFlowRunId)</code></a></td><td><a class="text-button" href="@FlowRunUrl(artifact.StorageFlowRunId)" title="@artifact.StorageFlowRunId"><code>@ShortIdentifier(artifact.StorageFlowRunId)</code></a></td></tr></Row>
+                        <Row Context="artifact"><tr data-testid="knowledge-snapshot-artifact-row"><td><a class="text-button knowledge-artifact-id-link" href="@SnapshotArtifactUrl(artifact)" title="@artifact.ArtifactId"><code>@artifact.ArtifactId</code></a></td><td><code>@artifact.MediaType</code></td><td>@FormatSize(artifact.Length)</td><td><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId)" title="@artifact.ProducerFlowRunId"><code>@ShortIdentifier(artifact.ProducerFlowRunId)</code></a></td><td><a class="text-button" href="@FlowRunUrl(artifact.StorageFlowRunId)" title="@artifact.StorageFlowRunId"><code>@ShortIdentifier(artifact.StorageFlowRunId)</code></a></td></tr></Row>
                     </DataGrid>
                 </section>
             }
@@ -198,7 +198,7 @@ else if (source is not null && readiness is not null)
                     @foreach (var item in retrievalResult.Items)
                     {
                         <article class="knowledge-retrieval-item">
-                            <header><a href="@($"/artifacts/durable/{Uri.EscapeDataString(item.ArtifactId)}")" title="@item.ArtifactId"><UiIcon Name="document" /><span><strong>@ShortIdentifier(item.ArtifactId)</strong><small>@(item.MediaType ?? T("UnknownMediaType"))</small></span><UiIcon Name="arrow-right" /></a></header>
+                            <header><a class="text-button knowledge-artifact-id-link" href="@($"/artifacts/durable/{Uri.EscapeDataString(item.ArtifactId)}")" title="@item.ArtifactId"><code>@item.ArtifactId</code></a><small>@(item.MediaType ?? T("UnknownMediaType"))</small></header>
                             @if (!string.IsNullOrWhiteSpace(item.Content)) { <pre>@item.Content</pre> }
                         </article>
                     }
@@ -272,8 +272,6 @@ else if (source is not null && readiness is not null)
     private IReadOnlyList<DetailsTab> VisibleTabs => IsProjected
         ? [DetailsTab.Overview, DetailsTab.Definition, DetailsTab.Projections, DetailsTab.Snapshots, DetailsTab.Retrieval, DetailsTab.Tools, DetailsTab.Yaml]
         : [DetailsTab.Overview, DetailsTab.Definition, DetailsTab.Acquisitions, DetailsTab.Snapshots, DetailsTab.Retrieval, DetailsTab.Tools, DetailsTab.Yaml];
-    private string EditUrl => SourceNamespace.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(Name)}/edit"
-        : $"/knowledge-sources/{Uri.EscapeDataString(Name)}/edit?namespace={Uri.EscapeDataString(SourceNamespace.Value)}";
     private string ToolSetUrl => exposure is null ? "/tools/sets" : exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
         ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
         : $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}?namespace={Uri.EscapeDataString((exposure.ToolSet.Namespace ?? SourceNamespace).Value)}";
@@ -372,6 +370,13 @@ else if (source is not null && readiness is not null)
         }
         catch (Exception exception) { failed = true; message = exception.Message; }
         finally { busy = false; }
+    }
+    private void SourceProjectionSaved(KnowledgeSourceResource saved)
+    {
+        source = saved;
+        LoadDefinition(saved);
+        message = T("SourceSaved");
+        failed = false;
     }
     private void SelectTab(DetailsTab tab)
     {

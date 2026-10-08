@@ -63,12 +63,10 @@
     overflow-wrap: anywhere;
 }
 
-.knowledge-edit-action,
 .knowledge-retrieval-actions .button-primary {
     gap: .55rem;
 }
 
-.knowledge-edit-action ::deep .ui-icon,
 .knowledge-retrieval-actions ::deep .ui-icon {
     width: 1rem;
     height: 1rem;
@@ -95,48 +93,16 @@
     font-weight: 400;
 }
 
-.knowledge-artifact-link {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: .55rem;
-    min-width: 16rem;
-    color: var(--text);
-    text-decoration: none;
+.knowledge-artifact-id-link {
+    display: inline-flex;
+    max-width: 100%;
+    text-align: left;
 }
 
-.knowledge-artifact-link > span:nth-child(2) {
-    display: grid;
-    gap: .1rem;
-    min-width: 0;
-}
-
-.knowledge-artifact-link strong,
-.knowledge-artifact-link small {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.knowledge-artifact-link small {
-    color: var(--primary);
-    font-size: .68rem;
-}
-
-.knowledge-artifact-link > ::deep .ui-icon {
-    width: .95rem;
-    height: .95rem;
-    color: var(--muted);
-}
-
-.knowledge-artifact-icon {
-    display: grid;
-    place-items: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: .5rem;
-    background: var(--primary-soft);
-    color: var(--primary);
+.knowledge-artifact-id-link code {
+    color: inherit;
+    overflow-wrap: anywhere;
+    white-space: normal;
 }
 
 .knowledge-retrieval {
@@ -205,7 +171,7 @@
 
 .knowledge-retrieval-result > header,
 .knowledge-retrieval-result > footer,
-.knowledge-retrieval-item header a {
+.knowledge-retrieval-item header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -239,35 +205,13 @@
     background: var(--surface);
 }
 
-.knowledge-retrieval-item header a {
-    justify-content: flex-start;
+.knowledge-retrieval-item header {
     padding: .75rem .85rem;
-    color: var(--text);
-    text-decoration: none;
 }
 
-.knowledge-retrieval-item header a > span {
-    display: grid;
-    flex: 1;
-    gap: .1rem;
-    min-width: 0;
-}
-
-.knowledge-retrieval-item header a strong,
-.knowledge-retrieval-item header a small {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.knowledge-retrieval-item header a small {
+.knowledge-retrieval-item header small {
+    flex: 0 0 auto;
     color: var(--muted);
-}
-
-.knowledge-retrieval-item header ::deep .ui-icon {
-    width: 1rem;
-    height: 1rem;
-    color: var(--primary);
 }
 
 .knowledge-retrieval-item pre {

@@ -248,6 +248,7 @@ public sealed class KnowledgeSourceEditorTests
             var artifactLink = rendered.Find("[data-testid='knowledge-snapshot-artifact-row'] td a");
             Assert.AreEqual("/artifacts/durable/artifact-0123456789abcdef", artifactLink.GetAttribute("href"));
             Assert.AreEqual("artifact-0123456789abcdef", artifactLink.GetAttribute("title"));
+            Assert.AreEqual("artifact-0123456789abcdef", artifactLink.TextContent);
             StringAssert.Contains(rendered.Find("[data-testid='knowledge-snapshot-details']").TextContent,
                 "application/json");
         });
@@ -295,25 +296,31 @@ public sealed class KnowledgeSourceEditorTests
             StringAssert.Contains(result.TextContent, "Rechercher · 1 résultat(s)");
             Assert.AreEqual("/artifacts/durable/artifact-0123456789abcdef",
                 result.QuerySelector(".knowledge-retrieval-item a")?.GetAttribute("href"));
+            Assert.AreEqual("artifact-0123456789abcdef",
+                result.QuerySelector(".knowledge-retrieval-item a")?.TextContent);
             Assert.HasCount(1, result.QuerySelectorAll(".knowledge-retrieval-item pre"));
         });
     }
 
     [TestMethod]
-    public void ProjectedDetailsExposeVisibleEditActionAndFullWidthParameters()
+    public void ProjectedDetailsEmbedTheDefinitionFormAndExposeFullWidthParameters()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = CreateContext(new KnowledgeClientStub(ProjectedSource()));
+        var client = new KnowledgeClientStub(ProjectedSource());
+        using var context = CreateContext(client);
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
             .Add(component => component.Name, "agentstration-documentation"));
 
         rendered.Find("[data-testid='knowledge-source-definition-tab']").Click();
         rendered.WaitForAssertion(() =>
         {
-            var action = rendered.Find(".knowledge-edit-action");
-            StringAssert.Contains(action.TextContent, "Edit source");
-            Assert.AreEqual("/knowledge-sources/agentstration-documentation/edit", action.GetAttribute("href"));
+            Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-data-source-bindings']"));
+            Assert.AreEqual("agentstration-documentation",
+                rendered.Find("[data-testid='knowledge-source-name']").GetAttribute("value"));
+            Assert.IsEmpty(rendered.FindAll(".knowledge-edit-action"));
         });
+        rendered.Find("button[type='submit']").Click();
+        rendered.WaitForAssertion(() => Assert.IsNotNull(client.UpdatedRequest));
 
         rendered.Find("[data-testid='knowledge-source-projections-tab']").Click();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered

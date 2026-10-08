@@ -7,10 +7,13 @@
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
 
-<PageTitle>@T(IsNew ? "CreateSource" : "EditSource") · Agentstration</PageTitle>
-<PageHeader Title="@T(IsNew ? "CreateSource" : "EditSource")" Description="@T("ProjectionEditorDescription")" TestId="knowledge-source-editor">
-    <Actions><a class="button-secondary" href="@(IsNew ? "/knowledge-sources" : DetailsUrl)">@T("Cancel")</a></Actions>
-</PageHeader>
+@if (!Embedded)
+{
+    <PageTitle>@T(IsNew ? "CreateSource" : "EditSource") · Agentstration</PageTitle>
+    <PageHeader Title="@T(IsNew ? "CreateSource" : "EditSource")" Description="@T("ProjectionEditorDescription")" TestId="knowledge-source-editor">
+        <Actions><a class="button-secondary" href="@(IsNew ? "/knowledge-sources" : DetailsUrl)">@T("Cancel")</a></Actions>
+    </PageHeader>
+}
 
 @if (loading) { <LoadingState Message="@T("LoadingDetails")" /> }
 else
@@ -51,6 +54,8 @@ else
 @code {
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    [Parameter] public bool Embedded { get; set; }
+    [Parameter] public EventCallback<KnowledgeSourceResource> Saved { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<DataSourceResource> dataSources = [];
     private IReadOnlyList<FlowOption> projectionFlows = [], retrievalFlows = [], transformationFlows = [];
@@ -118,8 +123,16 @@ else
             var saved = IsNew
                 ? await Client.CreateAsync(new CreateKnowledgeSourceRequest(technicalName.Trim(), properties, sourceNamespace.Trim()), cancellation.Token)
                 : await Client.UpdateAsync(ExistingNamespace, Name!, new PutKnowledgeSourceRequest(properties), etag!, cancellation.Token);
-            var ns = saved.Value.Namespace;
-            Navigation.NavigateTo(ns.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}" : $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}?namespace={Uri.EscapeDataString(ns.Value)}");
+            if (Embedded)
+            {
+                etag = saved.ETag;
+                await Saved.InvokeAsync(saved.Value);
+            }
+            else
+            {
+                var ns = saved.Value.Namespace;
+                Navigation.NavigateTo(ns.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}" : $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}?namespace={Uri.EscapeDataString(ns.Value)}");
+            }
         }
         catch (System.Text.Json.JsonException exception)
         {

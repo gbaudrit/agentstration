@@ -165,11 +165,16 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
             var bytes = await durable.ReadAsync(invocation.WorkspaceId, artifact.Receipt.OpaqueReference, 0, length, cancellationToken);
             remaining -= bytes.Length;
             var content = Decode(bytes.Span, artifact.Receipt.MediaType);
-            var index = content.IndexOf(query, StringComparison.OrdinalIgnoreCase);
-            if (index < 0) continue;
-            var start = Math.Max(0, index - ExcerptRadius);
-            var end = Math.Min(content.Length, index + query.Length + ExcerptRadius);
-            result.Add(new(item.ArtifactId, artifact.Receipt.MediaType, content[start..end], start, end));
+            var searchOffset = 0;
+            while (result.Count < limit && searchOffset < content.Length)
+            {
+                var index = content.IndexOf(query, searchOffset, StringComparison.OrdinalIgnoreCase);
+                if (index < 0) break;
+                var start = Math.Max(0, index - ExcerptRadius);
+                var end = Math.Min(content.Length, index + query.Length + ExcerptRadius);
+                result.Add(new(item.ArtifactId, artifact.Receipt.MediaType, content[start..end], start, end));
+                searchOffset = index + query.Length;
+            }
         }
         return result;
     }

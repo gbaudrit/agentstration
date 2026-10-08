@@ -338,7 +338,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             FlowRunId = "builtin-producer",
             FlowStepId = "output"
         }), default);
-        var expectedContent = "Agentstration builtin retrieval is deterministic." +
+        var expectedContent = "Agentstration builtin retrieval is deterministic. Deterministic results remain bounded." +
             new string('x', KnowledgeRetrievalService.MaximumCitationExcerptCharacters);
         var content = Encoding.UTF8.GetBytes(expectedContent);
         _ = await artifacts.WriteAsync(staged.Value.ArtifactId, 0, content, default);
@@ -405,9 +405,9 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         var retrieval = factory.Services.GetRequiredService<KnowledgeRetrievalService>();
         var result = await retrieval.SearchAsync(
             new("builtin-knowledge"), new SearchKnowledgeRequest { Query = "deterministic", Limit = 5 }, default);
-        Assert.HasCount(1, result.Items);
-        Assert.AreEqual(durableId.ToString(), result.Items[0].ArtifactId);
-        StringAssert.Contains(result.Items[0].Content, "deterministic");
+        Assert.HasCount(2, result.Items);
+        Assert.IsTrue(result.Items.All(value => value.ArtifactId == durableId.ToString()));
+        Assert.IsTrue(result.Items.All(value => value.Content?.Contains("deterministic", StringComparison.OrdinalIgnoreCase) == true));
         Assert.AreEqual(KnowledgePlatformResourceProvisioner.RetrievalFlowName, result.RetrievalFlow.Name);
 
         var query = await retrieval.QueryAsync(new("builtin-knowledge"), new QueryKnowledgeRequest
@@ -416,7 +416,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             MaximumItems = 5,
             MaximumOutputCharacters = 1_024
         }, default);
-        Assert.HasCount(1, query.Items);
+        Assert.HasCount(2, query.Items);
         StringAssert.Contains(query.Answer, "deterministic");
 
         var read = await retrieval.ReadAsync(new("builtin-knowledge"), new ReadKnowledgeRequest
