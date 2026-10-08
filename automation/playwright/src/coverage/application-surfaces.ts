@@ -179,8 +179,8 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
     id: 'flow-designer', host: 'console', source: `${consolePages}/FlowDesigner.razor`,
     routes: ['/flows/{FlowId}/designer', '/namespaces/{FlowNamespace}/flows/{FlowId}/designer'], fixtureKeys: ['flowId', 'flowNamespace'],
-    pageObject: 'src/pages/flow-designer.page.ts', journey: 'exercise-bootstrap-provenance',
-    specification: 'tests/bootstrap-provenance.spec.ts', coverage: 'covered',
+    pageObject: 'src/pages/flow-designer.page.ts', journey: 'exercise-flow-transition-editing',
+    specification: 'tests/flow-transition-editing.spec.ts', coverage: 'covered',
   },
   coveredFlow('flow-runs', `${consolePages}/FlowRuns.razor`, ['/flow-runs'], [], 'inspect-flow-observability'),
   coveredFlow('flow-run-details', `${consolePages}/FlowRunDetails.razor`, ['/flow-runs/{RunId}'], ['runId'], 'inspect-flow-observability'),
