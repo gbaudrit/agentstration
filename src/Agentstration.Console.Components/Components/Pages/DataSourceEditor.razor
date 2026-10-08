@@ -19,6 +19,13 @@ else
     {
         <section class="metric-grid"><MetricCard Label="@T("State")" Value="@T(readiness?.Ready == true ? "Ready" : "NotReady")" Detail="@T(source!.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning)" /><MetricCard Label="@T("Profile")" Value="@(readiness?.Profile?.Definition.DisplayName ?? source!.Definition.Profile.Name)" Detail="@(readiness?.Profile?.Version ?? "—")" Status="@UiStatus.Info" Url="@ProfileUrl" /><MetricCard Label="@T("Generation")" Value="@source.Generation.ToString()" Detail="@($"{source.Namespace}/{source.Name}")" Status="@UiStatus.Info" /><MetricCard Label="@T("LastAcquisition")" Value="@(LatestAcquisition is null ? T("None") : AcquisitionStateLabel(LatestAcquisition.State))" Detail="@(LatestAcquisition is null ? T("AcquisitionCount", acquisitions.Count) : $"{T("AcquisitionCount", acquisitions.Count)} · {LatestAcquisition.CreatedAt.ToLocalTime():g}")" Status="@AcquisitionTone(LatestAcquisition?.State)" Url="@AcquisitionsUrl" /></section>
         @if (readiness?.Issues.Count > 0) { <section class="panel form-section">@foreach (var issue in readiness.Issues) { <p>@issue</p> }</section> }
+        @if (AcquisitionFlow is { } acquisitionFlow)
+        {
+            <section class="panel form-section data-source-flow-composition" data-testid="data-source-flow-composition">
+                <div class="panel-header"><div><p class="eyebrow">@T("FlowBindings")</p><h2>@T("AcquisitionFlow")</h2><p>@T("AcquisitionFlowHelp")</p></div></div>
+                <a class="data-source-flow-card" href="@AcquisitionFlowUrl" data-testid="data-source-acquisition-flow-link"><span class="data-source-composition-icon"><UiIcon Name="workflow" /></span><span><small>@T("AcquisitionFlow")</small><strong>@acquisitionFlow.Name</strong><code>@AcquisitionFlowIdentity</code></span><UiIcon Name="arrow-right" /></a>
+            </section>
+        }
     }
     else if (tab == Tab.Definition || IsNew)
     {
@@ -39,7 +46,11 @@ else
     }
     else if (tab == Tab.Yaml)
     {
-        <section class="panel form-section"><label class="profile-yaml-field"><span>@T("Manifest")</span><textarea class="form-code-editor runner-json" rows="30" @bind="rawYaml"></textarea></label><div class="form-actions"><button class="button-primary" type="button" disabled="@busy" @onclick="SaveYamlAsync">@T("ApplyYaml")</button></div></section>
+        <section class="panel form-section" data-testid="data-source-yaml-editor">
+            <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("DataSourceYaml")</h2><p>@T("DataSourceYamlHelp")</p></div></div>
+            <label class="data-source-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" aria-label="@T("ResourceManifest")" @bind="rawYaml" @bind:event="oninput"></textarea></label>
+            <div class="form-actions"><button class="button-primary" type="button" disabled="@busy" @onclick="SaveYamlAsync">@(busy ? T("Saving") : T("SaveYaml"))</button></div>
+        </section>
     }
 }
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("Delete")" Message="@T("DeleteConfirm")" ConfirmLabel="@T("Delete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
@@ -64,6 +75,12 @@ else
     private string? ProfileUrl => readiness?.Profile is not { } profile ? null
         : $"/data-source-profiles/{Uri.EscapeDataString(profile.Name)}?namespace={Uri.EscapeDataString(profile.Namespace.Value)}&scopeRef={Uri.EscapeDataString(profile.ScopeRef.Value)}";
     private string AcquisitionsUrl => $"{Url(source!)}&view=acquisitions";
+    private DataSourceFlowTarget? AcquisitionFlow => readiness?.Profile?.Definition.AcquisitionFlow;
+    private ResourceNamespace AcquisitionFlowNamespace => AcquisitionFlow?.Namespace ?? readiness?.Profile?.Namespace ?? source!.Namespace;
+    private string AcquisitionFlowIdentity => $"{AcquisitionFlowNamespace} · {(AcquisitionFlow?.UseActiveVersion == true ? T("ActiveVersion") : AcquisitionFlow?.Version ?? "—")}";
+    private string? AcquisitionFlowUrl => AcquisitionFlow is null ? null : AcquisitionFlowNamespace.IsDefault
+        ? $"/flows/{Uri.EscapeDataString(AcquisitionFlow.Name)}"
+        : $"/namespaces/{Uri.EscapeDataString(AcquisitionFlowNamespace.Value)}/flows/{Uri.EscapeDataString(AcquisitionFlow.Name)}";
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     protected override Task OnParametersSetAsync() => LoadAsync();
     private async Task LoadAsync() { loading = true; error = null; try { profiles = (await Profiles.GetAsync(cancellation.Token)).Where(value => value.ActiveVersion is not null && value.Definition.Enabled).ToArray(); if (!IsNew) { selectedScope = ResourceScopeRef.Parse(ScopeRef!); var snapshot = await Client.GetAsync(ResourceNamespace.Parse(Namespace), Name!, selectedScope.Value, cancellation.Token); source = snapshot.Value; etag = snapshot.ETag; readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token); acquisitions = (await Client.GetAcquisitionsAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token)).OrderByDescending(value => value.CreatedAt).ToArray(); LoadForm(); tab = View?.ToLowerInvariant() switch { "definition" => Tab.Definition, "acquisitions" => Tab.Acquisitions, "yaml" => Tab.Yaml, _ => Tab.Overview }; } } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
@@ -71,7 +88,7 @@ else
     private DataSourceProperties Definition() { using var config = JsonDocument.Parse(configurationJson); var profile = ParseProfile(profileKey); return new() { DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Enabled = enabled, Profile = new(profile.Name, profile.Scope, profile.Namespace), Configuration = config.RootElement.Clone() }; }
     private async Task SaveAsync() { busy = true; error = null; try { if (IsNew) { if (selectedScope is null) throw new InvalidOperationException(T("Scope")); var saved = await Client.CreateAsync(new(technicalName.Trim(), Definition(), sourceNamespace.Trim(), selectedScope), cancellation.Token); Navigation.NavigateTo(Url(saved.Value)); } else { var saved = await Client.UpdateAsync(source!.Namespace, source.Name, selectedScope!.Value, new(Definition()), etag!, cancellation.Token); source = saved.Value; etag = saved.ETag; readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token); LoadForm(); } } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
     private async Task StartAsync() { busy = true; error = null; try { using var parameters = JsonDocument.Parse(parametersJson); await Client.StartAcquisitionAsync(source!.Namespace, source.Name, selectedScope!.Value, new() { Parameters = parameters.RootElement.Clone(), DataSourceScopeRef = selectedScope }, cancellation.Token); acquisitions = (await Client.GetAcquisitionsAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token)).OrderByDescending(value => value.CreatedAt).ToArray(); } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
-    private async Task SaveYamlAsync() { try { var raw = ResourceManifestSerializer.FromYaml<RawSource>(rawYaml); if (raw.Metadata.Name != source!.Name || raw.Metadata.Namespace != source.Namespace || raw.ScopeRef != source.ScopeRef) throw new ArgumentException(T("IdentityImmutable")); var saved = await Client.UpdateAsync(source.Namespace, source.Name, selectedScope!.Value, new(raw.Definition), etag!, cancellation.Token); source = saved.Value; etag = saved.ETag; LoadForm(); } catch (Exception exception) { error = exception.Message; } }
+    private async Task SaveYamlAsync() { busy = true; error = null; try { var raw = ResourceManifestSerializer.FromYaml<RawSource>(rawYaml); if (raw.Metadata.Name != source!.Name || raw.Metadata.Namespace != source.Namespace || raw.ScopeRef != source.ScopeRef) throw new ArgumentException(T("IdentityImmutable")); var saved = await Client.UpdateAsync(source.Namespace, source.Name, selectedScope!.Value, new(raw.Definition), etag!, cancellation.Token); source = saved.Value; etag = saved.ETag; readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token); LoadForm(); } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
     private async Task DeleteAsync() { confirmDelete = false; await Client.DeleteAsync(source!.Namespace, source.Name, selectedScope!.Value, etag!, cancellation.Token); Navigation.NavigateTo("/data-sources"); }
     private void SelectTab(Tab value) { tab = value; if (value == Tab.Yaml && source is not null) LoadForm(); }
     private static string ProfileKey(DataSourceProfileResource item) => $"{item.ScopeRef!.Value.Value}|{item.Namespace.Value}|{item.Name}";

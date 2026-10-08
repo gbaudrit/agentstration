@@ -78,3 +78,94 @@
     overflow-wrap: anywhere;
     white-space: normal;
 }
+
+.data-source-flow-composition {
+    margin-top: 1.25rem;
+}
+
+.data-source-flow-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .75rem;
+    min-width: 0;
+    padding: .9rem;
+    border: 1px solid var(--border);
+    border-radius: .7rem;
+    background: var(--surface-2);
+    color: var(--text);
+    text-decoration: none;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.data-source-flow-card:hover {
+    border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+    background: color-mix(in srgb, var(--primary-soft) 30%, var(--surface-2));
+    transform: translateY(-1px);
+}
+
+.data-source-flow-card > span:nth-child(2) {
+    display: grid;
+    gap: .15rem;
+    min-width: 0;
+}
+
+.data-source-flow-card small {
+    color: var(--muted);
+    font-size: .68rem;
+}
+
+.data-source-flow-card strong,
+.data-source-flow-card code {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.data-source-flow-card strong {
+    font-size: .82rem;
+}
+
+.data-source-flow-card code {
+    color: var(--muted);
+    font-size: .67rem;
+}
+
+.data-source-flow-card > ::deep .ui-icon {
+    width: 1rem;
+    height: 1rem;
+    color: var(--muted);
+}
+
+.data-source-composition-icon {
+    display: grid;
+    place-items: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: .65rem;
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.data-source-composition-icon ::deep .ui-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.data-source-yaml-field {
+    display: grid;
+    min-width: 0;
+    gap: .45rem;
+    color: var(--text);
+}
+
+.data-source-yaml-field .form-code-editor {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: min(60vh, 640px);
+    max-height: none;
+    overflow: auto;
+    overflow-wrap: normal;
+    resize: vertical;
+    white-space: pre;
+}

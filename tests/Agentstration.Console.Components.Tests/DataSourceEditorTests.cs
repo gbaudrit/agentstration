@@ -35,6 +35,8 @@ public sealed class DataSourceEditorTests
             StringAssert.Contains(rendered.Markup, "Dernière acquisition");
             StringAssert.Contains(rendered.Markup, "Réussie");
             StringAssert.Contains(rendered.Markup, "1 acquisition(s)");
+            Assert.AreEqual("data-source-web-acquisition-builtin", rendered.Find("[data-testid='data-source-acquisition-flow-link'] strong").TextContent.Trim());
+            Assert.AreEqual("/flows/data-source-web-acquisition-builtin", rendered.Find("[data-testid='data-source-acquisition-flow-link']").GetAttribute("href"));
         });
 
         rendered.FindAll("[role='tab']").Single(value => value.TextContent == "Définition").Click();
@@ -53,6 +55,14 @@ public sealed class DataSourceEditorTests
             Assert.IsTrue(rendered.Find(".data-source-parameters").QuerySelector("textarea") is not null);
             Assert.AreEqual("Réussie", rendered.Find(".status-badge").TextContent.Trim());
             Assert.AreEqual("flowrun-data-source", rendered.Find(".data-source-flow-run").GetAttribute("title"));
+        });
+
+        rendered.FindAll("[role='tab']").Single(value => value.TextContent == "YAML").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(1, rendered.FindAll("[data-testid='data-source-yaml-editor']"));
+            Assert.IsTrue(rendered.Find(".data-source-yaml-field").QuerySelector("textarea") is not null);
+            StringAssert.Contains(rendered.Markup, "YAML de la source de données");
         });
     }
 

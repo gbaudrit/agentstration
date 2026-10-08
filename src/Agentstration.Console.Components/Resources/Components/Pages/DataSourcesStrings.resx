@@ -25,4 +25,12 @@
   <data name="AcquisitionState.Failed" xml:space="preserve"><value>Failed</value></data>
   <data name="AcquisitionState.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
   <data name="AcquisitionState.TimedOut" xml:space="preserve"><value>Timed out</value></data>
+  <data name="FlowBindings" xml:space="preserve"><value>Flow binding</value></data>
+  <data name="AcquisitionFlow" xml:space="preserve"><value>Acquisition Flow</value></data>
+  <data name="AcquisitionFlowHelp" xml:space="preserve"><value>The active Data Source Profile selects the Flow used to acquire and materialize this source.</value></data>
+  <data name="RawResource" xml:space="preserve"><value>Raw resource</value></data>
+  <data name="DataSourceYaml" xml:space="preserve"><value>Data Source YAML</value></data>
+  <data name="DataSourceYamlHelp" xml:space="preserve"><value>Edit the complete Data Source resource as YAML.</value></data>
+  <data name="ResourceManifest" xml:space="preserve"><value>Resource manifest</value></data>
+  <data name="SaveYaml" xml:space="preserve"><value>Save YAML</value></data>
 </root>
