@@ -1,11 +1,16 @@
+extern alias crawl4ai;
+
 using System.Text;
 using System.Text.Json;
 using Agentstration.Agents;
+using Agentstration.DataSources;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Extensions;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Assistant;
+using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement.Contracts;
@@ -17,6 +22,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Crawl4AiDataSourceProfileBundle = crawl4ai::Agentstration.Extensions.Crawl4AI.Crawl4AiDataSourceProfileBundle;
 
 namespace Agentstration.Management.Tests;
 
@@ -62,46 +68,40 @@ public sealed class AgentstrationDocumentationEndToEndTests
 
         var target = new BootstrapApplicationTarget(tenant.Id, workspace.Id);
         var management = services.GetRequiredService<BootstrapProfileManagementService>();
-        await ApplyAsync(management, new(["documentation-support"], target), principal.Id);
-
-        var bindings = new List<BootstrapBindingSelection>
+        var toolBindings = new Dictionary<string, ResourceReference>
         {
-            Selection("crawl4ai-crawl", AgentstrationToolProvider.ToolResourceName(FixtureCrawlTool.Name), workspace.Id),
-            Selection("crawl4ai-read", AgentstrationToolProvider.ToolResourceName(FixtureReadTool.Name), workspace.Id),
-            Selection("crawl4ai-delete", AgentstrationToolProvider.ToolResourceName(FixtureDeleteTool.Name), workspace.Id)
+            ["web.crawl"] = ToolReference(FixtureCrawlTool.Name, workspace.Id),
+            ["content.read"] = ToolReference(FixtureReadTool.Name, workspace.Id),
+            ["content.delete"] = ToolReference(FixtureDeleteTool.Name, workspace.Id)
         };
-        bindings.Add(await ExistingSelectionAsync(management, target, "assistant-model",
-            BootstrapBindingTargetKind.ModelProfile, "bootstrap-model", principal.Id));
-        bindings.Add(await ExistingSelectionAsync(management, target, "assistant-runtime",
-            BootstrapBindingTargetKind.RuntimeProfile, "bootstrap-runtime", principal.Id));
-        await ApplyAsync(management,
-            new(["agentstration-documentation"], target, bindings), principal.Id);
+        _ = await services.GetRequiredService<AepDataSourceProfileBundleInstaller>().InstallAsync(
+            Crawl4AiDataSourceProfileBundle.Create(), target, toolBindings, default);
 
-        var assignedAgent = await services.GetRequiredService<AgentManagementService>()
-            .GetAgentAsync("agentstration-documentation-assistant", default);
-        Assert.IsNotNull(assignedAgent);
-        Assert.IsEmpty(assignedAgent.Value.Definition.Tools);
-        Assert.HasCount(1, assignedAgent.Value.Definition.ToolSets);
-        Assert.AreEqual("agentstration-documentation", assignedAgent.Value.Definition.ToolSets[0].ToolSet.Name);
+        await ApplyAsync(management, new(["agentstration-documentation"], target), principal.Id);
 
-        var acquisitions = services.GetRequiredService<KnowledgeAcquisitionService>();
-        var started = await acquisitions.StartAsync(new("agentstration-documentation"),
+        var acquisitions = services.GetRequiredService<DataSourceAcquisitionService>();
+        var sourceScope = ResourceScopeRef.Workspace(workspace.Id);
+        var started = await acquisitions.StartAsync(ResourceNamespace.Default, "agentstration-documentation", sourceScope,
             JsonSerializer.SerializeToElement(new { }), "documentation-fixture", "documentation-fixture", default);
         var flowScope = new FlowRunScope(tenant.Id, new WorkspaceId(workspace.Id), principal.Id);
         await DrainAsync(services.GetRequiredService<FlowRunService>(), started.Value.FlowRunId, flowScope);
-        var completed = await acquisitions.GetAsync(started.Value.Name, ResourceNamespace.Default, default);
-        Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, completed.Value.State, completed.Value.ErrorMessage);
+        var completed = await acquisitions.GetAsync(ResourceNamespace.Default, started.Value.Name, default);
+        Assert.AreEqual(DataSourceAcquisitionState.Succeeded, completed.Value.State, completed.Value.ErrorMessage);
         var artifact = completed.Value.Manifest?.Artifacts.Single();
         Assert.IsNotNull(artifact);
-        Assert.AreEqual(KnowledgeArtifactDisposition.Publishable, artifact.Disposition);
+        Assert.AreEqual(DataSourceArtifactDisposition.Publishable, artifact.Disposition);
 
-        var snapshot = await services.GetRequiredService<KnowledgeSnapshotService>().PublishAsync(
-            started.Value.Name,
-            ResourceNamespace.Default,
-            new PublishKnowledgeSnapshotRequest { ArtifactIds = [artifact.ArtifactId] },
-            "documentation-fixture-snapshot",
-            default);
-        Assert.AreEqual(started.Value.FlowRunId, snapshot.Value.IngestionFlowRunId);
+        var projection = await services.GetRequiredService<KnowledgeProjectionService>().StartAsync(
+            new("agentstration-documentation"),
+            new StartKnowledgeProjectionRequest
+            {
+                AcquisitionIds = new Dictionary<string, string> { ["documentation"] = completed.Value.Name },
+                CorrelationId = "documentation-fixture-projection"
+            }, default);
+        Assert.AreEqual(KnowledgeAcquisitionState.Succeeded, projection.Value.State, projection.Value.ErrorMessage);
+        Assert.IsNotNull(projection.Value.SnapshotName);
+        _ = await services.GetRequiredService<KnowledgeSourceToolExposureService>().PublishAsync(
+            new("agentstration-documentation"), "1.0.0", false, default);
 
         var toolResult = await services.GetRequiredService<IToolDefinitionExecutor>().ExecuteAsync(
             new ToolDefinitionInvocation(
@@ -152,23 +152,8 @@ public sealed class AgentstrationDocumentationEndToEndTests
         Assert.Fail($"FlowRun '{runId}' did not reach a terminal state.");
     }
 
-    private static BootstrapBindingSelection Selection(string bindingName, string toolName, Guid workspaceId) =>
-        new("agentstration-documentation", bindingName,
-            new ResourceReference(toolName, ResourceScopeRef.Workspace(workspaceId)));
-
-    private static async Task<BootstrapBindingSelection> ExistingSelectionAsync(
-        BootstrapProfileManagementService management,
-        BootstrapApplicationTarget target,
-        string bindingName,
-        BootstrapBindingTargetKind kind,
-        string resourceName,
-        Guid principalId)
-    {
-        var option = (await management.GetBindingTargetsAsync(target, kind,
-            ["agentstration-documentation"], principalId, default)).Single(value => value.Name == resourceName);
-        return new("agentstration-documentation", bindingName,
-            new ResourceReference(option.Name, option.ScopeRef, ResourceNamespace.Parse(option.Namespace)));
-    }
+    private static ResourceReference ToolReference(string toolName, Guid workspaceId) =>
+        new(AgentstrationToolProvider.ToolResourceName(toolName), ResourceScopeRef.Workspace(workspaceId));
 
     private static async Task ApplyAsync(
         BootstrapProfileManagementService management,
@@ -179,7 +164,9 @@ public sealed class AgentstrationDocumentationEndToEndTests
         Assert.IsTrue(preview.CanApply,
             string.Join(Environment.NewLine, preview.Resources.Select(value => $"{value.Kind}/{value.Name}: {value.Message}")));
         var application = await management.ApplyAsync(selection, preview.Digest, principalId, default);
-        Assert.AreEqual(BootstrapApplicationStatus.Succeeded, application.Definition.Status);
+        Assert.AreEqual(BootstrapApplicationStatus.Succeeded, application.Definition.Status,
+            string.Join(Environment.NewLine, application.Definition.Resources.Select(value =>
+                $"{value.Kind}/{value.Name}: {value.Disposition} {value.Message}")));
     }
 
     private static WebApplicationFactory<Program> Factory(string catalogRoot) =>

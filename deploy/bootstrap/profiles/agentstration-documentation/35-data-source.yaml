@@ -1,0 +1,15 @@
+apiVersion: agentstration.io/v1
+kind: DataSource
+metadata:
+  name: agentstration-documentation
+  tags:
+    agentstration.io/category: data-source
+definition:
+  displayName: Agentstration documentation origin
+  description: Public Agentstration documentation acquired through the reusable Crawl4AI Web profile.
+  enabled: true
+  profile: { name: crawl4ai-web }
+  configuration:
+    url: https://docs.agentstration.io/
+    maximumDepth: 3
+    maximumPages: 25

@@ -200,7 +200,7 @@ public sealed class KnowledgeRetrievalService(
                     ?? profile?.RetrievalFlow
                     ?? (await sources.ResolveCompositionAsync(source.Value, cancellationToken)).Retrieval;
             }
-            catch (Exception exception) when (exception is KnowledgeSourceValidationException or KnowledgeSourceProfileValidationException)
+            catch (KnowledgeSourceValidationException exception)
             {
                 throw Error("knowledge_retrieval_flow_unavailable", exception.Message, exception);
             }

@@ -48,7 +48,6 @@ public sealed record DataSourceProfileProperties
     public IReadOnlyList<DataSourceProfileToolBinding> ToolBindings { get; init; } = [];
     public IReadOnlyDictionary<string, JsonElement> Limits { get; init; } = new Dictionary<string, JsonElement>();
     public IReadOnlyDictionary<string, JsonElement> Policies { get; init; } = new Dictionary<string, JsonElement>();
-    public IReadOnlyDictionary<string, JsonElement> CompatibilityRequirements { get; init; } = new Dictionary<string, JsonElement>();
 }
 
 public sealed record DataSourceProfileResource : Resource
@@ -78,20 +77,9 @@ public sealed record DataSourceProperties
     public JsonElement Configuration { get; init; } = JsonSerializer.SerializeToElement(new { });
 }
 
-public sealed record DataSourceMigrationInput
-{
-    public required string SourceKind { get; init; }
-    public required ResourceScopeRef ScopeRef { get; init; }
-    public required ResourceNamespace Namespace { get; init; }
-    public required string Name { get; init; }
-    public required Guid Uid { get; init; }
-    public required long Generation { get; init; }
-}
-
 public sealed record DataSourceResource : Resource
 {
     public DataSourceProperties Definition { get; init; } = null!;
-    public DataSourceMigrationInput? MigratedFrom { get; init; }
 }
 
 public sealed record ResolvedDataSourceProfile
@@ -139,7 +127,6 @@ public sealed record ResolvedDataSourceAcquisitionComposition
     public IReadOnlyList<ResolvedDataSourceToolBinding> Tools { get; init; } = [];
     public IReadOnlyDictionary<string, JsonElement> Limits { get; init; } = new Dictionary<string, JsonElement>();
     public IReadOnlyDictionary<string, JsonElement> Policies { get; init; } = new Dictionary<string, JsonElement>();
-    public IReadOnlyDictionary<string, JsonElement> CompatibilityRequirements { get; init; } = new Dictionary<string, JsonElement>();
 }
 
 public sealed record DataSourceReadiness(
@@ -162,8 +149,7 @@ public sealed record CreateDataSourceRequest(
     string Name,
     DataSourceProperties Properties,
     string? Namespace = null,
-    ResourceScopeRef? ScopeRef = null,
-    DataSourceMigrationInput? MigratedFrom = null);
+    ResourceScopeRef? ScopeRef = null);
 
 public sealed record PutDataSourceRequest(DataSourceProperties Properties);
 public sealed record SetDataSourceEnabledRequest(bool Enabled);

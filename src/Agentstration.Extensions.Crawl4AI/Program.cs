@@ -29,6 +29,7 @@ builder.Services.AddAgentstrationAep(options =>
     options.Tools.Add(new AepToolContribution("content.extract", "Extract acquired content", new("crawl4ai", "content_extract"), "Extract normalized text from acquired temporary content."));
     options.Tools.Add(new AepToolContribution("content.read", "Read acquired content", new("crawl4ai", "content_read"), "Read a bounded chunk from acquired temporary content."));
     options.Tools.Add(new AepToolContribution("content.delete", "Delete acquired content", new("crawl4ai", "content_delete"), "Delete acquired temporary content after transfer."));
+    options.DataSourceProfileBundles.Add(Crawl4AiDataSourceProfileBundle.Create());
 });
 builder.Services.AddAepEnrollmentAuthentication(builder.Configuration);
 builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();

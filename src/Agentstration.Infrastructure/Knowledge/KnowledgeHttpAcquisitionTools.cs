@@ -9,24 +9,24 @@ using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Knowledge;
 
-internal sealed record KnowledgeHttpFetchRequest(
+internal sealed record HttpFetchRequest(
     Uri Url,
     int MaximumBytes,
     int MaximumRedirects,
     TimeSpan Timeout,
     IReadOnlySet<string> AllowedMediaTypes);
 
-internal sealed record KnowledgeHttpFetchResult(Uri FinalUrl, string FileName, string MediaType, byte[] Content);
+internal sealed record HttpFetchResult(Uri FinalUrl, string FileName, string MediaType, byte[] Content);
 
-internal interface IKnowledgeHttpContentFetcher
+internal interface IHttpContentFetcher
 {
-    Task<KnowledgeHttpFetchResult> FetchAsync(KnowledgeHttpFetchRequest request, CancellationToken cancellationToken);
+    Task<HttpFetchResult> FetchAsync(HttpFetchRequest request, CancellationToken cancellationToken);
 }
 
-internal sealed class SafeKnowledgeHttpContentFetcher(HttpClient client) : IKnowledgeHttpContentFetcher
+internal sealed class SafeHttpContentFetcher(HttpClient client) : IHttpContentFetcher
 {
-    public async Task<KnowledgeHttpFetchResult> FetchAsync(
-        KnowledgeHttpFetchRequest request,
+    public async Task<HttpFetchResult> FetchAsync(
+        HttpFetchRequest request,
         CancellationToken cancellationToken)
     {
         ValidateUrl(request.Url);
@@ -41,35 +41,35 @@ internal sealed class SafeKnowledgeHttpContentFetcher(HttpClient client) : IKnow
             if (IsRedirect(response.StatusCode))
             {
                 if (redirect >= request.MaximumRedirects)
-                    throw Error("knowledge_http_redirect_limit", "The source exceeded the redirect limit.");
+                    throw Error("http_redirect_limit", "The source exceeded the redirect limit.");
                 if (response.Headers.Location is null)
-                    throw Error("knowledge_http_redirect_invalid", "The source returned a redirect without a Location header.");
+                    throw Error("http_redirect_invalid", "The source returned a redirect without a Location header.");
                 var next = response.Headers.Location.IsAbsoluteUri
                     ? response.Headers.Location
                     : new Uri(current, response.Headers.Location);
                 ValidateUrl(next);
                 if (string.Equals(current.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
                     && string.Equals(next.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
-                    throw Error("knowledge_http_redirect_downgrade", "An HTTPS source cannot redirect to HTTP.");
+                    throw Error("http_redirect_downgrade", "An HTTPS source cannot redirect to HTTP.");
                 current = next;
                 continue;
             }
             if (response.StatusCode != HttpStatusCode.OK)
-                throw Error("knowledge_http_status_invalid", $"The source returned HTTP {(int)response.StatusCode}.");
+                throw Error("http_status_invalid", $"The source returned HTTP {(int)response.StatusCode}.");
             var mediaType = response.Content.Headers.ContentType?.MediaType?.ToLowerInvariant()
-                ?? throw Error("knowledge_http_media_type_missing", "The source response must declare a media type.");
+                ?? throw Error("http_media_type_missing", "The source response must declare a media type.");
             if (!request.AllowedMediaTypes.Contains(mediaType))
-                throw Error("knowledge_http_media_type_invalid", $"Media type '{mediaType}' is not allowed for this profile.");
+                throw Error("http_media_type_invalid", $"Media type '{mediaType}' is not allowed for this profile.");
             if (response.Content.Headers.ContentType?.CharSet is { Length: > 0 } charset
                 && !string.Equals(charset.Trim('"'), "utf-8", StringComparison.OrdinalIgnoreCase))
-                throw Error("knowledge_http_charset_invalid", "Textual source responses must use UTF-8.");
+                throw Error("http_charset_invalid", "Textual source responses must use UTF-8.");
             if (response.Content.Headers.ContentLength is > 0
                 && response.Content.Headers.ContentLength > request.MaximumBytes)
-                throw Error("knowledge_http_size_limit", $"The source response exceeds {request.MaximumBytes} bytes.");
+                throw Error("http_size_limit", $"The source response exceeds {request.MaximumBytes} bytes.");
             byte[] content;
             try { content = await ReadBoundedAsync(response.Content, request.MaximumBytes, timeout.Token); }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            { throw Error("knowledge_http_timeout", "The source request timed out."); }
+            { throw Error("http_timeout", "The source request timed out."); }
             return new(current, SafeFileName(current, mediaType), mediaType, content);
         }
     }
@@ -88,7 +88,7 @@ internal sealed class SafeKnowledgeHttpContentFetcher(HttpClient client) : IKnow
     {
         var addresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
         var allowed = addresses.Where(address => SourceRegistryNetworkPolicy.IsAddressAllowed(address, false)).ToArray();
-        if (allowed.Length == 0) throw new KnowledgeHttpEndpointPolicyException();
+        if (allowed.Length == 0) throw new HttpEndpointPolicyException();
         Exception? last = null;
         foreach (var address in allowed)
         {
@@ -115,11 +115,11 @@ internal sealed class SafeKnowledgeHttpContentFetcher(HttpClient client) : IKnow
     {
         try { return await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeoutToken); }
         catch (OperationCanceledException) when (!callerToken.IsCancellationRequested)
-        { throw Error("knowledge_http_timeout", "The source request timed out."); }
+        { throw Error("http_timeout", "The source request timed out."); }
         catch (HttpRequestException exception) when (ContainsPolicyFailure(exception))
-        { throw Error("knowledge_http_endpoint_denied", "The source resolved only to denied network addresses.", exception); }
+        { throw Error("http_endpoint_denied", "The source resolved only to denied network addresses.", exception); }
         catch (HttpRequestException exception)
-        { throw Error("knowledge_http_unavailable", "The source request failed.", exception); }
+        { throw Error("http_unavailable", "The source request failed.", exception); }
     }
 
     private static async Task<byte[]> ReadBoundedAsync(HttpContent content, int maximumBytes, CancellationToken cancellationToken)
@@ -134,7 +134,7 @@ internal sealed class SafeKnowledgeHttpContentFetcher(HttpClient client) : IKnow
                 var read = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
                 if (read == 0) return output.ToArray();
                 if (output.Length + read > maximumBytes)
-                    throw Error("knowledge_http_size_limit", $"The source response exceeds {maximumBytes} bytes.");
+                    throw Error("http_size_limit", $"The source response exceeds {maximumBytes} bytes.");
                 await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
             }
         }
@@ -148,10 +148,10 @@ internal sealed class SafeKnowledgeHttpContentFetcher(HttpClient client) : IKnow
                 || string.Equals(url.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
             || !string.IsNullOrEmpty(url.UserInfo)
             || !string.IsNullOrEmpty(url.Fragment))
-            throw Error("knowledge_http_url_invalid", "The source URL must be an absolute HTTP(S) URL without credentials or a fragment.");
+            throw Error("http_url_invalid", "The source URL must be an absolute HTTP(S) URL without credentials or a fragment.");
         if (IPAddress.TryParse(url.IdnHost, out var address)
             && !SourceRegistryNetworkPolicy.IsAddressAllowed(address, false))
-            throw Error("knowledge_http_endpoint_denied", "The source URL targets a denied network address.");
+            throw Error("http_endpoint_denied", "The source URL targets a denied network address.");
     }
 
     private static string SafeFileName(Uri url, string mediaType)
@@ -175,16 +175,16 @@ internal sealed class SafeKnowledgeHttpContentFetcher(HttpClient client) : IKnow
     private static bool ContainsPolicyFailure(Exception exception)
     {
         for (Exception? current = exception; current is not null; current = current.InnerException)
-            if (current is KnowledgeHttpEndpointPolicyException) return true;
+            if (current is HttpEndpointPolicyException) return true;
         return false;
     }
     private static ToolDefinitionInvocationException Error(string code, string message, Exception? inner = null) => new(code, message, inner);
-    private sealed class KnowledgeHttpEndpointPolicyException : Exception;
+    private sealed class HttpEndpointPolicyException : Exception;
 }
 
-internal abstract class KnowledgeHttpAcquisitionMcpTool(
+internal abstract class HttpFetchMcpTool(
     ArtifactManagementService artifacts,
-    IKnowledgeHttpContentFetcher fetcher) : IInternalMcpToolHandler
+    IHttpContentFetcher fetcher) : IInternalMcpToolHandler
 {
     protected abstract string Name { get; }
     protected abstract string DisplayName { get; }
@@ -192,15 +192,15 @@ internal abstract class KnowledgeHttpAcquisitionMcpTool(
     protected abstract IReadOnlySet<string> AllowedMediaTypes { get; }
 
     public InternalMcpToolDefinition Definition => new(Name, DisplayName, Description,
-        KnowledgeHttpSchemas.Input, KnowledgeHttpSchemas.Output,
-        InitialCategory: KnowledgeBuiltinSchemas.Category, ExposeThroughMcp: false);
+        HttpFetchSchemas.Input, HttpFetchSchemas.Output,
+        InitialCategory: KnowledgeBuiltinSchemas.DataSourceCategory, ExposeThroughMcp: false);
 
     public async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         var configuration = RequiredObject(invocation.Arguments, "sourceConfiguration");
         var urlText = RequiredString(configuration, "url");
         if (urlText.Length > 2048 || !Uri.TryCreate(urlText, UriKind.Absolute, out var url))
-            throw Error("knowledge_http_url_invalid", "sourceConfiguration.url must be an absolute HTTP(S) URL.");
+            throw Error("http_url_invalid", "sourceConfiguration.url must be an absolute HTTP(S) URL.");
         var result = await fetcher.FetchAsync(new(url, MaximumBytes: 1024 * 1024, MaximumRedirects: 3,
             Timeout: TimeSpan.FromSeconds(20), AllowedMediaTypes), cancellationToken);
         var producer = new ArtifactProducer
@@ -234,17 +234,17 @@ internal abstract class KnowledgeHttpAcquisitionMcpTool(
     }
 
     private static JsonElement RequiredObject(JsonElement value, string name) => value.TryGetProperty(name, out var property)
-        && property.ValueKind == JsonValueKind.Object ? property : throw Error("knowledge_http_configuration_invalid", $"Argument '{name}' must be an object.");
+        && property.ValueKind == JsonValueKind.Object ? property : throw Error("http_configuration_invalid", $"Argument '{name}' must be an object.");
     private static string RequiredString(JsonElement value, string name) => value.TryGetProperty(name, out var property)
         && property.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(property.GetString())
-        ? property.GetString()! : throw Error("knowledge_http_configuration_invalid", $"Property '{name}' is required.");
+        ? property.GetString()! : throw Error("http_configuration_invalid", $"Property '{name}' is required.");
     private static ToolDefinitionInvocationException Error(string code, string message) => new(code, message);
 }
 
-internal sealed class KnowledgeWebFetchMcpTool(ArtifactManagementService artifacts, IKnowledgeHttpContentFetcher fetcher)
-    : KnowledgeHttpAcquisitionMcpTool(artifacts, fetcher)
+internal sealed class WebFetchMcpTool(ArtifactManagementService artifacts, IHttpContentFetcher fetcher)
+    : HttpFetchMcpTool(artifacts, fetcher)
 {
-    public const string ToolName = "knowledge.ingestion.web.fetch";
+    public const string ToolName = "web.fetch";
     protected override string Name => ToolName;
     protected override string DisplayName => "Fetch a Web resource";
     protected override string Description => "Fetches one bounded public HTTP(S) Web resource into governed staging.";
@@ -252,10 +252,10 @@ internal sealed class KnowledgeWebFetchMcpTool(ArtifactManagementService artifac
         { "text/html", "text/plain", "text/markdown", "application/json", "application/xml", "text/xml" };
 }
 
-internal sealed class KnowledgeRestGetMcpTool(ArtifactManagementService artifacts, IKnowledgeHttpContentFetcher fetcher)
-    : KnowledgeHttpAcquisitionMcpTool(artifacts, fetcher)
+internal sealed class RestGetMcpTool(ArtifactManagementService artifacts, IHttpContentFetcher fetcher)
+    : HttpFetchMcpTool(artifacts, fetcher)
 {
-    public const string ToolName = "knowledge.ingestion.rest.get";
+    public const string ToolName = "rest.get";
     protected override string Name => ToolName;
     protected override string DisplayName => "Fetch a public REST resource";
     protected override string Description => "Performs one bounded unauthenticated public HTTP(S) GET into governed staging.";
@@ -263,7 +263,7 @@ internal sealed class KnowledgeRestGetMcpTool(ArtifactManagementService artifact
         { "application/json", "application/xml", "text/xml", "text/plain" };
 }
 
-internal static class KnowledgeHttpSchemas
+internal static class HttpFetchSchemas
 {
     public static JsonElement Input { get; } = JsonSerializer.SerializeToElement(new
     {

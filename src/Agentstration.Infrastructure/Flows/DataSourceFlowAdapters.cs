@@ -98,8 +98,7 @@ public sealed class DataSourceAcquisitionCompositionResolver(
                 resolvedFlow.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract)),
             Tools = tools,
             Limits = Clone(profile.Definition.Limits),
-            Policies = Clone(profile.Definition.Policies),
-            CompatibilityRequirements = Clone(profile.Definition.CompatibilityRequirements)
+            Policies = Clone(profile.Definition.Policies)
         };
     }
 

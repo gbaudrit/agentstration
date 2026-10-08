@@ -13,17 +13,8 @@ internal static class KnowledgeSnapshotEndpoints
 
     public static void Map(
         RouteGroupBuilder sources,
-        RouteGroupBuilder acquisitions,
         RouteGroupBuilder snapshots)
     {
-        acquisitions.MapPost("/{id}/snapshots", PublishAsync)
-            .WithSummary("Publish a Knowledge Snapshot from an acquisition")
-            .Produces<KnowledgeSnapshotResource>(StatusCodes.Status201Created)
-            .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
-        acquisitions.MapGet("/{id}/snapshot-publications", ListPublicationsAsync)
-            .WithSummary("List Knowledge Snapshot publication attempts")
-            .Produces<IEnumerable<KnowledgeSnapshotPublicationResource>>()
-            .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         sources.MapGet("/{name}/snapshots", ListAsync)
             .WithSummary("List Knowledge Snapshot history")
             .Produces<IEnumerable<KnowledgeSnapshotView>>()
@@ -41,29 +32,6 @@ internal static class KnowledgeSnapshotEndpoints
             .Produces<KnowledgeSnapshotView>()
             .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
     }
-
-    private static Task<IResult> PublishAsync(
-        string id,
-        string? @namespace,
-        PublishKnowledgeSnapshotRequest body,
-        HttpRequest request,
-        HttpResponse response,
-        KnowledgeSnapshotService service,
-        CancellationToken cancellationToken) => ExecuteAsync(async () =>
-        {
-            var stored = await service.PublishAsync(id, ResourceNamespace.Parse(@namespace), body,
-                request.Headers["Idempotency-Key"].FirstOrDefault(), cancellationToken);
-            response.Headers.ETag = stored.ETag;
-            response.Headers.Location = Location(stored.Value);
-            return Results.Json(stored.Value, statusCode: StatusCodes.Status201Created);
-        });
-
-    private static Task<IResult> ListPublicationsAsync(
-        string id,
-        string? @namespace,
-        KnowledgeSnapshotService service,
-        CancellationToken cancellationToken) => ExecuteAsync(async () => Results.Ok(
-            await service.ListPublicationsAsync(id, ResourceNamespace.Parse(@namespace), cancellationToken)));
 
     private static Task<IResult> ListAsync(
         string name,
@@ -100,9 +68,6 @@ internal static class KnowledgeSnapshotEndpoints
         KnowledgeSnapshotService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () => Results.Ok(
             await service.GetAsync(new(id, ResourceNamespace.Parse(@namespace)), cancellationToken)));
-
-    private static string Location(KnowledgeSnapshotResource value) =>
-        $"/api/knowledgesnapshots/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString(value.Namespace.Value)}";
 
     private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {

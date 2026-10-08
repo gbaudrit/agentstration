@@ -146,9 +146,7 @@ public static class DependencyInjection
         services.AddSingleton<DataSourceProfileService>();
         services.AddSingleton<DataSourceManagementService>();
         services.AddSingleton<DataSourceAcquisitionService>();
-        services.AddSingleton<KnowledgeSourceProfileService>();
         services.AddSingleton<KnowledgeSourceManagementService>();
-        services.AddSingleton<KnowledgeAcquisitionService>();
         services.AddSingleton<KnowledgeProjectionService>();
         services.AddSingleton<KnowledgeRetrievalService>();
         services.AddSingleton<IParameterResolver>(provider => provider.GetRequiredService<ParameterManagementService>());
@@ -182,7 +180,6 @@ public static class DependencyInjection
         services.AddScoped<IBootstrapResourceHandler, ToolSetBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, AgentBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, FlowBootstrapResourceHandler>();
-        services.AddScoped<IBootstrapResourceHandler, KnowledgeSourceProfileBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, DataSourceProfileBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, DataSourceBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, KnowledgeSourceBootstrapResourceHandler>();
@@ -224,7 +221,8 @@ public static class DependencyInjection
         services.AddSingleton<IPackResourceHandler, ToolSetPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, AgentPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, FlowPackResourceHandler>();
-        services.AddSingleton<IPackResourceHandler, KnowledgeSourceProfilePackResourceHandler>();
+        services.AddSingleton<IPackResourceHandler, DataSourceProfilePackResourceHandler>();
+        services.AddSingleton<IPackResourceHandler, DataSourcePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, KnowledgeSourcePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, EntryPackResourceHandler>();
         services.AddSingleton<IPackWorkspaceResourceCatalog, WorkspacePackResourceCatalog>();
@@ -372,11 +370,11 @@ public static class DependencyInjection
         services.AddSingleton<IArtifactContentMaterializationGateway, ArtifactContentMaterializationGateway>();
         services.AddSingleton<ArtifactPlatformResourceProvisioner>();
         services.AddSingleton<KnowledgePlatformResourceProvisioner>();
-        services.AddHttpClient<IKnowledgeHttpContentFetcher, SafeKnowledgeHttpContentFetcher>(client =>
+        services.AddHttpClient<IHttpContentFetcher, SafeHttpContentFetcher>(client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("Agentstration-Knowledge/1.0");
-        }).ConfigurePrimaryHttpMessageHandler(SafeKnowledgeHttpContentFetcher.CreatePrimaryHandler);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Agentstration-DataSources/1.0");
+        }).ConfigurePrimaryHttpMessageHandler(SafeHttpContentFetcher.CreatePrimaryHandler);
         services.AddSingleton(new StagedArtifactCleanupOptions());
         if (enableHostedServices) services.AddHostedService<StagedArtifactCleanupWorker>();
         services.AddSingleton<LocalWorkExecutionGateway>();
@@ -418,9 +416,9 @@ public static class DependencyInjection
         AddInternalTool<StagedArtifactPurgeMcpTool>(services);
         AddInternalTool<ArtifactStorageWriteMcpTool>(services);
         AddInternalTool<ArtifactStorageReadMcpTool>(services);
-        AddInternalTool<KnowledgeIngestionImportMcpTool>(services);
-        AddInternalTool<KnowledgeWebFetchMcpTool>(services);
-        AddInternalTool<KnowledgeRestGetMcpTool>(services);
+        AddInternalTool<DataSourceArtifactImportMcpTool>(services);
+        AddInternalTool<WebFetchMcpTool>(services);
+        AddInternalTool<RestGetMcpTool>(services);
         AddInternalTool<KnowledgeRetrievalSearchMcpTool>(services);
         AddInternalTool<KnowledgeRetrievalQueryMcpTool>(services);
         AddInternalTool<KnowledgeRetrievalReadMcpTool>(services);
@@ -444,15 +442,15 @@ public static class DependencyInjection
         services.AddSingleton<IDataSourceAcquisitionCompositionResolver, DataSourceAcquisitionCompositionResolver>();
         services.AddSingleton<IDataSourceAcquisitionFlowGateway, DataSourceAcquisitionFlowGateway>();
         services.AddSingleton<IDataSourceArtifactReferenceValidator, DataSourceArtifactReferenceValidator>();
-        services.AddSingleton<IKnowledgeAcquisitionFlowGateway, KnowledgeAcquisitionFlowGateway>();
+        services.AddScoped<AepDataSourceProfileBundleInstaller>();
         services.AddSingleton<IKnowledgeProjectionInputResolver, KnowledgeProjectionInputResolver>();
         services.AddSingleton<IKnowledgeProjectionFlowGateway, KnowledgeProjectionFlowGateway>();
+        services.AddSingleton<IKnowledgeAcquisitionFlowGateway, KnowledgeAcquisitionFlowGateway>();
         services.AddSingleton<IKnowledgeRetrievalFlowGateway, KnowledgeRetrievalFlowGateway>();
         services.AddSingleton<IKnowledgeArtifactReferenceValidator, KnowledgeArtifactReferenceValidator>();
         services.AddSingleton<IKnowledgeSnapshotArtifactResolver, KnowledgeSnapshotArtifactResolver>();
         services.AddSingleton<KnowledgeSnapshotService>();
         if (enableHostedServices) services.AddHostedService<DataSourceAcquisitionRecoveryWorker>();
-        if (enableHostedServices) services.AddHostedService<KnowledgeAcquisitionRecoveryWorker>();
         if (enableHostedServices) services.AddHostedService<KnowledgeSnapshotRecoveryWorker>();
         services.AddSingleton<KnowledgeSourceToolExposureService>();
         services.AddSingleton<IFlowVersionActivationGuard, ToolDefinitionFlowActivationGuard>();

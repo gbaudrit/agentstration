@@ -31,6 +31,16 @@ public sealed class Crawl4AiExtensionTests
         CollectionAssert.AreEquivalent(
             new[] { "web.fetch", "web.crawl", "content.extract", "content.read", "content.delete" },
             manifest.Contributions.Tools?.Select(tool => tool.Id).ToArray());
+        var bundle = manifest.Contributions.DataSourceProfileBundles?.Single();
+        Assert.IsNotNull(bundle);
+        Assert.AreEqual("crawl4ai-web", bundle.Id);
+        Assert.AreEqual("1.0.0", bundle.Version);
+        Assert.HasCount(4, bundle.ResourceManifests);
+        CollectionAssert.AreEquivalent(
+            new[] { "web.crawl", "content.read", "content.delete" },
+            bundle.RequiredTools?.ToArray());
+        Assert.IsTrue(bundle.ResourceManifests.Any(value => value.Contains("kind: DataSourceProfile", StringComparison.Ordinal)));
+        Assert.IsTrue(bundle.ResourceManifests.Any(value => value.Contains("flow.contract: datasource.acquisition/v1", StringComparison.Ordinal)));
         Assert.AreEqual("/mcp", manifest.Mcp?.Servers.Single().Endpoint);
     }
 

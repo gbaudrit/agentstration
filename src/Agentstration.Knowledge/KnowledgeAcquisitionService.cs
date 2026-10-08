@@ -84,7 +84,7 @@ public sealed class KnowledgeAcquisitionService(
                 throw Error("knowledge_source_disabled", $"KnowledgeSource '{sourceId}' is disabled.");
             ResolvedKnowledgeSourceComposition composition;
             try { composition = await sources.ResolveCompositionAsync(source.Value, cancellationToken); }
-            catch (Exception exception) when (exception is KnowledgeSourceValidationException or KnowledgeSourceProfileValidationException)
+            catch (KnowledgeSourceValidationException exception)
             { throw Error("knowledge_ingestion_profile_unavailable", exception.Message); }
             var resolved = composition.Ingestion;
             if (!string.Equals(resolved.Contract, KnowledgeFlowContracts.Ingestion, StringComparison.Ordinal))

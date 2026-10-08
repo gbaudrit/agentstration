@@ -6,6 +6,8 @@ using System.Text;
 using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Api.Contracts;
+using Agentstration.DataSources;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Contracts;
@@ -685,7 +687,7 @@ public sealed class PackTests
     }
 
     [TestMethod]
-    public async Task PackInstallsKnowledgeSourceAfterItsPublishedFlowsAndRemovesItFirst()
+    public async Task PackInstallsDataSourceCompositionBeforeItsKnowledgeProjectionAndRemovesItFirst()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         using var client = factory.CreateClient();
@@ -693,23 +695,123 @@ public sealed class PackTests
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
         await using var archive = CreateZip(new Dictionary<string, string>
         {
-            ["pack.yaml"] = Manifest("flows/pack-flow.yaml", "knowledge-sources/pack-knowledge.yaml"),
-            ["flows/pack-flow.yaml"] = """
+            ["pack.yaml"] = Manifest(
+                "flows/pack-acquisition.yaml",
+                "flows/pack-projection.yaml",
+                "flows/pack-retrieval.yaml",
+                "data-source-profiles/pack-profile.yaml",
+                "data-sources/pack-source.yaml",
+                "knowledge-sources/pack-knowledge.yaml"),
+            ["flows/pack-acquisition.yaml"] = """
                 apiVersion: agentstration.io/v1
                 kind: Flow
                 metadata:
-                  name: pack-flow
+                  name: pack-acquisition
                 definition:
-                  displayName: Pack flow
+                  displayName: Pack acquisition
                   version: 1.0.0
                   enabled: true
+                  metadata: { flow.contract: datasource.acquisition/v1 }
                   spec:
                     flowKind: direct
                     target:
                       kind: agent
                       id: unused
+                  graph:
+                    entryStep: input
+                    inputSchema:
+                      type: object
+                      properties:
+                        dataSourceId: { type: string }
+                        dataSourceUid: { type: string }
+                        dataSourceGeneration: { type: integer }
+                        profile: { type: object }
+                        sourceConfiguration: { type: object }
+                        parameters: { type: object }
+                        caller: { type: object }
+                        correlationId: { type: string }
+                        acquisitionId: { type: string }
+                      required: [dataSourceId, dataSourceUid, dataSourceGeneration, profile, sourceConfiguration, parameters, caller, correlationId, acquisitionId]
+                    steps:
+                      - { type: input, name: input, displayName: Input }
+                      - { type: output, name: output, displayName: Output, outputMapping: { artifacts: [] } }
+                    transitions:
+                      - { id: input-output, fromStep: input, event: completed, toStep: output }
+                    outputSchema:
+                      type: object
+                      properties: { artifacts: { type: array } }
+                      required: [artifacts]
                   publish: true
                   activate: true
+                """,
+            ["flows/pack-projection.yaml"] = """
+                apiVersion: agentstration.io/v1
+                kind: Flow
+                metadata: { name: pack-projection }
+                definition:
+                  displayName: Pack projection
+                  version: 1.0.0
+                  enabled: true
+                  metadata: { flow.contract: knowledge.projection/v1 }
+                  spec: { flowKind: direct, target: { kind: agent, id: unused } }
+                  graph:
+                    entryStep: input
+                    inputSchema:
+                      type: object
+                      properties: { knowledgeSourceId: {}, knowledgeSourceUid: {}, knowledgeSourceGeneration: {}, inputs: {}, artifacts: {}, parameters: {}, caller: {}, correlationId: {}, projectionId: {} }
+                      required: [knowledgeSourceId, knowledgeSourceUid, knowledgeSourceGeneration, inputs, artifacts, parameters, caller, correlationId, projectionId]
+                    steps:
+                      - { type: input, name: input, displayName: Input }
+                      - { type: output, name: output, displayName: Output, outputMapping: {} }
+                    transitions:
+                      - { id: input-output, fromStep: input, event: completed, toStep: output }
+                    outputSchema: { type: object, properties: { artifacts: {} }, required: [artifacts] }
+                  publish: true
+                  activate: true
+                """,
+            ["flows/pack-retrieval.yaml"] = """
+                apiVersion: agentstration.io/v1
+                kind: Flow
+                metadata: { name: pack-retrieval }
+                definition:
+                  displayName: Pack retrieval
+                  version: 1.0.0
+                  enabled: true
+                  metadata: { flow.contract: knowledge.retrieval/v1, knowledge.capabilities: knowledge.search/v1 }
+                  spec: { flowKind: direct, target: { kind: agent, id: unused } }
+                  graph:
+                    entryStep: input
+                    inputSchema:
+                      type: object
+                      properties: { knowledgeSourceId: {}, knowledgeSourceUid: {}, knowledgeSourceGeneration: {}, operation: {}, snapshot: {}, request: {}, caller: {}, correlationId: {}, retrievalId: {} }
+                      required: [knowledgeSourceId, knowledgeSourceUid, knowledgeSourceGeneration, operation, snapshot, request, caller, correlationId, retrievalId]
+                    steps:
+                      - { type: input, name: input, displayName: Input }
+                      - { type: output, name: output, displayName: Output, outputMapping: {} }
+                    transitions:
+                      - { id: input-output, fromStep: input, event: completed, toStep: output }
+                    outputSchema: { type: object, properties: { items: {}, citations: {} }, required: [items, citations] }
+                  publish: true
+                  activate: true
+                """,
+            ["data-source-profiles/pack-profile.yaml"] = """
+                apiVersion: agentstration.io/v1
+                kind: DataSourceProfile
+                metadata: { name: pack-profile }
+                definition:
+                  displayName: Pack profile
+                  enabled: true
+                  version: 1.0.0
+                  acquisitionFlow: { name: pack-acquisition, version: 1.0.0, useActiveVersion: false }
+                """,
+            ["data-sources/pack-source.yaml"] = """
+                apiVersion: agentstration.io/v1
+                kind: DataSource
+                metadata: { name: pack-source }
+                definition:
+                  displayName: Pack source
+                  enabled: true
+                  profile: { name: pack-profile }
                 """,
             ["knowledge-sources/pack-knowledge.yaml"] = """
                 apiVersion: agentstration.io/v1
@@ -719,10 +821,11 @@ public sealed class PackTests
                 definition:
                   displayName: Pack knowledge
                   enabled: true
-                  ingestionFlow:
-                    name: pack-flow
-                  retrievalFlow:
-                    name: pack-flow
+                  dataSources:
+                    - name: input-1
+                      dataSource: { name: pack-source }
+                  projectionFlow: { name: pack-projection, version: 1.0.0, useActiveVersion: false }
+                  retrievalFlow: { name: pack-retrieval, version: 1.0.0, useActiveVersion: false }
                 """
         });
         var bytes = archive.ToArray();
@@ -732,9 +835,11 @@ public sealed class PackTests
         Assert.AreEqual(HttpStatusCode.OK, previewResponse.StatusCode, await previewResponse.Content.ReadAsStringAsync());
         var preview = await previewResponse.Content.ReadFromJsonAsync<PackInstallationPreview>();
         Assert.IsTrue(preview!.CanInstall);
-        CollectionAssert.AreEqual(
-            new[] { FlowResourceKinds.Flow, KnowledgeResourceKinds.KnowledgeSource },
-            preview.Resources.Select(value => value.Kind).ToArray());
+        var kinds = preview.Resources.Select(value => value.Kind).ToArray();
+        Assert.IsTrue(Array.IndexOf(kinds, DataSourceResourceKinds.DataSourceProfile)
+            < Array.IndexOf(kinds, DataSourceResourceKinds.DataSource));
+        Assert.IsTrue(Array.IndexOf(kinds, DataSourceResourceKinds.DataSource)
+            < Array.IndexOf(kinds, KnowledgeResourceKinds.KnowledgeSource));
 
         using var installContent = ArchiveContent(bytes, "knowledge.pack.zip");
         using var installedResponse = await client.PostAsync("/api/packs", installContent);
@@ -743,15 +848,19 @@ public sealed class PackTests
         var source = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>()
             .GetAsync(new("pack-knowledge", ns), default);
         Assert.IsNotNull(source);
-        Assert.AreEqual("True", source.Value.Status.Conditions.Single(value => value.Type == "Ready").Status);
+        var ready = source.Value.Status.Conditions.Single(value => value.Type == "Ready");
+        Assert.AreEqual("False", ready.Status);
+        StringAssert.Contains(ready.Message, "has no successful acquisition with artifacts");
         Assert.AreEqual("test-pack", source.Value.Metadata.Annotations[PackProvenanceAnnotations.Name]);
 
         using var removed = await client.DeleteAsync("/api/packs/agentstration/test-pack");
         Assert.AreEqual(HttpStatusCode.NoContent, removed.StatusCode, await removed.Content.ReadAsStringAsync());
         Assert.IsNull(await factory.Services.GetRequiredService<KnowledgeSourceManagementService>()
             .GetAsync(new("pack-knowledge", ns), default));
+        Assert.IsNull(await factory.Services.GetRequiredService<DataSourceManagementService>()
+            .GetAsync(ns, "pack-source", ResourceScopeRef.Workspace(requestContext.WorkspaceId), default));
         Assert.IsNull(await factory.Services.GetRequiredService<FlowService>()
-            .GetAsync(new(requestContext.WorkspaceId), new("pack-flow", ns), default));
+            .GetAsync(new(requestContext.WorkspaceId), new("pack-acquisition", ns), default));
     }
 
     [TestMethod]
