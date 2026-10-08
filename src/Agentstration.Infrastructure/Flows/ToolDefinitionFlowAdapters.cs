@@ -90,27 +90,20 @@ public sealed class ToolDefinitionExecutor(
 {
     private static readonly JsonSerializerOptions WebJsonOptions = new(JsonSerializerDefaults.Web);
 
+    public async Task<JsonElement?> SimulateAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
+    {
+        var stored = await ValidateAsync(invocation, cancellationToken);
+        return JsonSerializer.SerializeToElement(new
+        {
+            dryRun = true,
+            toolDefinition = stored.Value.Address.ToString(),
+            inputAccepted = true
+        });
+    }
+
     public async Task<ToolDefinitionInvocationResult> ExecuteAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
     {
-        var stored = await definitions.GetAsync(invocation.ToolName, invocation.Namespace, cancellationToken)
-            ?? throw new ToolDefinitionInvocationException("tool_definition_not_found", $"ToolDefinition '{invocation.Namespace}/{invocation.ToolName}' was not found.");
-        if (!stored.Value.Definition.Enabled)
-            throw new ToolDefinitionInvocationException("tool_definition_disabled", $"ToolDefinition '{stored.Value.Address}' is disabled.");
-        if (stored.Value.ScopeRef is not { Kind: ResourceScopeKind.Workspace, TargetId: { } ownerWorkspace }
-            || ownerWorkspace != invocation.WorkspaceId.Value)
-            throw new ToolDefinitionInvocationException("tool_definition_scope_mismatch", "The ToolDefinition is not owned by the invocation Workspace.");
-        if (invocation.Arguments.GetRawText().Length > 65_536)
-            throw new ToolDefinitionInvocationException("tool_definition_input_too_large", "ToolDefinition input cannot exceed 65536 JSON characters.");
-        if (stored.Value.Definition.FixedArguments is { ValueKind: JsonValueKind.Object } fixedArguments)
-            foreach (var property in fixedArguments.EnumerateObject())
-                if (invocation.Arguments.TryGetProperty(property.Name, out _))
-                    throw new ToolDefinitionInvocationException("tool_definition_fixed_argument_override",
-                        $"ToolDefinition argument '{property.Name}' is fixed and cannot be supplied by the caller.");
-        try { FlowRunService.ValidateInput(stored.Value.Definition.InputSchema, invocation.Arguments); }
-        catch (FlowValidationException exception)
-        {
-            throw new ToolDefinitionInvocationException("tool_definition_input_invalid", exception.Message, exception);
-        }
+        var stored = await ValidateAsync(invocation, cancellationToken);
 
         if (knowledgeRetrieval is not null
             && stored.Value.Metadata.Annotations.TryGetValue("agentstration.io/knowledge-source", out var sourceName)
@@ -131,7 +124,12 @@ public sealed class ToolDefinitionExecutor(
         var target = stored.Value.Definition.Flow;
         var flowNamespace = target.Namespace ?? stored.Value.Namespace;
         var scope = new FlowRunScope(invocation.TenantId, invocation.WorkspaceId, invocation.PrincipalId);
-        var origin = invocation.CallerKind == ToolDefinitionCallerKind.Agent ? FlowInvocationOrigin.Agent : FlowInvocationOrigin.Mcp;
+        var origin = invocation.CallerKind switch
+        {
+            ToolDefinitionCallerKind.Agent => FlowInvocationOrigin.Agent,
+            ToolDefinitionCallerKind.Console => FlowInvocationOrigin.Console,
+            _ => FlowInvocationOrigin.Mcp
+        };
         var callerId = invocation.CallerId ?? invocation.PrincipalId.ToString("D");
         RootFlowSubmission submission;
         try
@@ -300,6 +298,31 @@ public sealed class ToolDefinitionExecutor(
         foreach (var property in fixedArguments.Value.EnumerateObject())
             merged[property.Name] = JsonNode.Parse(property.Value.GetRawText());
         return JsonSerializer.SerializeToElement(merged);
+    }
+
+    private async Task<StoredResource<ToolDefinitionResource>> ValidateAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
+    {
+        var stored = await definitions.GetAsync(invocation.ToolName, invocation.Namespace, cancellationToken)
+            ?? throw new ToolDefinitionInvocationException("tool_definition_not_found", $"ToolDefinition '{invocation.Namespace}/{invocation.ToolName}' was not found.");
+        if (!stored.Value.Definition.Enabled)
+            throw new ToolDefinitionInvocationException("tool_definition_disabled", $"ToolDefinition '{stored.Value.Address}' is disabled.");
+        if (stored.Value.ScopeRef is not { Kind: ResourceScopeKind.Workspace, TargetId: { } ownerWorkspace }
+            || ownerWorkspace != invocation.WorkspaceId.Value)
+            throw new ToolDefinitionInvocationException("tool_definition_scope_mismatch", "The ToolDefinition is not owned by the invocation Workspace.");
+        if (invocation.Arguments.GetRawText().Length > 65_536)
+            throw new ToolDefinitionInvocationException("tool_definition_input_too_large", "ToolDefinition input cannot exceed 65536 JSON characters.");
+        if (stored.Value.Definition.FixedArguments is { ValueKind: JsonValueKind.Object } fixedArguments)
+            foreach (var property in fixedArguments.EnumerateObject())
+                if (invocation.Arguments.TryGetProperty(property.Name, out _))
+                    throw new ToolDefinitionInvocationException("tool_definition_fixed_argument_override",
+                        $"ToolDefinition argument '{property.Name}' is fixed and cannot be supplied by the caller.");
+        try { FlowRunService.ValidateInput(stored.Value.Definition.InputSchema, invocation.Arguments); }
+        catch (FlowValidationException exception)
+        {
+            throw new ToolDefinitionInvocationException("tool_definition_input_invalid", exception.Message, exception);
+        }
+
+        return stored;
     }
 
     private async Task<StoredFlowRun> AwaitCompletionAsync(string runId, FlowRunScope scope, CancellationToken cancellationToken)

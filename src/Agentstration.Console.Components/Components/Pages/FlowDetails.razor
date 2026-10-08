@@ -81,7 +81,7 @@ else
     }
     else if (activeTab == "Runs")
     {
-        <div class="toolbar"><button class="button-primary" @onclick="OpenRun">@T("RunFlow")</button><a class="button-secondary" href="/flow-runs">@T("AllFlowRuns")</a></div>
+        <div class="toolbar"><button class="button-primary" data-testid="flow-run-open" @onclick="OpenRun">@T("RunFlow")</button><a class="button-secondary" href="/flow-runs">@T("AllFlowRuns")</a></div>
         @if(runs.Count == 0){<EmptyState Title="@T("NoRunsTitle")" Message="@T("NoRunsMessage")" />}else{<RunGrid Runs="runs" />}
     }
     else if (activeTab == "Deployments")
@@ -98,7 +98,7 @@ else
     }
     @if (showRun)
     {
-        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true"><h2>@T("RunFlow")</h2><label>@T("PublishedVersion")<select @bind="runVersion">@foreach(var version in versions){<option value="@version.Version">@version.Version</option>}</select></label><label>@T("Deployment")<select @bind="deployment"><option value="local">local</option></select></label><label>@T("InputJson")<textarea rows="11" @bind="inputJson"></textarea></label>@if(error is not null){<p class="error-panel">@error</p>}<div class="dialog-actions"><button class="button-secondary" @onclick="() => showRun=false">@T("Cancel")</button><button class="button-primary" disabled="@submitting" @onclick="SubmitRunAsync">@(submitting ? T("Starting") : T("RunFlow"))</button></div></section></div>
+        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true" aria-labelledby="run-flow-title" data-testid="flow-run-dialog"><h2 id="run-flow-title">@T("RunFlow")</h2><label>@T("PublishedVersion")<select value="@runVersion" @onchange="ChangeRunVersion">@foreach(var version in versions){<option value="@version.Version">@version.Version</option>}</select></label><div class="flow-run-input"><h3>@T("FlowInput")</h3><p class="muted">@T("FlowInputHelp")</p><JsonSchemaInputEditor Schema="SelectedRunVersion?.Graph?.InputSchema" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunInputValidation" Disabled="submitting" /></div>@if(error is not null){<p class="error-panel" role="alert">@error</p>}<div class="dialog-actions"><button class="button-secondary" @onclick="() => showRun=false">@T("Cancel")</button><button class="button-primary" disabled="@(submitting || !runInputValid)" data-testid="flow-run-submit" @onclick="SubmitRunAsync">@(submitting ? T("Starting") : T("RunFlow"))</button></div></section></div>
     }
 }
 </div>
@@ -113,7 +113,8 @@ else
     private static readonly string[] Tabs = ["Overview", "Definition", "Runs", "Deployments", "YAML"];
     private readonly CancellationTokenSource cancellation = new();
     private FlowResponse? flow; private IReadOnlyList<FlowVersionResponse> versions=[]; private IReadOnlyList<FlowRun> runs=[];
-    private string activeTab="Overview", inputJson="{\n  \"prompt\": \"How can I optimize this SQL query?\"\n}", deployment="local", runVersion=""; private string? error; private bool showRun,submitting;
+    private string activeTab="Overview", runVersion=""; private string? error; private bool showRun,submitting,runInputValid=true;
+    private JsonElement runInput = JsonSerializer.SerializeToElement(new { });
     private FlowDraftResponse? definitionDraft;
     private string definitionDisplayName = string.Empty;
     private string definitionDescription = string.Empty;
@@ -143,6 +144,7 @@ else
     private FlowTopologyGraph PreviewTopology => flow is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.ProjectPreview(flow.Definition, flow.Graph);
     private int TopologyNodeCount => Topology.Nodes.Count(node => node.Type is not "input" and not "output" and not "conversation" and not "manager");
     private bool CanEditDefinition => FlowResourceNamespace.IsDefault && definitionDraft is not null;
+    private FlowVersionResponse? SelectedRunVersion => versions.SingleOrDefault(version => string.Equals(version.Version, runVersion, StringComparison.Ordinal));
     private bool DefinitionDirty => definitionDraft is not null &&
         (!string.Equals(definitionDisplayName.Trim(), definitionDraft.Value.DisplayName, StringComparison.Ordinal) ||
          !string.Equals(NormalizedDescription, NormalizeDescription(definitionDraft.Value.Description), StringComparison.Ordinal));
@@ -241,7 +243,10 @@ else
         }
         finally { definitionSaving = false; }
     }
-    private void OpenRun(){activeTab="Runs";showRun=true;error=null;if(flow?.Metadata.TryGetValue("agentstration.io/sample-input",out var sampleInput)==true)inputJson=sampleInput;}
-    private async Task SubmitRunAsync(){try{submitting=true;error=null;using var document=JsonDocument.Parse(inputJson);var run=await Client.CreateFlowRunAsync(FlowResourceNamespace,FlowId,new CreateFlowRunRequest(document.RootElement.Clone(),runVersion,deployment,FlowRunTrigger.Manual),cancellation.Token);Navigation.NavigateTo($"/flow-runs/{run.Id}");}catch(Exception exception){error=exception.Message;}finally{submitting=false;}}
+    private void OpenRun(){activeTab="Runs";showRun=true;error=null;runInputValid=true;runInput=ParseInput(flow?.Metadata.TryGetValue("agentstration.io/sample-input",out var sampleInput)==true?sampleInput:"{}");}
+    private void ChangeRunVersion(ChangeEventArgs arguments){runVersion=arguments.Value?.ToString()??string.Empty;error=null;}
+    private Task UpdateRunInputValidation(JsonSchemaInputValidationState value){runInputValid=value.IsValid;return Task.CompletedTask;}
+    private async Task SubmitRunAsync(){if(!runInputValid)return;try{submitting=true;error=null;var run=await Client.CreateFlowRunAsync(FlowResourceNamespace,FlowId,new CreateFlowRunRequest(runInput.Clone(),runVersion,"local",FlowRunTrigger.Manual),cancellation.Token);Navigation.NavigateTo($"/flow-runs/{run.Id}");}catch(Exception exception){error=exception.Message;}finally{submitting=false;}}
+    private static JsonElement ParseInput(string value){try{using var document=JsonDocument.Parse(value);return document.RootElement.ValueKind==JsonValueKind.Object?document.RootElement.Clone():JsonSerializer.SerializeToElement(new{});}catch(JsonException){return JsonSerializer.SerializeToElement(new{});}}
     public void Dispose(){cancellation.Cancel();cancellation.Dispose();}
 }

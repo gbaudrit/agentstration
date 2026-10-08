@@ -75,13 +75,17 @@ else
                     <button disabled="@ReadOnly" @onclick="() => LayoutAsync(false)"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="layout-distribute-horizontal" /></span><span>@T("HorizontalLayout")</span></button>
                     <button disabled="@ReadOnly" @onclick="() => LayoutAsync(true)"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="layout-distribute-vertical" /></span><span>@T("VerticalLayout")</span></button>
                     <button @onclick="Center"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="focus-centered" /></span><span>@T("Center")</span></button>
+                    <button aria-pressed="@showAllErrorTransitions" @onclick="ToggleErrorTransitions"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="alert-triangle" /></span><span>@T(showAllErrorTransitions ? "HideErrorTransitions" : "ShowErrorTransitions")</span></button>
                 </section>
             </aside>
 
             <div class="flow-canvas-wrap">
                 <FlowCanvas @ref="canvas" Document="Editor.State.Diagram" Revision="Editor.State.LocalRevision" FitRevision="layoutRevision"
-                            IsReadOnly="ReadOnly" EntryStep="@Editor.State.Resource.Definition.EntryStep" SelectedStepChanged="SelectStepAsync"
+                            IsReadOnly="ReadOnly" EntryStep="@Editor.State.Resource.Definition.EntryStep" SelectedStepName="@Editor.State.Selection.StepName"
+                            SelectedTransitionId="@Editor.State.Selection.TransitionId" ShowAllErrorTransitions="showAllErrorTransitions" SelectedStepChanged="SelectStepAsync"
+                            SelectedTransitionChanged="SelectTransitionAsync"
                             StepMoved="MoveStepAsync" StepRemoved="RemoveStepAsync" TransitionCreated="CreateTransitionAsync"
+                            TransitionReconnected="ReconnectTransitionAsync"
                             TransitionRemoved="RemoveTransitionAsync" />
             </div>
 
@@ -283,11 +287,24 @@ else
                 }
 
                 <hr /><h3>@T("Transitions")</h3>
+                @if (SelectedTransition is { } selectedTransition)
+                {
+                    <section class="transition-editor" data-testid="selected-transition-editor">
+                        <h4>@T("TransitionDetails")</h4>
+                        <label>@T("TransitionId")<input value="@selectedTransition.Id" readonly /></label>
+                        <label>@T("From")<select data-testid="transition-from" disabled="@ReadOnly" value="@selectedTransition.FromStep" @onchange="UpdateTransitionFromAsync">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
+                        <label>@T("Event")<input data-testid="transition-event" disabled="@ReadOnly" value="@selectedTransition.Event" @onchange="UpdateTransitionEventAsync" /></label>
+                        <label>@T("To")<select data-testid="transition-to" disabled="@ReadOnly" value="@selectedTransition.ToStep" @onchange="UpdateTransitionToAsync">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
+                        <label>@T("TransitionCondition")<input data-testid="transition-condition" disabled="@ReadOnly" value="@selectedTransition.Condition" @onchange="UpdateTransitionConditionAsync" /></label>
+                        <label>@T("TransitionPriority")<input data-testid="transition-priority" disabled="@ReadOnly" type="number" value="@selectedTransition.Priority" @onchange="UpdateTransitionPriorityAsync" /></label>
+                        <button class="button-danger" disabled="@ReadOnly" @onclick="() => RemoveTransitionAsync(selectedTransition.Id)">@T("DeleteTransition")</button>
+                    </section>
+                }
                 <label>@T("From")<select disabled="@ReadOnly" @bind="transitionFrom">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
                 <label>@T("Event")<input disabled="@ReadOnly" @bind="transitionEvent" /></label>
                 <label>@T("To")<select disabled="@ReadOnly" @bind="transitionTo">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
                 <button class="button-secondary" disabled="@ReadOnly" @onclick="AddTransitionAsync">@T("AddTransition")</button>
-                <ul class="transition-list">@foreach (var transition in Editor.State.Resource.Definition.Transitions) { <li><button @onclick="() => Editor.SelectTransition(transition.Id)">@transition.FromStep —@transition.Event→ @transition.ToStep</button><button disabled="@ReadOnly" @onclick="() => RemoveTransitionAsync(transition.Id)">×</button></li> }</ul>
+                <ul class="transition-list">@foreach (var transition in Editor.State.Resource.Definition.Transitions) { <li><button class="@(Editor.State.Selection.TransitionId == transition.Id ? "selected" : null)" @onclick="() => SelectTransitionAsync(transition.Id)">@transition.FromStep —@transition.Event→ @transition.ToStep</button><button disabled="@ReadOnly" aria-label="@T("DeleteTransitionNamed", transition.Id)" @onclick="() => RemoveTransitionAsync(transition.Id)">×</button></li> }</ul>
             </aside>
         }
 
@@ -306,12 +323,12 @@ else
 
     @if (showRun)
     {
-        <div class="dialog-backdrop"><section class="dialog run-dialog"><h2>@T("RunDraftRevision", Editor.State.Resource.DraftRevision?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")</h2><label>@T("InputJson")<textarea rows="10" @bind="runInput"></textarea></label><div class="dialog-actions"><button class="button-secondary" @onclick="() => showRun = false">@T("Cancel")</button><button class="button-primary" @onclick="RunDraftAsync">@T("RunDraft")</button></div></section></div>
+        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true" aria-labelledby="run-draft-title" data-testid="flow-designer-run-dialog"><h2 id="run-draft-title">@T("RunDraftRevision", Editor.State.Resource.DraftRevision?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")</h2><div class="flow-run-input"><h3>@T("InputJson")</h3><JsonSchemaInputEditor Schema="Editor.State.Resource.Definition.InputSchema" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunInputValidation" Disabled="runningDraft" /></div>@if (runError is not null) { <p class="error-panel" role="alert">@runError</p> }<div class="dialog-actions"><button class="button-secondary" disabled="@runningDraft" @onclick="() => showRun = false">@T("Cancel")</button><button class="button-primary" disabled="@(runningDraft || !runInputValid)" data-testid="flow-designer-run-submit" @onclick="RunDraftAsync">@(runningDraft ? T("RunningDraft") : T("RunDraft"))</button></div></section></div>
     }
 }
 
 @code {
-    private static readonly string[] Palette = ["input", "agent", "flow", "tool", "router", "condition", "transform", "output", "failure"];
+    private static readonly string[] Palette = ["input", "agent", "flow", "tool", "router", "condition", "transform", "output"];
     private readonly CancellationTokenSource cancellation = new();
     private CancellationTokenSource? autosave;
     private FlowCanvas? canvas;
@@ -326,15 +343,22 @@ else
     private string transitionTo = string.Empty;
     private string transitionEvent = "completed";
     private string publishVersion = "1.0.0";
-    private string runInput = "{\n  \"prompt\": \"How can I optimize this SQL query?\"\n}";
+    private bool showAllErrorTransitions;
+    private JsonElement runInput = JsonSerializer.SerializeToElement(new { prompt = "How can I optimize this SQL query?" });
     private string? error;
+    private string? runError;
     private bool saving;
     private bool publishing;
     private bool showRun;
+    private bool runningDraft;
+    private bool runInputValid = true;
     private bool loadingAgents;
     private long layoutRevision;
     private int toolPickerRevision;
     private string toolSearch = string.Empty;
+
+    private FlowTransitionDefinition? SelectedTransition => Editor.State.Resource?.Definition.Transitions
+        .FirstOrDefault(transition => transition.Id == Editor.State.Selection.TransitionId);
 
     [Parameter, EditorRequired] public string ResourceId { get; set; } = string.Empty;
     [Parameter] public bool IsReadOnly { get; set; }
@@ -400,8 +424,22 @@ else
     }
 
     private Task MoveStepAsync(MoveStepCommand command) => DispatchAsync(command);
-    private Task CreateTransitionAsync(FlowTransitionDefinition transition) => DispatchAsync(new AddTransitionCommand(transition));
-    private Task RemoveTransitionAsync(string id) => DispatchAsync(new RemoveTransitionCommand(id));
+    private async Task CreateTransitionAsync(FlowTransitionDefinition transition)
+    {
+        await DispatchAsync(new AddTransitionCommand(transition));
+        Editor.SelectTransition(transition.Id);
+    }
+    private Task ReconnectTransitionAsync(ReconnectTransitionCommand command) => DispatchAsync(command);
+    private async Task RemoveTransitionAsync(string id)
+    {
+        await DispatchAsync(new RemoveTransitionCommand(id));
+        if (Editor.State.Selection.TransitionId == id) Editor.SelectTransition(null);
+    }
+    private Task SelectTransitionAsync(string? id)
+    {
+        Editor.SelectTransition(id);
+        return Task.CompletedTask;
+    }
     private async Task SelectStepAsync(string? name)
     {
         Editor.SelectStep(name);
@@ -419,6 +457,7 @@ else
         layoutRevision++;
     }
     private void Center() => canvas?.Center();
+    private void ToggleErrorTransitions() => showAllErrorTransitions = !showAllErrorTransitions;
     private void EditorChanged(object? sender, EventArgs args) => _ = InvokeAsync(StateHasChanged);
     private void SourceChanged(string source) { if (ReadOnly) return; sourceText = source; Editor.SetSource(source, Editor.State.SourceError); }
 
@@ -459,8 +498,27 @@ else
         catch (Exception exception) { error = exception.Message; }
         finally { publishing = false; }
     }
-    private void OpenRun() { if (ReadOnly) return; showRun = true; error = null; }
-    private async Task RunDraftAsync() { if (ReadOnly) return; try { await SaveAsync(); using var json = JsonDocument.Parse(runInput); var run = await Backend.RunDraftAsync(Target, new(json.RootElement.Clone(), Trigger: FlowRunTrigger.Manual), cancellation.Token); Navigation.NavigateTo($"/flow-runs/{run.Id}"); } catch (Exception exception) { error = exception.Message; } }
+    private void OpenRun() { if (ReadOnly) return; showRun = true; error = null; runError = null; runInputValid = true; runInput = ParseInput("{}"); }
+    private Task UpdateRunInputValidation(JsonSchemaInputValidationState value) { runInputValid = value.IsValid; return Task.CompletedTask; }
+    private async Task RunDraftAsync()
+    {
+        if (ReadOnly || !runInputValid || runningDraft) return;
+        try
+        {
+            runningDraft = true;
+            runError = null;
+            await SaveAsync();
+            if (error is not null) return;
+            var run = await Backend.RunDraftAsync(Target, new(runInput.Clone(), Trigger: FlowRunTrigger.Manual), cancellation.Token);
+            Navigation.NavigateTo($"/flow-runs/{run.Id}");
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            runError = exception.Message;
+        }
+        finally { runningDraft = false; }
+    }
+    private static JsonElement ParseInput(string value) { try { using var document = JsonDocument.Parse(value); return document.RootElement.ValueKind == JsonValueKind.Object ? document.RootElement.Clone() : JsonSerializer.SerializeToElement(new { }); } catch (JsonException) { return JsonSerializer.SerializeToElement(new { }); } }
     private async Task ApplySourceAsync(string source)
     {
         if (ReadOnly) return;
@@ -494,13 +552,42 @@ else
             "condition" => new ConditionFlowStepDefinition { Name = name, DisplayName = "Condition", Left = "${input.prompt}", Right = "" },
             "transform" => new TransformFlowStepDefinition { Name = name, DisplayName = "Transform", Mapping = JsonSerializer.SerializeToElement(new { }) },
             "output" => new OutputFlowStepDefinition { Name = name, DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
-            _ => new FailureFlowStepDefinition { Name = name, DisplayName = "Failure" }
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported Flow step type.")
         };
         if (step is FlowCallStepDefinition flowCall) await LoadFlowVersionsAsync(flowCall.Flow);
-        await DispatchAsync(new AddStepCommand(step, new(40 + index * 180, 250))); Editor.SelectStep(name);
+        var errorTransition = step is AgentFlowStepDefinition or ToolFlowStepDefinition or FlowCallStepDefinition
+            ? ErrorOutputTransition(Editor.State.Resource.Definition, name)
+            : null;
+        await DispatchAsync(new AddStepCommand(step, new(40 + index * 180, 250), errorTransition));
+        Editor.SelectStep(name);
+    }
+
+    private static FlowTransitionDefinition? ErrorOutputTransition(FlowGraphDefinition definition, string sourceStep)
+    {
+        var target = definition.Steps.OfType<OutputFlowStepDefinition>()
+            .FirstOrDefault(output => output.Outcome == FlowOutputOutcome.Error);
+        return target is null
+            ? null
+            : new($"{sourceStep}-error-{target.Name}", sourceStep, "error", target.Name);
     }
 
     private async Task AddTransitionAsync() { if (!string.IsNullOrWhiteSpace(transitionFrom) && !string.IsNullOrWhiteSpace(transitionTo)) await CreateTransitionAsync(new($"{transitionFrom}-{transitionEvent}-{transitionTo}", transitionFrom, transitionEvent, transitionTo)); }
+    private Task UpdateTransitionFromAsync(ChangeEventArgs e) => UpdateSelectedTransitionAsync(transition => transition with { FromStep = Text(e) });
+    private Task UpdateTransitionEventAsync(ChangeEventArgs e) => UpdateSelectedTransitionAsync(transition => transition with { Event = Text(e) });
+    private Task UpdateTransitionToAsync(ChangeEventArgs e) => UpdateSelectedTransitionAsync(transition => transition with { ToStep = Text(e) });
+    private Task UpdateTransitionConditionAsync(ChangeEventArgs e) => UpdateSelectedTransitionAsync(transition => transition with { Condition = EmptyToNull(Text(e)) });
+    private Task UpdateTransitionPriorityAsync(ChangeEventArgs e)
+    {
+        var text = Text(e);
+        var priority = int.TryParse(text, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value)
+            ? value
+            : (int?)null;
+        return UpdateSelectedTransitionAsync(transition => transition with { Priority = priority });
+    }
+    private Task UpdateSelectedTransitionAsync(Func<FlowTransitionDefinition, FlowTransitionDefinition> update) =>
+        ReadOnly || SelectedTransition is not { } transition
+            ? Task.CompletedTask
+            : DispatchAsync(new UpdateTransitionCommand(update(transition)));
     private Task RemoveSelectedAsync() => SelectedStep is { } step ? RemoveStepAsync(step.Name) : Task.CompletedTask;
     private async Task RemoveStepAsync(string name)
     {

@@ -14,7 +14,8 @@ public sealed record ResolvedFlowCall(
     FlowId FlowId,
     string Version,
     JsonElement? InputSchema,
-    JsonElement? OutputSchema);
+    JsonElement? OutputSchema,
+    IReadOnlyList<FlowOutputDefinition>? Outputs = null);
 
 public sealed record ResolvedFlowTool(
     string ResourceId,
@@ -89,12 +90,19 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         {
             if (!NamePattern().IsMatch(step.Name)) issues.Add(Error("step_name_invalid", "Step names must contain letters, digits, '-' or '_'.", step.Name, property: "name"));
             if (!steps.TryAdd(step.Name, step)) issues.Add(Error("step_name_duplicate", $"Step '{step.Name}' is duplicated.", step.Name));
-            await ValidateStepAsync(step, context, issues, cancellationToken);
+            await ValidateStepAsync(step, definition.Transitions, context, issues, cancellationToken);
+            if (step is AgentFlowStepDefinition or ToolFlowStepDefinition or ToolRouteFlowStepDefinition or FlowCallStepDefinition
+                && !definition.Transitions.Any(transition => transition.FromStep == step.Name && transition.Event == "error"))
+                issues.Add(Error(
+                    "error_transition_required",
+                    $"Step '{step.Name}' requires a transition for its 'error' output.",
+                    step.Name,
+                    property: "transitions"));
         }
 
         if (!steps.ContainsKey(definition.EntryStep)) issues.Add(Error("entry_step_unknown", "The entry step does not exist.", property: "entryStep"));
         if (definition.Steps.Count(step => step is InputFlowStepDefinition) != 1) issues.Add(Error("input_step_required", "A Flow requires exactly one Input step."));
-        if (!definition.Steps.Any(step => step is OutputFlowStepDefinition or FailureFlowStepDefinition)) issues.Add(Error("terminal_step_required", "A Flow requires an Output or Failure terminal step."));
+        if (!definition.Steps.Any(step => step is OutputFlowStepDefinition or FailureFlowStepDefinition)) issues.Add(Error("terminal_step_required", "A Flow requires at least one named output."));
 
         var transitionIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var transition in definition.Transitions)
@@ -102,6 +110,10 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             if (!transitionIds.Add(transition.Id)) issues.Add(Error("transition_id_duplicate", $"Transition '{transition.Id}' is duplicated.", transitionId: transition.Id));
             if (!steps.ContainsKey(transition.FromStep)) issues.Add(Error("transition_source_unknown", $"Transition source '{transition.FromStep}' does not exist.", transitionId: transition.Id));
             if (!steps.ContainsKey(transition.ToStep)) issues.Add(Error("transition_target_unknown", $"Transition target '{transition.ToStep}' does not exist.", transitionId: transition.Id));
+            if (steps.GetValueOrDefault(transition.FromStep) is { } source
+                && source is not FlowCallStepDefinition
+                && !source.OutputEvents().Contains(transition.Event, StringComparer.Ordinal))
+                issues.Add(Error("transition_event_invalid", $"Step '{source.Name}' does not emit event '{transition.Event}'.", source.Name, transition.Id, "event"));
             if (!string.IsNullOrWhiteSpace(transition.Condition)) ValidateExpression(transition.Condition, issues, transition.FromStep, transition.Id, "condition");
         }
 
@@ -116,10 +128,22 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         foreach (var terminal in definition.Steps.Where(step => step is OutputFlowStepDefinition or FailureFlowStepDefinition))
             if (definition.Transitions.Any(transition => transition.FromStep == terminal.Name)) issues.Add(Error("terminal_has_transition", $"Terminal step '{terminal.Name}' cannot have outgoing transitions.", terminal.Name));
 
+        foreach (var output in definition.Steps.OfType<OutputFlowStepDefinition>())
+        {
+            _ = definition.ResolveOutputSchema(output, out var ambiguous);
+            if (ambiguous)
+                issues.Add(Error("flow_output_schema_ambiguous", $"Schema inference for named output '{output.Name}' is ambiguous. Declare its schema explicitly.", output.Name, property: "schema"));
+        }
+
         return new FlowValidationResult(issues);
     }
 
-    private async Task ValidateStepAsync(FlowStepDefinition step, FlowValidationContext context, List<FlowValidationIssue> issues, CancellationToken token)
+    private async Task ValidateStepAsync(
+        FlowStepDefinition step,
+        IReadOnlyList<FlowTransitionDefinition> transitions,
+        FlowValidationContext context,
+        List<FlowValidationIssue> issues,
+        CancellationToken token)
     {
         await ValidateArtifactOutputAsync(step, context, issues, token);
         switch (step)
@@ -150,7 +174,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 else ValidateJsonExpressions(transform.Mapping, issues, step.Name, "mapping");
                 break;
             case FlowCallStepDefinition flowCall:
-                await ValidateFlowCallAsync(flowCall, context, issues, token);
+                await ValidateFlowCallAsync(flowCall, transitions, context, issues, token);
                 break;
             case RepeatFlowStepDefinition repeat:
                 if (repeat.MaximumIterations is < 1 or > MaximumRepeatIterations)
@@ -175,6 +199,13 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 break;
             case OutputFlowStepDefinition output:
                 ValidateJsonExpressions(output.OutputMapping, issues, step.Name, "outputMapping");
+                ValidateJsonExpressions(output.DetailsExpression is null ? null : JsonSerializer.SerializeToElement(output.DetailsExpression), issues, step.Name, "detailsExpression");
+                if (!ValidContractSchema(output.Schema))
+                    issues.Add(Error("flow_output_schema_invalid", "The named output has an invalid or unsupported schema.", step.Name, property: "schema"));
+                if (output.Outcome == FlowOutputOutcome.Error && output.Code is not null && string.IsNullOrWhiteSpace(output.Code))
+                    issues.Add(Error("flow_output_error_code_invalid", "An error output code cannot be empty.", step.Name, property: "code"));
+                if (output.Outcome == FlowOutputOutcome.Error && output.Message is not null && string.IsNullOrWhiteSpace(output.Message))
+                    issues.Add(Error("flow_output_error_message_invalid", "An error output message cannot be empty.", step.Name, property: "message"));
                 break;
         }
     }
@@ -301,6 +332,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
 
     private async Task ValidateFlowCallAsync(
         FlowCallStepDefinition step,
+        IReadOnlyList<FlowTransitionDefinition> transitions,
         FlowValidationContext context,
         List<FlowValidationIssue> issues,
         CancellationToken token)
@@ -331,6 +363,20 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             issues.Add(Error("flow_input_schema_invalid", "The selected Flow has an invalid or unsupported input schema.", step.Name, property: "flow.inputSchema"));
         if (!ValidContractSchema(target.OutputSchema))
             issues.Add(Error("flow_output_schema_invalid", "The selected Flow has an invalid or unsupported output schema.", step.Name, property: "flow.outputSchema"));
+        foreach (var output in target.Outputs ?? [])
+            if (!ValidContractSchema(output.Schema))
+                issues.Add(Error("flow_output_schema_invalid", $"Named output '{output.Name}' has an invalid or unsupported schema.", step.Name, property: $"flow.outputs.{output.Name}.schema"));
+        if (target.Outputs is { Count: > 0 })
+        {
+            var outputNames = target.Outputs.Select(output => output.Name).ToHashSet(StringComparer.Ordinal);
+            foreach (var transition in transitions.Where(transition => transition.FromStep == step.Name && !outputNames.Contains(transition.Event)))
+                issues.Add(Error(
+                    "transition_event_invalid",
+                    $"Flow step '{step.Name}' does not expose named output '{transition.Event}'.",
+                    step.Name,
+                    transition.Id,
+                    "event"));
+        }
         ValidateMappingAgainstSchema(step, target.InputSchema, issues);
         if (await resources.CreatesFlowCycleAsync(context.WorkspaceId.Value, context.OwnerFlowId.Value, target, token))
             issues.Add(Error("flow_dependency_cycle", $"Calling Flow '{target.FlowId}' would create a direct or indirect dependency cycle.", step.Name, property: "flow"));

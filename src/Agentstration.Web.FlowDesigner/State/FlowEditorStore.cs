@@ -8,7 +8,7 @@ namespace Agentstration.Web.FlowDesigner.State;
 public enum FlowEditorMode { Designer, Definition, Split }
 public enum FlowSaveState { Saved, Saving, UnsavedChanges, SaveFailed }
 public sealed record FlowEditorSelection(string? StepName = null, string? TransitionId = null);
-public sealed record FlowDesignerNode(string Name, string Type, string DisplayName, FlowNodePosition Position, string? Resource);
+public sealed record FlowDesignerNode(string Name, string Type, string DisplayName, FlowNodePosition Position, string? Resource, IReadOnlyList<string> OutputEvents);
 public sealed record FlowDesignerLink(string Id, string From, string To, string Event);
 public sealed record FlowDesignerDocument(IReadOnlyList<FlowDesignerNode> Nodes, IReadOnlyList<FlowDesignerLink> Links)
 {
@@ -16,7 +16,10 @@ public sealed record FlowDesignerDocument(IReadOnlyList<FlowDesignerNode> Nodes,
     {
         var nodes = definition.Steps.Select((step, index) => new FlowDesignerNode(step.Name, step.Type(), step.DisplayName ?? step.Name,
             definition.Designer.NodePositions.TryGetValue(step.Name, out var position) ? position : new(index * 200, 50),
-            step switch { AgentFlowStepDefinition agent => agent.Agent.ResourceId, RouterFlowStepDefinition router => $"{router.Candidates.Count} routes", FlowCallStepDefinition flow => flow.Flow.ResourceId, RepeatFlowStepDefinition repeat => $"{repeat.Flow.ResourceId} · ≤ {repeat.MaximumIterations}", ToolFlowStepDefinition tool => tool.Tool.ResourceId, _ => null })).ToArray();
+            step switch { AgentFlowStepDefinition agent => agent.Agent.ResourceId, RouterFlowStepDefinition router => $"{router.Candidates.Count} routes", FlowCallStepDefinition flow => flow.Flow.ResourceId, RepeatFlowStepDefinition repeat => $"{repeat.Flow.ResourceId} · ≤ {repeat.MaximumIterations}", ToolFlowStepDefinition tool => tool.Tool.ResourceId, ToolRouteFlowStepDefinition route => route.ToolSet.ResourceId, _ => null },
+            step is FlowCallStepDefinition
+                ? definition.Transitions.Where(transition => transition.FromStep == step.Name).Select(transition => transition.Event).Distinct(StringComparer.Ordinal).ToArray()
+                : step.OutputEvents())).ToArray();
         return new(nodes, definition.Transitions.Select(transition => new FlowDesignerLink(transition.Id, transition.FromStep, transition.ToStep, transition.Event)).ToArray());
     }
 }
@@ -41,9 +44,23 @@ public sealed record FlowEditorState
 
 public interface IFlowEditorCommand { FlowGraphDefinition Apply(FlowGraphDefinition definition); }
 public sealed record ReplaceDefinitionCommand(FlowGraphDefinition Definition) : IFlowEditorCommand { public FlowGraphDefinition Apply(FlowGraphDefinition definition) => Definition; }
-public sealed record AddStepCommand(FlowStepDefinition Step, FlowNodePosition Position) : IFlowEditorCommand
+public sealed record AddStepCommand(
+    FlowStepDefinition Step,
+    FlowNodePosition Position,
+    FlowTransitionDefinition? Transition = null) : IFlowEditorCommand
 {
-    public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with { Steps = [.. definition.Steps, Step], Designer = definition.Designer with { NodePositions = new Dictionary<string, FlowNodePosition>(definition.Designer.NodePositions, StringComparer.Ordinal) { [Step.Name] = Position } } };
+    public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with
+    {
+        Steps = [.. definition.Steps, Step],
+        Transitions = Transition is null ? definition.Transitions : [.. definition.Transitions, Transition],
+        Designer = definition.Designer with
+        {
+            NodePositions = new Dictionary<string, FlowNodePosition>(definition.Designer.NodePositions, StringComparer.Ordinal)
+            {
+                [Step.Name] = Position
+            }
+        }
+    };
 }
 public sealed record RemoveStepCommand(string Name) : IFlowEditorCommand
 {
@@ -64,6 +81,30 @@ public sealed record UpdateStepCommand(FlowStepDefinition Step) : IFlowEditorCom
 public sealed record AddTransitionCommand(FlowTransitionDefinition Transition) : IFlowEditorCommand
 {
     public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with { Transitions = [.. definition.Transitions.Where(item => item.Id != Transition.Id), Transition] };
+}
+public sealed record UpdateTransitionCommand(FlowTransitionDefinition Transition) : IFlowEditorCommand
+{
+    public FlowGraphDefinition Apply(FlowGraphDefinition definition)
+    {
+        if (definition.Transitions.All(item => item.Id != Transition.Id))
+            return definition;
+
+        return definition with
+        {
+            Transitions = definition.Transitions
+                .Select(item => item.Id == Transition.Id ? Transition : item)
+                .ToArray()
+        };
+    }
+}
+public sealed record ReconnectTransitionCommand(string Id, string FromStep, string ToStep, string Event) : IFlowEditorCommand
+{
+    public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with
+    {
+        Transitions = definition.Transitions
+            .Select(item => item.Id == Id ? item with { FromStep = FromStep, ToStep = ToStep, Event = Event } : item)
+            .ToArray()
+    };
 }
 public sealed record RemoveTransitionCommand(string Id) : IFlowEditorCommand
 {

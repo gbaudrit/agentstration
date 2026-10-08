@@ -14,7 +14,7 @@
   <data name="Mode.Definition"><value>Definition</value></data>
   <data name="Mode.Split"><value>Split</value></data>
   <data name="Undo"><value>Undo</value></data><data name="Redo"><value>Redo</value></data>
-  <data name="Validate"><value>Validate</value></data><data name="RunDraft"><value>Run draft</value></data>
+  <data name="Validate"><value>Validate</value></data><data name="RunDraft"><value>Run draft</value></data><data name="RunningDraft"><value>Starting draft run…</value></data>
   <data name="Save"><value>Save</value></data><data name="Version"><value>Version</value></data>
   <data name="PublishVersion"><value>Publish version</value></data><data name="Publish"><value>Publish</value></data><data name="Publishing"><value>Publishing…</value></data>
   <data name="ActionFailed"><value>Action could not be completed</value></data><data name="DismissError"><value>Dismiss error</value></data>
@@ -28,6 +28,7 @@
   <data name="Step.flow"><value>Flow</value></data>
   <data name="Step.tool"><value>Tool</value></data>
   <data name="HorizontalLayout"><value>Horizontal layout</value></data><data name="VerticalLayout"><value>Vertical layout</value></data><data name="Center"><value>Center</value></data>
+  <data name="ShowErrorTransitions"><value>Show error paths</value></data><data name="HideErrorTransitions"><value>Hide error paths</value></data>
   <data name="Inspector"><value>Inspector</value></data><data name="SelectStep"><value>Select a step to edit it.</value></data>
   <data name="DisplayName"><value>Display name</value></data><data name="TechnicalName"><value>Technical name</value></data><data name="Type"><value>Type</value></data>
   <data name="StepDetails"><value>Step</value></data><data name="StepDisplayName"><value>Step display name</value></data><data name="StepId"><value>Step ID</value></data>
@@ -49,6 +50,8 @@
   <data name="LeftValue"><value>Left value</value></data><data name="Operator"><value>Operator</value></data><data name="RightValue"><value>Right value</value></data>
   <data name="ErrorCode"><value>Error code</value></data><data name="Message"><value>Message</value></data><data name="DeleteStep"><value>Delete step</value></data>
   <data name="Transitions"><value>Transitions</value></data><data name="From"><value>From</value></data><data name="Event"><value>Event</value></data><data name="To"><value>To</value></data><data name="AddTransition"><value>Add transition</value></data>
+  <data name="TransitionDetails"><value>Selected transition</value></data><data name="TransitionId"><value>Transition ID</value></data><data name="TransitionCondition"><value>Condition</value></data><data name="TransitionPriority"><value>Priority</value></data><data name="DeleteTransition"><value>Delete transition</value></data><data name="DeleteTransitionNamed"><value>Delete transition {0}</value></data>
+  <data name="InputConnectionHandle"><value>Incoming transition handle</value></data><data name="OutputConnectionHandle"><value>Outgoing transition handle</value></data><data name="NamedOutputConnectionHandle"><value>Outgoing {0} transition handle</value></data>
   <data name="Validation"><value>Validation</value></data><data name="IssueCount.One"><value>{0} issue</value></data><data name="IssueCount.Many"><value>{0} issues</value></data>
   <data name="PublishedDefinitionHelp"><value>This published definition is displayed without creating a Draft.</value></data>
   <data name="ValidationHelp"><value>Validate the Draft to check structure, reachability, expressions and resources.</value></data>

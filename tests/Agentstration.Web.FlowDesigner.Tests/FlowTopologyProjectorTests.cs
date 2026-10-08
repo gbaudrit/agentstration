@@ -22,7 +22,7 @@ public sealed class FlowTopologyProjectorTests
             Transitions =
             [
                 new("input-agent", "input", "completed", "agent"),
-                new("agent-output", "agent", "completed", "output")
+                new("agent-output", "agent", "success", "output")
             ],
             Designer = new FlowDesignerMetadata
             {
