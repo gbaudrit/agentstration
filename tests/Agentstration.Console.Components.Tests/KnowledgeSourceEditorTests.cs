@@ -267,6 +267,61 @@ public sealed class KnowledgeSourceEditorTests
     }
 
     [TestMethod]
+    public void FrenchRetrievalUsesLocalizedCardsAndGovernedLinks()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        var snapshot = ExistingSnapshot();
+        using var context = CreateContext(new KnowledgeClientStub(ExistingSource(), snapshots: [snapshot],
+            retrievalResult: ExistingRetrievalResult(snapshot)));
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
+            .NavigateTo("/knowledge-sources/agentstration-documentation?view=retrieval");
+
+        var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
+            .Add(component => component.Name, "agentstration-documentation"));
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("Consultation",
+                rendered.Find("[data-testid='knowledge-source-retrieval-tab']").TextContent);
+            Assert.AreEqual("Rechercher",
+                rendered.Find("[data-testid='knowledge-retrieval-operation'] option[value='search']").TextContent);
+        });
+        rendered.Find("[data-testid='knowledge-retrieval-text']").Change("documentation");
+        rendered.Find("[data-testid='knowledge-retrieval-run']").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var result = rendered.Find("[data-testid='knowledge-retrieval-result']");
+            StringAssert.Contains(result.TextContent, "Rechercher · 1 résultat(s)");
+            Assert.AreEqual("/artifacts/durable/artifact-0123456789abcdef",
+                result.QuerySelector(".knowledge-retrieval-item a")?.GetAttribute("href"));
+            Assert.HasCount(1, result.QuerySelectorAll(".knowledge-retrieval-item pre"));
+        });
+    }
+
+    [TestMethod]
+    public void ProjectedDetailsExposeVisibleEditActionAndFullWidthParameters()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(new KnowledgeClientStub(ProjectedSource()));
+        var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
+            .Add(component => component.Name, "agentstration-documentation"));
+
+        rendered.Find("[data-testid='knowledge-source-definition-tab']").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            var action = rendered.Find(".knowledge-edit-action");
+            StringAssert.Contains(action.TextContent, "Edit source");
+            Assert.AreEqual("/knowledge-sources/agentstration-documentation/edit", action.GetAttribute("href"));
+        });
+
+        rendered.Find("[data-testid='knowledge-source-projections-tab']").Click();
+        rendered.WaitForAssertion(() => Assert.IsTrue(rendered
+            .Find("[data-testid='knowledge-projection-parameters']")
+            .ParentElement!.ClassList.Contains("knowledge-projection-parameters")));
+    }
+
+    [TestMethod]
     public void DetailsEditsTheDefinitionAndShowsTheSavedYaml()
     {
         using var culture = new TestCultureScope("en-US");
@@ -547,7 +602,31 @@ public sealed class KnowledgeSourceEditorTests
         ]
     }, KnowledgeSnapshotLifecycleState.Active);
 
-    private sealed class KnowledgeClientStub(KnowledgeSourceResource? source = null, IReadOnlyList<KnowledgeAcquisitionResource>? acquisitions = null, KnowledgeSourceToolExposureResource? exposure = null, IReadOnlyList<KnowledgeSnapshotView>? snapshots = null) : IKnowledgeSourcesClient
+    private static KnowledgeRetrievalResult ExistingRetrievalResult(KnowledgeSnapshotView snapshot) => new()
+    {
+        Operation = KnowledgeSourceOperation.Search,
+        KnowledgeSourceId = "default/agentstration-documentation",
+        KnowledgeSourceUid = snapshot.Snapshot.KnowledgeSourceUid,
+        KnowledgeSourceGeneration = snapshot.Snapshot.KnowledgeSourceGeneration,
+        SnapshotName = snapshot.Snapshot.Name,
+        SnapshotUid = snapshot.Snapshot.Uid,
+        RetrievalFlow = new ResolvedKnowledgeFlowBinding("knowledge-retrieval-builtin", ResourceNamespace.Default,
+            "1.0.0", true, null, null, KnowledgeFlowContracts.Retrieval),
+        FlowRunId = "flowrun-retrieval-0123456789abcdef",
+        CorrelationId = "retrieval-correlation",
+        Items =
+        [
+            new KnowledgeRetrievalItem
+            {
+                Id = "artifact-0123456789abcdef:0",
+                ArtifactId = "artifact-0123456789abcdef",
+                Content = "Agentstration documentation",
+                MediaType = "application/json"
+            }
+        ]
+    };
+
+    private sealed class KnowledgeClientStub(KnowledgeSourceResource? source = null, IReadOnlyList<KnowledgeAcquisitionResource>? acquisitions = null, KnowledgeSourceToolExposureResource? exposure = null, IReadOnlyList<KnowledgeSnapshotView>? snapshots = null, KnowledgeRetrievalResult? retrievalResult = null) : IKnowledgeSourcesClient
     {
         public CreateKnowledgeSourceRequest? CreatedRequest { get; private set; }
         public PutKnowledgeSourceRequest? UpdatedRequest { get; private set; }
@@ -592,7 +671,8 @@ public sealed class KnowledgeSourceEditorTests
         public Task<IReadOnlyList<KnowledgeSnapshotView>> GetSnapshotsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(snapshots ?? []);
         public Task<KnowledgeSnapshotView> SelectActiveSnapshotAsync(ResourceNamespace @namespace, string name, string snapshotName, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<KnowledgeSnapshotResource>> PublishSnapshotAsync(ResourceNamespace @namespace, string acquisitionId, PublishKnowledgeSnapshotRequest request, string? idempotencyKey = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<KnowledgeRetrievalResult> SearchAsync(ResourceNamespace @namespace, string name, SearchKnowledgeRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<KnowledgeRetrievalResult> SearchAsync(ResourceNamespace @namespace, string name, SearchKnowledgeRequest request, CancellationToken cancellationToken = default) =>
+            retrievalResult is null ? throw new NotSupportedException() : Task.FromResult(retrievalResult);
         public Task<KnowledgeRetrievalResult> QueryAsync(ResourceNamespace @namespace, string name, QueryKnowledgeRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<KnowledgeRetrievalResult> ReadAsync(ResourceNamespace @namespace, string name, ReadKnowledgeRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }

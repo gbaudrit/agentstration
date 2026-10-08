@@ -54,4 +54,12 @@
   <data name="ProducerFlow" xml:space="preserve"><value>Producer Flow</value></data>
   <data name="StorageFlow" xml:space="preserve"><value>Storage Flow</value></data>
   <data name="SelectArtifact" xml:space="preserve"><value>Select a Snapshot artifact</value></data>
+  <data name="OpenArtifact" xml:space="preserve"><value>Open artifact</value></data>
+  <data name="Operation.Search" xml:space="preserve"><value>Search</value></data>
+  <data name="Operation.Query" xml:space="preserve"><value>Ask a question</value></data>
+  <data name="Operation.Read" xml:space="preserve"><value>Read an artifact</value></data>
+  <data name="Results" xml:space="preserve"><value>Results</value></data>
+  <data name="Completed" xml:space="preserve"><value>Completed</value></data>
+  <data name="SynthesizedAnswer" xml:space="preserve"><value>Synthesized answer</value></data>
+  <data name="UnknownMediaType" xml:space="preserve"><value>Unknown media type</value></data>
 </root>
