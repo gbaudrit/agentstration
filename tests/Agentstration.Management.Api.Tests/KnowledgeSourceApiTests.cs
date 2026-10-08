@@ -74,55 +74,64 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
-    public async Task WebBuiltInDataSourceProfileAcquiresAndPersistsOneResource()
+    public async Task WebBuiltInDataSourceProfileProjectsAndSearchesEveryResource()
     {
         await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
             services.RemoveAll<IHttpContentFetcher>();
-            services.AddSingleton<IHttpContentFetcher>(new StubHttpFetcher(
-                new HttpFetchResult(new("https://example.test/docs/index.html"), "index.html", "text/html",
-                    "<html><body>Agentstration data source</body></html>"u8.ToArray())));
+            services.AddSingleton<IHttpContentFetcher>(new StubHttpFetcher(request =>
+            {
+                var sourceName = request.Url.AbsolutePath.Contains("secondary", StringComparison.Ordinal)
+                    ? "secondary" : "primary";
+                var repetitions = sourceName == "primary" ? string.Join(' ', Enumerable.Repeat("shared", 12)) : "shared";
+                return new(request.Url, $"{sourceName}.html", "text/html",
+                    JsonSerializer.SerializeToUtf8Bytes($"<html><body>{sourceName} {repetitions}</body></html>"));
+            }));
         }));
         var context = await GetBootstrapContextAsync(factory);
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
-        var source = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(
-            new DataSourceResource
-            {
-                ApiVersion = ResourceApiVersions.CoreV1,
-                Kind = DataSourceResourceKinds.DataSource,
-                Metadata = new() { Name = "web-origin" },
-                ScopeRef = scope,
-                Definition = new()
-                {
-                    DisplayName = "Web origin",
-                    Profile = new("web-builtin", scope),
-                    Configuration = JsonSerializer.SerializeToElement(new
-                    {
-                        url = "https://example.test/docs/index.html"
-                    })
-                }
-            }, default);
+        var sourceManagement = factory.Services.GetRequiredService<DataSourceManagementService>();
         var acquisitions = factory.Services.GetRequiredService<DataSourceAcquisitionService>();
-        var started = await acquisitions.StartAsync(source.Value.Namespace, source.Value.Name, scope,
-            JsonSerializer.SerializeToElement(new { }), "web-origin", "web-origin", default);
         var runs = factory.Services.GetRequiredService<FlowRunService>();
         var executionScope = new FlowRunScope(context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId);
 
-        await runs.ExecuteAsync(new(started.Value.FlowRunId, executionScope), default);
-        var parent = await runs.GetAsync(executionScope.WorkspaceId, started.Value.FlowRunId, default);
-        var childRunId = parent!.Value.Steps.Single(step => step.StepName == "persist").ChildFlowRunId;
-        Assert.IsNotNull(childRunId);
-        await runs.ExecuteAsync(new(childRunId, executionScope), default);
-        await runs.ExecuteAsync(new(started.Value.FlowRunId, executionScope), default);
+        async Task<(DataSourceResource Source, DataSourceAcquisitionResource Acquisition)> AcquireAsync(
+            string name, string url)
+        {
+            var source = await sourceManagement.CreateAsync(new DataSourceResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = DataSourceResourceKinds.DataSource,
+                Metadata = new() { Name = name },
+                ScopeRef = scope,
+                Definition = new()
+                {
+                    DisplayName = name,
+                    Profile = new("web-builtin", scope),
+                    Configuration = JsonSerializer.SerializeToElement(new { url })
+                }
+            }, default);
+            var started = await acquisitions.StartAsync(source.Value.Namespace, source.Value.Name, scope,
+                JsonSerializer.SerializeToElement(new { }), name, name, default);
+            await runs.ExecuteAsync(new(started.Value.FlowRunId, executionScope), default);
+            var parent = await runs.GetAsync(executionScope.WorkspaceId, started.Value.FlowRunId, default);
+            var childRunId = parent!.Value.Steps.Single(step => step.StepName == "persist").ChildFlowRunId;
+            Assert.IsNotNull(childRunId);
+            await runs.ExecuteAsync(new(childRunId, executionScope), default);
+            await runs.ExecuteAsync(new(started.Value.FlowRunId, executionScope), default);
+            var completed = await acquisitions.GetAsync(started.Value.Namespace, started.Value.Name, default);
+            Assert.AreEqual(DataSourceAcquisitionState.Succeeded, completed.Value.State, completed.Value.ErrorMessage);
+            return (source.Value, completed.Value);
+        }
 
-        var completed = await acquisitions.GetAsync(started.Value.Namespace, started.Value.Name, default);
-        Assert.AreEqual(DataSourceAcquisitionState.Succeeded, completed.Value.State, completed.Value.ErrorMessage);
-        var artifact = completed.Value.Manifest?.Artifacts.Single();
+        var primary = await AcquireAsync("web-primary", "https://example.test/docs/primary.html");
+        var secondary = await AcquireAsync("web-secondary", "https://example.test/docs/secondary.html");
+        var artifact = primary.Acquisition.Manifest?.Artifacts.Single();
         Assert.IsNotNull(artifact);
         Assert.AreEqual(DataSourceArtifactDisposition.Publishable, artifact.Disposition);
-        Assert.AreEqual("web-builtin", completed.Value.Composition.Profile.Name);
-        Assert.AreEqual(DataSourceFlowContracts.Acquisition, completed.Value.Composition.Flow.Contract);
+        Assert.AreEqual("web-builtin", primary.Acquisition.Composition.Profile.Name);
+        Assert.AreEqual(DataSourceFlowContracts.Acquisition, primary.Acquisition.Composition.Flow.Contract);
         var durable = await factory.Services.GetRequiredService<ArtifactManagementService>()
             .GetFlowRunArtifactAsync(FlowRunArtifactId.Parse(artifact.ArtifactId), default);
         Assert.IsNotNull(durable);
@@ -142,8 +151,13 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
                     [
                         new KnowledgeDataSourceBinding
                         {
-                            Name = "origin",
-                            DataSource = new(source.Value.Name, scope)
+                            Name = "primary",
+                            DataSource = new(primary.Source.Name, scope)
+                        },
+                        new KnowledgeDataSourceBinding
+                        {
+                            Name = "secondary",
+                            DataSource = new(secondary.Source.Name, scope)
                         }
                     ],
                     ProjectionFlow = new() { Name = KnowledgePlatformResourceProvisioner.ProjectionFlowName },
@@ -177,6 +191,16 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         var snapshotService = factory.Services.GetRequiredService<KnowledgeSnapshotService>();
         var publishedSnapshots = await snapshotService.ListAsync(new(knowledgeSource.Value.Name), default);
         Assert.HasCount(2, publishedSnapshots);
+
+        using var searchResponse = await client.PostAsJsonAsync(
+            $"/api/knowledgesources/{knowledgeSource.Value.Name}/search",
+            new SearchKnowledgeRequest { Query = "shared", Limit = 10 });
+        Assert.AreEqual(HttpStatusCode.OK, searchResponse.StatusCode,
+            await searchResponse.Content.ReadAsStringAsync());
+        var search = await searchResponse.Content.ReadFromJsonAsync<KnowledgeRetrievalResult>();
+        Assert.IsNotNull(search);
+        Assert.HasCount(10, search.Items);
+        Assert.HasCount(2, search.Items.Select(item => item.ArtifactId).Distinct().ToArray());
     }
 
     [TestMethod]
@@ -249,9 +273,9 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         Assert.AreEqual("knowledge_source_data_sources_invalid", rejected.Code);
     }
 
-    private sealed class StubHttpFetcher(HttpFetchResult result) : IHttpContentFetcher
+    private sealed class StubHttpFetcher(Func<HttpFetchRequest, HttpFetchResult> fetch) : IHttpContentFetcher
     {
         public Task<HttpFetchResult> FetchAsync(HttpFetchRequest request, CancellationToken cancellationToken) =>
-            Task.FromResult(result);
+            Task.FromResult(fetch(request));
     }
 }

@@ -157,11 +157,11 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
     private async Task<List<Match>> FindAsync(InternalMcpToolInvocation invocation,
         IReadOnlyList<KnowledgeSnapshotArtifact> evidence, string query, int limit, CancellationToken cancellationToken)
     {
-        var result = new List<Match>();
+        var matchesByArtifact = new List<List<Match>>();
         var remaining = MaximumTotalScannedBytes;
         foreach (var item in evidence)
         {
-            if (result.Count >= limit || remaining <= 0) break;
+            if (remaining <= 0) break;
             var artifact = await RequireArtifactAsync(invocation.WorkspaceId, item, cancellationToken);
             if (!IsText(artifact.Receipt.MediaType)) continue;
             var length = checked((int)Math.Min(Math.Min(artifact.Receipt.Length, MaximumScannedBytesPerArtifact), remaining));
@@ -170,16 +170,35 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
             remaining -= bytes.Length;
             var content = Decode(bytes.Span, artifact.Receipt.MediaType);
             var searchOffset = 0;
-            while (result.Count < limit && searchOffset < content.Length)
+            var artifactMatches = new List<Match>();
+            while (artifactMatches.Count < limit && searchOffset < content.Length)
             {
                 var index = content.IndexOf(query, searchOffset, StringComparison.OrdinalIgnoreCase);
                 if (index < 0) break;
                 var start = Math.Max(0, index - ExcerptRadius);
                 var end = Math.Min(content.Length, index + query.Length + ExcerptRadius);
-                result.Add(new(item.ArtifactId, artifact.Receipt.MediaType, content[start..end], start, end));
+                artifactMatches.Add(new(item.ArtifactId, artifact.Receipt.MediaType, content[start..end], start, end));
                 searchOffset = index + query.Length;
             }
+
+            if (artifactMatches.Count > 0) matchesByArtifact.Add(artifactMatches);
         }
+
+        var result = new List<Match>(limit);
+        for (var matchIndex = 0; result.Count < limit; matchIndex++)
+        {
+            var added = false;
+            foreach (var artifactMatches in matchesByArtifact)
+            {
+                if (matchIndex >= artifactMatches.Count) continue;
+                result.Add(artifactMatches[matchIndex]);
+                added = true;
+                if (result.Count == limit) break;
+            }
+
+            if (!added) break;
+        }
+
         return result;
     }
 
