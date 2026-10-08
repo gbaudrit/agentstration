@@ -27,6 +27,7 @@ else
                 <label><span>@T("Namespace")</span><input @bind="sourceNamespace" maxlength="128" /></label>
             }
             <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="description" maxlength="2000"></textarea></label>
+            <label class="knowledge-choice form-span-2" data-testid="knowledge-source-editor-enabled-option"><input type="checkbox" @bind="enabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("ProjectionEnabledHelp")</small></span></label>
             <label><span>@T("ProjectionFlow")</span><select @bind="projectionFlowKey" required data-testid="knowledge-source-projection-flow"><option value="">@T("SelectProjectionFlow")</option>@foreach (var flow in projectionFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
             <label><span>@T("RetrievalFlow")</span><select @bind="retrievalFlowKey" required data-testid="knowledge-source-retrieval-flow"><option value="">@T("SelectRetrievalFlow")</option>@foreach (var flow in retrievalFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
             <section class="form-span-2 panel form-section" data-testid="knowledge-source-data-source-bindings">
@@ -39,13 +40,12 @@ else
                         <label><span>@T("DataSource")</span><select @bind="binding.DataSourceKey" required><option value="">@T("SelectDataSource")</option>@foreach (var dataSource in dataSources) { <option value="@DataSourceKey(dataSource)">@DataSourceLabel(dataSource)</option> }</select></label>
                         <label><span>@T("TransformationFlowOptional")</span><select @bind="binding.TransformationFlowKey"><option value="">@T("IdentityTransformation")</option>@foreach (var flow in transformationFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
                         <label class="knowledge-choice"><input type="checkbox" @bind="binding.Required" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("RequiredInput")</strong><small>@T("RequiredInputHelp")</small></span></label>
-                        <label><span>@T("MaximumAgeHours")</span><input type="number" min="0.01" step="0.01" @bind="binding.MaximumAgeHours" /><small>@T("MaximumAgeHoursHelp")</small></label>
+                        <label><span>@T("MaximumAge")</span><input type="text" inputmode="numeric" placeholder="hh:mm:ss" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" title="@T("MaximumAgeFormat")" @bind="binding.MaximumAgeText" data-testid="knowledge-source-binding-maximum-age" /><small>@T("MaximumAgeHelp")</small></label>
                         <label class="form-span-2"><span>@T("TransformationConfiguration")</span><textarea class="runner-json" rows="5" @bind="binding.ConfigurationJson"></textarea><small>@T("TransformationConfigurationHelp")</small></label>
                         <div class="form-actions form-span-2"><button class="text-button" type="button" @onclick="() => RemoveBinding(binding)">@T("Remove")</button></div>
                     </div>
                 }
             </section>
-            <label class="knowledge-choice form-span-2" data-testid="knowledge-source-editor-enabled-option"><input type="checkbox" @bind="enabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("ProjectionEnabledHelp")</small></span></label>
         </div>
         <div class="form-actions"><button class="button-primary" type="submit" disabled="@busy">@(busy ? T("Saving") : T("Save"))</button></div>
     </EditForm>
@@ -161,8 +161,33 @@ else
         if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object) throw new ArgumentException(T("JsonObjectRequired"));
         return new() { Name = value.Name.Trim(), DataSource = DataSourceReference(value.DataSourceKey),
             TransformationFlow = FlowTarget(value.TransformationFlowKey), Configuration = document.RootElement.Clone(), Required = value.Required,
-            MaximumAge = value.MaximumAgeHours is { } hours ? TimeSpan.FromHours(hours) : null };
+            MaximumAge = ParseMaximumAge(value.MaximumAgeText) };
     }
+    private TimeSpan? ParseMaximumAge(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var parts = value.Split(':');
+        if (parts.Length != 3
+            || !long.TryParse(parts[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var hours)
+            || !int.TryParse(parts[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var minutes)
+            || !int.TryParse(parts[2], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var seconds)
+            || hours < 0 || minutes is < 0 or > 59 || seconds is < 0 or > 59
+            || hours > (long)TimeSpan.MaxValue.TotalHours)
+            throw new ArgumentException(T("MaximumAgeFormat"));
+        try
+        {
+            return new TimeSpan(checked(hours * TimeSpan.TicksPerHour
+                + minutes * TimeSpan.TicksPerMinute
+                + seconds * TimeSpan.TicksPerSecond));
+        }
+        catch (OverflowException exception)
+        {
+            throw new ArgumentException(T("MaximumAgeFormat"), exception);
+        }
+    }
+    private static string FormatMaximumAge(TimeSpan? value) => value is null
+        ? string.Empty
+        : $"{(long)value.Value.TotalHours:00}:{value.Value.Minutes:00}:{value.Value.Seconds:00}";
     private static string DataSourceKey(DataSourceResource value) => $"{value.ScopeRef!.Value.Value}|{value.Namespace.Value}|{value.Name}";
     private static string DataSourceLabel(DataSourceResource value) => $"{value.Definition.DisplayName} · {value.ScopeRef}";
     private ResourceReference DataSourceReference(string key)
@@ -191,7 +216,7 @@ else
         public string TransformationFlowKey { get; set; } = string.Empty;
         public string ConfigurationJson { get; set; } = "{}";
         public bool Required { get; set; } = true;
-        public double? MaximumAgeHours { get; set; }
+        public string MaximumAgeText { get; set; } = string.Empty;
         public static BindingModel From(KnowledgeDataSourceBinding value, ResourceNamespace owner) => new()
         {
             Name = value.Name,
@@ -200,7 +225,7 @@ else
             TransformationFlowKey = TargetKey(value.TransformationFlow, owner),
             ConfigurationJson = System.Text.Json.JsonSerializer.Serialize(value.Configuration, IndentedJson),
             Required = value.Required,
-            MaximumAgeHours = value.MaximumAge?.TotalHours
+            MaximumAgeText = FormatMaximumAge(value.MaximumAge)
         };
     }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }

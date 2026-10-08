@@ -28,8 +28,9 @@
   <data name="IdentityTransformation" xml:space="preserve"><value>Aucune transformation · conserver les artefacts</value></data>
   <data name="RequiredInput" xml:space="preserve"><value>Entrée requise</value></data>
   <data name="RequiredInputHelp" xml:space="preserve"><value>Empêche la projection si cette entrée ne dispose d’aucune acquisition réussie.</value></data>
-  <data name="MaximumAgeHours" xml:space="preserve"><value>Âge maximal (heures)</value></data>
-  <data name="MaximumAgeHoursHelp" xml:space="preserve"><value>Facultatif. Les acquisitions plus anciennes sont signalées comme obsolètes et ne peuvent pas être projetées.</value></data>
+  <data name="MaximumAge" xml:space="preserve"><value>Âge maximal (hh:mm:ss)</value></data>
+  <data name="MaximumAgeHelp" xml:space="preserve"><value>Facultatif. Les heures peuvent dépasser 24. Les acquisitions plus anciennes sont signalées comme obsolètes et ne peuvent pas être projetées.</value></data>
+  <data name="MaximumAgeFormat" xml:space="preserve"><value>L’âge maximal doit utiliser le format hh:mm:ss ; les heures peuvent dépasser 24.</value></data>
   <data name="TransformationConfiguration" xml:space="preserve"><value>Configuration de la transformation (JSON)</value></data>
   <data name="TransformationConfigurationHelp" xml:space="preserve"><value>Fournissez un objet JSON borné transmis uniquement au Flow de transformation de cette liaison.</value></data>
   <data name="ProjectionEditorDescription" xml:space="preserve"><value>Projetez une ou plusieurs sources de données gouvernées dans un snapshot de connaissances immuable.</value></data>

@@ -34,6 +34,9 @@ public sealed class KnowledgeSourceEditorTests
             Assert.IsTrue(rendered.Find("[data-testid='knowledge-source-retrieval-flow']").HasAttribute("required"));
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-data-source-bindings']"));
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-editor-enabled-option'].knowledge-choice"));
+            Assert.IsTrue(
+                rendered.Markup.IndexOf("knowledge-source-editor-enabled-option", StringComparison.Ordinal)
+                < rendered.Markup.IndexOf("knowledge-source-projection-flow", StringComparison.Ordinal));
             Assert.IsFalse(rendered.Markup.Contains("Legacy direct Flow bindings", StringComparison.Ordinal));
         });
 
@@ -62,6 +65,7 @@ public sealed class KnowledgeSourceEditorTests
             $"{DataSourceScope.Value}|default|documentation");
         rendered.Find("[data-testid='knowledge-source-data-source-bindings'] textarea")
             .Change("{\"format\":\"markdown\"}");
+        rendered.Find("[data-testid='knowledge-source-binding-maximum-age']").Change("25:30:45");
         rendered.Find("button[type='submit']").Click();
 
         rendered.WaitForAssertion(() =>
@@ -70,6 +74,8 @@ public sealed class KnowledgeSourceEditorTests
             Assert.HasCount(1, client.CreatedRequest.Properties.DataSources);
             Assert.AreEqual("documentation", client.CreatedRequest.Properties.DataSources[0].DataSource.Name);
             Assert.AreEqual("markdown", client.CreatedRequest.Properties.DataSources[0].Configuration.GetProperty("format").GetString());
+            Assert.AreEqual(TimeSpan.FromHours(25) + TimeSpan.FromMinutes(30) + TimeSpan.FromSeconds(45),
+                client.CreatedRequest.Properties.DataSources[0].MaximumAge);
         });
     }
 
@@ -129,7 +135,7 @@ public sealed class KnowledgeSourceEditorTests
         var existing = ProjectedSource() with { Definition = ProjectedSource().Definition with
         {
             DataSources = [ProjectedSource().Definition.DataSources[0] with
-                { Configuration = JsonSerializer.SerializeToElement(new { format = "markdown" }) }]
+                { Configuration = JsonSerializer.SerializeToElement(new { format = "markdown" }), MaximumAge = TimeSpan.FromHours(49) + TimeSpan.FromMinutes(2) + TimeSpan.FromSeconds(3) }]
         } };
         var client = new KnowledgeClientStub(existing);
         using var context = CreateContext(client);
@@ -140,10 +146,14 @@ public sealed class KnowledgeSourceEditorTests
 
         rendered.WaitForAssertion(() => Assert.HasCount(1,
             rendered.FindAll("[data-testid='knowledge-source-data-source-bindings']")));
+        Assert.AreEqual("49:02:03",
+            rendered.Find("[data-testid='knowledge-source-binding-maximum-age']").GetAttribute("value"));
         rendered.Find("button[type='submit']").Click();
 
         rendered.WaitForAssertion(() => Assert.AreEqual("markdown",
             client.UpdatedRequest?.Properties.DataSources[0].Configuration.GetProperty("format").GetString()));
+        Assert.AreEqual(TimeSpan.FromHours(49) + TimeSpan.FromMinutes(2) + TimeSpan.FromSeconds(3),
+            client.UpdatedRequest?.Properties.DataSources[0].MaximumAge);
     }
 
     [TestMethod]
