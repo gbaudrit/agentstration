@@ -224,6 +224,16 @@ public sealed class KnowledgeFlowActivationGuard : IFlowVersionActivationGuard
             ValidateRetrieval(version);
             return Task.CompletedTask;
         }
+        if (string.Equals(contract, KnowledgeFlowContracts.Projection, StringComparison.Ordinal))
+        {
+            RequireObjectSchema(version.Graph?.InputSchema, "input");
+            RequireProperties(version.Graph!.InputSchema!.Value,
+                ["knowledgeSourceId", "knowledgeSourceUid", "knowledgeSourceGeneration", "inputs", "artifacts",
+                    "parameters", "caller", "correlationId", "projectionId"], "input");
+            RequireObjectSchema(version.Graph.OutputSchema, "output");
+            RequireProperties(version.Graph.OutputSchema!.Value, ["artifacts"], "output");
+            return Task.CompletedTask;
+        }
         if (!string.Equals(contract, KnowledgeFlowContracts.Ingestion, StringComparison.Ordinal))
             throw new FlowValidationException("knowledge_flow_contract_unknown",
                 $"Knowledge Flow contract '{contract}' is not supported.");
@@ -280,7 +290,42 @@ public sealed class KnowledgeFlowActivationGuard : IFlowVersionActivationGuard
     }
 
     private static FlowValidationException Invalid(string direction, string detail) =>
-        new("knowledge_ingestion_contract_invalid", $"The {KnowledgeFlowContracts.Ingestion} {direction} schema {detail}.");
+        new("knowledge_flow_contract_invalid", $"The Knowledge Flow {direction} schema {detail}.");
+}
+
+public sealed class ArtifactTransformationFlowActivationGuard : IFlowVersionActivationGuard
+{
+    public Task ValidateActivationAsync(WorkspaceId workspaceId, FlowVersion version, CancellationToken cancellationToken)
+    {
+        _ = workspaceId;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!version.Metadata.TryGetValue(FlowMetadataKeys.Contract, out var contract)
+            || !string.Equals(contract, KnowledgeFlowContracts.ArtifactTransformation, StringComparison.Ordinal))
+            return Task.CompletedTask;
+        Require(version.Graph?.InputSchema,
+            ["bindingName", "dataSource", "artifacts", "configuration", "caller", "correlationId", "transformationId"],
+            "input");
+        Require(version.Graph?.OutputSchema, ["artifacts"], "output");
+        return Task.CompletedTask;
+    }
+
+    private static void Require(JsonElement? schema, IReadOnlyList<string> names, string direction)
+    {
+        if (schema is not { ValueKind: JsonValueKind.Object }
+            || !schema.Value.TryGetProperty("type", out var type) || type.GetString() != "object"
+            || !schema.Value.TryGetProperty("properties", out var properties) || properties.ValueKind != JsonValueKind.Object
+            || !schema.Value.TryGetProperty("required", out var required) || required.ValueKind != JsonValueKind.Array)
+            throw Invalid(direction, "must be an object schema with properties and required arrays");
+        var requiredNames = required.EnumerateArray().Where(value => value.ValueKind == JsonValueKind.String)
+            .Select(value => value.GetString()!).ToHashSet(StringComparer.Ordinal);
+        foreach (var name in names)
+            if (!properties.TryGetProperty(name, out _) || !requiredNames.Contains(name))
+                throw Invalid(direction, $"must require property '{name}'");
+    }
+
+    private static FlowValidationException Invalid(string direction, string detail) =>
+        new("artifact_transformation_contract_invalid",
+            $"The {KnowledgeFlowContracts.ArtifactTransformation} {direction} schema {detail}.");
 }
 
 public sealed class KnowledgeArtifactReferenceValidator(IResourceStore store)
@@ -368,7 +413,10 @@ public sealed class KnowledgeFlowDeletionGuard(
             value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
             && targetId == workspaceId.Value
             && (References(value, value.Definition.IngestionFlow, flowId)
-                || References(value, value.Definition.RetrievalFlow, flowId)));
+                || References(value, value.Definition.ProjectionFlow, flowId)
+                || References(value, value.Definition.RetrievalFlow, flowId)
+                || value.Definition.DataSources.Any(binding =>
+                    References(value, binding.TransformationFlow, flowId))));
         if (usage is not null)
             throw new FlowValidationException("flow_in_use_by_knowledge_source",
                 $"Flow '{flowId}' is referenced by KnowledgeSource '{usage.Address}'.");
@@ -398,8 +446,11 @@ public sealed class KnowledgeFlowDeletionGuard(
         var retained = snapshots.Select(value => value.Value).FirstOrDefault(value =>
             value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
             && targetId == workspaceId.Value
-            && string.Equals(value.IngestionFlow.Name, flowId.Value, StringComparison.Ordinal)
-            && value.IngestionFlow.Namespace == flowId.Namespace);
+            && (References(value.IngestionFlow, flowId)
+                || value.ProjectionFlow is not null && References(value.ProjectionFlow, flowId)
+                || value.RetrievalFlow is not null && References(value.RetrievalFlow, flowId)
+                || value.ProjectionInputs.Any(input => input.TransformationFlow is not null
+                    && References(input.TransformationFlow, flowId))));
         if (retained is not null)
             throw new FlowValidationException("flow_in_use_by_knowledge_snapshot",
                 $"Flow '{flowId}' is retained by Knowledge Snapshot '{retained.Address}'.");
@@ -432,6 +483,9 @@ public sealed class KnowledgeSnapshotFlowRunDeletionGuard(
             value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
             && targetId == workspaceId.Value
             && (string.Equals(value.IngestionFlowRunId, runId, StringComparison.Ordinal)
+                || string.Equals(value.ProjectionFlowRunId, runId, StringComparison.Ordinal)
+                || value.ProjectionInputs.Any(input => string.Equals(input.AcquisitionFlowRunId, runId, StringComparison.Ordinal)
+                    || string.Equals(input.TransformationFlowRunId, runId, StringComparison.Ordinal))
                 || value.Artifacts.Any(artifact => string.Equals(
                     artifact.StorageFlowRunId, runId, StringComparison.Ordinal))));
         if (retained is not null)

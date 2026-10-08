@@ -195,7 +195,8 @@ public sealed class KnowledgeRetrievalService(
             var profile = snapshot.Profile;
             try
             {
-                flow = profile?.RetrievalFlow
+                flow = snapshot.RetrievalFlow
+                    ?? profile?.RetrievalFlow
                     ?? (await sources.ResolveCompositionAsync(source.Value, cancellationToken)).Retrieval;
             }
             catch (Exception exception) when (exception is KnowledgeSourceValidationException or KnowledgeSourceProfileValidationException)

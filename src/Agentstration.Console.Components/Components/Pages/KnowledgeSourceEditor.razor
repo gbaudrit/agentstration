@@ -2,12 +2,13 @@
 @page "/knowledge-sources/{Name}/edit"
 @implements IDisposable
 @inject IKnowledgeSourcesClient Client
-@inject IKnowledgeSourceProfilesClient Profiles
+@inject IDataSourcesClient DataSources
+@inject IFlowApiClient Flows
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
 
 <PageTitle>@T(IsNew ? "CreateSource" : "EditSource") · Agentstration</PageTitle>
-<PageHeader Title="@T(IsNew ? "CreateSource" : "EditSource")" Description="@T("EditorDescription")" TestId="knowledge-source-editor">
+<PageHeader Title="@T(IsNew ? "CreateSource" : "EditSource")" Description="@T("ProjectionEditorDescription")" TestId="knowledge-source-editor">
     <Actions><a class="button-secondary" href="@(IsNew ? "/knowledge-sources" : DetailsUrl)">@T("Cancel")</a></Actions>
 </PageHeader>
 
@@ -23,9 +24,25 @@ else
                 <label><span>@T("Namespace")</span><input @bind="sourceNamespace" maxlength="128" /></label>
             }
             <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="description" maxlength="2000"></textarea></label>
-            <label><span>@T("Profile")</span><select @bind="profileKey" required data-testid="knowledge-source-profile"><option value="">@T("SelectProfile")</option>@foreach (var profile in profiles) { <option value="@Key(profile.Namespace, profile.Name)">@ProfileOptionLabel(profile)</option> }</select></label>
-            <label class="form-field-wide"><span>@T("SourceConfiguration")</span><textarea class="runner-json" rows="8" @bind="acquisitionConfigurationJson" data-testid="knowledge-source-configuration"></textarea><small>@T("SourceConfigurationHelp")</small></label>
-            <label class="knowledge-choice form-field-wide" data-testid="knowledge-source-editor-enabled-option"><input type="checkbox" @bind="enabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span></label>
+            <label><span>@T("ProjectionFlow")</span><select @bind="projectionFlowKey" required data-testid="knowledge-source-projection-flow"><option value="">@T("SelectProjectionFlow")</option>@foreach (var flow in projectionFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
+            <label><span>@T("RetrievalFlow")</span><select @bind="retrievalFlowKey" required data-testid="knowledge-source-retrieval-flow"><option value="">@T("SelectRetrievalFlow")</option>@foreach (var flow in retrievalFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
+            <section class="form-span-2 panel form-section" data-testid="knowledge-source-data-source-bindings">
+                <div class="panel-header"><div><p class="eyebrow">@T("ProjectionInputs")</p><h2>@T("DataSourceBindings")</h2><p>@T("DataSourceBindingsHelp")</p></div><button class="button-secondary" type="button" @onclick="AddBinding">@T("AddDataSource")</button></div>
+                @if (bindings.Count == 0) { <p class="muted">@T("NoDataSourceBindings")</p> }
+                @foreach (var binding in bindings)
+                {
+                    <div class="form-grid knowledge-binding-card">
+                        <label><span>@T("BindingName")</span><input @bind="binding.Name" maxlength="128" /></label>
+                        <label><span>@T("DataSource")</span><select @bind="binding.DataSourceKey" required><option value="">@T("SelectDataSource")</option>@foreach (var dataSource in dataSources) { <option value="@DataSourceKey(dataSource)">@DataSourceLabel(dataSource)</option> }</select></label>
+                        <label><span>@T("TransformationFlowOptional")</span><select @bind="binding.TransformationFlowKey"><option value="">@T("IdentityTransformation")</option>@foreach (var flow in transformationFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
+                        <label class="knowledge-choice"><input type="checkbox" @bind="binding.Required" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("RequiredInput")</strong><small>@T("RequiredInputHelp")</small></span></label>
+                        <label><span>@T("MaximumAgeHours")</span><input type="number" min="0.01" step="0.01" @bind="binding.MaximumAgeHours" /><small>@T("MaximumAgeHoursHelp")</small></label>
+                        <label class="form-span-2"><span>@T("TransformationConfiguration")</span><textarea class="runner-json" rows="5" @bind="binding.ConfigurationJson"></textarea><small>@T("TransformationConfigurationHelp")</small></label>
+                        <div class="form-actions form-span-2"><button class="text-button" type="button" @onclick="() => RemoveBinding(binding)">@T("Remove")</button></div>
+                    </div>
+                }
+            </section>
+            <label class="knowledge-choice form-span-2" data-testid="knowledge-source-editor-enabled-option"><input type="checkbox" @bind="enabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("ProjectionEnabledHelp")</small></span></label>
         </div>
         <div class="form-actions"><button class="button-primary" type="submit" disabled="@busy">@(busy ? T("Saving") : T("Save"))</button></div>
     </EditForm>
@@ -35,10 +52,11 @@ else
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
     private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<KnowledgeSourceProfileResource> profiles = [];
+    private IReadOnlyList<DataSourceResource> dataSources = [];
+    private IReadOnlyList<FlowOption> projectionFlows = [], retrievalFlows = [], transformationFlows = [];
+    private readonly List<BindingModel> bindings = [];
     private string technicalName = string.Empty, sourceNamespace = "default", displayName = string.Empty,
-        description = string.Empty, profileKey = string.Empty, acquisitionConfigurationJson = "{}";
-    private KnowledgeFlowTarget? legacyIngestionFlow, legacyRetrievalFlow;
+        description = string.Empty, projectionFlowKey = string.Empty, retrievalFlowKey = string.Empty;
     private string? etag, message;
     private bool enabled, busy, loading = true;
     private static readonly System.Text.Json.JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
@@ -53,8 +71,10 @@ else
         message = null;
         try
         {
-            var profilesTask = Profiles.GetAsync(cancellation.Token);
-            profiles = await profilesTask;
+            var dataSourcesTask = DataSources.GetAsync(cancellation.Token);
+            var flowsTask = LoadFlowsAsync();
+            await Task.WhenAll(dataSourcesTask, flowsTask);
+            dataSources = await dataSourcesTask;
             if (!IsNew)
             {
                 var snapshot = await Client.GetAsync(ExistingNamespace, Name!, cancellation.Token);
@@ -63,11 +83,16 @@ else
                 displayName = snapshot.Value.Definition.DisplayName;
                 description = snapshot.Value.Definition.Description ?? string.Empty;
                 enabled = snapshot.Value.Definition.Enabled;
-                acquisitionConfigurationJson = System.Text.Json.JsonSerializer.Serialize(
-                    snapshot.Value.Definition.AcquisitionConfiguration, IndentedJson);
-                legacyIngestionFlow = snapshot.Value.Definition.IngestionFlow;
-                legacyRetrievalFlow = snapshot.Value.Definition.RetrievalFlow;
-                profileKey = ReferenceKey(snapshot.Value.Definition.Profile, snapshot.Value.Namespace);
+                projectionFlowKey = TargetKey(snapshot.Value.Definition.ProjectionFlow, snapshot.Value.Namespace);
+                retrievalFlowKey = TargetKey(snapshot.Value.Definition.RetrievalFlow, snapshot.Value.Namespace);
+                bindings.Clear();
+                bindings.AddRange(snapshot.Value.Definition.DataSources.Select(value => BindingModel.From(value, snapshot.Value.Namespace)));
+            }
+            else
+            {
+                projectionFlowKey = projectionFlows.FirstOrDefault(value => value.Name == "knowledge-projection-builtin")?.Key ?? string.Empty;
+                retrievalFlowKey = retrievalFlows.FirstOrDefault(value => value.Name == "knowledge-retrieval-builtin")?.Key ?? string.Empty;
+                AddBinding();
             }
         }
         catch (Exception exception) { message = exception.Message; }
@@ -81,21 +106,14 @@ else
         message = null;
         try
         {
-            using var configuration = System.Text.Json.JsonDocument.Parse(acquisitionConfigurationJson);
-            if (configuration.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
-            {
-                message = T("SourceConfigurationObjectRequired");
-                return;
-            }
             var properties = new KnowledgeSourceProperties
             {
                 DisplayName = displayName.Trim(),
                 Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
                 Enabled = enabled,
-                AcquisitionConfiguration = configuration.RootElement.Clone(),
-                Profile = Reference(profileKey),
-                IngestionFlow = string.IsNullOrWhiteSpace(profileKey) && !IsNew ? legacyIngestionFlow : null,
-                RetrievalFlow = string.IsNullOrWhiteSpace(profileKey) && !IsNew ? legacyRetrievalFlow : null
+                DataSources = bindings.Select(ToBinding).ToArray(),
+                ProjectionFlow = FlowTarget(projectionFlowKey),
+                RetrievalFlow = FlowTarget(retrievalFlowKey)
             };
             var saved = IsNew
                 ? await Client.CreateAsync(new CreateKnowledgeSourceRequest(technicalName.Trim(), properties, sourceNamespace.Trim()), cancellation.Token)
@@ -111,13 +129,66 @@ else
         finally { busy = false; }
     }
 
-    private static string Key(ResourceNamespace ns, string name) => $"{ns.Value}|{name}";
-    private string ProfileOptionLabel(KnowledgeSourceProfileResource value) => $"{value.Definition.DisplayName} ({value.ActiveVersion ?? T("Draft")})";
-    private static string ReferenceKey(ResourceReference? reference, ResourceNamespace owner) => reference is null ? string.Empty : Key(reference.Namespace ?? owner, reference.Name);
-    private static ResourceReference? Reference(string key)
+    private async Task LoadFlowsAsync()
     {
-        var parts = key.Split('|', 2);
-        return parts.Length != 2 ? null : new ResourceReference(parts[1], null, ResourceNamespace.Parse(parts[0]));
+        var summaries = await Flows.GetFlowsAsync(cancellation.Token);
+        var details = await Task.WhenAll(summaries.Select(value => Flows.GetFlowAsync(value.Namespace, value.Id, cancellation.Token)));
+        var options = details.Where(value => value.Enabled && value.ActiveVersion is not null)
+            .Select(value => new FlowOption(value.Namespace, value.Id, value.DisplayName ?? value.Name,
+                value.ActiveVersion!, value.Metadata.GetValueOrDefault("flow.contract"))).ToArray();
+        projectionFlows = options.Where(value => value.Contract == KnowledgeFlowContracts.Projection).ToArray();
+        retrievalFlows = options.Where(value => value.Contract == KnowledgeFlowContracts.Retrieval).ToArray();
+        transformationFlows = options.Where(value => value.Contract == KnowledgeFlowContracts.ArtifactTransformation).ToArray();
+    }
+    private void AddBinding() => bindings.Add(new() { Name = $"input-{bindings.Count + 1}" });
+    private void RemoveBinding(BindingModel binding) => bindings.Remove(binding);
+    private KnowledgeDataSourceBinding ToBinding(BindingModel value)
+    {
+        using var document = System.Text.Json.JsonDocument.Parse(value.ConfigurationJson);
+        if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object) throw new ArgumentException(T("JsonObjectRequired"));
+        return new() { Name = value.Name.Trim(), DataSource = DataSourceReference(value.DataSourceKey),
+            TransformationFlow = FlowTarget(value.TransformationFlowKey), Configuration = document.RootElement.Clone(), Required = value.Required,
+            MaximumAge = value.MaximumAgeHours is { } hours ? TimeSpan.FromHours(hours) : null };
+    }
+    private static string DataSourceKey(DataSourceResource value) => $"{value.ScopeRef!.Value.Value}|{value.Namespace.Value}|{value.Name}";
+    private static string DataSourceLabel(DataSourceResource value) => $"{value.Definition.DisplayName} · {value.ScopeRef}";
+    private ResourceReference DataSourceReference(string key)
+    {
+        var parts = key.Split('|', 3);
+        if (parts.Length != 3) throw new ArgumentException(T("DataSourceSelectionRequired"));
+        return new(parts[2], ResourceScopeRef.Parse(parts[0]), ResourceNamespace.Parse(parts[1]));
+    }
+    private static string FlowKey(FlowOption value) => value.Key;
+    private static string FlowLabel(FlowOption value) => $"{value.DisplayName} · {value.Namespace}/{value.Name}:{value.Version}";
+    private static KnowledgeFlowTarget? FlowTarget(string key)
+    {
+        var parts = key.Split('|', 3);
+        return parts.Length != 3 ? null : new() { Namespace = ResourceNamespace.Parse(parts[0]), Name = parts[1], UseActiveVersion = false, Version = parts[2] };
+    }
+    private static string TargetKey(KnowledgeFlowTarget? target, ResourceNamespace owner) => target is null ? string.Empty
+        : $"{(target.Namespace ?? owner).Value}|{target.Name}|{target.Version ?? "active"}";
+    private sealed record FlowOption(ResourceNamespace Namespace, string Name, string DisplayName, string Version, string? Contract)
+    {
+        public string Key => $"{Namespace.Value}|{Name}|{Version}";
+    }
+    private sealed class BindingModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string DataSourceKey { get; set; } = string.Empty;
+        public string TransformationFlowKey { get; set; } = string.Empty;
+        public string ConfigurationJson { get; set; } = "{}";
+        public bool Required { get; set; } = true;
+        public double? MaximumAgeHours { get; set; }
+        public static BindingModel From(KnowledgeDataSourceBinding value, ResourceNamespace owner) => new()
+        {
+            Name = value.Name,
+            DataSourceKey = value.DataSource.ScopeRef is null ? string.Empty
+                : $"{value.DataSource.ScopeRef.Value.Value}|{(value.DataSource.Namespace ?? owner).Value}|{value.DataSource.Name}",
+            TransformationFlowKey = TargetKey(value.TransformationFlow, owner),
+            ConfigurationJson = System.Text.Json.JsonSerializer.Serialize(value.Configuration, IndentedJson),
+            Required = value.Required,
+            MaximumAgeHours = value.MaximumAge?.TotalHours
+        };
     }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

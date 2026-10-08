@@ -56,3 +56,13 @@
     font-weight: 400;
     line-height: 1.4;
 }
+.knowledge-binding-card {
+    padding: 1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-medium);
+    background: var(--surface-subtle);
+}
+
+.knowledge-binding-card + .knowledge-binding-card {
+    margin-top: 1rem;
+}

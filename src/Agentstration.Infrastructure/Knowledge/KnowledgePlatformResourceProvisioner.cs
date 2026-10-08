@@ -23,6 +23,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
     public const string IngestionToolSetName = "knowledge-ingestion-builtin";
     public const string RetrievalToolSetName = "knowledge-retrieval-builtin";
     public const string IngestionFlowName = "knowledge-ingestion-builtin";
+    public const string ProjectionFlowName = "knowledge-projection-builtin";
     public const string RetrievalFlowName = "knowledge-retrieval-builtin";
     public const string WebIngestionFlowName = "knowledge-web-ingestion-builtin";
     public const string RestIngestionFlowName = "knowledge-rest-ingestion-builtin";
@@ -30,6 +31,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
     public const string ToolSetVersion = "1.0.0";
     public const string IngestionFlowVersion = "1.1.0";
     public const string RetrievalFlowVersion = "1.0.0";
+    public const string ProjectionFlowVersion = "1.0.0";
     public const string ProfileFlowVersion = "1.0.0";
     public const string ProfileVersion = "1.0.0";
 
@@ -48,6 +50,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 (KnowledgeFlowContracts.Read, KnowledgeBuiltinToolNames.RetrievalRead)
             ], cancellationToken);
         await EnsureIngestionFlowAsync(new WorkspaceId(workspaceId), cancellationToken);
+        await EnsureProjectionFlowAsync(new WorkspaceId(workspaceId), cancellationToken);
         await EnsureRetrievalFlowAsync(new WorkspaceId(workspaceId), cancellationToken);
         await EnsureHttpIngestionFlowAsync(new WorkspaceId(workspaceId), WebIngestionFlowName,
             "Web resource ingestion · Built-in", KnowledgeWebFetchMcpTool.ToolName, cancellationToken);
@@ -436,6 +439,36 @@ public sealed class KnowledgePlatformResourceProvisioner(
             KnowledgeFlowContracts.Retrieval,
             string.Join(',', KnowledgeFlowContracts.Search, KnowledgeFlowContracts.Query, KnowledgeFlowContracts.Read),
             RetrievalFlowVersion, graph, cancellationToken);
+    }
+
+    private async Task EnsureProjectionFlowAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
+    {
+        var input = KnowledgeBuiltinSchemas.ProjectionInput;
+        var output = KnowledgeBuiltinSchemas.IngestionOutput;
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            InputSchema = input,
+            OutputSchema = output,
+            Steps =
+            [
+                new InputFlowStepDefinition
+                {
+                    Name = "input",
+                    DisplayName = "Projection inputs",
+                    Schema = input
+                },
+                new OutputFlowStepDefinition
+                {
+                    Name = "output",
+                    DisplayName = "Projected artifacts",
+                    OutputMapping = JsonSerializer.SerializeToElement(new { artifacts = "${input.artifacts}" })
+                }
+            ],
+            Transitions = [new("input-output", "input", "completed", "output")]
+        };
+        await CreateAndPublishFlowAsync(workspaceId, ProjectionFlowName, "Knowledge projection · Built-in",
+            KnowledgeFlowContracts.Projection, null, ProjectionFlowVersion, graph, cancellationToken);
     }
 
     private async Task CreateAndPublishFlowAsync(WorkspaceId workspaceId, string name, string displayName, string contract,
