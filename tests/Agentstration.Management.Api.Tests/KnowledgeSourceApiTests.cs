@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Artifacts;
@@ -337,7 +338,9 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             FlowRunId = "builtin-producer",
             FlowStepId = "output"
         }), default);
-        var content = "Agentstration builtin retrieval is deterministic."u8.ToArray();
+        var expectedContent = "Agentstration builtin retrieval is deterministic." +
+            new string('x', KnowledgeRetrievalService.MaximumCitationExcerptCharacters);
+        var content = Encoding.UTF8.GetBytes(expectedContent);
         _ = await artifacts.WriteAsync(staged.Value.ArtifactId, 0, content, default);
         _ = await artifacts.SealAsync(staged.Value.ArtifactId, default);
         var storedOutput = await factory.Services.GetRequiredService<ArtifactStorageWriteMcpTool>().ExecuteAsync(
@@ -422,7 +425,10 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             Offset = 0
         }, default);
         Assert.HasCount(1, read.Items);
-        Assert.AreEqual("Agentstration builtin retrieval is deterministic.", read.Items[0].Content);
+        Assert.AreEqual(expectedContent, read.Items[0].Content);
+        Assert.HasCount(1, read.Citations);
+        Assert.AreEqual(KnowledgeRetrievalService.MaximumCitationExcerptCharacters,
+            read.Citations[0].Excerpt?.Length);
     }
 
     [TestMethod]

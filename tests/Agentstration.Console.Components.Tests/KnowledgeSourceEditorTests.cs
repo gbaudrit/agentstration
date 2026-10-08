@@ -251,6 +251,19 @@ public sealed class KnowledgeSourceEditorTests
             StringAssert.Contains(rendered.Find("[data-testid='knowledge-snapshot-details']").TextContent,
                 "application/json");
         });
+
+        rendered.Find("[data-testid='knowledge-source-retrieval-tab']").Click();
+        rendered.Find("[data-testid='knowledge-retrieval-operation']").Change("read");
+        rendered.WaitForAssertion(() =>
+        {
+            var artifactOption = rendered.Find(
+                "[data-testid='knowledge-retrieval-artifact'] option[value='artifact-0123456789abcdef']");
+            StringAssert.Contains(artifactOption.TextContent, "application/json");
+            Assert.IsTrue(rendered.Find("[data-testid='knowledge-retrieval-run']").HasAttribute("disabled"));
+        });
+        rendered.Find("[data-testid='knowledge-retrieval-artifact']").Change("artifact-0123456789abcdef");
+        rendered.WaitForAssertion(() =>
+            Assert.IsFalse(rendered.Find("[data-testid='knowledge-retrieval-run']").HasAttribute("disabled")));
     }
 
     [TestMethod]

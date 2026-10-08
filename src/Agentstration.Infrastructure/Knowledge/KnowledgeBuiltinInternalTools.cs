@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -136,12 +137,15 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
         var artifact = await RequireArtifactAsync(invocation.WorkspaceId, evidence, cancellationToken);
         var bytes = await durable.ReadAsync(invocation.WorkspaceId, artifact.Receipt.OpaqueReference, offset, length, cancellationToken);
         var content = Decode(bytes.Span, artifact.Receipt.MediaType);
+        var excerpt = content.Length <= KnowledgeRetrievalService.MaximumCitationExcerptCharacters
+            ? content
+            : content[..KnowledgeRetrievalService.MaximumCitationExcerptCharacters];
         var end = checked(offset + bytes.Length);
         return JsonSerializer.SerializeToElement(new
         {
             items = new[] { new { id = $"{artifactId}:{offset}", artifactId, content, mediaType = artifact.Receipt.MediaType,
                 score = (double?)null, metadata = new Dictionary<string, string>() } },
-            citations = new[] { new { artifactId, locator = $"bytes={offset}-{end}", start = offset, end, excerpt = content } },
+            citations = new[] { new { artifactId, locator = $"bytes={offset}-{end}", start = offset, end, excerpt } },
             answer = (string?)null, continuationToken = (string?)null
         });
     }

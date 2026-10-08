@@ -53,4 +53,5 @@
   <data name="Size" xml:space="preserve"><value>Size</value></data>
   <data name="ProducerFlow" xml:space="preserve"><value>Producer Flow</value></data>
   <data name="StorageFlow" xml:space="preserve"><value>Storage Flow</value></data>
+  <data name="SelectArtifact" xml:space="preserve"><value>Select a Snapshot artifact</value></data>
 </root>
