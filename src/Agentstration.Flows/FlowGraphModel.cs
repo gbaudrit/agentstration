@@ -202,7 +202,6 @@ public enum FlowOutputOutcome
     [JsonStringEnumMemberName("error")]
     Error
 }
-
 public sealed record OutputFlowStepDefinition : FlowStepDefinition
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

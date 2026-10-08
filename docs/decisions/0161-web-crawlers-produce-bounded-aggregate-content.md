@@ -1,4 +1,4 @@
-# ADR-0160: Web crawlers produce bounded aggregate content
+# ADR-0161: Web crawlers produce bounded aggregate content
 
 ## Status
 

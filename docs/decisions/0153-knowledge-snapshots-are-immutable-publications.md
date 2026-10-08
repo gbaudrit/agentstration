@@ -1,4 +1,4 @@
-# ADR-0152: Knowledge Snapshots are immutable artifact publications
+# ADR-0153: Knowledge Snapshots are immutable artifact publications
 
 ## Status
 

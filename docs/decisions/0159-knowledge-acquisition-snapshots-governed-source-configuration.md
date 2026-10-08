@@ -1,4 +1,4 @@
-# ADR-0158 — Knowledge acquisition snapshots governed source configuration
+# ADR-0159 — Knowledge acquisition snapshots governed source configuration
 
 ## Status
 

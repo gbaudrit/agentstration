@@ -66,4 +66,4 @@ Classified Flows use the single Flow-owned `flow.contract` metadata key:
 
 The contract value is a classification and schema boundary, not a new deployment unit. REST, Console, MCP, and background work delegate to the same family services inside the authoritative Agentstration process.
 
-See [ADR-0163](../decisions/0163-data-sources-own-governed-acquisition.md), [ADR-0165](../decisions/0165-flow-contracts-use-one-flow-owned-metadata-key.md), and [ADR-0166](../decisions/0166-knowledge-sources-project-data-source-artifacts.md).
+See [ADR-0164](../decisions/0164-data-sources-own-governed-acquisition.md), [ADR-0166](../decisions/0166-flow-contracts-use-one-flow-owned-metadata-key.md), and [ADR-0167](../decisions/0167-knowledge-sources-project-data-source-artifacts.md).

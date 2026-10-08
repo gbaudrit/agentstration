@@ -25,4 +25,4 @@ inputMapping:
   producerFlowStepId: persist
 ```
 
-The same values are reconstructed from durable FlowRun state after a restart. See ADR-0159.
+The same values are reconstructed from durable FlowRun state after a restart. See ADR-0160.

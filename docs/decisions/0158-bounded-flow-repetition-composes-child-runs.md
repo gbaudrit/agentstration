@@ -1,4 +1,4 @@
-# ADR-0157 — Bounded Flow repetition composes durable child runs
+# ADR-0158 — Bounded Flow repetition composes durable child runs
 
 ## Status
 
@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Some provider-neutral workflows must process an unknown number of bounded units. Knowledge acquisition is the first concrete case: an acquisition Tool can return an opaque content reference, while a Flow must repeatedly read bounded chunks and write them through governed StagedArtifact Tools. The graph executor intentionally rejects cycles, and copying complete content into one Flow transition would violate the bounded payload and staging decisions in ADR-0150 and ADR-0156.
+Some provider-neutral workflows must process an unknown number of bounded units. Knowledge acquisition is the first concrete case: an acquisition Tool can return an opaque content reference, while a Flow must repeatedly read bounded chunks and write them through governed StagedArtifact Tools. The graph executor intentionally rejects cycles, and copying complete content into one Flow transition would violate the bounded payload and staging decisions in ADR-0151 and ADR-0157.
 
 Allowing arbitrary graph cycles would make progress recovery, retry identity, cancellation, and resource bounds implicit. Embedding provider-specific pagination in the Flow runtime would instead couple the engine to Crawl4AI or another acquisition technology.
 

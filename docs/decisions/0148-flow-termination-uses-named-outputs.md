@@ -1,4 +1,4 @@
-# ADR-0167: Flow termination uses named outputs
+# ADR-0148: Flow termination uses named outputs
 
 ## Status
 

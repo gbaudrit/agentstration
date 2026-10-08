@@ -1,4 +1,4 @@
-# ADR-0153: Knowledge retrieval is a Snapshot-bound Flow invocation
+# ADR-0154: Knowledge retrieval is a Snapshot-bound Flow invocation
 
 ## Status
 

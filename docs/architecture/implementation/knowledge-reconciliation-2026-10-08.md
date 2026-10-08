@@ -10,7 +10,7 @@ This scoped reconciliation compares the implementation delivered through the #62
 - Crawl4AI AEP contributions and its `crawl4ai-web` Data Source Profile bundle;
 - the `agentstration-documentation` Bootstrap profile;
 - the shared LikeC4 model, DAT Markdown and Mermaid dynamic views;
-- ADR-0148 through ADR-0166, with particular attention to the explicit supersession statements in ADR-0165 and ADR-0166.
+- ADR-0149 through ADR-0167, with particular attention to the explicit supersession statements in ADR-0166 and ADR-0167.
 
 ## Reconciled model
 
@@ -28,13 +28,13 @@ This scoped reconciliation compares the implementation delivered through the #62
 
 ## Decision-history interpretation
 
-[ADR-0165](../../decisions/0165-flow-contracts-use-one-flow-owned-metadata-key.md) explicitly replaces the earlier family-specific metadata keys and the pre-release `data.source.acquisition/v1` spelling. [ADR-0166](../../decisions/0166-knowledge-sources-project-data-source-artifacts.md) explicitly supersedes Knowledge-owned acquisition, Knowledge Source Profiles, `knowledge.ingestion/v1`, and ADR-0163's temporary compatibility path. The repository had not shipped those resources, so the current model has no migration or historical-record rewrite requirement.
+[ADR-0166](../../decisions/0166-flow-contracts-use-one-flow-owned-metadata-key.md) explicitly replaces the earlier family-specific metadata keys and the pre-release `data.source.acquisition/v1` spelling. [ADR-0167](../../decisions/0167-knowledge-sources-project-data-source-artifacts.md) explicitly supersedes Knowledge-owned acquisition, Knowledge Source Profiles, `knowledge.ingestion/v1`, and ADR-0164's temporary compatibility path. The repository had not shipped those resources, so the current model has no migration or historical-record rewrite requirement.
 
-The earlier ADR files remain unchanged as historical evidence. Current guidance follows ADR-0165 and ADR-0166 rather than presenting the superseded paths as supported behavior.
+The earlier ADR files remain unchanged as historical evidence. Current guidance follows ADR-0166 and ADR-0167 rather than presenting the superseded paths as supported behavior.
 
 ## Remaining discrepancies and independent work
 
-- ADR-0155 still describes a built-in `knowledge.ingestion/v1` Flow. ADR-0166 supersedes that behavior but does not name ADR-0155 in its supersession list. The implementation provisions `datasource.acquisition/v1` Flows and `knowledge-projection-builtin`; a future decision-history cleanup should make this supersession explicit without rewriting ADR-0155.
+- ADR-0156 still describes a built-in `knowledge.ingestion/v1` Flow. ADR-0167 supersedes that behavior but does not name ADR-0156 in its supersession list. The implementation provisions `datasource.acquisition/v1` Flows and `knowledge-projection-builtin`; a future decision-history cleanup should make this supersession explicit without rewriting ADR-0156.
 - The dormant pre-release `KnowledgeSourceProfile`, Knowledge acquisition, and ingestion-oriented Snapshot remnants have been removed from contracts, services, adapters, Console surfaces, and composition. The supported model now starts with Data Source acquisition and continues with Knowledge projection, immutable snapshots, retrieval, and governed Tool exposure.
 - Automatic installation of an extension-contributed Data Source Profile bundle during AEP enrollment is not implemented. [#696](https://github.com/gbaudrit/agentstration/issues/696) owns that independent capability and requires installation at the extension's scope.
 - MCP-aligned normalization of Tool output `content` and `structuredContent` remains independent in [#737](https://github.com/gbaudrit/agentstration/issues/737).

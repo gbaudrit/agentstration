@@ -1,4 +1,4 @@
-# ADR-0154: Knowledge Tools use the governed internal MCP path
+# ADR-0155: Knowledge Tools use the governed internal MCP path
 
 ## Status
 

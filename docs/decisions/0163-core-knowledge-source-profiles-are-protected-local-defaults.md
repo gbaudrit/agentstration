@@ -1,4 +1,4 @@
-# ADR-0162: Core Knowledge Source Profiles are protected local defaults
+# ADR-0163: Core Knowledge Source Profiles are protected local defaults
 
 ## Status
 
@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-ADR-0161 introduced reusable, versioned Knowledge Source Profiles, but a fresh Workspace still had no immediately usable profile. A universal ingestion Flow cannot represent Web fetches, REST responses, and existing Artifact imports with one honest configuration schema and one implementation. Optional AEP extensions must enrich the catalog without becoming a prerequisite for local execution.
+ADR-0162 introduced reusable, versioned Knowledge Source Profiles, but a fresh Workspace still had no immediately usable profile. A universal ingestion Flow cannot represent Web fetches, REST responses, and existing Artifact imports with one honest configuration schema and one implementation. Optional AEP extensions must enrich the catalog without becoming a prerequisite for local execution.
 
 ADR-0069 treats the generic `agentstration.io/builtin` annotation as descriptive provenance, not as an authorization boundary. The three profiles in this decision need a stronger lifecycle because their definitions are code-owned compatibility contracts that Agentstration must be able to evolve predictably.
 
@@ -20,7 +20,7 @@ The Artifact import profile consumes explicit durable Artifact identifiers alrea
 
 The profile identities are reserved by the Knowledge family. Interactive create, update, publication, activation, application, delete, and YAML replacement operations cannot mutate those identities. System reconciliation is the only writer. The protection is based on the reserved identities and system Control Plane context, not on mutable annotations. Metadata still records `agentstration.io/builtin: "true"`, `agentstration.io/origin: core`, and `agentstration.io/owner: agentstration.knowledge` for discovery and diagnostics.
 
-Reconciliation creates a missing profile and its initial immutable revision, then leaves an existing core-owned profile untouched. It rejects a non-core resource occupying a reserved identity. Future code-owned revisions must retain historical revisions and use an explicit upgrade or repair operation rather than silently replacing an active profile. Administrators customize behavior by creating a separate profile, optionally applying a built-in revision through the ADR-0161 application mechanism.
+Reconciliation creates a missing profile and its initial immutable revision, then leaves an existing core-owned profile untouched. It rejects a non-core resource occupying a reserved identity. Future code-owned revisions must retain historical revisions and use an explicit upgrade or repair operation rather than silently replacing an active profile. Administrators customize behavior by creating a separate profile, optionally applying a built-in revision through the ADR-0162 application mechanism.
 
 ## Consequences
 

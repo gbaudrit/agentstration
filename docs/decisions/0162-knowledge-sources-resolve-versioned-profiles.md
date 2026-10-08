@@ -1,4 +1,4 @@
-# ADR-0161: Knowledge Sources resolve reusable versioned profiles
+# ADR-0162: Knowledge Sources resolve reusable versioned profiles
 
 ## Status
 
@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-ADR-0148 bound every Knowledge Source directly to ingestion and retrieval Flows. That keeps the source provider-neutral, but repeats the same Flow and governed Tool composition across every source. Replacing a crawler or retrieval implementation then requires editing each source independently and provides no single reviewable activation point.
+ADR-0149 bound every Knowledge Source directly to ingestion and retrieval Flows. That keeps the source provider-neutral, but repeats the same Flow and governed Tool composition across every source. Replacing a crawler or retrieval implementation then requires editing each source independently and provides no single reviewable activation point.
 
 Extensions may contribute specialized compositions, while operators also need stable logical profiles such as `web` whose implementation can be changed without changing the identity of every source. Accepted acquisitions, snapshots, and retrieval runs must remain reproducible after such a change.
 
@@ -27,4 +27,4 @@ Legacy Knowledge Sources with direct ingestion and retrieval Flow bindings remai
 - Source configuration remains data; executable authority stays in exact published Flow, Tool, provider, and ToolSet dependencies.
 - Bootstrap and Packs order profiles after their dependencies and before Knowledge Sources.
 - Flow deletion is rejected while a profile draft or immutable profile revision retains it.
-- ADR-0148 remains valid for Workspace ownership and provider neutrality, but its direct per-source Flow binding is now the compatibility path rather than the preferred model.
+- ADR-0149 remains valid for Workspace ownership and provider neutrality, but its direct per-source Flow binding is now the compatibility path rather than the preferred model.

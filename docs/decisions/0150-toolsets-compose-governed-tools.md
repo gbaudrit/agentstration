@@ -1,4 +1,4 @@
-# ADR-0149: ToolSets compose governed Tools without becoming authority
+# ADR-0150: ToolSets compose governed Tools without becoming authority
 
 ## Status
 

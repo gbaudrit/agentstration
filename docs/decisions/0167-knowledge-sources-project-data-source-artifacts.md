@@ -1,4 +1,4 @@
-# ADR-0166: Knowledge Sources project Data Source artifacts
+# ADR-0167: Knowledge Sources project Data Source artifacts
 
 ## Status
 
@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-ADR-0163 moved governed origin acquisition to Data Sources, but Knowledge Sources still retained their earlier ingestion-oriented shape. That leaves two authorities for acquisition and cannot express the intended cases where one acquired origin feeds several Knowledge views or one Knowledge view aggregates several origins.
+ADR-0164 moved governed origin acquisition to Data Sources, but Knowledge Sources still retained their earlier ingestion-oriented shape. That leaves two authorities for acquisition and cannot express the intended cases where one acquired origin feeds several Knowledge views or one Knowledge view aggregates several origins.
 
 The repository has not shipped the Knowledge Source Profile and direct Knowledge acquisition model. A compatibility migration for those pre-release resources would preserve the wrong ownership boundary and add behavior that no supported installation requires.
 
@@ -22,7 +22,7 @@ Only durable publishable Artifacts emitted by the projection Flow enter the immu
 
 `KnowledgeSourceProfile`, `knowledge.ingestion/v1`, and Knowledge-owned origin configuration are superseded for new Knowledge composition. No historical compatibility or record-rewrite requirement is introduced because this model has not shipped from the integration branch. Data Source Profiles remain the reusable governance and acquisition boundary.
 
-This decision supersedes the Knowledge-owned acquisition and Knowledge Source Profile decisions in ADR-0148, ADR-0151, ADR-0158, ADR-0161, and ADR-0162. It also supersedes ADR-0163's temporary compatibility path. Their historical rationale remains recorded; ADR-0152, ADR-0153, ADR-0154, ADR-0163's Data Source ownership, and ADR-0165's Flow metadata convention remain in force.
+This decision supersedes the Knowledge-owned acquisition and Knowledge Source Profile decisions in ADR-0149, ADR-0152, ADR-0159, ADR-0162, and ADR-0163. It also supersedes ADR-0164's temporary compatibility path. Their historical rationale remains recorded; ADR-0153, ADR-0154, ADR-0155, ADR-0164's Data Source ownership, and ADR-0166's Flow metadata convention remain in force.
 
 ## Consequences
 

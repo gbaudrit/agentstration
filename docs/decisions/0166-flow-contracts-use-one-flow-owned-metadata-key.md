@@ -1,4 +1,4 @@
-# ADR-0165: Flow contracts use one Flow-owned metadata key
+# ADR-0166: Flow contracts use one Flow-owned metadata key
 
 ## Status
 
@@ -24,7 +24,7 @@ Additional metadata that qualifies one contract remains family-owned. In particu
 
 The previous `artifact.contract`, `dataSource.contract`, and `knowledge.contract` keys are removed without aliases or dual reads. These contracts have not shipped from the integration branch, so existing local development data must be reset or reconciled through normal built-in provisioning rather than treated as a production migration.
 
-This decision supersedes the metadata-key conventions implicit in ADR-0150, ADR-0151, ADR-0153, and ADR-0163. It also replaces ADR-0163's pre-release `data.source.acquisition/v1` spelling with `datasource.acquisition/v1`. Their domain ownership, execution, validation, and provenance decisions remain unchanged.
+This decision supersedes the metadata-key conventions implicit in ADR-0151, ADR-0152, ADR-0154, and ADR-0164. It also replaces ADR-0164's pre-release `data.source.acquisition/v1` spelling with `datasource.acquisition/v1`. Their domain ownership, execution, validation, and provenance decisions remain unchanged.
 
 ## Consequences
 

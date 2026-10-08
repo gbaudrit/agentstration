@@ -1,4 +1,4 @@
-# ADR-0151: Knowledge acquisition runs published ingestion Flows
+# ADR-0152: Knowledge acquisition runs published ingestion Flows
 
 ## Status
 

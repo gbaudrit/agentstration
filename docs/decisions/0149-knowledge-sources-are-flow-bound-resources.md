@@ -1,4 +1,4 @@
-# ADR-0148: Knowledge Sources are Workspace-owned Flow-bound resources
+# ADR-0149: Knowledge Sources are Workspace-owned Flow-bound resources
 
 ## Status
 
