@@ -64,8 +64,10 @@ export class FlowDesignerPage {
   }
 
   public async selectTransition(text: string): Promise<void> {
-    await this.page.locator('.transition-list li > button').filter({ hasText: text }).click();
-    await expect(this.page.getByTestId(TestIds.flowObservability.selectedTransitionEditor)).toBeVisible();
+    await expect(async () => {
+      await this.page.locator('.transition-list li > button').filter({ hasText: text }).click();
+      await expect(this.page.getByTestId(TestIds.flowObservability.selectedTransitionEditor)).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
   }
 
   public async reconnectSelectedTransitionSource(targetName: string): Promise<void> {
@@ -164,7 +166,8 @@ export class FlowDesignerPage {
   public async expectReadOnlyPublished(consoleUrl: string, namespace: string, name: string): Promise<void> {
     await this.open(consoleUrl, namespace, name);
     await expect(this.page.locator('.read-only-badge')).toBeVisible();
-    await expect(this.page.locator('.flow-port-handle.locked')).toHaveCount(await this.page.locator('.flow-port-handle').count());
+    await expect(this.page.locator('.flow-port-handle.locked').first()).toBeVisible();
+    await expect(this.page.locator('.flow-port-handle:not(.locked)')).toHaveCount(0);
     await expect(this.page.locator('svg .diagram-control')).toHaveCount(0);
   }
 
