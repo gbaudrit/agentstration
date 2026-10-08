@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Flows;
@@ -122,6 +123,13 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             snapshot.Value.RetrievalFlow?.Name);
         Assert.HasCount(2, projection.ProjectionInput?.Inputs ?? []);
         Assert.HasCount(2, projection.ProjectionInput?.Artifacts ?? []);
+        var projectionInput = projection.ProjectionRequestInput!.Value;
+        Assert.AreEqual("website", projectionInput.GetProperty("inputs")[0].GetProperty("bindingName").GetString());
+        var projectedArtifact = projectionInput.GetProperty("artifacts")[0];
+        Assert.AreEqual("input-website", projectedArtifact.GetProperty("artifactId").GetString());
+        Assert.AreEqual("durable", projectedArtifact.GetProperty("kind").GetString());
+        Assert.AreEqual("publishable", projectedArtifact.GetProperty("disposition").GetString());
+        Assert.IsFalse(projectedArtifact.TryGetProperty("ArtifactId", out _));
 
         var history = await client.GetFromJsonAsync<KnowledgeProjectionResource[]>(
             $"/api/knowledgesources/{source.Value.Name}/projections");
@@ -1798,8 +1806,10 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
     private sealed class ProjectionTestDouble : IKnowledgeProjectionInputResolver, IKnowledgeProjectionFlowGateway,
         IKnowledgeRetrievalFlowGateway
     {
+        private static readonly JsonSerializerOptions FlowContractJsonOptions = CreateFlowContractJsonOptions();
         public string OutputArtifactId { get; set; } = string.Empty;
         public KnowledgeProjectionFlowInput? ProjectionInput { get; private set; }
+        public JsonElement? ProjectionRequestInput { get; private set; }
 
         public Task<KnowledgeDataSourceBindingReadiness> GetReadinessAsync(
             ResourceScopeRef executionScope,
@@ -1850,9 +1860,12 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             CancellationToken cancellationToken)
         {
             if (request.Flow.Contract == KnowledgeFlowContracts.Projection)
-                ProjectionInput = request.Input.Deserialize<KnowledgeProjectionFlowInput>();
+            {
+                ProjectionRequestInput = request.Input.Clone();
+                ProjectionInput = request.Input.Deserialize<KnowledgeProjectionFlowInput>(FlowContractJsonOptions);
+            }
             if (request.Flow.Contract == KnowledgeFlowContracts.ArtifactTransformation
-                && request.Input.Deserialize<KnowledgeArtifactTransformationInput>()?.BindingName == "optional-feed")
+                && request.Input.Deserialize<KnowledgeArtifactTransformationInput>(FlowContractJsonOptions)?.BindingName == "optional-feed")
                 return Task.FromResult(new KnowledgeProjectionFlowRunResult(request.RunId,
                     KnowledgeAcquisitionState.Failed, null, "optional_transform_failed",
                     "The optional feed could not be normalized.",
@@ -1874,6 +1887,13 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             return Task.FromResult(new KnowledgeProjectionFlowRunResult(request.RunId,
                 KnowledgeAcquisitionState.Succeeded, output, null, null,
                 new DateTimeOffset(2026, 10, 8, 8, 1, 0, TimeSpan.Zero)));
+        }
+
+        private static JsonSerializerOptions CreateFlowContractJsonOptions()
+        {
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+            return options;
         }
 
         public Task<KnowledgeRetrievalFlowResult> ExecuteAsync(

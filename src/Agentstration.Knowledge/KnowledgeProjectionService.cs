@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
@@ -71,6 +72,7 @@ public sealed class KnowledgeProjectionService(
     ISecurityAuditWriter audit,
     TimeProvider timeProvider)
 {
+    private static readonly JsonSerializerOptions FlowContractJsonOptions = CreateFlowContractJsonOptions();
     private readonly ConcurrentDictionary<(Guid WorkspaceId, Guid SourceUid), SemaphoreSlim> gates = new();
 
     public const int MaximumInputs = 32;
@@ -171,7 +173,7 @@ public sealed class KnowledgeProjectionService(
                     Caller = new(context.PrincipalId, context.TenantId, context.WorkspaceId),
                     CorrelationId = correlationId,
                     ProjectionId = projectionId
-                });
+                }, FlowContractJsonOptions);
                 var run = await flowRuns.ExecuteAsync(new(resource.ProjectionFlowRunId, projectionFlow, projectionInput,
                     context.PrincipalId.ToString("D"), correlationId, context.TenantId, context.WorkspaceId,
                     context.PrincipalId), cancellationToken);
@@ -283,7 +285,7 @@ public sealed class KnowledgeProjectionService(
                     Caller = new(context.PrincipalId, context.TenantId, context.WorkspaceId),
                     CorrelationId = correlationId,
                     TransformationId = $"{source.Name}:{binding.Name}:{evidence.AcquisitionId}"
-                });
+                }, FlowContractJsonOptions);
                 var run = await flowRuns.ExecuteAsync(new(runId, flow, input, context.PrincipalId.ToString("D"),
                     correlationId, context.TenantId, context.WorkspaceId, context.PrincipalId), cancellationToken);
                 if (run.State != KnowledgeAcquisitionState.Succeeded)
@@ -480,6 +482,13 @@ public sealed class KnowledgeProjectionService(
         ArtifactId = value.ArtifactId, Kind = value.Kind, Disposition = value.Disposition,
         Name = value.Name, MediaType = value.MediaType, Digest = value.Digest
     };
+
+    private static JsonSerializerOptions CreateFlowContractJsonOptions()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+        return options;
+    }
 
     private static void RequireContract(
         ResolvedKnowledgeFlowBinding flow,
