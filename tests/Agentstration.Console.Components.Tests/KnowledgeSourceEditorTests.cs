@@ -1,8 +1,8 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
-using Agentstration.DataSources.Contracts;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Models;
@@ -132,11 +132,14 @@ public sealed class KnowledgeSourceEditorTests
     public void EditionPreservesThePersistedSourceConfiguration()
     {
         using var culture = new TestCultureScope("en-US");
-        var existing = ProjectedSource() with { Definition = ProjectedSource().Definition with
+        var existing = ProjectedSource() with
         {
-            DataSources = [ProjectedSource().Definition.DataSources[0] with
+            Definition = ProjectedSource().Definition with
+            {
+                DataSources = [ProjectedSource().Definition.DataSources[0] with
                 { Configuration = JsonSerializer.SerializeToElement(new { format = "markdown" }), MaximumAge = TimeSpan.FromHours(49) + TimeSpan.FromMinutes(2) + TimeSpan.FromSeconds(3) }]
-        } };
+            }
+        };
         var client = new KnowledgeClientStub(existing);
         using var context = CreateContext(client);
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()

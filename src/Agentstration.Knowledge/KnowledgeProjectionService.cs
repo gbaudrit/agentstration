@@ -457,8 +457,12 @@ public sealed class KnowledgeProjectionService(
             var disposition = ParseEnum<KnowledgeArtifactDisposition>(entry, "disposition", role);
             result.Add(new()
             {
-                ArtifactId = id.GetString()!, Kind = kind, Disposition = disposition,
-                Name = Optional(entry, "name"), MediaType = Optional(entry, "mediaType"), Digest = Optional(entry, "digest")
+                ArtifactId = id.GetString()!,
+                Kind = kind,
+                Disposition = disposition,
+                Name = Optional(entry, "name"),
+                MediaType = Optional(entry, "mediaType"),
+                Digest = Optional(entry, "digest")
             });
         }
         return new() { Artifacts = result };

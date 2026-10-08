@@ -24,7 +24,8 @@ public sealed partial class ApiClientTests
                     ? (object)new ArtifactContentChunk(0, Convert.ToBase64String("preview"u8), true)
                     : artifact)
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new ArtifactsApiClient(http);
 
         _ = await client.GetStagedAsync(artifact.ArtifactId);
@@ -46,7 +47,8 @@ public sealed partial class ApiClientTests
         {
             requestPath = request.RequestUri!.PathAndQuery;
             return new HttpResponseMessage(HttpStatusCode.NotFound);
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new ArtifactsApiClient(http);
 
         var result = await client.GetDurableAsync(id);
@@ -72,7 +74,8 @@ public sealed partial class ApiClientTests
                     ? JsonContent.Create<IReadOnlyList<FlowRunArtifactMaterialization>>([materialization])
                     : JsonContent.Create(materialization)
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new ArtifactsApiClient(http);
 
         var started = await client.StartMaterializationAsync(id);

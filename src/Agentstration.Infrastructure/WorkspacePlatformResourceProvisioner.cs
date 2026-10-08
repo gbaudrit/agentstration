@@ -1,7 +1,7 @@
 using Agentstration.Identity.Contracts;
-using Agentstration.Infrastructure.Notifications;
 using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Knowledge;
+using Agentstration.Infrastructure.Notifications;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;

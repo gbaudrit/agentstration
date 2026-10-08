@@ -1,6 +1,6 @@
-using System.Text.Json;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
@@ -85,7 +85,9 @@ public sealed class ToolSetApiTests : ModelManagementApiTestBase
         _ = await agents.PutAgentAsync(Agent("docs-agent", "1.0.0", ["docs.search"]), null, true, default);
         var spec = new AgentDeploymentSpec
         {
-            Environment = "local", RuntimeProfileName = "maf-builtin", HostingMode = AgentHostingMode.InProcess
+            Environment = "local",
+            RuntimeProfileName = "maf-builtin",
+            HostingMode = AgentHostingMode.InProcess
         };
         var revision = await agents.CreateRevisionAsync("docs-agent", spec, default);
 
@@ -158,7 +160,9 @@ public sealed class ToolSetApiTests : ModelManagementApiTestBase
 
     private static ToolSetMember Member(string name, string capability, string route) => new()
     {
-        Tool = new ResourceReference(name), Capability = capability, Route = route
+        Tool = new ResourceReference(name),
+        Capability = capability,
+        Route = route
     };
 
     private static async Task SeedToolAsync(IResourceStore store, ResourceScopeRef scopeRef, string name, string externalId)
@@ -175,7 +179,8 @@ public sealed class ToolSetApiTests : ModelManagementApiTestBase
                 Generation = 1,
                 Definition = new ToolProviderProperties
                 {
-                    DisplayName = "Test provider", ProviderType = ToolProviderType.Mcp,
+                    DisplayName = "Test provider",
+                    ProviderType = ToolProviderType.Mcp,
                     Mcp = new McpToolProviderConfiguration { Internal = true }
                 }
             }, null, true, default);

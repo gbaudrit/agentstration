@@ -61,15 +61,15 @@ public sealed class FlowStepArtifactCleanupModeJsonConverter : JsonConverter<Flo
 {
     public override FlowStepArtifactCleanupMode Read(ref Utf8JsonReader reader, Type typeToConvert,
         JsonSerializerOptions options) => reader.TokenType switch
-    {
-        JsonTokenType.True => FlowStepArtifactCleanupMode.Always,
-        JsonTokenType.False => FlowStepArtifactCleanupMode.Never,
-        JsonTokenType.String when reader.GetString()?.Equals("auto", StringComparison.OrdinalIgnoreCase) == true =>
-            FlowStepArtifactCleanupMode.Auto,
-        JsonTokenType.String when bool.TryParse(reader.GetString(), out var clean) =>
-            clean ? FlowStepArtifactCleanupMode.Always : FlowStepArtifactCleanupMode.Never,
-        _ => throw new JsonException("Artifact output clean must be 'auto', true, or false.")
-    };
+        {
+            JsonTokenType.True => FlowStepArtifactCleanupMode.Always,
+            JsonTokenType.False => FlowStepArtifactCleanupMode.Never,
+            JsonTokenType.String when reader.GetString()?.Equals("auto", StringComparison.OrdinalIgnoreCase) == true =>
+                FlowStepArtifactCleanupMode.Auto,
+            JsonTokenType.String when bool.TryParse(reader.GetString(), out var clean) =>
+                clean ? FlowStepArtifactCleanupMode.Always : FlowStepArtifactCleanupMode.Never,
+            _ => throw new JsonException("Artifact output clean must be 'auto', true, or false.")
+        };
 
     public override void Write(Utf8JsonWriter writer, FlowStepArtifactCleanupMode value,
         JsonSerializerOptions options)

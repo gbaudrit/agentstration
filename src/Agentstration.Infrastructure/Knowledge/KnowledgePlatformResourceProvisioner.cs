@@ -77,31 +77,31 @@ public sealed class KnowledgePlatformResourceProvisioner(
         string externalTool,
         string capability,
         JsonElement configurationSchema) => new()
-    {
-        ApiVersion = ResourceApiVersions.CoreV1,
-        Kind = DataSourceResourceKinds.DataSourceProfile,
-        Metadata = new ResourceMetadata
         {
-            Name = name,
-            Annotations = new Dictionary<string, string>
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = DataSourceResourceKinds.DataSourceProfile,
+            Metadata = new ResourceMetadata
             {
-                [ResourceProvenanceAnnotations.BuiltIn] = "true",
-                [ResourceProvenanceAnnotations.Origin] = "agentstration.core",
-                [ResourceProvenanceAnnotations.Owner] = "agentstration"
-            }
-        },
-        ScopeRef = scope,
-        Generation = 1,
-        Status = Succeeded(),
-        Definition = new DataSourceProfileProperties
-        {
-            DisplayName = displayName,
-            Description = description,
-            Version = ProfileVersion,
-            Enabled = true,
-            ConfigurationSchema = configurationSchema,
-            AcquisitionFlow = new() { Name = acquisitionFlow, Version = ProfileFlowVersion, UseActiveVersion = false },
-            ToolBindings =
+                Name = name,
+                Annotations = new Dictionary<string, string>
+                {
+                    [ResourceProvenanceAnnotations.BuiltIn] = "true",
+                    [ResourceProvenanceAnnotations.Origin] = "agentstration.core",
+                    [ResourceProvenanceAnnotations.Owner] = "agentstration"
+                }
+            },
+            ScopeRef = scope,
+            Generation = 1,
+            Status = Succeeded(),
+            Definition = new DataSourceProfileProperties
+            {
+                DisplayName = displayName,
+                Description = description,
+                Version = ProfileVersion,
+                Enabled = true,
+                ConfigurationSchema = configurationSchema,
+                AcquisitionFlow = new() { Name = acquisitionFlow, Version = ProfileFlowVersion, UseActiveVersion = false },
+                ToolBindings =
             [
                 new()
                 {
@@ -110,19 +110,19 @@ public sealed class KnowledgePlatformResourceProvisioner(
                     Tool = new ResourceReference(AgentstrationToolProvider.ToolResourceName(externalTool), scope, ResourceNamespace.Default)
                 }
             ],
-            Limits = new Dictionary<string, JsonElement>
-            {
-                ["maximumBytes"] = JsonSerializer.SerializeToElement(1024 * 1024),
-                ["maximumRedirects"] = JsonSerializer.SerializeToElement(3),
-                ["timeoutSeconds"] = JsonSerializer.SerializeToElement(20)
-            },
-            Policies = new Dictionary<string, JsonElement>
-            {
-                ["publicNetworkOnly"] = JsonSerializer.SerializeToElement(true),
-                ["credentialsAllowed"] = JsonSerializer.SerializeToElement(false)
+                Limits = new Dictionary<string, JsonElement>
+                {
+                    ["maximumBytes"] = JsonSerializer.SerializeToElement(1024 * 1024),
+                    ["maximumRedirects"] = JsonSerializer.SerializeToElement(3),
+                    ["timeoutSeconds"] = JsonSerializer.SerializeToElement(20)
+                },
+                Policies = new Dictionary<string, JsonElement>
+                {
+                    ["publicNetworkOnly"] = JsonSerializer.SerializeToElement(true),
+                    ["credentialsAllowed"] = JsonSerializer.SerializeToElement(false)
+                }
             }
-        }
-    };
+        };
 
     private async Task EnsureDataSourceProfileAsync(
         DataSourceProfileResource desired,
@@ -377,8 +377,12 @@ public sealed class KnowledgePlatformResourceProvisioner(
         var output = KnowledgeBuiltinSchemas.RetrievalOutput;
         ToolRouteFlowStepDefinition Route(string name, string displayName, string capability) => new()
         {
-            Name = name, DisplayName = displayName, ToolSet = new(RetrievalToolSetName, ToolSetVersion),
-            Capability = capability, Route = "default", ArgumentsMapping = JsonSerializer.SerializeToElement("${input}")
+            Name = name,
+            DisplayName = displayName,
+            ToolSet = new(RetrievalToolSetName, ToolSetVersion),
+            Capability = capability,
+            Route = "default",
+            ArgumentsMapping = JsonSerializer.SerializeToElement("${input}")
         };
         var graph = new FlowGraphDefinition
         {

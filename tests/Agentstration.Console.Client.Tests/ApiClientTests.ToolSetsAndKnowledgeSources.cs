@@ -23,7 +23,8 @@ public sealed partial class ApiClientTests
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(toolSet) };
             response.Headers.ETag = EntityTagHeaderValue.Parse("\"toolset-etag\"");
             return response;
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new ToolSetsApiClient(http);
 
         var snapshot = await client.GetToolSetAsync(toolSet.Namespace, toolSet.Metadata.Name);
@@ -48,7 +49,8 @@ public sealed partial class ApiClientTests
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(exposure) };
             response.Headers.ETag = EntityTagHeaderValue.Parse("\"exposure-etag\"");
             return response;
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         var snapshot = await new KnowledgeSourcesApiClient(http).PublishExposureAsync(
             sourceNamespace,
@@ -86,7 +88,8 @@ public sealed partial class ApiClientTests
             var response = new HttpResponseMessage(HttpStatusCode.Created) { Content = JsonContent.Create(projection) };
             response.Headers.ETag = EntityTagHeaderValue.Parse("\"projection-etag\"");
             return response;
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         var snapshot = await new KnowledgeSourcesApiClient(http).StartProjectionAsync(
             sourceNamespace,

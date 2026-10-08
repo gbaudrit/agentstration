@@ -192,7 +192,11 @@ public sealed class ToolSetPackResourceHandler(ToolSetService service) : IPackRe
     private static ToolSetResource Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<ToolSetResource>(resource.Manifest.GetRawText());
     private static ManagedPackResource Managed(PackResourceDocument resource, ResourceNamespace @namespace, string token) => new()
     {
-        Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = token
+        Namespace = @namespace,
+        Kind = resource.Kind,
+        Name = resource.Name,
+        Path = resource.Path,
+        VersionToken = token
     };
 }
 

@@ -325,22 +325,22 @@ public sealed class McpToolCatalogTests
         string extensionId,
         AepTransportAuthenticationMode authenticationMode = AepTransportAuthenticationMode.None,
         ResourceReference? credential = null) => new()
-    {
-        ApiVersion = ResourceApiVersions.CoreV1,
-        Kind = ExtensionKinds.ExtensionRegistration,
-        Metadata = new ResourceMetadata { Name = name },
-        ScopeRef = WorkspaceScope,
-        Definition = new ExtensionRegistrationProperties
         {
-            DisplayName = name,
-            Endpoint = new Uri("http://extension/"),
-            ExpectedExtensionId = extensionId,
-            Enabled = true,
-            AuthenticationMode = authenticationMode,
-            EnrollmentMode = AepEnrollmentMode.PairingCode,
-            Credential = credential
-        }
-    };
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ExtensionKinds.ExtensionRegistration,
+            Metadata = new ResourceMetadata { Name = name },
+            ScopeRef = WorkspaceScope,
+            Definition = new ExtensionRegistrationProperties
+            {
+                DisplayName = name,
+                Endpoint = new Uri("http://extension/"),
+                ExpectedExtensionId = extensionId,
+                Enabled = true,
+                AuthenticationMode = authenticationMode,
+                EnrollmentMode = AepEnrollmentMode.PairingCode,
+                Credential = credential
+            }
+        };
 
     private static ToolProviderResource Provider() => new()
     {

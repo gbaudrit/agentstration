@@ -3,9 +3,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.DataSources;
 using Agentstration.DataSources.Contracts;
-using Agentstration.Identity.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
+using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
@@ -356,13 +356,13 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         string name,
         ResourceScopeRef scope,
         DataSourceProfileProperties definition) => new()
-    {
-        ApiVersion = ResourceApiVersions.CoreV1,
-        Kind = DataSourceResourceKinds.DataSourceProfile,
-        Metadata = new ResourceMetadata { Name = name },
-        ScopeRef = scope,
-        Definition = definition
-    };
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = DataSourceResourceKinds.DataSourceProfile,
+            Metadata = new ResourceMetadata { Name = name },
+            ScopeRef = scope,
+            Definition = definition
+        };
 
     private static DataSourceResource SourceResource(string name, ResourceScopeRef scope, ResourceReference profile) => new()
     {
