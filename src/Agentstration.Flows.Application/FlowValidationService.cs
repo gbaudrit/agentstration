@@ -91,7 +91,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             if (!NamePattern().IsMatch(step.Name)) issues.Add(Error("step_name_invalid", "Step names must contain letters, digits, '-' or '_'.", step.Name, property: "name"));
             if (!steps.TryAdd(step.Name, step)) issues.Add(Error("step_name_duplicate", $"Step '{step.Name}' is duplicated.", step.Name));
             await ValidateStepAsync(step, definition.Transitions, context, issues, cancellationToken);
-            if (step is AgentFlowStepDefinition or ToolFlowStepDefinition or ToolRouteFlowStepDefinition or FlowCallStepDefinition
+            if (step is AgentFlowStepDefinition or ToolFlowStepDefinition or ToolRouteFlowStepDefinition
                 && !definition.Transitions.Any(transition => transition.FromStep == step.Name && transition.Event == "error"))
                 issues.Add(Error(
                     "error_transition_required",
@@ -378,6 +378,18 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                     step.Name,
                     transition.Id,
                     "event"));
+
+            var errorOutputNames = target.Outputs
+                .Where(output => output.Outcome == FlowOutputOutcome.Error)
+                .Select(output => output.Name)
+                .ToHashSet(StringComparer.Ordinal);
+            if (errorOutputNames.Count > 0
+                && !transitions.Any(transition => transition.FromStep == step.Name && errorOutputNames.Contains(transition.Event)))
+                issues.Add(Error(
+                    "error_transition_required",
+                    $"Step '{step.Name}' requires a transition for one of its error outputs.",
+                    step.Name,
+                    property: "transitions"));
         }
         ValidateMappingAgainstSchema(step, target.InputSchema, issues);
         if (await resources.CreatesFlowCycleAsync(context.WorkspaceId.Value, context.OwnerFlowId.Value, target, token))

@@ -462,7 +462,16 @@ public sealed class FlowDesignerReadOnlyTests
     {
         using var culture = new CultureScope("en-US");
         using var context = CreateContext();
-        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false));
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }
+            ]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
         context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
         context.Services.AddSingleton<FlowEditorStore>();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -495,6 +504,9 @@ public sealed class FlowDesignerReadOnlyTests
         Assert.AreEqual("${transition.output}", call.InputMapping?.GetString());
         Assert.IsTrue(rendered.Find("[data-testid='flow-pass-transition-output']").HasAttribute("checked"));
         StringAssert.Contains(rendered.Markup, "Pass incoming transition output");
+        var errorTransition = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Transitions
+            .Single(transition => transition.FromStep == call.Name && transition.ToStep == "error");
+        Assert.AreEqual("rejected", errorTransition.Event);
 
         rendered.Find("[data-testid='flow-pass-transition-output']").Change(false);
         call = Assert.IsInstanceOfType<FlowCallStepDefinition>(context.Services.GetRequiredService<FlowEditorStore>()

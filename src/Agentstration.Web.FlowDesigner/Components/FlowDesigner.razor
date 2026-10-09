@@ -574,21 +574,34 @@ else
             "output" => new OutputFlowStepDefinition { Name = name, DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported Flow step type.")
         };
-        var errorTransition = step is AgentFlowStepDefinition or ToolFlowStepDefinition or FlowCallStepDefinition
-            ? ErrorOutputTransition(Editor.State.Resource.Definition, name)
-            : null;
+        IReadOnlyList<FlowDesignerFlowVersion>? callVersions = null;
+        if (step is FlowCallStepDefinition flowCall)
+        {
+            callVersions = await Resources.GetFlowVersionsAsync(flowCall.Flow.Namespace ?? Namespace, flowCall.Flow.ResourceId, cancellation.Token);
+            flowVersions = callVersions;
+        }
+        var errorEvent = step switch
+        {
+            AgentFlowStepDefinition or ToolFlowStepDefinition => "error",
+            FlowCallStepDefinition selectedCall => ResolveFlowVersion(selectedCall, callVersions ?? [])?.NamedOutputs
+                .FirstOrDefault(output => output.Outcome == FlowOutputOutcome.Error)?.Name,
+            _ => null
+        };
+        var errorTransition = errorEvent is null
+            ? null
+            : ErrorOutputTransition(Editor.State.Resource.Definition, name, errorEvent);
         await DispatchAsync(new AddStepCommand(step, new(40 + index * 180, 250), errorTransition));
         Editor.SelectStep(name);
-        if (step is FlowCallStepDefinition flowCall) await LoadFlowVersionsAsync(flowCall);
+        if (step is FlowCallStepDefinition addedCall) SyncFlowCallOutputs(addedCall, callVersions ?? []);
     }
 
-    private static FlowTransitionDefinition? ErrorOutputTransition(FlowGraphDefinition definition, string sourceStep)
+    private static FlowTransitionDefinition? ErrorOutputTransition(FlowGraphDefinition definition, string sourceStep, string errorEvent)
     {
         var target = definition.Steps.OfType<OutputFlowStepDefinition>()
             .FirstOrDefault(output => output.Outcome == FlowOutputOutcome.Error);
         return target is null
             ? null
-            : new($"{sourceStep}-error-{target.Name}", sourceStep, "error", target.Name);
+            : new($"{sourceStep}-{errorEvent}-{target.Name}", sourceStep, errorEvent, target.Name);
     }
 
     private async Task AddTransitionAsync() { if (!string.IsNullOrWhiteSpace(transitionFrom) && !string.IsNullOrWhiteSpace(transitionTo)) await CreateTransitionAsync(new($"{transitionFrom}-{transitionEvent}-{transitionTo}", transitionFrom, transitionEvent, transitionTo)); }
