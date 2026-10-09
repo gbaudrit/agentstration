@@ -49,12 +49,12 @@ The report records workload parameters, provider, elapsed time, runtime and OS m
 
 The fast, integration, and performance lanes cap concurrent test modules at 4, 2, and 1 respectively. Host-heavy API and Management modules also use one class worker per assembly. CI reruns the designated hosted modules sequentially through `scripts/ci/run-test-module-with-diagnostics.ps1` in the dedicated `hosted-module-diagnostics` job. That job runs in parallel with functional coverage and compiles only the designated test projects after restoring the repository graph, so memory safeguards do not extend the `build-and-test` critical path. Each JSON artifact contains the discovered count, duration, process peak working set, process peak private memory, aggregate peak working set for active `dotnet` processes, runtime, and OS. The diagnostic artifact deliberately excludes test output and payloads.
 
-The Management budgets below use Release runs on Windows 11 10.0.26200 with .NET 10.0.10/10.0.11, collected during #298. The consolidated `Agentstration.Api.Tests` baseline was collected on the same Windows build with .NET 10.0.11 during #142: 191 tests in 200 seconds, 1503.7 MiB peak working set, 1176.6 MiB peak private memory, and 1621.2 MiB aggregate `dotnet` working set. A warning is evidence to review the Linux and Windows trend; a failure caps regression relative to the retained baseline. Adjust these values only after retaining representative artifacts from both runner families.
+The Management budgets below use Release runs on Windows 11 10.0.26200 with .NET 10.0.10/10.0.11, collected during #298. `Agentstration.Management.Api.Tests` was recalibrated during #745 from 108-test Release runs: 1784.1 MiB peak working set on Ubuntu 24.04.5 with .NET 10.0.12 and 1757.6 MiB on Windows 11 10.0.26200 with .NET 10.0.11. The consolidated `Agentstration.Api.Tests` baseline was collected on the same Windows build with .NET 10.0.11 during #142: 191 tests in 200 seconds, 1503.7 MiB peak working set, 1176.6 MiB peak private memory, and 1621.2 MiB aggregate `dotnet` working set. A warning is evidence to review the Linux and Windows trend; a failure caps regression relative to the retained baseline. Adjust these values only after retaining representative artifacts from both runner families.
 
 | Module | Baseline peak (MiB) | Warning (MiB) | Failure (MiB) | Minimum tests |
 | --- | ---: | ---: | ---: | ---: |
 | `Agentstration.Api.Tests` | 1503.7 | 1700 | 2048 | 191 |
-| `Agentstration.Management.Api.Tests` | 749.3 | 900 | 1024 | 43 |
+| `Agentstration.Management.Api.Tests` | 1784.1 | 1920 | 2304 | 108 |
 | `Agentstration.Management.Bootstrap.Tests` | 355.3 | 500 | 700 | 23 |
 | `Agentstration.Management.Security.Tests` | 730.1 | 800 | 1024 | 38 |
 | `Agentstration.Management.Aep.Tests` | 322.1 | 450 | 700 | 11 |
