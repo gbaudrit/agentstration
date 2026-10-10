@@ -237,6 +237,9 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)");
 
+                    b.Property<bool>("IsWorkplaceTask")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("OwnerPrincipalId")
                         .IsRequired()
                         .HasMaxLength(36)
@@ -298,6 +301,8 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                     b.HasIndex("WorkspaceId", "InteractionId", "UpdatedAt");
 
                     b.HasIndex("WorkspaceId", "OwnerPrincipalId", "UpdatedAt");
+
+                    b.HasIndex("WorkspaceId", "OwnerPrincipalId", "IsWorkplaceTask", "UpdatedAt");
 
                     b.HasIndex("WorkspaceId", "Status", "UpdatedAt");
 

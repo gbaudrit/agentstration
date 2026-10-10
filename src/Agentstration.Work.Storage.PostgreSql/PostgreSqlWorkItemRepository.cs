@@ -41,6 +41,7 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         item.Property(value => value.EntryId).HasMaxLength(512);
         item.Property(value => value.AnchorTaskId).HasMaxLength(36);
         item.Property(value => value.FlowRunId).HasMaxLength(128);
+        item.HasIndex(value => new { value.WorkspaceId, value.OwnerPrincipalId, value.IsWorkplaceTask, value.UpdatedAt });
         item.Property(value => value.CreatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         item.Property(value => value.UpdatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         item.HasIndex(value => new { value.WorkspaceId, value.Status, value.UpdatedAt });
@@ -253,6 +254,7 @@ internal sealed class WorkItemDocument
     public string? EntryId { get; set; }
     public string? AnchorTaskId { get; set; }
     public string? FlowRunId { get; set; }
+    public bool IsWorkplaceTask { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public long Version { get; set; }
@@ -334,6 +336,7 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         if (!string.IsNullOrWhiteSpace(query.AnchorTaskId)) documents = documents.Where(value => value.AnchorTaskId == query.AnchorTaskId);
         if (query.IsContinuation == true) documents = documents.Where(value => value.AnchorTaskId != null);
         if (query.IsContinuation == false) documents = documents.Where(value => value.AnchorTaskId == null && value.WorkspaceId != null);
+        if (query.WorkplaceTasksOnly) documents = documents.Where(value => value.IsWorkplaceTask);
         if (query.OperationalTasks)
         {
             documents = documents.Where(value => value.AnchorTaskId == null && value.WorkspaceId != null);
@@ -488,6 +491,7 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         EntryId = Metadata(item, "workplace.entryId"),
         AnchorTaskId = Metadata(item, "workplace.taskId"),
         FlowRunId = Metadata(item, "flowRunId"),
+        IsWorkplaceTask = WorkplaceTaskIdentity.IsTask(item),
         CreatedAt = item.CreatedAt,
         UpdatedAt = item.UpdatedAt,
         Version = item.Version,
@@ -511,6 +515,7 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         document.EntryId = updated.EntryId;
         document.AnchorTaskId = updated.AnchorTaskId;
         document.FlowRunId = updated.FlowRunId;
+        document.IsWorkplaceTask = updated.IsWorkplaceTask;
         document.UpdatedAt = updated.UpdatedAt;
         document.Version = updated.Version;
         document.Payload = updated.Payload;
