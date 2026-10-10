@@ -472,6 +472,81 @@ public sealed class WorkPlaneTests
     }
 
     [TestMethod]
+    public async Task WorkplaceQueriesExcludeTechnicalRootWorkItemsAndRetainInteractiveAndTriggerTasks()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var interactionId = Guid.NewGuid();
+        var interactive = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "entry", "Interactive task", Now,
+            metadata: new Dictionary<string, string>
+            {
+                [WorkplaceTaskIdentity.EntryMetadata] = "assistant",
+                [WorkplaceTaskIdentity.InteractionMetadata] = interactionId.ToString("D")
+            });
+        var trigger = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "entry", "Trigger task", Now.AddSeconds(1),
+            metadata: new Dictionary<string, string>
+            {
+                [WorkplaceTaskIdentity.OriginMetadata] = WorkplaceTaskIdentity.TriggerOrigin
+            });
+        var technical = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "flow-api", "Technical flow", Now.AddSeconds(2));
+        var malformed = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "entry", "Malformed task", Now.AddSeconds(3),
+            metadata: new Dictionary<string, string>
+            {
+                [WorkplaceTaskIdentity.EntryMetadata] = "assistant",
+                [WorkplaceTaskIdentity.InteractionMetadata] = "not-a-guid"
+            });
+        var otherWorkspace = new WorkspaceId(Guid.NewGuid());
+        var foreign = WorkItem.Create(WorkItemId.New(), otherWorkspace, OwnerPrincipalId, "entry", "Foreign task", Now.AddSeconds(4),
+            metadata: new Dictionary<string, string>
+            {
+                [WorkplaceTaskIdentity.OriginMetadata] = WorkplaceTaskIdentity.TriggerOrigin
+            });
+        await fixture.Repository.CreateAsync(interactive, default);
+        await fixture.Repository.CreateAsync(trigger, default);
+        await fixture.Repository.CreateAsync(technical, default);
+        await fixture.Repository.CreateAsync(malformed, default);
+        await fixture.Repository.CreateAsync(foreign, default);
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub(), new EntryExecutionResolverStub());
+
+        var listed = await workplace.ListTasksAsync(WorkplaceId, null, default);
+        var firstPage = await workplace.QueryOperationalTasksAsync(
+            WorkplaceId, WorkTaskStatus.Draft, null, null, 1, 1,
+            WorkItemSortField.CreatedAt, WorkItemSortDirection.Ascending, default);
+        var secondPage = await workplace.QueryOperationalTasksAsync(
+            WorkplaceId, WorkTaskStatus.Draft, null, null, 2, 1,
+            WorkItemSortField.CreatedAt, WorkItemSortDirection.Ascending, default);
+
+        Assert.HasCount(2, listed);
+        CollectionAssert.AreEquivalent(
+            new[] { WorkTaskId.FromWorkItem(interactive.Id), WorkTaskId.FromWorkItem(trigger.Id) },
+            listed.Select(value => value.Id).ToArray());
+        Assert.AreEqual(2, firstPage.TotalCount);
+        Assert.HasCount(1, firstPage.Items);
+        Assert.HasCount(1, secondPage.Items);
+        Assert.AreNotEqual(firstPage.Items.Single().Id, secondPage.Items.Single().Id);
+        await Assert.ThrowsExactlyAsync<KeyNotFoundException>(() =>
+            workplace.GetTaskAsync(WorkplaceId, WorkTaskId.FromWorkItem(technical.Id), default));
+    }
+
+    [TestMethod]
+    public async Task WorkplaceQueriesReturnEmptyWhenWorkspaceContainsOnlyTechnicalWorkItems()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        await fixture.Repository.CreateAsync(
+            WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "flow-api", "Technical flow", Now),
+            default);
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub(), new EntryExecutionResolverStub());
+
+        var listed = await workplace.ListTasksAsync(WorkplaceId, null, default);
+        var operational = await workplace.QueryOperationalTasksAsync(
+            WorkplaceId, null, null, null, 1, 20,
+            WorkItemSortField.UpdatedAt, WorkItemSortDirection.Descending, default);
+
+        Assert.IsEmpty(listed);
+        Assert.IsEmpty(operational.Items);
+        Assert.AreEqual(0, operational.TotalCount);
+    }
+
+    [TestMethod]
     public async Task SqliteStorageAllowsTheSameWorkItemIdInDifferentWorkspaces()
     {
         await using var fixture = await WorkFixture.CreateAsync();

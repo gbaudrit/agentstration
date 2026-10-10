@@ -16,4 +16,8 @@
   <data name="Command.DiscoverSources" xml:space="preserve"><value>Découvrir des Sources</value></data>
   <data name="Nav.Conversations" xml:space="preserve"><value>Conversations</value></data>
   <data name="Command.CreateToolCategory" xml:space="preserve"><value>Créer une catégorie d’outils</value></data>
+  <data name="Nav.KnowledgeSources" xml:space="preserve"><value>Sources de connaissances</value></data>
+  <data name="Nav.Artifacts" xml:space="preserve"><value>Artefacts</value></data>
+  <data name="Nav.DataSources" xml:space="preserve"><value>Sources de données</value></data>
+  <data name="Nav.DataSourceProfiles" xml:space="preserve"><value>Profils de source de données</value></data>
 </root>

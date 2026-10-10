@@ -44,10 +44,12 @@ The remaining AWP v1 operations are deliberately narrow:
 
 - `/assignments/steps/open` validates a `StepDefinitionId` against the pinned Flow snapshot and mints the effective `StepExecutionId`.
 - `/assignments/turns/open` mints a Turn and its single v1 `TurnAttempt` under an optional StepExecution.
-- `/assignments/model/invoke` and `/assignments/tools/invoke` keep model credentials, Tool authorization, governance hooks and audit inside Agentstration. Tool calls must reference a server-authorized Turn/TurnAttempt and a Tool declared by that Agent revision.
+- `/assignments/model/invoke` and `/assignments/tools/invoke` keep model credentials, Agent Tool authorization, governance hooks and audit inside Agentstration. Agent Tool calls must reference a server-authorized Turn/TurnAttempt and a Tool declared by that Agent revision.
+- `/assignments/flow-tools/invoke` executes a direct `Tool` or resolves and executes a `ToolRoute` from the immutable Flow snapshot. Agentstration returns the effective Tool, provider and ToolSet-route identities for durable projection.
 - `/assignments/events` accepts at most 256 ordered events per call. Attempt-local sequences are contiguous, EventIds are stable across replay, identical duplicates are accepted idempotently, and conflicting replays are rejected.
 - `/assignments/checkpoints` persists only explicitly supplied checkpoints with a schema version and compatibility key equal to the assignment material digest. A checkpoint is not an automatic recovery promise after Worker loss.
-- `/assignments/child-flows` accepts only a server-authorized Flow-call StepExecution, while `/assignments/artifacts` uses opaque Artifact IDs and bounds content to 1 MiB.
+- `/assignments/child-flows` accepts only a server-authorized `Flow`, bounded `Repeat`, or Artifact-storage child for the immutable StepDefinition. The server creates the deterministic durable child Run and returns its pinned v1 material; the owning Worker executes the complete child tree under the root assignment.
+- `/assignments/flow-artifacts/capture` resolves the step's declared `artifactOutput` and performs governed staging inside Agentstration. `/assignments/flow-artifacts/cleanup` applies the declared cleanup policy through the same authoritative Artifact service. Generic `/assignments/artifacts` operations continue to use opaque IDs and bound content to 1 MiB.
 - `/assignments/complete` and `/assignments/fail` apply the terminal command idempotently.
 
 Every operation revalidates the Workspace, Worker session, AssignmentAttempt, opaque token, lease and fencing generation at the authoritative boundary. New governed side effects are rejected during the configured lease safety margin; an operation already in progress is cancelled before lease expiry. Read-only and durable mutation operations never expose a generic Management or storage API.

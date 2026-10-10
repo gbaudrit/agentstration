@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Agentstration.ResourcePlanning;
 using Agentstration.ResourcePlanning.Contracts;
 using Agentstration.ResourcePlanning.Storage.Abstractions;
@@ -25,6 +26,12 @@ public abstract class ResourcePlanningMcpTool(
         try
         {
             var scope = new ResourcePlanScope(invocation.TenantId, invocation.WorkspaceId);
+            if (ToolDryRunContract.IsEnabled(invocation.Arguments)
+                && Operation is ResourcePlanningToolOperation.Create
+                    or ResourcePlanningToolOperation.Refine
+                    or ResourcePlanningToolOperation.Submit
+                    or ResourcePlanningToolOperation.CreateChangeSet)
+                return PreviewMutation(invocation);
             return Operation switch
             {
                 ResourcePlanningToolOperation.Create => await CreateAsync(scope, invocation, cancellationToken),
@@ -46,6 +53,49 @@ public abstract class ResourcePlanningMcpTool(
         catch (ResourcePlanMaterializationException exception) { throw Failure("resource_plan_materialization_failed", exception); }
         catch (ArgumentException exception) { throw Failure("resource_planning_arguments_invalid", exception); }
         catch (JsonException exception) { throw Failure("resource_planning_arguments_invalid", exception); }
+    }
+
+    private JsonElement PreviewMutation(InternalMcpToolInvocation invocation)
+    {
+        Guid? planId = null;
+        switch (Operation)
+        {
+            case ResourcePlanningToolOperation.Create:
+                EnsureOnly(invocation.Arguments, "title", "goal", "description", "plan");
+                _ = RequiredString(invocation.Arguments, "title");
+                _ = RequiredString(invocation.Arguments, "goal");
+                _ = Required(invocation.Arguments, "plan").Deserialize<FunctionalResourcePlanV1>(JsonOptions)
+                    ?? throw new JsonException("The functional plan is required.");
+                break;
+            case ResourcePlanningToolOperation.Refine:
+                EnsureOnly(invocation.Arguments, "planId", "expectedETag", "title", "goal", "description", "plan");
+                planId = RequiredGuid(invocation.Arguments, "planId");
+                _ = RequiredString(invocation.Arguments, "expectedETag");
+                _ = RequiredString(invocation.Arguments, "title");
+                _ = RequiredString(invocation.Arguments, "goal");
+                _ = Required(invocation.Arguments, "plan").Deserialize<FunctionalResourcePlanV1>(JsonOptions)
+                    ?? throw new JsonException("The functional plan is required.");
+                break;
+            case ResourcePlanningToolOperation.Submit:
+                EnsureOnly(invocation.Arguments, "planId", "expectedETag");
+                planId = RequiredGuid(invocation.Arguments, "planId");
+                _ = RequiredString(invocation.Arguments, "expectedETag");
+                break;
+            case ResourcePlanningToolOperation.CreateChangeSet:
+                EnsureOnly(invocation.Arguments, "planId", "bindings", "integrationBindings", "expectedDigest");
+                planId = RequiredGuid(invocation.Arguments, "planId");
+                _ = BindingRequest(invocation.Arguments);
+                break;
+            default:
+                throw new UnreachableException();
+        }
+        return JsonSerializer.SerializeToElement(new
+        {
+            dryRun = true,
+            operation = Operation.ToString(),
+            validated = true,
+            planId
+        }, JsonOptions);
     }
 
     private async Task<JsonElement?> CreateAsync(ResourcePlanScope scope, InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
@@ -129,7 +179,7 @@ public abstract class ResourcePlanningMcpTool(
         Guid.TryParse(RequiredString(arguments, name), out var value) ? value : throw new ToolDefinitionInvocationException("resource_planning_argument_invalid", $"Argument '{name}' must be a UUID.");
     private static void EnsureOnly(JsonElement arguments, params string[] allowed)
     {
-        var names = new HashSet<string>(allowed, StringComparer.Ordinal);
+        var names = new HashSet<string>(allowed, StringComparer.Ordinal) { ToolDryRunContract.ParameterName };
         foreach (var argument in arguments.EnumerateObject())
             if (!names.Contains(argument.Name))
                 throw new ToolDefinitionInvocationException("resource_planning_argument_unknown", $"Argument '{argument.Name}' is not declared by the Tool schema.");
@@ -137,8 +187,20 @@ public abstract class ResourcePlanningMcpTool(
 
     protected static InternalMcpToolDefinition Define(string name, string displayName, string description, object properties, string[] required) => new(
         name, displayName, description,
-        JsonSerializer.SerializeToElement(new { type = "object", properties, required, additionalProperties = false }),
+        InputSchema(properties, required),
         JsonSerializer.SerializeToElement(new { type = "object", additionalProperties = true }));
+
+    private static JsonElement InputSchema(object properties, string[] required)
+    {
+        var propertyMap = JsonSerializer.SerializeToNode(properties, JsonOptions)?.AsObject()
+            ?? throw new InvalidOperationException("Resource Planning Tool properties must serialize to an object.");
+        propertyMap[ToolDryRunContract.ParameterName] = JsonSerializer.SerializeToNode(new
+        {
+            type = "boolean",
+            description = "Validates the operation and returns a preview without changing resources."
+        }, JsonOptions);
+        return JsonSerializer.SerializeToElement(new { type = "object", properties = propertyMap, required, additionalProperties = false }, JsonOptions);
+    }
 
     protected static object StringProperty(string? description = null) => new { type = "string", description };
     protected static object BindingsProperty() => new { type = "array", description = "Explicit Model Profile and Runtime Profile references for each planned role.", items = new { type = "object", properties = new { logicalId = StringProperty(), modelProfile = new { type = "object", properties = new { name = StringProperty(), scopeRef = StringProperty(), @namespace = StringProperty() }, required = new[] { "name" } }, runtimeProfile = new { type = "object", properties = new { name = StringProperty(), scopeRef = StringProperty(), @namespace = StringProperty() }, required = new[] { "name" } } }, required = new[] { "logicalId", "modelProfile", "runtimeProfile" }, additionalProperties = false } };

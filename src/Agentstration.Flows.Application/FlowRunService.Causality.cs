@@ -53,15 +53,21 @@ public sealed partial class FlowRunService
             var events = await ListEventsAsync(scope, current.Run.Id, 0, cancellationToken);
             result.Add(ProjectCausalityNode(current.Run, current.ParentStepName, events));
 
-            foreach (var step in current.Run.Steps.Where(value => !string.IsNullOrWhiteSpace(value.ChildFlowRunId)))
+            foreach (var step in current.Run.Steps)
             {
-                var child = await GetAsync(step.ChildFlowRunId!, scope, cancellationToken);
-                if (child is null
-                    || child.Value.ParentFlowRunId != current.Run.Id
-                    || child.Value.RootFlowRunId != root.Id
-                    || child.Value.NestingDepth != current.Run.NestingDepth + 1)
-                    continue;
-                queue.Enqueue((child.Value, step.StepName));
+                var childRunIds = step.ChildFlowRunIds
+                    .Concat(string.IsNullOrWhiteSpace(step.ChildFlowRunId) ? [] : [step.ChildFlowRunId])
+                    .Distinct(StringComparer.Ordinal);
+                foreach (var childRunId in childRunIds)
+                {
+                    var child = await GetAsync(childRunId!, scope, cancellationToken);
+                    if (child is null
+                        || child.Value.ParentFlowRunId != current.Run.Id
+                        || child.Value.RootFlowRunId != root.Id
+                        || child.Value.NestingDepth != current.Run.NestingDepth + 1)
+                        continue;
+                    queue.Enqueue((child.Value, step.StepName));
+                }
             }
         }
 

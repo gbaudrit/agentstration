@@ -1,0 +1,163 @@
+.agent-tools-panel > .panel-header {
+    align-items: flex-start;
+    gap: 24px;
+    margin-bottom: 20px;
+}
+
+.agent-tools-panel > .panel-header p:last-child {
+    max-width: 720px;
+    margin: 6px 0 0;
+    color: var(--muted);
+    line-height: 1.55;
+}
+
+.agent-toolset-grid {
+    display: grid;
+    gap: 18px;
+}
+
+.agent-toolset-card {
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: 0 8px 28px color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.agent-toolset-card.selected {
+    border-color: color-mix(in srgb, var(--primary) 58%, var(--border));
+    box-shadow: inset 3px 0 var(--primary), 0 8px 28px color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.agent-toolset-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px 20px;
+    border-bottom: 1px solid color-mix(in srgb, var(--primary) 12%, var(--border));
+    background: linear-gradient(115deg, color-mix(in srgb, var(--primary-soft) 72%, var(--surface)) 0%, var(--surface) 70%);
+}
+
+.agent-toolset-identity {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 14px;
+}
+
+.agent-toolset-icon {
+    display: inline-grid;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--primary);
+}
+
+.agent-toolset-kind {
+    color: var(--primary);
+    font-size: .68rem;
+    font-weight: 750;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.agent-toolset-header h3 {
+    margin: 2px 0 4px;
+    font-size: 1rem;
+}
+
+.agent-toolset-assignment {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+    padding: 16px 20px;
+}
+
+.agent-toolset-assignment input,
+.agent-toolset-member input {
+    width: 18px;
+    height: 18px;
+    margin: 2px 0 0;
+    accent-color: var(--primary);
+}
+
+.agent-toolset-assignment label,
+.agent-toolset-member > span {
+    display: grid;
+    min-width: 0;
+    gap: 5px;
+}
+
+.agent-toolset-assignment label {
+    cursor: pointer;
+}
+
+.agent-toolset-assignment small,
+.agent-toolset-member small {
+    color: var(--muted);
+    line-height: 1.45;
+}
+
+.agent-toolset-members {
+    display: grid;
+    gap: 10px;
+    padding: 0 20px 18px 50px;
+}
+
+.agent-toolset-members > p {
+    margin: 0;
+    color: var(--muted);
+    font-size: .78rem;
+}
+
+.agent-toolset-member-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(290px, 100%), 1fr));
+    gap: 10px;
+}
+
+.agent-toolset-member {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
+    cursor: pointer;
+}
+
+.agent-toolset-member:has(input:checked) {
+    border-color: color-mix(in srgb, var(--primary) 48%, var(--border));
+    background: color-mix(in srgb, var(--primary-soft) 42%, var(--surface));
+}
+
+.agent-toolset-member strong,
+.agent-toolset-member code {
+    overflow-wrap: anywhere;
+}
+
+.agent-toolset-member small {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+}
+
+@media (max-width: 700px) {
+    .agent-tools-panel > .panel-header,
+    .agent-toolset-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .agent-toolset-members {
+        padding-left: 20px;
+    }
+}

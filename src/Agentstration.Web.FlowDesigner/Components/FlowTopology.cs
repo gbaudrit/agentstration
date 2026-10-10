@@ -460,6 +460,7 @@ public static class FlowTopologyProjector
         ConditionFlowStepDefinition condition => condition.Mode,
         TransformFlowStepDefinition transform => transform.Mode,
         FlowCallStepDefinition flow => flow.Flow.VersionStrategy == FlowCallVersionStrategy.Exact ? $"{flow.Flow.ResourceId} · {flow.Flow.Version}" : $"{flow.Flow.ResourceId} · active",
+        RepeatFlowStepDefinition repeat => repeat.Flow.VersionStrategy == FlowCallVersionStrategy.Exact ? $"{repeat.Flow.ResourceId} · {repeat.Flow.Version} · ≤ {repeat.MaximumIterations}" : $"{repeat.Flow.ResourceId} · active · ≤ {repeat.MaximumIterations}",
         ToolFlowStepDefinition tool => tool.Tool.ResourceId,
         FailureFlowStepDefinition failure => failure.Code,
         _ => null

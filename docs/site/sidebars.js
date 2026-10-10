@@ -17,6 +17,14 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: 'Guides',
+      items: [
+        'guides/official-assistant',
+        'guides/agentstration-documentation-knowledge-source',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Concepts',
       items: [
         'concepts/overview',
@@ -33,6 +41,7 @@ const sidebars = {
         'concepts/model-providers',
         'concepts/model-profiles',
         'concepts/flows',
+        'concepts/data-sources-and-knowledge',
         'concepts/flow-modes',
         'concepts/interactions',
         'concepts/work-tasks',
@@ -98,6 +107,7 @@ const sidebars = {
             'architecture/implementation/dependency-rules',
             'architecture/implementation/current-state',
             'architecture/implementation/reconciliation-baseline-2026-09-28',
+            'architecture/implementation/knowledge-reconciliation-2026-10-08',
             'architecture/migration-inventory',
           ],
         },
@@ -114,6 +124,9 @@ const sidebars = {
         'reference/packs',
         'reference/source-registries',
         'reference/source-registry-tool',
+        'reference/crawl4ai-web-acquisition',
+        'reference/builtin-data-source-profiles',
+        'reference/knowledge-and-artifact-flow-contracts',
         'reference/resources/agents',
         'reference/secrets-and-vaults',
         'reference/configuration',

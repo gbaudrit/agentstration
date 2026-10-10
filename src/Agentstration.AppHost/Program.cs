@@ -1,7 +1,11 @@
 using Agentstration.AppHost;
 using Aspire.Hosting.ApplicationModel;
 
-var builder = DistributedApplication.CreateBuilder(args);
+var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions
+{
+    Args = args,
+    DeveloperCertificateDefaultHttpsTerminationEnabled = false
+});
 var worktreeRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", ".."));
 var slot = builder.Configuration["Agentstration:Slot"] ?? "main";
 var dynamicApplicationPorts = bool.TryParse(
@@ -74,6 +78,40 @@ var foundryEnabledSetting = builder.Configuration["Foundry:Enabled"];
 if (foundryEnabledSetting is not null && !bool.TryParse(foundryEnabledSetting, out _))
     throw new InvalidOperationException("Foundry:Enabled must be true or false.");
 var foundryEnabled = bool.TryParse(foundryEnabledSetting, out var configuredFoundryEnabled) && configuredFoundryEnabled;
+var crawl4AiEnabledSetting = builder.Configuration["Crawl4AI:Enabled"];
+if (crawl4AiEnabledSetting is not null && !bool.TryParse(crawl4AiEnabledSetting, out _))
+    throw new InvalidOperationException("Crawl4AI:Enabled must be true or false.");
+var crawl4AiEnabled = bool.TryParse(crawl4AiEnabledSetting, out var configuredCrawl4AiEnabled) && configuredCrawl4AiEnabled;
+var crawl4AiProvisioning = builder.Configuration["Crawl4AI:Provisioning"] ?? "Managed";
+var crawl4AiManaged = string.Equals(crawl4AiProvisioning, "Managed", StringComparison.OrdinalIgnoreCase);
+if (!crawl4AiManaged && !string.Equals(crawl4AiProvisioning, "External", StringComparison.OrdinalIgnoreCase))
+    throw new InvalidOperationException("Crawl4AI:Provisioning must be either 'Managed' or 'External'.");
+var crawl4AiEndpoint = builder.Configuration["Crawl4AI:Endpoint"] ?? "http://localhost:11235";
+if (!crawl4AiManaged && (!Uri.TryCreate(crawl4AiEndpoint, UriKind.Absolute, out var parsedCrawl4AiEndpoint)
+    || (parsedCrawl4AiEndpoint.Scheme != Uri.UriSchemeHttp && parsedCrawl4AiEndpoint.Scheme != Uri.UriSchemeHttps)))
+{
+    throw new InvalidOperationException("Crawl4AI:Endpoint must be an absolute HTTP(S) URL when external provisioning is selected.");
+}
+var crawl4AiAllowedDomains = builder.Configuration.GetSection("Crawl4AI:AllowedDomains")
+    .GetChildren()
+    .Select(value => value.Value)
+    .Where(value => !string.IsNullOrWhiteSpace(value))
+    .Cast<string>()
+    .ToArray();
+if (crawl4AiEnabled && crawl4AiAllowedDomains.Length == 0)
+    throw new InvalidOperationException("Crawl4AI:AllowedDomains must contain at least one domain when Crawl4AI is enabled.");
+var crawl4AiAllowedMediaTypes = builder.Configuration.GetSection("Crawl4AI:AllowedMediaTypes")
+    .GetChildren()
+    .Select(value => value.Value)
+    .Where(value => !string.IsNullOrWhiteSpace(value))
+    .Cast<string>()
+    .ToArray();
+var crawl4AiAllowedPorts = builder.Configuration.GetSection("Crawl4AI:AllowedPorts")
+    .GetChildren()
+    .Select(value => value.Value)
+    .Where(value => !string.IsNullOrWhiteSpace(value))
+    .Cast<string>()
+    .ToArray();
 
 var ollamaExtension = builder.AddProject<Projects.Agentstration_Extensions_Ollama>("ollama-extension")
     .WithEnvironment("Agentstration__Slot", slot)
@@ -123,6 +161,72 @@ if (foundryEnabled)
     }
     developmentExtensions.Add(new DevelopmentAepExtension(
         "Agentstration.Extensions.Foundry", "foundry-extension", foundryExtension));
+}
+if (crawl4AiEnabled)
+{
+    var crawl4AiTokenFile = builder.Configuration["Crawl4AI:ApiTokenFile"];
+    var crawl4AiExtension = builder.AddProject<Projects.Agentstration_Extensions_Crawl4AI>("crawl4ai-extension")
+        .WithEnvironment("Agentstration__Slot", slot)
+        .WithEnvironment("Crawl4AI__ContentDirectory", Path.Combine(slotDataPath, "crawl4ai-content"))
+        .WithHttpHealthCheck("/health/ready")
+        .WithDynamicHostPorts(dynamicApplicationPorts);
+    if (crawl4AiManaged)
+    {
+        var crawl4AiToken = builder.AddParameter(
+            $"crawl4ai-token-{instanceId}",
+            new GenerateParameterDefault(),
+            secret: true,
+            persist: true);
+        var crawl4AiService = builder.AddContainer(
+                "crawl4ai",
+                builder.Configuration["Crawl4AI:Image"] ?? "unclecode/crawl4ai")
+            .WithImageTag(builder.Configuration["Crawl4AI:ImageTag"] ?? "0.9.4")
+            .WithHttpEndpoint(targetPort: 11235, name: "http")
+            .WithHttpHealthCheck("/health")
+            .WithEnvironment("CRAWL4AI_API_TOKEN", crawl4AiToken)
+            .WithDeveloperCertificateTrust(false)
+            .WithContainerRuntimeArgs(
+                "--shm-size=1g",
+                "--cap-drop=ALL",
+                "--security-opt=no-new-privileges",
+                "--read-only",
+                "--tmpfs=/tmp",
+                "--tmpfs=/var/lib/redis:uid=999,gid=999,mode=0700",
+                "--tmpfs=/var/lib/crawl4ai/outputs:uid=999,gid=999,mode=0700",
+                "--tmpfs=/home/appuser/.crawl4ai:uid=999,gid=999,mode=0700",
+                "--tmpfs=/home/appuser/.cache/url_seeder:uid=999,gid=999,mode=0700",
+                "--tmpfs=/home/appuser/.gunicorn:uid=999,gid=999,mode=0700",
+                "--pids-limit=512",
+                "--memory=4g");
+        crawl4AiExtension
+            .WithEnvironment("Crawl4AI__Endpoint", crawl4AiService.GetEndpoint("http"))
+            .WithEnvironment("Crawl4AI__ApiToken", crawl4AiToken)
+            .WaitFor(crawl4AiService);
+    }
+    else
+    {
+        crawl4AiExtension.WithEnvironment("Crawl4AI__Endpoint", crawl4AiEndpoint);
+        if (!string.IsNullOrWhiteSpace(crawl4AiTokenFile))
+            crawl4AiExtension.WithEnvironment("Crawl4AI__ApiTokenFile", crawl4AiTokenFile);
+    }
+    for (var index = 0; index < crawl4AiAllowedDomains.Length; index++)
+        crawl4AiExtension.WithEnvironment($"Crawl4AI__AllowedDomains__{index}", crawl4AiAllowedDomains[index]);
+    for (var index = 0; index < crawl4AiAllowedMediaTypes.Length; index++)
+        crawl4AiExtension.WithEnvironment($"Crawl4AI__AllowedMediaTypes__{index}", crawl4AiAllowedMediaTypes[index]);
+    for (var index = 0; index < crawl4AiAllowedPorts.Length; index++)
+        crawl4AiExtension.WithEnvironment($"Crawl4AI__AllowedPorts__{index}", crawl4AiAllowedPorts[index]);
+    foreach (var key in new[]
+    {
+        "AllowPrivateAddresses", "MaximumDepth", "MaximumPages", "RequestTimeoutSeconds",
+        "MaximumResponseBytes", "MaximumContentBytes", "MaximumLinksPerPage", "MaximumReadChunkBytes",
+        "ContentRetentionMinutes", "MaximumSpoolBytes"
+    })
+    {
+        if (builder.Configuration[$"Crawl4AI:{key}"] is { } value)
+            crawl4AiExtension.WithEnvironment($"Crawl4AI__{key}", value);
+    }
+    developmentExtensions.Add(new DevelopmentAepExtension(
+        "Agentstration.Extensions.Crawl4AI", "crawl4ai-extension", crawl4AiExtension));
 }
 var sharedKeys = usePairingCode
     ? new Dictionary<string, string>(StringComparer.Ordinal)

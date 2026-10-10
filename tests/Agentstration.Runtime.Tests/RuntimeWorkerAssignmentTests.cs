@@ -695,6 +695,17 @@ public sealed class RuntimeWorkerAssignmentTests
 
             public Task<RuntimeGovernedModelResponse> InvokeModelAsync(RuntimeGovernedModelRequest request, CancellationToken cancellationToken) => Unexpected<RuntimeGovernedModelResponse>();
             public Task<System.Text.Json.JsonElement?> InvokeToolAsync(RuntimeGovernedToolRequest request, CancellationToken cancellationToken) => Unexpected<System.Text.Json.JsonElement?>();
+            public Task<RuntimeGovernedFlowToolResult> InvokeFlowToolAsync(WorkspaceId workspaceId,
+                string flowRunId, string stepDefinitionId, System.Text.Json.JsonElement arguments,
+                CancellationToken cancellationToken) => Unexpected<RuntimeGovernedFlowToolResult>();
+            public Task<RuntimeGovernedFlowArtifact> CaptureFlowArtifactAsync(WorkspaceId workspaceId,
+                string flowRunId, string stepDefinitionId, string? fileName, string mediaType,
+                System.Text.Json.JsonElement content, IReadOnlyDictionary<string, string> provenance,
+                CancellationToken cancellationToken) => Unexpected<RuntimeGovernedFlowArtifact>();
+            public Task CleanupFlowArtifactAsync(WorkspaceId workspaceId, string flowRunId,
+                string stepDefinitionId, RuntimeGovernedFlowArtifact artifact,
+                CancellationToken cancellationToken) =>
+                Task.FromException(new AssertFailedException("A governed operation was not expected."));
             public async Task<RuntimeGovernedArtifact> StoreArtifactAsync(WorkspaceId workspaceId,
                 RuntimeAssignmentId assignmentId, string name, string contentType, byte[] content,
                 CancellationToken cancellationToken)
@@ -704,7 +715,9 @@ public sealed class RuntimeWorkerAssignmentTests
                 return new(Guid.NewGuid(), name, contentType, content.LongLength, content);
             }
             public Task<RuntimeGovernedArtifact?> GetArtifactAsync(WorkspaceId workspaceId, RuntimeAssignmentId assignmentId, Guid artifactId, CancellationToken cancellationToken) => Unexpected<RuntimeGovernedArtifact?>();
-            public Task<RuntimeGovernedChildFlow> CreateOrGetChildFlowAsync(WorkspaceId workspaceId, string parentRunId, string stepDefinitionId, System.Text.Json.JsonElement input, CancellationToken cancellationToken) => Unexpected<RuntimeGovernedChildFlow>();
+            public Task<RuntimeGovernedChildFlow> CreateOrGetChildFlowAsync(WorkspaceId workspaceId, string parentRunId,
+                string stepDefinitionId, System.Text.Json.JsonElement input, string purpose, int? iteration,
+                CancellationToken cancellationToken) => Unexpected<RuntimeGovernedChildFlow>();
 
             private static Task<T> Unexpected<T>() => Task.FromException<T>(new AssertFailedException("A governed operation was not expected."));
         }

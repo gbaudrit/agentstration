@@ -14,7 +14,8 @@ public sealed record ResolvedFlowCall(
     FlowId FlowId,
     string Version,
     JsonElement? InputSchema,
-    JsonElement? OutputSchema);
+    JsonElement? OutputSchema,
+    IReadOnlyList<FlowOutputDefinition>? Outputs = null);
 
 public sealed record ResolvedFlowTool(
     string ResourceId,
@@ -23,6 +24,20 @@ public sealed record ResolvedFlowTool(
     JsonElement? OutputSchema,
     bool Enabled,
     bool Available,
+    bool RequiresApproval);
+public sealed record ResolvedFlowToolRoute(
+    FlowToolReference Tool,
+    string ToolSetName,
+    ResourceNamespace ToolSetNamespace,
+    string ToolSetVersion,
+    string Capability,
+    string Route,
+    Guid ToolUid,
+    long ToolGeneration,
+    string ProviderName,
+    ResourceNamespace ProviderNamespace,
+    JsonElement InputSchema,
+    JsonElement? OutputSchema,
     bool RequiresApproval);
 
 public interface IFlowDefinitionValidator
@@ -50,10 +65,19 @@ public interface IFlowResourceReferenceResolver
         ResourceNamespace ownerNamespace,
         FlowToolReference reference,
         CancellationToken cancellationToken) => Task.FromResult<ResolvedFlowTool?>(null);
+
+    Task<ResolvedFlowToolRoute?> ResolveToolRouteAsync(
+        WorkspaceId workspaceId,
+        ResourceNamespace ownerNamespace,
+        ToolRouteFlowStepDefinition step,
+        CancellationToken cancellationToken) => Task.FromResult<ResolvedFlowToolRoute?>(null);
 }
 
 public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver resources) : IFlowDefinitionValidator
 {
+    public const int MaximumRepeatIterations = 1000;
+    public const long MaximumStepArtifactBytes = 64 * 1024 * 1024;
+
     [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$", RegexOptions.CultureInvariant)]
     private static partial Regex NamePattern();
 
@@ -66,12 +90,19 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         {
             if (!NamePattern().IsMatch(step.Name)) issues.Add(Error("step_name_invalid", "Step names must contain letters, digits, '-' or '_'.", step.Name, property: "name"));
             if (!steps.TryAdd(step.Name, step)) issues.Add(Error("step_name_duplicate", $"Step '{step.Name}' is duplicated.", step.Name));
-            await ValidateStepAsync(step, context, issues, cancellationToken);
+            await ValidateStepAsync(step, definition.Transitions, context, issues, cancellationToken);
+            if (step is AgentFlowStepDefinition or ToolFlowStepDefinition or ToolRouteFlowStepDefinition
+                && !definition.Transitions.Any(transition => transition.FromStep == step.Name && transition.Event == "error"))
+                issues.Add(Error(
+                    "error_transition_required",
+                    $"Step '{step.Name}' requires a transition for its 'error' output.",
+                    step.Name,
+                    property: "transitions"));
         }
 
         if (!steps.ContainsKey(definition.EntryStep)) issues.Add(Error("entry_step_unknown", "The entry step does not exist.", property: "entryStep"));
         if (definition.Steps.Count(step => step is InputFlowStepDefinition) != 1) issues.Add(Error("input_step_required", "A Flow requires exactly one Input step."));
-        if (!definition.Steps.Any(step => step is OutputFlowStepDefinition or FailureFlowStepDefinition)) issues.Add(Error("terminal_step_required", "A Flow requires an Output or Failure terminal step."));
+        if (!definition.Steps.Any(step => step is OutputFlowStepDefinition or FailureFlowStepDefinition)) issues.Add(Error("terminal_step_required", "A Flow requires at least one named output."));
 
         var transitionIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var transition in definition.Transitions)
@@ -79,6 +110,11 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             if (!transitionIds.Add(transition.Id)) issues.Add(Error("transition_id_duplicate", $"Transition '{transition.Id}' is duplicated.", transitionId: transition.Id));
             if (!steps.ContainsKey(transition.FromStep)) issues.Add(Error("transition_source_unknown", $"Transition source '{transition.FromStep}' does not exist.", transitionId: transition.Id));
             if (!steps.ContainsKey(transition.ToStep)) issues.Add(Error("transition_target_unknown", $"Transition target '{transition.ToStep}' does not exist.", transitionId: transition.Id));
+            if (steps.GetValueOrDefault(transition.FromStep) is { } source
+                && source is not FlowCallStepDefinition
+                && source is not RepeatFlowStepDefinition
+                && !source.OutputEvents().Contains(transition.Event, StringComparer.Ordinal))
+                issues.Add(Error("transition_event_invalid", $"Step '{source.Name}' does not emit event '{transition.Event}'.", source.Name, transition.Id, "event"));
             if (!string.IsNullOrWhiteSpace(transition.Condition)) ValidateExpression(transition.Condition, issues, transition.FromStep, transition.Id, "condition");
         }
 
@@ -93,11 +129,24 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         foreach (var terminal in definition.Steps.Where(step => step is OutputFlowStepDefinition or FailureFlowStepDefinition))
             if (definition.Transitions.Any(transition => transition.FromStep == terminal.Name)) issues.Add(Error("terminal_has_transition", $"Terminal step '{terminal.Name}' cannot have outgoing transitions.", terminal.Name));
 
+        foreach (var output in definition.Steps.OfType<OutputFlowStepDefinition>())
+        {
+            _ = definition.ResolveOutputSchema(output, out var ambiguous);
+            if (ambiguous)
+                issues.Add(Error("flow_output_schema_ambiguous", $"Schema inference for named output '{output.Name}' is ambiguous. Declare its schema explicitly.", output.Name, property: "schema"));
+        }
+
         return new FlowValidationResult(issues);
     }
 
-    private async Task ValidateStepAsync(FlowStepDefinition step, FlowValidationContext context, List<FlowValidationIssue> issues, CancellationToken token)
+    private async Task ValidateStepAsync(
+        FlowStepDefinition step,
+        IReadOnlyList<FlowTransitionDefinition> transitions,
+        FlowValidationContext context,
+        List<FlowValidationIssue> issues,
+        CancellationToken token)
     {
+        await ValidateArtifactOutputAsync(step, transitions, context, issues, token);
         switch (step)
         {
             case AgentFlowStepDefinition agent:
@@ -119,21 +168,135 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             case ConditionFlowStepDefinition condition:
                 if (condition.Mode.Equals("Advanced", StringComparison.OrdinalIgnoreCase)) ValidateExpression(condition.Expression, issues, step.Name, property: "expression");
                 else if (string.IsNullOrWhiteSpace(condition.Left)) issues.Add(Error("condition_left_required", "A simple Condition requires a left value.", step.Name, property: "left"));
+                else if (condition.Left.StartsWith("${", StringComparison.Ordinal)) ValidateExpression(condition.Left, issues, step.Name, property: "left");
                 break;
             case TransformFlowStepDefinition transform:
                 if (transform.Mode.Equals("Expression", StringComparison.OrdinalIgnoreCase)) ValidateExpression(transform.Expression, issues, step.Name, property: "expression");
                 else ValidateJsonExpressions(transform.Mapping, issues, step.Name, "mapping");
                 break;
             case FlowCallStepDefinition flowCall:
-                await ValidateFlowCallAsync(flowCall, context, issues, token);
+                await ValidateFlowCallAsync(flowCall, transitions, context, issues, token);
+                break;
+            case RepeatFlowStepDefinition repeat:
+                if (repeat.MaximumIterations is < 1 or > MaximumRepeatIterations)
+                    issues.Add(Error("flow_repeat_iterations_invalid", $"Repeat maximumIterations must be between 1 and {MaximumRepeatIterations}.", step.Name, property: "maximumIterations"));
+                ValidateExpression(repeat.Until, issues, step.Name, property: "until");
+                ValidateJsonExpressions(repeat.NextInputMapping, issues, step.Name, "nextInputMapping");
+                await ValidateFlowCallAsync(new FlowCallStepDefinition
+                {
+                    Name = repeat.Name,
+                    DisplayName = repeat.DisplayName,
+                    Description = repeat.Description,
+                    Flow = repeat.Flow,
+                    InputMapping = repeat.InputMapping
+                }, transitions, context, issues, token);
+                await ValidateRepeatNextInputAsync(repeat, context, issues, token);
                 break;
             case ToolFlowStepDefinition tool:
                 await ValidateToolAsync(tool, context, issues, token);
                 break;
+            case ToolRouteFlowStepDefinition route:
+                await ValidateToolRouteAsync(route, context, issues, token);
+                break;
             case OutputFlowStepDefinition output:
                 ValidateJsonExpressions(output.OutputMapping, issues, step.Name, "outputMapping");
+                ValidateJsonExpressions(output.DetailsExpression is null ? null : JsonSerializer.SerializeToElement(output.DetailsExpression), issues, step.Name, "detailsExpression");
+                if (!ValidContractSchema(output.Schema))
+                    issues.Add(Error("flow_output_schema_invalid", "The named output has an invalid or unsupported schema.", step.Name, property: "schema"));
+                if (output.Outcome == FlowOutputOutcome.Error && output.Code is not null && string.IsNullOrWhiteSpace(output.Code))
+                    issues.Add(Error("flow_output_error_code_invalid", "An error output code cannot be empty.", step.Name, property: "code"));
+                if (output.Outcome == FlowOutputOutcome.Error && output.Message is not null && string.IsNullOrWhiteSpace(output.Message))
+                    issues.Add(Error("flow_output_error_message_invalid", "An error output message cannot be empty.", step.Name, property: "message"));
                 break;
         }
+    }
+
+    private async Task ValidateArtifactOutputAsync(
+        FlowStepDefinition step,
+        IReadOnlyList<FlowTransitionDefinition> transitions,
+        FlowValidationContext context,
+        List<FlowValidationIssue> issues,
+        CancellationToken token)
+    {
+        var artifact = step.ArtifactOutput;
+        if (artifact is null) return;
+        if (step is not (AgentFlowStepDefinition or ToolFlowStepDefinition or ToolRouteFlowStepDefinition
+            or FlowCallStepDefinition or RepeatFlowStepDefinition or OutputFlowStepDefinition))
+        {
+            issues.Add(Error("step_artifact_output_unsupported",
+                $"Step type '{step.Type()}' cannot save its result as an Artifact.", step.Name, property: "artifactOutput"));
+            return;
+        }
+
+        if (artifact.FileName is { } fileName)
+        {
+            if (fileName.StartsWith("${", StringComparison.Ordinal))
+                ValidateExpression(fileName, issues, step.Name, "artifactOutput.fileName");
+            else if (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 255
+                || fileName.Contains('/') || fileName.Contains('\\'))
+                issues.Add(Error("step_artifact_file_name_invalid",
+                    "Artifact output fileName must be a simple file name of at most 255 characters.",
+                    step.Name, property: "artifactOutput.fileName"));
+        }
+        if (!string.IsNullOrWhiteSpace(artifact.MediaType)
+            && artifact.MediaType.StartsWith("${", StringComparison.Ordinal))
+            ValidateExpression(artifact.MediaType, issues, step.Name, "artifactOutput.mediaType");
+        else if (string.IsNullOrWhiteSpace(artifact.MediaType)
+            || artifact.MediaType.Length > 255
+            || !artifact.MediaType.Contains('/', StringComparison.Ordinal))
+            issues.Add(Error("step_artifact_media_type_invalid",
+                "Artifact output mediaType must be a valid non-empty media type.",
+                step.Name, property: "artifactOutput.mediaType"));
+        if (artifact.MaximumBytes is <= 0 or > MaximumStepArtifactBytes)
+            issues.Add(Error("step_artifact_maximum_bytes_invalid",
+                $"Artifact output maximumBytes must be between 1 and {MaximumStepArtifactBytes}.",
+                step.Name, property: "artifactOutput.maximumBytes"));
+        if (artifact.StagingBinding is { } binding
+            && (string.IsNullOrWhiteSpace(binding.Name) || binding.Name.Contains('/', StringComparison.Ordinal)))
+            issues.Add(Error("step_artifact_staging_binding_invalid",
+                "Artifact output stagingBinding must use a logical binding name.",
+                step.Name, property: "artifactOutput.stagingBinding"));
+        ValidateJsonExpressions(artifact.ContentMapping, issues, step.Name, "artifactOutput.contentMapping");
+        if (artifact.StorageFlow is { } storageFlow)
+        {
+            await ValidateFlowCallAsync(new FlowCallStepDefinition
+            {
+                Name = step.Name,
+                Flow = storageFlow,
+                InputMapping = JsonSerializer.SerializeToElement(new
+                {
+                    stagedArtifactId = "staged-artifact",
+                    producerFlowRunId = "flow-run",
+                    producerFlowStepId = step.Name
+                })
+            }, transitions, context, issues, token);
+        }
+    }
+
+    private async Task ValidateToolRouteAsync(
+        ToolRouteFlowStepDefinition step,
+        FlowValidationContext context,
+        List<FlowValidationIssue> issues,
+        CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(step.ToolSet.ResourceId)
+            || string.IsNullOrWhiteSpace(step.ToolSet.Version)
+            || string.IsNullOrWhiteSpace(step.Capability))
+        {
+            issues.Add(Error("tool_route_reference_invalid", "ToolRoute requires a ToolSet, exact version, and capability.", step.Name, property: "toolSet"));
+            return;
+        }
+        ValidateJsonExpressions(step.ArgumentsMapping, issues, step.Name, "argumentsMapping");
+        if (!context.ResolveResources || context.WorkspaceId is null || context.OwnerFlowId is null) return;
+        var resolved = await resources.ResolveToolRouteAsync(context.WorkspaceId.Value,
+            context.OwnerFlowId.Value.Namespace, step, token);
+        if (resolved is null)
+        {
+            issues.Add(Error("tool_route_not_found", "The ToolSet route could not be resolved deterministically.", step.Name, property: "toolSet"));
+            return;
+        }
+        ValidateMappingAgainstSchema(step.Name, "argumentsMapping", step.ArgumentsMapping,
+            resolved.InputSchema, "tool_route_argument", issues);
     }
 
     private async Task ValidateToolAsync(
@@ -171,6 +334,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
 
     private async Task ValidateFlowCallAsync(
         FlowCallStepDefinition step,
+        IReadOnlyList<FlowTransitionDefinition> transitions,
         FlowValidationContext context,
         List<FlowValidationIssue> issues,
         CancellationToken token)
@@ -201,9 +365,63 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             issues.Add(Error("flow_input_schema_invalid", "The selected Flow has an invalid or unsupported input schema.", step.Name, property: "flow.inputSchema"));
         if (!ValidContractSchema(target.OutputSchema))
             issues.Add(Error("flow_output_schema_invalid", "The selected Flow has an invalid or unsupported output schema.", step.Name, property: "flow.outputSchema"));
+        foreach (var output in target.Outputs ?? [])
+            if (!ValidContractSchema(output.Schema))
+                issues.Add(Error("flow_output_schema_invalid", $"Named output '{output.Name}' has an invalid or unsupported schema.", step.Name, property: $"flow.outputs.{output.Name}.schema"));
+        if (target.Outputs is { Count: > 0 })
+        {
+            var outputNames = target.Outputs.Select(output => output.Name).ToHashSet(StringComparer.Ordinal);
+            foreach (var transition in transitions.Where(transition => transition.FromStep == step.Name && !outputNames.Contains(transition.Event)))
+                issues.Add(Error(
+                    "transition_event_invalid",
+                    $"Flow step '{step.Name}' does not expose named output '{transition.Event}'.",
+                    step.Name,
+                    transition.Id,
+                    "event"));
+
+            var errorOutputNames = target.Outputs
+                .Where(output => output.Outcome == FlowOutputOutcome.Error)
+                .Select(output => output.Name)
+                .ToHashSet(StringComparer.Ordinal);
+            if (errorOutputNames.Count > 0
+                && !transitions.Any(transition => transition.FromStep == step.Name && errorOutputNames.Contains(transition.Event)))
+                issues.Add(Error(
+                    "error_transition_required",
+                    $"Step '{step.Name}' requires a transition for one of its error outputs.",
+                    step.Name,
+                    property: "transitions"));
+        }
         ValidateMappingAgainstSchema(step, target.InputSchema, issues);
         if (await resources.CreatesFlowCycleAsync(context.WorkspaceId.Value, context.OwnerFlowId.Value, target, token))
             issues.Add(Error("flow_dependency_cycle", $"Calling Flow '{target.FlowId}' would create a direct or indirect dependency cycle.", step.Name, property: "flow"));
+    }
+
+    private async Task ValidateRepeatNextInputAsync(
+        RepeatFlowStepDefinition step,
+        FlowValidationContext context,
+        List<FlowValidationIssue> issues,
+        CancellationToken token)
+    {
+        if (step.NextInputMapping is null
+            || !context.ResolveResources
+            || context.WorkspaceId is null
+            || context.OwnerFlowId is null)
+            return;
+
+        var target = await resources.ResolveFlowAsync(
+            context.WorkspaceId.Value,
+            context.OwnerFlowId.Value.Namespace,
+            step.Flow,
+            token);
+        if (target is null || !ValidContractSchema(target.InputSchema)) return;
+        if (target.InputSchema is { } schema)
+        {
+            if (step.NextInputMapping is { ValueKind: JsonValueKind.String } mapping
+                && FlowExpressionParser.TryParse(mapping.GetString()!, out var expression, out _)
+                && IsCompleteObjectReference(expression.Body))
+                return;
+            ValidateMappingAgainstSchema(step.Name, "nextInputMapping", step.NextInputMapping, schema, "flow_next_input_mapping", issues);
+        }
     }
 
     private static void ValidateMappingAgainstSchema(FlowCallStepDefinition step, JsonElement? schema, List<FlowValidationIssue> issues)
@@ -327,7 +545,17 @@ public sealed record FlowExpressionContext(IReadOnlyCollection<string> StepNames
 public sealed record FlowExecutionContext(
     JsonElement Input,
     IReadOnlyDictionary<string, JsonElement?> StepOutputs,
-    JsonElement? TransitionOutput = null);
+    JsonElement? TransitionOutput = null,
+    FlowExecutionMetadata? Execution = null,
+    JsonElement? CurrentStepOutput = null);
+
+public sealed record FlowExecutionMetadata(
+    string FlowRunId,
+    string RootFlowRunId,
+    string? ParentFlowRunId,
+    string StepName,
+    string? CorrelationId,
+    string? StepDisplayName = null);
 
 public interface IExpressionParser { ExpressionParseResult Parse(string expression); }
 public interface IExpressionValidator { ExpressionValidationResult Validate(ParsedExpression expression, FlowExpressionContext context); }
@@ -340,6 +568,13 @@ public sealed class FlowExpressionParser : IExpressionParser, IExpressionValidat
     public ExpressionValidationResult Validate(ParsedExpression expression, FlowExpressionContext context)
     {
         var path = ComparisonParts(expression.Body)[0];
+        if (path.StartsWith("execution", StringComparison.Ordinal)
+            && !IsSupportedExecutionPath(path))
+            return new(false, $"Expression references unknown execution context property '{path}'.");
+        if ((path.Equals("step", StringComparison.Ordinal) || path.StartsWith("step.", StringComparison.Ordinal))
+            && path is not "step.name" and not "step.displayName" and not "step.output"
+            && !path.StartsWith("step.output.", StringComparison.Ordinal))
+            return new(false, $"Expression references unknown current step property '{path}'.");
         if (path.StartsWith("steps.", StringComparison.Ordinal))
         {
             var segments = path.Split('.');
@@ -368,9 +603,19 @@ public sealed class FlowExpressionParser : IExpressionParser, IExpressionValidat
         var first = ComparisonParts(body)[0];
         if (!first.StartsWith("input", StringComparison.Ordinal)
             && !first.StartsWith("steps.", StringComparison.Ordinal)
-            && !first.StartsWith("transition.output", StringComparison.Ordinal))
+            && first is not "step.name"
+            && first is not "step.displayName"
+            && first is not "step.output"
+            && !first.StartsWith("step.output.", StringComparison.Ordinal)
+            && !first.StartsWith("transition.output", StringComparison.Ordinal)
+            && !first.StartsWith("execution.", StringComparison.Ordinal))
         {
-            error = "Expressions may reference only input, the incoming transition output, or step outputs.";
+            error = "Expressions may reference only input, execution context, the incoming transition output, or step outputs.";
+            return false;
+        }
+        if (first.StartsWith("execution.", StringComparison.Ordinal) && !IsSupportedExecutionPath(first))
+        {
+            error = $"Expression references unknown execution context property '{first}'.";
             return false;
         }
         parsed = new ParsedExpression(expression, body); return true;
@@ -391,6 +636,8 @@ public sealed class FlowExpressionParser : IExpressionParser, IExpressionValidat
         var segments = path.Split('.'); JsonElement? current;
         var offset = 1;
         if (segments[0] == "input") current = context.Input;
+        else if (segments[0] == "execution") return ResolveExecution(path, context.Execution);
+        else if (segments[0] == "step") return ResolveCurrentStep(path, context);
         else if (segments[0] == "transition") { current = context.TransitionOutput; offset = 2; }
         else { if (segments.Length < 3 || !context.StepOutputs.TryGetValue(segments[1], out current)) return null; offset = segments[2] == "output" ? 3 : 2; }
         for (var index = offset; index < segments.Length; index++)
@@ -400,6 +647,42 @@ public sealed class FlowExpressionParser : IExpressionParser, IExpressionValidat
         }
         return current;
     }
+
+    private static JsonElement? ResolveExecution(string path, FlowExecutionMetadata? execution) => path switch
+    {
+        "execution.flowRunId" when execution is not null => JsonSerializer.SerializeToElement(execution.FlowRunId),
+        "execution.rootFlowRunId" when execution is not null => JsonSerializer.SerializeToElement(execution.RootFlowRunId),
+        "execution.parentFlowRunId" when execution?.ParentFlowRunId is { } value => JsonSerializer.SerializeToElement(value),
+        "execution.stepName" when execution is not null => JsonSerializer.SerializeToElement(execution.StepName),
+        "execution.correlationId" when execution?.CorrelationId is { } value => JsonSerializer.SerializeToElement(value),
+        _ => null
+    };
+
+    private static JsonElement? ResolveCurrentStep(string path, FlowExecutionContext context)
+    {
+        if (path == "step.name" && context.Execution is not null)
+            return JsonSerializer.SerializeToElement(context.Execution.StepName);
+        if (path == "step.displayName" && context.Execution is not null)
+            return JsonSerializer.SerializeToElement(
+                context.Execution.StepDisplayName ?? context.Execution.StepName);
+        if (path == "step.output") return context.CurrentStepOutput;
+        if (!path.StartsWith("step.output.", StringComparison.Ordinal)) return null;
+        JsonElement? current = context.CurrentStepOutput;
+        foreach (var segment in path["step.output.".Length..].Split('.'))
+        {
+            if (current is null || current.Value.ValueKind != JsonValueKind.Object
+                || !current.Value.TryGetProperty(segment, out var property)) return null;
+            current = property;
+        }
+        return current;
+    }
+
+    private static bool IsSupportedExecutionPath(string path) => path is
+        "execution.flowRunId"
+        or "execution.rootFlowRunId"
+        or "execution.parentFlowRunId"
+        or "execution.stepName"
+        or "execution.correlationId";
 
     private static JsonElement ResolveLiteral(string value)
     {

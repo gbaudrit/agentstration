@@ -23,12 +23,11 @@ definition:
         name: clarify
         displayName: Ask for clarification
         agent: { resourceId: assistant-fallback, namespace: agentstration.assistant }
-      - { type: output, name: output, displayName: Clarification }
+      - { type: output, name: completed, displayName: Clarification, outcome: success, outputMapping: "${transition.output}", schema: { type: object, additionalProperties: true } }
+      - { type: output, name: error, displayName: Clarification failed, outcome: error, code: ASSISTANT_FALLBACK_FAILED, message: The fallback Agent failed., outputMapping: "${transition.output}", schema: { type: object, additionalProperties: true } }
     transitions:
       - { id: input-to-clarify, fromStep: input, event: completed, toStep: clarify }
-      - { id: clarify-to-output, fromStep: clarify, event: completed, toStep: output }
-    outputSchema:
-      type: object
-      additionalProperties: true
+      - { id: clarify-completed, fromStep: clarify, event: success, toStep: completed }
+      - { id: clarify-error, fromStep: clarify, event: error, toStep: error }
   publish: true
   activate: true

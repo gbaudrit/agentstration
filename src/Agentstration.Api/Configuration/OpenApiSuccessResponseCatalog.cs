@@ -5,6 +5,7 @@ using Agentstration.Extensions.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.Parameters;
@@ -222,6 +223,7 @@ internal static class OpenApiSuccessResponseCatalog
             if (path.EndsWith("/model", StringComparison.OrdinalIgnoreCase)) return Json<AgentModelResponse>(200, "Get the agent model resolution");
             if (path.EndsWith("/purge-impact", StringComparison.OrdinalIgnoreCase)) return Json<AgentRevisionPurgeImpactResponse>(200, "Get agent revision purge impact");
             if (path.EndsWith("/revisions", StringComparison.OrdinalIgnoreCase)) return Json<AgentRevision>(201, "Create an agent revision");
+            if (path.Contains("/revisions/", StringComparison.OrdinalIgnoreCase)) return Json<AgentRevision>(200, "Get an agent revision");
             var collection = path.EndsWith("/agents", StringComparison.OrdinalIgnoreCase);
             if (collection) return Json<PagedResponse<AgentResource>>(200, "List agents");
             return Json<AgentResource>(200, method == "PUT" ? "Create or update an agent" : "Get an agent");
@@ -374,6 +376,15 @@ internal static class OpenApiSuccessResponseCatalog
             if (path.EndsWith("/tools", StringComparison.OrdinalIgnoreCase)) return Json<ValueResponse<ToolResource>>(200, "List Tool Provider tools");
             return Json<ToolProviderResource>(200, method == "PUT" ? "Update a Tool Provider" : "Get a Tool Provider");
         }
+        if (path.StartsWith("/api/toolsets", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path.EndsWith("/route", StringComparison.OrdinalIgnoreCase)) return Json<ToolSetRouteSelection>(200, "Resolve a ToolSet route");
+            if (path.Contains("/versions/", StringComparison.OrdinalIgnoreCase)) return Json<ToolSetVersionResource>(200, "Get a published ToolSet version");
+            if (path.EndsWith("/versions", StringComparison.OrdinalIgnoreCase))
+                return method == "POST" ? Json<ToolSetVersionResource>(201, "Publish a ToolSet version") : Json<ValueResponse<ToolSetVersionResource>>(200, "List ToolSet versions");
+            if (path == "/api/toolsets") return method == "POST" ? Json<ToolSetResource>(201, "Create a ToolSet") : Json<ValueResponse<ToolSetResource>>(200, "List ToolSets");
+            return Json<ToolSetResource>(200, method == "PUT" ? "Update a ToolSet" : "Get a ToolSet");
+        }
         if (path.StartsWith("/api/tools", StringComparison.OrdinalIgnoreCase))
             return path == "/api/tools" ? Json<ValueResponse<ToolResource>>(200, "List Tools") : Json<ToolResource>(200, "Get or update a Tool");
         if (path.StartsWith("/api/toolexecutionhooks", StringComparison.OrdinalIgnoreCase))
@@ -393,6 +404,16 @@ internal static class OpenApiSuccessResponseCatalog
                     ? Json<ParameterResource>(201, "Create a Parameter")
                     : Json<IReadOnlyList<ParameterResource>>(200, "List Parameters");
             return Json<ParameterResource>(200, method == "PUT" ? "Update a Parameter" : "Get a Parameter");
+        }
+        if (path.StartsWith("/api/knowledgesources", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path.EndsWith("/readiness", StringComparison.OrdinalIgnoreCase))
+                return Json<KnowledgeSourceReadiness>(200, "Inspect KnowledgeSource readiness");
+            if (path == "/api/knowledgesources")
+                return method == "POST"
+                    ? Json<KnowledgeSourceResource>(201, "Create a KnowledgeSource")
+                    : Json<IReadOnlyList<KnowledgeSourceResource>>(200, "List KnowledgeSources");
+            return Json<KnowledgeSourceResource>(200, method == "PUT" ? "Update a KnowledgeSource" : "Get a KnowledgeSource");
         }
         if (path.StartsWith("/api/secrets", StringComparison.OrdinalIgnoreCase))
         {
@@ -489,6 +510,8 @@ internal static class OpenApiSuccessResponseCatalog
         || path.StartsWith("/api/tools", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/toolexecutionhooks", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/parameters", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/api/knowledgesourceprofiles", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/api/knowledgesources", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/vaults", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/secrets", StringComparison.OrdinalIgnoreCase);
 

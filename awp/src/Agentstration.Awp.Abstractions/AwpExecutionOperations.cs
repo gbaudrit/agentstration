@@ -26,7 +26,12 @@ public sealed record AwpExecutionAgentMaterial(
     string Instructions,
     string ModelProfileName,
     string ModelProfileNamespace,
-    IReadOnlyList<AwpExecutionToolMaterial> Tools);
+    IReadOnlyList<AwpExecutionToolMaterial> Tools)
+{
+    public string AgentNamespace { get; init; } = "default";
+    public string RuntimeProfileName { get; init; } = string.Empty;
+    public string RuntimeProfileNamespace { get; init; } = "default";
+}
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(AwpDirectAgentExecutionMaterial), "directAgent")]
@@ -60,7 +65,11 @@ public sealed record AwpRootFlowExecutionMaterial(
     JsonElement Input,
     JsonElement Definition,
     IReadOnlyList<AwpExecutionAgentMaterial> Agents,
-    AwpFlowResumeMaterial? Resume = null)
+    Guid PrincipalId,
+    AwpFlowResumeMaterial? Resume = null,
+    string? RootFlowRunId = null,
+    string? ParentFlowRunId = null,
+    string? CorrelationId = null)
     : AwpExecutionMaterial(MaterialId, SchemaVersion, Digest, RunId);
 
 public sealed record AwpFlowResumeMaterial(
@@ -142,6 +151,58 @@ public sealed record AwpInvokeToolRequest(
 
 public sealed record AwpInvokeToolResponse(DateTimeOffset ServerTime, JsonElement? Result);
 
+public sealed record AwpInvokeFlowToolRequest(
+    AwpAssignmentCommandContext Context,
+    AwpStepExecutionId StepExecutionId,
+    JsonElement Arguments);
+
+public sealed record AwpFlowToolRoute(
+    string ToolSetName,
+    string ToolSetNamespace,
+    string ToolSetVersion,
+    string Capability,
+    string Route);
+
+public sealed record AwpInvokeFlowToolResponse(
+    DateTimeOffset ServerTime,
+    JsonElement? Result,
+    string ToolName,
+    string ToolNamespace,
+    Guid ToolUid,
+    long ToolGeneration,
+    string ProviderName,
+    string ProviderNamespace,
+    string ProviderType,
+    string ExternalToolId,
+    AwpFlowToolRoute? Route);
+
+public sealed record AwpCaptureFlowArtifactRequest(
+    AwpAssignmentCommandContext Context,
+    AwpStepExecutionId StepExecutionId,
+    string? FileName,
+    string MediaType,
+    JsonElement Content,
+    IReadOnlyDictionary<string, string> Provenance);
+
+public sealed record AwpFlowArtifact(
+    string ArtifactId,
+    string FileName,
+    string MediaType,
+    string Kind = "staged",
+    string? StorageFlowRunId = null,
+    string? LocalArtifactId = null);
+
+public sealed record AwpCaptureFlowArtifactResponse(
+    DateTimeOffset ServerTime,
+    AwpFlowArtifact Artifact);
+
+public sealed record AwpCleanupFlowArtifactRequest(
+    AwpAssignmentCommandContext Context,
+    AwpStepExecutionId StepExecutionId,
+    AwpFlowArtifact Artifact);
+
+public sealed record AwpCleanupFlowArtifactResponse(DateTimeOffset ServerTime);
+
 public sealed record AwpStoreArtifactRequest(
     AwpAssignmentCommandContext Context,
     string Name,
@@ -161,7 +222,9 @@ public sealed record AwpArtifactResponse(
 public sealed record AwpCreateChildFlowRequest(
     AwpAssignmentCommandContext Context,
     AwpStepExecutionId StepExecutionId,
-    JsonElement Input);
+    JsonElement Input,
+    string Purpose = "flowCall",
+    int? Iteration = null);
 
 public sealed record AwpChildFlowResponse(
     DateTimeOffset ServerTime,

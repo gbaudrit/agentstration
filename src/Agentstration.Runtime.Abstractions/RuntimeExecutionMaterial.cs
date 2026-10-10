@@ -38,6 +38,7 @@ public sealed record RuntimeExecutionAgentMaterial(
 {
     public ResourceNamespace AgentNamespace { get; init; } = ResourceNamespace.Default;
     public string RuntimeProfileName { get; init; } = string.Empty;
+    public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
 }
 
 public abstract record RuntimeExecutionMaterial(
@@ -78,7 +79,10 @@ public sealed record RuntimeRootFlowExecutionMaterial(
     JsonElement Input,
     JsonElement Definition,
     IReadOnlyList<RuntimeExecutionAgentMaterial> Agents,
-    RuntimeFlowResumeMaterial? Resume = null)
+    RuntimeFlowResumeMaterial? Resume = null,
+    string? RootFlowRunId = null,
+    string? ParentFlowRunId = null,
+    string? CorrelationId = null)
     : RuntimeExecutionMaterial(MaterialId, SchemaVersion, Digest, RuntimeAssignmentTargetKind.FlowRun, WorkspaceId, TenantId, PrincipalId, RunId);
 
 public sealed record RuntimeFlowResumeMaterial(

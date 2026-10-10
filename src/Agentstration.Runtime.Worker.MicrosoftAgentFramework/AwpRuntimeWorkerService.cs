@@ -130,11 +130,20 @@ internal sealed class AwpRuntimeWorkerService(
             var material = (await client.GetMaterialAsync(session.Context, execution.Token)).Material;
             ValidateMaterialReference(assignment.ExecutionMaterial, material);
             await session.AppendEventAsync(AwpExecutionEventKind.RunStarted, location, null, null, execution.Token);
-            var output = await executor.ExecuteAsync(session, material, execution.Token);
+            var result = await executor.ExecuteAsync(session, material, execution.Token);
             await session.AppendEventAsync(AwpExecutionEventKind.RunCompleted, location,
-                JsonSerializer.SerializeToElement(new { status = "succeeded", output }), null, execution.Token);
+                JsonSerializer.SerializeToElement(new
+                {
+                    status = result.Outcome == "error" ? "failed" : "succeeded",
+                    output = result.Output,
+                    outputName = result.OutputName,
+                    outcome = result.Outcome,
+                    errorCode = result.ErrorCode,
+                    error = result.ErrorMessage,
+                    errorDetails = result.ErrorDetails
+                }), null, execution.Token);
             await session.EnsureCanStartMutationAsync(execution.Token);
-            await client.CompleteAsync(new(session.Context, new(Guid.NewGuid()), output), execution.Token);
+            await client.CompleteAsync(new(session.Context, new(Guid.NewGuid()), result.Output), execution.Token);
             activity?.SetStatus(ActivityStatusCode.Ok);
         }
         catch (AwpWaitingForInputException) when (session.CanStartMutation())

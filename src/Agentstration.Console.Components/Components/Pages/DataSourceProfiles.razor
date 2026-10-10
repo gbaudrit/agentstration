@@ -1,0 +1,31 @@
+@page "/data-source-profiles"
+@implements IDisposable
+@inject IDataSourceProfilesClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+
+<PageTitle>@T("Profiles") · Agentstration</PageTitle>
+<PageHeader Title="@T("Profiles")" Description="@T("ProfilesHelp")" TestId="resource-data-source-profiles">
+    <Actions><a class="button-primary" href="/data-source-profiles/new">@T("Create")</a><a class="button-secondary" href="/data-sources">@T("DataSources")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
+</PageHeader>
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else if (error is not null) { <ErrorState Message="@error" /> }
+else if (items.Count == 0) { <EmptyState Title="@T("Profiles")" Message="@T("EmptyProfiles")"><a class="button-primary" href="/data-source-profiles/new">@T("Create")</a></EmptyState> }
+else
+{
+    <DataGrid TItem="DataSourceProfileResource" Items="items">
+        <Header><tr><th>@T("Name")</th><th>@T("ActiveVersion")</th><th>@T("DraftVersion")</th><th>@T("Scope")</th><th></th></tr></Header>
+        <Row Context="item"><tr><td><strong><a class="resource-name-link" href="@Url(item)">@item.Definition.DisplayName</a></strong><code>@item.Namespace/@item.Name</code></td><td><code>@(item.ActiveVersion ?? "—")</code></td><td><code>@item.Definition.Version</code></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" /></td><td><a class="text-button" href="@Url(item)">@T("Open")</a></td></tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<DataSourceProfileResource> items = [];
+    private bool loading = true;
+    private string? error;
+    private string T(string key) => Localizer[key];
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync() { loading = true; error = null; try { items = await Client.GetAsync(cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
+    private static string Url(DataSourceProfileResource item) => $"/data-source-profiles/{Uri.EscapeDataString(item.Name)}?namespace={Uri.EscapeDataString(item.Namespace.Value)}&scopeRef={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

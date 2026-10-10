@@ -1,12 +1,31 @@
 <div class="flow-node @Node.Source.Type" aria-label="@Node.Source.DisplayName">
-    <PortRenderer Port="Node.Input" />
+    <span class="flow-port-handle input @(Node.Locked ? "locked" : null)" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" title="@Localizer["InputConnectionHandle"]" aria-label="@Localizer["InputConnectionHandle"]">
+        <PortRenderer Port="Node.Input" />
+    </span>
     <span class="flow-node-icon" aria-hidden="true"><UiIcon Name="@FlowStepIcons.Name(Node.Source.Type)" /></span>
     <span class="flow-node-copy"><strong title="@Node.Source.DisplayName">@Node.Source.DisplayName</strong><small>@Node.Source.Type</small></span>
     @if (Node.Source.Resource is not null) { <code title="@Node.Source.Resource">@Short(Node.Source.Resource)</code> }
-    <PortRenderer Port="Node.Output" />
+    @for (var index = 0; index < Node.Outputs.Count; index++)
+    {
+        var output = Node.Outputs[index];
+        var top = 100d * (index + 1) / (Node.Outputs.Count + 1);
+        <span class="flow-port-handle output @OutcomeClass(output) @(Node.Locked ? "locked" : null)" style="top: @top.ToString(System.Globalization.CultureInfo.InvariantCulture)%" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" title="@OutputLabel(output)" aria-label="@OutputLabel(output)">
+            @if (Node.Outputs.Count > 1)
+            {
+                <span class="flow-port-label">@OutcomeSymbol(output)@output.EventName</span>
+            }
+            <PortRenderer Port="output" />
+        </span>
+    }
 </div>
 
 @code {
+    [Inject] private IStringLocalizer<FlowDesignerStrings> Localizer { get; set; } = default!;
     [Parameter, EditorRequired] public FlowDiagramNode Node { get; set; } = default!;
     private static string Short(string value) => value[(value.LastIndexOf('/') + 1)..];
+    private string OutputLabel(FlowDiagramPort output) => output.Outcome is { } outcome
+        ? Localizer["NamedOutputConnectionHandleWithOutcome", output.EventName!, Localizer[$"OutputOutcome.{outcome}"]]
+        : Localizer["NamedOutputConnectionHandle", output.EventName!];
+    private static string? OutcomeClass(FlowDiagramPort output) => output.Outcome is { } outcome ? $"outcome-{outcome.ToString().ToLowerInvariant()}" : null;
+    private static string OutcomeSymbol(FlowDiagramPort output) => output.Outcome switch { FlowOutputOutcome.Success => "✓ ", FlowOutputOutcome.Error => "! ", _ => string.Empty };
 }

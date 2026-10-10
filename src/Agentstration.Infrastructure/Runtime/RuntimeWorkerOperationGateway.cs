@@ -1,5 +1,7 @@
 using System.Text.Json;
+using Agentstration.Flows;
 using Agentstration.Flows.Application;
+using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
@@ -14,6 +16,10 @@ public sealed class RuntimeWorkerOperationGateway(
     IToolExecutionPipeline toolExecution,
     IArtifactStore artifacts,
     IRuntimeExecutionStateStore executionStates,
+    IFlowRepository flowRunRepository,
+    IFlowToolExecutor flowToolExecutor,
+    IFlowToolSetResolver flowToolSetResolver,
+    IFlowStepArtifactCapture flowArtifactCapture,
     FlowRunService flowRuns,
     TimeProvider timeProvider,
     IRequestContextScopeFactory requestScopes) : IRuntimeWorkerOperationGateway
@@ -96,6 +102,120 @@ public sealed class RuntimeWorkerOperationGateway(
         return new RuntimeGovernedArtifact(artifactId, name, reference.ContentType, reference.Length, content);
     }
 
+    public async Task<RuntimeGovernedFlowToolResult> InvokeFlowToolAsync(
+        Agentstration.Resources.WorkspaceId workspaceId,
+        string flowRunId,
+        string stepDefinitionId,
+        JsonElement arguments,
+        CancellationToken cancellationToken)
+    {
+        var stored = await flowRunRepository.GetRunAsync(workspaceId, flowRunId, cancellationToken)
+            ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
+        var run = stored.Value;
+        using var requestScope = EnterScope(run.Scope.TenantId, run.Scope.WorkspaceId, run.Scope.PrincipalId);
+        var step = run.DefinitionSnapshot.Graph?.Steps.SingleOrDefault(value =>
+            string.Equals(value.Name, stepDefinitionId, StringComparison.Ordinal))
+            ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid",
+                "The Flow Tool StepDefinition is not present in the assigned Flow snapshot.");
+        var attempt = Math.Max(1, run.Steps.Single(value => value.StepName == stepDefinitionId).Attempt);
+        FlowToolReference tool;
+        RuntimeGovernedFlowToolRoute? route = null;
+        switch (step)
+        {
+            case ToolFlowStepDefinition direct:
+                tool = direct.Tool;
+                break;
+            case ToolRouteFlowStepDefinition routed:
+                var resolved = await flowToolSetResolver.ResolveAsync(workspaceId, run.FlowId.Namespace,
+                    routed, cancellationToken);
+                tool = resolved.Tool;
+                route = new(resolved.ToolSetName, resolved.ToolSetNamespace, resolved.ToolSetVersion,
+                    resolved.Capability, resolved.Route);
+                break;
+            default:
+                throw new RuntimeExecutionMaterialException("flow_tool_step_invalid",
+                    "The assigned StepDefinition is not a Tool or ToolRoute step.");
+        }
+
+        var result = await flowToolExecutor.ExecuteAsync(new(
+            run.Scope,
+            run.Id,
+            run.FlowId,
+            step.Name,
+            attempt,
+            run.CorrelationId ?? run.Id,
+            tool,
+            arguments), cancellationToken);
+        return new(
+            result.Output?.Clone(),
+            result.ToolName,
+            result.ToolNamespace,
+            result.ToolUid,
+            result.ToolGeneration,
+            result.ProviderName,
+            result.ProviderNamespace,
+            result.ProviderType,
+            result.ExternalToolId,
+            route);
+    }
+
+    public async Task<RuntimeGovernedFlowArtifact> CaptureFlowArtifactAsync(
+        Agentstration.Resources.WorkspaceId workspaceId,
+        string flowRunId,
+        string stepDefinitionId,
+        string? fileName,
+        string mediaType,
+        JsonElement content,
+        IReadOnlyDictionary<string, string> provenance,
+        CancellationToken cancellationToken)
+    {
+        var (run, step) = await GetFlowStepAsync(workspaceId, flowRunId, stepDefinitionId, cancellationToken);
+        var declaration = step.ArtifactOutput
+            ?? throw new RuntimeExecutionMaterialException("flow_step_artifact_not_declared",
+                "The assigned Flow step does not declare an Artifact output.");
+        using var requestScope = EnterScope(run.Scope.TenantId, run.Scope.WorkspaceId, run.Scope.PrincipalId);
+        var trustedProvenance = new Dictionary<string, string>(provenance, StringComparer.Ordinal)
+        {
+            ["flowName"] = run.FlowId.Value,
+            ["flowNamespace"] = run.FlowId.Namespace.Value,
+            ["flowVersion"] = run.FlowVersion,
+            ["rootFlowRunId"] = run.RootFlowRunId ?? run.Id
+        };
+        if (run.ParentFlowRunId is not null) trustedProvenance["parentFlowRunId"] = run.ParentFlowRunId;
+        var attempt = Math.Max(1, run.Steps.Single(value => value.StepName == stepDefinitionId).Attempt);
+        trustedProvenance["stepAttempt"] = attempt.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var artifact = await flowArtifactCapture.CaptureAsync(new(
+            run.Scope,
+            run.Id,
+            run.RootFlowRunId ?? run.Id,
+            run.ParentFlowRunId,
+            step.Name,
+            attempt,
+            run.CorrelationId,
+            declaration with { FileName = fileName, MediaType = mediaType },
+            content,
+            trustedProvenance), cancellationToken);
+        return new(artifact.ArtifactId, artifact.FileName, artifact.MediaType, artifact.Kind,
+            artifact.StorageFlowRunId, artifact.LocalArtifactId);
+    }
+
+    public async Task CleanupFlowArtifactAsync(
+        Agentstration.Resources.WorkspaceId workspaceId,
+        string flowRunId,
+        string stepDefinitionId,
+        RuntimeGovernedFlowArtifact artifact,
+        CancellationToken cancellationToken)
+    {
+        var (run, step) = await GetFlowStepAsync(workspaceId, flowRunId, stepDefinitionId, cancellationToken);
+        if (step.ArtifactOutput is null)
+            throw new RuntimeExecutionMaterialException("flow_step_artifact_not_declared",
+                "The assigned Flow step does not declare an Artifact output.");
+        using var requestScope = EnterScope(run.Scope.TenantId, run.Scope.WorkspaceId, run.Scope.PrincipalId);
+        await flowArtifactCapture.CleanupAsync(run.Scope, run.Id, step.Name,
+            new(artifact.ArtifactId, artifact.FileName, artifact.MediaType, artifact.Kind,
+                artifact.StorageFlowRunId, artifact.LocalArtifactId), cancellationToken);
+    }
+
     public async Task<RuntimeGovernedArtifact?> GetArtifactAsync(
         Agentstration.Resources.WorkspaceId workspaceId,
         RuntimeAssignmentId assignmentId,
@@ -121,9 +241,12 @@ public sealed class RuntimeWorkerOperationGateway(
         string parentRunId,
         string stepDefinitionId,
         JsonElement input,
+        string purpose,
+        int? iteration,
         CancellationToken cancellationToken)
     {
-        var child = await flowRuns.CreateOrGetAssignedChildAsync(workspaceId, parentRunId, stepDefinitionId, input, cancellationToken);
+        var child = await flowRuns.CreateOrGetAssignedChildAsync(workspaceId, parentRunId,
+            stepDefinitionId, input, purpose, iteration, cancellationToken);
         return new RuntimeGovernedChildFlow(child.Value.Id, child.Value.Status.ToString(), child.Value.Output?.Clone());
     }
 
@@ -158,6 +281,21 @@ public sealed class RuntimeWorkerOperationGateway(
 
     private static int? ToInt32(long? value) => value is null || value < 0 ? null : (int)Math.Min(value.Value, int.MaxValue);
     private static string AssignmentRunId(RuntimeAssignmentId assignmentId) => $"awp-assignment:{assignmentId.Value:N}";
+
+    private async Task<(FlowRun Run, FlowStepDefinition Step)> GetFlowStepAsync(
+        Agentstration.Resources.WorkspaceId workspaceId,
+        string flowRunId,
+        string stepDefinitionId,
+        CancellationToken cancellationToken)
+    {
+        var stored = await flowRunRepository.GetRunAsync(workspaceId, flowRunId, cancellationToken)
+            ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
+        var step = stored.Value.DefinitionSnapshot.Graph?.Steps.SingleOrDefault(value =>
+            string.Equals(value.Name, stepDefinitionId, StringComparison.Ordinal))
+            ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid",
+                "The StepDefinition is not present in the assigned Flow snapshot.");
+        return (stored.Value, step);
+    }
     private IDisposable EnterScope(Guid tenantId, Agentstration.Resources.WorkspaceId workspaceId, Guid principalId) =>
         requestScopes.Push(new RequestContext(principalId, tenantId, workspaceId.Value));
 

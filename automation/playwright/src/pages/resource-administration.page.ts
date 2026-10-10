@@ -18,6 +18,8 @@ export const ResourceListRoutes: readonly ResourceAdministrationRoute[] = [
   { path: '/secrets', marker: 'secrets' },
   { path: '/vaults', marker: 'vaults' },
   { path: '/tools', marker: 'tools' },
+  { path: '/tools/sets', marker: 'toolSets' },
+  { path: '/knowledge-sources', marker: 'knowledgeSources' },
   { path: '/tools/providers', marker: 'toolProviders' },
   { path: '/tools/definitions', marker: 'toolDefinitions' },
   { path: '/triggers', marker: 'triggers' },

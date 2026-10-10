@@ -1,5 +1,7 @@
-<span class="metric-help" tabindex="0" aria-label="@Text">?<span class="metric-tooltip" role="tooltip">@Text</span></span>
+<span class="metric-help @(OpenToLeft ? "metric-help-left" : null) @(AlignStart ? "metric-help-start" : null)" tabindex="0" aria-label="@Text">?<span class="metric-tooltip" role="tooltip">@Text</span></span>
 
 @code {
     [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
+    [Parameter] public bool OpenToLeft { get; set; }
+    [Parameter] public bool AlignStart { get; set; }
 }

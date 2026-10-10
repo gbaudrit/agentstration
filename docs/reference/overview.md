@@ -9,6 +9,8 @@ Reference documentation describes verified contracts and operational details:
 - [Pack format and lifecycle](packs.md)
 - [Agent resource](resources/agents.md)
 - [Secrets and Vaults](secrets-and-vaults.md)
+- [Built-in Data Source Profiles](builtin-data-source-profiles.md)
+- [Data Source, Knowledge, and Artifact Flow contracts](knowledge-and-artifact-flow-contracts.md)
 - [Configuration](configuration.md)
 - [Identity and authorization](identity-and-authorization.md)
 - [Detailed current capabilities and examples](current-capabilities.md)

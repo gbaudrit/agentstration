@@ -20,6 +20,9 @@ public static class AwpProtocol
     public const string FailAssignmentPath = BasePath + "/assignments/fail";
     public const string InvokeModelPath = BasePath + "/assignments/model/invoke";
     public const string InvokeToolPath = BasePath + "/assignments/tools/invoke";
+    public const string InvokeFlowToolPath = BasePath + "/assignments/flow-tools/invoke";
+    public const string CaptureFlowArtifactPath = BasePath + "/assignments/flow-artifacts/capture";
+    public const string CleanupFlowArtifactPath = BasePath + "/assignments/flow-artifacts/cleanup";
     public const string StoreArtifactPath = BasePath + "/assignments/artifacts";
     public const string GetArtifactPath = BasePath + "/assignments/artifacts/get";
     public const string CreateChildFlowPath = BasePath + "/assignments/child-flows";

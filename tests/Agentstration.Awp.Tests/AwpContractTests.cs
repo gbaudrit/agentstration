@@ -187,6 +187,59 @@ public sealed class AwpContractTests
     }
 
     [TestMethod]
+    public void RootFlowMaterialCarriesExecutionScopeAndAgentNamespaceInV1()
+    {
+        var principalId = Guid.Parse("81000000-0000-0000-0000-000000000001");
+        var agent = new AwpExecutionAgentMaterial(
+            "agent:1", "agent-step", Guid.Parse("80000000-0000-0000-0000-000000000001"),
+            "assistant", 4, "revision-4", "sha256:agent", "MicrosoftAgentFramework",
+            "Assistant", "Description", "Instructions", "default", "default", [])
+        {
+            AgentNamespace = "support",
+            RuntimeProfileName = "maf-local",
+            RuntimeProfileNamespace = "platform"
+        };
+        AwpExecutionMaterial material = new AwpRootFlowExecutionMaterial(
+            "material-flow", "1.0", "sha256:material", "flowrun-root", "flow", "default",
+            "1.0", "sha256:flow", JsonSerializer.SerializeToElement(new { input = "hello" }),
+            JsonSerializer.SerializeToElement(new { version = "1.0" }), [agent], principalId,
+            RootFlowRunId: "flowrun-root", CorrelationId: "correlation-1");
+
+        var json = JsonSerializer.Serialize(material, AwpProtocol.JsonOptions);
+        var actual = Assert.IsInstanceOfType<AwpRootFlowExecutionMaterial>(
+            JsonSerializer.Deserialize<AwpExecutionMaterial>(json, AwpProtocol.JsonOptions));
+
+        Assert.AreEqual(principalId, actual.PrincipalId);
+        Assert.AreEqual("support", actual.Agents.Single().AgentNamespace);
+        Assert.AreEqual("maf-local", actual.Agents.Single().RuntimeProfileName);
+        Assert.AreEqual("platform", actual.Agents.Single().RuntimeProfileNamespace);
+        Assert.AreEqual("flowrun-root", actual.RootFlowRunId);
+        Assert.AreEqual("correlation-1", actual.CorrelationId);
+        Assert.DoesNotContain("secret", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("credential", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [TestMethod]
+    public void FlowToolChildAndArtifactOperationsRoundTripAsV1Contracts()
+    {
+        var context = CreateCommandContext();
+        var stepId = new AwpStepExecutionId(Guid.Parse("30000000-0000-0000-0000-000000000002"));
+        var tool = RoundTrip(new AwpInvokeFlowToolRequest(context, stepId,
+            JsonSerializer.SerializeToElement(new { query = "hello" })));
+        var child = RoundTrip(new AwpCreateChildFlowRequest(context, stepId,
+            JsonSerializer.SerializeToElement(new { page = 2 }), "repeat", 2));
+        var capture = RoundTrip(new AwpCaptureFlowArtifactRequest(context, stepId, "result.json",
+            "application/json", JsonSerializer.SerializeToElement(new { value = 1 }),
+            new Dictionary<string, string> { ["invocationKind"] = "tool" }));
+
+        Assert.AreEqual("hello", tool.Arguments.GetProperty("query").GetString());
+        Assert.AreEqual("repeat", child.Purpose);
+        Assert.AreEqual(2, child.Iteration);
+        Assert.AreEqual("result.json", capture.FileName);
+        Assert.AreEqual("tool", capture.Provenance["invocationKind"]);
+    }
+
+    [TestMethod]
     public void CheckpointCarriesExplicitSchemaAndMaterialCompatibilityKey()
     {
         var request = new AwpStoreCheckpointRequest(CreateCommandContext(), "checkpoint-1", "maf-json-v1",
@@ -200,6 +253,9 @@ public sealed class AwpContractTests
         Assert.AreEqual("sha256:material", actual.CompatibilityKey);
         Assert.AreEqual(1, actual.Payload.GetProperty("state").GetInt32());
     }
+
+    private static T RoundTrip<T>(T value) => JsonSerializer.Deserialize<T>(
+        JsonSerializer.Serialize(value, AwpProtocol.JsonOptions), AwpProtocol.JsonOptions)!;
 
     [TestMethod]
     public void GovernedModelMessagesPreserveToolCallAndResultContent()

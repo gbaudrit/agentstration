@@ -92,6 +92,19 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
         return await ReadResourceAsync<AgentResource>(response, cancellationToken);
     }
 
+    public async Task<ResourceSnapshot<AgentRevision>> GetAgentRevisionAsync(
+        ResourceNamespace @namespace,
+        string agentName,
+        string revisionName,
+        CancellationToken cancellationToken)
+    {
+        var path = @namespace.IsDefault
+            ? $"api/agents/{Uri.EscapeDataString(agentName)}/revisions/{Uri.EscapeDataString(revisionName)}"
+            : $"api/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(agentName)}/revisions/{Uri.EscapeDataString(revisionName)}";
+        using var response = await httpClient.GetAsync(path, cancellationToken);
+        return await ReadResourceAsync<AgentRevision>(response, cancellationToken);
+    }
+
     public async Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken)
     {
         using var message = new HttpRequestMessage(HttpMethod.Put, AgentPath(request.Metadata.Namespace, request.Metadata.Name))

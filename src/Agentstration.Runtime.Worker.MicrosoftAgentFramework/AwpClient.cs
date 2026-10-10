@@ -77,6 +77,18 @@ internal sealed class AwpClient : IDisposable
         CancellationToken cancellationToken) => PostAsync<AwpInvokeToolRequest, AwpInvokeToolResponse>(
             AwpProtocol.InvokeToolPath, request, Guid.NewGuid(), cancellationToken);
 
+    public Task<AwpInvokeFlowToolResponse> InvokeFlowToolAsync(AwpInvokeFlowToolRequest request,
+        CancellationToken cancellationToken) => PostAsync<AwpInvokeFlowToolRequest, AwpInvokeFlowToolResponse>(
+            AwpProtocol.InvokeFlowToolPath, request, Guid.NewGuid(), cancellationToken);
+
+    public Task<AwpCaptureFlowArtifactResponse> CaptureFlowArtifactAsync(AwpCaptureFlowArtifactRequest request,
+        CancellationToken cancellationToken) => PostAsync<AwpCaptureFlowArtifactRequest, AwpCaptureFlowArtifactResponse>(
+            AwpProtocol.CaptureFlowArtifactPath, request, Guid.NewGuid(), cancellationToken);
+
+    public async Task CleanupFlowArtifactAsync(AwpCleanupFlowArtifactRequest request,
+        CancellationToken cancellationToken) => _ = await PostAsync<AwpCleanupFlowArtifactRequest, AwpCleanupFlowArtifactResponse>(
+            AwpProtocol.CleanupFlowArtifactPath, request, Guid.NewGuid(), cancellationToken);
+
     public Task<AwpArtifactResponse> StoreArtifactAsync(AwpStoreArtifactRequest request,
         CancellationToken cancellationToken) => PostAsync<AwpStoreArtifactRequest, AwpArtifactResponse>(
             AwpProtocol.StoreArtifactPath, request, Guid.NewGuid(), cancellationToken);

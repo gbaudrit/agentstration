@@ -1,0 +1,39 @@
+@page "/tools/sets"
+@inject IToolSetsClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ToolSetsStrings> Localizer
+
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-toolsets">
+    <Actions><a class="button-secondary" href="/knowledge-sources">@T("KnowledgeSources")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
+</PageHeader>
+<ResourceTabs Label="@T("SectionsLabel")"><a href="/tools">@T("Catalog")</a><a class="active" href="/tools/sets">@T("ToolSets")</a><a href="/tools/categories">@T("Categories")</a><a href="/tools/definitions">@T("Definitions")</a><a href="/tools/providers">@T("Providers")</a></ResourceTabs>
+
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else if (error is not null) { <ErrorState Message="@error" /> }
+else if (toolSets.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
+else
+{
+    <DataGrid TItem="ToolSetResource" Items="toolSets">
+        <Header><tr><th>@T("ToolSet")</th><th>@T("Version")</th><th>@T("Members")</th><th>@T("Category")</th><th>@T("State")</th><th></th></tr></Header>
+        <Row Context="toolSet"><tr data-testid="toolset-row"><td><span class="resource-name-with-scope"><strong>@toolSet.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="toolSet.ScopeRef" Compact /></span><code>@toolSet.Namespace/@toolSet.Name</code></td><td><code>@toolSet.Definition.Version</code></td><td>@toolSet.Definition.Members.Count</td><td>@(toolSet.Definition.Category?.Name ?? "—")</td><td><StatusBadge Text="@T(toolSet.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(toolSet.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" /></td><td><a class="text-button" href="@DetailsUrl(toolSet)">@T("Inspect")</a></td></tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private IReadOnlyList<ToolSetResource> toolSets = [];
+    private bool loading = true;
+    private string? error;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try { toolSets = await Client.GetToolSetsAsync(); }
+        catch (Exception exception) { error = exception.Message; }
+        finally { loading = false; }
+    }
+    private static string DetailsUrl(ToolSetResource value) => value.Namespace.IsDefault
+        ? $"/tools/sets/{Uri.EscapeDataString(value.Name)}"
+        : $"/tools/sets/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString(value.Namespace.Value)}";
+}

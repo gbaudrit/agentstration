@@ -8,15 +8,30 @@ namespace Agentstration.Web.FlowDesigner.State;
 public enum FlowEditorMode { Designer, Definition, Split }
 public enum FlowSaveState { Saved, Saving, UnsavedChanges, SaveFailed }
 public sealed record FlowEditorSelection(string? StepName = null, string? TransitionId = null);
-public sealed record FlowDesignerNode(string Name, string Type, string DisplayName, FlowNodePosition Position, string? Resource);
+public sealed record FlowDesignerNode(string Name, string Type, string DisplayName, FlowNodePosition Position, string? Resource, IReadOnlyList<string> OutputEvents)
+{
+    public IReadOnlyDictionary<string, FlowOutputOutcome> OutputOutcomes { get; init; } = new Dictionary<string, FlowOutputOutcome>(StringComparer.Ordinal);
+}
 public sealed record FlowDesignerLink(string Id, string From, string To, string Event);
 public sealed record FlowDesignerDocument(IReadOnlyList<FlowDesignerNode> Nodes, IReadOnlyList<FlowDesignerLink> Links)
 {
-    public static FlowDesignerDocument From(FlowGraphDefinition definition)
+    public static FlowDesignerDocument From(FlowGraphDefinition definition, IReadOnlyDictionary<string, IReadOnlyList<FlowDesignerOutput>>? flowCallOutputs = null)
     {
-        var nodes = definition.Steps.Select((step, index) => new FlowDesignerNode(step.Name, step.Type(), step.DisplayName ?? step.Name,
-            definition.Designer.NodePositions.TryGetValue(step.Name, out var position) ? position : new(index * 200, 50),
-            step switch { AgentFlowStepDefinition agent => agent.Agent.ResourceId, RouterFlowStepDefinition router => $"{router.Candidates.Count} routes", FlowCallStepDefinition flow => flow.Flow.ResourceId, ToolFlowStepDefinition tool => tool.Tool.ResourceId, _ => null })).ToArray();
+        var nodes = definition.Steps.Select((step, index) =>
+        {
+            var resolvedOutputs = step is FlowCallStepDefinition && flowCallOutputs?.TryGetValue(step.Name, out var outputs) == true ? outputs : null;
+            return new FlowDesignerNode(step.Name, step.Type(), step.DisplayName ?? step.Name,
+                definition.Designer.NodePositions.TryGetValue(step.Name, out var position) ? position : new(index * 200, 50),
+                step switch { AgentFlowStepDefinition agent => agent.Agent.ResourceId, RouterFlowStepDefinition router => $"{router.Candidates.Count} routes", FlowCallStepDefinition flow => flow.Flow.ResourceId, RepeatFlowStepDefinition repeat => $"{repeat.Flow.ResourceId} · ≤ {repeat.MaximumIterations}", ToolFlowStepDefinition tool => tool.Tool.ResourceId, ToolRouteFlowStepDefinition route => route.ToolSet.ResourceId, _ => null },
+                resolvedOutputs?.Select(output => output.Name).ToArray()
+                    ?? (step is FlowCallStepDefinition
+                        ? []
+                        : step.OutputEvents()))
+            {
+                OutputOutcomes = resolvedOutputs?.ToDictionary(output => output.Name, output => output.Outcome, StringComparer.Ordinal)
+                    ?? new Dictionary<string, FlowOutputOutcome>(StringComparer.Ordinal)
+            };
+        }).ToArray();
         return new(nodes, definition.Transitions.Select(transition => new FlowDesignerLink(transition.Id, transition.FromStep, transition.ToStep, transition.Event)).ToArray());
     }
 }
@@ -41,9 +56,23 @@ public sealed record FlowEditorState
 
 public interface IFlowEditorCommand { FlowGraphDefinition Apply(FlowGraphDefinition definition); }
 public sealed record ReplaceDefinitionCommand(FlowGraphDefinition Definition) : IFlowEditorCommand { public FlowGraphDefinition Apply(FlowGraphDefinition definition) => Definition; }
-public sealed record AddStepCommand(FlowStepDefinition Step, FlowNodePosition Position) : IFlowEditorCommand
+public sealed record AddStepCommand(
+    FlowStepDefinition Step,
+    FlowNodePosition Position,
+    FlowTransitionDefinition? Transition = null) : IFlowEditorCommand
 {
-    public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with { Steps = [.. definition.Steps, Step], Designer = definition.Designer with { NodePositions = new Dictionary<string, FlowNodePosition>(definition.Designer.NodePositions, StringComparer.Ordinal) { [Step.Name] = Position } } };
+    public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with
+    {
+        Steps = [.. definition.Steps, Step],
+        Transitions = Transition is null ? definition.Transitions : [.. definition.Transitions, Transition],
+        Designer = definition.Designer with
+        {
+            NodePositions = new Dictionary<string, FlowNodePosition>(definition.Designer.NodePositions, StringComparer.Ordinal)
+            {
+                [Step.Name] = Position
+            }
+        }
+    };
 }
 public sealed record RemoveStepCommand(string Name) : IFlowEditorCommand
 {
@@ -61,13 +90,105 @@ public sealed record UpdateStepCommand(FlowStepDefinition Step) : IFlowEditorCom
 {
     public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with { Steps = definition.Steps.Select(current => current.Name == Step.Name ? Step : current).ToArray() };
 }
+public sealed record RenameStepCommand(string OldName, string NewName) : IFlowEditorCommand
+{
+    public FlowGraphDefinition Apply(FlowGraphDefinition definition)
+    {
+        if (string.IsNullOrWhiteSpace(NewName) || definition.Steps.Any(step => step.Name == NewName && step.Name != OldName)) return definition;
+        var steps = definition.Steps.Select(step => step.Name == OldName ? step with { Name = NewName } : step).ToArray();
+        var transitions = definition.Transitions.Select(item => item with
+        {
+            FromStep = item.FromStep == OldName ? NewName : item.FromStep,
+            ToStep = item.ToStep == OldName ? NewName : item.ToStep
+        }).ToArray();
+        var positions = new Dictionary<string, FlowNodePosition>(definition.Designer.NodePositions, StringComparer.Ordinal);
+        if (positions.Remove(OldName, out var position)) positions[NewName] = position;
+        return definition with { EntryStep = definition.EntryStep == OldName ? NewName : definition.EntryStep, Steps = steps, Transitions = transitions, Designer = definition.Designer with { NodePositions = positions } };
+    }
+}
 public sealed record AddTransitionCommand(FlowTransitionDefinition Transition) : IFlowEditorCommand
 {
     public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with { Transitions = [.. definition.Transitions.Where(item => item.Id != Transition.Id), Transition] };
 }
+public sealed record UpdateTransitionCommand(FlowTransitionDefinition Transition) : IFlowEditorCommand
+{
+    public FlowGraphDefinition Apply(FlowGraphDefinition definition)
+    {
+        if (definition.Transitions.All(item => item.Id != Transition.Id))
+            return definition;
+
+        return definition with
+        {
+            Transitions = definition.Transitions
+                .Select(item => item.Id == Transition.Id ? Transition : item)
+                .ToArray()
+        };
+    }
+}
+public sealed record ReconnectTransitionCommand(string Id, string FromStep, string ToStep, string Event) : IFlowEditorCommand
+{
+    public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with
+    {
+        Transitions = definition.Transitions
+            .Select(item => item.Id == Id ? item with { FromStep = FromStep, ToStep = ToStep, Event = Event } : item)
+            .ToArray()
+    };
+}
 public sealed record RemoveTransitionCommand(string Id) : IFlowEditorCommand
 {
     public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with { Transitions = definition.Transitions.Where(item => item.Id != Id).ToArray() };
+}
+public sealed record ReconcileFlowCallTransitionsCommand(
+    IReadOnlyDictionary<string, IReadOnlyList<FlowDesignerOutput>> OutputsByStep) : IFlowEditorCommand
+{
+    public FlowGraphDefinition Apply(FlowGraphDefinition definition)
+    {
+        var transitions = definition.Transitions.ToList();
+        var changed = false;
+        var localOutputs = definition.Steps
+            .Select(step => step switch
+            {
+                FailureFlowStepDefinition => new KeyValuePair<string, FlowOutputOutcome>(step.Name, FlowOutputOutcome.Error),
+                OutputFlowStepDefinition output => new(step.Name, output.Outcome ?? FlowOutputOutcome.Success),
+                _ => (KeyValuePair<string, FlowOutputOutcome>?)null
+            })
+            .OfType<KeyValuePair<string, FlowOutputOutcome>>()
+            .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+        foreach (var call in definition.Steps.OfType<FlowCallStepDefinition>())
+        {
+            if (!OutputsByStep.TryGetValue(call.Name, out var outputs) || outputs.Count == 0)
+                continue;
+
+            var declaredEvents = outputs.Select(output => output.Name).ToHashSet(StringComparer.Ordinal);
+            foreach (var invalid in transitions.Where(transition =>
+                transition.FromStep == call.Name
+                && !declaredEvents.Contains(transition.Event)
+                && localOutputs.ContainsKey(transition.ToStep)
+                && transition.Condition is null
+                && transition.Priority is null).ToArray())
+            {
+                var candidates = outputs
+                    .Where(output => output.Outcome == localOutputs[invalid.ToStep])
+                    .Select(output => output.Name)
+                    .ToArray();
+                var replacement = candidates.Length == 1 ? candidates[0] : null;
+                if (replacement is null) continue;
+
+                var index = transitions.IndexOf(invalid);
+                if (transitions.Any(transition =>
+                    transition.Id != invalid.Id
+                    && transition.FromStep == call.Name
+                    && transition.ToStep == invalid.ToStep
+                    && transition.Event == replacement))
+                    transitions.RemoveAt(index);
+                else
+                    transitions[index] = invalid with { Event = replacement };
+                changed = true;
+            }
+        }
+
+        return changed ? definition with { Transitions = transitions } : definition;
+    }
 }
 public sealed record ApplyAutoLayoutCommand(bool Vertical) : IFlowEditorCommand
 {
@@ -163,6 +284,7 @@ public sealed class FlowEditorStore
     private readonly Stack<FlowGraphDefinition> undo = new();
     private readonly Stack<FlowGraphDefinition> redo = new();
     public FlowEditorState State { get; private set; } = new();
+    private IReadOnlyDictionary<string, IReadOnlyList<FlowDesignerOutput>> flowCallOutputs = new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(StringComparer.Ordinal);
     public event EventHandler? StateChanged;
     public bool CanUndo => undo.Count > 0;
     public bool CanRedo => redo.Count > 0;
@@ -170,6 +292,7 @@ public sealed class FlowEditorStore
     public void Load(FlowDesignerLoadResult result, FlowDesignerTarget target)
     {
         undo.Clear(); redo.Clear();
+        flowCallOutputs = new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(StringComparer.Ordinal);
         State = new FlowEditorState { Resource = result.Resource, Diagram = FlowDesignerDocument.From(result.Resource.Definition), ETag = result.ETag, LocalRevision = result.Resource.DraftRevision ?? 0, SourceText = result.Source, SaveState = FlowSaveState.Saved, Namespace = target.Namespace, PublishedVersion = result.PublishedVersion, IsReadOnly = result.IsReadOnly };
         Changed();
     }
@@ -181,9 +304,13 @@ public sealed class FlowEditorStore
         cancellationToken.ThrowIfCancellationRequested();
         if (State.IsReadOnly) throw new InvalidOperationException("A published namespaced Flow is read-only.");
         var resource = State.Resource ?? throw new InvalidOperationException("The editor has not loaded a Flow definition.");
-        undo.Push(resource.Definition); redo.Clear();
         var definition = command.Apply(resource.Definition);
-        State = State with { Resource = resource with { Definition = definition }, Diagram = FlowDesignerDocument.From(definition), IsDirty = true, SaveState = FlowSaveState.UnsavedChanges, LocalRevision = State.LocalRevision + 1, SourceError = null };
+        if (ReferenceEquals(definition, resource.Definition)) return Task.CompletedTask;
+        undo.Push(resource.Definition); redo.Clear();
+        var selection = command is RenameStepCommand rename && State.Selection.StepName == rename.OldName
+            ? new FlowEditorSelection(rename.NewName)
+            : State.Selection;
+        State = State with { Resource = resource with { Definition = definition }, Diagram = FlowDesignerDocument.From(definition, flowCallOutputs), Selection = selection, IsDirty = true, SaveState = FlowSaveState.UnsavedChanges, LocalRevision = State.LocalRevision + 1, SourceError = null };
         Changed(); return Task.CompletedTask;
     }
 
@@ -191,12 +318,28 @@ public sealed class FlowEditorStore
     public void SelectTransition(string? id) { State = State with { Selection = new FlowEditorSelection(null, id) }; Changed(); }
     public void SetMode(FlowEditorMode mode) { State = State with { Mode = mode }; Changed(); }
     public void SetIssues(IReadOnlyList<FlowValidationIssue> issues) { State = State with { Issues = issues }; Changed(); }
+    public void SetFlowCallOutputs(string stepName, IReadOnlyList<FlowDesignerOutput> outputs)
+    {
+        var updated = new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(flowCallOutputs, StringComparer.Ordinal);
+        if (outputs.Count == 0) updated.Remove(stepName); else updated[stepName] = outputs;
+        flowCallOutputs = updated;
+        if (State.Resource is not null)
+            State = State with { Diagram = FlowDesignerDocument.From(State.Resource.Definition, flowCallOutputs) };
+        Changed();
+    }
+    public void SetFlowCallOutputs(IReadOnlyDictionary<string, IReadOnlyList<FlowDesignerOutput>> outputs)
+    {
+        flowCallOutputs = new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(outputs, StringComparer.Ordinal);
+        if (State.Resource is not null)
+            State = State with { Diagram = FlowDesignerDocument.From(State.Resource.Definition, flowCallOutputs) };
+        Changed();
+    }
     public void SetSource(string source, string? error = null) { State = State with { SourceText = source, SourceError = error, IsDirty = error is null || State.IsDirty }; Changed(); }
     public void MarkSaving() { State = State with { SaveState = FlowSaveState.Saving }; Changed(); }
     public void MarkSaveFailed() { State = State with { SaveState = FlowSaveState.SaveFailed }; Changed(); }
-    public void MarkSaved(FlowDraftResponse response, string source) { State = State with { Resource = new(response.Value.FlowId, response.Value.DisplayName, response.Value.Description, response.Value.Tags, response.Value.Definition, response.Value.Revision), Diagram = FlowDesignerDocument.From(response.Value.Definition), ETag = response.ETag, LocalRevision = response.Value.Revision, SourceText = source, IsDirty = false, SaveState = FlowSaveState.Saved, SourceError = null }; Changed(); }
+    public void MarkSaved(FlowDraftResponse response, string source) { State = State with { Resource = new(response.Value.FlowId, response.Value.DisplayName, response.Value.Description, response.Value.Tags, response.Value.Definition, response.Value.Revision), Diagram = FlowDesignerDocument.From(response.Value.Definition, flowCallOutputs), ETag = response.ETag, LocalRevision = response.Value.Revision, SourceText = source, IsDirty = false, SaveState = FlowSaveState.Saved, SourceError = null }; Changed(); }
     public void Undo() { if (!undo.TryPop(out var definition) || State.Resource is null || State.IsReadOnly) return; redo.Push(State.Resource.Definition); ReplaceHistory(definition); }
     public void Redo() { if (!redo.TryPop(out var definition) || State.Resource is null || State.IsReadOnly) return; undo.Push(State.Resource.Definition); ReplaceHistory(definition); }
-    private void ReplaceHistory(FlowGraphDefinition definition) { State = State with { Resource = State.Resource! with { Definition = definition }, Diagram = FlowDesignerDocument.From(definition), IsDirty = true, SaveState = FlowSaveState.UnsavedChanges }; Changed(); }
+    private void ReplaceHistory(FlowGraphDefinition definition) { State = State with { Resource = State.Resource! with { Definition = definition }, Diagram = FlowDesignerDocument.From(definition, flowCallOutputs), IsDirty = true, SaveState = FlowSaveState.UnsavedChanges }; Changed(); }
     private void Changed() => StateChanged?.Invoke(this, EventArgs.Empty);
 }
