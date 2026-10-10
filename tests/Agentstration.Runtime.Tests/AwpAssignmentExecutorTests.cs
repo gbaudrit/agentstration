@@ -132,6 +132,88 @@ public sealed class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
+    public async Task RepeatFailsWithStableCodeWhenTheIterationLimitIsReached()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "repeat",
+            Steps =
+            [
+                new RepeatFlowStepDefinition
+                {
+                    Name = "repeat",
+                    Flow = new("child"),
+                    InputMapping = JsonSerializer.SerializeToElement(new { done = false }),
+                    NextInputMapping = JsonSerializer.SerializeToElement(new { done = false }),
+                    Until = "${steps.repeat.output.done == true}",
+                    MaximumIterations = 2
+                },
+                new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success }
+            ],
+            Transitions = [new("repeat-completed", "repeat", "completed", "completed")]
+        };
+        var handler = new GraphHandler(TestNow)
+        {
+            ChildOutputFactory = _ => JsonSerializer.SerializeToElement(new { done = false })
+        };
+
+        var exception = await Assert.ThrowsAsync<AwpExecutionNotSupportedException>(() =>
+            ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }), handler));
+
+        Assert.AreEqual("flow_repeat_limit_exceeded", exception.Code);
+        Assert.HasCount(2, handler.ChildRequests);
+    }
+
+    [TestMethod]
+    public async Task RootFlowExpressionsResolveAuthoritativeExecutionContextOnTheWorker()
+    {
+        var graph = ExecutionContextGraph();
+
+        var (result, _) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }),
+            runId: "flowrun-context", rootRunId: "flowrun-context",
+            correlationId: "correlation-context");
+
+        Assert.AreEqual("flowrun-context", result.Output?.GetProperty("flowRunId").GetString());
+        Assert.AreEqual("flowrun-context", result.Output?.GetProperty("rootFlowRunId").GetString());
+        Assert.AreEqual(JsonValueKind.Null, result.Output?.GetProperty("parentFlowRunId").ValueKind);
+        Assert.AreEqual("capture", result.Output?.GetProperty("stepName").GetString());
+        Assert.AreEqual("correlation-context", result.Output?.GetProperty("correlationId").GetString());
+    }
+
+    [TestMethod]
+    public async Task ChildFlowExpressionsResolveRootParentAndCurrentRunOnTheWorker()
+    {
+        var parent = new FlowGraphDefinition
+        {
+            EntryStep = "child",
+            Steps =
+            [
+                new FlowCallStepDefinition { Name = "child", Flow = new("context-child") },
+                new OutputFlowStepDefinition
+                {
+                    Name = "output",
+                    Outcome = FlowOutputOutcome.Success,
+                    OutputMapping = JsonSerializer.SerializeToElement("${steps.child.output}")
+                }
+            ],
+            Transitions = [new("child-output", "child", "output", "output")]
+        };
+        var handler = new GraphHandler(TestNow)
+        {
+            ChildGraph = ExecutionContextGraph(),
+            ChildCorrelationId = "correlation-child"
+        };
+
+        var (result, _) = await ExecuteGraphAsync(parent, JsonSerializer.SerializeToElement(new { }),
+            handler, correlationId: "correlation-child");
+
+        StringAssert.StartsWith(result.Output?.GetProperty("flowRunId").GetString(), "flowrun-child-");
+        Assert.AreEqual("flowrun-root", result.Output?.GetProperty("rootFlowRunId").GetString());
+        Assert.AreEqual("flowrun-root", result.Output?.GetProperty("parentFlowRunId").GetString());
+        Assert.AreEqual("correlation-child", result.Output?.GetProperty("correlationId").GetString());
+    }
+
+    [TestMethod]
     public async Task GraphExecutesGovernedToolRouteCapturesArtifactAndReturnsNamedOutput()
     {
         var now = DateTimeOffset.Parse("2026-10-10T08:00:00Z",
@@ -275,7 +357,11 @@ public sealed class AwpAssignmentExecutorTests
     private static async Task<(AwpAssignmentExecutionResult Result, GraphHandler Handler)> ExecuteGraphAsync(
         FlowGraphDefinition graph,
         JsonElement input,
-        GraphHandler? configuredHandler = null)
+        GraphHandler? configuredHandler = null,
+        string runId = "flowrun-root",
+        string? rootRunId = null,
+        string? parentRunId = null,
+        string? correlationId = null)
     {
         using var credential = new AwpClientCredential(Guid.NewGuid(), Guid.NewGuid(), "test-instance",
             System.Text.Encoding.UTF8.GetBytes("test-worker-secret-material-at-least-32-bytes"));
@@ -283,7 +369,7 @@ public sealed class AwpAssignmentExecutorTests
         using var client = new AwpClient(new Uri("https://authority.test"), credential,
             new(Guid.NewGuid()), TimeProvider.System, 0, handler);
         var assignment = new AwpRunAssignment(new(Guid.NewGuid()), new(Guid.NewGuid()),
-            new(Guid.NewGuid(), Guid.NewGuid().ToString("D")), new AwpRootFlowRunTarget("flowrun-root"),
+            new(Guid.NewGuid(), Guid.NewGuid().ToString("D")), new AwpRootFlowRunTarget(rootRunId ?? runId),
             new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", "1.0"),
             new("material-1", "1.0", "sha256:material"),
             new("ownership", 1, DateTimeOffset.UtcNow.AddMinutes(5), 15));
@@ -293,11 +379,40 @@ public sealed class AwpAssignmentExecutorTests
             NullLogger<AwpAssignmentExecutor>.Instance);
         var definition = Version("root", graph, TestNow);
         var material = new AwpRootFlowExecutionMaterial("material-1", "1.0", "sha256:material",
-            "flowrun-root", "root", "default", "1.0", "sha256:root", input,
-            JsonSerializer.SerializeToElement(definition, JsonOptions), [], Guid.NewGuid());
+            runId, "root", "default", "1.0", "sha256:root", input,
+            JsonSerializer.SerializeToElement(definition, JsonOptions), [], Guid.NewGuid(),
+            RootFlowRunId: rootRunId ?? runId, ParentFlowRunId: parentRunId,
+            CorrelationId: correlationId);
 
         return (await executor.ExecuteAsync(session, material, CancellationToken.None), handler);
     }
+
+    private static FlowGraphDefinition ExecutionContextGraph() => new()
+    {
+        EntryStep = "capture",
+        Steps =
+        [
+            new TransformFlowStepDefinition
+            {
+                Name = "capture",
+                Mapping = JsonSerializer.SerializeToElement(new
+                {
+                    flowRunId = "${execution.flowRunId}",
+                    rootFlowRunId = "${execution.rootFlowRunId}",
+                    parentFlowRunId = "${execution.parentFlowRunId}",
+                    stepName = "${execution.stepName}",
+                    correlationId = "${execution.correlationId}"
+                })
+            },
+            new OutputFlowStepDefinition
+            {
+                Name = "output",
+                Outcome = FlowOutputOutcome.Success,
+                OutputMapping = JsonSerializer.SerializeToElement("${steps.capture.output}")
+            }
+        ],
+        Transitions = [new("capture-output", "capture", "completed", "output")]
+    };
 
     private sealed class GraphHandler(DateTimeOffset now) : HttpMessageHandler
     {
@@ -307,6 +422,9 @@ public sealed class AwpAssignmentExecutorTests
         public string? ChildOutputName { get; init; }
         public string ChildOutcome { get; init; } = "success";
         public JsonElement? ChildOutput { get; init; }
+        public Func<AwpCreateChildFlowRequest, JsonElement>? ChildOutputFactory { get; init; }
+        public FlowGraphDefinition? ChildGraph { get; init; }
+        public string? ChildCorrelationId { get; init; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
             CancellationToken cancellationToken)
@@ -367,7 +485,7 @@ public sealed class AwpAssignmentExecutorTests
             var request = Payload<AwpCreateChildFlowRequest>(bytes);
             ChildRequests.Add(request);
             var runId = $"flowrun-child-{request.Iteration}";
-            var graph = new FlowGraphDefinition
+            var graph = ChildGraph ?? new FlowGraphDefinition
             {
                 EntryStep = "completed",
                 Steps =
@@ -378,7 +496,8 @@ public sealed class AwpAssignmentExecutorTests
                         Outcome = ChildOutcome == "error" ? FlowOutputOutcome.Error : FlowOutputOutcome.Success,
                         Code = ChildOutcome == "error" ? "child_failed" : null,
                         Message = ChildOutcome == "error" ? "The child failed." : null,
-                        OutputMapping = ChildOutput ?? JsonSerializer.SerializeToElement("${input}")
+                        OutputMapping = ChildOutputFactory?.Invoke(request) ?? ChildOutput
+                            ?? JsonSerializer.SerializeToElement("${input}")
                     }
                 ]
             };
@@ -394,7 +513,8 @@ public sealed class AwpAssignmentExecutorTests
                             Outcome = ChildOutcome == "error" ? FlowOutputOutcome.Error : FlowOutputOutcome.Success,
                             Code = ChildOutcome == "error" ? "child_failed" : null,
                             Message = ChildOutcome == "error" ? "The child failed." : null,
-                            OutputMapping = ChildOutput ?? JsonSerializer.SerializeToElement("${input}")
+                            OutputMapping = ChildOutputFactory?.Invoke(request) ?? ChildOutput
+                                ?? JsonSerializer.SerializeToElement("${input}")
                         }
                     ]
                 };
@@ -402,7 +522,8 @@ public sealed class AwpAssignmentExecutorTests
             var material = new AwpRootFlowExecutionMaterial($"material-{runId}", "1.0", "sha256:material",
                 runId, "child", "default", "1.0", "sha256:child", request.Input,
                 JsonSerializer.SerializeToElement(definition, JsonOptions), [], Guid.NewGuid(),
-                RootFlowRunId: "flowrun-root", ParentFlowRunId: "flowrun-root");
+                RootFlowRunId: "flowrun-root", ParentFlowRunId: "flowrun-root",
+                CorrelationId: ChildCorrelationId);
             return new(now, runId, "Pending", null, material);
         }
 

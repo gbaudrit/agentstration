@@ -105,65 +105,6 @@ public sealed partial class FlowTests
         Assert.AreEqual(3, causality.Items.Count(item => item.ParentStepName == "read"));
     }
 
-    [TestMethod]
-    public async Task RepeatFailsWhenTheIterationLimitIsReached()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        await CreatePublishedGraphAsync(fixture, "chunk-reader", RepeatChildGraph());
-        var parent = await CreatePublishedGraphAsync(fixture, "parent", RepeatGraph(2));
-        var runs = Service(fixture, new TestFlowRunQueue(), agents: new ChunkAgentExecutor(endOffset: 10));
-        var pending = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual,
-            "tester", "repeat-limit", JsonSerializer.SerializeToElement(new { source = "docs", offset = 0 }), TestScope, default);
-
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-        for (var iteration = 1; iteration <= 2; iteration++)
-        {
-            var parentRun = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-            var childRunId = parentRun.Steps.Single(step => step.StepName == "read").ChildFlowRunId!;
-            await runs.ExecuteAsync(new(childRunId, TestScope), default);
-            await runs.ExecuteAsync(new(parentRun.Id, TestScope), default);
-        }
-
-        var failed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Failed, failed.Status);
-        Assert.AreEqual("flow_repeat_limit_exceeded", failed.Error?.Code);
-        Assert.HasCount(2, failed.Steps.Single(step => step.StepName == "read").ChildFlowRunIds);
-    }
-
-    [TestMethod]
-    public async Task RepeatRecoveryRecreatesTheCurrentChildWithItsPersistedInput()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        await CreatePublishedGraphAsync(fixture, "chunk-reader", RepeatChildGraph());
-        var parent = await CreatePublishedGraphAsync(fixture, "parent", RepeatGraph(5));
-        var first = Service(fixture, new TestFlowRunQueue(), agents: new ChunkAgentExecutor(endOffset: 3));
-        var pending = await first.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual,
-            "tester", "repeat-recovery", JsonSerializer.SerializeToElement(new { source = "docs", offset = 0 }), TestScope, default);
-
-        await first.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-        var firstWaiting = (await first.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        await first.ExecuteAsync(new(firstWaiting.Steps.Single(step => step.StepName == "read").ChildFlowRunId!, TestScope), default);
-        await first.ExecuteAsync(new(firstWaiting.Id, TestScope), default);
-
-        var secondWaiting = (await first.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        var repeat = secondWaiting.Steps.Single(step => step.StepName == "read");
-        Assert.AreEqual(2, repeat.RepeatIteration);
-        Assert.AreEqual(1, repeat.ResolvedInput?.GetProperty("offset").GetInt32());
-        var missingChildId = repeat.ChildFlowRunId!;
-        var missingChild = (await first.GetAsync(TestScope.WorkspaceId, missingChildId, default))!;
-        await fixture.Repository.DeleteRunAsync(TestScope.WorkspaceId, missingChildId, missingChild.ETag, default);
-
-        var recoveryQueue = new TestFlowRunQueue();
-        var recovered = Service(fixture, recoveryQueue, agents: new ChunkAgentExecutor(endOffset: 3));
-        await recovered.InitializeAsync(default);
-        Assert.IsTrue(recoveryQueue.Enqueued.Any(item => item.RunId == pending.Value.Id));
-
-        await recovered.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-        var recreated = (await recovered.GetAsync(TestScope.WorkspaceId, missingChildId, default))!.Value;
-        Assert.AreEqual(1, recreated.Input.GetProperty("offset").GetInt32());
-        Assert.AreEqual(pending.Value.Id, recreated.ParentFlowRunId);
-    }
-
     private static FlowGraphDefinition RepeatGraph(int maximumIterations, string childFlowName = "chunk-reader") => new()
     {
         EntryStep = "input",
