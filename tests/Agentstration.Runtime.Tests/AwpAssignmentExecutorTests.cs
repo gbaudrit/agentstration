@@ -314,6 +314,61 @@ public sealed class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
+    [DataRow(false, false)]
+    [DataRow(true, false)]
+    [DataRow(false, true)]
+    public async Task AgentAndOutputDefaultsPreserveExplicitMappingsOnTheWorker(
+        bool mapAgentFromRootInput,
+        bool mapOutputFromRootInput)
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "transform",
+            Steps =
+            [
+                new TransformFlowStepDefinition
+                {
+                    Name = "transform",
+                    Mapping = JsonSerializer.SerializeToElement(new { value = "transformed" })
+                },
+                new AgentFlowStepDefinition
+                {
+                    Name = "agent",
+                    Agent = new("echo-agent"),
+                    InputMapping = mapAgentFromRootInput
+                        ? JsonSerializer.SerializeToElement("${input}")
+                        : null
+                },
+                new OutputFlowStepDefinition
+                {
+                    Name = "output",
+                    OutputMapping = mapOutputFromRootInput
+                        ? JsonSerializer.SerializeToElement("${input}")
+                        : null
+                }
+            ],
+            Transitions =
+            [
+                new("transform-agent", "transform", "completed", "agent"),
+                new("agent-output", "agent", "success", "output")
+            ]
+        };
+        var handler = new GraphHandler(TestNow) { ModelOutput = "agent-result" };
+
+        var (result, _) = await ExecuteGraphAsync(graph,
+            JsonSerializer.SerializeToElement(new { value = "original" }), handler);
+
+        var invocation = handler.ModelRequests.Single();
+        var prompt = Assert.IsInstanceOfType<AwpModelTextContent>(
+            invocation.Messages.Last().Contents.Single()).Text;
+        StringAssert.Contains(prompt, mapAgentFromRootInput ? "original" : "transformed");
+        if (mapOutputFromRootInput)
+            Assert.AreEqual("original", result.Output?.GetProperty("value").GetString());
+        else
+            Assert.AreEqual("agent-result", result.Output?.GetString());
+    }
+
+    [TestMethod]
     public async Task RepeatFailsWithStableCodeWhenTheIterationLimitIsReached()
     {
         var graph = new FlowGraphDefinition
@@ -666,7 +721,7 @@ public sealed class AwpAssignmentExecutorTests
         var definition = Version("root", graph, TestNow);
         var material = new AwpRootFlowExecutionMaterial("material-1", "1.0", "sha256:material",
             runId, "root", "default", "1.0", "sha256:root", input,
-            JsonSerializer.SerializeToElement(definition, JsonOptions), [], Guid.NewGuid(),
+            JsonSerializer.SerializeToElement(definition, JsonOptions), [AgentMaterial()], Guid.NewGuid(),
             RootFlowRunId: rootRunId ?? runId, ParentFlowRunId: parentRunId,
             CorrelationId: correlationId);
 
@@ -700,11 +755,16 @@ public sealed class AwpAssignmentExecutorTests
         Transitions = [new("capture-output", "capture", "completed", "output")]
     };
 
+    private static AwpExecutionAgentMaterial AgentMaterial() => new(
+        "agent-material", "agent", Guid.NewGuid(), "echo-agent", 1, "revision", "sha256:agent",
+        "prompt-agent", "Echo agent", "Echo agent", "Return an answer.", "default-reasoning", "default", []);
+
     private sealed class GraphHandler(DateTimeOffset now) : HttpMessageHandler
     {
         public List<AwpExecutionEvent> Events { get; } = [];
         public List<AwpCreateChildFlowRequest> ChildRequests { get; } = [];
         public List<AwpCleanupFlowArtifactRequest> CleanupRequests { get; } = [];
+        public List<AwpInvokeModelRequest> ModelRequests { get; } = [];
         public int FlowToolInvocationCount { get; private set; }
         public AwpCaptureFlowArtifactRequest? CaptureRequest { get; private set; }
         public string? ChildOutputName { get; init; }
@@ -714,6 +774,7 @@ public sealed class AwpAssignmentExecutorTests
         public FlowGraphDefinition? ChildGraph { get; init; }
         public string? ChildCorrelationId { get; init; }
         public Action? OnChildCreated { get; init; }
+        public string ModelOutput { get; init; } = "agent-result";
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
             CancellationToken cancellationToken)
@@ -724,7 +785,9 @@ public sealed class AwpAssignmentExecutorTests
             object payload = request.RequestUri!.AbsolutePath switch
             {
                 AwpProtocol.OpenStepExecutionPath => OpenStep(bytes),
+                AwpProtocol.OpenTurnPath => OpenTurn(bytes),
                 AwpProtocol.AppendEventsPath => AppendEvents(bytes),
+                AwpProtocol.InvokeModelPath => InvokeModel(bytes),
                 AwpProtocol.InvokeFlowToolPath => InvokeFlowTool(),
                 AwpProtocol.CaptureFlowArtifactPath => Capture(bytes),
                 AwpProtocol.CleanupFlowArtifactPath => Cleanup(bytes),
@@ -758,6 +821,19 @@ public sealed class AwpAssignmentExecutorTests
             var request = Payload<AwpAppendEventsRequest>(bytes);
             Events.AddRange(request.Events);
             return new(now, request.Events[^1].AttemptEventSequence, []);
+        }
+
+        private AwpOpenTurnResponse OpenTurn(byte[] bytes)
+        {
+            var request = Payload<AwpOpenTurnRequest>(bytes);
+            return new(now, new(new(Guid.NewGuid()), new(new(Guid.NewGuid()), 1), request.ParticipantId));
+        }
+
+        private AwpInvokeModelResponse InvokeModel(byte[] bytes)
+        {
+            var request = Payload<AwpInvokeModelRequest>(bytes);
+            ModelRequests.Add(request);
+            return new(now, [new AwpModelTextContent(ModelOutput)], "deterministic", "stop", 1, 1);
         }
 
         private AwpCaptureFlowArtifactResponse Capture(byte[] bytes)

@@ -70,45 +70,6 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
-    [DataRow(null, null, "transformed")]
-    [DataRow("${input}", null, "original")]
-    [DataRow(null, "${input}", "original")]
-    public async Task AgentAndOutputDefaultsPreserveExplicitMappings(string? agentMapping, string? outputMapping, string expectedOutput)
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        var graph = new FlowGraphDefinition
-        {
-            EntryStep = "input",
-            Steps =
-            [
-                new InputFlowStepDefinition { Name = "input" },
-                new TransformFlowStepDefinition { Name = "transform", Mapping = JsonSerializer.SerializeToElement(new { value = "transformed" }) },
-                new AgentFlowStepDefinition { Name = "agent", Agent = new("echo-agent"), InputMapping = agentMapping is null ? null : JsonSerializer.SerializeToElement(agentMapping) },
-                new OutputFlowStepDefinition { Name = "output", OutputMapping = outputMapping is null ? null : JsonSerializer.SerializeToElement(outputMapping) }
-            ],
-            Transitions =
-            [
-                new("input-transform", "input", "completed", "transform"),
-                new("transform-agent", "transform", "completed", "agent"),
-                new("agent-output", "agent", "success", "output")
-            ]
-        };
-        var flow = await CreatePublishedGraphAsync(fixture, "mapping-defaults", graph);
-        var runs = Service(fixture, new TestFlowRunQueue(), agents: new EchoAgentExecutor());
-        using var input = JsonDocument.Parse("""{"value":"original"}""");
-
-        var pending = await runs.CreateAsync(flow.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "mapping-defaults",
-            input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual(expectedOutput, completed.Output?.GetProperty("value").GetString());
-        Assert.AreEqual(agentMapping is null ? "transformed" : "original",
-            completed.Steps.Single(step => step.StepName == "agent").Output?.GetProperty("value").GetString());
-    }
-
-    [TestMethod]
     public async Task NestedFlowDepthIsBoundedWithAStableFailure()
     {
         await using var fixture = await FlowFixture.CreateAsync();
@@ -294,21 +255,5 @@ public sealed partial class FlowTests
             new("analyze-cancelled", "analyze", "cancelled", "failure")
         ]
     };
-
-    private sealed class EchoAgentExecutor : IFlowAgentExecutor
-    {
-        public Task<FlowAgentExecutionResult> ExecuteAsync(
-            FlowAgentExecutionRequest request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(new FlowAgentExecutionResult(
-                request.Input.Clone(),
-                $"/agents/{request.Target.Id}",
-                1,
-                "/profiles/default",
-                "Deterministic",
-                null,
-                [],
-                []));
-    }
 
 }
