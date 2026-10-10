@@ -144,10 +144,13 @@ public sealed class FlowEditorStoreTests
             Steps =
             [
                 new FlowCallStepDefinition { Name = "child", Flow = new("nested") },
+                new OutputFlowStepDefinition { Name = "done" },
                 new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }
             ],
             Transitions =
             [
+                new("old-success", "child", "completed", "done"),
+                new("current-success", "child", "done", "done"),
                 new("arbitrary-legacy-id", "child", "failure", "error"),
                 new("child-failed-error", "child", "failed", "error")
             ]
@@ -159,8 +162,8 @@ public sealed class FlowEditorStoreTests
 
         var reconciled = new ReconcileFlowCallTransitionsCommand(outputs).Apply(definition);
 
-        Assert.HasCount(1, reconciled.Transitions);
-        Assert.AreEqual("failed", reconciled.Transitions.Single().Event);
+        Assert.HasCount(2, reconciled.Transitions);
+        CollectionAssert.AreEquivalent(new[] { "done", "failed" }, reconciled.Transitions.Select(item => item.Event).ToArray());
 
         var replaced = new ReconcileFlowCallTransitionsCommand(outputs).Apply(definition with
         {

@@ -145,27 +145,37 @@ public sealed record ReconcileFlowCallTransitionsCommand(
     {
         var transitions = definition.Transitions.ToList();
         var changed = false;
-        var localErrorOutputs = definition.Steps
-            .Where(step => step is FailureFlowStepDefinition
-                || step is OutputFlowStepDefinition { Outcome: FlowOutputOutcome.Error })
-            .Select(step => step.Name)
-            .ToHashSet(StringComparer.Ordinal);
+        var localOutputs = definition.Steps
+            .Select(step => step switch
+            {
+                FailureFlowStepDefinition => new KeyValuePair<string, FlowOutputOutcome>(step.Name, FlowOutputOutcome.Error),
+                OutputFlowStepDefinition output => new(step.Name, output.Outcome ?? FlowOutputOutcome.Success),
+                _ => (KeyValuePair<string, FlowOutputOutcome>?)null
+            })
+            .OfType<KeyValuePair<string, FlowOutputOutcome>>()
+            .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
         foreach (var call in definition.Steps.OfType<FlowCallStepDefinition>())
         {
             if (!OutputsByStep.TryGetValue(call.Name, out var outputs) || outputs.Count == 0)
                 continue;
 
             var declaredEvents = outputs.Select(output => output.Name).ToHashSet(StringComparer.Ordinal);
-            var replacement = outputs.FirstOrDefault(output => output.Outcome == FlowOutputOutcome.Error)?.Name;
             foreach (var invalid in transitions.Where(transition =>
                 transition.FromStep == call.Name
                 && !declaredEvents.Contains(transition.Event)
-                && localErrorOutputs.Contains(transition.ToStep)
+                && localOutputs.ContainsKey(transition.ToStep)
                 && transition.Condition is null
                 && transition.Priority is null).ToArray())
             {
+                var candidates = outputs
+                    .Where(output => output.Outcome == localOutputs[invalid.ToStep])
+                    .Select(output => output.Name)
+                    .ToArray();
+                var replacement = candidates.Length == 1 ? candidates[0] : null;
+                if (replacement is null) continue;
+
                 var index = transitions.IndexOf(invalid);
-                if (replacement is null || transitions.Any(transition =>
+                if (transitions.Any(transition =>
                     transition.Id != invalid.Id
                     && transition.FromStep == call.Name
                     && transition.ToStep == invalid.ToStep
