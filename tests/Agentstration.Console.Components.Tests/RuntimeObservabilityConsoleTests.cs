@@ -52,9 +52,42 @@ public sealed class RuntimeObservabilityConsoleTests
 
         var cut = context.Render<RuntimeWorkers>();
 
+        StringAssert.Contains(cut.Markup, ">Workers<");
         StringAssert.Contains(cut.Markup, "runtime-worker-1");
         StringAssert.Contains(cut.Markup, "Online");
+        StringAssert.Contains(cut.Find(".status-badge").ClassName, "status-success");
         StringAssert.Contains(cut.Markup, "1 active assignment(s)");
+    }
+
+    [TestMethod]
+    public void WorkerDetailsUseTheStandardPageStructureAndShowDurableAssignmentHistory()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var workerId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var worker = new RuntimeWorkerSummaryResponse(workerId, "runtime-worker-1", "1", "Active",
+            RuntimeWorkerPresenceState.Online, Guid.NewGuid(), "0.3.0-alpha.1+6df69331b49a5ed45cc5ca51a796f85146ebb93d",
+            1, 0, now.AddMinutes(-2), now, [new("microsoft-agent-framework", "1.0", ["1.0"], "maf-1.0")]);
+        var assignment = new RuntimeAssignmentPlacementResponse(Guid.NewGuid(), nameof(RuntimeAssignmentTargetKind.FlowRun),
+            "flowrun-root-1", "Succeeded", "microsoft-agent-framework", "1.0", "1.0", now.AddMinutes(-1), now,
+            [new(Guid.NewGuid(), workerId, Guid.NewGuid(), 1, "Succeeded", now.AddMinutes(-1), now, now.AddSeconds(30), now, null)]);
+        using var context = CreateContext(new RuntimeClient { Details = new(worker, [assignment]) });
+
+        var cut = context.Render<RuntimeWorkerDetails>(parameters => parameters.Add(component => component.WorkerId, workerId));
+
+        StringAssert.Contains(cut.Markup, "Back to Workers");
+        StringAssert.Contains(cut.Find(".page-header .status-badge").ClassName, "status-success");
+        Assert.AreEqual("true", cut.Find("#worker-overview-tab").GetAttribute("aria-selected"));
+        StringAssert.Contains(cut.Markup, "Identity and presence");
+        StringAssert.Contains(cut.Markup, "0.3.0-alpha.1");
+        Assert.IsFalse(cut.Markup.Contains("Durable assignments handled by this Worker", StringComparison.Ordinal));
+
+        cut.Find("#worker-assignments-tab").Click();
+
+        Assert.AreEqual("true", cut.Find("#worker-assignments-tab").GetAttribute("aria-selected"));
+        StringAssert.Contains(cut.Markup, "Durable assignments handled by this Worker");
+        StringAssert.Contains(cut.Markup, "/flow-runs/flowrun-root-1");
+        Assert.IsFalse(cut.Markup.Contains("This Worker has no assignment history.", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -78,7 +111,7 @@ public sealed class RuntimeObservabilityConsoleTests
         StringAssert.Contains(cut.Markup, $"/settings/runtime-workers/{workerId:D}");
         StringAssert.Contains(cut.Markup, "Attempt history (1)");
         StringAssert.Contains(cut.Markup, "Fencing generation");
-        StringAssert.Contains(cut.Markup, "<dd>3</dd>");
+        Assert.AreEqual("3", cut.FindAll(".runtime-attempt-card dd").Last().TextContent.Trim());
     }
 
     private static BunitContext CreateContext(IRuntimeApiClient client)
@@ -94,9 +127,12 @@ public sealed class RuntimeObservabilityConsoleTests
     {
         public IReadOnlyList<AgentInstanceResponse> Instances { get; init; } = [];
         public IReadOnlyList<RuntimeWorkerSummaryResponse> Workers { get; init; } = [];
+        public RuntimeWorkerDetailsResponse? Details { get; init; }
         public RuntimeAssignmentPlacementResponse? Placement { get; init; }
         public Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(CancellationToken cancellationToken) => Task.FromResult(Instances);
         public Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> GetRuntimeWorkersAsync(CancellationToken cancellationToken) => Task.FromResult(Workers);
+        public Task<RuntimeWorkerDetailsResponse> GetRuntimeWorkerAsync(Guid workerId, CancellationToken cancellationToken) =>
+            Task.FromResult(Details ?? throw new InvalidOperationException("Worker details were not configured."));
         public Task<RuntimeAssignmentPlacementResponse?> GetPlacementAsync(RuntimeAssignmentTargetKind targetKind, string runId, CancellationToken cancellationToken) => Task.FromResult(Placement);
         public Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<RuntimeRun> CreateRunAsync(CreateRuntimeRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();

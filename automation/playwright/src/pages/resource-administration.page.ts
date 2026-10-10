@@ -10,7 +10,7 @@ export interface ResourceAdministrationRoute {
 
 export const ResourceListRoutes: readonly ResourceAdministrationRoute[] = [
   { path: '/agents', marker: 'agents' },
-  { path: '/deployments', marker: 'deployments' },
+  { path: '/agent-instances', marker: 'agentInstances' },
   { path: '/entries', marker: 'entries' },
   { path: '/modelprofiles', marker: 'modelProfiles' },
   { path: '/modelproviders', marker: 'modelProviders' },

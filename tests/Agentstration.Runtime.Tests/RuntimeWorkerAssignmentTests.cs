@@ -367,6 +367,27 @@ public sealed class RuntimeWorkerAssignmentTests
     }
 
     [TestMethod]
+    public async Task AssignmentQueryRetainsCompletedHistoryForTheWorker()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        await fixture.CreateAssignmentAsync();
+        var workerId = Guid.NewGuid();
+        var claim = await fixture.ClaimAsync(workerId, Guid.NewGuid())
+            ?? throw new AssertFailedException("Expected an assignment claim.");
+        await fixture.Service.CompleteAsync(claim.Ownership,
+            new RuntimeAssignmentTerminalCommand(RuntimeAssignmentTerminalOutcome.Succeeded, Guid.NewGuid(), "done"), default);
+
+        var history = await fixture.Assignments.ListAsync(new RuntimeWorkerAssignmentQuery
+        {
+            WorkerId = new RuntimeWorkerId(workerId)
+        }, default);
+
+        Assert.HasCount(1, history);
+        Assert.AreEqual(RuntimeAssignmentState.Succeeded, history[0].Value.State);
+        Assert.AreEqual(workerId, history[0].Value.Attempts.Single().WorkerId.Value);
+    }
+
+    [TestMethod]
     public async Task AvailabilitySignalClosesLostWakeWindowAndCoalescesDuplicatePulses()
     {
         var signal = new RuntimeAssignmentAvailabilitySignal();

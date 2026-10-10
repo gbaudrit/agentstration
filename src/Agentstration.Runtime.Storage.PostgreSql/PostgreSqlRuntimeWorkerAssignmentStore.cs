@@ -108,7 +108,10 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         if (query.WorkspaceId is { } workspaceId)
             documents = documents.Where(value => value.WorkspaceId == workspaceId.Value);
         if (query.WorkerId is { } workerId)
-            documents = documents.Where(value => value.ActiveWorkerId == workerId.Value);
+        {
+            var workerReference = $"\"workerId\":{{\"value\":\"{workerId.Value:D}\"}}";
+            documents = documents.Where(value => value.Payload.Contains(workerReference));
+        }
         if (query.States is { Count: > 0 })
         {
             var states = query.States.Select(value => value.ToString()).ToArray();

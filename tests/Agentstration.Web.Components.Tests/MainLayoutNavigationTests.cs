@@ -28,7 +28,7 @@ public sealed class MainLayoutNavigationTests
             ("Resources", [("Packs", "/packs"), ("Sources", "/settings/sources"), ("Source registries", "/settings/source-registries")]),
             ("Integrations", [("MCP & Tools", "/tools"), ("Extensions", "/extensions"), ("Model providers", "/modelproviders"), ("Source providers", "/sourceproviders")]),
             ("Configuration", [("Runtime profiles", "/runtimeprofiles"), ("Secrets", "/secrets"), ("Resource scopes", "/settings/resource-scopes")]),
-            ("System", [("Runtime Workers", "/settings/runtime-workers"), ("Organization", "/settings/organization"), ("Bootstrap", "/settings/bootstrap"), ("Cleanup", "/cleanup"), ("Settings", "/settings")]));
+            ("System", [("Workers", "/settings/runtime-workers"), ("Organization", "/settings/organization"), ("Bootstrap", "/settings/bootstrap"), ("Cleanup", "/cleanup"), ("Settings", "/settings")]));
 
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/settings/profile']").Count);
         Assert.AreEqual("Profile", rendered.Find(".topbar-actions a[href='/settings/profile']").GetAttribute("aria-label"));

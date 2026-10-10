@@ -7,31 +7,73 @@
 @if (details is null) { <LoadingState Message="@T("Loading")" /> }
 else
 {
-    <PageHeader Title="@details.Worker.DisplayName" Description="@T("DetailsDescription")" TestId="runtime-worker-details">
-        <Metadata><StatusBadge Text="@T($"Presence.{details.Worker.Presence}")" Status="@PlatformDashboardService.ToStatus(details.Worker.Presence.ToString())" /><span><code>@details.Worker.WorkerId</code></span></Metadata>
+    <PageHeader Title="@T("WorkerDetails")" Description="@details.Worker.DisplayName" TestId="runtime-worker-details">
+        <Status><StatusBadge Text="@T($"Presence.{details.Worker.Presence}")" Status="@PresenceStatus(details.Worker.Presence)" /></Status>
+        <Metadata><span><code>@details.Worker.WorkerId</code></span></Metadata>
+        <Actions><a class="button-secondary" href="/settings/runtime-workers">@T("BackToWorkers")</a></Actions>
     </PageHeader>
-    <dl class="resource-details resource-section"><dt>@T("Session")</dt><dd><code>@(details.Worker.SessionId?.ToString("D") ?? "—")</code></dd><dt>@T("Version")</dt><dd>@(details.Worker.SoftwareVersion ?? "—")</dd><dt>@T("Protocol")</dt><dd>@details.Worker.ProtocolVersion</dd><dt>@T("Capacity")</dt><dd>@(details.Worker.MaximumConcurrentAssignments?.ToString() ?? "—")</dd><dt>@T("LastSeen")</dt><dd>@(details.Worker.LastSeenAt?.LocalDateTime.ToString("g") ?? "—")</dd></dl>
-    <h2>@T("Assignments")</h2>
-    @if (details.RecentAssignments.Count == 0) { <p>@T("NoAssignments")</p> }
-    else
-    {
-        <DataGrid TItem="RuntimeAssignmentPlacementResponse" Items="details.RecentAssignments">
-            <Header><tr><th>@T("Run")</th><th>@T("State")</th><th>@T("Runtime")</th><th>@T("Attempts")</th><th>@T("Updated")</th></tr></Header>
-            <Row Context="item"><tr><td><a class="text-button" href="@RunUrl(item)">@item.RunId</a><br /><small>@T($"TargetKind.{item.TargetKind}")</small></td><td>@T($"AssignmentState.{item.State}")</td><td>@item.RuntimeCapability · @item.RuntimeCapabilityVersion</td><td>@item.Attempts.Count</td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td></tr></Row>
-        </DataGrid>
-        @foreach (var assignment in details.RecentAssignments.Where(item => item.Attempts.Count > 0))
+    <nav class="section-tabs worker-detail-tabs" role="tablist" aria-label="@T("WorkerViewsAriaLabel")">
+        @foreach (var tab in Enum.GetValues<WorkerTab>())
         {
-            <details class="resource-section"><summary>@T("RunAttempts", assignment.RunId, assignment.Attempts.Count)</summary><ol class="operations-list">@foreach (var attempt in assignment.Attempts.OrderByDescending(item => item.AcquiredAt)) { <li><span>@T($"AttemptState.{attempt.State}") · @attempt.AcquiredAt.LocalDateTime.ToString("g")</span><small>@T("AttemptDetails", attempt.WorkerSessionId, attempt.LastHeartbeatAt.LocalDateTime.ToString("g"), attempt.LeaseExpiresAt.LocalDateTime.ToString("g"), attempt.FencingGeneration, attempt.ErrorCode ?? "—")</small></li> }</ol></details>
+            <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="worker-detail-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@T($"Tab.{tab}")@if (tab == WorkerTab.Assignments) { <span class="worker-tab-count">@details.RecentAssignments.Count</span> }</button>
         }
-    }
+    </nav>
+    <main id="worker-detail-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
+        @if (activeTab == WorkerTab.Overview)
+        {
+            <section class="metric-grid worker-metrics">
+                <MetricCard Label="@T("Presence")" Value="@T($"Presence.{details.Worker.Presence}")" Detail="@T($"Enrollment.{details.Worker.EnrollmentState}")" Status="@PresenceStatus(details.Worker.Presence)" />
+                <MetricCard Label="@T("Capacity")" Value="@(details.Worker.MaximumConcurrentAssignments?.ToString() ?? "—")" Detail="@T("ActiveAssignments", details.Worker.ActiveAssignments)" Status="@(details.Worker.ActiveAssignments > 0 ? UiStatus.Info : UiStatus.Neutral)" />
+                <MetricCard Label="@T("Protocol")" Value="@details.Worker.ProtocolVersion" Detail="@T("ProtocolDetail")" Status="@UiStatus.Info" />
+                <MetricCard Label="@T("LastSeen")" Value="@(details.Worker.LastSeenAt?.LocalDateTime.ToString("g") ?? "—")" Detail="@T("ServerObserved")" Status="@PresenceStatus(details.Worker.Presence)" />
+            </section>
+            <section class="worker-detail-grid">
+                <article class="panel worker-detail-card">
+                    <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("IdentityAndPresence")</h2></div></div>
+                    <dl class="details-list"><dt>@T("WorkerId")</dt><dd><code>@details.Worker.WorkerId</code></dd><dt>@T("Session")</dt><dd><code>@(details.Worker.SessionId?.ToString("D") ?? "—")</code></dd><dt>@T("Registered")</dt><dd>@(details.Worker.RegisteredAt?.LocalDateTime.ToString("g") ?? "—")</dd></dl>
+                </article>
+                <article class="panel worker-detail-card">
+                    <div class="panel-header"><div><p class="eyebrow">@T("Execution")</p><h2>@T("CompatibilityAndCapacity")</h2></div></div>
+                    <dl class="details-list"><dt>@T("Version")</dt><dd><span>@SoftwareVersion(details.Worker.SoftwareVersion)</span>@if (SoftwareBuild(details.Worker.SoftwareVersion) is { } build) { <small class="worker-build" title="@details.Worker.SoftwareVersion">+@build</small> }</dd><dt>@T("Capabilities")</dt><dd>@(details.Worker.Capabilities.Count == 0 ? "—" : string.Join(", ", details.Worker.Capabilities.Select(FormatCapability)))</dd></dl>
+                </article>
+            </section>
+        }
+        else
+        {
+            <article class="panel worker-assignments">
+                <div class="panel-header"><div><h2>@T("Assignments")</h2><p>@T("AssignmentsDescription")</p></div><span class="worker-count">@details.RecentAssignments.Count</span></div>
+                @if (details.RecentAssignments.Count == 0) { <div class="worker-empty"><p>@T("NoAssignments")</p></div> }
+                else
+                {
+                    <div class="worker-assignments-grid">
+                    <DataGrid TItem="RuntimeAssignmentPlacementResponse" Items="details.RecentAssignments">
+                        <Header><tr><th>@T("Run")</th><th>@T("State")</th><th>@T("Runtime")</th><th>@T("Attempts")</th><th>@T("Updated")</th></tr></Header>
+                        <Row Context="item"><tr><td data-label="@T("Run")"><a class="text-button worker-run-link" href="@RunUrl(item)">@item.RunId</a><small>@T($"TargetKind.{item.TargetKind}")</small></td><td data-label="@T("State")"><StatusBadge Text="@T($"AssignmentState.{item.State}")" Status="@PlatformDashboardService.ToStatus(item.State)" /></td><td data-label="@T("Runtime")">@item.RuntimeCapability · @item.RuntimeCapabilityVersion</td><td data-label="@T("Attempts")">@item.Attempts.Count</td><td data-label="@T("Updated")">@item.UpdatedAt.LocalDateTime.ToString("g")</td></tr></Row>
+                    </DataGrid>
+                    </div>
+                    @foreach (var assignment in details.RecentAssignments.Where(item => item.Attempts.Count > 0))
+                    {
+                        <details class="worker-attempts"><summary>@T("RunAttempts", assignment.RunId, assignment.Attempts.Count)</summary><ol class="operations-list">@foreach (var attempt in assignment.Attempts.OrderByDescending(item => item.AcquiredAt)) { <li><span>@T($"AttemptState.{attempt.State}") · @attempt.AcquiredAt.LocalDateTime.ToString("g")</span><small>@T("AttemptDetails", attempt.WorkerSessionId, attempt.LastHeartbeatAt.LocalDateTime.ToString("g"), attempt.LeaseExpiresAt.LocalDateTime.ToString("g"), attempt.FencingGeneration, attempt.ErrorCode ?? "—")</small></li> }</ol></details>
+                    }
+                }
+            </article>
+        }
+    </main>
 }
 
 @code {
     [Parameter] public Guid WorkerId { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private RuntimeWorkerDetailsResponse? details;
+    private WorkerTab activeTab;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     protected override async Task OnParametersSetAsync() => details = await Client.GetRuntimeWorkerAsync(WorkerId, cancellation.Token);
+    private static string FormatCapability(RuntimeWorkerCapabilityResponse capability) => $"{capability.RuntimeKind} {capability.CapabilityVersion}";
+    private static string SoftwareVersion(string? version) => string.IsNullOrWhiteSpace(version) ? "—" : version.Split('+', 2)[0];
+    private static string? SoftwareBuild(string? version) => version?.Split('+', 2) is [_, var build] ? build : null;
+    private static UiStatus PresenceStatus(RuntimeWorkerPresenceState presence) => PlatformDashboardService.ToStatus(presence.ToString());
+    private static string TabId(WorkerTab tab) => $"worker-{tab.ToString().ToLowerInvariant()}-tab";
     private static string RunUrl(RuntimeAssignmentPlacementResponse item) => item.TargetKind == nameof(RuntimeAssignmentTargetKind.FlowRun) ? $"/flow-runs/{Uri.EscapeDataString(item.RunId)}" : $"/runs/{Uri.EscapeDataString(item.RunId)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private enum WorkerTab { Overview, Assignments }
 }

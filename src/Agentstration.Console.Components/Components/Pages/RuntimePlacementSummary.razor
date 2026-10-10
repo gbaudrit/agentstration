@@ -12,23 +12,33 @@ else if (placement is not null)
         .FirstOrDefault(attempt => attempt.State == nameof(RuntimeAssignmentAttemptState.Active))
         ?? placement.Attempts.OrderByDescending(attempt => attempt.AcquiredAt).FirstOrDefault();
     <section class="panel runtime-placement" data-testid="runtime-placement">
-        <div class="panel-header"><h2>@T("Title")</h2><StatusBadge Text="@T($"State.{placement.State}")" Status="@PlatformDashboardService.ToStatus(placement.State)" /></div>
-        <dl class="details-list">
-            <dt>@T("Worker")</dt>
-            <dd>@if (effectiveAttempt is null) { <span>@T("NotAssigned")</span> } else { <a href="@WorkerUrl(effectiveAttempt.WorkerId)"><code>@effectiveAttempt.WorkerId</code></a> }</dd>
-            <dt>@T("Runtime")</dt><dd>@placement.RuntimeCapability · @placement.RuntimeCapabilityVersion</dd>
-            <dt>@T("MaterialVersion")</dt><dd>@placement.ExecutionMaterialVersion</dd>
-        </dl>
+        <div class="panel-header runtime-placement-header"><div><p class="eyebrow">@T("Eyebrow")</p><h2>@T("Title")</h2></div><StatusBadge Text="@T($"State.{placement.State}")" Status="@PlatformDashboardService.ToStatus(placement.State)" /></div>
+        <div class="runtime-placement-overview">
+            <article class="runtime-worker-card">
+                <span class="field-label">@T("Worker")</span>
+                @if (effectiveAttempt is null)
+                {
+                    <strong>@T("NotAssigned")</strong>
+                }
+                else
+                {
+                    <a href="@WorkerUrl(effectiveAttempt.WorkerId)"><strong>@T("OpenWorker")</strong><code title="@effectiveAttempt.WorkerId.ToString("D")">@effectiveAttempt.WorkerId</code><span aria-hidden="true">→</span></a>
+                }
+            </article>
+            <article class="runtime-fact"><span class="field-label">@T("Runtime")</span><strong>@placement.RuntimeCapability</strong><small>@placement.RuntimeCapabilityVersion</small></article>
+            <article class="runtime-fact"><span class="field-label">@T("MaterialVersion")</span><strong>@placement.ExecutionMaterialVersion</strong></article>
+            <article class="runtime-fact"><span class="field-label">@T("Assignment")</span><code title="@placement.AssignmentId.ToString("D")">@placement.AssignmentId</code></article>
+        </div>
         @if (placement.Attempts.Count > 0)
         {
-            <details>
-                <summary>@T("AttemptHistory", placement.Attempts.Count)</summary>
-                <ol class="operations-list">
-                    @foreach (var attempt in placement.Attempts.OrderByDescending(item => item.AcquiredAt))
+            <section class="runtime-attempts" aria-label="@T("AttemptHistory", placement.Attempts.Count)">
+                <div class="runtime-section-heading"><div><h3>@T("AttemptHistoryTitle")</h3><p>@T("AttemptHistoryDescription")</p></div><span>@placement.Attempts.Count</span></div>
+                <ol class="runtime-attempt-grid">
+                    @foreach (var item in placement.Attempts.OrderByDescending(item => item.AcquiredAt).Select((attempt, index) => new { attempt, index }))
                     {
-                        <li>
-                            <a href="@WorkerUrl(attempt.WorkerId)"><code>@attempt.WorkerId</code></a>
-                            <span>@T($"AttemptState.{attempt.State}")</span>
+                        var attempt = item.attempt;
+                        <li class="runtime-attempt-card">
+                            <div class="runtime-attempt-header"><div><span class="field-label">@T("Attempt", placement.Attempts.Count - item.index)</span><a href="@WorkerUrl(attempt.WorkerId)"><code title="@attempt.WorkerId.ToString("D")">@attempt.WorkerId</code></a></div><StatusBadge Text="@T($"AttemptState.{attempt.State}")" Status="@PlatformDashboardService.ToStatus(attempt.State)" /></div>
                             <dl class="details-list">
                                 <dt>@T("Session")</dt><dd><code>@attempt.WorkerSessionId</code></dd>
                                 <dt>@T("Acquired")</dt><dd>@attempt.AcquiredAt.LocalDateTime.ToString("g")</dd>
@@ -41,7 +51,7 @@ else if (placement is not null)
                         </li>
                     }
                 </ol>
-            </details>
+            </section>
         }
     </section>
 }

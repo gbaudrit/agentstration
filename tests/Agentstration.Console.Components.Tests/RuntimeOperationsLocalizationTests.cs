@@ -25,7 +25,7 @@ public sealed class RuntimeOperationsLocalizationTests
 
             Assert.AreEqual("Conteneur dédié", Localizer<DeploymentStrings>(services)["Hosting.DedicatedContainer"].Value);
             Assert.AreEqual("Instances d’agent", Localizer<DeploymentStrings>(services)["AgentInstances"].Value);
-            Assert.AreEqual("Workers Runtime", Localizer<RuntimeWorkerStrings>(services)["RuntimeWorkers"].Value);
+            Assert.AreEqual("Workers", Localizer<RuntimeWorkerStrings>(services)["RuntimeWorkers"].Value);
             Assert.AreEqual("Délai dépassé", Localizer<AgentRunsStrings>(services)["RunState.TimedOut"].Value);
             Assert.AreEqual("Conserver pour cette exécution", Localizer<AgentRunnerStrings>(services)["ToolArguments.Retain"].Value);
             Assert.AreEqual("Température", Localizer<AgentRunnerInspectorStrings>(services)["Temperature"].Value);

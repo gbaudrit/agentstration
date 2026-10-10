@@ -75,6 +75,7 @@
   <data name="TimelineViewsAriaLabel"><value>Vues du déroulement de l’exécution</value></data>
   <data name="RunViewsAriaLabel"><value>Vues de l’exécution de Flow</value></data>
   <data name="Summary"><value>Synthèse</value></data>
+  <data name="Worker"><value>Worker</value></data>
   <data name="SummaryDuration"><value>Durée</value></data>
   <data name="SummaryCompletedSteps"><value>Étapes terminées</value></data>
   <data name="SummaryTurns"><value>Tours</value></data>

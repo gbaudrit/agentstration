@@ -6,6 +6,8 @@ using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Contracts;
 using Agentstration.Triggers;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.Pages;
@@ -17,6 +19,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
+[DoNotParallelize]
 public sealed class FlowDetailsDesignerTests
 {
     [TestMethod]
@@ -236,6 +239,50 @@ public sealed class FlowDetailsDesignerTests
         Assert.AreEqual("/flow-runs", rendered.Find("a.button-secondary").GetAttribute("href"));
     }
 
+    [TestMethod]
+    public void FlowRunShowsWorkerPlacementInsideTheWorkerTab()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var flowId = new FlowId("support");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "flowrun-runtime",
+            FlowId = flowId,
+            FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Succeeded,
+            Trigger = FlowRunTrigger.Manual,
+            CorrelationId = "runtime-tab",
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition,
+                new Dictionary<string, string>(), FlowClientStub.Now)
+        };
+        var workerId = Guid.NewGuid();
+        var now = FlowClientStub.Now;
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
+        context.Services.AddSingleton<IRuntimeApiClient>(new RuntimeClientStub(new(Guid.NewGuid(), "FlowRun", run.Id,
+            "Succeeded", "microsoft-agent-framework", "1.0", "1.0", now, now,
+            [new(Guid.NewGuid(), workerId, Guid.NewGuid(), 1, "Succeeded", now, now, now.AddSeconds(30), now, null)])));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
+        context.Services.AddSingleton(TimeProvider.System);
+
+        var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+
+        Assert.IsEmpty(rendered.FindAll("[data-testid=runtime-placement]"));
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == "Worker").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Find("[data-testid=runtime-placement]").TextContent, "Worker assignment");
+            StringAssert.Contains(rendered.Markup, $"/settings/runtime-workers/{workerId:D}");
+        });
+    }
+
     private sealed class FlowClientStub : IFlowApiClient
     {
         public static readonly DateTimeOffset Now = DateTimeOffset.Parse("2026-08-15T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
@@ -342,6 +389,19 @@ public sealed class FlowDetailsDesignerTests
         public Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task DeleteAgentAsync(string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ManagementSummary> GetSummaryAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class RuntimeClientStub(RuntimeAssignmentPlacementResponse placement) : IRuntimeApiClient
+    {
+        public Task<RuntimeAssignmentPlacementResponse?> GetPlacementAsync(RuntimeAssignmentTargetKind targetKind, string runId, CancellationToken cancellationToken) => Task.FromResult<RuntimeAssignmentPlacementResponse?>(placement);
+        public Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RuntimeRun> CreateRunAsync(CreateRuntimeRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RuntimeRun> GetRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<RuntimeRun>> GetRunsAsync(string? agentResourceId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<RuntimeRunEvent>> GetRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public IAsyncEnumerable<RuntimeRunEvent> ObserveRunAsync(string runId, long afterSequence, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RuntimeRun> CancelRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RuntimeRun> RetryRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class NoOpRealtimeConfigurator : IConsoleRealtimeConnectionConfigurator

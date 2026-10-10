@@ -28,7 +28,6 @@ else
     <PageHeader Title="@T("FlowRun")" Description="@run.Id">
         <Actions>@if (!run.Status.IsTerminal()) { <button class="button-danger" @onclick="CancelAsync">@T("Cancel")</button> }<a class="button-secondary" href="/tool-governance/flow/@Uri.EscapeDataString(run.Id)">@T("ToolGovernance")</a><a class="button-secondary" href="@ConsoleResourceUrls.Flow(run.FlowId)">@T("FlowDefinition")</a></Actions>
     </PageHeader>
-    <RuntimePlacementSummary TargetKind="RuntimeAssignmentTargetKind.FlowRun" RunId="@run.Id" />
     <nav class="section-tabs flow-run-page-tabs" role="tablist" aria-label="@T("RunViewsAriaLabel")">
         @foreach (var tab in AvailableTabs)
         {
@@ -160,6 +159,10 @@ else
                 <article class="panel io-panel flow-run-tab-card"><div class="panel-header"><h2>@T("Output")</h2></div><pre>@Pretty(run.Output)</pre></article>
             </section>
         }
+        else if (activeTab == RunTab.Worker)
+        {
+            <RuntimePlacementSummary TargetKind="RuntimeAssignmentTargetKind.FlowRun" RunId="@run.Id" />
+        }
         else
         {
             <FlowRunTimeline Events="eventBuffer.Snapshot()" IsLive="@(!run.Status.IsTerminal())" InferParticipantHandoffs="IsHandoffRun"
@@ -201,8 +204,8 @@ else
     private IReadOnlyList<FlowRunEvent>? replayEvents;
     private CancellationTokenSource? replayCancellation;
     private RunTab activeTab;
-    private static readonly RunTab[] StandardTabs = [RunTab.Summary, RunTab.Causality, RunTab.Activity, RunTab.InputOutput, RunTab.RawEvents];
-    private static readonly RunTab[] HandoffTabs = [RunTab.Summary, RunTab.Causality, RunTab.Activity, RunTab.Handoffs, RunTab.InputOutput, RunTab.RawEvents];
+    private static readonly RunTab[] StandardTabs = [RunTab.Summary, RunTab.Worker, RunTab.Causality, RunTab.Activity, RunTab.InputOutput, RunTab.RawEvents];
+    private static readonly RunTab[] HandoffTabs = [RunTab.Summary, RunTab.Worker, RunTab.Causality, RunTab.Activity, RunTab.Handoffs, RunTab.InputOutput, RunTab.RawEvents];
     private IReadOnlyList<RunTab> AvailableTabs => IsHandoffRun ? HandoffTabs : StandardTabs;
     private IReadOnlyDictionary<string, string> ParticipantUrls => BuildParticipantUrls();
     private FlowRunTimeline.TimelineView SelectedTimelineView => activeTab switch
@@ -222,6 +225,7 @@ else
     private string TabLabel(RunTab tab) => T(tab switch
     {
         RunTab.Summary => "Summary",
+        RunTab.Worker => "Worker",
         RunTab.Causality => "Causality",
         RunTab.Activity => "Activity",
         RunTab.Handoffs => "Handoffs",
@@ -548,5 +552,5 @@ else
         cancellation.Dispose();
     }
 
-    private enum RunTab { Summary, Causality, Activity, Handoffs, InputOutput, RawEvents }
+    private enum RunTab { Summary, Worker, Causality, Activity, Handoffs, InputOutput, RawEvents }
 }
