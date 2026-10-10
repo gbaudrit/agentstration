@@ -593,6 +593,57 @@ public sealed class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
+    public async Task DirectFlowUsesTheAssignedRunStepTurnAndAgentCoordinates()
+    {
+        var definition = new FlowVersion(new WorkspaceId(Guid.NewGuid()),
+            new FlowId("direct", ResourceNamespace.Default), "1.0", null,
+            new DirectFlowDefinition(new(FlowTargetKind.Agent, "assistant")),
+            new Dictionary<string, string>(), TestNow, null, "sha256:direct");
+        var agent = AgentMaterial() with
+        {
+            ParticipantId = "assistant-participant",
+            AgentName = "assistant",
+            Generation = 3
+        };
+        using var credential = new AwpClientCredential(Guid.NewGuid(), Guid.NewGuid(), "test-instance",
+            System.Text.Encoding.UTF8.GetBytes("test-worker-secret-material-at-least-32-bytes"));
+        var handler = new GraphHandler(TestNow);
+        using var client = new AwpClient(new Uri("https://authority.test"), credential,
+            new(Guid.NewGuid()), TimeProvider.System, 0, handler);
+        var assignment = new AwpRunAssignment(new(Guid.NewGuid()), new(Guid.NewGuid()),
+            new(Guid.NewGuid(), Guid.NewGuid().ToString("D")), new AwpRootFlowRunTarget("flowrun-direct"),
+            new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", "1.0"),
+            new("material-direct", "1.0", "sha256:material-direct"),
+            new("ownership", 1, DateTimeOffset.UtcNow.AddMinutes(5), 15));
+        var session = new AwpAssignmentSession(client, assignment, TestNow, TimeProvider.System,
+            TimeSpan.FromSeconds(5));
+        var executor = new AwpAssignmentExecutor(NullLoggerFactory.Instance,
+            NullLogger<AwpAssignmentExecutor>.Instance);
+        var material = new AwpRootFlowExecutionMaterial("material-direct", "1.0", "sha256:material-direct",
+            "flowrun-direct", "direct", "default", "1.0", "sha256:direct",
+            JsonSerializer.SerializeToElement(new { prompt = "Use the Tool" }),
+            JsonSerializer.SerializeToElement(definition, JsonOptions), [agent], Guid.NewGuid(),
+            CorrelationId: "direct-scope-correlation");
+
+        var result = await executor.ExecuteAsync(session, material, CancellationToken.None);
+
+        Assert.AreEqual("agent-result", result.Output?.GetString());
+        var step = handler.StepRequests.Single(value => value.StepDefinitionId == "Agent");
+        Assert.AreEqual("flowrun-direct", step.FlowRunId);
+        Assert.AreEqual("1.0", step.FlowVersion);
+        Assert.AreEqual("sha256:direct", step.FlowDefinitionHash);
+        var turn = handler.TurnRequests.Single();
+        Assert.AreEqual("flowrun-direct", turn.RunId);
+        Assert.AreEqual("Agent", turn.FlowStep?.StepDefinitionId);
+        Assert.AreEqual("assistant-participant", turn.ParticipantId);
+        Assert.AreEqual("assistant-participant", handler.ModelRequests.Single().ParticipantId);
+        var completed = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.StepCompleted
+            && value.Location.FlowStep?.StepDefinitionId == "Agent");
+        Assert.AreEqual("assistant", completed.Payload?.GetProperty("agentResourceId").GetString());
+        Assert.AreEqual(3, completed.Payload?.GetProperty("agentVersion").GetInt64());
+    }
+
+    [TestMethod]
     public async Task RepeatFailsWithStableCodeWhenTheIterationLimitIsReached()
     {
         var graph = new FlowGraphDefinition
@@ -992,6 +1043,8 @@ public sealed class AwpAssignmentExecutorTests
         public List<AwpInvokeModelRequest> ModelRequests { get; } = [];
         public List<AwpInvokeFlowToolRequest> FlowToolRequests { get; } = [];
         public List<AwpStoreCheckpointRequest> CheckpointRequests { get; } = [];
+        public List<AwpOpenStepExecutionRequest> StepRequests { get; } = [];
+        public List<AwpOpenTurnRequest> TurnRequests { get; } = [];
         public int FlowToolInvocationCount { get; private set; }
         public AwpCaptureFlowArtifactRequest? CaptureRequest { get; private set; }
         public string? ChildOutputName { get; init; }
@@ -1034,6 +1087,7 @@ public sealed class AwpAssignmentExecutorTests
         private AwpOpenStepExecutionResponse OpenStep(byte[] bytes)
         {
             var request = Payload<AwpOpenStepExecutionRequest>(bytes);
+            StepRequests.Add(request);
             var position = request.StepDefinitionId is "lookup" or "repeat" ? 0 : 1;
             var type = request.StepDefinitionId switch
             {
@@ -1063,6 +1117,7 @@ public sealed class AwpAssignmentExecutorTests
         private AwpOpenTurnResponse OpenTurn(byte[] bytes)
         {
             var request = Payload<AwpOpenTurnRequest>(bytes);
+            TurnRequests.Add(request);
             return new(now, new(new(Guid.NewGuid()), new(new(Guid.NewGuid()), 1), request.ParticipantId));
         }
 
