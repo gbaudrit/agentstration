@@ -634,6 +634,25 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void ServerFlowGatewaysObserveAwpAssignmentsWithoutExecutingFlowsInProcess()
+    {
+        var flows = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Infrastructure", "Flows");
+        var gateways = new[]
+        {
+            "KnowledgeProjectionAdapters.cs",
+            "KnowledgeFlowAdapters.cs",
+            "ToolDefinitionFlowAdapters.cs"
+        };
+
+        foreach (var gateway in gateways)
+        {
+            var source = File.ReadAllText(Path.Combine(flows, gateway));
+            Assert.DoesNotContain("runs.ExecuteAsync(", source, StringComparison.Ordinal,
+                $"{gateway} must submit through the configured AWP queue and only observe durable Flow Run state.");
+        }
+    }
+
+    [TestMethod]
     public void AepMicrosoftExtensionsAiAdapterDoesNotReferenceMafOrOllama()
     {
         var references = typeof(AepChatClient).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();

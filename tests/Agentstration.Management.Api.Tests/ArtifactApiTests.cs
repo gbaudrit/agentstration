@@ -237,10 +237,19 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
             await startedResponse.Content.ReadAsStringAsync());
         var started = await startedResponse.Content.ReadFromJsonAsync<FlowRunArtifactMaterialization>(JsonOptions());
         Assert.IsNotNull(started);
-        await factory.Services.GetRequiredService<FlowRunService>().ExecuteAsync(new FlowRunQueueItem(
-            started.FlowRunId,
-            new FlowRunScope(context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId)), default);
-        var completed = await client.GetFromJsonAsync<FlowRunArtifactMaterialization>(startedResponse.Headers.Location, JsonOptions());
+        var completed = started;
+        for (var attempt = 0; attempt < 100
+            && !string.Equals(completed.Status, FlowRunStatus.Succeeded.ToString(), StringComparison.Ordinal)
+            && !string.Equals(completed.Status, FlowRunStatus.Failed.ToString(), StringComparison.Ordinal)
+            && !string.Equals(completed.Status, FlowRunStatus.Cancelled.ToString(), StringComparison.Ordinal)
+            && !string.Equals(completed.Status, FlowRunStatus.TimedOut.ToString(), StringComparison.Ordinal);
+            attempt++)
+        {
+            await Task.Delay(25);
+            completed = await client.GetFromJsonAsync<FlowRunArtifactMaterialization>(
+                startedResponse.Headers.Location, JsonOptions());
+            Assert.IsNotNull(completed);
+        }
         Assert.IsNotNull(completed);
         Assert.AreEqual(FlowRunStatus.Succeeded.ToString(), completed.Status, completed.ErrorMessage);
         Assert.IsNotNull(completed.StagedArtifactId);

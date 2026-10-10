@@ -84,8 +84,6 @@ public sealed class KnowledgeRetrievalFlowGateway(FlowRunService runs) : IKnowle
                 null,
                 null,
                 scope), cancellationToken);
-            if (!stored.Value.Status.IsTerminal())
-                await runs.ExecuteAsync(new FlowRunQueueItem(stored.Value.Id, scope), cancellationToken);
             var completed = await AwaitCompletionAsync(stored.Value.Id, scope, cancellationToken);
             if (completed.Value.Status != FlowRunStatus.Succeeded)
                 throw new KnowledgeRetrievalException(
@@ -119,13 +117,6 @@ public sealed class KnowledgeRetrievalFlowGateway(FlowRunService runs) : IKnowle
                     "The retrieval Flow Run could not be reloaded.");
             if (stored.Value.Status.IsTerminal() || stored.Value.Status == FlowRunStatus.WaitingForInput)
                 return stored;
-            if (stored.Value.Status == FlowRunStatus.WaitingForChild
-                && stored.Value.Steps.SingleOrDefault(step => step.ChildFlowRunId is not null)?.ChildFlowRunId is { } childRunId)
-            {
-                await runs.ExecuteAsync(new FlowRunQueueItem(childRunId, scope), cancellationToken);
-                await runs.ExecuteAsync(new FlowRunQueueItem(runId, scope), cancellationToken);
-                continue;
-            }
             await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
         }
     }

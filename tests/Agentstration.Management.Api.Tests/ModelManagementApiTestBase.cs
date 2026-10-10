@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Threading.Channels;
 using Agentstration.Aep.Abstractions;
+using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
@@ -13,6 +15,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Management.Tests;
 
@@ -223,11 +226,72 @@ public abstract class ModelManagementApiTestBase
                 services.RemoveAll<IModelProviderDiscovery>();
                 services.RemoveAll<IModelProviderCapabilitiesResolver>();
                 services.RemoveAll<IExtensionInspector>();
+                services.RemoveAll<IFlowRunQueue>();
                 services.AddSingleton<UnavailableModelProviderAdapter>();
                 services.AddSingleton<IModelProviderDiscovery>(provider => provider.GetRequiredService<UnavailableModelProviderAdapter>());
                 services.AddSingleton<IModelProviderCapabilitiesResolver>(provider => provider.GetRequiredService<UnavailableModelProviderAdapter>());
                 services.AddSingleton<IExtensionInspector>(provider => provider.GetRequiredService<UnavailableModelProviderAdapter>());
+                services.AddSingleton<IFlowRunQueue, InProcessFlowTestQueue>();
             });
+        }
+    }
+
+    private sealed class InProcessFlowTestQueue : IFlowRunQueue, IAsyncDisposable
+    {
+        private readonly Channel<FlowRunQueueItem> queue = Channel.CreateUnbounded<FlowRunQueueItem>(
+            new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+        private readonly IServiceProvider services;
+        private readonly ILogger<InProcessFlowTestQueue> logger;
+        private readonly CancellationTokenSource shutdown = new();
+        private readonly Task processor;
+
+        public InProcessFlowTestQueue(IServiceProvider services, ILogger<InProcessFlowTestQueue> logger)
+        {
+            this.services = services;
+            this.logger = logger;
+            processor = Task.Run(ProcessAsync, CancellationToken.None);
+        }
+
+        public ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken) =>
+            queue.Writer.WriteAsync(item, cancellationToken);
+
+        public async IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.CompletedTask;
+            cancellationToken.ThrowIfCancellationRequested();
+            yield break;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await shutdown.CancelAsync();
+            queue.Writer.TryComplete();
+            await processor;
+            shutdown.Dispose();
+        }
+
+        private async Task ProcessAsync()
+        {
+            try
+            {
+                await foreach (var item in queue.Reader.ReadAllAsync(shutdown.Token))
+                {
+                    try
+                    {
+                        using var scope = services.CreateScope();
+                        await scope.ServiceProvider.GetRequiredService<FlowRunService>()
+                            .ExecuteAsync(item, shutdown.Token);
+                    }
+                    catch (Exception exception) when (exception is not OperationCanceledException)
+                    {
+                        logger.LogError(exception, "The in-process test Flow queue could not execute {FlowRunId}", item.RunId);
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (shutdown.IsCancellationRequested)
+            {
+            }
         }
     }
 }

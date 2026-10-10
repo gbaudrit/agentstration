@@ -93,9 +93,6 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
         var sourceManagement = factory.Services.GetRequiredService<DataSourceManagementService>();
         var acquisitions = factory.Services.GetRequiredService<DataSourceAcquisitionService>();
-        var runs = factory.Services.GetRequiredService<FlowRunService>();
-        var executionScope = new FlowRunScope(context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId);
-
         async Task<(DataSourceResource Source, DataSourceAcquisitionResource Acquisition)> AcquireAsync(
             string name, string url)
         {
@@ -114,13 +111,16 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             }, default);
             var started = await acquisitions.StartAsync(source.Value.Namespace, source.Value.Name, scope,
                 JsonSerializer.SerializeToElement(new { }), name, name, default);
-            await runs.ExecuteAsync(new(started.Value.FlowRunId, executionScope), default);
-            var parent = await runs.GetAsync(executionScope.WorkspaceId, started.Value.FlowRunId, default);
-            var childRunId = parent!.Value.Steps.Single(step => step.StepName == "persist").ChildFlowRunId;
-            Assert.IsNotNull(childRunId);
-            await runs.ExecuteAsync(new(childRunId, executionScope), default);
-            await runs.ExecuteAsync(new(started.Value.FlowRunId, executionScope), default);
-            var completed = await acquisitions.GetAsync(started.Value.Namespace, started.Value.Name, default);
+            var completed = started;
+            for (var attempt = 0; attempt < 200
+                && completed.Value.State is DataSourceAcquisitionState.Pending
+                    or DataSourceAcquisitionState.Running
+                    or DataSourceAcquisitionState.WaitingForChild;
+                attempt++)
+            {
+                await Task.Delay(25);
+                completed = await acquisitions.GetAsync(started.Value.Namespace, started.Value.Name, default);
+            }
             Assert.AreEqual(DataSourceAcquisitionState.Succeeded, completed.Value.State, completed.Value.ErrorMessage);
             return (source.Value, completed.Value);
         }
