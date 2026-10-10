@@ -224,7 +224,7 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
-    public async Task FlowRunExecutesPublishedSnapshotAndPersistsDiagnosticSteps()
+    public async Task FlowRunSnapshotAndHistoryRemainAfterDeletingThePublishedFlow()
     {
         await using var fixture = await FlowFixture.CreateAsync();
         var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand("routing-run", "Routes SQL", "1.0.0", true,
@@ -235,15 +235,14 @@ public sealed partial class FlowTests
             ])), default);
         await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var queue = new TestFlowRunQueue();
-        var expressions = new FlowExpressionParser();
         var runs = new FlowRunService(
             fixture.Repository,
             queue,
             new TestCancellationRegistry(),
             new TestAgentExecutor(),
             new UnsupportedFlowOrchestrationEngine(),
-            expressions,
-            expressions,
+            new FlowExpressionParser(),
+            new FlowExpressionParser(),
             new NullFlowRunEventSink(),
             new TestFlowRunExecutionScope(),
             TimeProvider.System);
@@ -253,29 +252,19 @@ public sealed partial class FlowTests
         Assert.AreEqual(FlowRunStatus.Pending, pending.Value.Status);
         Assert.AreEqual(pending.Value.Id, queue.Enqueued.Single().RunId);
         Assert.AreEqual(TestScope, queue.Enqueued.Single().Scope);
-
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual("1.0.0", completed.DefinitionSnapshot.Version);
-        CollectionAssert.AreEqual(new[] { "Input", "Router", "Agent", "Output" }, completed.Steps.Select(step => step.StepName).ToArray());
-        Assert.IsTrue(completed.Steps.All(step => step.Status == FlowStepRunStatus.Succeeded));
-        Assert.AreEqual("sql-expert", completed.Steps.Single(step => step.StepName == "Router").SelectedTransition);
-        var agent = completed.Steps.Single(step => step.StepName == "Agent");
-        Assert.AreEqual(3L, agent.AgentVersion);
-        Assert.AreEqual("Deterministic", agent.Provider);
-        Assert.AreEqual(12, agent.Usage!.InputTokens);
-        Assert.AreEqual(4, agent.Usage.OutputTokens);
-        Assert.AreEqual("done", completed.Output!.Value.GetString());
-        Assert.AreEqual(1, (await runs.ListAsync(created.Value.Id, FlowRunStatus.Succeeded, 0, 20, TestScope, default)).Items.Count);
+        Assert.AreEqual("1.0.0", pending.Value.DefinitionSnapshot.Version);
+        CollectionAssert.AreEqual(new[] { "Input", "Router", "Agent", "Output" },
+            pending.Value.Steps.Select(step => step.StepName).ToArray());
+        Assert.AreEqual(1, (await runs.ListAsync(created.Value.Id, FlowRunStatus.Pending,
+            0, 20, TestScope, default)).Items.Count);
 
         var current = await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default);
         await fixture.Service.DeleteAsync(TestScope.WorkspaceId, created.Value.Id, current!.ETag, default);
 
         Assert.IsNull(await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default));
         Assert.IsNull(await fixture.Repository.GetVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", default));
-        Assert.IsNotNull(await fixture.Repository.GetRunAsync(TestScope.WorkspaceId, completed.Id, default));
-        Assert.IsNotEmpty(await fixture.Repository.ListRunEventsAsync(TestScope.WorkspaceId, completed.Id, 0, default));
+        Assert.IsNotNull(await fixture.Repository.GetRunAsync(TestScope.WorkspaceId, pending.Value.Id, default));
+        Assert.IsNotEmpty(await fixture.Repository.ListRunEventsAsync(TestScope.WorkspaceId, pending.Value.Id, 0, default));
     }
 
     [TestMethod]
@@ -405,57 +394,6 @@ public sealed partial class FlowTests
         }, new FlowValidationContext(false), default);
 
         Assert.IsFalse(connected.Issues.Any(issue => issue.Code == "error_transition_required"));
-    }
-
-    [TestMethod]
-    public async Task DraftRunExecutesTypedGraphAndPersistsDifferentialEvents()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        var graph = new FlowGraphDefinition
-        {
-            EntryStep = "input",
-            Steps =
-            [
-                new InputFlowStepDefinition { Name = "input" },
-                new TransformFlowStepDefinition { Name = "transform", Mapping = JsonSerializer.SerializeToElement(new { prompt = "${input.prompt}", eligible = true }) },
-                new ConditionFlowStepDefinition { Name = "condition", Left = "${steps.transform.output.eligible}", Operator = "equals", Right = "true" },
-                new RouterFlowStepDefinition { Name = "router", Candidates = [new("sql", new("sql-expert"), Examples: ["query"])], Fallback = new("sql-expert") },
-                new AgentFlowStepDefinition { Name = "agent", Agent = new("${steps.router.output.selectedAgent}"), InputMapping = JsonSerializer.SerializeToElement(new { prompt = "${steps.transform.output.prompt}" }) },
-                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement(new { result = "${steps.agent.output}" }) },
-                new FailureFlowStepDefinition { Name = "failure" }
-            ],
-            Transitions =
-            [
-                new("t1", "input", "completed", "transform"),
-                new("t2", "transform", "completed", "condition"),
-                new("t3", "condition", "true", "router"),
-                new("t4", "condition", "false", "failure"),
-                new("t5", "router", "selected", "agent"),
-                new("t6", "router", "failed", "failure"),
-                new("t7", "agent", "success", "output"),
-                new("t8", "agent", "error", "failure")
-            ]
-        };
-        var now = TimeProvider.System.GetUtcNow();
-        var draft = new FlowDraft { WorkspaceId = TestScope.WorkspaceId, Id = "typed-draft", FlowId = new("typed-run"), DisplayName = "Typed run", Definition = graph, CreatedAt = now, UpdatedAt = now };
-        var queue = new TestFlowRunQueue();
-        var expressionEngine = new FlowExpressionParser();
-        var runs = new FlowRunService(fixture.Repository, queue, new TestCancellationRegistry(), new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressionEngine, expressionEngine, new NullFlowRunEventSink(), new TestFlowRunExecutionScope(), TimeProvider.System);
-        using var input = JsonDocument.Parse("""{"prompt":"Review this query"}""");
-
-        var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", "typed-correlation", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        CollectionAssert.AreEqual(new[] { "input", "transform", "condition", "router", "agent", "output" }, completed.Steps.Where(step => step.Status == FlowStepRunStatus.Succeeded).Select(step => step.StepName).ToArray());
-        Assert.AreEqual(FlowStepRunStatus.Skipped, completed.Steps.Single(step => step.StepName == "failure").Status);
-        Assert.AreEqual("done", completed.Output!.Value.GetProperty("result").GetString());
-        var events = await runs.ListEventsAsync(TestScope, completed.Id, 0, default);
-        Assert.IsTrue(events.Count >= 15);
-        Assert.AreEqual(FlowRunEventType.FlowRunCreated, events[0].Type);
-        Assert.AreEqual(FlowRunEventType.FlowRunCompleted, events[^1].Type);
-        CollectionAssert.AreEqual(events.Select(item => item.Sequence).Order().ToArray(), events.Select(item => item.Sequence).ToArray());
     }
 
     [TestMethod]

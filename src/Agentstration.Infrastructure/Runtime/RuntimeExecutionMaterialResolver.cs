@@ -163,12 +163,10 @@ public sealed class RuntimeExecutionMaterialResolver(
         string.Equals(run.Id, assignment.TargetRunId, StringComparison.Ordinal)
         || string.Equals(run.RootFlowRunId, assignment.TargetRunId, StringComparison.Ordinal);
 
-    private static IReadOnlyList<(string ParticipantId, FlowTargetReference Target)> ExecutionAgentReferences(FlowVersion version)
+    internal static IReadOnlyList<(string ParticipantId, FlowTargetReference Target)> ExecutionAgentReferences(FlowVersion version)
     {
         IEnumerable<(string ParticipantId, FlowTargetReference Target)> references = version.Graph is not null
-            ? version.Graph.Steps.OfType<AgentFlowStepDefinition>().Select(step => (step.Name,
-                new FlowTargetReference(FlowTargetKind.Agent, step.Agent.ResourceId,
-                    step.Agent.Version?.ToString(System.Globalization.CultureInfo.InvariantCulture), step.Agent.Namespace)))
+            ? GraphAgentReferences(version.Graph)
             : version.Definition switch
             {
                 DirectFlowDefinition direct => [("Agent", direct.Target)],
@@ -190,6 +188,26 @@ public sealed class RuntimeExecutionMaterialResolver(
                 Namespace = value.Target.Namespace ?? version.FlowId.Namespace
             }))
             .ToArray();
+    }
+
+    private static IEnumerable<(string ParticipantId, FlowTargetReference Target)> GraphAgentReferences(
+        FlowGraphDefinition graph)
+    {
+        var staticAgents = graph.Steps.OfType<AgentFlowStepDefinition>()
+            .Where(step => !step.Agent.ResourceId.StartsWith("${", StringComparison.Ordinal))
+            .Select(step => (step.Name, new FlowTargetReference(FlowTargetKind.Agent,
+                step.Agent.ResourceId,
+                step.Agent.Version?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                step.Agent.Namespace)));
+        var routedAgents = graph.Steps.OfType<RouterFlowStepDefinition>()
+            .SelectMany(router => router.Candidates.Select(candidate => candidate.Agent)
+                .Append(router.Fallback).Where(target => target is not null).Cast<FlowResourceReference>())
+            .Select(target => ($"Agent:{target.ResourceId}", new FlowTargetReference(
+                FlowTargetKind.Agent, target.ResourceId,
+                target.Version?.ToString(System.Globalization.CultureInfo.InvariantCulture), target.Namespace)));
+        return staticAgents.Concat(routedAgents)
+            .GroupBy(value => new { value.Item2.Id, value.Item2.Version, value.Item2.Namespace })
+            .Select(group => group.First());
     }
 
     private static IReadOnlyList<(string Name, string DisplayName, string Type)> ExecutionSteps(FlowVersion version)

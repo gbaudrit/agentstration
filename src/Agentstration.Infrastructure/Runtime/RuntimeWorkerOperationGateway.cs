@@ -46,13 +46,15 @@ public sealed class RuntimeWorkerOperationGateway(
         if (request.Options.Parameters.TryGetValue("maxOutputTokens", out var tokens) && tokens.TryGetInt32(out var tokenValue))
             options.MaxOutputTokens = tokenValue;
         var response = await client.GetResponseAsync(messages, options, cancellationToken);
+        var metadata = client.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
         var contents = response.Messages.SelectMany(value => value.Contents).Select(ToContent).OfType<RuntimeGovernedModelContent>().ToArray();
         return new RuntimeGovernedModelResponse(
             contents,
             response.ModelId,
             response.FinishReason?.ToString(),
             ToInt32(response.Usage?.InputTokenCount),
-            ToInt32(response.Usage?.OutputTokenCount));
+            ToInt32(response.Usage?.OutputTokenCount),
+            metadata?.ContributionId);
     }
 
     public async Task<JsonElement?> InvokeToolAsync(RuntimeGovernedToolRequest request, CancellationToken cancellationToken)

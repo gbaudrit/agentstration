@@ -224,14 +224,22 @@ internal sealed class AwpAssignmentExecutor(
         var step = await OpenStepAsync(session, material, "Agent", cancellationToken);
         await session.AppendEventAsync(AwpExecutionEventKind.StepStarted,
             new(material.RunId, FlowStep: step), null, null, cancellationToken);
-        var output = await ExecuteFlowAgentAsync(session, material, agent, step, material.Input, cancellationToken);
+        var execution = await ExecuteFlowAgentAsync(session, material, agent, step, material.Input, cancellationToken);
+        var output = JsonSerializer.SerializeToElement(execution.Output);
         await session.AppendEventAsync(AwpExecutionEventKind.StepCompleted,
             new(material.RunId, FlowStep: step), JsonSerializer.SerializeToElement(new
             {
                 status = "succeeded",
                 output,
                 agentResourceId = agent.AgentName,
-                agentVersion = agent.Generation
+                agentVersion = agent.Generation,
+                modelProfileResourceId = agent.ModelProfileName,
+                provider = execution.ProviderType,
+                usage = execution.Usage is null ? null : new
+                {
+                    inputTokens = execution.Usage.InputTokens,
+                    outputTokens = execution.Usage.OutputTokens
+                }
             }), null, cancellationToken);
         await CompleteStepAsync(session, material, "Output", output, null, cancellationToken);
         return output;
@@ -259,6 +267,7 @@ internal sealed class AwpAssignmentExecutor(
             JsonElement? output;
             var eventName = "completed";
             AwpExecutionAgentMaterial? executedAgent = null;
+            AgentExecutionResult? executedAgentResult = null;
             AwpInvokeFlowToolResponse? executedTool = null;
             var childRunIds = new List<string>();
             var childExecutions = new List<AwpChildExecutionResult>();
@@ -273,16 +282,19 @@ internal sealed class AwpAssignmentExecutor(
                     output = material.Input.Clone();
                     break;
                 case AgentFlowStepDefinition agentStep:
+                    var agentResourceId = await ResolveStringAsync(agentStep.Agent.ResourceId,
+                        context, cancellationToken);
                     executedAgent = material.Agents.SingleOrDefault(value => value.ParticipantId == agentStep.Name)
-                        ?? material.Agents.SingleOrDefault(value => value.AgentName == agentStep.Agent.ResourceId)
+                        ?? material.Agents.SingleOrDefault(value => value.AgentName == agentResourceId)
                         ?? throw new AwpExecutionNotSupportedException("flow_agent_material_missing", $"Agent for step '{agentStep.Name}' is absent from the execution material.");
                     var agentInput = agentStep.InputMapping is null
                         ? transitionOutput?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
                         : await ResolveJsonAsync(agentStep.InputMapping.Value, context, cancellationToken);
                     try
                     {
-                        output = await ExecuteFlowAgentAsync(session, material, executedAgent, step,
+                        executedAgentResult = await ExecuteFlowAgentAsync(session, material, executedAgent, step,
                             agentInput, cancellationToken);
+                        output = JsonSerializer.SerializeToElement(executedAgentResult.Output);
                         eventName = "success";
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
@@ -295,8 +307,11 @@ internal sealed class AwpAssignmentExecutor(
                     }
                     break;
                 case RouterFlowStepDefinition router:
-                    var selection = router.Candidates.FirstOrDefault(candidate => material.Input.GetRawText()
-                        .Contains(candidate.Route, StringComparison.OrdinalIgnoreCase));
+                    var routingInput = material.Input.GetRawText();
+                    var selection = router.Candidates.FirstOrDefault(candidate =>
+                        MatchesTarget(routingInput, candidate.Route)
+                        || candidate.Examples?.Any(example => routingInput.Contains(
+                            example, StringComparison.OrdinalIgnoreCase)) == true);
                     if (selection is null && router.Fallback is null)
                         throw new AwpExecutionNotSupportedException("router_no_route", $"Router step '{router.Name}' could not select a route.");
                     output = JsonSerializer.SerializeToElement(new
@@ -500,6 +515,13 @@ internal sealed class AwpAssignmentExecutor(
                     selectedTransition = transition?.Id,
                     agentResourceId = executedAgent?.AgentName,
                     agentVersion = executedAgent?.Generation,
+                    modelProfileResourceId = executedAgent?.ModelProfileName,
+                    provider = executedAgentResult?.ProviderType,
+                    usage = executedAgentResult?.Usage is null ? null : new
+                    {
+                        inputTokens = executedAgentResult.Usage.InputTokens,
+                        outputTokens = executedAgentResult.Usage.OutputTokens
+                    },
                     tool = executedTool is null ? null : new
                     {
                         executedTool.ToolName,
@@ -606,7 +628,7 @@ internal sealed class AwpAssignmentExecutor(
         }
     }
 
-    private async Task<JsonElement> ExecuteFlowAgentAsync(AwpAssignmentSession session,
+    private async Task<AgentExecutionResult> ExecuteFlowAgentAsync(AwpAssignmentSession session,
         AwpRootFlowExecutionMaterial material, AwpExecutionAgentMaterial agent,
         AwpFlowStepLocation step, JsonElement input, CancellationToken cancellationToken)
     {
@@ -637,7 +659,20 @@ internal sealed class AwpAssignmentExecutor(
                 JsonSerializer.SerializeToElement(new { content = result.Output }), null, cancellationToken);
         await session.AppendEventAsync(AwpExecutionEventKind.TurnCompleted, location,
             JsonSerializer.SerializeToElement(new { participantId = agent.ParticipantId }), null, cancellationToken);
-        return JsonSerializer.SerializeToElement(result.Output);
+        var effective = result with
+        {
+            ProviderType = chatClient.LastProviderType,
+            ModelName = chatClient.LastModelId ?? result.ModelName
+        };
+        await session.AppendEventAsync(AwpExecutionEventKind.Diagnostic, location,
+            JsonSerializer.SerializeToElement(new
+            {
+                model = effective.ModelName,
+                provider = effective.ProviderType,
+                inputTokens = effective.Usage?.InputTokens,
+                outputTokens = effective.Usage?.OutputTokens
+            }), null, cancellationToken);
+        return effective;
     }
 
     private async Task<AwpFlowStepLocation> OpenStepAsync(AwpAssignmentSession session,
@@ -655,9 +690,17 @@ internal sealed class AwpAssignmentExecutor(
             JsonSerializer.SerializeToElement(new { status = "succeeded", output, selectedTransition }), null, cancellationToken);
     }
 
-    private static FlowTargetReference SelectTarget(RoutingFlowDefinition routing, JsonElement input) =>
-        routing.Destinations.FirstOrDefault(destination => input.GetRawText().Contains(destination.Id, StringComparison.OrdinalIgnoreCase))
-        ?? routing.Fallback ?? routing.Destinations[0];
+    private static FlowTargetReference SelectTarget(RoutingFlowDefinition routing, JsonElement input)
+    {
+        var text = input.GetRawText();
+        return routing.Destinations.FirstOrDefault(destination => MatchesTarget(text, destination.Id))
+            ?? routing.Fallback ?? routing.Destinations[0];
+    }
+
+    private static bool MatchesTarget(string input, string targetId) =>
+        input.Contains(targetId, StringComparison.OrdinalIgnoreCase)
+        || targetId.Split('-', StringSplitOptions.RemoveEmptyEntries)
+            .Any(part => part.Length > 2 && input.Contains(part, StringComparison.OrdinalIgnoreCase));
 
     private static JsonElement ResolveMappedInput(JsonElement? mapping, JsonElement fallback,
         IReadOnlyDictionary<string, JsonElement?> outputs)

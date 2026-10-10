@@ -81,14 +81,21 @@ public sealed class AwpAssignmentProjection(
             CompletedAt = now,
             ExecutionLeaseId = null,
             ExecutionLeaseExpiresAt = null,
-            Steps = stored.Value.Steps.Select(step => step.Status == FlowStepRunStatus.Running
-                ? step with
+            Steps = stored.Value.Steps.Select(step => step.Status switch
+            {
+                FlowStepRunStatus.Running => step with
                 {
                     Status = cancelled ? FlowStepRunStatus.Cancelled : FlowStepRunStatus.Failed,
                     CompletedAt = now,
                     Error = succeeded ? null : new FlowRunError(errorCode, "The Runtime Worker stopped during this step.")
-                }
-                : step).ToArray()
+                },
+                FlowStepRunStatus.NotStarted => step with
+                {
+                    Status = FlowStepRunStatus.Skipped,
+                    CompletedAt = now
+                },
+                _ => step
+            }).ToArray()
         };
         await flowRuns.UpdateRunAsync(updated, stored.ETag, cancellationToken);
         await AppendFlowEventAsync(updated, status switch
@@ -176,6 +183,8 @@ public sealed class AwpAssignmentProjection(
                     SelectedTransition = StringProperty(executionEvent.Payload, "selectedTransition"),
                     AgentResourceId = StringProperty(executionEvent.Payload, "agentResourceId") ?? current.AgentResourceId,
                     AgentVersion = LongProperty(executionEvent.Payload, "agentVersion") ?? current.AgentVersion,
+                    ModelProfileResourceId = StringProperty(executionEvent.Payload, "modelProfileResourceId")
+                        ?? current.ModelProfileResourceId,
                     ChildFlowRunId = childFlowRunIds.LastOrDefault(value =>
                             !string.Equals(value, artifactStorageFlowRunId, StringComparison.Ordinal))
                         ?? current.ChildFlowRunId,
@@ -184,6 +193,7 @@ public sealed class AwpAssignmentProjection(
                     ToolRoute = ParseToolRoute(executionEvent.Payload) ?? current.ToolRoute,
                     Tools = ParseToolIdentity(executionEvent.Payload) is { } tool ? [tool] : current.Tools,
                     Provider = ParseProviderIdentity(executionEvent.Payload) ?? current.Provider,
+                    Usage = ParseUsage(executionEvent.Payload) ?? current.Usage,
                     Artifacts = artifacts.Count > 0 ? artifacts : current.Artifacts,
                     ArtifactStorageFlowRunId = artifactStorageFlowRunId ?? current.ArtifactStorageFlowRunId,
                     Error = failed ? new FlowRunError(StringProperty(executionEvent.Payload, "errorCode") ?? "flow_step_failed",
@@ -275,7 +285,10 @@ public sealed class AwpAssignmentProjection(
                 StringProperty(payload, "errorDetails")) : null,
             CompletedAt = occurredAt,
             ExecutionLeaseId = null,
-            ExecutionLeaseExpiresAt = null
+            ExecutionLeaseExpiresAt = null,
+            Steps = stored.Value.Steps.Select(step => step.Status == FlowStepRunStatus.NotStarted
+                ? step with { Status = FlowStepRunStatus.Skipped, CompletedAt = occurredAt }
+                : step).ToArray()
         };
         await UpdateFlowAsync(stored, updated, timedOut ? FlowRunEventType.FlowRunTimedOut
                 : failed ? FlowRunEventType.FlowRunFailed : FlowRunEventType.FlowRunCompleted,
@@ -327,6 +340,17 @@ public sealed class AwpAssignmentProjection(
 
     private static long? LongProperty(JsonElement? payload, string name) =>
         Property(payload, name) is { ValueKind: JsonValueKind.Number } value && value.TryGetInt64(out var number) ? number : null;
+
+    private static FlowStepRunUsage? ParseUsage(JsonElement? payload)
+    {
+        var usage = Property(payload, "usage");
+        if (usage is not { ValueKind: JsonValueKind.Object }) return null;
+        var input = LongProperty(usage, "inputTokens");
+        var output = LongProperty(usage, "outputTokens");
+        return input is null && output is null ? null : new(
+            input is null ? null : checked((int)input.Value),
+            output is null ? null : checked((int)output.Value));
+    }
 
     private static int? IntProperty(JsonElement? payload, string name) =>
         Property(payload, name) is { ValueKind: JsonValueKind.Number } value && value.TryGetInt32(out var number) ? number : null;
@@ -404,7 +428,8 @@ public sealed class AwpAssignmentProjection(
             ? CatalogId(StringProperty(tool, "toolNamespace"), StringProperty(tool, "toolName")) : null;
 
     private static string? ParseProviderIdentity(JsonElement? payload) =>
-        Property(payload, "tool") is { ValueKind: JsonValueKind.Object } tool
+        StringProperty(payload, "provider") is { Length: > 0 } provider ? provider
+        : Property(payload, "tool") is { ValueKind: JsonValueKind.Object } tool
             ? CatalogId(StringProperty(tool, "providerNamespace"), StringProperty(tool, "providerName")) : null;
 
     private static string? CatalogId(string? @namespace, string? name) => string.IsNullOrWhiteSpace(name) ? null

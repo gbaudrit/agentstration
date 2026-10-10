@@ -8,6 +8,7 @@ using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Flows;
+using Agentstration.Infrastructure.Runtime;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Work;
@@ -18,6 +19,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Agentstration.Application.Tests;
 
@@ -208,26 +210,42 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
-    public async Task FlowRunAuthorizationIsRevalidatedBeforeExecution()
+    public async Task FlowRunAuthorizationIsRevalidatedBeforeWorkerMaterialIsIssued()
     {
         await using var fixture = await FlowFixture.CreateAsync();
         var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand("revoked-run", null, "1.0.0", true,
             new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"))), default);
         await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
-        var expressions = new FlowExpressionParser();
-        var agent = new TrackingAgentExecutor();
         var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(),
-            agent, new UnsupportedFlowOrchestrationEngine(), expressions, expressions,
-            new NullFlowRunEventSink(), new DeniedFlowRunExecutionScope(), TimeProvider.System);
+            new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), new FlowExpressionParser(),
+            new FlowExpressionParser(), new NullFlowRunEventSink(), new TestFlowRunExecutionScope(),
+            TimeProvider.System);
         using var input = JsonDocument.Parse("""{"prompt":"test"}""");
         var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "principal", "revoked", input.RootElement, TestScope, default);
+        var assignment = new RuntimeWorkerAssignment
+        {
+            WorkspaceId = TestScope.WorkspaceId,
+            TenantId = TestScope.TenantId,
+            Id = new(Guid.NewGuid()),
+            TargetKind = RuntimeAssignmentTargetKind.FlowRun,
+            TargetRunId = pending.Value.Id,
+            RuntimeCapability = "microsoft-agent-framework",
+            RuntimeCapabilityVersion = "1.0",
+            ExecutionMaterialVersion = RuntimeExecutionMaterialVersions.V1,
+            ExecutionMaterialId = $"flow-run:{pending.Value.Id}",
+            ExecutionMaterialDigest = "sha256:test",
+            State = RuntimeAssignmentState.Pending,
+            CreatedAt = Now,
+            UpdatedAt = Now
+        };
+        var resolver = new RuntimeExecutionMaterialResolver(null!, fixture.Repository, null!,
+            new DeniedFlowRunExecutionScope(), null!, null!, null!,
+            Options.Create(new FlowRunExecutionOptions()));
 
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
+        var exception = await Assert.ThrowsExactlyAsync<FlowValidationException>(() =>
+            resolver.ResolveAsync(assignment, default));
 
-        var failed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Failed, failed.Status);
-        Assert.AreEqual("flow_run_authorization_denied", failed.Error?.Code);
-        Assert.AreEqual(0, agent.ExecutionCount);
+        Assert.AreEqual("flow_run_authorization_denied", exception.Code);
     }
 
     [TestMethod]

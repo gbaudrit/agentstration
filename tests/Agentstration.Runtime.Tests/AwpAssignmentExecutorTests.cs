@@ -730,6 +730,109 @@ public sealed class AwpAssignmentExecutorTests
             && value.Location.FlowStep?.StepDefinitionId == "Agent");
         Assert.AreEqual("assistant", completed.Payload?.GetProperty("agentResourceId").GetString());
         Assert.AreEqual(3, completed.Payload?.GetProperty("agentVersion").GetInt64());
+        Assert.AreEqual("default-reasoning", completed.Payload?.GetProperty("modelProfileResourceId").GetString());
+        Assert.AreEqual("Deterministic", completed.Payload?.GetProperty("provider").GetString());
+        Assert.AreEqual(12, completed.Payload?.GetProperty("usage").GetProperty("inputTokens").GetInt32());
+        Assert.AreEqual(4, completed.Payload?.GetProperty("usage").GetProperty("outputTokens").GetInt32());
+        var diagnostic = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.Diagnostic
+            && value.Location.FlowStep?.StepDefinitionId == "Agent");
+        Assert.AreEqual("deterministic", diagnostic.Payload?.GetProperty("model").GetString());
+        Assert.AreEqual("Deterministic", diagnostic.Payload?.GetProperty("provider").GetString());
+    }
+
+    [TestMethod]
+    public async Task RoutingFlowSelectsAnAgentFromAMeaningfulTargetNamePart()
+    {
+        var definition = new FlowVersion(new WorkspaceId(Guid.NewGuid()),
+            new FlowId("routing", ResourceNamespace.Default), "1.0", null,
+            new RoutingFlowDefinition(FlowRoutingStrategy.Deterministic,
+            [
+                new(FlowTargetKind.Agent, "dotnet-expert"),
+                new(FlowTargetKind.Agent, "sql-expert")
+            ]), new Dictionary<string, string>(), TestNow, null, "sha256:routing");
+        var sqlAgent = AgentMaterial() with
+        {
+            ParticipantId = "Agent:sql-expert",
+            AgentName = "sql-expert",
+            Generation = 3
+        };
+        var dotnetAgent = AgentMaterial() with
+        {
+            ParticipantId = "Agent:dotnet-expert",
+            AgentName = "dotnet-expert"
+        };
+        using var credential = new AwpClientCredential(Guid.NewGuid(), Guid.NewGuid(), "test-instance",
+            System.Text.Encoding.UTF8.GetBytes("test-worker-secret-material-at-least-32-bytes"));
+        var handler = new GraphHandler(TestNow);
+        using var client = new AwpClient(new Uri("https://authority.test"), credential,
+            new(Guid.NewGuid()), TimeProvider.System, 0, handler);
+        var assignment = new AwpRunAssignment(new(Guid.NewGuid()), new(Guid.NewGuid()),
+            new(Guid.NewGuid(), Guid.NewGuid().ToString("D")), new AwpRootFlowRunTarget("flowrun-routing"),
+            new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", "1.0"),
+            new("material-routing", "1.0", "sha256:material-routing"),
+            new("ownership", 1, DateTimeOffset.UtcNow.AddMinutes(5), 15));
+        var session = new AwpAssignmentSession(client, assignment, TestNow, TimeProvider.System,
+            TimeSpan.FromSeconds(5));
+        var executor = new AwpAssignmentExecutor(NullLoggerFactory.Instance,
+            NullLogger<AwpAssignmentExecutor>.Instance);
+        var material = new AwpRootFlowExecutionMaterial("material-routing", "1.0", "sha256:material-routing",
+            "flowrun-routing", "routing", "default", "1.0", "sha256:routing",
+            JsonSerializer.SerializeToElement(new { prompt = "Review this SQL query" }),
+            JsonSerializer.SerializeToElement(definition, JsonOptions), [dotnetAgent, sqlAgent], Guid.NewGuid());
+
+        var result = await executor.ExecuteAsync(session, material, CancellationToken.None);
+
+        Assert.AreEqual("agent-result", result.Output?.GetString());
+        Assert.AreEqual("Agent:sql-expert", handler.ModelRequests.Single().ParticipantId);
+        var router = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.StepCompleted
+            && value.Location.FlowStep?.StepDefinitionId == "Router");
+        Assert.AreEqual("sql-expert", router.Payload?.GetProperty("selectedTransition").GetString());
+    }
+
+    [TestMethod]
+    public async Task GraphAgentResolvesTheRouterSelectedAgentFromAssignedMaterial()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "router",
+            Steps =
+            [
+                new RouterFlowStepDefinition
+                {
+                    Name = "router",
+                    Candidates = [new("sql", new("sql-expert"), Examples: ["query"])],
+                    Fallback = new("dotnet-expert")
+                },
+                new AgentFlowStepDefinition
+                {
+                    Name = "agent",
+                    Agent = new("${steps.router.output.selectedAgent}")
+                },
+                new OutputFlowStepDefinition { Name = "output", Outcome = FlowOutputOutcome.Success }
+            ],
+            Transitions =
+            [
+                new("router-agent", "router", "selected", "agent"),
+                new("agent-output", "agent", "success", "output")
+            ]
+        };
+        var routedAgent = AgentMaterial() with
+        {
+            ParticipantId = "Agent:sql-expert",
+            AgentName = "sql-expert",
+            Generation = 3
+        };
+
+        var (result, handler) = await ExecuteGraphAsync(graph,
+            JsonSerializer.SerializeToElement(new { prompt = "Review this query" }),
+            agentMaterial: routedAgent);
+
+        Assert.AreEqual("agent-result", result.Output?.GetString());
+        Assert.AreEqual("Agent:sql-expert", handler.ModelRequests.Single().ParticipantId);
+        var completed = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.StepCompleted
+            && value.Location.FlowStep?.StepDefinitionId == "agent");
+        Assert.AreEqual("sql-expert", completed.Payload?.GetProperty("agentResourceId").GetString());
+        Assert.AreEqual(3, completed.Payload?.GetProperty("agentVersion").GetInt64());
     }
 
     [TestMethod]
@@ -1221,7 +1324,8 @@ public sealed class AwpAssignmentExecutorTests
             if (ModelFailureMessage is not null) throw new InvalidOperationException(ModelFailureMessage);
             var request = Payload<AwpInvokeModelRequest>(bytes);
             ModelRequests.Add(request);
-            return new(now, [new AwpModelTextContent(ModelOutput)], "deterministic", "stop", 1, 1);
+            return new(now, [new AwpModelTextContent(ModelOutput)], "deterministic", "stop", 12, 4,
+                "Deterministic");
         }
 
         private AwpCaptureFlowArtifactResponse Capture(byte[] bytes)

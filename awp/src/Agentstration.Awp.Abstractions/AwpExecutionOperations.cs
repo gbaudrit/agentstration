@@ -139,7 +139,8 @@ public sealed record AwpInvokeModelResponse(
     string? ModelId,
     string? FinishReason,
     int? InputTokens,
-    int? OutputTokens);
+    int? OutputTokens,
+    string? ProviderType = null);
 
 public sealed record AwpInvokeToolRequest(
     AwpAssignmentCommandContext Context,
