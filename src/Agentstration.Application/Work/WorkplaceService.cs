@@ -55,8 +55,8 @@ public sealed partial class WorkplaceService(
 {
     private const int WorkItemQueryPageSize = 200;
     private const string WorkspaceMetadata = "workplace.workspaceId";
-    private const string EntryMetadata = "workplace.entryId";
-    private const string InteractionMetadata = "workplace.interactionId";
+    private const string EntryMetadata = WorkplaceTaskIdentity.EntryMetadata;
+    private const string InteractionMetadata = WorkplaceTaskIdentity.InteractionMetadata;
     private const string FlowRunMetadata = "flowRunId";
     private const string TaskMetadata = "workplace.taskId";
     private const string ParentFlowRunMetadata = "workplace.parentFlowRunId";

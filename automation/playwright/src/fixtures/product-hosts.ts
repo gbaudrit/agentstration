@@ -40,7 +40,7 @@ interface ControlledRuntimeProxy extends PlatformHealthTestControl {
 
 const startupTimeoutMilliseconds = 180_000;
 
-export async function startProductHosts(): Promise<ProductHosts> {
+export async function startProductHosts(authenticationMode: 'Development' | 'Local' = 'Development'): Promise<ProductHosts> {
   const runId = `${Date.now()}-${process.pid}`;
   const workDirectory = path.join(automationRoot, '.work', runId);
   const dataDirectory = path.join(workDirectory, 'data');
@@ -104,7 +104,7 @@ export async function startProductHosts(): Promise<ProductHosts> {
     Data__FlowPath: path.join(dataDirectory, 'flow-plane.db'),
     Data__RuntimePath: path.join(dataDirectory, 'runtime-plane.db'),
     AI__Provider: 'Deterministic',
-    Agentstration__Authentication__Mode: 'Development',
+    Agentstration__Authentication__Mode: authenticationMode,
     Agentstration__Authentication__DevelopmentGrantPlatformAdministrator: 'true',
     Agentstration__Bootstrap__Path: bootstrapPath,
     Agentstration__Bootstrap__InitialBootstrapEnabled: 'true',

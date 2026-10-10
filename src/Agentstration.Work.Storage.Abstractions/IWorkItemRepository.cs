@@ -26,6 +26,7 @@ public sealed record WorkItemQuery(
     string? Search = null,
     bool? HasPendingAction = null,
     bool OperationalTasks = false,
+    bool WorkplaceTasksOnly = false,
     DateTimeOffset? UpdatedFrom = null,
     DateTimeOffset? UpdatedTo = null);
 

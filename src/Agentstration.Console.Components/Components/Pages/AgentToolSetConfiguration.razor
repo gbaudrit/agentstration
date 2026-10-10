@@ -1,0 +1,85 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
+
+<section class="panel form-section agent-tools-panel" data-testid="agent-toolset-configuration">
+    <div class="panel-header"><div><p class="eyebrow">@T("ToolSetConfiguration")</p><h2>@T("GovernedToolSets")</h2><p>@T("ToolSetConfigurationHelp")</p></div><a class="button-secondary" href="/tools/sets">@T("ManageToolSets")</a></div>
+    @if (Versions.Count == 0)
+    {
+        <p class="muted">@T("NoPublishedToolSets")</p>
+    }
+    else
+    {
+        <div class="agent-toolset-grid">
+        @foreach (var version in Versions.OrderBy(value => value.ToolSetName, StringComparer.CurrentCultureIgnoreCase).ThenByDescending(value => value.PublishedAt))
+        {
+            var assignment = Assignment(version);
+            <article class="agent-toolset-card @(assignment is not null ? "selected" : null)" data-toolset="@version.ToolSetName" data-version="@version.Version">
+                <header class="agent-toolset-header">
+                    <div class="agent-toolset-identity"><span class="agent-toolset-icon" aria-hidden="true"><TablerIcon Name="layers" /></span><div><span class="agent-toolset-kind">@T("PublishedToolSet")</span><h3>@version.ToolSetName</h3><code>@version.Namespace/@version.ToolSetName:@version.Version</code></div></div>
+                    <a class="text-button" href="@ToolSetUrl(version)">@T("InspectToolSet") →</a>
+                </header>
+                <div class="agent-toolset-assignment">
+                    <input id="@FullInputId(version)" type="checkbox" checked="@(assignment is not null)" @onchange="args => ToggleFullAsync(version, (bool)args.Value!)" />
+                    <label for="@FullInputId(version)"><strong>@T(assignment?.Members.Count == 0 ? "AllMembers" : "SelectedMembers")</strong><small>@T("PinnedVersionHelp", version.Version)</small></label>
+                </div>
+                @if (assignment is not null)
+                {
+                    <div class="agent-toolset-members" aria-label="@T("ToolSetMembers")">
+                        <p>@T("ChooseToolSetMembers")</p>
+                        <div class="agent-toolset-member-grid">
+                        @foreach (var member in version.Members)
+                        {
+                            var selected = assignment.Members.Count == 0 || assignment.Members.Contains(member.ToolName, StringComparer.Ordinal);
+                            <label class="agent-toolset-member" for="@MemberInputId(version, member)">
+                                <input id="@MemberInputId(version, member)" type="checkbox" checked="@selected" @onchange="args => ToggleMemberAsync(version, member.ToolName, (bool)args.Value!)" />
+                                <span><strong>@member.ToolName</strong><small><code>@member.Capability · @member.Route</code><span>@member.ProviderName</span></small></span>
+                            </label>
+                        }
+                        </div>
+                    </div>
+                }
+            </article>
+        }
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public IReadOnlyList<ToolSetVersionResource> Versions { get; set; } = [];
+    [Parameter] public IReadOnlyList<AgentToolSetSelection> Selected { get; set; } = [];
+    [Parameter] public EventCallback<IReadOnlyList<AgentToolSetSelection>> SelectedChanged { get; set; }
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private AgentToolSetSelection? Assignment(ToolSetVersionResource version) => Selected.SingleOrDefault(value =>
+        string.Equals(value.ToolSet.Name, version.ToolSetName, StringComparison.Ordinal)
+        && (value.ToolSet.Namespace ?? ResourceNamespace.Default) == version.Namespace
+        && string.Equals(value.Version, version.Version, StringComparison.Ordinal));
+    private async Task ToggleFullAsync(ToolSetVersionResource version, bool selected)
+    {
+        var values = WithoutToolSet(version);
+        if (selected) values.Add(Create(version, []));
+        await SelectedChanged.InvokeAsync(values);
+    }
+    private async Task ToggleMemberAsync(ToolSetVersionResource version, string member, bool selected)
+    {
+        var current = Assignment(version);
+        var members = current?.Members.Count == 0
+            ? version.Members.Select(value => value.ToolName).ToList()
+            : current?.Members.ToList() ?? [];
+        if (selected && !members.Contains(member, StringComparer.Ordinal)) members.Add(member);
+        if (!selected) members.RemoveAll(value => string.Equals(value, member, StringComparison.Ordinal));
+        var values = WithoutToolSet(version);
+        if (members.Count > 0) values.Add(Create(version, members));
+        await SelectedChanged.InvokeAsync(values);
+    }
+    private List<AgentToolSetSelection> WithoutToolSet(ToolSetVersionResource version) => Selected.Where(value =>
+        !string.Equals(value.ToolSet.Name, version.ToolSetName, StringComparison.Ordinal)
+        || (value.ToolSet.Namespace ?? ResourceNamespace.Default) != version.Namespace).ToList();
+    private static AgentToolSetSelection Create(ToolSetVersionResource version, IReadOnlyList<string> members) => new()
+    {
+        ToolSet = new ResourceReference(version.ToolSetName, @namespace: version.Namespace), Version = version.Version, Members = members
+    };
+    private static string ToolSetUrl(ToolSetVersionResource version) => version.Namespace.IsDefault
+        ? $"/tools/sets/{Uri.EscapeDataString(version.ToolSetName)}"
+        : $"/tools/sets/{Uri.EscapeDataString(version.ToolSetName)}?namespace={Uri.EscapeDataString(version.Namespace.Value)}";
+    private static string FullInputId(ToolSetVersionResource version) => $"agent-toolset-{version.ToolSetName}-{version.Version}";
+    private static string MemberInputId(ToolSetVersionResource version, PublishedToolSetMember member) => $"{FullInputId(version)}-{member.ToolName}";
+}

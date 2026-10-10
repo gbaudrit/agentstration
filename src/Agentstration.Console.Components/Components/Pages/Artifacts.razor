@@ -1,0 +1,75 @@
+@page "/artifacts"
+@inject IArtifactsClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
+
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-artifacts"><Actions><a class="button-secondary" href="/knowledge-sources">@T("KnowledgeSources")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions></PageHeader>
+<ResourceTabs Label="@T("Sections")"><button type="button" class="@(showDurable ? "active" : null)" @onclick="() => showDurable = true">@T("Durable") <span>@durable.Count</span></button><button type="button" class="@(showDurable ? null : "active")" @onclick="() => showDurable = false">@T("Staged") <span>@staged.Count</span></button></ResourceTabs>
+
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else if (error is not null) { <ErrorState Message="@error" /> }
+else if (!showDurable)
+{
+    @if (staged.Count == 0) { <EmptyState Title="@T("NoStaged")" Message="@T("NoStagedHelp")" /> }
+    else
+    {
+        <DataGrid TItem="StagedArtifactView" Items="staged">
+            <Header><tr><th>@T("Artifact")</th><th>@T("Producer")</th><th>@T("State")</th><th>@T("Size")</th><th>@T("Expires")</th></tr></Header>
+            <Row Context="item">
+                <tr data-testid="staged-artifact-row">
+                    <td><ArtifactReference Href="@StagedUrl(item)" Name="@item.FileName" Identifier="@item.ArtifactId.ToString()" IdentifierLabel="@T("Identifier")" /></td>
+                    <td><ArtifactReference Href="@ProducerUrl(item.Producer)" Name="@item.Producer.Kind.ToString()" Identifier="@ProducerIdentity(item.Producer)" IdentifierLabel="@T("Identifier")" /></td>
+                    <td>
+                        <span class="artifact-status">
+                            <StatusBadge Text="@T($"Status.{item.Status}")" Status="@Tone(item.Status)" />
+                            <HelpTooltip Text="@T($"StatusHelp.{item.Status}")" OpenToLeft />
+                        </span>
+                    </td>
+                    <td>@Size(item.Length)</td>
+                    <td>@item.ExpiresAt.ToLocalTime().ToString("g")</td>
+                </tr>
+            </Row>
+        </DataGrid>
+    }
+}
+else
+{
+    @if (durable.Count == 0) { <EmptyState Title="@T("NoDurable")" Message="@T("NoDurableHelp")" /> }
+    else
+    {
+        <DataGrid TItem="FlowRunArtifactResource" Items="durable">
+            <Header><tr><th>@T("Artifact")</th><th>@T("FlowRun")</th><th>@T("Step")</th><th>@T("MediaType")</th><th>@T("Size")</th><th>@T("Created")</th></tr></Header>
+            <Row Context="item">
+                <tr data-testid="durable-artifact-row">
+                    <td><ArtifactReference Href="@DurableUrl(item)" Name="@DurableName(item)" Identifier="@item.ArtifactId.ToString()" IdentifierLabel="@T("Identifier")" /></td>
+                    <td><ArtifactReference Href="@FlowRunUrl(item.ProducerFlowRunId)" Name="@T("FlowRun")" Identifier="@item.ProducerFlowRunId" IdentifierLabel="@T("Identifier")" /></td>
+                    <td><code>@item.ProducerFlowStepId</code></td>
+                    <td>@item.Receipt.MediaType</td>
+                    <td>@Size(item.Receipt.Length)</td>
+                    <td>@item.CreatedAt.ToLocalTime().ToString("g")</td>
+                </tr>
+            </Row>
+        </DataGrid>
+    }
+}
+
+@code {
+    private IReadOnlyList<StagedArtifactView> staged = [];
+    private IReadOnlyList<FlowRunArtifactResource> durable = [];
+    private bool loading = true, showDurable = true;
+    private string? error;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync() { loading = true; error = null; try { var stagedTask = Client.GetStagedAsync(); var durableTask = Client.GetDurableAsync(); await Task.WhenAll(stagedTask, durableTask); staged = (await stagedTask).OrderByDescending(value => value.CreatedAt).ToArray(); durable = (await durableTask).OrderByDescending(value => value.CreatedAt).ToArray(); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
+    private static string StagedUrl(StagedArtifactView artifact) => $"/artifacts/staged/{artifact.ArtifactId}";
+    private static string DurableUrl(FlowRunArtifactResource artifact) => $"/artifacts/durable/{artifact.ArtifactId}";
+    private static string FlowRunUrl(string id) => $"/flow-runs/{Uri.EscapeDataString(id)}";
+    private static string? ProducerUrl(ArtifactProducer producer) => producer.FlowRunId is not null
+        ? FlowRunUrl(producer.FlowRunId)
+        : producer.RuntimeRunId is not null ? $"/runs/{Uri.EscapeDataString(producer.RuntimeRunId)}" : null;
+    private static string ProducerIdentity(ArtifactProducer producer) => producer.FlowRunId ?? producer.RuntimeRunId ?? producer.Id;
+    private static string DurableName(FlowRunArtifactResource artifact) => artifact.Receipt.Provenance.TryGetValue("fileName", out var fileName)
+        && !string.IsNullOrWhiteSpace(fileName) ? fileName : artifact.ArtifactId.ToString();
+    private static UiStatus Tone(StagedArtifactStatus status) => status switch { StagedArtifactStatus.Sealed or StagedArtifactStatus.Persisted => UiStatus.Success, StagedArtifactStatus.Failed or StagedArtifactStatus.Expired => UiStatus.Warning, StagedArtifactStatus.Purged or StagedArtifactStatus.Discarded => UiStatus.Neutral, _ => UiStatus.Info };
+    private static string Size(long value) => value < 1024 ? $"{value} B" : value < 1024 * 1024 ? $"{value / 1024d:F1} KB" : $"{value / 1024d / 1024d:F1} MB";
+}

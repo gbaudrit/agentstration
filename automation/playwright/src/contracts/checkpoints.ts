@@ -110,6 +110,14 @@ export const Checkpoints = {
     immutable: 'resource-naming-immutable',
     conflict: 'resource-naming-conflict',
   },
+  toolExecution: {
+    overview: 'tool-execution-overview',
+    simulationReady: 'tool-execution-simulation-ready',
+    simulationResult: 'tool-execution-simulation-result',
+    realResult: 'tool-execution-real-result',
+    simulationUnavailable: 'tool-execution-simulation-unavailable',
+    approvalRequired: 'tool-execution-approval-required',
+  },
   foundrySecretBinding: {
     providerCreated: 'foundry-secret-binding-provider-created',
     secretBound: 'foundry-secret-binding-secret-bound',

@@ -25,4 +25,5 @@
   <data name="Status.error"><value>Error</value></data>
   <data name="Status.notDiscovered"><value>Not discovered</value></data>
   <data name="Categories" xml:space="preserve"><value>Categories</value></data>
+  <data name="ToolSets" xml:space="preserve"><value>ToolSets</value></data>
 </root>

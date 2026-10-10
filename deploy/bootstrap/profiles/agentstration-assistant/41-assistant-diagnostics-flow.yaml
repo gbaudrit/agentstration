@@ -23,12 +23,11 @@ definition:
         name: diagnose
         displayName: Inspect evidence and diagnose
         agent: { resourceId: assistant-diagnostics, namespace: agentstration.assistant }
-      - { type: output, name: output, displayName: Diagnostic findings }
+      - { type: output, name: completed, displayName: Diagnostic findings, outcome: success, outputMapping: "${transition.output}", schema: { type: object, additionalProperties: true } }
+      - { type: output, name: error, displayName: Diagnostics failed, outcome: error, code: ASSISTANT_DIAGNOSTICS_FAILED, message: The Diagnostics Agent failed., outputMapping: "${transition.output}", schema: { type: object, additionalProperties: true } }
     transitions:
       - { id: input-to-diagnose, fromStep: input, event: completed, toStep: diagnose }
-      - { id: diagnose-to-output, fromStep: diagnose, event: completed, toStep: output }
-    outputSchema:
-      type: object
-      additionalProperties: true
+      - { id: diagnose-completed, fromStep: diagnose, event: success, toStep: completed }
+      - { id: diagnose-error, fromStep: diagnose, event: error, toStep: error }
   publish: true
   activate: true

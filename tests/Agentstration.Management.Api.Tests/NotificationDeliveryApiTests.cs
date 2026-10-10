@@ -39,6 +39,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         CollectionAssert.AreEquivalent(new[] { "title", "message" },
             schema.GetProperty("required").EnumerateArray().Select(value => value.GetString()).ToArray());
         var properties = schema.GetProperty("properties");
+        Assert.AreEqual("boolean", properties.GetProperty("dryRun").GetProperty("type").GetString());
         Assert.IsFalse(properties.TryGetProperty("deliveryKey", out _));
         foreach (var (name, maximum) in new[] { ("title", 200), ("message", 4000) })
         {
@@ -58,8 +59,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         var output = definition.OutputSchema!.Value;
         Assert.IsFalse(output.GetProperty("properties").TryGetProperty("deliveryKey", out _));
         Assert.IsFalse(output.GetProperty("properties").TryGetProperty("recovered", out _));
-        CollectionAssert.AreEquivalent(new[] { "notificationId", "createdAt" },
-            output.GetProperty("required").EnumerateArray().Select(value => value.GetString()).ToArray());
+        Assert.AreEqual(2, output.GetProperty("oneOf").GetArrayLength());
 
         await using var factory = Factory();
         var context = await GetBootstrapContextAsync(factory);
@@ -74,6 +74,13 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
                 ToolDefinitionCallerKind.Agent), default));
             Assert.AreEqual("notification_action_url_invalid", failure.Code);
         }
+        var preview = await handler.ExecuteAsync(new(
+            context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId, "dry-run-call", null,
+            JsonSerializer.SerializeToElement(new { title = "Preview", message = "Not persisted", dryRun = true }),
+            ToolDefinitionCallerKind.Console), default);
+        Assert.AreEqual(true, preview?.GetProperty("dryRun").GetBoolean());
+        Assert.IsEmpty(await factory.Services.GetRequiredService<IWorkplaceRepository>()
+            .ListNotificationsAsync(new WorkspaceId(context.WorkspaceId), null, default));
     }
 
     [TestMethod]
@@ -319,7 +326,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         Transitions =
         [
             new("input-tool", "input", "completed", "create-notification"),
-            new("tool-output", "create-notification", "completed", "output")
+            new("tool-output", "create-notification", "success", "output")
         ]
     };
 

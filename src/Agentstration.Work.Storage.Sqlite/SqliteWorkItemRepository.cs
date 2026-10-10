@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.Work;
@@ -15,6 +16,37 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
+        await EnsureWorkplaceTaskProjectionAsync(context, cancellationToken);
+    }
+
+    private static async Task EnsureWorkplaceTaskProjectionAsync(WorkDbContext context, CancellationToken cancellationToken)
+    {
+        var connection = context.Database.GetDbConnection();
+        var closeConnection = connection.State != ConnectionState.Open;
+        if (closeConnection) await connection.OpenAsync(cancellationToken);
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM pragma_table_info('WorkItems') WHERE name = 'IsWorkplaceTask';";
+            var exists = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture) > 0;
+            if (exists) return;
+
+            command.CommandText = "ALTER TABLE \"WorkItems\" ADD COLUMN \"IsWorkplaceTask\" INTEGER NOT NULL DEFAULT 0;";
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            command.CommandText = """
+                UPDATE "WorkItems"
+                SET "IsWorkplaceTask" = 1
+                WHERE ("EntryId" IS NOT NULL AND length("InteractionId") = 36)
+                   OR json_extract("Payload", '$.metadata.origin') = 'trigger';
+                """;
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            command.CommandText = "CREATE INDEX \"IX_WorkItems_WorkspaceId_OwnerPrincipalId_IsWorkplaceTask_UpdatedAt\" ON \"WorkItems\" (\"WorkspaceId\", \"OwnerPrincipalId\", \"IsWorkplaceTask\", \"UpdatedAt\");";
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        finally
+        {
+            if (closeConnection) await connection.CloseAsync();
+        }
     }
 
     public async Task<StoredWorkItem> CreateAsync(WorkItem workItem, CancellationToken cancellationToken)
@@ -82,6 +114,7 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         if (!string.IsNullOrWhiteSpace(query.AnchorTaskId)) documents = documents.Where(value => value.AnchorTaskId == query.AnchorTaskId);
         if (query.IsContinuation == true) documents = documents.Where(value => value.AnchorTaskId != null);
         if (query.IsContinuation == false) documents = documents.Where(value => value.AnchorTaskId == null && value.WorkspaceId != null);
+        if (query.WorkplaceTasksOnly) documents = documents.Where(value => value.IsWorkplaceTask);
         if (query.OperationalTasks)
         {
             documents = documents.Where(value => value.AnchorTaskId == null && value.WorkspaceId != null);
@@ -236,6 +269,7 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         EntryId = Metadata(item, "workplace.entryId"),
         AnchorTaskId = Metadata(item, "workplace.taskId"),
         FlowRunId = Metadata(item, "flowRunId"),
+        IsWorkplaceTask = WorkplaceTaskIdentity.IsTask(item),
         CreatedAt = item.CreatedAt,
         UpdatedAt = item.UpdatedAt,
         Version = item.Version,
@@ -259,6 +293,7 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         document.EntryId = updated.EntryId;
         document.AnchorTaskId = updated.AnchorTaskId;
         document.FlowRunId = updated.FlowRunId;
+        document.IsWorkplaceTask = updated.IsWorkplaceTask;
         document.UpdatedAt = updated.UpdatedAt;
         document.Version = updated.Version;
         document.Payload = updated.Payload;

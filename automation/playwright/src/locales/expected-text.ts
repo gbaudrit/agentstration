@@ -36,6 +36,14 @@ export interface ExpectedText {
     groups: readonly string[];
     labels: readonly string[];
   };
+  toolExecution: {
+    overview: string;
+    execution: string;
+    simulation: string;
+    realExecution: string;
+    runTool: string;
+    input: string;
+  };
 }
 
 export const ExpectedTextByLocale = {
@@ -47,12 +55,12 @@ export const ExpectedTextByLocale = {
       profile: 'Profile',
       groups: [
         { heading: '', links: [{ label: 'Overview', url: '/' }] },
-        { heading: 'Design', links: [{ label: 'Agents', url: '/agents' }, { label: 'Flows', url: '/flows' }, { label: 'Entries', url: '/entries' }, { label: 'Resource plans', url: '/resource-plans' }, { label: 'Model profiles', url: '/modelprofiles' }] },
+        { heading: 'Design', links: [{ label: 'Agents', url: '/agents' }, { label: 'Flows', url: '/flows' }, { label: 'Entries', url: '/entries' }, { label: 'Resource plans', url: '/resource-plans' }, { label: 'Model profiles', url: '/modelprofiles' }, { label: 'Data Source Profiles', url: '/data-source-profiles' }] },
         { heading: 'Automate', links: [{ label: 'Triggers', url: '/triggers' }] },
         { heading: 'Operate', links: [{ label: 'Conversations', url: '/conversations' }, { label: 'Tasks', url: '/tasks' }] },
         { heading: 'Observe', links: [{ label: 'Agent instances', url: '/agent-instances' }, { label: 'Agent runs', url: '/agent-runs' }, { label: 'Flow runs', url: '/flow-runs' }, { label: 'Run events', url: '/run-events' }] },
         { heading: 'Workplace', links: [{ label: 'Configuration', url: '/workspaces' }] },
-        { heading: 'Resources', links: [{ label: 'Packs', url: '/packs' }, { label: 'Sources', url: '/settings/sources' }, { label: 'Source registries', url: '/settings/source-registries' }] },
+        { heading: 'Resources', links: [{ label: 'Packs', url: '/packs' }, { label: 'Data Sources', url: '/data-sources' }, { label: 'Knowledge Sources', url: '/knowledge-sources' }, { label: 'Artifacts', url: '/artifacts' }, { label: 'Sources', url: '/settings/sources' }, { label: 'Source registries', url: '/settings/source-registries' }] },
         { heading: 'Integrations', links: [{ label: 'MCP & Tools', url: '/tools' }, { label: 'Extensions', url: '/extensions' }, { label: 'Model providers', url: '/modelproviders' }, { label: 'Source providers', url: '/sourceproviders' }] },
         { heading: 'Configuration', links: [{ label: 'Runtime profiles', url: '/runtimeprofiles' }, { label: 'Secrets', url: '/secrets' }, { label: 'Resource scopes', url: '/settings/resource-scopes' }] },
         { heading: 'System', links: [{ label: 'Workers', url: '/settings/runtime-workers' }, { label: 'Organization', url: '/settings/organization' }, { label: 'Bootstrap', url: '/settings/bootstrap' }, { label: 'Cleanup', url: '/cleanup' }, { label: 'Settings', url: '/settings' }] },
@@ -82,6 +90,14 @@ export const ExpectedTextByLocale = {
       groups: ['Build / Configure', 'Operate', 'Supervise'],
       labels: ['Defined agents', 'Defined flows', 'Extensions', 'Model providers', 'Enabled triggers', 'Agent runs', 'Flow runs', 'Tasks running', 'Active Agent instances', 'Needs attention', 'Notifications'],
     },
+    toolExecution: {
+      overview: 'Overview',
+      execution: 'Execution',
+      simulation: 'Simulation',
+      realExecution: 'Real execution',
+      runTool: 'Run this tool',
+      input: 'Input',
+    },
   },
   'fr-FR': {
     navigation: {
@@ -91,12 +107,12 @@ export const ExpectedTextByLocale = {
       profile: 'Profil',
       groups: [
         { heading: '', links: [{ label: 'Vue d’ensemble', url: '/' }] },
-        { heading: 'Concevoir', links: [{ label: 'Agents', url: '/agents' }, { label: 'Flows', url: '/flows' }, { label: 'Entrées', url: '/entries' }, { label: 'Plans de ressources', url: '/resource-plans' }, { label: 'Profils de modèle', url: '/modelprofiles' }] },
+        { heading: 'Concevoir', links: [{ label: 'Agents', url: '/agents' }, { label: 'Flows', url: '/flows' }, { label: 'Entrées', url: '/entries' }, { label: 'Plans de ressources', url: '/resource-plans' }, { label: 'Profils de modèle', url: '/modelprofiles' }, { label: 'Profils de source de données', url: '/data-source-profiles' }] },
         { heading: 'Automatiser', links: [{ label: 'Déclencheurs', url: '/triggers' }] },
         { heading: 'Exploiter', links: [{ label: 'Conversations', url: '/conversations' }, { label: 'Tâches', url: '/tasks' }] },
         { heading: 'Observer', links: [{ label: 'Instances d’agent', url: '/agent-instances' }, { label: 'Exécutions d’agents', url: '/agent-runs' }, { label: 'Exécutions de Flows', url: '/flow-runs' }, { label: 'Événements d’exécution', url: '/run-events' }] },
         { heading: 'Workplace', links: [{ label: 'Configuration', url: '/workspaces' }] },
-        { heading: 'Ressources', links: [{ label: 'Packs', url: '/packs' }, { label: 'Sources', url: '/settings/sources' }, { label: 'Registres de Sources', url: '/settings/source-registries' }] },
+        { heading: 'Ressources', links: [{ label: 'Packs', url: '/packs' }, { label: 'Sources de données', url: '/data-sources' }, { label: 'Sources de connaissances', url: '/knowledge-sources' }, { label: 'Artefacts', url: '/artifacts' }, { label: 'Sources', url: '/settings/sources' }, { label: 'Registres de Sources', url: '/settings/source-registries' }] },
         { heading: 'Intégrations', links: [{ label: 'MCP & Outils', url: '/tools' }, { label: 'Extensions', url: '/extensions' }, { label: 'Fournisseurs de modèles', url: '/modelproviders' }, { label: 'Fournisseurs de Sources', url: '/sourceproviders' }] },
         { heading: 'Configuration', links: [{ label: 'Profils d’exécution', url: '/runtimeprofiles' }, { label: 'Secrets', url: '/secrets' }, { label: 'Périmètres', url: '/settings/resource-scopes' }] },
         { heading: 'Système', links: [{ label: 'Workers', url: '/settings/runtime-workers' }, { label: 'Organisation', url: '/settings/organization' }, { label: 'Bootstrap', url: '/settings/bootstrap' }, { label: 'Nettoyage', url: '/cleanup' }, { label: 'Paramètres', url: '/settings' }] },
@@ -125,6 +141,14 @@ export const ExpectedTextByLocale = {
     platformOverview: {
       groups: ['Créer / Configurer', 'Exploiter', 'Superviser'],
       labels: ['Agents définis', 'Flows définis', 'Extensions', 'Fournisseurs de modèles', 'Déclencheurs actifs', 'Exécutions d’agents', 'Exécutions de Flows', 'Tâches en cours', 'Instances d’agent actives', 'Nécessite votre attention', 'Notifications'],
+    },
+    toolExecution: {
+      overview: 'Vue d’ensemble',
+      execution: 'Exécution',
+      simulation: 'Simulation',
+      realExecution: 'Exécution réelle',
+      runTool: 'Exécuter cet outil',
+      input: 'Entrées',
     },
   },
 } as const satisfies Record<SupportedTestLocale, ExpectedText>;

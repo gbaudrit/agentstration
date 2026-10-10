@@ -5,6 +5,7 @@ using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Security.Contracts;
+using Agentstration.Tools;
 
 namespace Agentstration.Agents;
 
@@ -38,6 +39,7 @@ public sealed class AgentManagementService(
     IManagementEventPublisher eventBus,
     IModelProfileReferenceValidator modelProfiles,
     IResourceReferenceResolver references,
+    ToolSetService toolSets,
     IResourceScopeOperations scopeOperations,
     TimeProvider timeProvider,
     IEnumerable<IResourceDeletionGuard> deletionGuards,
@@ -171,7 +173,8 @@ public sealed class AgentManagementService(
     {
         await ValidateRuntimeProfileAsync(spec.RuntimeProfileNamespace, spec.RuntimeProfileName, cancellationToken);
         var agent = await GetAgentAsync(@namespace, agentName, cancellationToken) ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
-        var resolved = compiler.Compile(agent.Value, spec);
+        var (toolSetTools, toolSetAssignments) = await ResolveToolSetAssignmentsAsync(agent.Value, cancellationToken);
+        var resolved = compiler.Compile(agent.Value, spec, toolSetTools, toolSetAssignments);
         var number = agent.Value.Generation;
         var revisionName = $"{agentName}--{number:000000}";
         var existing = await store.GetAsync<AgentRevision>(new(AgentResourceKinds.AgentRevision, revisionName, @namespace), cancellationToken);
@@ -246,6 +249,20 @@ public sealed class AgentManagementService(
         revision.AgentUid == agent.Uid
         && revision.AgentVersion == agent.Generation
         && string.Equals(revision.DefinitionHash, definition.DefinitionHash, StringComparison.Ordinal);
+
+    public async Task<StoredResource<AgentRevision>> GetRevisionAsync(
+        ResourceNamespace @namespace,
+        string agentName,
+        string revisionName,
+        CancellationToken cancellationToken)
+    {
+        var key = new ResourceKey(AgentResourceKinds.AgentRevision, revisionName, @namespace);
+        var revision = await store.GetAsync<AgentRevision>(key, cancellationToken)
+            ?? throw new ResourceNotFoundException(key);
+        if (!string.Equals(revision.Value.AgentName, agentName, StringComparison.Ordinal))
+            throw new ResourceNotFoundException(key);
+        return revision;
+    }
 
     public async Task<AgentRevisionPurgeImpact> GetRevisionPurgeImpactAsync(
         ResourceNamespace @namespace,
@@ -420,6 +437,57 @@ public sealed class AgentManagementService(
             var runtime = resource.Definition.RuntimeProfile.Resolve(resource.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
             throw new ResourceNotFoundException(new(RuntimeProfileResourceKinds.RuntimeProfile, runtime.Name, runtime.Namespace));
         }
+        _ = await ResolveToolSetAssignmentsAsync(resource with { ScopeRef = scopeRef }, cancellationToken);
+    }
+
+    private async Task<(IReadOnlyCollection<ResourceReference> Tools, IReadOnlyCollection<ResolvedAgentToolSetAssignment> Assignments)>
+        ResolveToolSetAssignmentsAsync(AgentResource resource, CancellationToken cancellationToken)
+    {
+        var tools = new List<ResourceReference>();
+        var assignments = new List<ResolvedAgentToolSetAssignment>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var selection in resource.Definition.ToolSets)
+        {
+            var toolSetNamespace = selection.ToolSet.Namespace ?? resource.Namespace;
+            var identity = $"{toolSetNamespace.Value}/{selection.ToolSet.Name}:{selection.Version}";
+            if (!seen.Add(identity))
+                throw new AgentDefinitionValidationException("duplicate_tool_set_reference", $"ToolSet reference '{identity}' is duplicated.");
+            if (string.IsNullOrWhiteSpace(selection.Version))
+                throw new AgentDefinitionValidationException("tool_set_version_required", "An Agent ToolSet assignment requires an exact published version.");
+            var scopeRef = resource.ScopeRef
+                ?? throw new AgentDefinitionValidationException("agent_scope_invalid", "An Agent ToolSet assignment requires an Agent ownership scope.");
+            var published = await toolSets.GetVersionExactAsync(scopeRef, toolSetNamespace, selection.ToolSet.Name, selection.Version, cancellationToken)
+                ?? throw new AgentDefinitionValidationException("tool_set_version_not_found", $"Published ToolSet '{identity}' was not found.");
+
+            var requested = selection.Members.ToHashSet(StringComparer.Ordinal);
+            if (requested.Count != selection.Members.Count)
+                throw new AgentDefinitionValidationException("tool_set_member_selection_duplicate", $"ToolSet assignment '{identity}' contains duplicate members.");
+            var available = published.Value.Members
+                .ToDictionary(member => ToolResourceIdentity.CatalogId(member.ToolNamespace, member.ToolName), StringComparer.Ordinal);
+            if (requested.Count > 0)
+                foreach (var member in requested.Where(member => !available.ContainsKey(member)))
+                    throw new AgentDefinitionValidationException("tool_set_member_not_found", $"ToolSet member '{member}' does not exist in '{identity}'.");
+            IEnumerable<string> selectedNames = requested.Count == 0 ? available.Keys : requested;
+            var selected = selectedNames
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            tools.AddRange(selected.Select(member =>
+            {
+                var separator = member.IndexOf('/', StringComparison.Ordinal);
+                return separator < 0
+                    ? new ResourceReference(member)
+                    : new ResourceReference(member[(separator + 1)..], @namespace: ResourceNamespace.Parse(member[..separator]));
+            }));
+            assignments.Add(new ResolvedAgentToolSetAssignment
+            {
+                ToolSetName = selection.ToolSet.Name,
+                ToolSetNamespace = toolSetNamespace,
+                Version = selection.Version,
+                DefinitionHash = published.Value.DefinitionHash,
+                Members = selected
+            });
+        }
+        return (tools, assignments);
     }
 
     private async Task<StoredResource<AgentDeployment>> SetDesiredStateAsync(StoredResource<AgentDeployment> stored, DesiredAgentState state, CancellationToken cancellationToken) =>
@@ -449,6 +517,14 @@ public sealed class AgentManagementService(
         {
             ValidateReference(tool, "tool_reference_invalid");
             if (!tools.Add(tool.Name)) throw new AgentDefinitionValidationException("duplicate_tool_reference", $"Tool reference '{tool.Name}' is duplicated.");
+        }
+        foreach (var selection in definition.ToolSets)
+        {
+            ValidateReference(selection.ToolSet, "tool_set_reference_invalid");
+            if (string.IsNullOrWhiteSpace(selection.Version))
+                throw new AgentDefinitionValidationException("tool_set_version_required", "An exact ToolSet version is required.");
+            foreach (var member in selection.Members)
+                ValidateName(member.Contains('/', StringComparison.Ordinal) ? member[(member.IndexOf('/', StringComparison.Ordinal) + 1)..] : member, "tool_set.member");
         }
     }
 

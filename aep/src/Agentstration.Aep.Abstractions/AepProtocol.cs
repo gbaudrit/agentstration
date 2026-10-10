@@ -55,6 +55,7 @@ public static class AepContributionKinds
     public const string ModelProvider = "model-provider";
     public const string SourceProvider = "source-provider";
     public const string Tool = "tool";
+    public const string DataSourceProfileBundle = "data-source-profile-bundle";
 }
 
 public static class AepOptionScopes
@@ -402,7 +403,16 @@ public sealed record AepHealth(string Status, string? Details = null);
 public sealed record AepContributions(
     IReadOnlyList<AepModelProviderDescriptor> ModelProviders,
     IReadOnlyList<AepToolContribution>? Tools = null,
-    IReadOnlyList<AepSourceProviderDescriptor>? SourceProviders = null);
+    IReadOnlyList<AepSourceProviderDescriptor>? SourceProviders = null,
+    IReadOnlyList<AepDataSourceProfileBundleContribution>? DataSourceProfileBundles = null);
+
+public sealed record AepDataSourceProfileBundleContribution(
+    string Id,
+    string DisplayName,
+    string Version,
+    IReadOnlyList<string> ResourceManifests,
+    string? Description = null,
+    IReadOnlyList<string>? RequiredTools = null);
 
 public sealed record AepSourceProviderDescriptor(
     string Id,
@@ -489,6 +499,19 @@ public static class AepDescriptorValidator
             else if (!sourceProviders.Add(provider.Id)) errors.Add($"Source provider contribution '{provider.Id}' is duplicated.");
             if (string.IsNullOrWhiteSpace(provider.DisplayName)) errors.Add($"Source provider contribution '{provider.Id}' displayName is required.");
         }
+        var profileBundles = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var bundle in descriptor.Contributions.DataSourceProfileBundles ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(bundle.Id)) errors.Add("Data Source Profile bundle contribution id is required.");
+            else if (!profileBundles.Add(bundle.Id)) errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' is duplicated.");
+            if (string.IsNullOrWhiteSpace(bundle.DisplayName)) errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' displayName is required.");
+            if (string.IsNullOrWhiteSpace(bundle.Version)) errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' version is required.");
+            if (bundle.ResourceManifests.Count == 0) errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' requires resource manifests.");
+            if (bundle.ResourceManifests.Count > 32 || bundle.ResourceManifests.Any(value => value.Length > 256 * 1024))
+                errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' exceeds resource manifest limits.");
+            if (bundle.RequiredTools?.Any(string.IsNullOrWhiteSpace) == true)
+                errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' contains an invalid required Tool id.");
+        }
         var requirements = descriptor.ValueRequirements ?? [];
         var hasCapability = descriptor.Capabilities.TryGetValue(AepCapabilityNames.ValueRequirements, out var valueCapability);
         if (requirements.Count > 0 && !hasCapability)
@@ -574,7 +597,9 @@ public static class AepDescriptorValidator
         || string.Equals(kind, AepContributionKinds.SourceProvider, StringComparison.Ordinal)
             && (contributions.SourceProviders ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
         || string.Equals(kind, AepContributionKinds.Tool, StringComparison.Ordinal)
-            && (contributions.Tools ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase));
+            && (contributions.Tools ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
+        || string.Equals(kind, AepContributionKinds.DataSourceProfileBundle, StringComparison.Ordinal)
+            && (contributions.DataSourceProfileBundles ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase));
 
     private static bool IsValidValueRequirementId(string? id) =>
         id is { Length: >= 1 and <= 64 }

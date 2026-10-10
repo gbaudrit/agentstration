@@ -1,9 +1,12 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Agentstration.Application.Work;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
+using Agentstration.Knowledge;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Tools;
@@ -80,30 +83,53 @@ public sealed class ToolDefinitionFlowDeletionGuard(
 
 public sealed class ToolDefinitionExecutor(
     ToolDefinitionService definitions,
+    IToolDefinitionFlowResolver flowResolver,
     RootFlowSubmissionService submissions,
-    FlowRunService runs) : IToolDefinitionExecutor
+    FlowRunService runs,
+    KnowledgeRetrievalService? knowledgeRetrieval = null) : IToolDefinitionExecutor
 {
+    private static readonly JsonSerializerOptions WebJsonOptions = new(JsonSerializerDefaults.Web);
+
+    public async Task<JsonElement?> SimulateAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
+    {
+        var stored = await ValidateAsync(invocation, cancellationToken);
+        return JsonSerializer.SerializeToElement(new
+        {
+            dryRun = true,
+            toolDefinition = stored.Value.Address.ToString(),
+            inputAccepted = true
+        });
+    }
+
     public async Task<ToolDefinitionInvocationResult> ExecuteAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
     {
-        var stored = await definitions.GetAsync(invocation.ToolName, invocation.Namespace, cancellationToken)
-            ?? throw new ToolDefinitionInvocationException("tool_definition_not_found", $"ToolDefinition '{invocation.Namespace}/{invocation.ToolName}' was not found.");
-        if (!stored.Value.Definition.Enabled)
-            throw new ToolDefinitionInvocationException("tool_definition_disabled", $"ToolDefinition '{stored.Value.Address}' is disabled.");
-        if (stored.Value.ScopeRef is not { Kind: ResourceScopeKind.Workspace, TargetId: { } ownerWorkspace }
-            || ownerWorkspace != invocation.WorkspaceId.Value)
-            throw new ToolDefinitionInvocationException("tool_definition_scope_mismatch", "The ToolDefinition is not owned by the invocation Workspace.");
-        if (invocation.Arguments.GetRawText().Length > 65_536)
-            throw new ToolDefinitionInvocationException("tool_definition_input_too_large", "ToolDefinition input cannot exceed 65536 JSON characters.");
-        try { FlowRunService.ValidateInput(stored.Value.Definition.InputSchema, invocation.Arguments); }
+        var stored = await ValidateAsync(invocation, cancellationToken);
+
+        if (knowledgeRetrieval is not null
+            && stored.Value.Metadata.Annotations.TryGetValue("agentstration.io/knowledge-source", out var sourceName)
+            && stored.Value.Metadata.Annotations.TryGetValue("agentstration.io/knowledge-operation", out var operationName)
+            && Enum.TryParse<KnowledgeSourceOperation>(operationName, true, out var operation))
+            return await ExecuteKnowledgeRetrievalAsync(stored.Value, invocation, sourceName, operation,
+                knowledgeRetrieval, cancellationToken);
+
+        var flowInput = MergeArguments(invocation.Arguments, stored.Value.Definition.FixedArguments);
+        var flowContract = await flowResolver.ResolveAsync(stored.Value.ScopeRef!.Value, stored.Value.Namespace,
+            stored.Value.Definition.Flow, cancellationToken);
+        try { FlowRunService.ValidateInput(flowContract.InputSchema, flowInput); }
         catch (FlowValidationException exception)
         {
-            throw new ToolDefinitionInvocationException("tool_definition_input_invalid", exception.Message, exception);
+            throw new ToolDefinitionInvocationException("tool_definition_fixed_input_invalid", exception.Message, exception);
         }
 
         var target = stored.Value.Definition.Flow;
         var flowNamespace = target.Namespace ?? stored.Value.Namespace;
         var scope = new FlowRunScope(invocation.TenantId, invocation.WorkspaceId, invocation.PrincipalId);
-        var origin = invocation.CallerKind == ToolDefinitionCallerKind.Agent ? FlowInvocationOrigin.Agent : FlowInvocationOrigin.Mcp;
+        var origin = invocation.CallerKind switch
+        {
+            ToolDefinitionCallerKind.Agent => FlowInvocationOrigin.Agent,
+            ToolDefinitionCallerKind.Console => FlowInvocationOrigin.Console,
+            _ => FlowInvocationOrigin.Mcp
+        };
         var callerId = invocation.CallerId ?? invocation.PrincipalId.ToString("D");
         RootFlowSubmission submission;
         try
@@ -111,7 +137,7 @@ public sealed class ToolDefinitionExecutor(
             submission = await submissions.SubmitAsync(new SubmitRootFlowCommand(
                 invocation.WorkspaceId,
                 new FlowReference(new FlowId(target.Name, flowNamespace), target.Version, target.UseActiveVersion, flowNamespace),
-                invocation.Arguments,
+                flowInput,
                 origin,
                 callerId,
                 invocation.CallerKind == ToolDefinitionCallerKind.Flow ? FlowRunTrigger.Flow : FlowRunTrigger.Api,
@@ -171,6 +197,132 @@ public sealed class ToolDefinitionExecutor(
             completed.Value.FlowVersion,
             completed.Value.CorrelationId ?? string.Empty,
             submission.Recovered));
+    }
+
+    private static async Task<ToolDefinitionInvocationResult> ExecuteKnowledgeRetrievalAsync(
+        ToolDefinitionResource definition,
+        ToolDefinitionInvocation invocation,
+        string sourceName,
+        KnowledgeSourceOperation operation,
+        KnowledgeRetrievalService retrieval,
+        CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(definition.Definition.InvocationTimeoutSeconds));
+        try
+        {
+            if (!invocation.Arguments.TryGetProperty("request", out var request)
+                || request.ValueKind != JsonValueKind.Object)
+                throw new ToolDefinitionInvocationException("knowledge_retrieval_request_invalid",
+                    "A Knowledge retrieval request object is required.");
+            var origin = invocation.CallerKind switch
+            {
+                ToolDefinitionCallerKind.Agent => KnowledgeRetrievalInvocationOrigin.Agent,
+                ToolDefinitionCallerKind.Flow => KnowledgeRetrievalInvocationOrigin.Flow,
+                _ => KnowledgeRetrievalInvocationOrigin.Mcp
+            };
+            var sourceId = new KnowledgeSourceId(sourceName, definition.Namespace);
+            var executionContext = new KnowledgeRetrievalExecutionContext(
+                invocation.ExecutionContext?.AgentId,
+                invocation.ExecutionContext?.AgentRevisionId,
+                invocation.ExecutionContext?.RuntimeRunId,
+                invocation.ExecutionContext?.FlowRunId,
+                invocation.ExecutionContext?.FlowStepId,
+                invocation.CallId,
+                invocation.ExecutionContext?.InvocationId);
+            var result = operation switch
+            {
+                KnowledgeSourceOperation.Search => await retrieval.SearchAsync(sourceId,
+                    request.Deserialize<SearchKnowledgeRequest>(WebJsonOptions)
+                    ?? throw new JsonException("Search request was empty."), timeout.Token, origin, invocation.CallerId,
+                    executionContext),
+                KnowledgeSourceOperation.Query => await retrieval.QueryAsync(sourceId,
+                    request.Deserialize<QueryKnowledgeRequest>(WebJsonOptions)
+                    ?? throw new JsonException("Query request was empty."), timeout.Token, origin, invocation.CallerId,
+                    executionContext),
+                KnowledgeSourceOperation.Read => await retrieval.ReadAsync(sourceId,
+                    request.Deserialize<ReadKnowledgeRequest>(WebJsonOptions)
+                    ?? throw new JsonException("Read request was empty."), timeout.Token, origin, invocation.CallerId,
+                    executionContext),
+                _ => throw new ArgumentOutOfRangeException(nameof(operation))
+            };
+            var output = JsonSerializer.SerializeToElement(new KnowledgeRetrievalFlowOutput
+            {
+                Items = result.Items,
+                Citations = result.Citations,
+                Answer = result.Answer,
+                ContinuationToken = result.ContinuationToken
+            }, WebJsonOptions);
+            return new(output, new ToolDefinitionOperationReceipt(
+                $"knowledge-retrieval:{result.FlowRunId}",
+                result.FlowRunId,
+                result.RetrievalFlow.Name,
+                result.RetrievalFlow.Namespace,
+                result.RetrievalFlow.Version,
+                result.CorrelationId,
+                false,
+                new ToolDefinitionKnowledgeReceipt(
+                    result.KnowledgeSourceId,
+                    result.KnowledgeSourceUid,
+                    result.KnowledgeSourceGeneration,
+                    result.SnapshotName,
+                    result.SnapshotUid,
+                    result.Items.Select(value => value.ArtifactId)
+                        .Concat(result.Citations.Select(value => value.ArtifactId))
+                        .Distinct(StringComparer.Ordinal)
+                        .Order(StringComparer.Ordinal)
+                        .ToArray())));
+        }
+        catch (ToolDefinitionInvocationException) { throw; }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new ToolDefinitionInvocationException("tool_definition_timed_out",
+                $"ToolDefinition '{definition.Address}' exceeded its execution timeout.");
+        }
+        catch (KnowledgeRetrievalException exception)
+        {
+            throw new ToolDefinitionInvocationException(exception.Code, exception.Message, exception);
+        }
+        catch (JsonException exception)
+        {
+            throw new ToolDefinitionInvocationException("knowledge_retrieval_request_invalid",
+                $"The Knowledge retrieval request is invalid: {exception.Message}", exception);
+        }
+    }
+
+    private static JsonElement MergeArguments(JsonElement arguments, JsonElement? fixedArguments)
+    {
+        if (fixedArguments is null) return arguments.Clone();
+        var merged = JsonNode.Parse(arguments.GetRawText())?.AsObject()
+            ?? throw new ToolDefinitionInvocationException("tool_definition_input_invalid", "ToolDefinition input must be an object.");
+        foreach (var property in fixedArguments.Value.EnumerateObject())
+            merged[property.Name] = JsonNode.Parse(property.Value.GetRawText());
+        return JsonSerializer.SerializeToElement(merged);
+    }
+
+    private async Task<StoredResource<ToolDefinitionResource>> ValidateAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
+    {
+        var stored = await definitions.GetAsync(invocation.ToolName, invocation.Namespace, cancellationToken)
+            ?? throw new ToolDefinitionInvocationException("tool_definition_not_found", $"ToolDefinition '{invocation.Namespace}/{invocation.ToolName}' was not found.");
+        if (!stored.Value.Definition.Enabled)
+            throw new ToolDefinitionInvocationException("tool_definition_disabled", $"ToolDefinition '{stored.Value.Address}' is disabled.");
+        if (stored.Value.ScopeRef is not { Kind: ResourceScopeKind.Workspace, TargetId: { } ownerWorkspace }
+            || ownerWorkspace != invocation.WorkspaceId.Value)
+            throw new ToolDefinitionInvocationException("tool_definition_scope_mismatch", "The ToolDefinition is not owned by the invocation Workspace.");
+        if (invocation.Arguments.GetRawText().Length > 65_536)
+            throw new ToolDefinitionInvocationException("tool_definition_input_too_large", "ToolDefinition input cannot exceed 65536 JSON characters.");
+        if (stored.Value.Definition.FixedArguments is { ValueKind: JsonValueKind.Object } fixedArguments)
+            foreach (var property in fixedArguments.EnumerateObject())
+                if (invocation.Arguments.TryGetProperty(property.Name, out _))
+                    throw new ToolDefinitionInvocationException("tool_definition_fixed_argument_override",
+                        $"ToolDefinition argument '{property.Name}' is fixed and cannot be supplied by the caller.");
+        try { FlowRunService.ValidateInput(stored.Value.Definition.InputSchema, invocation.Arguments); }
+        catch (FlowValidationException exception)
+        {
+            throw new ToolDefinitionInvocationException("tool_definition_input_invalid", exception.Message, exception);
+        }
+
+        return stored;
     }
 
     private async Task<StoredFlowRun> AwaitCompletionAsync(string runId, FlowRunScope scope, CancellationToken cancellationToken)

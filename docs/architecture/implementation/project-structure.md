@@ -17,6 +17,9 @@ src/
   Agentstration.Extensions*/          Extension registration, inventory and AEP enrollment
   Agentstration.Packs*/               Pack installation, authoring and composition
   Agentstration.Sources*/             Source and Source Registry resources and use cases
+  Agentstration.Artifacts*/           Staged and durable Artifact lifecycle and API
+  Agentstration.DataSources*/         Governed origins, profiles, acquisitions and API
+  Agentstration.Knowledge*/           Projections, immutable Snapshots, retrieval and API
   Agentstration.Parameters*/          Scoped nonsecret Parameter resources
   Agentstration.ResourcePlanning*/    Resource Plan lifecycle and relational storage
   Agentstration.Runtime.*/            Runtime contracts, core, local and MAF adapters
