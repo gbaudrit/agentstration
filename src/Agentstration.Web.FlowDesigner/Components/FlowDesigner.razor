@@ -100,7 +100,7 @@ else
                     <div class="inspector-details-group">
                         <div class="inspector-details-heading"><h3>@T("StepDetails")</h3><span class="inspector-step-type">@T($"Step.{SelectedStep.Type()}")</span></div>
                         <label>@T("StepDisplayName")<input disabled="@ReadOnly" value="@(SelectedStep.DisplayName ?? SelectedStep.Name)" @onchange="UpdateDisplayNameAsync" /></label>
-                        <label>@T("StepId")<input value="@SelectedStep.Name" readonly /></label>
+                        <label>@T("StepId")<input data-testid="step-name" disabled="@(ReadOnly || SelectedStep is not OutputFlowStepDefinition)" value="@SelectedStep.Name" @onchange="UpdateOutputNameAsync" /></label>
                     </div>
                     @if (SelectedStep is AgentFlowStepDefinition agent)
                     {
@@ -278,6 +278,18 @@ else
                         <label>@T("Operator")<input disabled="@ReadOnly" value="@condition.Operator" @onchange="e => UpdateSelectedAsync(condition with { Operator = Text(e) })" /></label>
                         <label>@T("RightValue")<input disabled="@ReadOnly" value="@condition.Right" @onchange="e => UpdateSelectedAsync(condition with { Right = Text(e) })" /></label>
                     }
+                    else if (SelectedStep is OutputFlowStepDefinition output)
+                    {
+                        <label>@T("OutputOutcome")<select disabled="@ReadOnly" value="@(output.Outcome ?? FlowOutputOutcome.Success)" @onchange="UpdateOutputOutcomeAsync"><option value="@FlowOutputOutcome.Success">@T("OutputOutcome.Success")</option><option value="@FlowOutputOutcome.Error">@T("OutputOutcome.Error")</option></select></label>
+                        <label>@T("OutputMapping")<textarea data-testid="output-mapping" disabled="@ReadOnly" value="@JsonText(output.OutputMapping)" @onchange="UpdateOutputMappingAsync"></textarea></label>
+                        <label>@T("OutputSchema")<textarea data-testid="output-schema" disabled="@ReadOnly" value="@JsonText(output.Schema)" @onchange="UpdateOutputSchemaAsync"></textarea></label>
+                        @if ((output.Outcome ?? FlowOutputOutcome.Success) == FlowOutputOutcome.Error)
+                        {
+                            <label>@T("ErrorCode")<input disabled="@ReadOnly" value="@output.Code" @onchange="e => UpdateSelectedAsync(output with { Code = EmptyToNull(Text(e)) })" /></label>
+                            <label>@T("Message")<textarea disabled="@ReadOnly" value="@output.Message" @onchange="e => UpdateSelectedAsync(output with { Message = EmptyToNull(Text(e)) })"></textarea></label>
+                            <label>@T("ErrorDetailsExpression")<input disabled="@ReadOnly" value="@output.DetailsExpression" @onchange="e => UpdateSelectedAsync(output with { DetailsExpression = EmptyToNull(Text(e)) })" /></label>
+                        }
+                    }
                     else if (SelectedStep is FailureFlowStepDefinition failure)
                     {
                         <label>@T("ErrorCode")<input disabled="@ReadOnly" value="@failure.Code" @onchange="e => UpdateSelectedAsync(failure with { Code = Text(e) })" /></label>
@@ -293,7 +305,9 @@ else
                         <h4>@T("TransitionDetails")</h4>
                         <label>@T("TransitionId")<input value="@selectedTransition.Id" readonly /></label>
                         <label>@T("From")<select data-testid="transition-from" disabled="@ReadOnly" value="@selectedTransition.FromStep" @onchange="UpdateTransitionFromAsync">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
-                        <label>@T("Event")<input data-testid="transition-event" disabled="@ReadOnly" value="@selectedTransition.Event" @onchange="UpdateTransitionEventAsync" /></label>
+                        <label>@T("Event")@if (TransitionEvents(selectedTransition) is { Count: > 0 } events)
+                        { <select data-testid="transition-event" disabled="@ReadOnly" value="@selectedTransition.Event" @onchange="UpdateTransitionEventAsync">@foreach (var item in events) { <option value="@item">@item</option> }</select> }
+                        else { <input data-testid="transition-event" disabled="@ReadOnly" value="@selectedTransition.Event" @onchange="UpdateTransitionEventAsync" /> }</label>
                         <label>@T("To")<select data-testid="transition-to" disabled="@ReadOnly" value="@selectedTransition.ToStep" @onchange="UpdateTransitionToAsync">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
                         <label>@T("TransitionCondition")<input data-testid="transition-condition" disabled="@ReadOnly" value="@selectedTransition.Condition" @onchange="UpdateTransitionConditionAsync" /></label>
                         <label>@T("TransitionPriority")<input data-testid="transition-priority" disabled="@ReadOnly" type="number" value="@selectedTransition.Priority" @onchange="UpdateTransitionPriorityAsync" /></label>
@@ -371,11 +385,11 @@ else
     private FlowDesignerFlow? SelectedFlow => SelectedStep is FlowCallStepDefinition step
         ? flows.FirstOrDefault(flow => flow.Name == step.Flow.ResourceId && flow.Namespace == (step.Flow.Namespace ?? Namespace))
         : null;
-    private FlowDesignerFlowVersion? SelectedFlowVersion => SelectedStep is FlowCallStepDefinition call
-        ? flowVersions.FirstOrDefault(version => version.Version == (call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact
+    private FlowDesignerFlowVersion? SelectedFlowVersion => SelectedStep is FlowCallStepDefinition call ? FlowVersion(call) : null;
+    private FlowDesignerFlowVersion? FlowVersion(FlowCallStepDefinition call)
+        => flowVersions.FirstOrDefault(version => version.Version == (call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact
             ? call.Flow.Version
-            : flows.FirstOrDefault(flow => FlowKey(flow.Namespace, flow.Name) == FlowKey(call.Flow))?.ActiveVersion))
-        : null;
+            : flows.FirstOrDefault(flow => FlowKey(flow.Namespace, flow.Name) == FlowKey(call.Flow))?.ActiveVersion));
     private FlowDesignerTool? SelectedTool => SelectedStep is ToolFlowStepDefinition tool
         ? tools.FirstOrDefault(item => ToolKey(item.Namespace, item.Name) == ToolKey(tool.Tool))
         : null;
@@ -404,9 +418,9 @@ else
             agents = routerAgents = await Resources.GetAgentsAsync(cancellation.Token);
             flows = await Resources.GetFlowsAsync(cancellation.Token);
             tools = await Resources.GetToolsAsync(cancellation.Token);
+            await RefreshFlowCallOutputsAsync(loaded.Resource.Definition);
             if (!ReadOnly)
                 publishVersion = SuggestedPublishVersion(await Resources.GetFlowVersionsAsync(Namespace, ResourceId, cancellation.Token));
-            if (SelectedStep is FlowCallStepDefinition call) await LoadFlowVersionsAsync(call.Flow);
             transitionFrom = loaded.Resource.Definition.EntryStep;
             transitionTo = loaded.Resource.Definition.Steps.Skip(1).FirstOrDefault()?.Name ?? transitionFrom;
         }
@@ -449,7 +463,7 @@ else
             && (string.IsNullOrWhiteSpace(agent.DisplayName) || agent.DisplayName == "Agent")
             && SelectedAgent is { } selectedAgent)
             await UpdateSelectedAsync(agent with { DisplayName = selectedAgent.DisplayName });
-        if (SelectedStep is FlowCallStepDefinition call) await LoadFlowVersionsAsync(call.Flow);
+        if (SelectedStep is FlowCallStepDefinition call) await LoadFlowVersionsAsync(call);
     }
     private async Task LayoutAsync(bool vertical)
     {
@@ -476,7 +490,13 @@ else
         finally { saving = false; }
     }
 
-    private async Task ValidateAsync() { if (ReadOnly) return; Editor.SetIssues((await Backend.ValidateAsync(Target, cancellation.Token)).Issues); }
+    private async Task ValidateAsync()
+    {
+        if (ReadOnly) return;
+        await SaveAsync();
+        if (error is not null) return;
+        Editor.SetIssues((await Backend.ValidateAsync(Target, cancellation.Token)).Issues);
+    }
     private async Task PublishAsync()
     {
         if (ReadOnly || publishing) return;
@@ -519,6 +539,11 @@ else
         finally { runningDraft = false; }
     }
     private static JsonElement ParseInput(string value) { try { using var document = JsonDocument.Parse(value); return document.RootElement.ValueKind == JsonValueKind.Object ? document.RootElement.Clone() : JsonSerializer.SerializeToElement(new { }); } catch (JsonException) { return JsonSerializer.SerializeToElement(new { }); } }
+    private static bool TryParseJson(string value, out JsonElement parsed)
+    {
+        try { using var document = JsonDocument.Parse(value); parsed = document.RootElement.Clone(); return true; }
+        catch (JsonException) { parsed = default; return false; }
+    }
     private async Task ApplySourceAsync(string source)
     {
         if (ReadOnly) return;
@@ -529,6 +554,7 @@ else
             var canonical = await Backend.GetSourceAsync(Target, cancellation.Token);
             sourceText = canonical.Source;
             Editor.MarkSaved(saved, canonical.Source);
+            await RefreshFlowCallOutputsAsync(saved.Value.Definition);
         }
         catch (Exception exception)
         {
@@ -554,21 +580,34 @@ else
             "output" => new OutputFlowStepDefinition { Name = name, DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported Flow step type.")
         };
-        if (step is FlowCallStepDefinition flowCall) await LoadFlowVersionsAsync(flowCall.Flow);
-        var errorTransition = step is AgentFlowStepDefinition or ToolFlowStepDefinition or FlowCallStepDefinition
-            ? ErrorOutputTransition(Editor.State.Resource.Definition, name)
-            : null;
+        IReadOnlyList<FlowDesignerFlowVersion>? callVersions = null;
+        if (step is FlowCallStepDefinition flowCall)
+        {
+            callVersions = await Resources.GetFlowVersionsAsync(flowCall.Flow.Namespace ?? Namespace, flowCall.Flow.ResourceId, cancellation.Token);
+            flowVersions = callVersions;
+        }
+        var errorEvent = step switch
+        {
+            AgentFlowStepDefinition or ToolFlowStepDefinition => "error",
+            FlowCallStepDefinition selectedCall => ResolveFlowVersion(selectedCall, callVersions ?? [])?.NamedOutputs
+                .FirstOrDefault(output => output.Outcome == FlowOutputOutcome.Error)?.Name,
+            _ => null
+        };
+        var errorTransition = errorEvent is null
+            ? null
+            : ErrorOutputTransition(Editor.State.Resource.Definition, name, errorEvent);
         await DispatchAsync(new AddStepCommand(step, new(40 + index * 180, 250), errorTransition));
         Editor.SelectStep(name);
+        if (step is FlowCallStepDefinition addedCall) SyncFlowCallOutputs(addedCall, callVersions ?? []);
     }
 
-    private static FlowTransitionDefinition? ErrorOutputTransition(FlowGraphDefinition definition, string sourceStep)
+    private static FlowTransitionDefinition? ErrorOutputTransition(FlowGraphDefinition definition, string sourceStep, string errorEvent)
     {
         var target = definition.Steps.OfType<OutputFlowStepDefinition>()
             .FirstOrDefault(output => output.Outcome == FlowOutputOutcome.Error);
         return target is null
             ? null
-            : new($"{sourceStep}-error-{target.Name}", sourceStep, "error", target.Name);
+            : new($"{sourceStep}-{errorEvent}-{target.Name}", sourceStep, errorEvent, target.Name);
     }
 
     private async Task AddTransitionAsync() { if (!string.IsNullOrWhiteSpace(transitionFrom) && !string.IsNullOrWhiteSpace(transitionTo)) await CreateTransitionAsync(new($"{transitionFrom}-{transitionEvent}-{transitionTo}", transitionFrom, transitionEvent, transitionTo)); }
@@ -611,20 +650,29 @@ else
     {
         if (SelectedStep is not FlowCallStepDefinition call || !TryParseFlowKey(Text(e), out var target)) return;
         var reference = call.Flow with { ResourceId = target.Name, Namespace = target.Namespace == Namespace ? null : target.Namespace };
-        await LoadFlowVersionsAsync(reference);
-        if (reference.VersionStrategy == FlowCallVersionStrategy.Exact && flowVersions.All(version => version.Version != reference.Version))
-            reference = reference with { Version = flowVersions.FirstOrDefault()?.Version };
-        await UpdateSelectedAsync(call with { Flow = reference });
+        var versions = await Resources.GetFlowVersionsAsync(reference.Namespace ?? Namespace, reference.ResourceId, cancellation.Token);
+        if (reference.VersionStrategy == FlowCallVersionStrategy.Exact && versions.All(version => version.Version != reference.Version))
+            reference = reference with { Version = versions.FirstOrDefault()?.Version };
+        var updated = call with { Flow = reference };
+        await UpdateSelectedAsync(updated);
+        flowVersions = versions;
+        SyncFlowCallOutputs(updated, versions);
     }
     private async Task UpdateFlowVersionStrategyAsync(ChangeEventArgs e)
     {
         if (SelectedStep is not FlowCallStepDefinition call || !Enum.TryParse<FlowCallVersionStrategy>(Text(e), out var strategy)) return;
         var reference = call.Flow with { VersionStrategy = strategy, Version = strategy == FlowCallVersionStrategy.Exact ? flowVersions.FirstOrDefault()?.Version : null };
-        await UpdateSelectedAsync(call with { Flow = reference });
+        var updated = call with { Flow = reference };
+        await UpdateSelectedAsync(updated);
+        SyncFlowCallOutputs(updated, flowVersions);
     }
-    private Task UpdateFlowExactVersionAsync(ChangeEventArgs e) => SelectedStep is FlowCallStepDefinition call
-        ? UpdateSelectedAsync(call with { Flow = call.Flow with { Version = Text(e) } })
-        : Task.CompletedTask;
+    private async Task UpdateFlowExactVersionAsync(ChangeEventArgs e)
+    {
+        if (SelectedStep is not FlowCallStepDefinition call) return;
+        var updated = call with { Flow = call.Flow with { Version = Text(e) } };
+        await UpdateSelectedAsync(updated);
+        SyncFlowCallOutputs(updated, flowVersions);
+    }
     private Task UpdateFlowMappingAsync(string propertyName, ChangeEventArgs e)
     {
         if (SelectedStep is not FlowCallStepDefinition call) return Task.CompletedTask;
@@ -702,7 +750,75 @@ else
         var target = tools.FirstOrDefault();
         return target is null ? new(UnconfiguredTool) : new(target.Name, target.Namespace == Namespace ? null : target.Namespace);
     }
-    private async Task LoadFlowVersionsAsync(FlowCallReference reference) => flowVersions = await Resources.GetFlowVersionsAsync(reference.Namespace ?? Namespace, reference.ResourceId, cancellation.Token);
+    private async Task LoadFlowVersionsAsync(FlowCallStepDefinition call)
+    {
+        flowVersions = await Resources.GetFlowVersionsAsync(call.Flow.Namespace ?? Namespace, call.Flow.ResourceId, cancellation.Token);
+        SyncFlowCallOutputs(call, flowVersions);
+    }
+    private async Task RefreshFlowCallOutputsAsync(FlowGraphDefinition definition)
+    {
+        var resolved = new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(StringComparer.Ordinal);
+        var versionsByTarget = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal);
+        foreach (var call in definition.Steps.OfType<FlowCallStepDefinition>())
+        {
+            var targetNamespace = call.Flow.Namespace ?? Namespace;
+            var key = FlowKey(targetNamespace, call.Flow.ResourceId);
+            if (!versionsByTarget.TryGetValue(key, out var versions))
+            {
+                versions = await Resources.GetFlowVersionsAsync(targetNamespace, call.Flow.ResourceId, cancellation.Token);
+                versionsByTarget[key] = versions;
+            }
+            if (ResolveFlowVersion(call, versions) is { NamedOutputs.Count: > 0 } selected)
+                resolved[call.Name] = selected.NamedOutputs;
+        }
+        Editor.SetFlowCallOutputs(resolved);
+        if (!ReadOnly)
+        {
+            var revision = Editor.State.LocalRevision;
+            await Editor.DispatchAsync(new ReconcileFlowCallTransitionsCommand(resolved), cancellation.Token);
+            if (Editor.State.LocalRevision != revision) ScheduleAutosave();
+        }
+    }
+    private void SyncFlowCallOutputs(FlowCallStepDefinition call, IReadOnlyList<FlowDesignerFlowVersion> versions) =>
+        Editor.SetFlowCallOutputs(call.Name, ResolveFlowVersion(call, versions)?.NamedOutputs ?? []);
+    private FlowDesignerFlowVersion? ResolveFlowVersion(FlowCallStepDefinition call, IReadOnlyList<FlowDesignerFlowVersion> versions)
+    {
+        var version = call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact
+            ? call.Flow.Version
+            : flows.FirstOrDefault(flow => FlowKey(flow.Namespace, flow.Name) == FlowKey(call.Flow))?.ActiveVersion;
+        return version is null ? null : versions.FirstOrDefault(candidate => candidate.Version == version);
+    }
+    private IReadOnlyList<string> TransitionEvents(FlowTransitionDefinition transition)
+    {
+        return Editor.State.Diagram.Nodes.FirstOrDefault(node => node.Name == transition.FromStep)?.OutputEvents ?? [];
+    }
+    private async Task UpdateOutputNameAsync(ChangeEventArgs e)
+    {
+        if (ReadOnly || SelectedStep is not OutputFlowStepDefinition output) return;
+        var name = Text(e);
+        if (string.IsNullOrWhiteSpace(name) || name == output.Name) return;
+        if (!IsValidStepName(name)) { error = T("OutputNameInvalid"); return; }
+        if (Editor.State.Resource!.Definition.Steps.Any(step => step.Name == name)) { error = T("OutputNameDuplicate", name); return; }
+        await DispatchAsync(new RenameStepCommand(output.Name, name));
+    }
+    private Task UpdateOutputOutcomeAsync(ChangeEventArgs e) => SelectedStep is OutputFlowStepDefinition output && Enum.TryParse<FlowOutputOutcome>(Text(e), out var outcome)
+        ? UpdateSelectedAsync(output with { Outcome = outcome }) : Task.CompletedTask;
+    private Task UpdateOutputMappingAsync(ChangeEventArgs e) => UpdateOutputJsonAsync(e, schema: false);
+    private Task UpdateOutputSchemaAsync(ChangeEventArgs e) => UpdateOutputJsonAsync(e, schema: true);
+    private Task UpdateOutputJsonAsync(ChangeEventArgs e, bool schema)
+    {
+        if (ReadOnly || SelectedStep is not OutputFlowStepDefinition output) return Task.CompletedTask;
+        var text = e.Value?.ToString()?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(text))
+            return UpdateSelectedAsync(schema ? output with { Schema = null } : output with { OutputMapping = null });
+        if (!TryParseJson(text, out var value) || (schema && value.ValueKind != JsonValueKind.Object))
+        {
+            error = T(schema ? "OutputSchemaInvalid" : "OutputMappingInvalid");
+            return Task.CompletedTask;
+        }
+        error = null;
+        return UpdateSelectedAsync(schema ? output with { Schema = value } : output with { OutputMapping = value });
+    }
     private static string FlowKey(ResourceNamespace @namespace, string name) => $"{@namespace.Value}|{name}";
     private string FlowKey(FlowCallReference reference) => FlowKey(reference.Namespace ?? Namespace, reference.ResourceId);
     private static bool TryParseFlowKey(string value, out (ResourceNamespace Namespace, string Name) target)
@@ -726,6 +842,8 @@ else
         && string.Equals(value.GetString(), "${transition.output}", StringComparison.Ordinal);
     private static string Text(ChangeEventArgs e) => e.Value?.ToString()?.Trim() ?? string.Empty;
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
+    private static string JsonText(JsonElement? value) => value?.GetRawText() ?? string.Empty;
+    private static bool IsValidStepName(string value) => value.All(character => char.IsLetterOrDigit(character) || character is '-' or '_');
     private static string SuggestedPublishVersion(IReadOnlyList<FlowDesignerFlowVersion> versions)
     {
         Version? latest = null;

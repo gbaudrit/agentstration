@@ -217,6 +217,38 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task FlowCallValidationAcceptsRenamedErrorOutputAndRequiresItsConnection()
+    {
+        var outputs = new[]
+        {
+            new FlowOutputDefinition("completed", "Completed", FlowOutputOutcome.Success, null),
+            new FlowOutputDefinition("Validation", "Validation", FlowOutputOutcome.Error, null)
+        };
+        var resolver = new FlowCallResolverStub(new(new("analysis"), "3.0.0", null, null, outputs));
+        var graph = Graph(new FlowCallStepDefinition { Name = "analyze", Flow = new("analysis") });
+        graph = graph with
+        {
+            Transitions = graph.Transitions
+                .Select(transition => transition.Id == "call-error" ? transition with { Event = "Validation" } : transition)
+                .ToArray()
+        };
+
+        var connected = await new FlowGraphValidator(resolver).ValidateAsync(
+            graph,
+            new FlowValidationContext(true, TestScope.WorkspaceId, new("parent")),
+            default);
+
+        Assert.IsFalse(connected.Issues.Any(issue => issue.Code is "transition_event_invalid" or "error_transition_required"));
+
+        var disconnected = await new FlowGraphValidator(resolver).ValidateAsync(
+            graph with { Transitions = graph.Transitions.Where(transition => transition.Id != "call-error").ToArray() },
+            new FlowValidationContext(true, TestScope.WorkspaceId, new("parent")),
+            default);
+
+        Assert.IsTrue(disconnected.Issues.Any(issue => issue.Code == "error_transition_required" && issue.StepId == "analyze"));
+    }
+
+    [TestMethod]
     public async Task RepositoryResolverFindsNamespacedPublishedVersionsAndIndirectCycles()
     {
         await using var fixture = await FlowFixture.CreateAsync();

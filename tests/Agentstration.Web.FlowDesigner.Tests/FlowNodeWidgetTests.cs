@@ -42,4 +42,24 @@ public sealed class FlowNodeWidgetTests
         Assert.HasCount(1, rendered.FindAll(".flow-port-handle"));
         Assert.HasCount(0, rendered.FindAll(".flow-port-handle.output"));
     }
+
+    [TestMethod]
+    public void NamedFlowOutputsExposeOutcomeWithTextAndAccessibleLabel()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.ComponentFactories.AddStub<PortRenderer>();
+        var source = new FlowDesignerNode("child", "flow", "Child", new(0, 0), "nested", ["approved", "rejected"])
+        {
+            OutputOutcomes = new Dictionary<string, FlowOutputOutcome>
+            {
+                ["approved"] = FlowOutputOutcome.Success,
+                ["rejected"] = FlowOutputOutcome.Error
+            }
+        };
+        var rendered = context.Render<FlowNodeWidget>(parameters => parameters.Add(component => component.Node, new FlowDiagramNode(source)));
+
+        CollectionAssert.AreEqual(new[] { "✓ approved", "! rejected" }, rendered.FindAll(".flow-port-label").Select(element => element.TextContent).ToArray());
+        StringAssert.Contains(rendered.Find(".outcome-error").GetAttribute("aria-label")!, "rejected");
+    }
 }

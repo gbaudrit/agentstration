@@ -390,7 +390,7 @@ public sealed partial class FlowTests
         var missing = await validator.ValidateAsync(graph, new FlowValidationContext(false), default);
 
         CollectionAssert.AreEquivalent(
-            new[] { "agent", "tool", "child" },
+            new[] { "agent", "tool" },
             missing.Issues.Where(issue => issue.Code == "error_transition_required").Select(issue => issue.StepId).ToArray());
 
         var connected = await validator.ValidateAsync(graph with
