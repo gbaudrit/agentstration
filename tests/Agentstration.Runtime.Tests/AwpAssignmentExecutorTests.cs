@@ -85,6 +85,53 @@ public sealed class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
+    public async Task FlowCallRoutesAChildFailureThroughTheExplicitFailedTransition()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "delegate",
+            Steps =
+            [
+                new FlowCallStepDefinition { Name = "delegate", Flow = new("child") },
+                new FailureFlowStepDefinition
+                {
+                    Name = "failure",
+                    Code = "parent_failed",
+                    Message = "The child Flow failed."
+                }
+            ],
+            Transitions = [new("child-failed", "delegate", "failed", "failure")]
+        };
+        var handler = new GraphHandler(TestNow)
+        {
+            ChildGraph = new FlowGraphDefinition
+            {
+                EntryStep = "failure",
+                Steps =
+                [
+                    new FailureFlowStepDefinition
+                    {
+                        Name = "failure",
+                        Code = "child_failed",
+                        Message = "The delegated Flow failed."
+                    }
+                ]
+            }
+        };
+
+        var (result, _) = await ExecuteGraphAsync(graph,
+            JsonSerializer.SerializeToElement(new { request = "review" }), handler);
+
+        Assert.AreEqual("error", result.Outcome);
+        Assert.AreEqual("parent_failed", result.ErrorCode);
+        var delegated = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.StepCompleted
+            && value.Location.FlowStep?.StepDefinitionId == "delegate");
+        Assert.AreEqual("failed", delegated.Payload?.GetProperty("status").GetString());
+        Assert.AreEqual("child-failed", delegated.Payload?.GetProperty("selectedTransition").GetString());
+        Assert.AreEqual("child_failed", delegated.Payload?.GetProperty("errorCode").GetString());
+    }
+
+    [TestMethod]
     public async Task TransformConditionAndTransitionOutputExecuteOnTheWorker()
     {
         var graph = new FlowGraphDefinition
