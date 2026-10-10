@@ -1151,13 +1151,6 @@ public sealed class WorkPlaneTests
             return ValueTask.CompletedTask;
         }
 
-        public async IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync(
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            await Task.CompletedTask;
-            cancellationToken.ThrowIfCancellationRequested();
-            yield break;
-        }
     }
 
     private static WorkItem Running()

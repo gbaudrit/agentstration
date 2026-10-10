@@ -76,7 +76,6 @@ public sealed partial class FlowTests
     {
         public List<FlowRunQueueItem> Enqueued { get; } = [];
         public ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken) { Enqueued.Add(item); return ValueTask.CompletedTask; }
-        public async IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken) { await Task.CompletedTask; yield break; }
     }
 
     private sealed class TestFlowRunExecutionScope : IFlowRunExecutionScope

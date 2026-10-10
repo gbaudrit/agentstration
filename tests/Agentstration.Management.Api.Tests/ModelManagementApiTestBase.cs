@@ -255,14 +255,6 @@ public abstract class ModelManagementApiTestBase
         public ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken) =>
             queue.Writer.WriteAsync(item, cancellationToken);
 
-        public async IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync(
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            await Task.CompletedTask;
-            cancellationToken.ThrowIfCancellationRequested();
-            yield break;
-        }
-
         public async ValueTask DisposeAsync()
         {
             await shutdown.CancelAsync();

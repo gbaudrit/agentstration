@@ -856,13 +856,6 @@ public sealed class WorkplaceApiTests
             return ValueTask.CompletedTask;
         }
 
-        public async IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync(
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            await Task.CompletedTask;
-            cancellationToken.ThrowIfCancellationRequested();
-            yield break;
-        }
     }
 
     private static async Task<(WorkTaskResult[] Results, WorkTaskArtifact[] Artifacts)> WaitForOutputsAsync(HttpClient client, Guid taskId, int count)

@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using System.Threading.Channels;
 using Agentstration.Agents;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
@@ -17,23 +16,6 @@ using Agentstration.Tools.Mcp;
 using Agentstration.Work;
 
 namespace Agentstration.Infrastructure.Flows;
-
-public sealed class LocalFlowRunQueue : IFlowRunQueue
-{
-    private readonly Channel<FlowRunQueueItem> channel = Channel.CreateBounded<FlowRunQueueItem>(new BoundedChannelOptions(256)
-    {
-        FullMode = BoundedChannelFullMode.Wait,
-        SingleReader = true,
-        SingleWriter = false
-    });
-
-    public ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken) => channel.Writer.WriteAsync(item, cancellationToken);
-
-    public async IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync([EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        await foreach (var item in channel.Reader.ReadAllAsync(cancellationToken)) yield return item;
-    }
-}
 
 public sealed class WorkspaceFlowRunExecutionScope(
     IIdentityStore identities,
