@@ -369,6 +369,132 @@ public sealed class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
+    public async Task AgentFailureWithoutErrorTransitionPreservesTheWorkerError()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "agent",
+            Steps = [new AgentFlowStepDefinition { Name = "agent", Agent = new("echo-agent") }]
+        };
+        var handler = new GraphHandler(TestNow) { ModelFailureMessage = "simulated agent failure" };
+
+        var exception = await Assert.ThrowsAsync<AwpExecutionNotSupportedException>(() =>
+            ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }), handler));
+
+        Assert.AreEqual("agent_step_failed", exception.Code);
+        Assert.AreEqual("simulated agent failure", exception.Message);
+        var failed = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.StepCompleted
+            && value.Location.FlowStep?.StepDefinitionId == "agent");
+        Assert.AreEqual("failed", failed.Payload?.GetProperty("status").GetString());
+        Assert.AreEqual("agent_step_failed", failed.Payload?.GetProperty("errorCode").GetString());
+        Assert.AreEqual(JsonValueKind.Null, failed.Payload?.GetProperty("selectedTransition").ValueKind);
+    }
+
+    [TestMethod]
+    public async Task AgentFailureUsesTheExplicitErrorTransition()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "agent",
+            Steps =
+            [
+                new AgentFlowStepDefinition { Name = "agent", Agent = new("echo-agent") },
+                new FailureFlowStepDefinition
+                {
+                    Name = "failure",
+                    Code = "HANDLED_AGENT_ERROR",
+                    Message = "The agent failure was handled."
+                }
+            ],
+            Transitions = [new("agent-error", "agent", "error", "failure")]
+        };
+        var handler = new GraphHandler(TestNow) { ModelFailureMessage = "simulated agent failure" };
+
+        var (result, _) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }), handler);
+
+        Assert.AreEqual("error", result.Outcome);
+        Assert.AreEqual("HANDLED_AGENT_ERROR", result.ErrorCode);
+        var failed = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.StepCompleted
+            && value.Location.FlowStep?.StepDefinitionId == "agent");
+        Assert.AreEqual("agent-error", failed.Payload?.GetProperty("selectedTransition").GetString());
+        Assert.AreEqual("agent_step_failed", failed.Payload?.GetProperty("errorCode").GetString());
+    }
+
+    [TestMethod]
+    public async Task ToolStepMapsArgumentsAndProjectsResolvedToolIdentity()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "notify",
+            Steps =
+            [
+                new ToolFlowStepDefinition
+                {
+                    Name = "notify",
+                    Tool = new("notification.send"),
+                    ArgumentsMapping = JsonSerializer.SerializeToElement(new { message = "${input.message}" })
+                },
+                new OutputFlowStepDefinition
+                {
+                    Name = "output",
+                    OutputMapping = JsonSerializer.SerializeToElement("${steps.notify.output}")
+                }
+            ],
+            Transitions = [new("notify-output", "notify", "success", "output")]
+        };
+
+        var (result, handler) = await ExecuteGraphAsync(graph,
+            JsonSerializer.SerializeToElement(new { message = "A new article is available." }));
+
+        Assert.AreEqual("found", result.Output?.GetProperty("answer").GetString());
+        var request = handler.FlowToolRequests.Single();
+        Assert.AreEqual("A new article is available.", request.Arguments.GetProperty("message").GetString());
+        var completed = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.StepCompleted
+            && value.Location.FlowStep?.StepDefinitionId == "notify");
+        Assert.AreEqual("knowledge-search", completed.Payload?.GetProperty("tool")
+            .GetProperty("ToolName").GetString());
+        Assert.AreEqual(3, completed.Payload?.GetProperty("tool").GetProperty("ToolGeneration").GetInt64());
+    }
+
+    [TestMethod]
+    public async Task AgentArtifactCapturesTheExactMaterialGeneration()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "answer",
+            Steps =
+            [
+                new AgentFlowStepDefinition
+                {
+                    Name = "answer",
+                    Agent = new("assistant"),
+                    ArtifactOutput = new()
+                    {
+                        FileName = "answer.json",
+                        Clean = FlowStepArtifactCleanupMode.Never
+                    }
+                },
+                new OutputFlowStepDefinition
+                {
+                    Name = "output",
+                    OutputMapping = JsonSerializer.SerializeToElement("${steps.answer.output}")
+                }
+            ],
+            Transitions = [new("answer-output", "answer", "success", "output")]
+        };
+        var agent = AgentMaterial() with { AgentName = "assistant", Generation = 3 };
+
+        var (result, handler) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }),
+            agentMaterial: agent);
+
+        Assert.AreEqual("agent-result", result.Output?.GetString());
+        Assert.AreEqual("agent", handler.CaptureRequest?.Provenance["invocationKind"]);
+        Assert.AreEqual("assistant", handler.CaptureRequest?.Provenance["agentResourceId"]);
+        Assert.AreEqual("3", handler.CaptureRequest?.Provenance["agentVersion"]);
+        Assert.IsEmpty(handler.CleanupRequests);
+    }
+
+    [TestMethod]
     public async Task RepeatFailsWithStableCodeWhenTheIterationLimitIsReached()
     {
         var graph = new FlowGraphDefinition
@@ -702,6 +828,7 @@ public sealed class AwpAssignmentExecutorTests
         string? rootRunId = null,
         string? parentRunId = null,
         string? correlationId = null,
+        AwpExecutionAgentMaterial? agentMaterial = null,
         CancellationToken cancellationToken = default)
     {
         using var credential = new AwpClientCredential(Guid.NewGuid(), Guid.NewGuid(), "test-instance",
@@ -721,7 +848,7 @@ public sealed class AwpAssignmentExecutorTests
         var definition = Version("root", graph, TestNow);
         var material = new AwpRootFlowExecutionMaterial("material-1", "1.0", "sha256:material",
             runId, "root", "default", "1.0", "sha256:root", input,
-            JsonSerializer.SerializeToElement(definition, JsonOptions), [AgentMaterial()], Guid.NewGuid(),
+            JsonSerializer.SerializeToElement(definition, JsonOptions), [agentMaterial ?? AgentMaterial()], Guid.NewGuid(),
             RootFlowRunId: rootRunId ?? runId, ParentFlowRunId: parentRunId,
             CorrelationId: correlationId);
 
@@ -765,6 +892,7 @@ public sealed class AwpAssignmentExecutorTests
         public List<AwpCreateChildFlowRequest> ChildRequests { get; } = [];
         public List<AwpCleanupFlowArtifactRequest> CleanupRequests { get; } = [];
         public List<AwpInvokeModelRequest> ModelRequests { get; } = [];
+        public List<AwpInvokeFlowToolRequest> FlowToolRequests { get; } = [];
         public int FlowToolInvocationCount { get; private set; }
         public AwpCaptureFlowArtifactRequest? CaptureRequest { get; private set; }
         public string? ChildOutputName { get; init; }
@@ -775,6 +903,7 @@ public sealed class AwpAssignmentExecutorTests
         public string? ChildCorrelationId { get; init; }
         public Action? OnChildCreated { get; init; }
         public string ModelOutput { get; init; } = "agent-result";
+        public string? ModelFailureMessage { get; init; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
             CancellationToken cancellationToken)
@@ -788,7 +917,7 @@ public sealed class AwpAssignmentExecutorTests
                 AwpProtocol.OpenTurnPath => OpenTurn(bytes),
                 AwpProtocol.AppendEventsPath => AppendEvents(bytes),
                 AwpProtocol.InvokeModelPath => InvokeModel(bytes),
-                AwpProtocol.InvokeFlowToolPath => InvokeFlowTool(),
+                AwpProtocol.InvokeFlowToolPath => InvokeFlowTool(bytes),
                 AwpProtocol.CaptureFlowArtifactPath => Capture(bytes),
                 AwpProtocol.CleanupFlowArtifactPath => Cleanup(bytes),
                 AwpProtocol.CreateChildFlowPath => CreateChild(bytes),
@@ -831,6 +960,7 @@ public sealed class AwpAssignmentExecutorTests
 
         private AwpInvokeModelResponse InvokeModel(byte[] bytes)
         {
+            if (ModelFailureMessage is not null) throw new InvalidOperationException(ModelFailureMessage);
             var request = Payload<AwpInvokeModelRequest>(bytes);
             ModelRequests.Add(request);
             return new(now, [new AwpModelTextContent(ModelOutput)], "deterministic", "stop", 1, 1);
@@ -842,8 +972,9 @@ public sealed class AwpAssignmentExecutorTests
             return new(now, new("artifact-1", "result.json", "application/json"));
         }
 
-        private AwpInvokeFlowToolResponse InvokeFlowTool()
+        private AwpInvokeFlowToolResponse InvokeFlowTool(byte[] bytes)
         {
+            FlowToolRequests.Add(Payload<AwpInvokeFlowToolRequest>(bytes));
             FlowToolInvocationCount++;
             return new(now, JsonSerializer.SerializeToElement(new { answer = "found" }),
                 "knowledge-search", "default", Guid.NewGuid(), 3,
