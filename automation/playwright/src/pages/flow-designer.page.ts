@@ -1,6 +1,22 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 
+export interface NamedOutputCompositionFixture {
+  childName: string;
+  parentName: string;
+}
+
+export interface NamedOutputAuthoring {
+  name: string;
+  displayName: string;
+  outcome: 'Success' | 'Error';
+  mapping: string;
+  schema: string;
+  code?: string;
+  message?: string;
+  details?: string;
+}
+
 export class FlowDesignerPage {
   public constructor(private readonly page: Page) {}
 
@@ -51,6 +67,168 @@ export class FlowDesignerPage {
       await expect(this.page.getByRole('textbox', { name: 'Step ID' })).toHaveValue('transform', { timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
     return name;
+  }
+
+  public async createNamedOutputCompositionAndOpen(consoleUrl: string): Promise<NamedOutputCompositionFixture> {
+    const suffix = Date.now();
+    // Keep fixtures at the start of the sorted catalog so the Designer's bounded resource picker sees them
+    // even when the Development bootstrap contains a large Flow catalog.
+    const childName = `aaa-named-output-child-${suffix}`;
+    const parentName = `aaa-named-output-parent-${suffix}`;
+
+    const child = await this.createDraft(consoleUrl, childName, 'Named output child');
+    const legacyDefinition = {
+      entryStep: 'input',
+      steps: [
+        { type: 'input', name: 'input', displayName: 'Input' },
+        {
+          type: 'output', name: 'historical-result', displayName: 'Historical result',
+          outputMapping: '${transition.output}',
+          schema: { type: 'object', properties: { legacyValue: { type: 'string' } } },
+        },
+        { type: 'failure', name: 'legacy-failure', displayName: 'Legacy failure', code: 'LEGACY_FAILURE', message: 'Legacy failure.' },
+      ],
+      transitions: [{ id: 'input-completed-historical', fromStep: 'input', event: 'completed', toStep: 'historical-result' }],
+      designer: { preferredLayout: 'Horizontal', nodePositions: {
+        input: { x: 80, y: 220 }, 'historical-result': { x: 500, y: 120 }, 'legacy-failure': { x: 500, y: 360 },
+      } },
+    };
+    let childEtag = await this.updateDraft(consoleUrl, childName, child, legacyDefinition);
+    await this.publishDraft(consoleUrl, childName, '1.0.0', false);
+
+    const modernDefinition = {
+      entryStep: 'input',
+      inputSchema: { type: 'object', properties: { approved: { type: 'boolean' } }, required: ['approved'] },
+      steps: [
+        { type: 'input', name: 'input', displayName: 'Input', schema: { type: 'object', properties: { approved: { type: 'boolean' } }, required: ['approved'] } },
+        { type: 'condition', name: 'decision', displayName: 'Decision', mode: 'Simple', left: '${input.approved}', operator: 'equals', right: 'true' },
+        {
+          type: 'output', name: 'approved', displayName: 'Approved', outcome: 'success', outputMapping: '${transition.output}',
+          schema: { type: 'object', properties: { decision: { type: 'string' } }, required: ['decision'] },
+        },
+        {
+          type: 'output', name: 'rejected', displayName: 'Rejected', outcome: 'success', outputMapping: '${transition.output}',
+          schema: { type: 'object', properties: { reason: { type: 'string' } }, required: ['reason'] },
+        },
+        {
+          type: 'output', name: 'provider-error', displayName: 'Provider error', outcome: 'error', code: 'PROVIDER_ERROR', message: 'Provider failed.',
+          schema: { type: 'object', properties: { retryable: { type: 'boolean' } }, required: ['retryable'] },
+        },
+      ],
+      transitions: [
+        { id: 'input-completed-decision', fromStep: 'input', event: 'completed', toStep: 'decision' },
+        { id: 'decision-true-approved', fromStep: 'decision', event: 'true', toStep: 'approved' },
+        { id: 'decision-false-rejected', fromStep: 'decision', event: 'false', toStep: 'rejected' },
+      ],
+      designer: { preferredLayout: 'Horizontal', nodePositions: {
+        input: { x: 60, y: 240 }, decision: { x: 360, y: 240 }, approved: { x: 700, y: 60 },
+        rejected: { x: 700, y: 260 }, 'provider-error': { x: 700, y: 460 },
+      } },
+    };
+    const childDraft = await this.getDraft(consoleUrl, childName);
+    childEtag = childDraft.eTag ?? childEtag;
+    await this.updateDraft(consoleUrl, childName, { ...childDraft, eTag: childEtag }, modernDefinition);
+    await this.publishDraft(consoleUrl, childName, '2.0.0', true);
+
+    const parent = await this.createDraft(consoleUrl, parentName, 'Named output parent');
+    const parentDefinition = {
+      entryStep: 'input',
+      steps: [
+        { type: 'input', name: 'input', displayName: 'Input' },
+        { type: 'flow', name: 'review', displayName: 'Child review', flow: { resourceId: childName, versionStrategy: 'active' }, inputMapping: '${transition.output}' },
+      ],
+      transitions: [{ id: 'input-completed-review', fromStep: 'input', event: 'completed', toStep: 'review' }],
+      designer: { preferredLayout: 'Horizontal', nodePositions: { input: { x: 60, y: 260 }, review: { x: 420, y: 260 } } },
+    };
+    await this.updateDraft(consoleUrl, parentName, parent, parentDefinition);
+    await this.open(consoleUrl, 'default', parentName);
+    await expect(this.node('Child review')).toBeVisible();
+    return { childName, parentName };
+  }
+
+  public async expectPublishedOutputContracts(consoleUrl: string, childName: string): Promise<void> {
+    const response = await this.page.request.get(`${consoleUrl}/api/flows/${encodeURIComponent(childName)}/versions/2.0.0`);
+    const body = await response.text();
+    expect(response.status(), body).toBe(200);
+    const published = JSON.parse(body);
+    const outputs = published.graph.steps.filter((step: { type: string }) => step.type === 'output');
+    expect(outputs.map((output: { name: string; outcome: string }) => [output.name, output.outcome])).toEqual([
+      ['approved', 'success'], ['rejected', 'success'], ['provider-error', 'error'],
+    ]);
+    expect(outputs.every((output: { schema?: unknown }) => output.schema)).toBe(true);
+  }
+
+  public async expectNamedPorts(nodeDisplayName: string, ports: readonly { event: string; outcome: 'success' | 'error' }[]): Promise<void> {
+    const handles = this.node(nodeDisplayName).locator('.flow-port-handle.output');
+    await expect(handles).toHaveCount(ports.length);
+    for (const port of ports) {
+      const handle = handles.filter({ hasText: port.event });
+      await expect(handle).toHaveCount(1);
+      await expect(handle).toHaveClass(new RegExp(`outcome-${port.outcome}`));
+      await expect(handle.locator('.flow-port-label')).toContainText(port.outcome === 'success' ? `✓ ${port.event}` : `! ${port.event}`);
+    }
+  }
+
+  public async selectStep(displayName: string): Promise<void> {
+    await expect(async () => {
+      await this.node(displayName).locator('.flow-node-copy').click();
+      await expect(this.page.getByTestId(TestIds.flowObservability.stepDisplayName)).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
+  }
+
+  public async useFlowCallVersion(strategy: 'Active' | 'Exact', version?: string): Promise<void> {
+    await this.page.getByTestId(TestIds.flowObservability.flowCallVersionStrategy).selectOption(strategy);
+    if (strategy === 'Exact') {
+      const versionSelect = this.page.getByTestId(TestIds.flowObservability.flowCallExactVersion);
+      await expect(versionSelect).toBeVisible();
+      if (version) await versionSelect.selectOption(version);
+    }
+    // Persist each version switch before the next authoring action so a slower autosave from the
+    // previous strategy cannot restore stale ports while the scenario edits another node.
+    await this.save();
+    await this.expectAutosaved();
+  }
+
+  public async addNamedOutput(output: NamedOutputAuthoring): Promise<void> {
+    await this.page.getByTestId(TestIds.flowObservability.paletteOutput).click();
+    await expect(this.page.getByTestId(TestIds.flowObservability.stepDisplayName)).toHaveValue('Output');
+    // Complete the add-step save before editing the new node. On a busy smoke run, letting that
+    // request overlap the first field change can reapply the initial "Output" projection.
+    await this.save();
+    await this.expectAutosaved();
+    await this.changeField(TestIds.flowObservability.stepDisplayName, output.displayName);
+    await this.changeField(TestIds.flowObservability.stepName, output.name);
+    await this.page.getByTestId(TestIds.flowObservability.outputOutcome).selectOption(output.outcome);
+    await this.changeField(TestIds.flowObservability.outputMapping, output.mapping);
+    await this.changeField(TestIds.flowObservability.outputSchema, output.schema);
+    if (output.outcome === 'Error') {
+      if (output.code) await this.changeField(TestIds.flowObservability.outputErrorCode, output.code);
+      if (output.message) await this.changeField(TestIds.flowObservability.outputErrorMessage, output.message);
+      if (output.details) await this.changeField(TestIds.flowObservability.outputErrorDetails, output.details);
+    }
+    await expect(this.node(output.displayName)).toBeVisible();
+  }
+
+  public async dragNamedOutputToInput(sourceDisplayName: string, event: string, targetDisplayName: string): Promise<void> {
+    const source = this.namedOutputHandle(sourceDisplayName, event);
+    const target = this.node(targetDisplayName).locator('.flow-port-handle.input');
+    await this.drag(source, target);
+  }
+
+  public async setSelectedTransitionPriority(priority: number): Promise<void> {
+    await this.changeField(TestIds.flowObservability.transitionPriority, priority.toString());
+  }
+
+  public async changeSelectedTransitionEvent(event: string): Promise<void> {
+    await this.page.getByTestId(TestIds.flowObservability.transitionEvent).selectOption(event);
+  }
+
+  public async expectSelectedTransitionPriority(priority: number): Promise<void> {
+    await expect(this.page.getByTestId(TestIds.flowObservability.transitionPriority)).toHaveValue(priority.toString());
+  }
+
+  public async renameSelectedOutput(name: string): Promise<void> {
+    await this.changeField(TestIds.flowObservability.stepName, name);
   }
 
   public async dragOutputToInput(sourceName: string, targetName: string): Promise<void> {
@@ -226,6 +404,62 @@ export class FlowDesignerPage {
     return this.page.locator('.flow-node').filter({ has: this.page.locator('strong').filter({ hasText: new RegExp(`^${escapeRegExp(name)}$`, 'i') }) }).first();
   }
 
+  private namedOutputHandle(nodeDisplayName: string, event: string): Locator {
+    return this.node(nodeDisplayName).locator('.flow-port-handle.output').filter({
+      has: this.page.locator('.flow-port-label').filter({ hasText: new RegExp(`(?:✓|!)\\s*${escapeRegExp(event)}$`) }),
+    });
+  }
+
+  private async changeField(testId: string, value: string): Promise<void> {
+    const field = this.page.getByTestId(testId);
+    await field.fill(value);
+    await field.blur();
+    await expect(field).toHaveValue(value);
+  }
+
+  private async createDraft(consoleUrl: string, name: string, displayName: string): Promise<{ value: Record<string, unknown>; eTag: string }> {
+    const response = await this.page.request.post(`${consoleUrl}/api/flows/drafts`, {
+      data: { name, displayName, template: 'Empty' },
+    });
+    const body = await response.text();
+    expect(response.status(), body).toBe(201);
+    return JSON.parse(body);
+  }
+
+  private async getDraft(consoleUrl: string, name: string): Promise<{ value: Record<string, unknown>; eTag: string }> {
+    const response = await this.page.request.get(`${consoleUrl}/api/flows/${encodeURIComponent(name)}/draft`);
+    const body = await response.text();
+    expect(response.status(), body).toBe(200);
+    return JSON.parse(body);
+  }
+
+  private async updateDraft(
+    consoleUrl: string,
+    name: string,
+    draftResponse: { value: Record<string, unknown>; eTag: string },
+    definition: Record<string, unknown>,
+  ): Promise<string> {
+    const response = await this.page.request.put(`${consoleUrl}/api/flows/${encodeURIComponent(name)}/draft`, {
+      headers: { 'If-Match': draftResponse.eTag },
+      data: {
+        displayName: draftResponse.value.displayName,
+        description: draftResponse.value.description,
+        tags: draftResponse.value.tags,
+        definition,
+      },
+    });
+    const body = await response.text();
+    expect(response.status(), body).toBe(200);
+    return JSON.parse(body).eTag;
+  }
+
+  private async publishDraft(consoleUrl: string, name: string, version: string, activate: boolean): Promise<void> {
+    const response = await this.page.request.post(`${consoleUrl}/api/flows/${encodeURIComponent(name)}/publish`, {
+      data: { version, activate },
+    });
+    expect(response.status(), await response.text()).toBe(201);
+  }
+
   private async drag(source: Locator, target: Locator): Promise<void> {
     const sourceBox = await source.boundingBox();
     const targetBox = await target.boundingBox();
@@ -265,6 +499,7 @@ export class FlowDesignerPage {
     if (!nearest) throw new Error('The selected transition endpoint controls are not measurable.');
     return controls.nth(nearest.index);
   }
+
 }
 
 function distance(box: { x: number; y: number; width: number; height: number }, point: { x: number; y: number }): number {

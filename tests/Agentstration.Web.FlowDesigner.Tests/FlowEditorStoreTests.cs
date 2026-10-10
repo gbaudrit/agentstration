@@ -241,6 +241,27 @@ public sealed class FlowEditorStoreTests
     }
 
     [TestMethod]
+    public void ReapplyingEquivalentFlowCallOutputsDoesNotNotifyOrReproject()
+    {
+        var now = DateTimeOffset.Parse("2026-08-04T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "child",
+            Steps = [new FlowCallStepDefinition { Name = "child", Flow = new("nested") }]
+        };
+        var draft = new FlowDraft { WorkspaceId = WorkspaceId, Id = "editor-draft", FlowId = new("editor"), DisplayName = "Editor", Definition = definition, CreatedAt = now, UpdatedAt = now };
+        var store = new FlowEditorStore();
+        store.Load(new FlowDraftResponse(draft, "\"etag-1\""), "entryStep: child");
+        var notifications = 0;
+        store.StateChanged += (_, _) => notifications++;
+        FlowDesignerOutput[] outputs = [new("approved", "Approved", FlowOutputOutcome.Success, null)];
+
+        Assert.IsTrue(store.SetFlowCallOutputs("child", outputs));
+        Assert.IsFalse(store.SetFlowCallOutputs("child", [new("approved", "Approved", FlowOutputOutcome.Success, null)]));
+        Assert.AreEqual(1, notifications);
+    }
+
+    [TestMethod]
     public async Task RejectedRenameDoesNotDirtyTheStore()
     {
         var now = DateTimeOffset.Parse("2026-08-04T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);

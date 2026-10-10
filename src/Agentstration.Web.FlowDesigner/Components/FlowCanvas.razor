@@ -24,6 +24,7 @@
         Links = { RequireTarget = true }
     });
     private long renderedRevision = -1;
+    private long renderedResolvedOutputsRevision = -1;
     private long renderedFitRevision = -1;
     private string? renderedSelectedStepName;
     private string? renderedSelectedErrorTransitionId;
@@ -38,6 +39,7 @@
 
     [Parameter, EditorRequired] public FlowDesignerDocument Document { get; set; } = new([], []);
     [Parameter] public long Revision { get; set; }
+    [Parameter] public long ResolvedOutputsRevision { get; set; }
     [Parameter] public long FitRevision { get; set; }
     [Parameter] public bool IsReadOnly { get; set; }
     [Parameter] public string? EntryStep { get; set; }
@@ -72,11 +74,13 @@
             ? SelectedTransitionId
             : null;
         if (Revision != renderedRevision ||
+            ResolvedOutputsRevision != renderedResolvedOutputsRevision ||
             renderedSelectedStepName != SelectedStepName ||
             renderedSelectedErrorTransitionId != selectedErrorTransitionId ||
             renderedShowAllErrorTransitions != ShowAllErrorTransitions)
         {
             renderedRevision = Revision;
+            renderedResolvedOutputsRevision = ResolvedOutputsRevision;
             renderedSelectedStepName = SelectedStepName;
             renderedSelectedErrorTransitionId = selectedErrorTransitionId;
             renderedShowAllErrorTransitions = ShowAllErrorTransitions;
