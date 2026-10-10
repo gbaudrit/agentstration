@@ -495,6 +495,46 @@ public sealed class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
+    public async Task ToolArtifactCaptureDoesNotReplaceTheFlowOutputAndCleansTheStagedArtifact()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "notify",
+            Steps =
+            [
+                new ToolFlowStepDefinition
+                {
+                    Name = "notify",
+                    Tool = new("notification.send"),
+                    ArtifactOutput = new()
+                    {
+                        FileName = "notification.txt",
+                        MediaType = "text/plain",
+                        ContentMapping = JsonSerializer.SerializeToElement("${step.output.answer}")
+                    }
+                },
+                new OutputFlowStepDefinition
+                {
+                    Name = "output",
+                    OutputMapping = JsonSerializer.SerializeToElement("${steps.notify.output}")
+                }
+            ],
+            Transitions = [new("notify-output", "notify", "success", "output")]
+        };
+
+        var (result, handler) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }));
+
+        Assert.AreEqual("found", result.Output?.GetProperty("answer").GetString());
+        Assert.AreEqual("notification.txt", handler.CaptureRequest?.FileName);
+        Assert.AreEqual("text/plain", handler.CaptureRequest?.MediaType);
+        Assert.AreEqual("found", handler.CaptureRequest?.Content.GetString());
+        Assert.AreEqual("tool", handler.CaptureRequest?.Provenance["invocationKind"]);
+        Assert.AreEqual("knowledge-search", handler.CaptureRequest?.Provenance["toolName"]);
+        Assert.AreEqual("3", handler.CaptureRequest?.Provenance["toolGeneration"]);
+        Assert.AreEqual("artifact-1", handler.CleanupRequests.Single().Artifact.ArtifactId);
+    }
+
+    [TestMethod]
     public async Task RepeatFailsWithStableCodeWhenTheIterationLimitIsReached()
     {
         var graph = new FlowGraphDefinition
