@@ -5,6 +5,7 @@ using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Agentstration.Infrastructure.Runtime;
 
@@ -15,7 +16,8 @@ public sealed class RuntimeExecutionMaterialResolver(
     IFlowRunExecutionScope flowScopes,
     IRuntimeAgentResolver agents,
     AgentManagementService agentManagement,
-    IToolCatalog tools) : IRuntimeExecutionMaterialResolver
+    IToolCatalog tools,
+    IOptions<FlowRunExecutionOptions> flowOptions) : IRuntimeExecutionMaterialResolver
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -153,7 +155,8 @@ public sealed class RuntimeExecutionMaterialResolver(
             resume,
             run.RootFlowRunId ?? run.Id,
             run.ParentFlowRunId,
-            run.CorrelationId);
+            run.CorrelationId,
+            flowOptions.Value.OrchestrationTimeout);
     }
 
     private static bool BelongsToAssignment(RuntimeWorkerAssignment assignment, FlowRun run) =>

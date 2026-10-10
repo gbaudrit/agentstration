@@ -575,7 +575,8 @@ public sealed class AwpAssignmentExecutorTests
         var material = new AwpRootFlowExecutionMaterial("material-1", "1.0", "sha256:material",
             "flowrun-root", "orchestration", "default", "1.0", "sha256:orchestration",
             JsonSerializer.SerializeToElement(new { prompt = "Investigate" }),
-            JsonSerializer.SerializeToElement(definition, JsonOptions), [researcher, reviewer], Guid.NewGuid());
+            JsonSerializer.SerializeToElement(definition, JsonOptions), [researcher, reviewer], Guid.NewGuid(),
+            OrchestrationTimeoutMilliseconds: 600_000);
 
         var result = await executor.ExecuteAsync(session, material, CancellationToken.None);
 
@@ -590,6 +591,94 @@ public sealed class AwpAssignmentExecutorTests
         Assert.AreEqual(2, handler.Events.Count(value => value.Kind == AwpExecutionEventKind.TurnCompleted));
         Assert.AreEqual(2, handler.Events.Count(value => value.Kind == AwpExecutionEventKind.ResponseDelta));
         Assert.IsGreaterThan(0, handler.CheckpointRequests.Count);
+    }
+
+    [TestMethod]
+    public async Task OrchestrationTimeoutIsEnforcedByTheWorker()
+    {
+        var orchestration = new OrchestrationFlowDefinition(
+            [new FlowTargetReference(FlowTargetKind.Agent, "agent-a")],
+            new SequentialOrchestrationPattern());
+        var definition = new FlowVersion(new WorkspaceId(Guid.NewGuid()),
+            new FlowId("timeout", ResourceNamespace.Default), "1.0", null, orchestration,
+            new Dictionary<string, string>(), TestNow, null, "sha256:timeout");
+        var agent = AgentMaterial() with
+        {
+            ParticipantId = "agent-a",
+            AgentName = "agent-a",
+            ModelProfileName = "awp-participant:agent-a"
+        };
+        using var credential = new AwpClientCredential(Guid.NewGuid(), Guid.NewGuid(), "test-instance",
+            System.Text.Encoding.UTF8.GetBytes("test-worker-secret-material-at-least-32-bytes"));
+        var handler = new GraphHandler(TestNow) { StallModel = true };
+        using var client = new AwpClient(new Uri("https://authority.test"), credential,
+            new(Guid.NewGuid()), TimeProvider.System, 0, handler);
+        var assignment = new AwpRunAssignment(new(Guid.NewGuid()), new(Guid.NewGuid()),
+            new(Guid.NewGuid(), Guid.NewGuid().ToString("D")), new AwpRootFlowRunTarget("flowrun-timeout"),
+            new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", "1.0"),
+            new("material-timeout", "1.0", "sha256:material-timeout"),
+            new("ownership", 1, DateTimeOffset.UtcNow.AddMinutes(5), 15));
+        var session = new AwpAssignmentSession(client, assignment, TestNow, TimeProvider.System,
+            TimeSpan.FromSeconds(5));
+        var executor = new AwpAssignmentExecutor(NullLoggerFactory.Instance,
+            NullLogger<AwpAssignmentExecutor>.Instance);
+        var material = new AwpRootFlowExecutionMaterial("material-timeout", "1.0", "sha256:material-timeout",
+            "flowrun-timeout", "timeout", "default", "1.0", "sha256:timeout",
+            JsonSerializer.SerializeToElement(new { prompt = "Wait" }),
+            JsonSerializer.SerializeToElement(definition, JsonOptions), [agent], Guid.NewGuid(),
+            OrchestrationTimeoutMilliseconds: 25);
+
+        var exception = await Assert.ThrowsExactlyAsync<AwpExecutionTimedOutException>(() =>
+            executor.ExecuteAsync(session, material, CancellationToken.None));
+
+        Assert.AreEqual("flow_run_timed_out", exception.Code);
+    }
+
+    [TestMethod]
+    public async Task ChildOrchestrationTimeoutUsesTheExplicitTimedOutTransition()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "analyze",
+            Steps =
+            [
+                new FlowCallStepDefinition { Name = "analyze", Flow = new("child") },
+                new FailureFlowStepDefinition
+                {
+                    Name = "failure",
+                    Code = "CHILD_FLOW_FAILED",
+                    Message = "Child Flow failed."
+                }
+            ],
+            Transitions = [new("analyze-timeout", "analyze", "timedOut", "failure")]
+        };
+        var childAgent = AgentMaterial() with
+        {
+            ParticipantId = "agent-a",
+            AgentName = "agent-a",
+            ModelProfileName = "awp-participant:agent-a"
+        };
+        var handler = new GraphHandler(TestNow)
+        {
+            StallModel = true,
+            ChildDefinition = new OrchestrationFlowDefinition(
+                [new FlowTargetReference(FlowTargetKind.Agent, "agent-a")],
+                new SequentialOrchestrationPattern()),
+            ChildAgents = [childAgent],
+            ChildOrchestrationTimeout = TimeSpan.FromMilliseconds(25)
+        };
+
+        var (result, _) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }), handler);
+
+        Assert.AreEqual("error", result.Outcome);
+        Assert.AreEqual("CHILD_FLOW_FAILED", result.ErrorCode);
+        var call = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.StepCompleted
+            && value.Location.FlowStep?.StepDefinitionId == "analyze");
+        Assert.AreEqual("analyze-timeout", call.Payload?.GetProperty("selectedTransition").GetString());
+        Assert.AreEqual("flow_run_timed_out", call.Payload?.GetProperty("errorCode").GetString());
+        var child = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.RunCompleted
+            && value.Location.RunId.StartsWith("flowrun-child-", StringComparison.Ordinal));
+        Assert.AreEqual("timedOut", child.Payload?.GetProperty("status").GetString());
     }
 
     [TestMethod]
@@ -1052,15 +1141,21 @@ public sealed class AwpAssignmentExecutorTests
         public JsonElement? ChildOutput { get; init; }
         public Func<AwpCreateChildFlowRequest, JsonElement>? ChildOutputFactory { get; init; }
         public FlowGraphDefinition? ChildGraph { get; init; }
+        public FlowDefinition? ChildDefinition { get; init; }
+        public IReadOnlyList<AwpExecutionAgentMaterial> ChildAgents { get; init; } = [];
+        public TimeSpan ChildOrchestrationTimeout { get; init; }
         public string? ChildCorrelationId { get; init; }
         public Action? OnChildCreated { get; init; }
         public string ModelOutput { get; init; } = "agent-result";
         public string? ModelFailureMessage { get; init; }
+        public bool StallModel { get; init; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             var bytes = await request.Content!.ReadAsByteArrayAsync(cancellationToken);
+            if (StallModel && request.RequestUri!.AbsolutePath == AwpProtocol.InvokeModelPath)
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             using var document = JsonDocument.Parse(bytes);
             var messageId = document.RootElement.GetProperty("messageId").GetGuid();
             object payload = request.RequestUri!.AbsolutePath switch
@@ -1189,12 +1284,17 @@ public sealed class AwpAssignmentExecutorTests
                         }
                     ]
                 };
-            var definition = Version("child", graph, now);
+            var definition = ChildDefinition is null
+                ? Version("child", graph, now)
+                : new FlowVersion(new WorkspaceId(Guid.NewGuid()),
+                    new FlowId("child", ResourceNamespace.Default), "1.0", null, ChildDefinition,
+                    new Dictionary<string, string>(), now, null, "sha256:child");
             var material = new AwpRootFlowExecutionMaterial($"material-{runId}", "1.0", "sha256:material",
                 runId, "child", "default", "1.0", "sha256:child", request.Input,
-                JsonSerializer.SerializeToElement(definition, JsonOptions), [], Guid.NewGuid(),
+                JsonSerializer.SerializeToElement(definition, JsonOptions), ChildAgents, Guid.NewGuid(),
                 RootFlowRunId: "flowrun-root", ParentFlowRunId: "flowrun-root",
-                CorrelationId: ChildCorrelationId);
+                CorrelationId: ChildCorrelationId,
+                OrchestrationTimeoutMilliseconds: checked((int)ChildOrchestrationTimeout.TotalMilliseconds));
             OnChildCreated?.Invoke();
             return new(now, runId, "Pending", null, material);
         }

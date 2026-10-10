@@ -165,6 +165,34 @@ public sealed class AwpAssignmentProjectionTests
             Assert.AreEqual("flow-artifact-1", artifact.ArtifactId);
             Assert.AreEqual("staged-artifact-1", artifact.LocalArtifactId);
             Assert.AreEqual(storageRunId, artifact.StorageFlowRunId);
+
+            var timedOutAssignment = assignment with
+            {
+                State = RuntimeAssignmentState.Failed,
+                Attempts =
+                [
+                    new RuntimeAssignmentAttempt
+                    {
+                        Id = new(Guid.NewGuid()),
+                        WorkerId = new(Guid.NewGuid()),
+                        WorkerSessionId = new(Guid.NewGuid()),
+                        FencingGeneration = 1,
+                        AcquiredAt = now,
+                        LeaseExpiresAt = now.AddMinutes(1),
+                        LastHeartbeatAt = now,
+                        State = RuntimeAssignmentAttemptState.Failed,
+                        CompletedAt = now.AddSeconds(2),
+                        ErrorCode = "flow_run_timed_out"
+                    }
+                ]
+            };
+            await projection.ProjectTerminalAsync(new(timedOutAssignment, RuntimeRunState.Failed, false), default);
+
+            var timedOut = (await repository.GetRunAsync(workspaceId, runId, default))!.Value;
+            Assert.AreEqual(FlowRunStatus.TimedOut, timedOut.Status);
+            Assert.AreEqual("flow_run_timed_out", timedOut.Error?.Code);
+            Assert.IsTrue((await repository.ListRunEventsAsync(workspaceId, runId, 0, default))
+                .Any(value => value.Type == FlowRunEventType.FlowRunTimedOut));
         }
         finally
         {

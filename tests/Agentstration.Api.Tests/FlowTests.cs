@@ -118,63 +118,6 @@ public sealed partial class FlowTests
         }
     }
 
-    private sealed class FailingAgentExecutor : IFlowAgentExecutor
-    {
-        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowAgentExecutionRequest request, CancellationToken cancellationToken) =>
-            Task.FromException<FlowAgentExecutionResult>(new InvalidOperationException("simulated agent failure"));
-    }
-
-    private sealed class TestOrchestrationEngine : IFlowOrchestrationEngine
-    {
-        public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
-            FlowOrchestrationExecutionRequest request,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            Assert.AreEqual(FlowOrchestrationStrategy.Handoff, request.Definition.Strategy);
-            Assert.IsTrue(request.Definition.Participants.All(participant =>
-                participant.Namespace == new ResourceNamespace("daily-life-assistant")));
-            cancellationToken.ThrowIfCancellationRequested();
-            yield return new FlowParticipantTurnStarted("researcher", 1);
-            yield return new FlowParticipantDelta("researcher", "draft");
-            yield return new FlowParticipantTurnCompleted("researcher", 1);
-            var researcher = Participant("researcher", 1, "draft");
-            yield return new FlowParticipantCompleted(researcher);
-            yield return new FlowParticipantHandoff("researcher", "reviewer");
-            yield return new FlowParticipantTurnStarted("reviewer", 2);
-            yield return new FlowParticipantDelta("reviewer", "reviewed");
-            yield return new FlowParticipantTurnCompleted("reviewer", 2);
-            var reviewer = Participant("reviewer", 2, "reviewed");
-            yield return new FlowParticipantCompleted(reviewer);
-            yield return new FlowExecutionCompleted(new FlowOrchestrationResult(
-                FlowOrchestrationStrategy.Handoff,
-                JsonSerializer.SerializeToElement("reviewed"),
-                [researcher, reviewer]));
-            await Task.CompletedTask;
-        }
-
-        private static FlowParticipantResult Participant(string id, int turn, string output) => new(
-            id,
-            [new FlowParticipantTurnResult(turn, output)],
-            JsonSerializer.SerializeToElement(output),
-            id,
-            1,
-            "default",
-            "Deterministic",
-            [],
-            null);
-    }
-
-    private sealed class StalledOrchestrationEngine : IFlowOrchestrationEngine
-    {
-        public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
-            FlowOrchestrationExecutionRequest request,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-            yield break;
-        }
-    }
-
     private sealed class ConcurrentTrackingAgentExecutor : IFlowAgentExecutor
     {
         private int executionCount;

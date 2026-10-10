@@ -82,7 +82,8 @@ public sealed record RuntimeRootFlowExecutionMaterial(
     RuntimeFlowResumeMaterial? Resume = null,
     string? RootFlowRunId = null,
     string? ParentFlowRunId = null,
-    string? CorrelationId = null)
+    string? CorrelationId = null,
+    TimeSpan OrchestrationTimeout = default)
     : RuntimeExecutionMaterial(MaterialId, SchemaVersion, Digest, RuntimeAssignmentTargetKind.FlowRun, WorkspaceId, TenantId, PrincipalId, RunId);
 
 public sealed record RuntimeFlowResumeMaterial(

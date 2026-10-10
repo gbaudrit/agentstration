@@ -110,41 +110,6 @@ public sealed partial class FlowTests
         Assert.HasCount(2, (await runs.ListAsync(null, null, 0, 20, TestScope, default)).Items);
     }
 
-    [TestMethod]
-    public async Task ChildTimeoutResumesTheExplicitTimeoutTransition()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        var child = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
-            "child",
-            null,
-            "1.0.0",
-            true,
-            new OrchestrationFlowDefinition(
-                [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
-                new SequentialOrchestrationPattern())), default);
-        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, child.Value.Id, "1.0.0", true, default);
-        var parent = await CreatePublishedGraphAsync(fixture, "parent", ParentGraph());
-        var runs = Service(
-            fixture,
-            new TestFlowRunQueue(),
-            new FlowRunExecutionOptions { OrchestrationTimeout = TimeSpan.FromMilliseconds(25) },
-            new StalledOrchestrationEngine());
-        using var input = JsonDocument.Parse("""{"article":"new item"}""");
-        var root = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "timeout-child", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(root.Value.Id, TestScope), default);
-        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, root.Value.Id, default))!.Value;
-        var childId = waiting.Steps.Single(step => step.StepName == "analyze").ChildFlowRunId!;
-
-        await runs.ExecuteAsync(new(childId, TestScope), default);
-        await runs.ExecuteAsync(new(root.Value.Id, TestScope), default);
-
-        var failed = (await runs.GetAsync(TestScope.WorkspaceId, root.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Failed, failed.Status);
-        var call = failed.Steps.Single(step => step.StepName == "analyze");
-        Assert.AreEqual("analyze-timeout", call.SelectedTransition);
-        Assert.AreEqual("flow_run_timed_out", call.Error?.Code);
-    }
-
     private static FlowRunService Service(
         FlowFixture fixture,
         TestFlowRunQueue queue,

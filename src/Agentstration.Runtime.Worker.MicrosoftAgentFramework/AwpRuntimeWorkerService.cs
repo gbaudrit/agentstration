@@ -175,6 +175,12 @@ internal sealed class AwpRuntimeWorkerService(
             logger.LogWarning("Stopped assignment {AssignmentId} because its lease can no longer safely authorize mutations",
                 assignment.AssignmentId.Value);
         }
+        catch (AwpExecutionTimedOutException exception) when (session.CanStartMutation())
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, exception.Code);
+            await TryFailAsync(session, AwpExecutionFailureKind.TimedOut, exception.Code,
+                exception.Message, stoppingToken);
+        }
         catch (Exception exception) when (session.CanStartMutation())
         {
             var code = exception is AwpExecutionNotSupportedException unsupported

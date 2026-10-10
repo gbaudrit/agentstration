@@ -61,10 +61,12 @@ public sealed class AwpAssignmentProjection(
         var terminalPayload = TerminalPayload(assignment, runId);
         var functionalFailure = assignmentSucceeded && IsFailed(terminalPayload);
         var succeeded = assignmentSucceeded && !functionalFailure;
-        var status = succeeded ? FlowRunStatus.Succeeded : cancelled ? FlowRunStatus.Cancelled : FlowRunStatus.Failed;
         var output = assignmentSucceeded ? Property(terminalPayload, "output") : null;
         var errorCode = assignment.CurrentAttempt?.ErrorCode ?? (cancelled ? "flow_run_cancelled" : "worker_execution_failed");
         if (functionalFailure) errorCode = StringProperty(terminalPayload, "errorCode") ?? "FLOW_FAILED";
+        var timedOut = string.Equals(errorCode, "flow_run_timed_out", StringComparison.Ordinal);
+        var status = succeeded ? FlowRunStatus.Succeeded : cancelled ? FlowRunStatus.Cancelled
+            : timedOut ? FlowRunStatus.TimedOut : FlowRunStatus.Failed;
         var updated = stored.Value with
         {
             Status = status,
@@ -93,6 +95,7 @@ public sealed class AwpAssignmentProjection(
         {
             FlowRunStatus.Succeeded => FlowRunEventType.FlowRunCompleted,
             FlowRunStatus.Cancelled => FlowRunEventType.FlowRunCancelled,
+            FlowRunStatus.TimedOut => FlowRunEventType.FlowRunTimedOut,
             _ => FlowRunEventType.FlowRunFailed
         }, null, succeeded ? output : JsonSerializer.SerializeToElement(updated.Error), now, cancellationToken);
     }
@@ -257,11 +260,13 @@ public sealed class AwpAssignmentProjection(
         CancellationToken cancellationToken)
     {
         if (stored.Value.RootFlowRunId is null || stored.Value.Status.IsTerminal()) return;
-        var failed = payload is { } value && value.TryGetProperty("status", out var status)
-            && string.Equals(status.GetString(), "failed", StringComparison.OrdinalIgnoreCase);
+        var statusValue = StringProperty(payload, "status");
+        var timedOut = string.Equals(statusValue, "timedOut", StringComparison.OrdinalIgnoreCase);
+        var failed = timedOut || string.Equals(statusValue, "failed", StringComparison.OrdinalIgnoreCase);
         var updated = stored.Value with
         {
-            Status = failed ? FlowRunStatus.Failed : FlowRunStatus.Succeeded,
+            Status = timedOut ? FlowRunStatus.TimedOut
+                : failed ? FlowRunStatus.Failed : FlowRunStatus.Succeeded,
             Output = Property(payload, "output"),
             OutputName = StringProperty(payload, "outputName"),
             OutputOutcome = ParseOutcome(payload),
@@ -272,7 +277,8 @@ public sealed class AwpAssignmentProjection(
             ExecutionLeaseId = null,
             ExecutionLeaseExpiresAt = null
         };
-        await UpdateFlowAsync(stored, updated, failed ? FlowRunEventType.FlowRunFailed : FlowRunEventType.FlowRunCompleted,
+        await UpdateFlowAsync(stored, updated, timedOut ? FlowRunEventType.FlowRunTimedOut
+                : failed ? FlowRunEventType.FlowRunFailed : FlowRunEventType.FlowRunCompleted,
             null, payload, occurredAt, cancellationToken);
     }
 

@@ -95,11 +95,32 @@ internal sealed class AwpAssignmentExecutor(
             DirectFlowDefinition direct => await ExecuteSimpleAsync(session, material, direct.Target, false, cancellationToken),
             RoutingFlowDefinition routing => await ExecuteSimpleAsync(session, material,
                 SelectTarget(routing, material.Input), true, cancellationToken),
-            OrchestrationFlowDefinition orchestration => await ExecuteOrchestrationAsync(session, material,
+            OrchestrationFlowDefinition orchestration => await ExecuteTimedOrchestrationAsync(session, material,
                 orchestration, cancellationToken),
             _ => throw new AwpExecutionNotSupportedException("flow_kind_unsupported", "The assigned Flow kind is unsupported by this Worker.")
         };
         return new(output);
+    }
+
+    private async Task<JsonElement?> ExecuteTimedOrchestrationAsync(AwpAssignmentSession session,
+        AwpRootFlowExecutionMaterial material, OrchestrationFlowDefinition orchestration,
+        CancellationToken cancellationToken)
+    {
+        if (material.OrchestrationTimeoutMilliseconds <= 0)
+            throw new AwpExecutionNotSupportedException("flow_orchestration_timeout_invalid",
+                "The assigned Flow orchestration timeout must be positive.");
+        using var timeout = new CancellationTokenSource(
+            TimeSpan.FromMilliseconds(material.OrchestrationTimeoutMilliseconds), session.TimeProvider);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+        try
+        {
+            return await ExecuteOrchestrationAsync(session, material, orchestration, linked.Token);
+        }
+        catch (Exception) when (timeout.IsCancellationRequested
+            && !cancellationToken.IsCancellationRequested)
+        {
+            throw new AwpExecutionTimedOutException();
+        }
     }
 
     private async Task<JsonElement?> ExecuteOrchestrationAsync(AwpAssignmentSession session,
@@ -335,7 +356,8 @@ internal sealed class AwpAssignmentExecutor(
                     childRunIds.Add(child.RunId);
                     output = child.Result.Output?.Clone();
                     eventName = child.Result.OutputName
-                        ?? (child.Result.Outcome == "error" ? "failed" : "completed");
+                        ?? (child.Result.ErrorCode == "flow_run_timed_out" ? "timedOut"
+                            : child.Result.Outcome == "error" ? "failed" : "completed");
                     if (child.Result.Outcome == "error")
                     {
                         errorCode = child.Result.ErrorCode ?? "child_flow_failed";
@@ -574,7 +596,7 @@ internal sealed class AwpAssignmentExecutor(
             await session.AppendEventAsync(AwpExecutionEventKind.RunCompleted,
                 new(child.RunId), JsonSerializer.SerializeToElement(new
                 {
-                    status = "failed",
+                    status = code == "flow_run_timed_out" ? "timedOut" : "failed",
                     outcome = "error",
                     errorCode = code,
                     error = exception.Message
@@ -843,10 +865,13 @@ internal sealed class AwpAssignmentExecutor(
         : throw new InvalidOperationException("The assignment Workspace identity is invalid.");
 }
 
-internal sealed class AwpExecutionNotSupportedException(string code, string message) : Exception(message)
+internal class AwpExecutionNotSupportedException(string code, string message) : Exception(message)
 {
     public string Code { get; } = code;
 }
+
+internal sealed class AwpExecutionTimedOutException()
+    : AwpExecutionNotSupportedException("flow_run_timed_out", "The Flow Run exceeded its execution timeout.");
 
 internal sealed record AwpAssignmentExecutionResult(
     JsonElement? Output,

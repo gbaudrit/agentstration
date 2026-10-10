@@ -639,7 +639,8 @@ public static class AwpRuntimeWorkerEndpoints
                 flow.Resume.RespondedAt, flow.Resume.PrincipalId),
             flow.RootFlowRunId,
             flow.ParentFlowRunId,
-            flow.CorrelationId),
+            flow.CorrelationId,
+            checked((int)Math.Ceiling(flow.OrchestrationTimeout.TotalMilliseconds))),
         _ => throw new ArgumentOutOfRangeException(nameof(material))
     };
 

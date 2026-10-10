@@ -69,7 +69,8 @@ public sealed record AwpRootFlowExecutionMaterial(
     AwpFlowResumeMaterial? Resume = null,
     string? RootFlowRunId = null,
     string? ParentFlowRunId = null,
-    string? CorrelationId = null)
+    string? CorrelationId = null,
+    int OrchestrationTimeoutMilliseconds = 0)
     : AwpExecutionMaterial(MaterialId, SchemaVersion, Digest, RunId);
 
 public sealed record AwpFlowResumeMaterial(
