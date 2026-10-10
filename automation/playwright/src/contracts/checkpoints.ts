@@ -68,6 +68,13 @@ export const Checkpoints = {
     agentRun: 'flow-observability-agent-run',
     events: 'flow-observability-events',
   },
+  flowNamedOutputs: {
+    activePorts: 'flow-named-outputs-active-ports',
+    historicalPorts: 'flow-named-outputs-historical-ports',
+    outputsAuthored: 'flow-named-outputs-authored',
+    transitionsConnected: 'flow-named-outputs-transitions-connected',
+    publishedReadOnly: 'flow-named-outputs-published-read-only',
+  },
   consoleAdministration: {
     organization: 'console-admin-organization',
     member: 'console-admin-member',
