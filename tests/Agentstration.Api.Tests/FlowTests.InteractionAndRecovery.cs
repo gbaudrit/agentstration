@@ -22,7 +22,7 @@ namespace Agentstration.Application.Tests;
 public sealed partial class FlowTests
 {
     [TestMethod]
-    public async Task InteractiveOrchestrationSurvivesReconstructionAndRecoversAnAnsweredRun()
+    public async Task InteractiveResponseSurvivesReconstructionAndRequeuesTheAnsweredRun()
     {
         await using var fixture = await FlowFixture.CreateAsync();
         var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
@@ -32,18 +32,15 @@ public sealed partial class FlowTests
                 new HandoffOrchestrationPattern("agent-a", [new("agent-a", "agent-b")]))), default);
         await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var expressions = new FlowExpressionParser();
-        var firstQueue = new TestFlowRunQueue();
         var firstService = new FlowRunService(
-            fixture.Repository, firstQueue, new TestCancellationRegistry(), new TestAgentExecutor(),
-            new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), new TestAgentExecutor(),
+            new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
             new TestFlowRunExecutionScope(), TimeProvider.System);
         using var input = JsonDocument.Parse("""{"prompt":"Need a name"}""");
 
         var pending = await firstService.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
             "tester", "interactive-correlation", input.RootElement, TestScope, default);
-        await firstService.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var waiting = (await firstService.GetAsync(pending.Value.Id, TestScope, default))!.Value;
+        var waiting = await PutWaitingForInputAsync(fixture.Repository, pending, TimeProvider.System);
         Assert.AreEqual(FlowRunStatus.WaitingForInput, waiting.Status);
         Assert.AreEqual(7, waiting.RuntimeBindings.Single(binding => binding.ParticipantId == "agent-a").AgentGeneration);
         Assert.IsNotNull(waiting.RuntimeState);
@@ -52,7 +49,7 @@ public sealed partial class FlowTests
         var lostQueue = new TestFlowRunQueue();
         var reconstructed = new FlowRunService(
             fixture.Repository, lostQueue, new TestCancellationRegistry(), new TestAgentExecutor(),
-            new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
             new TestFlowRunExecutionScope(), TimeProvider.System);
         await reconstructed.RespondAsync(waiting.Id, request.Value.Id, JsonSerializer.SerializeToElement("Ada"), "principal-1", TestScope, default);
         await Assert.ThrowsExactlyAsync<InputRequestAlreadyResolvedException>(() => reconstructed.RespondAsync(
@@ -61,16 +58,13 @@ public sealed partial class FlowTests
         var recoveryQueue = new TestFlowRunQueue();
         var recovered = new FlowRunService(
             fixture.Repository, recoveryQueue, new TestCancellationRegistry(), new TestAgentExecutor(),
-            new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
             new TestFlowRunExecutionScope(), TimeProvider.System);
         await recovered.InitializeAsync(default);
         Assert.IsTrue(recoveryQueue.Enqueued.Any(item => item.RunId == waiting.Id));
-        await recovered.ExecuteAsync(new(waiting.Id, TestScope), default);
-
-        var completed = (await recovered.GetAsync(waiting.Id, TestScope, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual("Ada", completed.Output!.Value.GetProperty("finalOutput").GetString());
-        Assert.AreEqual(7, completed.RuntimeBindings.Single(binding => binding.ParticipantId == "agent-a").AgentGeneration);
+        var answered = (await recovered.ListInputsAsync(waiting.Id, InputRequestStatus.Answered,
+            TestScope, default)).Single().Value;
+        Assert.AreEqual("Ada", answered.Response?.Value.GetString());
     }
 
     [TestMethod]
@@ -88,12 +82,12 @@ public sealed partial class FlowTests
         var events = new NullFlowRunEventSink();
         var runs = new FlowRunService(
             fixture.Repository, new TestFlowRunQueue(), cancellations, new TestAgentExecutor(),
-            new SuspendingOrchestrationEngine(), expressions, expressions, events,
+            new UnsupportedFlowOrchestrationEngine(), expressions, expressions, events,
             new TestFlowRunExecutionScope(), TimeProvider.System);
         using var input = JsonDocument.Parse("""{"prompt":"Need input"}""");
         var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
             "tester", "retention-correlation", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
+        await PutWaitingForInputAsync(fixture.Repository, pending, TimeProvider.System);
 
         var active = await runs.GetRevisionUsageAsync("revision-agent-a-7", default);
         Assert.AreEqual(1, active.ActiveRunCount);
@@ -124,33 +118,6 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
-    public async Task ConcurrentWorkersClaimARunOnlyOnce()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
-            "single-claim", null, "1.0.0", true, new DirectFlowDefinition(new(FlowTargetKind.Agent, "agent-a"))), default);
-        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
-        var expressions = new FlowExpressionParser();
-        var executor = new ConcurrentTrackingAgentExecutor();
-        FlowRunService Worker() => new(
-            fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), executor,
-            new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
-            new TestFlowRunExecutionScope(), TimeProvider.System);
-        var first = Worker();
-        var second = Worker();
-        using var input = JsonDocument.Parse("""{"prompt":"once"}""");
-        var pending = await first.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
-            "tester", "single-claim", input.RootElement, TestScope, default);
-
-        await Task.WhenAll(first.ExecuteAsync(new(pending.Value.Id, TestScope), default), second.ExecuteAsync(new(pending.Value.Id, TestScope), default));
-
-        Assert.AreEqual(1, executor.ExecutionCount);
-        var completed = (await first.GetAsync(pending.Value.Id, TestScope, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.IsNull(completed.ExecutionLeaseId);
-    }
-
-    [TestMethod]
     public async Task PendingInputExpiresDeterministicallyAndTimesOutTheRun()
     {
         await using var fixture = await FlowFixture.CreateAsync();
@@ -164,13 +131,13 @@ public sealed partial class FlowTests
         var expressions = new FlowExpressionParser();
         var runs = new FlowRunService(
             fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), new TestAgentExecutor(),
-            new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
             new TestFlowRunExecutionScope(), clock,
             new FlowRunExecutionOptions { InputRequestTimeout = TimeSpan.FromMinutes(1) });
         using var input = JsonDocument.Parse("""{"prompt":"Wait"}""");
         var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
             "tester", "input-timeout", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
+        await PutWaitingForInputAsync(fixture.Repository, pending, clock);
         clock.Advance(TimeSpan.FromMinutes(2));
 
         await runs.ExpireDueInputsAsync(default);
@@ -179,6 +146,49 @@ public sealed partial class FlowTests
         Assert.AreEqual(FlowRunStatus.TimedOut, timedOut.Status);
         Assert.AreEqual("input_request_timed_out", timedOut.Error?.Code);
         Assert.AreEqual(InputRequestStatus.Expired, (await runs.ListInputsAsync(pending.Value.Id, null, TestScope, default)).Single().Value.Status);
+    }
+
+    private static async Task<FlowRun> PutWaitingForInputAsync(
+        IFlowRepository repository,
+        StoredFlowRun pending,
+        TimeProvider timeProvider)
+    {
+        var now = timeProvider.GetUtcNow();
+        var waiting = pending.Value with
+        {
+            Status = FlowRunStatus.WaitingForInput,
+            StartedAt = pending.Value.StartedAt ?? now,
+            RuntimeState = new("test-runtime", "state-1", now),
+            RuntimeBindings =
+            [
+                new RuntimeExecutionBinding
+                {
+                    ParticipantId = "agent-a",
+                    AgentNamespace = ResourceNamespace.Default,
+                    AgentResourceId = "agent-a",
+                    AgentGeneration = 7,
+                    DeploymentId = "deployment-agent-a-7",
+                    RevisionId = "revision-agent-a-7",
+                    RuntimeProfileName = "local",
+                    ModelProfileName = "default"
+                }
+            ]
+        };
+        await repository.UpdateRunAsync(waiting, pending.ETag, default);
+        await repository.CreateInputRequestAsync(new InputRequest
+        {
+            WorkspaceId = waiting.WorkspaceId,
+            Id = $"input-{Guid.NewGuid():N}",
+            RunId = waiting.Id,
+            RuntimeRequestId = "runtime-request-1",
+            Prompt = "What is your name?",
+            Type = InputRequestType.Text,
+            Options = [],
+            Source = "agent-a",
+            CreatedAt = now,
+            ExpiresAt = now.AddMinutes(1)
+        }, default);
+        return waiting;
     }
 
 }

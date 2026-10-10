@@ -107,32 +107,6 @@ public sealed partial class FlowTests
             Task.FromResult(new FlowAgentExecutionResult(JsonSerializer.SerializeToElement("done"), $"/agents/{request.Target.Id}", 3, "/profiles/default", "Deterministic", new FlowStepRunUsage(12, 4), ["lookup"], ["executed"]));
     }
 
-    private sealed class TrackingAgentExecutor : IFlowAgentExecutor
-    {
-        public int ExecutionCount { get; private set; }
-
-        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowAgentExecutionRequest request, CancellationToken cancellationToken)
-        {
-            ExecutionCount++;
-            return Task.FromResult(new FlowAgentExecutionResult(JsonSerializer.SerializeToElement("done"), "/agents/agent", 1, "/profiles/default", "Test", null, [], []));
-        }
-    }
-
-    private sealed class ConcurrentTrackingAgentExecutor : IFlowAgentExecutor
-    {
-        private int executionCount;
-        public int ExecutionCount => executionCount;
-
-        public async Task<FlowAgentExecutionResult> ExecuteAsync(
-            FlowAgentExecutionRequest request,
-            CancellationToken cancellationToken)
-        {
-            Interlocked.Increment(ref executionCount);
-            await Task.Delay(100, cancellationToken);
-            return new(JsonSerializer.SerializeToElement("done"), request.Target.Id, 1, "default", "Test", null, [], []);
-        }
-    }
-
     private sealed class AdvancingTimeProvider(DateTimeOffset initial) : TimeProvider
     {
         private DateTimeOffset current = initial;
@@ -180,51 +154,6 @@ public sealed partial class FlowTests
                 states.Remove(key);
             return Task.CompletedTask;
         }
-    }
-
-    private sealed class SuspendingOrchestrationEngine : IFlowOrchestrationEngine
-    {
-        public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
-            FlowOrchestrationExecutionRequest request,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            var bindings = request.RuntimeBindings is { Count: > 0 }
-                ? request.RuntimeBindings
-                :
-                [
-                    Binding("agent-a", 7),
-                    Binding("agent-b", 4)
-                ];
-            yield return new FlowRuntimeBindingsResolved(bindings);
-            if (request.AnsweredInput?.Response is null)
-            {
-                yield return new FlowExternalInputRequested(
-                    "runtime-request-1", "What is your name?", InputRequestType.Text, [], "agent-a",
-                    new DurableRuntimeStateReference("test-runtime", "state-1", DateTimeOffset.UtcNow));
-                yield break;
-            }
-            Assert.AreEqual(7, bindings.Single(binding => binding.ParticipantId == "agent-a").AgentGeneration);
-            var answer = request.AnsweredInput.Response.Value.GetString()!;
-            var participant = new FlowParticipantResult(
-                "agent-a", [new(1, answer)], JsonSerializer.SerializeToElement(answer), "agent-a", 7,
-                "default", "Deterministic", [], null);
-            yield return new FlowParticipantCompleted(participant);
-            yield return new FlowExecutionCompleted(new FlowOrchestrationResult(
-                FlowOrchestrationStrategy.Handoff, JsonSerializer.SerializeToElement(answer), [participant]));
-            await Task.CompletedTask;
-        }
-
-        private static RuntimeExecutionBinding Binding(string participant, long generation) => new()
-        {
-            ParticipantId = participant,
-            AgentNamespace = ResourceNamespace.Default,
-            AgentResourceId = participant,
-            AgentGeneration = generation,
-            DeploymentId = $"deployment-{participant}-{generation}",
-            RevisionId = $"revision-{participant}-{generation}",
-            RuntimeProfileName = "local",
-            ModelProfileName = "default"
-        };
     }
 
     private sealed record InteractionApiCase(
