@@ -163,32 +163,6 @@ public sealed partial class FlowTests
         JsonElement ValidValue,
         JsonElement InvalidValue);
 
-    private sealed class TypedSuspendingOrchestrationEngine : IFlowOrchestrationEngine
-    {
-        public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
-            FlowOrchestrationExecutionRequest request,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var kind = request.Input.GetProperty("kind").GetString();
-            var type = kind switch
-            {
-                "choice" => InputRequestType.Choice,
-                "confirmation" => InputRequestType.Confirmation,
-                _ => InputRequestType.Text
-            };
-            var options = type == InputRequestType.Choice ? new[] { "red", "blue" } : [];
-            yield return new FlowExternalInputRequested(
-                $"runtime-{request.RunId}",
-                $"Provide a {kind} response",
-                type,
-                options,
-                "sql-expert",
-                new DurableRuntimeStateReference("test-runtime", $"state-{request.RunId}", DateTimeOffset.UtcNow));
-            await Task.CompletedTask;
-        }
-    }
-
     private sealed class ExistingResourceResolver : IFlowResourceReferenceResolver
     {
         public Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken) => Task.FromResult(true);

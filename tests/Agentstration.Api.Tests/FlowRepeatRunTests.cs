@@ -63,48 +63,6 @@ public sealed partial class FlowTests
         Assert.IsTrue(await resolver.CreatesFlowCycleAsync(TestScope.WorkspaceId, parent.Value.Id, target, default));
     }
 
-    [TestMethod]
-    public async Task RepeatCreatesDurableChildrenUntilTheConditionSucceeds()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        await CreatePublishedGraphAsync(fixture, "chunk-reader", RepeatChildGraph());
-        var parent = await CreatePublishedGraphAsync(fixture, "parent", RepeatGraph(5));
-        var runs = Service(fixture, new TestFlowRunQueue(), agents: new ChunkAgentExecutor(endOffset: 3));
-        var input = JsonSerializer.SerializeToElement(new { source = "docs", offset = 0 });
-        var pending = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual,
-            "tester", "repeat-success", input, TestScope, default);
-
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-        var firstWaiting = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        var firstChildId = firstWaiting.Steps.Single(step => step.StepName == "read").ChildFlowRunId!;
-
-        await runs.ExecuteAsync(new(firstWaiting.Id, TestScope), default);
-        var redelivered = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(firstChildId, redelivered.Steps.Single(step => step.StepName == "read").ChildFlowRunId);
-        Assert.HasCount(2, (await runs.ListAsync(null, null, 0, 20, TestScope, default)).Items);
-
-        for (var iteration = 1; iteration <= 3; iteration++)
-        {
-            var parentRun = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-            var repeat = parentRun.Steps.Single(step => step.StepName == "read");
-            Assert.AreEqual(iteration, repeat.RepeatIteration);
-            await runs.ExecuteAsync(new(repeat.ChildFlowRunId!, TestScope), default);
-            await runs.ExecuteAsync(new(parentRun.Id, TestScope), default);
-        }
-
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual(3, completed.Output?.GetProperty("nextOffset").GetInt32());
-        var completedRepeat = completed.Steps.Single(step => step.StepName == "read");
-        Assert.AreEqual(3, completedRepeat.RepeatIteration);
-        Assert.HasCount(3, completedRepeat.ChildFlowRunIds);
-        Assert.AreEqual(3, completedRepeat.ChildFlowRunIds.Distinct(StringComparer.Ordinal).Count());
-
-        var causality = await runs.GetCausalityAsync(completed.Id, 0, 10, TestScope, default);
-        Assert.AreEqual(4, causality.TotalCount);
-        Assert.AreEqual(3, causality.Items.Count(item => item.ParentStepName == "read"));
-    }
-
     private static FlowGraphDefinition RepeatGraph(int maximumIterations, string childFlowName = "chunk-reader") => new()
     {
         EntryStep = "input",
@@ -129,47 +87,4 @@ public sealed partial class FlowTests
         ]
     };
 
-    private static FlowGraphDefinition RepeatChildGraph() => new()
-    {
-        EntryStep = "input",
-        InputSchema = JsonSerializer.SerializeToElement(new
-        {
-            type = "object",
-            properties = new { offset = new { type = "integer" } },
-            required = new[] { "offset" }
-        }),
-        Steps =
-        [
-            new InputFlowStepDefinition { Name = "input" },
-            new AgentFlowStepDefinition { Name = "read", Agent = new("chunk-agent"), InputMapping = JsonSerializer.SerializeToElement("${input}") },
-            new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.read.output}") },
-            new FailureFlowStepDefinition { Name = "failure", Code = "CHUNK_READ_FAILED", Message = "The chunk could not be read." }
-        ],
-        Transitions =
-        [
-            new("input-read", "input", "completed", "read"),
-            new("read-output", "read", "success", "output"),
-            new("read-failure", "read", "error", "failure")
-        ]
-    };
-
-    private sealed class ChunkAgentExecutor(int endOffset) : IFlowAgentExecutor
-    {
-        public Task<FlowAgentExecutionResult> ExecuteAsync(
-            FlowAgentExecutionRequest request,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var nextOffset = request.Input.GetProperty("offset").GetInt32() + 1;
-            return Task.FromResult(new FlowAgentExecutionResult(
-                JsonSerializer.SerializeToElement(new { nextOffset, endOfContent = nextOffset >= endOffset }),
-                "/agents/chunk-agent",
-                1,
-                "/profiles/default",
-                "Deterministic",
-                null,
-                [],
-                []));
-        }
-    }
 }

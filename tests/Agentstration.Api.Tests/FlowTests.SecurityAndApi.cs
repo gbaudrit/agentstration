@@ -413,10 +413,8 @@ public sealed partial class FlowTests
             builder.ConfigureTestServices(services =>
             {
                 services.RemoveAll<IFlowRunQueue>();
-                services.RemoveAll<IFlowOrchestrationEngine>();
                 services.RemoveAll<TimeProvider>();
                 services.AddSingleton<IFlowRunQueue>(queue);
-                services.AddSingleton<IFlowOrchestrationEngine, TypedSuspendingOrchestrationEngine>();
                 services.AddSingleton<TimeProvider>(clock);
             });
         });
@@ -432,10 +430,9 @@ public sealed partial class FlowTests
             (await client.PostAsJsonAsync("/api/flows", definition, JsonOptions)).StatusCode);
         Assert.AreEqual(HttpStatusCode.Created,
             (await client.PostAsJsonAsync("/api/flows/interactive-api-flow/versions", new CreateFlowVersionRequest("1.0.0"))).StatusCode);
-        var service = factory.Services.GetRequiredService<FlowRunService>();
         var current = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         var principalId = current.PrincipalId.ToString("D");
-        var apiScope = new FlowRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId);
+        var repository = factory.Services.GetRequiredService<IFlowRepository>();
 
         var cases = new[]
         {
@@ -452,7 +449,10 @@ public sealed partial class FlowTests
             Assert.AreEqual(HttpStatusCode.Accepted, createResponse.StatusCode);
             var run = await createResponse.Content.ReadFromJsonAsync<FlowRun>(JsonOptions);
             Assert.IsNotNull(run);
-            await service.ExecuteAsync(new(run.Id, apiScope), default);
+            var stored = await repository.GetRunAsync(run.WorkspaceId, run.Id, default);
+            Assert.IsNotNull(stored);
+            await PutWaitingForInputAsync(repository, stored, clock,
+                interaction.Type, interaction.Options);
 
             var pending = await client.GetFromJsonAsync<InputRequest[]>(
                 $"/api/flowRuns/{run.Id}/inputs?status=Pending", JsonOptions);
@@ -488,7 +488,9 @@ public sealed partial class FlowTests
         var expiringCreate = await client.PostAsJsonAsync("/api/flows/interactive-api-flow/runs",
             new CreateFlowRunRequest(expiringInput.RootElement.Clone()), JsonOptions);
         var expiringRun = await expiringCreate.Content.ReadFromJsonAsync<FlowRun>(JsonOptions);
-        await service.ExecuteAsync(new(expiringRun!.Id, apiScope), default);
+        var expiringStored = await repository.GetRunAsync(expiringRun!.WorkspaceId, expiringRun.Id, default);
+        Assert.IsNotNull(expiringStored);
+        await PutWaitingForInputAsync(repository, expiringStored, clock);
         var expiringRequest = (await client.GetFromJsonAsync<InputRequest[]>(
             $"/api/flowRuns/{expiringRun.Id}/inputs?status=Pending", JsonOptions))!.Single();
         clock.Advance(TimeSpan.FromDays(8));

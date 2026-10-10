@@ -151,7 +151,9 @@ public sealed partial class FlowTests
     private static async Task<FlowRun> PutWaitingForInputAsync(
         IFlowRepository repository,
         StoredFlowRun pending,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        InputRequestType type = InputRequestType.Text,
+        IReadOnlyList<string>? options = null)
     {
         var now = timeProvider.GetUtcNow();
         var waiting = pending.Value with
@@ -182,8 +184,8 @@ public sealed partial class FlowTests
             RunId = waiting.Id,
             RuntimeRequestId = "runtime-request-1",
             Prompt = "What is your name?",
-            Type = InputRequestType.Text,
-            Options = [],
+            Type = type,
+            Options = options ?? [],
             Source = "agent-a",
             CreatedAt = now,
             ExpiresAt = now.AddMinutes(1)
