@@ -13,16 +13,28 @@ public sealed partial class FlowRunService
         string parentRunId,
         string stepDefinitionId,
         JsonElement input,
+        string purpose,
+        int? iteration,
         CancellationToken cancellationToken)
     {
         var parent = await repository.GetRunAsync(workspaceId, parentRunId, cancellationToken)
             ?? throw new FlowRunNotFoundException(parentRunId);
-        var call = parent.Value.DefinitionSnapshot.Graph?.Steps
-            .OfType<FlowCallStepDefinition>()
-            .SingleOrDefault(value => string.Equals(value.Name, stepDefinitionId, StringComparison.Ordinal))
-            ?? throw new FlowValidationException("child_flow_step_invalid", "The assigned StepDefinition is not a Flow call.");
+        var step = parent.Value.DefinitionSnapshot.Graph?.Steps.SingleOrDefault(value =>
+            string.Equals(value.Name, stepDefinitionId, StringComparison.Ordinal))
+            ?? throw new FlowValidationException("child_flow_step_invalid", "The assigned StepDefinition was not found.");
+        var call = purpose switch
+        {
+            "flowCall" when step is FlowCallStepDefinition flowCall && iteration is null => flowCall,
+            "repeat" when step is RepeatFlowStepDefinition repeat
+                && iteration is >= 1 && iteration <= repeat.MaximumIterations => RepeatCall(repeat),
+            "artifactStorage" when step.ArtifactOutput?.StorageFlow is not null && iteration is null =>
+                ArtifactStorageCall(step),
+            _ => throw new FlowValidationException("child_flow_step_invalid",
+                "The child Flow purpose does not match the assigned StepDefinition.")
+        };
         var attempt = Math.Max(1, parent.Value.Steps.Single(value => value.StepName == stepDefinitionId).Attempt);
-        var childRunId = ChildFlowRunId(parent.Value, stepDefinitionId, attempt);
+        var identity = purpose == "artifactStorage" ? $"{stepDefinitionId}:artifact-storage" : stepDefinitionId;
+        var childRunId = ChildFlowRunId(parent.Value, identity, attempt, iteration);
         return await EnsureChildFlowRunAsync(parent.Value, call, input, childRunId, cancellationToken);
     }
 

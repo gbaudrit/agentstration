@@ -161,6 +161,56 @@ public sealed class RuntimeWorkerExecutionService(
         return await operations.StoreArtifactAsync(proof.WorkspaceId, proof.AssignmentId, name, contentType, content, lease.Token);
     }
 
+    public async Task<RuntimeGovernedFlowToolResult> InvokeFlowToolAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        Guid stepExecutionId,
+        JsonElement arguments,
+        CancellationToken cancellationToken)
+    {
+        if (arguments.GetRawText().Length > 1_048_576)
+            throw new RuntimeExecutionMaterialException("tool_arguments_too_large", "Tool arguments cannot exceed 1 MiB.");
+        var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
+        if (authorization.Assignment.TargetKind != RuntimeAssignmentTargetKind.FlowRun)
+            throw new RuntimeExecutionMaterialException("flow_tool_not_allowed", "Only a Flow assignment can invoke a Flow Tool.");
+        var step = authorization.Assignment.StepExecutions.SingleOrDefault(value => value.Id == stepExecutionId)
+            ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Flow Tool does not reference an authorized StepExecution.");
+        using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
+        return await operations.InvokeFlowToolAsync(proof.WorkspaceId, step.FlowRunId,
+            step.StepDefinitionId, arguments, lease.Token);
+    }
+
+    public async Task<RuntimeGovernedFlowArtifact> CaptureFlowArtifactAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        Guid stepExecutionId,
+        string? fileName,
+        string mediaType,
+        JsonElement content,
+        IReadOnlyDictionary<string, string> provenance,
+        CancellationToken cancellationToken)
+    {
+        if (content.GetRawText().Length > 1_048_576 || provenance.Count > 64)
+            throw new RuntimeExecutionMaterialException("flow_artifact_request_too_large",
+                "A Flow Artifact request cannot exceed 1 MiB or 64 provenance entries.");
+        var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
+        var step = AuthorizedFlowStep(authorization, stepExecutionId, "Flow Artifact capture");
+        using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
+        return await operations.CaptureFlowArtifactAsync(proof.WorkspaceId, step.FlowRunId,
+            step.StepDefinitionId, fileName, mediaType, content, provenance, lease.Token);
+    }
+
+    public async Task CleanupFlowArtifactAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        Guid stepExecutionId,
+        RuntimeGovernedFlowArtifact artifact,
+        CancellationToken cancellationToken)
+    {
+        var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
+        var step = AuthorizedFlowStep(authorization, stepExecutionId, "Flow Artifact cleanup");
+        using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
+        await operations.CleanupFlowArtifactAsync(proof.WorkspaceId, step.FlowRunId,
+            step.StepDefinitionId, artifact, lease.Token);
+    }
+
     public async Task<RuntimeGovernedArtifact?> GetArtifactAsync(
         RuntimeAssignmentOwnershipProof proof,
         Guid artifactId,
@@ -174,6 +224,8 @@ public sealed class RuntimeWorkerExecutionService(
         RuntimeAssignmentOwnershipProof proof,
         Guid stepExecutionId,
         JsonElement input,
+        string purpose,
+        int? iteration,
         CancellationToken cancellationToken)
     {
         var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
@@ -183,7 +235,7 @@ public sealed class RuntimeWorkerExecutionService(
             ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The child Flow does not reference an authorized StepExecution.");
         using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
         var child = await operations.CreateOrGetChildFlowAsync(proof.WorkspaceId, step.FlowRunId,
-            step.StepDefinitionId, input, lease.Token);
+            step.StepDefinitionId, input, purpose, iteration, lease.Token);
         await assignments.RegisterChildFlowAsync(proof, child.RunId, lease.Token);
         var material = await materials.ResolveFlowRunAsync(authorization.Assignment, child.RunId, lease.Token);
         return child with { Material = material };
@@ -224,6 +276,19 @@ public sealed class RuntimeWorkerExecutionService(
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.LeaseTooShort,
                 "The assignment lease is too close to expiry to start a governed side effect.");
         return authorization;
+    }
+
+    private static RuntimeAssignmentStepExecution AuthorizedFlowStep(
+        RuntimeAssignmentAuthorization authorization,
+        Guid stepExecutionId,
+        string operation)
+    {
+        if (authorization.Assignment.TargetKind != RuntimeAssignmentTargetKind.FlowRun)
+            throw new RuntimeExecutionMaterialException("flow_operation_not_allowed",
+                $"Only a Flow assignment can perform {operation}.");
+        return authorization.Assignment.StepExecutions.SingleOrDefault(value => value.Id == stepExecutionId)
+            ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid",
+                $"{operation} does not reference an authorized StepExecution.");
     }
 
     private async Task<RuntimeAssignmentLeaseGuard> CreateLeaseGuardAsync(

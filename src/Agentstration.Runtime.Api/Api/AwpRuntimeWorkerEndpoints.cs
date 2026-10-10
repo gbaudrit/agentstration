@@ -53,6 +53,15 @@ public static class AwpRuntimeWorkerEndpoints
         awp.MapPost("/assignments/tools/invoke", InvokeToolAsync)
             .Produces<AwpEnvelope<AwpInvokeToolResponse>>()
             .WithSummary("Invoke an assigned Agent Tool through governance and audit hooks");
+        awp.MapPost("/assignments/flow-tools/invoke", InvokeFlowToolAsync)
+            .Produces<AwpEnvelope<AwpInvokeFlowToolResponse>>()
+            .WithSummary("Invoke the Tool declared by an assigned Flow step through governance and audit hooks");
+        awp.MapPost("/assignments/flow-artifacts/capture", CaptureFlowArtifactAsync)
+            .Produces<AwpEnvelope<AwpCaptureFlowArtifactResponse>>()
+            .WithSummary("Capture a governed Artifact declared by an assigned Flow step");
+        awp.MapPost("/assignments/flow-artifacts/cleanup", CleanupFlowArtifactAsync)
+            .Produces<AwpEnvelope<AwpCleanupFlowArtifactResponse>>()
+            .WithSummary("Clean a governed temporary Artifact declared by an assigned Flow step");
         awp.MapPost("/assignments/artifacts", StoreArtifactAsync)
             .Produces<AwpEnvelope<AwpArtifactResponse>>()
             .WithSummary("Store a bounded assignment Artifact without exposing its backend path");
@@ -358,6 +367,81 @@ public static class AwpRuntimeWorkerEndpoints
         return Envelope(envelope.MessageId, now, new AwpInvokeToolResponse(now, result));
     }, principal);
 
+    private static async Task<IResult> InvokeFlowToolAsync(
+        AwpEnvelope<AwpInvokeFlowToolRequest> envelope,
+        ClaimsPrincipal principal,
+        RuntimeWorkerDispatchService dispatch,
+        RuntimeWorkerExecutionService execution,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken) => await ExecuteAsync(async identity =>
+    {
+        ValidateEnvelope(envelope.ProtocolVersion, envelope.MessageId);
+        var request = envelope.Payload
+            ?? throw new RuntimeWorkerDispatchException(AwpErrorCodes.InvalidRequest, "The Flow Tool invocation request is required.");
+        ValidateCommand(identity, request.Context, dispatch);
+        var result = await execution.InvokeFlowToolAsync(ToProof(request.Context), request.StepExecutionId.Value,
+            request.Arguments, cancellationToken);
+        var now = timeProvider.GetUtcNow();
+        return Envelope(envelope.MessageId, now, new AwpInvokeFlowToolResponse(
+            now,
+            result.Output,
+            result.ToolName,
+            result.ToolNamespace.ToString(),
+            result.ToolUid,
+            result.ToolGeneration,
+            result.ProviderName,
+            result.ProviderNamespace.ToString(),
+            result.ProviderType,
+            result.ExternalToolId,
+            result.Route is null ? null : new AwpFlowToolRoute(
+                result.Route.ToolSetName,
+                result.Route.ToolSetNamespace.ToString(),
+                result.Route.ToolSetVersion,
+                result.Route.Capability,
+                result.Route.Route)));
+    }, principal);
+
+    private static async Task<IResult> CaptureFlowArtifactAsync(
+        AwpEnvelope<AwpCaptureFlowArtifactRequest> envelope,
+        ClaimsPrincipal principal,
+        RuntimeWorkerDispatchService dispatch,
+        RuntimeWorkerExecutionService execution,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken) => await ExecuteAsync(async identity =>
+    {
+        ValidateEnvelope(envelope.ProtocolVersion, envelope.MessageId);
+        var request = envelope.Payload
+            ?? throw new RuntimeWorkerDispatchException(AwpErrorCodes.InvalidRequest, "The Flow Artifact capture request is required.");
+        ValidateCommand(identity, request.Context, dispatch);
+        var artifact = await execution.CaptureFlowArtifactAsync(ToProof(request.Context),
+            request.StepExecutionId.Value, request.FileName, request.MediaType, request.Content,
+            request.Provenance, cancellationToken);
+        var now = timeProvider.GetUtcNow();
+        return Envelope(envelope.MessageId, now, new AwpCaptureFlowArtifactResponse(now,
+            new(artifact.ArtifactId, artifact.FileName, artifact.MediaType, artifact.Kind,
+                artifact.StorageFlowRunId, artifact.LocalArtifactId)));
+    }, principal);
+
+    private static async Task<IResult> CleanupFlowArtifactAsync(
+        AwpEnvelope<AwpCleanupFlowArtifactRequest> envelope,
+        ClaimsPrincipal principal,
+        RuntimeWorkerDispatchService dispatch,
+        RuntimeWorkerExecutionService execution,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken) => await ExecuteAsync(async identity =>
+    {
+        ValidateEnvelope(envelope.ProtocolVersion, envelope.MessageId);
+        var request = envelope.Payload
+            ?? throw new RuntimeWorkerDispatchException(AwpErrorCodes.InvalidRequest, "The Flow Artifact cleanup request is required.");
+        ValidateCommand(identity, request.Context, dispatch);
+        await execution.CleanupFlowArtifactAsync(ToProof(request.Context), request.StepExecutionId.Value,
+            new(request.Artifact.ArtifactId, request.Artifact.FileName, request.Artifact.MediaType,
+                request.Artifact.Kind, request.Artifact.StorageFlowRunId, request.Artifact.LocalArtifactId),
+            cancellationToken);
+        var now = timeProvider.GetUtcNow();
+        return Envelope(envelope.MessageId, now, new AwpCleanupFlowArtifactResponse(now));
+    }, principal);
+
     private static async Task<IResult> StoreArtifactAsync(
         AwpEnvelope<AwpStoreArtifactRequest> envelope,
         ClaimsPrincipal principal,
@@ -407,7 +491,7 @@ public static class AwpRuntimeWorkerEndpoints
             ?? throw new RuntimeWorkerDispatchException(AwpErrorCodes.InvalidRequest, "The child Flow request is required.");
         ValidateCommand(identity, request.Context, dispatch);
         var child = await execution.CreateOrGetChildFlowAsync(ToProof(request.Context), request.StepExecutionId.Value,
-            request.Input, cancellationToken);
+            request.Input, request.Purpose, request.Iteration, cancellationToken);
         var now = timeProvider.GetUtcNow();
         return Envelope(envelope.MessageId, now, new AwpChildFlowResponse(now, child.RunId, child.Status, child.Output,
             child.Material is null ? null : (AwpRootFlowExecutionMaterial)ToContract(child.Material)));
@@ -547,11 +631,15 @@ public static class AwpRuntimeWorkerEndpoints
             flow.Input,
             flow.Definition,
             flow.Agents.Select(ToContract).ToArray(),
+            flow.PrincipalId,
             flow.Resume is null ? null : new AwpFlowResumeMaterial(
                 flow.Resume.RuntimeType, flow.Resume.StateId, flow.Resume.InputRequestId,
                 flow.Resume.RuntimeRequestId, flow.Resume.Prompt, flow.Resume.InputType,
                 flow.Resume.Options, flow.Resume.Source, flow.Resume.Response,
-                flow.Resume.RespondedAt, flow.Resume.PrincipalId)),
+                flow.Resume.RespondedAt, flow.Resume.PrincipalId),
+            flow.RootFlowRunId,
+            flow.ParentFlowRunId,
+            flow.CorrelationId),
         _ => throw new ArgumentOutOfRangeException(nameof(material))
     };
 
@@ -576,7 +664,12 @@ public static class AwpRuntimeWorkerEndpoints
             value.Description,
             value.InputSchema,
             value.OutputSchema,
-            value.RequiresApproval)).ToArray());
+            value.RequiresApproval)).ToArray())
+    {
+        AgentNamespace = agent.AgentNamespace.ToString(),
+        RuntimeProfileName = agent.RuntimeProfileName,
+        RuntimeProfileNamespace = agent.RuntimeProfileNamespace.ToString()
+    };
 
     private static AwpCheckpointResponse ToContract(DateTimeOffset serverTime, RuntimeAssignmentCheckpoint checkpoint) => new(
         serverTime,

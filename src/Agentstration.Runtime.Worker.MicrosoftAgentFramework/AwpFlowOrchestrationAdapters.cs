@@ -125,7 +125,8 @@ internal sealed class AwpFlowAgentResolver(AwpRootFlowExecutionMaterial material
     public Task<ResolvedRuntimeAgent> ResolveAsync(RuntimeAgentReference reference, CancellationToken cancellationToken)
     {
         var agent = material.Agents.Single(value => value.AgentName == reference.ResourceId
-            && value.Generation == reference.Version);
+            && value.Generation == reference.Version
+            && string.Equals(value.AgentNamespace, reference.Namespace.Value, StringComparison.Ordinal));
         return Task.FromResult(ToResolved(agent));
     }
 
@@ -135,13 +136,14 @@ internal sealed class AwpFlowAgentResolver(AwpRootFlowExecutionMaterial material
     public Task<ResolvedRuntimeAgent> ResolveLatestAsync(string resourceId, ResourceNamespace @namespace,
         CancellationToken cancellationToken)
     {
-        var agent = material.Agents.Single(value => value.ParticipantId == resourceId);
+        var agent = material.Agents.Single(value => value.ParticipantId == resourceId
+            && string.Equals(value.AgentNamespace, @namespace.Value, StringComparison.Ordinal));
         return Task.FromResult(ToResolved(agent));
     }
 
     private static ResolvedRuntimeAgent ToResolved(AwpExecutionAgentMaterial agent) => new(
         agent.AgentId, agent.AgentName, agent.Generation, $"awp:{agent.MaterialId}", agent.RevisionId,
-        AwpRuntimeKinds.MicrosoftAgentFramework, $"awp-participant:{agent.ParticipantId}",
+        agent.RuntimeProfileName, agent.ModelProfileName,
         new ExecutableAgentDefinition
         {
             AgentId = agent.AgentId,
@@ -150,16 +152,22 @@ internal sealed class AwpFlowAgentResolver(AwpRootFlowExecutionMaterial material
             Description = agent.Description,
             AgentVersion = agent.Generation,
             EffectiveInstructions = agent.Instructions,
-            ModelProfileName = $"awp-participant:{agent.ParticipantId}",
-            ModelProfileNamespace = ResourceNamespace.Default,
-            RuntimeProfileName = AwpRuntimeKinds.MicrosoftAgentFramework,
+            ModelProfileName = agent.ModelProfileName,
+            ModelProfileNamespace = ResourceNamespace.Parse(agent.ModelProfileNamespace),
+            RuntimeProfileName = agent.RuntimeProfileName,
+            RuntimeProfileNamespace = ResourceNamespace.Parse(agent.RuntimeProfileNamespace),
             EffectiveToolNames = agent.Tools.Select(tool => tool.Id).ToArray(),
             MiddlewareIds = [],
             ContextProviderIds = [],
             Capabilities = [],
             Handler = agent.Handler,
             DefinitionHash = agent.DefinitionHash
-        }, true, "Ready", null);
+        }, true, "Ready", null)
+    {
+        AgentNamespace = ResourceNamespace.Parse(agent.AgentNamespace),
+        RuntimeProfileNamespace = ResourceNamespace.Parse(agent.RuntimeProfileNamespace),
+        ModelProfileNamespace = ResourceNamespace.Parse(agent.ModelProfileNamespace)
+    };
 }
 
 internal sealed class AwpFlowToolExecutionPipeline(

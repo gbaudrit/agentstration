@@ -19,7 +19,7 @@ public sealed class RuntimeWorkerOperationGatewayTests
         var scopes = new RecordingRequestContextScopes();
         var resolver = new ContextAssertingChatClientResolver(scopes, tenantId, workspaceId.Value, principalId);
         var gateway = new RuntimeWorkerOperationGateway(
-            resolver, null!, null!, null!, null!, TimeProvider.System, scopes);
+            resolver, null!, null!, null!, null!, null!, null!, null!, null!, TimeProvider.System, scopes);
 
         var response = await gateway.InvokeModelAsync(new RuntimeGovernedModelRequest(
             Agent(),

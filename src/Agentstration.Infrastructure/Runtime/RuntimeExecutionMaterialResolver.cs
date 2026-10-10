@@ -150,7 +150,10 @@ public sealed class RuntimeExecutionMaterialResolver(
             run.Input.Clone(),
             JsonSerializer.SerializeToElement(run.DefinitionSnapshot, JsonOptions),
             resolvedAgents,
-            resume);
+            resume,
+            run.RootFlowRunId ?? run.Id,
+            run.ParentFlowRunId,
+            run.CorrelationId);
     }
 
     private static bool BelongsToAssignment(RuntimeWorkerAssignment assignment, FlowRun run) =>
@@ -279,7 +282,8 @@ public sealed class RuntimeExecutionMaterialResolver(
             toolMaterials)
         {
             AgentNamespace = resolved.AgentNamespace,
-            RuntimeProfileName = resolved.RuntimeProfileName
+            RuntimeProfileName = resolved.RuntimeProfileName,
+            RuntimeProfileNamespace = resolved.RuntimeProfileNamespace
         };
     }
 }
