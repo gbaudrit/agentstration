@@ -47,15 +47,21 @@
   <data name="OpenProvider"><value>Open provider</value></data>
   <data name="References"><value>References</value></data>
   <data name="ToolsAndTags"><value>Tools and tags</value></data>
-  <data name="GovernedTools"><value>Governed tools</value></data>
+  <data name="GovernedTools"><value>Additional individual tools</value></data>
   <data name="ToolConfiguration"><value>Tool configuration</value></data>
-  <data name="ToolConfigurationHelp"><value>Select the governed tools available to this agent. Tools are grouped by their MCP source.</value></data>
+  <data name="ToolConfigurationHelp"><value>Add individual Tools beyond those already granted by a ToolSet. ToolSet grants appear checked and read-only; only individual additions are saved here.</value></data>
   <data name="ManageMcpTools"><value>Manage MCP / tools</value></data>
   <data name="OpenToolCatalog"><value>Open MCP / tools</value></data>
   <data name="McpProvider"><value>MCP</value></data>
   <data name="OpenMcp"><value>Open MCP</value></data>
   <data name="UnknownMcp"><value>Unknown MCP</value></data>
   <data name="SelectedTools"><value>Selected: {0}</value></data>
+  <data name="EffectiveSelectedTools"><value>Effective: {0}</value></data>
+  <data name="EffectiveToolAccess"><value>Effective tool access</value></data>
+  <data name="EffectiveTools"><value>effective</value></data>
+  <data name="ViaToolSets"><value>via ToolSets</value></data>
+  <data name="IndividualTools"><value>individual</value></data>
+  <data name="GrantedViaToolSet"><value>Granted via {0}</value></data>
   <data name="ToolCount"><value>{0} tools</value></data>
   <data name="NoDiscoveredTools"><value>No discovered tools are available. Configure them under Tools.</value></data>
   <data name="Available"><value>Available</value></data>
@@ -93,4 +99,6 @@
   <data name="ToolCategoriesHelp"><value>Use a category to select its currently assignable Tools in bulk. Only individual Tool references are saved on the Agent.</value></data>
   <data name="ManageCategories"><value>Manage categories</value></data>
   <data name="CategorySelection"><value>{0} of {1} selected</value></data>
+  <data name="ToolSetConfiguration" xml:space="preserve"><value>Versioned permissions</value></data><data name="GovernedToolSets" xml:space="preserve"><value>ToolSet grants</value></data><data name="ToolSetConfigurationHelp" xml:space="preserve"><value>Grant an exact published ToolSet version, then keep every member or choose a subset. Granted Tools are reflected in the effective access list below.</value></data><data name="ManageToolSets" xml:space="preserve"><value>Manage ToolSets</value></data><data name="NoPublishedToolSets" xml:space="preserve"><value>No published ToolSet version is available in this Workspace.</value></data><data name="PublishedToolSet" xml:space="preserve"><value>Published ToolSet</value></data><data name="InspectToolSet" xml:space="preserve"><value>Inspect</value></data><data name="AllMembers" xml:space="preserve"><value>Grant all members</value></data><data name="SelectedMembers" xml:space="preserve"><value>Grant selected members</value></data><data name="PinnedVersionHelp" xml:space="preserve"><value>Version {0} will be pinned; later additions do not extend a published Agent revision.</value></data><data name="ToolSetMembers" xml:space="preserve"><value>ToolSet members</value></data><data name="ChooseToolSetMembers" xml:space="preserve"><value>Choose the members granted through this version.</value></data>
+  <data name="ActiveRevision"><value>Active revision</value></data><data name="PinnedToolSetAssignments"><value>Pinned ToolSet assignments</value></data><data name="PinnedToolSetAssignmentsHelp"><value>This immutable evidence controls the Tools available to the active Agent revision.</value></data><data name="ToolSet"><value>ToolSet</value></data><data name="Version"><value>Version</value></data><data name="DefinitionHash"><value>Definition hash</value></data><data name="EffectiveMembers"><value>Effective members</value></data>
 </root>

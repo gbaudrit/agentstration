@@ -84,10 +84,11 @@ A Workflow models an application-controlled graph. The executable representation
 | `condition` | Evaluates a constrained simple condition or expression. | `true` or `false` |
 | `transform` | Produces a mapped or expression-derived value. | `completed` |
 | `flow` | Selects an accessible published Flow by active or exact version and maps its declared input. Durable child execution is delivered by the nested FlowRun increment. | `completed` or `failed` |
+| `repeat` | Repeats a published child Flow with explicit first/next input mappings, an `until` expression, and a finite iteration limit. | `completed`, `failed`, `timedOut`, or `cancelled` |
 | `output` | Maps the terminal Flow output. | `completed` |
 | `failure` | Terminates the Run with a declared code and message. | Terminal failure |
 
-Transitions connect `fromStep`, event, and `toStep`; an optional condition and priority refine selection. Execution is bounded and rejects a step reached twice, so cycles are not currently supported. Business logic remains in application services and agents, not in the designer or transport endpoints.
+Transitions connect `fromStep`, event, and `toStep`; an optional condition and priority refine selection. Graph cycles remain unsupported. Bounded repetition is expressed only by `repeat`, which persists each iteration as a deterministic child FlowRun and exposes the last successful child output. Business logic remains in application services and agents, not in the designer or transport endpoints.
 
 The palette contains one generic Flow card, independently of the number of Flows installed in the Workspace. Its namespace-aware selector includes Pack Flows. Changing the target preserves existing mappings; validation reports properties that are no longer compatible with the selected input schema. An active reference follows the target's active published version, while an exact reference pins one immutable version. Publication resolves both forms and rejects dependency cycles before a Run can be created.
 

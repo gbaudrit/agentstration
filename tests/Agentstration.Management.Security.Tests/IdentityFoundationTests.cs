@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Agentstration.Flows.Application;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
@@ -415,6 +416,7 @@ public sealed class IdentityFoundationTests
                 controlPlaneConnectionString: $"Data Source={Path.Combine(directory, "control-plane.db")}");
             var provider = services.BuildServiceProvider();
             await provider.GetRequiredService<IResourceStore>().InitializeAsync(default);
+            await provider.GetRequiredService<FlowService>().InitializeAsync(default);
             var initialContext = await provider.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
             return new IdentityFixture(directory, provider, initialContext);
         }

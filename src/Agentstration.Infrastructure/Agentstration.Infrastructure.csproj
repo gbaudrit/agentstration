@@ -1,5 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.DataSources/Agentstration.DataSources.csproj" />
+    <ProjectReference Include="../Agentstration.Artifacts/Agentstration.Artifacts.csproj" />
+    <ProjectReference Include="../Agentstration.Artifacts.Contracts/Agentstration.Artifacts.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
     <ProjectReference Include="../Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Flows.Application/Agentstration.Flows.Application.csproj" />
@@ -14,6 +17,7 @@
     <ProjectReference Include="../Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.Aep/Agentstration.Extensions.Aep.csproj" />
     <ProjectReference Include="../Agentstration.Identity/Agentstration.Identity.csproj" />
+    <ProjectReference Include="../Agentstration.Knowledge/Agentstration.Knowledge.csproj" />
     <ProjectReference Include="../Agentstration.Models.Application/Agentstration.Models.Application.csproj" />
     <ProjectReference Include="../Agentstration.Packs/Agentstration.Packs.csproj" />
     <ProjectReference Include="../Agentstration.Packs.Contracts/Agentstration.Packs.Contracts.csproj" />

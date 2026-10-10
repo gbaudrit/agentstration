@@ -19,6 +19,7 @@ public static class AgentsApiModule
         GetAgentEndpoint.Map(group);
         DeleteAgentEndpoint.Map(group);
         CreateAgentRevisionEndpoint.Map(group);
+        GetAgentRevisionEndpoint.Map(group);
         PurgeAgentRevisionEndpoint.Map(group);
         CreateDeploymentEndpoint.Map(group);
         GetDeploymentEndpoint.Map(group);

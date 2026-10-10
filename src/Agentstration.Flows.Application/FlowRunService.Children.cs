@@ -7,9 +7,11 @@ namespace Agentstration.Flows.Application;
 
 public sealed partial class FlowRunService
 {
-    private static string ChildFlowRunId(FlowRun parent, string stepName, int attempt)
+    private static string ChildFlowRunId(FlowRun parent, string stepName, int attempt, int? iteration = null)
     {
-        var identity = $"{parent.WorkspaceId}:{parent.Id}:{stepName}:{attempt}";
+        var identity = iteration is null
+            ? $"{parent.WorkspaceId}:{parent.Id}:{stepName}:{attempt}"
+            : $"{parent.WorkspaceId}:{parent.Id}:{stepName}:{attempt}:{iteration.Value}";
         var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
         return $"flowrun-child-{hash[..32]}";
     }
@@ -18,10 +20,20 @@ public sealed partial class FlowRunService
         StoredFlowRun stored,
         string stepName,
         string childRunId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        JsonElement? resolvedInput = null,
+        int? repeatIteration = null)
     {
         var steps = stored.Value.Steps.Select(step => step.StepName == stepName
-            ? step with { ChildFlowRunId = childRunId }
+            ? step with
+            {
+                ChildFlowRunId = childRunId,
+                ChildFlowRunIds = step.ChildFlowRunIds.Contains(childRunId, StringComparer.Ordinal)
+                    ? step.ChildFlowRunIds
+                    : [.. step.ChildFlowRunIds, childRunId],
+                ResolvedInput = resolvedInput?.Clone() ?? step.ResolvedInput?.Clone(),
+                RepeatIteration = repeatIteration ?? step.RepeatIteration
+            }
             : step).ToArray();
         var suspended = await SaveAsync(stored, stored.Value with
         {
@@ -35,7 +47,7 @@ public sealed partial class FlowRunService
             suspended.Value.Id,
             FlowRunEventType.FlowRunWaitingForChild,
             stepName,
-            JsonSerializer.SerializeToElement(new { childFlowRunId = childRunId }),
+            JsonSerializer.SerializeToElement(new { childFlowRunId = childRunId, repeatIteration }),
             cancellationToken);
         return suspended;
     }
@@ -165,7 +177,8 @@ public sealed partial class FlowRunService
         if (parent is null
             || parent.Value.Status != FlowRunStatus.WaitingForChild
             || parent.Value.Scope != child.Scope
-            || !parent.Value.Steps.Any(step => step.Status == FlowStepRunStatus.Running && step.ChildFlowRunId == child.Id))
+            || !parent.Value.Steps.Any(step => step.Status == FlowStepRunStatus.Running
+                && (step.ChildFlowRunId == child.Id || step.ArtifactStorageFlowRunId == child.Id)))
             return;
 
         StoredFlowRun resumed;
@@ -185,7 +198,8 @@ public sealed partial class FlowRunService
         try
         {
             await EmitAsync(resumed.Value.WorkspaceId, resumed.Value.Id, FlowRunEventType.FlowRunResumedFromChild,
-                resumed.Value.Steps.Single(step => step.ChildFlowRunId == child.Id).StepName,
+                resumed.Value.Steps.Single(step => step.ChildFlowRunId == child.Id
+                    || step.ArtifactStorageFlowRunId == child.Id).StepName,
                 JsonSerializer.SerializeToElement(new { childFlowRunId = child.Id, childStatus = child.Status }), cancellationToken);
         }
         finally

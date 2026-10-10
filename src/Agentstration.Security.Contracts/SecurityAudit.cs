@@ -48,6 +48,31 @@ public static class SecurityAuditActions
     public const string SourceRegistryDeleted = "source-registry.deleted";
     public const string SourceRegistryRefreshed = "source-registry.refreshed";
     public const string SourceRegistrySourceImported = "source-registry.source-imported";
+    public const string DataSourceCreated = "data-source.created";
+    public const string DataSourceUpdated = "data-source.updated";
+    public const string DataSourceDeleted = "data-source.deleted";
+    public const string DataSourceProfileCreated = "data-source-profile.created";
+    public const string DataSourceProfileUpdated = "data-source-profile.updated";
+    public const string DataSourceProfileDeleted = "data-source-profile.deleted";
+    public const string DataSourceProfileRevisionPublished = "data-source-profile.revision-published";
+    public const string DataSourceProfileRevisionActivated = "data-source-profile.revision-activated";
+    public const string DataSourceAcquisitionStarted = "data-source-acquisition.started";
+    public const string DataSourceAcquisitionCancelled = "data-source-acquisition.cancelled";
+    public const string DataSourceAcquisitionRetried = "data-source-acquisition.retried";
+    public const string KnowledgeSourceCreated = "knowledge-source.created";
+    public const string KnowledgeSourceToolExposurePublished = "knowledge-source.tool-exposure-published";
+    public const string KnowledgeSourceUpdated = "knowledge-source.updated";
+    public const string KnowledgeSourceEnabled = "knowledge-source.enabled";
+    public const string KnowledgeSourceDisabled = "knowledge-source.disabled";
+    public const string KnowledgeSourceDeleted = "knowledge-source.deleted";
+    public const string KnowledgeSnapshotPublished = "knowledge-snapshot.published";
+    public const string KnowledgeSnapshotActivated = "knowledge-snapshot.activated";
+    public const string KnowledgeRetrievalCompleted = "knowledge-retrieval.completed";
+    public const string KnowledgeRetrievalFailed = "knowledge-retrieval.failed";
+    public const string ToolSetCreated = "tool-set.created";
+    public const string ToolSetUpdated = "tool-set.updated";
+    public const string ToolSetDeleted = "tool-set.deleted";
+    public const string ToolSetVersionPublished = "tool-set.version-published";
 }
 
 public sealed record SecurityAuditEvent(

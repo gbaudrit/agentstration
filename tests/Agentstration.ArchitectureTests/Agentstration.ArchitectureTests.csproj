@@ -9,6 +9,7 @@
     <ProjectReference Include="../../src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj" />
     <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
     <ProjectReference Include="../../src/Agentstration.Application/Agentstration.Application.csproj" />
     <ProjectReference Include="../../src/Agentstration.Console.Client/Agentstration.Console.Client.csproj" />
@@ -37,6 +38,8 @@
     <ProjectReference Include="../../src/Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Knowledge.Contracts/Agentstration.Knowledge.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Knowledge/Agentstration.Knowledge.csproj" />
     <ProjectReference Include="../../src/Agentstration.Models.Contracts/Agentstration.Models.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Secrets.Contracts/Agentstration.Secrets.Contracts.csproj" />

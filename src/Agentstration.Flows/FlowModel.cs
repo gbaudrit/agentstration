@@ -4,6 +4,11 @@ using Agentstration.Resources;
 
 namespace Agentstration.Flows;
 
+public static class FlowMetadataKeys
+{
+    public const string Contract = "flow.contract";
+}
+
 public readonly record struct FlowId(string Value, ResourceNamespace Namespace = default)
 {
     public override string ToString() => Value;

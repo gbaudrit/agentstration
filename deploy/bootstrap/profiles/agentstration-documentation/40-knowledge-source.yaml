@@ -1,0 +1,21 @@
+apiVersion: agentstration.io/v1
+kind: KnowledgeSource
+metadata:
+  name: agentstration-documentation
+  tags:
+    agentstration.io/category: knowledge-source
+definition:
+  displayName: Agentstration documentation
+  description: Public Agentstration product and operator documentation.
+  enabled: true
+  dataSources:
+    - name: documentation
+      dataSource: { name: agentstration-documentation }
+  projectionFlow:
+    name: knowledge-projection-builtin
+    version: 1.0.0
+    useActiveVersion: false
+  retrievalFlow:
+    name: knowledge-retrieval-builtin
+    version: 1.0.0
+    useActiveVersion: false

@@ -5,6 +5,8 @@ obj/
 .vscode/
 TestResults/
 artifacts/
+!src/Agentstration.Infrastructure/Artifacts/
+!src/Agentstration.Infrastructure/Artifacts/*.cs
 .models/
 deploy/compose/.env.postgresql
 deploy/compose/.env.foundry

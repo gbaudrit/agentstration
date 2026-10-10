@@ -8,6 +8,7 @@ using Agentstration.Application.Work;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
+using Agentstration.Extensions.Crawl4AI;
 using Agentstration.Extensions.Git;
 using Agentstration.Extensions.LlamaCpp;
 using Agentstration.Extensions.LocalAI;
@@ -17,6 +18,8 @@ using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
+using Agentstration.Knowledge;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Packs;
@@ -53,6 +56,53 @@ namespace Agentstration.ArchitectureTests;
 [TestClass]
 public sealed class DependencyTests
 {
+    [TestMethod]
+    public void Crawl4AiDependenciesStayInsideTheAutonomousExtension()
+    {
+        var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
+        var extensionProject = Path.Combine(sourceRoot, "Agentstration.Extensions.Crawl4AI", "Agentstration.Extensions.Crawl4AI.csproj");
+        var appHostProject = Path.Combine(sourceRoot, "Agentstration.AppHost", "Agentstration.AppHost.csproj");
+        Assert.IsTrue(File.Exists(extensionProject));
+        Assert.Contains("../Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj", File.ReadAllText(appHostProject));
+        Assert.IsFalse(typeof(Crawl4AiClient).Assembly.GetReferencedAssemblies().Any(reference =>
+            reference.Name is "Agentstration.Knowledge" or "Agentstration.Knowledge.Contracts"));
+
+        var violations = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !string.Equals(path, extensionProject, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(path, appHostProject, StringComparison.OrdinalIgnoreCase))
+            .Where(path => File.ReadAllText(path).Contains("Agentstration.Extensions.Crawl4AI", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(sourceRoot, path))
+            .ToArray();
+
+        Assert.IsEmpty(violations, $"Crawl4AI must not enter product modules: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
+    public void AspireCrawl4AiRegistrationKeepsManagedProvisioningOptionalAndHardened()
+    {
+        var appHost = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Agentstration.AppHost", "Program.cs"));
+        var settings = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Agentstration.AppHost", "appsettings.json"));
+
+        Assert.Contains("if (crawl4AiEnabled)", appHost, StringComparison.Ordinal);
+        Assert.Contains("Crawl4AI:Provisioning", appHost, StringComparison.Ordinal);
+        Assert.Contains("builder.AddContainer(", appHost, StringComparison.Ordinal);
+        Assert.Contains("unclecode/crawl4ai", appHost, StringComparison.Ordinal);
+        Assert.Contains("new GenerateParameterDefault()", appHost, StringComparison.Ordinal);
+        Assert.Contains("secret: true", appHost, StringComparison.Ordinal);
+        Assert.Contains(".WithEnvironment(\"CRAWL4AI_API_TOKEN\", crawl4AiToken)", appHost, StringComparison.Ordinal);
+        Assert.Contains(".WithEnvironment(\"Crawl4AI__ApiToken\", crawl4AiToken)", appHost, StringComparison.Ordinal);
+        Assert.Contains("DeveloperCertificateDefaultHttpsTerminationEnabled = false", appHost, StringComparison.Ordinal);
+        Assert.Contains(".WithDeveloperCertificateTrust(false)", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain(".WithBindMount(crawl4AiTokenFile", appHost, StringComparison.Ordinal);
+        Assert.Contains("--cap-drop=ALL", appHost, StringComparison.Ordinal);
+        Assert.Contains("--security-opt=no-new-privileges", appHost, StringComparison.Ordinal);
+        Assert.Contains("--read-only", appHost, StringComparison.Ordinal);
+        Assert.Contains(".WaitFor(crawl4AiService)", appHost, StringComparison.Ordinal);
+        Assert.Contains("\"Provisioning\": \"Managed\"", settings, StringComparison.Ordinal);
+        Assert.Contains("\"ImageTag\": \"0.9.4\"", settings, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"ImageTag\": \"latest\"", settings, StringComparison.OrdinalIgnoreCase);
+    }
+
     [TestMethod]
     public void FoundryDependenciesStayInsideTheAutonomousExtension()
     {
@@ -699,6 +749,7 @@ public sealed class DependencyTests
             typeof(AepEnrollmentService).Assembly,
             typeof(ExternalIdentityAdministrationService).Assembly,
             typeof(ModelProviderManagementService).Assembly,
+            typeof(KnowledgeSourceManagementService).Assembly,
             typeof(PackManagementService).Assembly,
             typeof(SourceManagementService).Assembly,
             typeof(RuntimeProfileManagementService).Assembly,
@@ -790,15 +841,15 @@ public sealed class DependencyTests
     {
         var expected = new[]
         {
-            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "ModelProvider", "ModelProfile", "RuntimeProfile", "Parameter",
-            "Secret", "Vault", "Tool", "ToolDefinition", "ToolProvider", "ToolExecutionHook", "Trigger", "Source", "SourceVersion", "SourceProvider"
+            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "KnowledgeSource", "KnowledgeSourceToolExposure", "ModelProvider", "ModelProfile", "RuntimeProfile", "Parameter",
+            "Secret", "Vault", "Tool", "ToolDefinition", "ToolProvider", "ToolExecutionHook", "ToolSet", "ToolSetVersion", "Trigger", "Source", "SourceVersion", "SourceProvider"
         };
         var actual = new[]
         {
             AgentResourceKinds.Agent, AgentResourceKinds.AgentRevision, AgentResourceKinds.AgentDeployment, FlowResourceKinds.Flow,
-            EntryResourceKinds.Entry, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile, ParameterResourceKinds.Parameter,
+            EntryResourceKinds.Entry, KnowledgeResourceKinds.KnowledgeSource, KnowledgeResourceKinds.KnowledgeSourceToolExposure, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile, ParameterResourceKinds.Parameter,
             SecretResourceKinds.Secret, SecretResourceKinds.Vault, ToolResourceKinds.Tool, ToolResourceKinds.ToolDefinition,
-            ToolResourceKinds.ToolProvider, ToolResourceKinds.ToolExecutionHook, TriggerResourceKinds.Trigger, SourceResourceKinds.Source,
+            ToolResourceKinds.ToolProvider, ToolResourceKinds.ToolExecutionHook, ToolResourceKinds.ToolSet, ToolResourceKinds.ToolSetVersion, TriggerResourceKinds.Trigger, SourceResourceKinds.Source,
             SourceResourceKinds.SourceVersion, SourceResourceKinds.SourceProvider
         };
 
@@ -815,6 +866,7 @@ public sealed class DependencyTests
             typeof(Agentstration.Bootstrap.Contracts.BootstrapApplicationResource).Assembly,
             typeof(Agentstration.Extensions.Contracts.ExtensionResponse).Assembly,
             typeof(Agentstration.Identity.Contracts.IdentityConsoleContextResponse).Assembly,
+            typeof(KnowledgeSourceResource).Assembly,
             typeof(Agentstration.Models.Contracts.ModelProviderResponse).Assembly,
             typeof(Agentstration.Parameters.Contracts.CreateParameterRequest).Assembly,
             typeof(Agentstration.ResourceManagement.Contracts.ResourceDeclaration<>).Assembly,

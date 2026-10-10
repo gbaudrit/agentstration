@@ -10,6 +10,47 @@ namespace Agentstration.Application.Tests;
 public sealed class FlowToolStepTests
 {
     [TestMethod]
+    public async Task ToolRouteStepPinsAnExactToolSetVersionAndValidatesTheSelectedToolSchema()
+    {
+        var schema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { query = new { type = "string" } },
+            required = new[] { "query" }
+        });
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new ToolRouteFlowStepDefinition
+                {
+                    Name = "search",
+                    ToolSet = new("docs", "1.0.0"),
+                    Capability = "knowledge.search",
+                    Route = "search",
+                    ArgumentsMapping = JsonSerializer.SerializeToElement(new { query = "${input.query}" })
+                },
+                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.search.output}") }
+            ],
+            Transitions =
+            [
+                new("input-search", "input", "completed", "search"),
+                new("search-output", "search", "success", "output"),
+                new("search-error", "search", "error", "output")
+            ]
+        };
+        var yaml = FlowDraftService.ToYaml(graph);
+        var restored = new FlowDraftService(null!, null!, null!, TimeProvider.System).ParseSource(yaml, "yaml");
+        var route = Assert.IsInstanceOfType<ToolRouteFlowStepDefinition>(restored.Steps[1]);
+        Assert.AreEqual("1.0.0", route.ToolSet.Version);
+        var result = await new FlowGraphValidator(new ToolResolver(schema)).ValidateAsync(
+            restored, new(true, Workspace, new FlowId("parent")), default);
+        Assert.IsTrue(result.IsValid, string.Join(Environment.NewLine, result.Issues.Select(issue => issue.Message)));
+    }
+
+    [TestMethod]
     public void YamlInputSchemaPreservesBooleanAndNumericConstraintTypes()
     {
         const string yaml = """
@@ -134,5 +175,24 @@ public sealed class FlowToolStepTests
                 Enabled: true,
                 Available: true,
                 RequiresApproval: false));
+
+        public Task<ResolvedFlowToolRoute?> ResolveToolRouteAsync(
+            WorkspaceId workspaceId,
+            ResourceNamespace ownerNamespace,
+            ToolRouteFlowStepDefinition step,
+            CancellationToken cancellationToken) => Task.FromResult<ResolvedFlowToolRoute?>(new(
+                new FlowToolReference("docs.search"),
+                step.ToolSet.ResourceId,
+                step.ToolSet.ResolveNamespace(ownerNamespace),
+                step.ToolSet.Version,
+                step.Capability,
+                step.Route ?? "search",
+                Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+                1,
+                "internal",
+                ResourceNamespace.Default,
+                schema,
+                null,
+                false));
     }
 }

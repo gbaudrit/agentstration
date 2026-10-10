@@ -24,7 +24,9 @@ public sealed record FlowDesignerMetadata
 [JsonDerivedType(typeof(ConditionFlowStepDefinition), "condition")]
 [JsonDerivedType(typeof(TransformFlowStepDefinition), "transform")]
 [JsonDerivedType(typeof(FlowCallStepDefinition), "flow")]
+[JsonDerivedType(typeof(RepeatFlowStepDefinition), "repeat")]
 [JsonDerivedType(typeof(ToolFlowStepDefinition), "tool")]
+[JsonDerivedType(typeof(ToolRouteFlowStepDefinition), "toolRoute")]
 [JsonDerivedType(typeof(OutputFlowStepDefinition), "output")]
 [JsonDerivedType(typeof(FailureFlowStepDefinition), "failure")]
 public abstract record FlowStepDefinition
@@ -32,6 +34,62 @@ public abstract record FlowStepDefinition
     public required string Name { get; init; }
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
+    public FlowStepArtifactOutputDefinition? ArtifactOutput { get; init; }
+}
+
+public sealed record FlowStepArtifactOutputDefinition
+{
+    public string? FileName { get; init; }
+    public string MediaType { get; init; } = "application/json";
+    public FlowStepArtifactContentEncoding ContentEncoding { get; init; }
+    public JsonElement? ContentMapping { get; init; }
+    public long? MaximumBytes { get; init; }
+    public ResourceReference? StagingBinding { get; init; }
+    public FlowCallReference? StorageFlow { get; init; }
+    public FlowStepArtifactCleanupMode Clean { get; init; }
+}
+
+[JsonConverter(typeof(FlowStepArtifactCleanupModeJsonConverter))]
+public enum FlowStepArtifactCleanupMode
+{
+    Auto,
+    Always,
+    Never
+}
+
+public sealed class FlowStepArtifactCleanupModeJsonConverter : JsonConverter<FlowStepArtifactCleanupMode>
+{
+    public override FlowStepArtifactCleanupMode Read(ref Utf8JsonReader reader, Type typeToConvert,
+        JsonSerializerOptions options) => reader.TokenType switch
+        {
+            JsonTokenType.True => FlowStepArtifactCleanupMode.Always,
+            JsonTokenType.False => FlowStepArtifactCleanupMode.Never,
+            JsonTokenType.String when reader.GetString()?.Equals("auto", StringComparison.OrdinalIgnoreCase) == true =>
+                FlowStepArtifactCleanupMode.Auto,
+            JsonTokenType.String when bool.TryParse(reader.GetString(), out var clean) =>
+                clean ? FlowStepArtifactCleanupMode.Always : FlowStepArtifactCleanupMode.Never,
+            _ => throw new JsonException("Artifact output clean must be 'auto', true, or false.")
+        };
+
+    public override void Write(Utf8JsonWriter writer, FlowStepArtifactCleanupMode value,
+        JsonSerializerOptions options)
+    {
+        if (value == FlowStepArtifactCleanupMode.Auto) writer.WriteStringValue("auto");
+        else writer.WriteBooleanValue(value == FlowStepArtifactCleanupMode.Always);
+    }
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<FlowStepArtifactContentEncoding>))]
+public enum FlowStepArtifactContentEncoding
+{
+    [JsonStringEnumMemberName("auto")]
+    Auto,
+    [JsonStringEnumMemberName("json")]
+    Json,
+    [JsonStringEnumMemberName("utf8")]
+    Utf8,
+    [JsonStringEnumMemberName("base64")]
+    Base64
 }
 
 public sealed record InputFlowStepDefinition : FlowStepDefinition
@@ -98,6 +156,15 @@ public sealed record FlowCallStepDefinition : FlowStepDefinition
     public JsonElement? InputMapping { get; init; }
 }
 
+public sealed record RepeatFlowStepDefinition : FlowStepDefinition
+{
+    public required FlowCallReference Flow { get; init; }
+    public JsonElement? InputMapping { get; init; }
+    public JsonElement? NextInputMapping { get; init; }
+    public required string Until { get; init; }
+    public int MaximumIterations { get; init; } = 100;
+}
+
 public sealed record FlowToolReference(
     string ResourceId,
     ResourceNamespace? Namespace = null)
@@ -111,6 +178,22 @@ public sealed record ToolFlowStepDefinition : FlowStepDefinition
     public JsonElement? ArgumentsMapping { get; init; }
 }
 
+public sealed record FlowToolSetReference(
+    string ResourceId,
+    string Version,
+    ResourceNamespace? Namespace = null)
+{
+    public ResourceNamespace ResolveNamespace(ResourceNamespace ownerNamespace) => Namespace ?? ownerNamespace;
+}
+
+public sealed record ToolRouteFlowStepDefinition : FlowStepDefinition
+{
+    public required FlowToolSetReference ToolSet { get; init; }
+    public required string Capability { get; init; }
+    public string? Route { get; init; }
+    public JsonElement? ArgumentsMapping { get; init; }
+}
+
 [JsonConverter(typeof(JsonStringEnumConverter<FlowOutputOutcome>))]
 public enum FlowOutputOutcome
 {
@@ -119,7 +202,6 @@ public enum FlowOutputOutcome
     [JsonStringEnumMemberName("error")]
     Error
 }
-
 public sealed record OutputFlowStepDefinition : FlowStepDefinition
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -202,7 +284,9 @@ public static class FlowStepDefinitionExtensions
         ConditionFlowStepDefinition => "condition",
         TransformFlowStepDefinition => "transform",
         FlowCallStepDefinition => "flow",
+        RepeatFlowStepDefinition => "repeat",
         ToolFlowStepDefinition => "tool",
+        ToolRouteFlowStepDefinition => "toolRoute",
         OutputFlowStepDefinition => "output",
         FailureFlowStepDefinition => "failure",
         _ => throw new ArgumentOutOfRangeException(nameof(step))
@@ -216,6 +300,7 @@ public static class FlowStepDefinitionExtensions
         ConditionFlowStepDefinition => ["true", "false"],
         TransformFlowStepDefinition => ["completed"],
         ToolFlowStepDefinition => ["success", "error"],
+        ToolRouteFlowStepDefinition => ["success", "error"],
         FlowCallStepDefinition => [],
         OutputFlowStepDefinition or FailureFlowStepDefinition => [],
         _ => throw new ArgumentOutOfRangeException(nameof(step))

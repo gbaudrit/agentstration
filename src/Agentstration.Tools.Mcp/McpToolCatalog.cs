@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
@@ -12,19 +13,6 @@ using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
 
 namespace Agentstration.Tools.Mcp;
-
-public interface IAepExtensionEndpointResolver { Uri Resolve(string extensionId); }
-
-public sealed class ConfigurationAepExtensionEndpointResolver(IConfiguration configuration) : IAepExtensionEndpointResolver
-{
-    public Uri Resolve(string extensionId)
-    {
-        var value = configuration[$"Agentstration:Extensions:{extensionId}:Endpoint"];
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var endpoint) || endpoint.Scheme is not ("http" or "https"))
-            throw new ToolResolutionException("extension_unavailable", $"AEP extension '{extensionId}' has no valid HTTP(S) endpoint configuration.");
-        return endpoint;
-    }
-}
 
 public interface IToolProviderEnvironmentResolver
 {
@@ -43,9 +31,9 @@ public sealed class ConfigurationToolProviderEnvironmentResolver(IConfiguration 
 }
 
 public sealed class ToolProviderAdapter(
-    IAepExtensionEndpointResolver extensionEndpoints,
+    IAepExtensionRegistrationResolver extensionRegistrations,
     IToolProviderEnvironmentResolver environments,
-    IHttpClientFactory httpClientFactory,
+    IHttpMessageHandlerFactory httpMessageHandlerFactory,
     ILoggerFactory loggerFactory) : IToolProviderDiscovery
 {
     public bool Supports(ToolProviderType providerType) => providerType is ToolProviderType.Aep or ToolProviderType.Mcp;
@@ -58,13 +46,17 @@ public sealed class ToolProviderAdapter(
             return Result(await client.ListToolsAsync(cancellationToken: cancellationToken), client);
         }
 
-        var (descriptor, extensionEndpoint) = await DiscoverAepAsync(provider, cancellationToken);
+        var (descriptor, extension) = await DiscoverAepAsync(provider, cancellationToken);
         var discovered = new List<DiscoveredToolDescriptor>();
         IReadOnlyDictionary<string, bool> capabilities = new Dictionary<string, bool>();
         IReadOnlyDictionary<string, string> serverMetadata = new Dictionary<string, string>();
         foreach (var server in descriptor.Mcp?.Servers ?? [])
         {
-            await using var client = await ConnectHttpAsync(AepDescriptorValidator.ResolveMcpEndpoint(extensionEndpoint, server), server.Id, cancellationToken);
+            await using var client = await ConnectHttpAsync(
+                AepDescriptorValidator.ResolveMcpEndpoint(extension.Registration.Definition.Endpoint, server),
+                server.Id,
+                extension.AccessTokenProvider,
+                cancellationToken);
             var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
             capabilities = Capabilities(client);
             serverMetadata = ServerMetadata(client);
@@ -88,12 +80,16 @@ public sealed class ToolProviderAdapter(
                 ?? throw new ToolResolutionException("mcp_tool_not_found", $"Provider '{provider.Metadata.Name}' no longer exposes tool '{tool.Definition.ExternalId}'."))).ToArray();
         }
 
-        var (descriptor, extensionEndpoint) = await DiscoverAepAsync(provider, cancellationToken);
+        var (descriptor, extension) = await DiscoverAepAsync(provider, cancellationToken);
         var result = new List<IAgentTool>();
         foreach (var group in tools.GroupBy(tool => (descriptor.Contributions.Tools ?? []).First(value => value.Id == tool.Definition.ExternalId).Mcp.Server, StringComparer.Ordinal))
         {
             var server = descriptor.Mcp!.Servers.First(value => value.Id == group.Key);
-            await using var client = await ConnectHttpAsync(AepDescriptorValidator.ResolveMcpEndpoint(extensionEndpoint, server), server.Id, cancellationToken);
+            await using var client = await ConnectHttpAsync(
+                AepDescriptorValidator.ResolveMcpEndpoint(extension.Registration.Definition.Endpoint, server),
+                server.Id,
+                extension.AccessTokenProvider,
+                cancellationToken);
             var native = await client.ListToolsAsync(cancellationToken: cancellationToken);
             foreach (var tool in group)
             {
@@ -105,24 +101,30 @@ public sealed class ToolProviderAdapter(
         return result;
     }
 
-    private async Task<(AepManifest Descriptor, Uri Endpoint)> DiscoverAepAsync(ToolProviderResource provider, CancellationToken cancellationToken)
+    private async Task<(AepManifest Descriptor, ResolvedAepExtension Extension)> DiscoverAepAsync(ToolProviderResource provider, CancellationToken cancellationToken)
     {
         var extensionId = provider.Definition.Aep!.ExtensionId;
-        var endpoint = extensionEndpoints.Resolve(extensionId);
-        var http = httpClientFactory.CreateClient(McpToolServiceCollectionExtensions.AepClientName);
-        http.BaseAddress = endpoint;
-        var descriptor = await new AepClient(http).DiscoverAsync(cancellationToken);
+        var extension = await extensionRegistrations.ResolveAsync(provider, cancellationToken);
+        using var http = CreateHttpClient(
+            McpToolServiceCollectionExtensions.AepClientName,
+            extension.Registration.Definition.Endpoint,
+            extension.AccessTokenProvider,
+            TimeSpan.FromSeconds(15));
+        var descriptor = await new AepClient(
+            http,
+            extension.AccessTokenProvider,
+            expectedExtensionId: extensionId).DiscoverAsync(cancellationToken);
         var errors = AepDescriptorValidator.Validate(descriptor);
         if (errors.Count > 0) throw new ToolResolutionException("aep_descriptor_invalid", string.Join(" ", errors));
         if (descriptor.Extension.Id != extensionId) throw new ToolResolutionException("extension_identity_mismatch", $"Expected extension '{extensionId}' but discovered '{descriptor.Extension.Id}'.");
-        return (descriptor, endpoint);
+        return (descriptor, extension);
     }
 
     private Task<McpClient> ConnectMcpAsync(ToolProviderResource provider, CancellationToken cancellationToken)
     {
         var mcp = provider.Definition.Mcp!;
         if (mcp.Transport == McpToolProviderTransport.StreamableHttp)
-            return ConnectHttpAsync(mcp.Endpoint!, provider.Metadata.Name, cancellationToken);
+            return ConnectHttpAsync(mcp.Endpoint!, provider.Metadata.Name, null, cancellationToken);
         var transport = new StdioClientTransport(new StdioClientTransportOptions
         {
             Name = provider.Metadata.Name,
@@ -135,10 +137,45 @@ public sealed class ToolProviderAdapter(
         return McpClient.CreateAsync(transport, loggerFactory: loggerFactory, cancellationToken: cancellationToken);
     }
 
-    private Task<McpClient> ConnectHttpAsync(Uri endpoint, string name, CancellationToken cancellationToken)
+    private Task<McpClient> ConnectHttpAsync(
+        Uri endpoint,
+        string name,
+        IAepAccessTokenProvider? accessTokenProvider,
+        CancellationToken cancellationToken)
     {
-        var transport = new HttpClientTransport(new HttpClientTransportOptions { Endpoint = endpoint, Name = name }, httpClientFactory.CreateClient(McpToolServiceCollectionExtensions.McpClientName), loggerFactory, ownsHttpClient: false);
+        var http = CreateHttpClient(
+            accessTokenProvider is null
+            ? McpToolServiceCollectionExtensions.McpClientName
+            : McpToolServiceCollectionExtensions.AepMcpClientName,
+            endpoint,
+            accessTokenProvider,
+            TimeSpan.FromSeconds(90));
+        var transport = new HttpClientTransport(new HttpClientTransportOptions { Endpoint = endpoint, Name = name }, http, loggerFactory, ownsHttpClient: true);
         return McpClient.CreateAsync(transport, loggerFactory: loggerFactory, cancellationToken: cancellationToken);
+    }
+
+    private HttpClient CreateHttpClient(
+        string name,
+        Uri endpoint,
+        IAepAccessTokenProvider? accessTokenProvider,
+        TimeSpan timeout)
+    {
+        HttpMessageHandler handler = httpMessageHandlerFactory.CreateHandler(name);
+        if (accessTokenProvider is not null)
+            handler = new AepBearerAuthenticationHandler(accessTokenProvider) { InnerHandler = handler };
+        return new HttpClient(handler, disposeHandler: false) { BaseAddress = endpoint, Timeout = timeout };
+    }
+
+    private sealed class AepBearerAuthenticationHandler(IAepAccessTokenProvider accessTokenProvider) : DelegatingHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var token = await accessTokenProvider.GetAccessTokenAsync(cancellationToken);
+            if (!string.IsNullOrWhiteSpace(token))
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            try { return await base.SendAsync(request, cancellationToken); }
+            finally { request.Headers.Authorization = null; }
+        }
     }
 
     private static ToolProviderDiscoveryResult Result(IList<McpClientTool> tools, McpClient client) =>
@@ -192,12 +229,16 @@ public sealed class ToolProviderAdapter(
         }
         else
         {
-            var (descriptor, extensionEndpoint) = await DiscoverAepAsync(provider, cancellationToken);
+            var (descriptor, extension) = await DiscoverAepAsync(provider, cancellationToken);
             var mapping = (descriptor.Contributions.Tools ?? []).FirstOrDefault(value => value.Id == tool.Definition.ExternalId)
                 ?? throw new ToolResolutionException("aep_tool_not_found", $"AEP contribution '{tool.Definition.ExternalId}' was not found.");
             var server = descriptor.Mcp?.Servers.FirstOrDefault(value => value.Id == mapping.Mcp.Server)
                 ?? throw new ToolResolutionException("aep_mcp_server_not_found", $"AEP MCP server '{mapping.Mcp.Server}' was not found.");
-            client = await ConnectHttpAsync(AepDescriptorValidator.ResolveMcpEndpoint(extensionEndpoint, server), server.Id, cancellationToken);
+            client = await ConnectHttpAsync(
+                AepDescriptorValidator.ResolveMcpEndpoint(extension.Registration.Definition.Endpoint, server),
+                server.Id,
+                extension.AccessTokenProvider,
+                cancellationToken);
             externalId = mapping.Mcp.Tool;
         }
 
@@ -209,8 +250,30 @@ public sealed class ToolProviderAdapter(
             var values = arguments is { ValueKind: JsonValueKind.Object }
                 ? arguments.Value.EnumerateObject().ToDictionary(value => value.Name, value => (object?)value.Value.Clone(), StringComparer.Ordinal)
                 : new Dictionary<string, object?>();
-            return JsonSerializer.SerializeToElement(await native.InvokeAsync(new Microsoft.Extensions.AI.AIFunctionArguments(values), cancellationToken));
+            var result = JsonSerializer.SerializeToElement(
+                await native.InvokeAsync(new Microsoft.Extensions.AI.AIFunctionArguments(values), cancellationToken));
+            if (result.ValueKind == JsonValueKind.Object
+                && result.TryGetProperty("isError", out var isError)
+                && isError.ValueKind == JsonValueKind.True)
+                throw new ToolResolutionException("mcp_tool_failed", McpErrorMessage(result));
+            return result;
         }
+    }
+
+    private static string McpErrorMessage(JsonElement result)
+    {
+        if (result.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in content.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.Object
+                    && item.TryGetProperty("text", out var text)
+                    && text.ValueKind == JsonValueKind.String
+                    && text.GetString() is { Length: > 0 } message)
+                    return message[..Math.Min(message.Length, 512)];
+            }
+        }
+        return "The MCP Tool reported an execution failure.";
     }
 }
 
@@ -319,7 +382,8 @@ public sealed class McpToolInvoker(
                 context.CorrelationId,
                 context.Arguments ?? JsonSerializer.SerializeToElement(new { }),
                 callerKind,
-                callerId), cancellationToken);
+                callerId,
+                InvocationContext(context)), cancellationToken);
             return new ToolInvocationResult(result.Output?.Clone(), new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["workItemId"] = result.Receipt.WorkItemId,
@@ -352,7 +416,7 @@ public sealed class McpToolInvoker(
             throw new ToolResolutionException("internal_tool_executor_unavailable", "The Agentstration ToolDefinition executor is unavailable.");
         return new ToolInvocationResult(await internalTools.Value.SimulateAsync(new ToolDefinitionInvocation(
             tenantId, workspaceId, principalId, tool.Namespace, externalId, context.ToolCallId, context.CorrelationId,
-            arguments, callerKind, callerId), cancellationToken), null);
+            arguments, callerKind, callerId, InvocationContext(context)), cancellationToken), null);
     }
 
     private async ValueTask<(ToolResource Tool, ToolProviderResource Provider)> ResolveAsync(
@@ -375,6 +439,14 @@ public sealed class McpToolInvoker(
         return (tool.Value, provider.Value);
     }
 
+    private static ToolDefinitionInvocationContext InvocationContext(ToolExecutionContext context) => new(
+        context.AgentId,
+        context.AgentRevisionId,
+        context.OwnerKind == ToolExecutionOwnerKind.RuntimeRun ? context.RunId : null,
+        context.OwnerKind == ToolExecutionOwnerKind.FlowRun ? context.RunId : null,
+        context.FlowStepId,
+        context.InvocationId);
+
     private static ToolDefinitionCallerKind CallerKind(ToolExecutionContext context) => context.OwnerKind switch
     {
         ToolExecutionOwnerKind.Console => ToolDefinitionCallerKind.Console,
@@ -389,6 +461,7 @@ public sealed class ToolResolutionException(string code, string message, Excepti
 public static class McpToolServiceCollectionExtensions
 {
     internal const string AepClientName = "agentstration-aep-tools";
+    internal const string AepMcpClientName = "agentstration-aep-mcp-tools";
     internal const string McpClientName = "agentstration-mcp-tools";
     public static IServiceCollection AddAgentstrationMcpTools(this IServiceCollection services)
     {
@@ -397,9 +470,12 @@ public static class McpToolServiceCollectionExtensions
         services.AddHttpClient(AepClientName, client => client.Timeout = TimeSpan.FromSeconds(15))
             .ConfigurePrimaryHttpMessageHandler(provider =>
                 AepSecureHttpMessageHandler.Create(provider.GetRequiredService<AepTransportSecurityOptions>()));
+        services.AddHttpClient(AepMcpClientName, client => client.Timeout = TimeSpan.FromSeconds(90))
+            .ConfigurePrimaryHttpMessageHandler(provider =>
+                AepSecureHttpMessageHandler.Create(provider.GetRequiredService<AepTransportSecurityOptions>()));
         services.AddHttpClient(McpClientName, client => client.Timeout = TimeSpan.FromSeconds(90))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
-        services.AddSingleton<IAepExtensionEndpointResolver, ConfigurationAepExtensionEndpointResolver>();
+        services.AddSingleton<IAepExtensionRegistrationResolver, ResourceAepExtensionRegistrationResolver>();
         services.AddSingleton<IToolProviderEnvironmentResolver, ConfigurationToolProviderEnvironmentResolver>();
         services.AddSingleton<ToolProviderAdapter>();
         services.AddSingleton<ToolRunnerService>();

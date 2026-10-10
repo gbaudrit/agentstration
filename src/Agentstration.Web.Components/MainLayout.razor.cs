@@ -19,12 +19,12 @@ public partial class MainLayout
     private static readonly NavigationGroup[] NavigationGroups =
     [
         new("", [new("Nav.Overview", "/", "home")]),
-        new("Group.Design", [new("Nav.Agents", "/agents", "agent", "agent"), new("Nav.Flows", "/flows", "workflow", "flow"), new("Nav.Entries", "/entries", "entry", "work"), new("Nav.ResourcePlans", "/resource-plans", "layers", "work", ["resources/read"]), new("Nav.ModelProfiles", "/modelprofiles", "layers", "model")]),
+        new("Group.Design", [new("Nav.Agents", "/agents", "agent", "agent"), new("Nav.Flows", "/flows", "workflow", "flow"), new("Nav.Entries", "/entries", "entry", "work"), new("Nav.ResourcePlans", "/resource-plans", "layers", "work", ["resources/read"]), new("Nav.ModelProfiles", "/modelprofiles", "layers", "model"), new("Nav.DataSourceProfiles", "/data-source-profiles", "database", "tool", ["resources/read"])]),
         new("Group.Automate", [new("Nav.Triggers", "/triggers", "clock", "work")]),
         new("Group.Operate", [new("Nav.Conversations", "/conversations", "message-circle", "work", ["runs/read"]), new("Nav.Tasks", "/tasks", "tasks", "work")]),
         new("Group.Observe", [new("Nav.Deployments", "/deployments", "server", "runtime"), new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
         new("Group.Workplace", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work")]),
-        new("Group.Resources", [new("Nav.Packs", "/packs", "package"), new("Nav.Sources", "/settings/sources", "books"), new("Nav.SourceRegistries", "/settings/source-registries", "database")]),
+        new("Group.Resources", [new("Nav.Packs", "/packs", "package"), new("Nav.DataSources", "/data-sources", "database", "tool", ["resources/read"]), new("Nav.KnowledgeSources", "/knowledge-sources", "books", "tool", ["resources/read"]), new("Nav.Artifacts", "/artifacts", "file", "flow"), new("Nav.Sources", "/settings/sources", "books"), new("Nav.SourceRegistries", "/settings/source-registries", "database")]),
         new("Group.Integrations", [new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.SourceProviders", "/sourceproviders", "database", "source")]),
         new("Group.Configuration", [new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key"), new("Nav.ResourceScopes", "/settings/resource-scopes", "layers", RequiredPermissions: ["resources/read"])]),
         new("Group.System", [new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "cloud-upload"), new("Nav.Cleanup", "/cleanup", "trash", RequiredPermissions: ["resources/delete", "runs/delete"]), new("Nav.Settings", "/settings", "settings")])
@@ -37,6 +37,7 @@ public partial class MainLayout
         new("Command.CreateAgent", "/agents/new", "plus", "Command", "new nouveau agent"),
         new("Nav.ModelProfiles", "/modelprofiles", "layers", "Group.Design", "models modèles"),
         new("Command.CreateModelProfile", "/modelprofiles/new", "plus", "Command", "new nouveau model modèle"),
+        new("Nav.DataSourceProfiles", "/data-source-profiles", "database", "Group.Design", "data source profiles acquisition profils sources données", ["resources/read"]),
         new("Nav.Flows", "/flows", "workflow", "Group.Design", "workflow designer flux conception"),
         new("Command.CreateFlow", "/flows/new", "plus", "Command", "new nouveau workflow flux"),
         new("Nav.Entries", "/entries", "entry", "Group.Design", "workplace entry entrée"),
@@ -55,6 +56,9 @@ public partial class MainLayout
         new("Command.CreateToolProvider", "/tools/providers/new", "plus", "Command", "new nouveau MCP AEP provider fournisseur"),
         new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "Group.Workplace", "workspace composition primary entries espace composition"),
         new("Nav.Packs", "/packs", "package", "Group.Resources", "package distribution install archive resources paquet installation"),
+        new("Nav.KnowledgeSources", "/knowledge-sources", "books", "Group.Resources", "knowledge source retrieval ingestion connaissances", ["resources/read"]),
+        new("Nav.DataSources", "/data-sources", "database", "Group.Resources", "data sources acquisition origins sources données", ["resources/read"]),
+        new("Nav.Artifacts", "/artifacts", "file", "Group.Resources", "staged durable artifacts retention purge artefacts stockage", ["resources/read"]),
         new("Command.CreateModelProvider", "/modelproviders/new", "plus", "Command", "new nouveau provider fournisseur"),
         new("Nav.SourceProviders", "/sourceproviders", "database", "Group.Integrations", "source providers fournisseurs Git AEP"),
         new("Command.CreateSourceProvider", "/sourceproviders/new", "plus", "Command", "new nouveau source provider fournisseur"),

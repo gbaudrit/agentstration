@@ -37,4 +37,3 @@ export const exerciseFlowTransitionEditing: Journey<ExerciseFlowTransitionEditin
   await designer.expectReadOnlyPublished(context.consoleUrl, 'default', name);
   await expect(context.pages.flowDesigner.designer).toBeVisible();
 };
-

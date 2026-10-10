@@ -10,6 +10,11 @@
     <Project Path="src/Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />
     <Project Path="src/Agentstration.Agents/Agentstration.Agents.csproj" />
   </Folder>
+  <Folder Name="/src/Artifacts/">
+    <Project Path="src/Agentstration.Artifacts.Api/Agentstration.Artifacts.Api.csproj" />
+    <Project Path="src/Agentstration.Artifacts.Contracts/Agentstration.Artifacts.Contracts.csproj" />
+    <Project Path="src/Agentstration.Artifacts/Agentstration.Artifacts.csproj" />
+  </Folder>
   <Folder Name="/src/Bootstrap/">
     <Project Path="src/Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <Project Path="src/Agentstration.Bootstrap.Api/Agentstration.Bootstrap.Api.csproj" />
@@ -40,6 +45,7 @@
     <Project Path="src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj" />
     <Project Path="src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
     <Project Path="src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
+    <Project Path="src/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj" />
   </Folder>
   <Folder Name="/src/Flows/">
     <Project Path="src/Agentstration.Flows/Agentstration.Flows.csproj" />
@@ -57,6 +63,16 @@
     <Project Path="src/Agentstration.Security.AspNetCoreIdentity/Agentstration.Security.AspNetCoreIdentity.csproj" />
     <Project Path="src/Agentstration.Security.AspNetCoreIdentity.PostgreSql/Agentstration.Security.AspNetCoreIdentity.PostgreSql.csproj" />
     <Project Path="src/Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/src/Knowledge/">
+    <Project Path="src/Agentstration.Knowledge.Api/Agentstration.Knowledge.Api.csproj" />
+    <Project Path="src/Agentstration.Knowledge.Contracts/Agentstration.Knowledge.Contracts.csproj" />
+    <Project Path="src/Agentstration.Knowledge/Agentstration.Knowledge.csproj" />
+  </Folder>
+  <Folder Name="/src/DataSources/">
+    <Project Path="src/Agentstration.DataSources.Api/Agentstration.DataSources.Api.csproj" />
+    <Project Path="src/Agentstration.DataSources.Contracts/Agentstration.DataSources.Contracts.csproj" />
+    <Project Path="src/Agentstration.DataSources/Agentstration.DataSources.csproj" />
   </Folder>
   <Folder Name="/src/Models/">
     <Project Path="src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
@@ -158,6 +174,7 @@
   <Folder Name="/tests/Extensions/">
     <Project Path="tests/Agentstration.Management.Aep.Tests/Agentstration.Management.Aep.Tests.csproj" />
     <Project Path="tests/Agentstration.SourceProviders.Git.Tests/Agentstration.SourceProviders.Git.Tests.csproj" />
+    <Project Path="tests/Agentstration.Extensions.Crawl4AI.Tests/Agentstration.Extensions.Crawl4AI.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Models/">
     <Project Path="tests/Agentstration.Models.Tests/Agentstration.Models.Tests.csproj" />

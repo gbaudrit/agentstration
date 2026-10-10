@@ -2,6 +2,8 @@ using System.Text.Json.Serialization;
 
 namespace Agentstration.Resources;
 
+public interface IImmutableResource { }
+
 public static class ResourceApiVersions
 {
     public const string CoreV1 = "agentstration.io/v1";

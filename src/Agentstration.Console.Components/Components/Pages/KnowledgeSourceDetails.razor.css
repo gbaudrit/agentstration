@@ -1,0 +1,515 @@
+.knowledge-acquisition-identity {
+    display: grid;
+    gap: .25rem;
+    min-width: 0;
+}
+
+.knowledge-acquisition-identity code,
+.knowledge-flow-run-link code {
+    overflow-wrap: anywhere;
+}
+
+.knowledge-acquisition-identity small {
+    color: var(--muted);
+}
+
+.knowledge-flow-run-link {
+    display: inline-flex;
+    max-width: 100%;
+}
+
+.knowledge-flow-run-link code {
+    color: inherit;
+}
+
+.knowledge-snapshot-link {
+    display: inline-flex;
+    max-width: 100%;
+}
+
+.knowledge-snapshot-link code {
+    overflow-wrap: anywhere;
+}
+
+.knowledge-snapshot-details {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: .7rem;
+    background: var(--surface-2);
+}
+
+.knowledge-snapshot-details h3,
+.knowledge-snapshot-details p {
+    margin-top: 0;
+}
+
+.knowledge-snapshot-provenance {
+    margin: 0;
+}
+
+.knowledge-snapshot-provenance dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.metric-grid ::deep .metric-card {
+    min-width: 0;
+}
+
+.metric-grid ::deep .metric-card strong {
+    overflow-wrap: anywhere;
+}
+
+.knowledge-retrieval-actions .button-primary {
+    gap: .55rem;
+}
+
+.knowledge-retrieval-actions ::deep .ui-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.knowledge-projection-parameters {
+    display: grid;
+    gap: .45rem;
+    width: min(48rem, 100%);
+    margin-bottom: 1rem;
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.knowledge-projection-parameters textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 9rem;
+    resize: vertical;
+}
+
+.knowledge-projection-parameters small {
+    font-weight: 400;
+}
+
+.knowledge-artifact-id-link {
+    display: inline-flex;
+    max-width: 100%;
+    text-align: left;
+}
+
+.knowledge-artifact-id-link code {
+    color: inherit;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.knowledge-retrieval {
+    gap: 1.1rem;
+}
+
+.knowledge-retrieval-header {
+    align-items: flex-start;
+}
+
+.knowledge-retrieval-icon {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: .7rem;
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.knowledge-retrieval-icon ::deep .ui-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.knowledge-retrieval-form {
+    display: grid;
+    grid-template-columns: minmax(12rem, .75fr) minmax(18rem, 1.25fr) minmax(14rem, 1fr);
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: .7rem;
+    background: var(--surface-2);
+}
+
+.knowledge-retrieval-form > label {
+    display: grid;
+    align-content: start;
+    gap: .45rem;
+    min-width: 0;
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.knowledge-retrieval-form input,
+.knowledge-retrieval-form select {
+    width: 100%;
+}
+
+.knowledge-retrieval-actions {
+    display: flex;
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+}
+
+.knowledge-retrieval-result {
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid color-mix(in srgb, #2bb673 35%, var(--border));
+    border-radius: .7rem;
+    background: color-mix(in srgb, #2bb673 5%, var(--surface));
+}
+
+.knowledge-retrieval-result > header,
+.knowledge-retrieval-result > footer,
+.knowledge-retrieval-item header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+}
+
+.knowledge-retrieval-result h3,
+.knowledge-retrieval-result p {
+    margin: 0;
+}
+
+.knowledge-retrieval-answer {
+    display: grid;
+    gap: .4rem;
+    padding: .85rem;
+    border: 1px solid var(--border);
+    border-radius: .55rem;
+    background: var(--surface);
+}
+
+.knowledge-retrieval-items {
+    display: grid;
+    gap: .75rem;
+}
+
+.knowledge-retrieval-item {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: .6rem;
+    background: var(--surface);
+}
+
+.knowledge-retrieval-item header {
+    padding: .75rem .85rem;
+}
+
+.knowledge-retrieval-item header small {
+    flex: 0 0 auto;
+    color: var(--muted);
+}
+
+.knowledge-retrieval-item pre {
+    max-height: 24rem;
+    margin: 0;
+    padding: .9rem;
+    overflow: auto;
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font: .75rem/1.55 var(--font-mono);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.knowledge-retrieval-result > footer {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    color: var(--muted);
+    font-size: .72rem;
+}
+
+.knowledge-retrieval-result > footer a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.knowledge-flow-composition {
+    gap: 1rem;
+}
+
+.knowledge-choice {
+    display: grid !important;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center !important;
+    align-self: stretch !important;
+    gap: .7rem !important;
+    min-height: 3.65rem;
+    padding: .75rem .9rem;
+    border: 1px solid var(--border);
+    border-radius: .65rem;
+    background: var(--surface-2);
+    cursor: pointer;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.knowledge-choice:hover {
+    border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+    background: color-mix(in srgb, var(--primary-soft) 32%, var(--surface-2));
+}
+
+.knowledge-choice input {
+    width: 1.05rem !important;
+    min-height: 1.05rem !important;
+    margin: 0;
+    accent-color: var(--primary);
+}
+
+.knowledge-choice-icon {
+    display: grid;
+    place-items: center;
+    width: 1.95rem;
+    height: 1.95rem;
+    border-radius: .55rem;
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.knowledge-choice-icon ::deep .ui-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.knowledge-choice > span:last-child {
+    display: grid;
+    gap: .2rem;
+}
+
+.knowledge-choice strong {
+    color: var(--text);
+    font-size: .78rem;
+}
+
+.knowledge-choice small {
+    color: var(--muted);
+    font-size: .69rem;
+    font-weight: 400;
+    line-height: 1.4;
+}
+
+.knowledge-profile-card,
+.knowledge-flow-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .75rem;
+    min-width: 0;
+    padding: .9rem;
+    border: 1px solid var(--border);
+    border-radius: .7rem;
+    color: var(--text);
+    text-decoration: none;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.knowledge-profile-card {
+    background: color-mix(in srgb, var(--primary-soft) 42%, var(--surface));
+}
+
+.knowledge-flow-card {
+    background: var(--surface-2);
+}
+
+.knowledge-profile-card:hover,
+.knowledge-flow-card:hover {
+    border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+    background: color-mix(in srgb, var(--primary-soft) 30%, var(--surface-2));
+    transform: translateY(-1px);
+}
+
+.knowledge-profile-card > span:nth-child(2),
+.knowledge-flow-card > span:nth-child(2) {
+    display: grid;
+    gap: .15rem;
+    min-width: 0;
+}
+
+.knowledge-profile-card small,
+.knowledge-flow-card small {
+    color: var(--muted);
+    font-size: .68rem;
+}
+
+.knowledge-profile-card strong,
+.knowledge-profile-card code,
+.knowledge-flow-card strong,
+.knowledge-flow-card code {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.knowledge-profile-card strong,
+.knowledge-flow-card strong {
+    font-size: .82rem;
+}
+
+.knowledge-profile-card code,
+.knowledge-flow-card code {
+    color: var(--muted);
+    font-size: .67rem;
+}
+
+.knowledge-profile-card > ::deep .ui-icon,
+.knowledge-flow-card > ::deep .ui-icon {
+    width: 1rem;
+    height: 1rem;
+    color: var(--muted);
+}
+
+.knowledge-composition-icon {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: .55rem;
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.knowledge-composition-icon ::deep .ui-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.knowledge-flow-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .75rem;
+}
+
+.knowledge-tool-link {
+    display: inline-grid;
+    gap: .15rem;
+}
+
+.knowledge-tool-link span {
+    color: var(--muted);
+    font: .7rem/1.3 var(--font-mono);
+}
+
+.knowledge-yaml-field {
+    display: grid;
+    gap: .5rem;
+}
+
+.knowledge-yaml-field textarea {
+    width: 100%;
+}
+
+.knowledge-acquisition-parameters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, .8fr);
+    gap: 1rem;
+    margin: 1rem 0 1.25rem;
+}
+
+.knowledge-parameters-editor,
+.knowledge-parameters-contract {
+    min-width: 0;
+}
+
+.knowledge-parameters-editor {
+    display: grid;
+    align-content: start;
+    gap: .45rem;
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.knowledge-parameters-editor textarea {
+    width: 100%;
+    resize: vertical;
+}
+
+.knowledge-parameters-contract {
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: .65rem;
+    background: var(--surface-2);
+}
+
+.knowledge-parameters-contract h3,
+.knowledge-parameters-contract p {
+    margin-top: 0;
+}
+
+.knowledge-parameter-fields {
+    display: grid;
+    gap: .55rem;
+    margin: .85rem 0;
+    padding: 0;
+    list-style: none;
+}
+
+.knowledge-parameter-fields li {
+    display: grid;
+    gap: .25rem;
+    padding: .65rem;
+    border: 1px solid var(--border);
+    border-radius: .5rem;
+    background: var(--surface);
+}
+
+.knowledge-parameter-fields li > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+}
+
+.knowledge-parameter-fields span,
+.knowledge-parameter-fields small {
+    color: var(--muted);
+    font-size: .72rem;
+}
+
+.knowledge-parameters-contract details {
+    margin-top: .75rem;
+}
+
+.knowledge-parameters-contract summary {
+    color: var(--primary);
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.knowledge-parameters-contract pre {
+    max-height: 18rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.field-validation-error {
+    color: #b42318;
+    font-weight: 650;
+}
+
+@media (max-width: 800px) {
+    .knowledge-acquisition-parameters,
+    .knowledge-flow-grid,
+    .knowledge-retrieval-form {
+        grid-template-columns: 1fr;
+    }
+
+    .knowledge-retrieval-actions {
+        grid-column: 1;
+    }
+}
