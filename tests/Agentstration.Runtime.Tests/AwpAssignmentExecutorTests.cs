@@ -535,6 +535,64 @@ public sealed class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
+    public async Task SequentialOrchestrationExecutesParticipantsAndEmitsDurableWorkerEvents()
+    {
+        var orchestration = new OrchestrationFlowDefinition(
+            [
+                new FlowTargetReference(FlowTargetKind.Agent, "researcher"),
+                new FlowTargetReference(FlowTargetKind.Agent, "reviewer")
+            ],
+            new SequentialOrchestrationPattern());
+        var definition = new FlowVersion(new WorkspaceId(Guid.NewGuid()),
+            new FlowId("orchestration", ResourceNamespace.Default), "1.0", null, orchestration,
+            new Dictionary<string, string>(), TestNow, null, "sha256:orchestration");
+        var researcher = AgentMaterial() with
+        {
+            ParticipantId = "researcher",
+            AgentName = "researcher",
+            ModelProfileName = "awp-participant:researcher"
+        };
+        var reviewer = AgentMaterial() with
+        {
+            ParticipantId = "reviewer",
+            AgentName = "reviewer",
+            ModelProfileName = "awp-participant:reviewer"
+        };
+        using var credential = new AwpClientCredential(Guid.NewGuid(), Guid.NewGuid(), "test-instance",
+            System.Text.Encoding.UTF8.GetBytes("test-worker-secret-material-at-least-32-bytes"));
+        var handler = new GraphHandler(TestNow);
+        using var client = new AwpClient(new Uri("https://authority.test"), credential,
+            new(Guid.NewGuid()), TimeProvider.System, 0, handler);
+        var assignment = new AwpRunAssignment(new(Guid.NewGuid()), new(Guid.NewGuid()),
+            new(Guid.NewGuid(), Guid.NewGuid().ToString("D")), new AwpRootFlowRunTarget("flowrun-root"),
+            new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", "1.0"),
+            new("material-1", "1.0", "sha256:material"),
+            new("ownership", 1, DateTimeOffset.UtcNow.AddMinutes(5), 15));
+        var session = new AwpAssignmentSession(client, assignment, TestNow, TimeProvider.System,
+            TimeSpan.FromSeconds(5));
+        var executor = new AwpAssignmentExecutor(NullLoggerFactory.Instance,
+            NullLogger<AwpAssignmentExecutor>.Instance);
+        var material = new AwpRootFlowExecutionMaterial("material-1", "1.0", "sha256:material",
+            "flowrun-root", "orchestration", "default", "1.0", "sha256:orchestration",
+            JsonSerializer.SerializeToElement(new { prompt = "Investigate" }),
+            JsonSerializer.SerializeToElement(definition, JsonOptions), [researcher, reviewer], Guid.NewGuid());
+
+        var result = await executor.ExecuteAsync(session, material, CancellationToken.None);
+
+        Assert.AreEqual("agent-result", result.Output?.GetProperty("finalOutput").GetString());
+        Assert.HasCount(2, result.Output?.GetProperty("participants").EnumerateArray().ToArray());
+        CollectionAssert.AreEqual(new[] { "researcher", "reviewer" },
+            handler.ModelRequests.Select(value => value.ParticipantId).ToArray());
+        CollectionAssert.AreEquivalent(new[] { "Input", "researcher", "reviewer", "Output" },
+            handler.Events.Where(value => value.Kind == AwpExecutionEventKind.StepCompleted)
+                .Select(value => value.Location.FlowStep?.StepDefinitionId).ToArray());
+        Assert.AreEqual(2, handler.Events.Count(value => value.Kind == AwpExecutionEventKind.TurnStarted));
+        Assert.AreEqual(2, handler.Events.Count(value => value.Kind == AwpExecutionEventKind.TurnCompleted));
+        Assert.AreEqual(2, handler.Events.Count(value => value.Kind == AwpExecutionEventKind.ResponseDelta));
+        Assert.IsGreaterThan(0, handler.CheckpointRequests.Count);
+    }
+
+    [TestMethod]
     public async Task RepeatFailsWithStableCodeWhenTheIterationLimitIsReached()
     {
         var graph = new FlowGraphDefinition
@@ -933,6 +991,7 @@ public sealed class AwpAssignmentExecutorTests
         public List<AwpCleanupFlowArtifactRequest> CleanupRequests { get; } = [];
         public List<AwpInvokeModelRequest> ModelRequests { get; } = [];
         public List<AwpInvokeFlowToolRequest> FlowToolRequests { get; } = [];
+        public List<AwpStoreCheckpointRequest> CheckpointRequests { get; } = [];
         public int FlowToolInvocationCount { get; private set; }
         public AwpCaptureFlowArtifactRequest? CaptureRequest { get; private set; }
         public string? ChildOutputName { get; init; }
@@ -956,6 +1015,7 @@ public sealed class AwpAssignmentExecutorTests
                 AwpProtocol.OpenStepExecutionPath => OpenStep(bytes),
                 AwpProtocol.OpenTurnPath => OpenTurn(bytes),
                 AwpProtocol.AppendEventsPath => AppendEvents(bytes),
+                AwpProtocol.StoreCheckpointPath => StoreCheckpoint(bytes),
                 AwpProtocol.InvokeModelPath => InvokeModel(bytes),
                 AwpProtocol.InvokeFlowToolPath => InvokeFlowTool(bytes),
                 AwpProtocol.CaptureFlowArtifactPath => Capture(bytes),
@@ -990,6 +1050,14 @@ public sealed class AwpAssignmentExecutorTests
             var request = Payload<AwpAppendEventsRequest>(bytes);
             Events.AddRange(request.Events);
             return new(now, request.Events[^1].AttemptEventSequence, []);
+        }
+
+        private AwpCheckpointResponse StoreCheckpoint(byte[] bytes)
+        {
+            var request = Payload<AwpStoreCheckpointRequest>(bytes);
+            CheckpointRequests.Add(request);
+            return new(now, request.CheckpointId, request.SchemaVersion, request.CompatibilityKey,
+                request.Payload, now);
         }
 
         private AwpOpenTurnResponse OpenTurn(byte[] bytes)

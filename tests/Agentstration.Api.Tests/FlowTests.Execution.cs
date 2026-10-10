@@ -97,60 +97,6 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
-    public async Task OrchestrationFlowUsesNeutralEngineAndPersistsParticipantProgress()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
-            "orchestration-run",
-            "Coordinates agents",
-            "1.0.0",
-            true,
-            new OrchestrationFlowDefinition(
-                [
-                    new FlowTargetReference(FlowTargetKind.Agent, "researcher"),
-                    new FlowTargetReference(FlowTargetKind.Agent, "reviewer")
-                ],
-                new HandoffOrchestrationPattern(
-                    "researcher",
-                    [new FlowHandoff("researcher", "reviewer")],
-                    Autonomous: true))), new ResourceNamespace("daily-life-assistant"), default);
-        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
-        var queue = new TestFlowRunQueue();
-        var expressions = new FlowExpressionParser();
-        var runs = new FlowRunService(
-            fixture.Repository,
-            queue,
-            new TestCancellationRegistry(),
-            new TestAgentExecutor(),
-            new TestOrchestrationEngine(),
-            expressions,
-            expressions,
-            new NullFlowRunEventSink(),
-            new TestFlowRunExecutionScope(),
-            TimeProvider.System);
-        using var input = JsonDocument.Parse("""{"prompt":"Investigate"}""");
-
-        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "tester", "orchestration-correlation", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        CollectionAssert.AreEqual(
-            new[] { "Input", "researcher", "reviewer", "Output" },
-            completed.Steps.Select(step => step.StepName).ToArray());
-        Assert.IsTrue(completed.Steps.All(step => step.Status == FlowStepRunStatus.Succeeded));
-        Assert.AreEqual("reviewed", completed.Output!.Value.GetProperty("finalOutput").GetString());
-        Assert.HasCount(2, completed.Output.Value.GetProperty("participants").EnumerateArray().ToArray());
-        var events = await runs.ListEventsAsync(TestScope, completed.Id, 0, default);
-        Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.StepOutputDelta));
-        Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.ParticipantTurnStarted));
-        Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.ParticipantTurnCompleted));
-        var handoff = events.Single(item => item.Type == FlowRunEventType.ParticipantHandoff);
-        Assert.AreEqual("researcher", handoff.Payload!.Value.GetProperty("from").GetString());
-        Assert.AreEqual("reviewer", handoff.Payload.Value.GetProperty("to").GetString());
-    }
-
-    [TestMethod]
     public async Task OrchestrationFlowTimeoutPersistsAnExplicitTerminalState()
     {
         await using var fixture = await FlowFixture.CreateAsync();
