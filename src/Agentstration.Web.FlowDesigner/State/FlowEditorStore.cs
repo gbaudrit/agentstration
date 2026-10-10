@@ -25,7 +25,7 @@ public sealed record FlowDesignerDocument(IReadOnlyList<FlowDesignerNode> Nodes,
                 step switch { AgentFlowStepDefinition agent => agent.Agent.ResourceId, RouterFlowStepDefinition router => $"{router.Candidates.Count} routes", FlowCallStepDefinition flow => flow.Flow.ResourceId, RepeatFlowStepDefinition repeat => $"{repeat.Flow.ResourceId} · ≤ {repeat.MaximumIterations}", ToolFlowStepDefinition tool => tool.Tool.ResourceId, ToolRouteFlowStepDefinition route => route.ToolSet.ResourceId, _ => null },
                 resolvedOutputs?.Select(output => output.Name).ToArray()
                     ?? (step is FlowCallStepDefinition
-                        ? definition.Transitions.Where(transition => transition.FromStep == step.Name).Select(transition => transition.Event).Distinct(StringComparer.Ordinal).ToArray()
+                        ? []
                         : step.OutputEvents()))
             {
                 OutputOutcomes = resolvedOutputs?.ToDictionary(output => output.Name, output => output.Outcome, StringComparer.Ordinal)
@@ -137,6 +137,43 @@ public sealed record ReconnectTransitionCommand(string Id, string FromStep, stri
 public sealed record RemoveTransitionCommand(string Id) : IFlowEditorCommand
 {
     public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with { Transitions = definition.Transitions.Where(item => item.Id != Id).ToArray() };
+}
+public sealed record ReconcileFlowCallTransitionsCommand(
+    IReadOnlyDictionary<string, IReadOnlyList<FlowDesignerOutput>> OutputsByStep) : IFlowEditorCommand
+{
+    public FlowGraphDefinition Apply(FlowGraphDefinition definition)
+    {
+        var transitions = definition.Transitions.ToList();
+        var changed = false;
+        foreach (var call in definition.Steps.OfType<FlowCallStepDefinition>())
+        {
+            if (!OutputsByStep.TryGetValue(call.Name, out var outputs) || outputs.Count == 0
+                || outputs.Any(output => output.Name == "error"))
+                continue;
+
+            var replacement = outputs.FirstOrDefault(output => output.Outcome == FlowOutputOutcome.Error)?.Name;
+            foreach (var legacy in transitions.Where(transition =>
+                transition.FromStep == call.Name
+                && transition.Event == "error"
+                && transition.Condition is null
+                && transition.Priority is null
+                && transition.Id == $"{call.Name}-error-{transition.ToStep}").ToArray())
+            {
+                var index = transitions.IndexOf(legacy);
+                if (replacement is null || transitions.Any(transition =>
+                    transition.Id != legacy.Id
+                    && transition.FromStep == call.Name
+                    && transition.ToStep == legacy.ToStep
+                    && transition.Event == replacement))
+                    transitions.RemoveAt(index);
+                else
+                    transitions[index] = legacy with { Event = replacement };
+                changed = true;
+            }
+        }
+
+        return changed ? definition with { Transitions = transitions } : definition;
+    }
 }
 public sealed record ApplyAutoLayoutCommand(bool Vertical) : IFlowEditorCommand
 {

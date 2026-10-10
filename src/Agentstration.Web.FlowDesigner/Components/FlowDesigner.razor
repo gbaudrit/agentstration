@@ -490,7 +490,13 @@ else
         finally { saving = false; }
     }
 
-    private async Task ValidateAsync() { if (ReadOnly) return; Editor.SetIssues((await Backend.ValidateAsync(Target, cancellation.Token)).Issues); }
+    private async Task ValidateAsync()
+    {
+        if (ReadOnly) return;
+        await SaveAsync();
+        if (error is not null) return;
+        Editor.SetIssues((await Backend.ValidateAsync(Target, cancellation.Token)).Issues);
+    }
     private async Task PublishAsync()
     {
         if (ReadOnly || publishing) return;
@@ -766,6 +772,12 @@ else
                 resolved[call.Name] = selected.NamedOutputs;
         }
         Editor.SetFlowCallOutputs(resolved);
+        if (!ReadOnly)
+        {
+            var revision = Editor.State.LocalRevision;
+            await Editor.DispatchAsync(new ReconcileFlowCallTransitionsCommand(resolved), cancellation.Token);
+            if (Editor.State.LocalRevision != revision) ScheduleAutosave();
+        }
     }
     private void SyncFlowCallOutputs(FlowCallStepDefinition call, IReadOnlyList<FlowDesignerFlowVersion> versions) =>
         Editor.SetFlowCallOutputs(call.Name, ResolveFlowVersion(call, versions)?.NamedOutputs ?? []);

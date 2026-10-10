@@ -136,6 +136,41 @@ public sealed class FlowEditorStoreTests
     }
 
     [TestMethod]
+    public void ReconcileFlowCallTransitionsReplacesOrRemovesLegacyAutomaticErrorEvent()
+    {
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "child",
+            Steps =
+            [
+                new FlowCallStepDefinition { Name = "child", Flow = new("nested") },
+                new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }
+            ],
+            Transitions =
+            [
+                new("child-error-error", "child", "error", "error"),
+                new("child-failed-error", "child", "failed", "error")
+            ]
+        };
+        var outputs = new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(StringComparer.Ordinal)
+        {
+            ["child"] = [new("done", "Done", FlowOutputOutcome.Success, null), new("failed", "Failed", FlowOutputOutcome.Error, null)]
+        };
+
+        var reconciled = new ReconcileFlowCallTransitionsCommand(outputs).Apply(definition);
+
+        Assert.HasCount(1, reconciled.Transitions);
+        Assert.AreEqual("failed", reconciled.Transitions.Single().Event);
+
+        var replaced = new ReconcileFlowCallTransitionsCommand(outputs).Apply(definition with
+        {
+            Transitions = [new("child-error-error", "child", "error", "error")]
+        });
+        Assert.AreEqual("failed", replaced.Transitions.Single().Event);
+        Assert.AreEqual("child-error-error", replaced.Transitions.Single().Id);
+    }
+
+    [TestMethod]
     public async Task UpdatingTransitionChangesMetadataWithoutReplacingItsIdentity()
     {
         var definition = new FlowGraphDefinition

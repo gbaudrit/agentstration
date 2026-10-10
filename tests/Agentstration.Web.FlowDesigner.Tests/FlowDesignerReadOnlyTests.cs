@@ -799,9 +799,15 @@ public sealed class FlowDesignerReadOnlyTests
             [
                 new InputFlowStepDefinition { Name = "input" },
                 new FlowCallStepDefinition { Name = "deliver", Flow = new("analysis", Namespace: new("pack.news")) },
-                new OutputFlowStepDefinition { Name = "done" }
+                new OutputFlowStepDefinition { Name = "done" },
+                new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }
             ],
-            Transitions = [new("input-deliver", "input", "completed", "deliver")]
+            Transitions =
+            [
+                new("input-deliver", "input", "completed", "deliver"),
+                new("deliver-error-error", "deliver", "error", "error"),
+                new("deliver-rejected-error", "deliver", "rejected", "error")
+            ]
         };
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
         context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
@@ -818,6 +824,17 @@ public sealed class FlowDesignerReadOnlyTests
             var node = store.State.Diagram.Nodes.Single(item => item.Name == "deliver");
             CollectionAssert.AreEqual(new[] { "approved", "rejected" }, node.OutputEvents.ToArray());
             Assert.AreEqual(FlowOutputOutcome.Error, node.OutputOutcomes["rejected"]);
+            Assert.IsFalse(store.State.Resource!.Definition.Transitions.Any(transition => transition.Event == "error"));
+            Assert.HasCount(1, store.State.Resource.Definition.Transitions.Where(transition => transition.FromStep == "deliver"));
+        });
+
+        rendered.Find("[data-testid='flow-designer-validate']").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            var backend = context.Services.GetRequiredService<IFlowDesignerBackend>() as BackendStub;
+            Assert.IsNotNull(backend);
+            Assert.AreEqual(1, backend.ValidationCount);
+            Assert.IsFalse(backend.LastSavedDefinition!.Transitions.Any(transition => transition.Event == "error"));
         });
     }
 
@@ -1064,6 +1081,8 @@ public sealed class FlowDesignerReadOnlyTests
             draft = CreateDraft(definition);
         }
         public int SaveCount { get; private set; }
+        public int ValidationCount { get; private set; }
+        public FlowGraphDefinition? LastSavedDefinition { get; private set; }
         public string? LastReplacementSource { get; private set; }
         public string? ReplacementError { get; set; }
         public FlowGraphDefinition? ReplacementDefinition { get; set; }
@@ -1078,7 +1097,13 @@ public sealed class FlowDesignerReadOnlyTests
         }
         public Task<FlowSourceResponse> GetSourceAsync(FlowDesignerTarget target, CancellationToken cancellationToken) =>
             Task.FromResult(new FlowSourceResponse(source, "yaml", draft.Value.Revision));
-        public Task<FlowDraftResponse> SaveDraftAsync(FlowDesignerTarget target, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken) { SaveCount++; return Task.FromResult(draft); }
+        public Task<FlowDraftResponse> SaveDraftAsync(FlowDesignerTarget target, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken)
+        {
+            SaveCount++;
+            LastSavedDefinition = request.Definition;
+            draft = new(draft.Value with { Definition = request.Definition, Revision = draft.Value.Revision + 1 }, $"\"etag-{draft.Value.Revision + 1}\"");
+            return Task.FromResult(draft);
+        }
         public Task<FlowDraftResponse> ReplaceSourceAsync(FlowDesignerTarget target, ReplaceFlowSourceRequest request, string etag, CancellationToken cancellationToken)
         {
             LastReplacementSource = request.Source;
@@ -1087,7 +1112,11 @@ public sealed class FlowDesignerReadOnlyTests
             draft = new(draft.Value with { Definition = ReplacementDefinition ?? draft.Value.Definition, Revision = draft.Value.Revision + 1 }, "\"next-etag\"");
             return Task.FromResult(draft);
         }
-        public Task<FlowValidationResponse> ValidateAsync(FlowDesignerTarget target, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<FlowValidationResponse> ValidateAsync(FlowDesignerTarget target, CancellationToken cancellationToken)
+        {
+            ValidationCount++;
+            return Task.FromResult(new FlowValidationResponse(true, []));
+        }
         public Task<FlowVersionResponse> PublishAsync(FlowDesignerTarget target, PublishFlowDraftRequest request, CancellationToken cancellationToken)
         {
             LastPublishVersion = request.Version;

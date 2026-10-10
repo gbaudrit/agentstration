@@ -78,7 +78,7 @@ public sealed class FlowDiagramMapperTests
     }
 
     [TestMethod]
-    public void ProjectPreservesExistingFlowCallOutputEventsUntilResolvedOutputsAreAvailable()
+    public void ProjectDoesNotInventFlowCallPortsFromUnresolvedTransitions()
     {
         var definition = new FlowGraphDefinition
         {
@@ -93,8 +93,8 @@ public sealed class FlowDiagramMapperTests
 
         var projection = FlowDiagramMapper.Project(FlowDesignerDocument.From(definition));
 
-        Assert.AreEqual("approved", projection.NodesByName["child"].Outputs.Single().EventName);
-        Assert.HasCount(1, projection.Links);
+        Assert.HasCount(0, projection.NodesByName["child"].Outputs);
+        Assert.HasCount(0, projection.Links);
     }
 
     [TestMethod]
