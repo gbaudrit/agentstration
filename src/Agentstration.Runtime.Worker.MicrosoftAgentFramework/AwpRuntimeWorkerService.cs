@@ -133,7 +133,7 @@ internal sealed class AwpRuntimeWorkerService(
             var output = await executor.ExecuteAsync(session, material, execution.Token);
             await session.AppendEventAsync(AwpExecutionEventKind.RunCompleted, location,
                 JsonSerializer.SerializeToElement(new { status = "succeeded", output }), null, execution.Token);
-            session.EnsureCanStartMutation();
+            await session.EnsureCanStartMutationAsync(execution.Token);
             await client.CompleteAsync(new(session.Context, new(Guid.NewGuid()), output), execution.Token);
             activity?.SetStatus(ActivityStatusCode.Ok);
         }

@@ -31,6 +31,7 @@ public sealed class RuntimeWorkerAssignmentService(
     TimeProvider timeProvider,
     RuntimeWorkerLeaseOptions options,
     RuntimeAssignmentAvailabilitySignal availability,
+    RuntimeAssignmentLeaseGuardRegistry leaseGuards,
     IRuntimeAssignmentProjection? configuredProjection = null)
 {
     private readonly IRuntimeAssignmentProjection projection = configuredProjection ?? new NullRuntimeAssignmentProjection();
@@ -140,7 +141,11 @@ public sealed class RuntimeWorkerAssignmentService(
     {
         var now = timeProvider.GetUtcNow();
         var renewed = await assignments.RenewAsync(proof, Digest(proof.OwnershipToken), now, now.Add(options.LeaseDuration), cancellationToken);
-        return new RuntimeAssignmentHeartbeat(renewed.Value, renewed.Value.CancellationRequestedAt is not null);
+        var cancellationRequested = renewed.Value.CancellationRequestedAt is not null;
+        var attempt = renewed.Value.CurrentAttempt
+            ?? throw new InvalidOperationException("A renewed assignment has no current attempt.");
+        leaseGuards.Renew(proof, attempt.LeaseExpiresAt, cancellationRequested);
+        return new RuntimeAssignmentHeartbeat(renewed.Value, cancellationRequested);
     }
 
     public Task<RuntimeAssignmentAuthorization> AuthorizeAsync(
@@ -280,11 +285,16 @@ public sealed class RuntimeWorkerAssignmentService(
             timeProvider.GetUtcNow(), cancellationToken);
     }
 
-    public Task<StoredRuntimeWorkerAssignment> RequestCancellationAsync(
+    public async Task<StoredRuntimeWorkerAssignment> RequestCancellationAsync(
         WorkspaceId workspaceId,
         RuntimeAssignmentId assignmentId,
-        CancellationToken cancellationToken) =>
-        assignments.RequestCancellationAsync(workspaceId, assignmentId, timeProvider.GetUtcNow(), cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var result = await assignments.RequestCancellationAsync(
+            workspaceId, assignmentId, timeProvider.GetUtcNow(), cancellationToken);
+        leaseGuards.Revoke(workspaceId, assignmentId);
+        return result;
+    }
 
     public async Task<RuntimeAssignmentTerminalResult> CompleteAsync(
         RuntimeAssignmentOwnershipProof proof,
@@ -292,6 +302,7 @@ public sealed class RuntimeWorkerAssignmentService(
         CancellationToken cancellationToken)
     {
         var result = await assignments.CompleteAsync(proof, Digest(proof.OwnershipToken), command, timeProvider.GetUtcNow(), cancellationToken);
+        leaseGuards.Revoke(proof.WorkspaceId, proof.AssignmentId);
         await projection.ProjectTerminalAsync(result, cancellationToken);
         return result;
     }
@@ -300,6 +311,7 @@ public sealed class RuntimeWorkerAssignmentService(
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
         var results = await assignments.ExpireLeasesAsync(timeProvider.GetUtcNow(), Math.Min(take, 1000), cancellationToken);
+        foreach (var result in results) leaseGuards.Revoke(result.Assignment.WorkspaceId, result.Assignment.Id);
         foreach (var result in results) await projection.ProjectTerminalAsync(result, cancellationToken);
         return results;
     }
@@ -310,6 +322,7 @@ public sealed class RuntimeWorkerAssignmentService(
         CancellationToken cancellationToken)
     {
         var results = await assignments.InterruptSupersededSessionsAsync(workerId, activeSessionId, timeProvider.GetUtcNow(), cancellationToken);
+        foreach (var result in results) leaseGuards.Revoke(result.Assignment.WorkspaceId, result.Assignment.Id);
         foreach (var result in results) await projection.ProjectTerminalAsync(result, cancellationToken);
         return results;
     }

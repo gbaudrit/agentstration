@@ -527,6 +527,41 @@ public sealed class RuntimeWorkerAssignmentTests
     }
 
     [TestMethod]
+    public async Task PersistedHeartbeatExtendsAnInFlightGovernedOperation()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        await fixture.CreateAssignmentAsync();
+        var claim = await fixture.ClaimRequiredAsync();
+        var operation = fixture.Execution.StoreArtifactAsync(
+            claim.Ownership, "result.txt", "text/plain", "value"u8.ToArray(), default);
+        await fixture.Operations.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        fixture.Clock.Advance(TimeSpan.FromSeconds(30));
+        _ = await fixture.Service.HeartbeatAsync(claim.Ownership, default);
+        fixture.Clock.Advance(TimeSpan.FromSeconds(11));
+
+        Assert.IsFalse(operation.IsCompleted,
+            "The persisted heartbeat must keep the governed operation alive beyond its original deadline.");
+        fixture.Operations.Release.TrySetResult();
+        var artifact = await operation;
+        Assert.AreEqual("result.txt", artifact.Name);
+    }
+
+    [TestMethod]
+    public async Task CancellationRequestRevokesAnInFlightLeaseGuard()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        await fixture.CreateAssignmentAsync();
+        var claim = await fixture.ClaimRequiredAsync();
+        using var guard = fixture.LeaseGuards.Register(claim.Ownership,
+            claim.Assignment.CurrentAttempt!.LeaseExpiresAt, default);
+
+        _ = await fixture.Service.RequestCancellationAsync(Workspace, claim.Assignment.Id, default);
+
+        Assert.IsTrue(guard.Token.IsCancellationRequested);
+    }
+
+    [TestMethod]
     public async Task RootFlowAssignmentCanBeClaimedWithoutARuntimeRunMirror()
     {
         await using var fixture = await AssignmentFixture.CreateAsync();
@@ -560,6 +595,8 @@ public sealed class RuntimeWorkerAssignmentTests
             Service = provider.GetRequiredService<RuntimeWorkerAssignmentService>();
             Dispatch = provider.GetRequiredService<RuntimeWorkerDispatchService>();
             Availability = provider.GetRequiredService<RuntimeAssignmentAvailabilitySignal>();
+            LeaseGuards = provider.GetRequiredService<RuntimeAssignmentLeaseGuardRegistry>();
+            Operations = provider.GetRequiredService<ControlledOperationGateway>();
             Execution = provider.GetRequiredService<RuntimeWorkerExecutionService>();
         }
 
@@ -569,6 +606,8 @@ public sealed class RuntimeWorkerAssignmentTests
         public RuntimeWorkerAssignmentService Service { get; }
         public RuntimeWorkerDispatchService Dispatch { get; }
         public RuntimeAssignmentAvailabilitySignal Availability { get; }
+        public RuntimeAssignmentLeaseGuardRegistry LeaseGuards { get; }
+        public ControlledOperationGateway Operations { get; }
         public RuntimeWorkerExecutionService Execution { get; }
         public string RunId { get; } = $"run-{Guid.NewGuid():N}";
         public RuntimeAssignmentId AssignmentId { get; private set; }
@@ -583,10 +622,13 @@ public sealed class RuntimeWorkerAssignmentTests
             services.AddSingleton(new RuntimeWorkerLeaseOptions());
             services.AddSingleton(new RuntimeWorkerDispatchOptions());
             services.AddSingleton<RuntimeAssignmentAvailabilitySignal>();
+            services.AddSingleton<RuntimeAssignmentLeaseGuardRegistry>();
             services.AddSingleton<RuntimeWorkerAssignmentService>();
             services.AddSingleton<RuntimeWorkerDispatchService>();
             services.AddSingleton<IRuntimeExecutionMaterialResolver, UnusedMaterialResolver>();
-            services.AddSingleton<IRuntimeWorkerOperationGateway, UnusedOperationGateway>();
+            services.AddSingleton<ControlledOperationGateway>();
+            services.AddSingleton<IRuntimeWorkerOperationGateway>(provider =>
+                provider.GetRequiredService<ControlledOperationGateway>());
             services.AddSingleton<RuntimeWorkerExecutionService>();
             services.AddSqliteRuntimeRuns($"Data Source={databasePath};Pooling=False");
             var provider = services.BuildServiceProvider();
@@ -646,11 +688,21 @@ public sealed class RuntimeWorkerAssignmentTests
                 Task.FromException<RuntimeFlowStepMaterial>(new AssertFailedException("Step resolution was not expected."));
         }
 
-        private sealed class UnusedOperationGateway : IRuntimeWorkerOperationGateway
+        public sealed class ControlledOperationGateway : IRuntimeWorkerOperationGateway
         {
+            public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
             public Task<RuntimeGovernedModelResponse> InvokeModelAsync(RuntimeGovernedModelRequest request, CancellationToken cancellationToken) => Unexpected<RuntimeGovernedModelResponse>();
             public Task<System.Text.Json.JsonElement?> InvokeToolAsync(RuntimeGovernedToolRequest request, CancellationToken cancellationToken) => Unexpected<System.Text.Json.JsonElement?>();
-            public Task<RuntimeGovernedArtifact> StoreArtifactAsync(WorkspaceId workspaceId, RuntimeAssignmentId assignmentId, string name, string contentType, byte[] content, CancellationToken cancellationToken) => Unexpected<RuntimeGovernedArtifact>();
+            public async Task<RuntimeGovernedArtifact> StoreArtifactAsync(WorkspaceId workspaceId,
+                RuntimeAssignmentId assignmentId, string name, string contentType, byte[] content,
+                CancellationToken cancellationToken)
+            {
+                Started.TrySetResult();
+                await Release.Task.WaitAsync(cancellationToken);
+                return new(Guid.NewGuid(), name, contentType, content.LongLength, content);
+            }
             public Task<RuntimeGovernedArtifact?> GetArtifactAsync(WorkspaceId workspaceId, RuntimeAssignmentId assignmentId, Guid artifactId, CancellationToken cancellationToken) => Unexpected<RuntimeGovernedArtifact?>();
             public Task<RuntimeGovernedChildFlow> CreateOrGetChildFlowAsync(WorkspaceId workspaceId, string parentRunId, string stepDefinitionId, System.Text.Json.JsonElement input, CancellationToken cancellationToken) => Unexpected<RuntimeGovernedChildFlow>();
 
@@ -660,7 +712,78 @@ public sealed class RuntimeWorkerAssignmentTests
 
     private sealed class MutableTimeProvider(DateTimeOffset current) : TimeProvider
     {
+        private readonly object gate = new();
+        private readonly List<ManualTimer> timers = [];
+
         public override DateTimeOffset GetUtcNow() => current;
-        public void Advance(TimeSpan duration) => current = current.Add(duration);
+
+        public override ITimer CreateTimer(
+            TimerCallback callback,
+            object? state,
+            TimeSpan dueTime,
+            TimeSpan period)
+        {
+            var timer = new ManualTimer(this, callback, state);
+            lock (gate) timers.Add(timer);
+            timer.Change(dueTime, period);
+            return timer;
+        }
+
+        public void Advance(TimeSpan duration)
+        {
+            current = current.Add(duration);
+            while (true)
+            {
+                ManualTimer[] due;
+                lock (gate) due = timers.Where(value => value.IsDue(current)).ToArray();
+                if (due.Length == 0) return;
+                foreach (var timer in due) timer.Fire(current);
+            }
+        }
+
+        private void Remove(ManualTimer timer)
+        {
+            lock (gate) timers.Remove(timer);
+        }
+
+        private sealed class ManualTimer(
+            MutableTimeProvider owner,
+            TimerCallback callback,
+            object? state) : ITimer
+        {
+            private DateTimeOffset? dueAt;
+            private TimeSpan period = Timeout.InfiniteTimeSpan;
+            private bool disposed;
+
+            public bool Change(TimeSpan dueTime, TimeSpan newPeriod)
+            {
+                if (disposed) return false;
+                dueAt = dueTime == Timeout.InfiniteTimeSpan ? null : owner.GetUtcNow().Add(dueTime);
+                period = newPeriod;
+                return true;
+            }
+
+            public bool IsDue(DateTimeOffset now) => !disposed && dueAt is { } due && due <= now;
+
+            public void Fire(DateTimeOffset now)
+            {
+                if (!IsDue(now)) return;
+                dueAt = period == Timeout.InfiniteTimeSpan ? null : now.Add(period);
+                callback(state);
+            }
+
+            public void Dispose()
+            {
+                if (disposed) return;
+                disposed = true;
+                owner.Remove(this);
+            }
+
+            public ValueTask DisposeAsync()
+            {
+                Dispose();
+                return ValueTask.CompletedTask;
+            }
+        }
     }
 }

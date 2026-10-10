@@ -53,6 +53,14 @@ internal sealed class AwpAssignmentSession
             throw new AwpLeaseUnsafeException("The assignment lease is too close to expiry for another mutation.");
     }
 
+    public async Task EnsureCanStartMutationAsync(CancellationToken cancellationToken)
+    {
+        if (CanStartMutation()) return;
+        var heartbeat = await Client.HeartbeatAsync(new(Context, LastEventSequence), cancellationToken);
+        ApplyHeartbeat(heartbeat);
+        EnsureCanStartMutation();
+    }
+
     public async Task AppendEventAsync(AwpExecutionEventKind kind, AwpExecutionLocation location,
         JsonElement? payload, AwpToolCallId? toolCallId, CancellationToken cancellationToken)
     {
@@ -62,7 +70,7 @@ internal sealed class AwpAssignmentSession
             if (pendingEvent is not null)
                 await SendPendingEventAsync(cancellationToken);
 
-            EnsureCanStartMutation();
+            await EnsureCanStartMutationAsync(cancellationToken);
             pendingEvent = new(new(Guid.NewGuid()), LastEventSequence + 1, timeProvider.GetUtcNow(),
                 kind, location, toolCallId, payload);
             await SendPendingEventAsync(cancellationToken);
@@ -75,7 +83,7 @@ internal sealed class AwpAssignmentSession
 
     private async Task SendPendingEventAsync(CancellationToken cancellationToken)
     {
-        EnsureCanStartMutation();
+        await EnsureCanStartMutationAsync(cancellationToken);
         var response = await Client.AppendEventsAsync(new(Context, [pendingEvent!]), cancellationToken);
         Interlocked.Exchange(ref eventSequence, response.AcceptedThroughSequence);
         pendingEvent = null;

@@ -54,7 +54,10 @@ process. It connects only to the AWP HTTP surface and has no database, store, or
 configuration. Each process has a stable `WorkerId`, a fresh session ID per start, and its own
 credential. Heartbeat continues independently while an assignment executes. Transient HTTP retries
 are bounded and retain stable command/event identities; the Worker stops new mutations before its
-lease safety margin and has no grace after expiry.
+lease safety margin and has no grace after expiry. For an already-running governed model, Tool,
+child-Flow, or Artifact operation, every durably accepted heartbeat moves the server-side cancellation
+deadline to the renewed lease safety boundary. Cancellation, terminal completion, lease expiry, or
+session fencing cancels that in-flight operation immediately.
 
 Aspire starts `Agentstration:RuntimeWorkers:Count` independently identified Workers and provisions
 their protected development key files. Compose starts the same executable as `runtime-worker-1` with

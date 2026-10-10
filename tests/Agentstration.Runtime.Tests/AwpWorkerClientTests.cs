@@ -51,6 +51,26 @@ public sealed class AwpWorkerClientTests
     }
 
     [TestMethod]
+    public async Task MutationRenewsLeaseOnDemandWhenPeriodicHeartbeatIsLate()
+    {
+        var clock = new MutableTimeProvider(DateTimeOffset.Parse("2026-10-03T12:00:00Z",
+            System.Globalization.CultureInfo.InvariantCulture));
+        using var credential = new AwpClientCredential(Guid.NewGuid(), Guid.NewGuid(), "test-instance",
+            System.Text.Encoding.UTF8.GetBytes("test-worker-secret-material-at-least-32-bytes"));
+        var handler = new HeartbeatHandler(clock);
+        using var client = new AwpClient(new Uri("https://authority.test"), credential, new(Guid.NewGuid()), clock, 0,
+            handler);
+        var session = new AwpAssignmentSession(client, Assignment(clock.GetUtcNow().AddSeconds(20)),
+            clock.GetUtcNow(), clock, TimeSpan.FromSeconds(8));
+        clock.Advance(TimeSpan.FromSeconds(13));
+
+        await session.EnsureCanStartMutationAsync(CancellationToken.None);
+
+        Assert.AreEqual(1, handler.RequestCount);
+        Assert.IsTrue(session.CanStartMutation());
+    }
+
+    [TestMethod]
     public void WorkerOptionsRejectClearTextUnlessExplicitlyAllowed()
     {
         var options = new RuntimeWorkerOptions
@@ -160,6 +180,29 @@ public sealed class AwpWorkerClientTests
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = JsonContent.Create(response, options: AwpProtocol.JsonOptions)
+            };
+        }
+    }
+
+    private sealed class HeartbeatHandler(MutableTimeProvider clock) : HttpMessageHandler
+    {
+        public int RequestCount { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            var envelope = await request.Content!.ReadFromJsonAsync<AwpEnvelope<AwpHeartbeatRequest>>(
+                AwpProtocol.JsonOptions, cancellationToken);
+            var now = clock.GetUtcNow();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new AwpEnvelope<AwpHeartbeatResponse>(
+                    AwpProtocol.Version,
+                    envelope!.MessageId,
+                    now,
+                    new(now, now.AddSeconds(45), AwpCancellationDirective.None)),
+                    options: AwpProtocol.JsonOptions)
             };
         }
     }

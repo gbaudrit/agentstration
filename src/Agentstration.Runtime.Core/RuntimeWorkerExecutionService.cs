@@ -7,7 +7,8 @@ public sealed class RuntimeWorkerExecutionService(
     RuntimeWorkerAssignmentService assignments,
     IRuntimeExecutionMaterialResolver materials,
     IRuntimeWorkerOperationGateway operations,
-    RuntimeWorkerLeaseOptions leaseOptions)
+    RuntimeWorkerLeaseOptions leaseOptions,
+    RuntimeAssignmentLeaseGuardRegistry leaseGuards)
 {
     public async Task<RuntimeExecutionMaterial> GetMaterialAsync(
         RuntimeAssignmentOwnershipProof proof,
@@ -115,7 +116,7 @@ public sealed class RuntimeWorkerExecutionService(
         _ = authorization.Assignment.Turns.SingleOrDefault(value => value.Id == turnId
             && value.AttemptId == turnAttemptId && string.Equals(value.ParticipantId, participantId, StringComparison.Ordinal))
             ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The model call does not reference an authorized Turn and TurnAttempt.");
-        using var lease = CreateLeaseCancellation(authorization, cancellationToken);
+        using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
         var options = material is RuntimeDirectAgentExecutionMaterial direct
             ? direct.Execution
             : new RuntimeExecutionOptions();
@@ -141,7 +142,7 @@ public sealed class RuntimeWorkerExecutionService(
             ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Tool call does not reference an authorized Turn and TurnAttempt.");
         var tool = agent.Tools.SingleOrDefault(value => string.Equals(value.Id, toolId, StringComparison.Ordinal))
             ?? throw new RuntimeExecutionMaterialException("tool_not_authorized", "The Tool is not declared by the assigned Agent revision.");
-        using var lease = CreateLeaseCancellation(authorization, cancellationToken);
+        using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
         return await operations.InvokeToolAsync(new RuntimeGovernedToolRequest(
             agent, tool, toolCallId, turnId, turnAttemptId, turn.StepExecutionId,
             material.TenantId, material.WorkspaceId, material.PrincipalId, material.RunId,
@@ -156,7 +157,7 @@ public sealed class RuntimeWorkerExecutionService(
         CancellationToken cancellationToken)
     {
         var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
-        using var lease = CreateLeaseCancellation(authorization, cancellationToken);
+        using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
         return await operations.StoreArtifactAsync(proof.WorkspaceId, proof.AssignmentId, name, contentType, content, lease.Token);
     }
 
@@ -180,7 +181,7 @@ public sealed class RuntimeWorkerExecutionService(
             throw new RuntimeExecutionMaterialException("child_flow_not_allowed", "Only a root Flow assignment can create a child Flow.");
         var step = authorization.Assignment.StepExecutions.SingleOrDefault(value => value.Id == stepExecutionId)
             ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The child Flow does not reference an authorized StepExecution.");
-        using var lease = CreateLeaseCancellation(authorization, cancellationToken);
+        using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
         var child = await operations.CreateOrGetChildFlowAsync(proof.WorkspaceId, step.FlowRunId,
             step.StepDefinitionId, input, lease.Token);
         await assignments.RegisterChildFlowAsync(proof, child.RunId, lease.Token);
@@ -225,14 +226,29 @@ public sealed class RuntimeWorkerExecutionService(
         return authorization;
     }
 
-    private CancellationTokenSource CreateLeaseCancellation(
+    private async Task<RuntimeAssignmentLeaseGuard> CreateLeaseGuardAsync(
+        RuntimeAssignmentOwnershipProof proof,
         RuntimeAssignmentAuthorization authorization,
         CancellationToken cancellationToken)
     {
-        var duration = authorization.LeaseRemaining - leaseOptions.MinimumSideEffectLeaseRemaining;
-        var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        linked.CancelAfter(duration);
-        return linked;
+        var attempt = authorization.Assignment.CurrentAttempt
+            ?? throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.NotOwned,
+                "The assignment has no active attempt.");
+        var guard = leaseGuards.Register(proof, attempt.LeaseExpiresAt, cancellationToken);
+        try
+        {
+            var refreshed = await AuthorizeSideEffectAsync(proof, cancellationToken);
+            attempt = refreshed.Assignment.CurrentAttempt
+                ?? throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.NotOwned,
+                    "The assignment has no active attempt.");
+            leaseGuards.Renew(proof, attempt.LeaseExpiresAt, refreshed.CancellationRequested);
+            return guard;
+        }
+        catch
+        {
+            guard.Dispose();
+            throw;
+        }
     }
 
     private static long ModelPayloadLength(IEnumerable<RuntimeGovernedModelMessage> messages) => messages

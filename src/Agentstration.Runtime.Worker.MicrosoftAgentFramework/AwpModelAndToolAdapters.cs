@@ -27,7 +27,7 @@ internal sealed class AwpModelChatClient(
     public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        session.EnsureCanStartMutation();
+        await session.EnsureCanStartMutationAsync(cancellationToken);
         var request = new AwpInvokeModelRequest(session.Context, agent.ParticipantId, turn.TurnId,
             turn.Attempt.TurnAttemptId, messages.Select(ToContract).ToArray());
         var response = await session.Client.InvokeModelAsync(request, cancellationToken);
@@ -111,7 +111,7 @@ internal sealed class AwpToolExecutionPipeline(
     public async ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context,
         CancellationToken cancellationToken = default)
     {
-        session.EnsureCanStartMutation();
+        await session.EnsureCanStartMutationAsync(cancellationToken);
         var toolCallId = StableGuid(context.ToolCallId);
         var response = await session.Client.InvokeToolAsync(new AwpInvokeToolRequest(
             session.Context,
