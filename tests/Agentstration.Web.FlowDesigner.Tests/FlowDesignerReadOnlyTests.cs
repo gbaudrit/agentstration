@@ -805,7 +805,7 @@ public sealed class FlowDesignerReadOnlyTests
             Transitions =
             [
                 new("input-deliver", "input", "completed", "deliver"),
-                new("deliver-error-error", "deliver", "error", "error"),
+                new("unexpected-id", "deliver", "failure", "error"),
                 new("deliver-rejected-error", "deliver", "rejected", "error")
             ]
         };
@@ -824,7 +824,7 @@ public sealed class FlowDesignerReadOnlyTests
             var node = store.State.Diagram.Nodes.Single(item => item.Name == "deliver");
             CollectionAssert.AreEqual(new[] { "approved", "rejected" }, node.OutputEvents.ToArray());
             Assert.AreEqual(FlowOutputOutcome.Error, node.OutputOutcomes["rejected"]);
-            Assert.IsFalse(store.State.Resource!.Definition.Transitions.Any(transition => transition.Event == "error"));
+            Assert.IsFalse(store.State.Resource!.Definition.Transitions.Any(transition => transition.Event == "failure"));
             Assert.HasCount(1, store.State.Resource.Definition.Transitions.Where(transition => transition.FromStep == "deliver"));
         });
 
@@ -834,7 +834,7 @@ public sealed class FlowDesignerReadOnlyTests
             var backend = context.Services.GetRequiredService<IFlowDesignerBackend>() as BackendStub;
             Assert.IsNotNull(backend);
             Assert.AreEqual(1, backend.ValidationCount);
-            Assert.IsFalse(backend.LastSavedDefinition!.Transitions.Any(transition => transition.Event == "error"));
+            Assert.IsFalse(backend.LastSavedDefinition!.Transitions.Any(transition => transition.Event == "failure"));
         });
     }
 

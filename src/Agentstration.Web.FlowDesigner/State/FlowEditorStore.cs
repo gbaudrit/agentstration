@@ -145,29 +145,34 @@ public sealed record ReconcileFlowCallTransitionsCommand(
     {
         var transitions = definition.Transitions.ToList();
         var changed = false;
+        var localErrorOutputs = definition.Steps
+            .Where(step => step is FailureFlowStepDefinition
+                || step is OutputFlowStepDefinition { Outcome: FlowOutputOutcome.Error })
+            .Select(step => step.Name)
+            .ToHashSet(StringComparer.Ordinal);
         foreach (var call in definition.Steps.OfType<FlowCallStepDefinition>())
         {
-            if (!OutputsByStep.TryGetValue(call.Name, out var outputs) || outputs.Count == 0
-                || outputs.Any(output => output.Name == "error"))
+            if (!OutputsByStep.TryGetValue(call.Name, out var outputs) || outputs.Count == 0)
                 continue;
 
+            var declaredEvents = outputs.Select(output => output.Name).ToHashSet(StringComparer.Ordinal);
             var replacement = outputs.FirstOrDefault(output => output.Outcome == FlowOutputOutcome.Error)?.Name;
-            foreach (var legacy in transitions.Where(transition =>
+            foreach (var invalid in transitions.Where(transition =>
                 transition.FromStep == call.Name
-                && transition.Event == "error"
+                && !declaredEvents.Contains(transition.Event)
+                && localErrorOutputs.Contains(transition.ToStep)
                 && transition.Condition is null
-                && transition.Priority is null
-                && transition.Id == $"{call.Name}-error-{transition.ToStep}").ToArray())
+                && transition.Priority is null).ToArray())
             {
-                var index = transitions.IndexOf(legacy);
+                var index = transitions.IndexOf(invalid);
                 if (replacement is null || transitions.Any(transition =>
-                    transition.Id != legacy.Id
+                    transition.Id != invalid.Id
                     && transition.FromStep == call.Name
-                    && transition.ToStep == legacy.ToStep
+                    && transition.ToStep == invalid.ToStep
                     && transition.Event == replacement))
                     transitions.RemoveAt(index);
                 else
-                    transitions[index] = legacy with { Event = replacement };
+                    transitions[index] = invalid with { Event = replacement };
                 changed = true;
             }
         }

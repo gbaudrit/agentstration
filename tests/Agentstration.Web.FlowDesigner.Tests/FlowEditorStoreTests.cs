@@ -136,7 +136,7 @@ public sealed class FlowEditorStoreTests
     }
 
     [TestMethod]
-    public void ReconcileFlowCallTransitionsReplacesOrRemovesLegacyAutomaticErrorEvent()
+    public void ReconcileFlowCallTransitionsAlignsInvalidErrorRoutesWithDeclaredOutput()
     {
         var definition = new FlowGraphDefinition
         {
@@ -148,7 +148,7 @@ public sealed class FlowEditorStoreTests
             ],
             Transitions =
             [
-                new("child-error-error", "child", "error", "error"),
+                new("arbitrary-legacy-id", "child", "failure", "error"),
                 new("child-failed-error", "child", "failed", "error")
             ]
         };
@@ -164,10 +164,10 @@ public sealed class FlowEditorStoreTests
 
         var replaced = new ReconcileFlowCallTransitionsCommand(outputs).Apply(definition with
         {
-            Transitions = [new("child-error-error", "child", "error", "error")]
+            Transitions = [new("arbitrary-legacy-id", "child", "failure", "error")]
         });
         Assert.AreEqual("failed", replaced.Transitions.Single().Event);
-        Assert.AreEqual("child-error-error", replaced.Transitions.Single().Id);
+        Assert.AreEqual("arbitrary-legacy-id", replaced.Transitions.Single().Id);
     }
 
     [TestMethod]
