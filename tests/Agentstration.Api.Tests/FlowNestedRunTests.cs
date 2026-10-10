@@ -30,16 +30,6 @@ public sealed partial class FlowTests
         Assert.IsNotNull(reloaded);
         Assert.AreEqual("${transition.output}", reloaded.Value.Graph!.Steps.OfType<OutputFlowStepDefinition>().Single(step => step.Outcome is not FlowOutputOutcome.Error).OutputMapping?.GetString());
         StringAssert.Contains(FlowDraftService.ToYaml(reloaded.Value.Graph), "${transition.output}");
-
-        var runs = Service(fixture, new TestFlowRunQueue());
-        var input = JsonSerializer.SerializeToElement(new { value = "root value" });
-        var pending = await runs.CreateAsync(created.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "direct-output",
-            input, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual("root value", completed.Output?.GetProperty("value").GetString());
     }
 
     [TestMethod]
@@ -218,57 +208,6 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
-    public async Task FlowCallPassesTheIncomingTransitionOutputToTheChild()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        await CreatePublishedGraphAsync(fixture, "child", ChildGraph());
-        var parent = await CreatePublishedGraphAsync(fixture, "parent", AgentThenFlowGraph());
-        var runs = Service(fixture, new TestFlowRunQueue(), agents: new StructuredAgentExecutor());
-        using var input = JsonDocument.Parse("""{"article":"original item"}""");
-
-        var pending = await runs.CreateAsync(
-            parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "agent-child-input",
-            input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        var childId = waiting.Steps.Single(step => step.StepName == "deliver").ChildFlowRunId;
-        Assert.IsNotNull(childId);
-        var child = (await runs.GetAsync(TestScope.WorkspaceId, childId, default))!.Value;
-        Assert.AreEqual("analyzed item", child.Input.GetProperty("article").GetString());
-        Assert.AreEqual(0.9, child.Input.GetProperty("confidence").GetDouble());
-    }
-
-    [TestMethod]
-    public async Task FlowCallWithoutMappingPassesTheIncomingTransitionOutputToTheChild()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        await CreatePublishedGraphAsync(fixture, "child", ChildGraph());
-        var graph = AgentThenFlowGraph();
-        graph = graph with
-        {
-            Steps = graph.Steps.Select(step => step is FlowCallStepDefinition call
-                ? call with { InputMapping = null }
-                : step).ToArray()
-        };
-        var parent = await CreatePublishedGraphAsync(fixture, "parent", graph);
-        var runs = Service(fixture, new TestFlowRunQueue(), agents: new StructuredAgentExecutor());
-        using var input = JsonDocument.Parse("""{"article":"original item"}""");
-
-        var pending = await runs.CreateAsync(
-            parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "default-child-input",
-            input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        var childId = waiting.Steps.Single(step => step.StepName == "deliver").ChildFlowRunId;
-        Assert.IsNotNull(childId);
-        var child = (await runs.GetAsync(TestScope.WorkspaceId, childId, default))!.Value;
-        Assert.AreEqual("analyzed item", child.Input.GetProperty("article").GetString());
-        Assert.AreEqual(0.9, child.Input.GetProperty("confidence").GetDouble());
-    }
-
-    [TestMethod]
     [DataRow(null, null, "transformed")]
     [DataRow("${input}", null, "original")]
     [DataRow(null, "${input}", "original")]
@@ -305,46 +244,6 @@ public sealed partial class FlowTests
         Assert.AreEqual(expectedOutput, completed.Output?.GetProperty("value").GetString());
         Assert.AreEqual(agentMapping is null ? "transformed" : "original",
             completed.Steps.Single(step => step.StepName == "agent").Output?.GetProperty("value").GetString());
-    }
-
-    [TestMethod]
-    [DataRow("left")]
-    [DataRow("right")]
-    public async Task ConvergingOutputUsesTheSelectedIncomingTransition(string route)
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        var graph = new FlowGraphDefinition
-        {
-            EntryStep = "input",
-            Steps =
-            [
-                new InputFlowStepDefinition { Name = "input" },
-                new ConditionFlowStepDefinition { Name = "branch", Left = "${input.route}", Operator = "equals", Right = "left" },
-                new TransformFlowStepDefinition { Name = "left", Mapping = JsonSerializer.SerializeToElement(new { route = "left" }) },
-                new TransformFlowStepDefinition { Name = "right", Mapping = JsonSerializer.SerializeToElement(new { route = "right" }) },
-                new OutputFlowStepDefinition { Name = "output" }
-            ],
-            Transitions =
-            [
-                new("input-branch", "input", "completed", "branch"),
-                new("branch-left", "branch", "true", "left"),
-                new("branch-right", "branch", "false", "right"),
-                new("left-output", "left", "completed", "output"),
-                new("right-output", "right", "completed", "output")
-            ]
-        };
-        var flow = await CreatePublishedGraphAsync(fixture, "converging-output", graph);
-        var runs = Service(fixture, new TestFlowRunQueue());
-        var input = JsonSerializer.SerializeToElement(new { route });
-
-        var pending = await runs.CreateAsync(flow.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", $"branch-{route}",
-            input, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual(route, completed.Output?.GetProperty("route").GetString());
-        Assert.AreEqual($"branch-{route}", completed.Steps.Single(step => step.StepName == "branch").SelectedTransition);
     }
 
     [TestMethod]
@@ -696,43 +595,6 @@ public sealed partial class FlowTests
             new("analyze-cancelled", "analyze", "cancelled", "failure")
         ]
     };
-
-    private static FlowGraphDefinition AgentThenFlowGraph() => new()
-    {
-        EntryStep = "input",
-        Steps =
-        [
-            new InputFlowStepDefinition { Name = "input" },
-            new AgentFlowStepDefinition { Name = "analyze", Agent = new("news-agent") },
-            new FlowCallStepDefinition
-            {
-                Name = "deliver",
-                Flow = new("child", FlowCallVersionStrategy.Exact, "1.0.0"),
-                InputMapping = JsonSerializer.SerializeToElement("${transition.output}")
-            }
-        ],
-        Transitions =
-        [
-            new("input-analyze", "input", "completed", "analyze"),
-            new("analyze-deliver", "analyze", "success", "deliver")
-        ]
-    };
-
-    private sealed class StructuredAgentExecutor : IFlowAgentExecutor
-    {
-        public Task<FlowAgentExecutionResult> ExecuteAsync(
-            FlowAgentExecutionRequest request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(new FlowAgentExecutionResult(
-                JsonSerializer.SerializeToElement(new { article = "analyzed item", confidence = 0.9 }),
-                $"/agents/{request.Target.Id}",
-                3,
-                "/profiles/default",
-                "Deterministic",
-                null,
-                [],
-                []));
-    }
 
     private sealed class EchoAgentExecutor : IFlowAgentExecutor
     {

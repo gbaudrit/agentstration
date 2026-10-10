@@ -132,6 +132,97 @@ public sealed class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task FlowCallUsesTheIncomingTransitionOutputAsItsDefaultInput(bool explicitMapping)
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "prepare",
+            Steps =
+            [
+                new TransformFlowStepDefinition
+                {
+                    Name = "prepare",
+                    Mapping = JsonSerializer.SerializeToElement(new { article = "analyzed item", confidence = 0.9 })
+                },
+                new FlowCallStepDefinition
+                {
+                    Name = "deliver",
+                    Flow = new("child"),
+                    InputMapping = explicitMapping
+                        ? JsonSerializer.SerializeToElement("${transition.output}")
+                        : null
+                },
+                new OutputFlowStepDefinition
+                {
+                    Name = "completed",
+                    OutputMapping = JsonSerializer.SerializeToElement("${transition.output}")
+                }
+            ],
+            Transitions =
+            [
+                new("prepare-deliver", "prepare", "completed", "deliver"),
+                new("deliver-completed", "deliver", "completed", "completed")
+            ]
+        };
+
+        var (result, handler) = await ExecuteGraphAsync(graph,
+            JsonSerializer.SerializeToElement(new { article = "original item" }));
+
+        var child = handler.ChildRequests.Single();
+        Assert.AreEqual("analyzed item", child.Input.GetProperty("article").GetString());
+        Assert.AreEqual(0.9, child.Input.GetProperty("confidence").GetDouble());
+        Assert.AreEqual("analyzed item", result.Output?.GetProperty("article").GetString());
+    }
+
+    [TestMethod]
+    [DataRow("left")]
+    [DataRow("right")]
+    public async Task ConvergingOutputUsesTheSelectedIncomingTransitionOnTheWorker(string route)
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "branch",
+            Steps =
+            [
+                new ConditionFlowStepDefinition
+                {
+                    Name = "branch",
+                    Left = "${input.route}",
+                    Operator = "equals",
+                    Right = "left"
+                },
+                new TransformFlowStepDefinition
+                {
+                    Name = "left",
+                    Mapping = JsonSerializer.SerializeToElement(new { route = "left" })
+                },
+                new TransformFlowStepDefinition
+                {
+                    Name = "right",
+                    Mapping = JsonSerializer.SerializeToElement(new { route = "right" })
+                },
+                new OutputFlowStepDefinition { Name = "output" }
+            ],
+            Transitions =
+            [
+                new("branch-left", "branch", "true", "left"),
+                new("branch-right", "branch", "false", "right"),
+                new("left-output", "left", "completed", "output"),
+                new("right-output", "right", "completed", "output")
+            ]
+        };
+
+        var (result, handler) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { route }));
+
+        Assert.AreEqual(route, result.Output?.GetProperty("route").GetString());
+        var branch = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.StepCompleted
+            && value.Location.FlowStep?.StepDefinitionId == "branch");
+        Assert.AreEqual($"branch-{route}", branch.Payload?.GetProperty("selectedTransition").GetString());
+    }
+
+    [TestMethod]
     public async Task RepeatFailsWithStableCodeWhenTheIterationLimitIsReached()
     {
         var graph = new FlowGraphDefinition
