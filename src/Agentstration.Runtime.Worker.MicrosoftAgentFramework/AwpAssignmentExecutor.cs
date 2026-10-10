@@ -240,6 +240,7 @@ internal sealed class AwpAssignmentExecutor(
             AwpExecutionAgentMaterial? executedAgent = null;
             AwpInvokeFlowToolResponse? executedTool = null;
             var childRunIds = new List<string>();
+            var childExecutions = new List<AwpChildExecutionResult>();
             var stepArtifacts = new List<AwpFlowArtifact>();
             string? artifactStorageFlowRunId = null;
             int? repeatIteration = null;
@@ -330,6 +331,7 @@ internal sealed class AwpAssignmentExecutor(
                         : await ResolveJsonAsync(flowCall.InputMapping.Value, context, cancellationToken);
                     var child = await ExecuteChildFlowAsync(session, step, childInput,
                         "flowCall", null, cancellationToken);
+                    childExecutions.Add(child);
                     childRunIds.Add(child.RunId);
                     output = child.Result.Output?.Clone();
                     eventName = child.Result.OutputName
@@ -350,6 +352,7 @@ internal sealed class AwpAssignmentExecutor(
                         repeatIteration = iteration;
                         var repeated = await ExecuteChildFlowAsync(session, step, repeatInput,
                             "repeat", iteration, cancellationToken);
+                        childExecutions.Add(repeated);
                         childRunIds.Add(repeated.RunId);
                         output = repeated.Result.Output?.Clone();
                         if (repeated.Result.Outcome == "error")
@@ -418,7 +421,8 @@ internal sealed class AwpAssignmentExecutor(
                 var content = artifactOutput.ContentMapping is null
                     ? output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
                     : await ResolveJsonAsync(artifactOutput.ContentMapping.Value, artifactContext, cancellationToken);
-                var provenance = ArtifactProvenance(stepDefinition, executedAgent, executedTool, childRunIds);
+                var provenance = ArtifactProvenance(stepDefinition, executedAgent, executedTool,
+                    childRunIds, childExecutions.LastOrDefault());
                 var captured = (await session.Client.CaptureFlowArtifactAsync(new(
                     session.Context, step.StepExecutionId, fileName, mediaType, content, provenance),
                     cancellationToken)).Artifact;
@@ -555,7 +559,8 @@ internal sealed class AwpAssignmentExecutor(
                     error = result.ErrorMessage,
                     errorDetails = result.ErrorDetails
                 }), null, cancellationToken);
-            return new(child.RunId, result);
+            return new(child.RunId, child.Material.FlowId, child.Material.FlowNamespace,
+                child.Material.FlowVersion, result);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -574,7 +579,8 @@ internal sealed class AwpAssignmentExecutor(
                     errorCode = code,
                     error = exception.Message
                 }), null, cancellationToken);
-            return new(child.RunId, result);
+            return new(child.RunId, child.Material.FlowId, child.Material.FlowNamespace,
+                child.Material.FlowVersion, result);
         }
     }
 
@@ -676,7 +682,8 @@ internal sealed class AwpAssignmentExecutor(
         FlowStepDefinition step,
         AwpExecutionAgentMaterial? agent,
         AwpInvokeFlowToolResponse? tool,
-        IReadOnlyList<string> childRunIds)
+        IReadOnlyList<string> childRunIds,
+        AwpChildExecutionResult? child)
     {
         var provenance = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -715,6 +722,12 @@ internal sealed class AwpAssignmentExecutor(
         }
         if (childRunIds.LastOrDefault() is { } childRunId)
             provenance["childFlowRunId"] = childRunId;
+        if (child is not null)
+        {
+            provenance["childFlowName"] = child.FlowId;
+            provenance["childFlowNamespace"] = child.FlowNamespace;
+            provenance["childFlowVersion"] = child.FlowVersion;
+        }
         return provenance;
     }
 
@@ -843,7 +856,12 @@ internal sealed record AwpAssignmentExecutionResult(
     string? ErrorMessage = null,
     string? ErrorDetails = null);
 
-internal sealed record AwpChildExecutionResult(string RunId, AwpAssignmentExecutionResult Result);
+internal sealed record AwpChildExecutionResult(
+    string RunId,
+    string FlowId,
+    string FlowNamespace,
+    string FlowVersion,
+    AwpAssignmentExecutionResult Result);
 
 internal sealed record AwpCapturedFlowArtifact(
     AwpFlowStepLocation Step,

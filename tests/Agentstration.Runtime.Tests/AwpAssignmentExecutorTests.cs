@@ -132,6 +132,50 @@ public sealed class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
+    public async Task FlowCallArtifactCapturesResolvedChildProvenance()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "delegate",
+            Steps =
+            [
+                new FlowCallStepDefinition
+                {
+                    Name = "delegate",
+                    Flow = new("child", FlowCallVersionStrategy.Exact, "1.0"),
+                    ArtifactOutput = new()
+                    {
+                        FileName = "child-result.json",
+                        ContentMapping = JsonSerializer.SerializeToElement("${step.output}"),
+                        Clean = FlowStepArtifactCleanupMode.Never
+                    }
+                },
+                new OutputFlowStepDefinition
+                {
+                    Name = "completed",
+                    OutputMapping = JsonSerializer.SerializeToElement("${transition.output}")
+                }
+            ],
+            Transitions = [new("delegate-completed", "delegate", "completed", "completed")]
+        };
+        var handler = new GraphHandler(TestNow)
+        {
+            ChildOutput = JsonSerializer.SerializeToElement(new { summary = "new item" })
+        };
+
+        var (result, _) = await ExecuteGraphAsync(graph,
+            JsonSerializer.SerializeToElement(new { article = "new item" }), handler);
+
+        Assert.AreEqual("new item", result.Output?.GetProperty("summary").GetString());
+        Assert.AreEqual("new item", handler.CaptureRequest?.Content.GetProperty("summary").GetString());
+        Assert.AreEqual("subFlow", handler.CaptureRequest?.Provenance["invocationKind"]);
+        StringAssert.StartsWith(handler.CaptureRequest?.Provenance["childFlowRunId"], "flowrun-child-");
+        Assert.AreEqual("child", handler.CaptureRequest?.Provenance["childFlowName"]);
+        Assert.AreEqual("default", handler.CaptureRequest?.Provenance["childFlowNamespace"]);
+        Assert.AreEqual("1.0", handler.CaptureRequest?.Provenance["childFlowVersion"]);
+    }
+
+    [TestMethod]
     public async Task TransformConditionAndTransitionOutputExecuteOnTheWorker()
     {
         var graph = new FlowGraphDefinition
@@ -424,6 +468,109 @@ public sealed class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ArtifactStorageFlowProducesDurableProjectionAndCleansTheStagedArtifact(bool failAfterStorage)
+    {
+        var terminal = failAfterStorage
+            ? (FlowStepDefinition)new FailureFlowStepDefinition
+            {
+                Name = "terminal",
+                Code = "after_storage_failed",
+                Message = "The parent failed after Artifact storage."
+            }
+            : new OutputFlowStepDefinition
+            {
+                Name = "terminal",
+                Outcome = FlowOutputOutcome.Success,
+                OutputMapping = JsonSerializer.SerializeToElement("${transition.output}")
+            };
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "lookup",
+            Steps =
+            [
+                new ToolRouteFlowStepDefinition
+                {
+                    Name = "lookup",
+                    DisplayName = "Produced result",
+                    ToolSet = new("knowledge", "1.0"),
+                    Capability = "search",
+                    ArtifactOutput = new()
+                    {
+                        FileName = "${step.displayName}",
+                        MediaType = "application/json",
+                        ContentMapping = JsonSerializer.SerializeToElement("${step.output}"),
+                        StorageFlow = new("artifact-storage", FlowCallVersionStrategy.Exact, "1.0")
+                    }
+                },
+                terminal
+            ],
+            Transitions = [new("lookup-terminal", "lookup", "success", "terminal")]
+        };
+        var handler = new GraphHandler(TestNow)
+        {
+            ChildOutput = JsonSerializer.SerializeToElement(new
+            {
+                flowRunArtifactId = "11111111111111111111111111111111"
+            })
+        };
+
+        var (result, _) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }), handler);
+
+        Assert.AreEqual(failAfterStorage ? "error" : "success", result.Outcome);
+        Assert.AreEqual(1, handler.FlowToolInvocationCount);
+        Assert.AreEqual("Produced result", handler.CaptureRequest?.FileName);
+        Assert.AreEqual("found", handler.CaptureRequest?.Content.GetProperty("answer").GetString());
+        var storage = handler.ChildRequests.Single();
+        Assert.AreEqual("artifactStorage", storage.Purpose);
+        Assert.AreEqual("artifact-1", storage.Input.GetProperty("stagedArtifactId").GetString());
+        Assert.AreEqual("flowrun-root", storage.Input.GetProperty("producerFlowRunId").GetString());
+        Assert.AreEqual("lookup", storage.Input.GetProperty("producerFlowStepId").GetString());
+        var projected = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.StepCompleted
+            && value.Location.FlowStep?.StepDefinitionId == "lookup");
+        Assert.AreEqual("11111111111111111111111111111111", projected.Payload?
+            .GetProperty("artifacts")[0].GetProperty("ArtifactId").GetString());
+        Assert.AreEqual("durable", projected.Payload?.GetProperty("artifacts")[0]
+            .GetProperty("Kind").GetString());
+        Assert.HasCount(1, handler.CleanupRequests);
+        Assert.AreEqual("artifact-1", handler.CleanupRequests.Single().Artifact.ArtifactId);
+    }
+
+    [TestMethod]
+    public async Task CancellationDuringArtifactStorageCleansTheStagedArtifact()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "lookup",
+            Steps =
+            [
+                new ToolRouteFlowStepDefinition
+                {
+                    Name = "lookup",
+                    ToolSet = new("knowledge", "1.0"),
+                    Capability = "search",
+                    ArtifactOutput = new()
+                    {
+                        FileName = "result.json",
+                        StorageFlow = new("artifact-storage", FlowCallVersionStrategy.Exact, "1.0")
+                    }
+                },
+                new OutputFlowStepDefinition { Name = "completed" }
+            ],
+            Transitions = [new("lookup-completed", "lookup", "success", "completed")]
+        };
+        var handler = new GraphHandler(TestNow) { OnChildCreated = cancellation.Cancel };
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => ExecuteGraphAsync(graph,
+            JsonSerializer.SerializeToElement(new { }), handler, cancellationToken: cancellation.Token));
+
+        Assert.HasCount(1, handler.CleanupRequests);
+        Assert.AreEqual("artifact-1", handler.CleanupRequests.Single().Artifact.ArtifactId);
+    }
+
+    [TestMethod]
     public async Task RepeatCreatesIndependentChildForEveryIterationAndUsesChildNamedOutput()
     {
         var now = DateTimeOffset.Parse("2026-10-10T08:00:00Z",
@@ -499,7 +646,8 @@ public sealed class AwpAssignmentExecutorTests
         string runId = "flowrun-root",
         string? rootRunId = null,
         string? parentRunId = null,
-        string? correlationId = null)
+        string? correlationId = null,
+        CancellationToken cancellationToken = default)
     {
         using var credential = new AwpClientCredential(Guid.NewGuid(), Guid.NewGuid(), "test-instance",
             System.Text.Encoding.UTF8.GetBytes("test-worker-secret-material-at-least-32-bytes"));
@@ -522,7 +670,7 @@ public sealed class AwpAssignmentExecutorTests
             RootFlowRunId: rootRunId ?? runId, ParentFlowRunId: parentRunId,
             CorrelationId: correlationId);
 
-        return (await executor.ExecuteAsync(session, material, CancellationToken.None), handler);
+        return (await executor.ExecuteAsync(session, material, cancellationToken), handler);
     }
 
     private static FlowGraphDefinition ExecutionContextGraph() => new()
@@ -556,6 +704,8 @@ public sealed class AwpAssignmentExecutorTests
     {
         public List<AwpExecutionEvent> Events { get; } = [];
         public List<AwpCreateChildFlowRequest> ChildRequests { get; } = [];
+        public List<AwpCleanupFlowArtifactRequest> CleanupRequests { get; } = [];
+        public int FlowToolInvocationCount { get; private set; }
         public AwpCaptureFlowArtifactRequest? CaptureRequest { get; private set; }
         public string? ChildOutputName { get; init; }
         public string ChildOutcome { get; init; } = "success";
@@ -563,6 +713,7 @@ public sealed class AwpAssignmentExecutorTests
         public Func<AwpCreateChildFlowRequest, JsonElement>? ChildOutputFactory { get; init; }
         public FlowGraphDefinition? ChildGraph { get; init; }
         public string? ChildCorrelationId { get; init; }
+        public Action? OnChildCreated { get; init; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
             CancellationToken cancellationToken)
@@ -574,12 +725,9 @@ public sealed class AwpAssignmentExecutorTests
             {
                 AwpProtocol.OpenStepExecutionPath => OpenStep(bytes),
                 AwpProtocol.AppendEventsPath => AppendEvents(bytes),
-                AwpProtocol.InvokeFlowToolPath => new AwpInvokeFlowToolResponse(now,
-                    JsonSerializer.SerializeToElement(new { answer = "found" }),
-                    "knowledge-search", "default", Guid.NewGuid(), 3,
-                    "builtin", "default", "Internal", "knowledge.search",
-                    new("knowledge", "default", "1.0", "search", "default")),
+                AwpProtocol.InvokeFlowToolPath => InvokeFlowTool(),
                 AwpProtocol.CaptureFlowArtifactPath => Capture(bytes),
+                AwpProtocol.CleanupFlowArtifactPath => Cleanup(bytes),
                 AwpProtocol.CreateChildFlowPath => CreateChild(bytes),
                 _ => throw new AssertFailedException($"Unexpected AWP request '{request.RequestUri.AbsolutePath}'.")
             };
@@ -616,6 +764,21 @@ public sealed class AwpAssignmentExecutorTests
         {
             CaptureRequest = Payload<AwpCaptureFlowArtifactRequest>(bytes);
             return new(now, new("artifact-1", "result.json", "application/json"));
+        }
+
+        private AwpInvokeFlowToolResponse InvokeFlowTool()
+        {
+            FlowToolInvocationCount++;
+            return new(now, JsonSerializer.SerializeToElement(new { answer = "found" }),
+                "knowledge-search", "default", Guid.NewGuid(), 3,
+                "builtin", "default", "Internal", "knowledge.search",
+                new("knowledge", "default", "1.0", "search", "default"));
+        }
+
+        private AwpCleanupFlowArtifactResponse Cleanup(byte[] bytes)
+        {
+            CleanupRequests.Add(Payload<AwpCleanupFlowArtifactRequest>(bytes));
+            return new(now);
         }
 
         private AwpChildFlowResponse CreateChild(byte[] bytes)
@@ -662,6 +825,7 @@ public sealed class AwpAssignmentExecutorTests
                 JsonSerializer.SerializeToElement(definition, JsonOptions), [], Guid.NewGuid(),
                 RootFlowRunId: "flowrun-root", ParentFlowRunId: "flowrun-root",
                 CorrelationId: ChildCorrelationId);
+            OnChildCreated?.Invoke();
             return new(now, runId, "Pending", null, material);
         }
 
