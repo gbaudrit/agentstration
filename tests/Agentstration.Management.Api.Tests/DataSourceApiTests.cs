@@ -174,6 +174,7 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
     public async Task DataSourceAcquisitionRunsWithoutAKnowledgeSourceAndPinsItsComposition()
     {
         await using var factory = Factory();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
         using var system = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
         var context = await GetBootstrapContextAsync(factory);
         var workspace = ResourceScopeRef.Workspace(context.WorkspaceId);

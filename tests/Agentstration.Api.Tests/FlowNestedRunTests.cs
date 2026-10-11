@@ -114,21 +114,13 @@ public sealed partial class FlowTests
         FlowFixture fixture,
         TestFlowRunQueue queue,
         FlowRunExecutionOptions? options = null,
-        IFlowOrchestrationEngine? orchestration = null,
-        IFlowAgentExecutor? agents = null,
         IFlowStepArtifactCapture? artifactCapture = null)
     {
-        var expressions = new FlowExpressionParser();
         return new FlowRunService(
             fixture.Repository,
             queue,
             new TestCancellationRegistry(),
-            agents ?? new TestAgentExecutor(),
-            orchestration ?? new UnsupportedFlowOrchestrationEngine(),
-            expressions,
-            expressions,
             new NullFlowRunEventSink(),
-            new TestFlowRunExecutionScope(),
             TimeProvider.System,
             options,
             configuredArtifactCapture: artifactCapture);

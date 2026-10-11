@@ -1084,13 +1084,10 @@ public sealed class WorkPlaneTests
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
-            builder.ConfigureTestServices(services =>
-            {
-                services.RemoveAll<IFlowRunQueue>();
-                services.AddSingleton<IFlowRunQueue, InProcessFlowTestQueue>();
-            });
+            AwpTestWorker.Configure(builder);
         });
         using var client = factory.CreateClient();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
         var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces");
         var workspace = workspaces!.Single(value => value.Name == "default");
         Assert.IsFalse(string.IsNullOrWhiteSpace(workspace.OrganizationName));
@@ -1137,21 +1134,6 @@ public sealed class WorkPlaneTests
 
     private static WorkItem CreatePending(string type = "analysis", string? requester = "requester-1") =>
         WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, type, "Perform the requested work", Now, requesterIdentity: requester);
-
-    private sealed class InProcessFlowTestQueue(IServiceProvider services) : IFlowRunQueue
-    {
-        public ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken)
-        {
-            _ = Task.Run(async () =>
-            {
-                using var scope = services.CreateScope();
-                await scope.ServiceProvider.GetRequiredService<FlowRunService>()
-                    .ExecuteAsync(item, CancellationToken.None);
-            }, CancellationToken.None);
-            return ValueTask.CompletedTask;
-        }
-
-    }
 
     private static WorkItem Running()
     {

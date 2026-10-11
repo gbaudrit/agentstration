@@ -184,6 +184,7 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     public async Task StorageToolsPersistIdempotentlyAndMaterializeThroughStandardFlows()
     {
         await using var factory = Factory();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
         var context = await GetBootstrapContextAsync(factory);
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();

@@ -78,13 +78,6 @@ public sealed partial class FlowTests
         public ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken) { Enqueued.Add(item); return ValueTask.CompletedTask; }
     }
 
-    private sealed class TestFlowRunExecutionScope : IFlowRunExecutionScope
-    {
-        public ValueTask ValidateAsync(FlowRunScope scope, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-        public IDisposable Enter(FlowRunScope scope) => new Scope();
-        private sealed class Scope : IDisposable { public void Dispose() { } }
-    }
-
     private sealed class DeniedFlowRunExecutionScope : IFlowRunExecutionScope
     {
         public ValueTask ValidateAsync(FlowRunScope scope, CancellationToken cancellationToken) =>
@@ -99,12 +92,6 @@ public sealed partial class FlowTests
         public CancellationToken Register(FlowRunKey run, CancellationToken stoppingToken) => stoppingToken;
         public bool Cancel(FlowRunKey run) => true;
         public void Complete(FlowRunKey run) { }
-    }
-
-    private sealed class TestAgentExecutor : IFlowAgentExecutor
-    {
-        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowAgentExecutionRequest request, CancellationToken cancellationToken) =>
-            Task.FromResult(new FlowAgentExecutionResult(JsonSerializer.SerializeToElement("done"), $"/agents/{request.Target.Id}", 3, "/profiles/default", "Deterministic", new FlowStepRunUsage(12, 4), ["lookup"], ["executed"]));
     }
 
     private sealed class AdvancingTimeProvider(DateTimeOffset initial) : TimeProvider

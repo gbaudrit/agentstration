@@ -88,6 +88,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
                     JsonSerializer.SerializeToUtf8Bytes($"<html><body>{sourceName} {repetitions}</body></html>"));
             }));
         }));
+        await using var worker = await AwpTestWorker.StartAsync(factory);
         var context = await GetBootstrapContextAsync(factory);
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var scope = ResourceScopeRef.Workspace(context.WorkspaceId);

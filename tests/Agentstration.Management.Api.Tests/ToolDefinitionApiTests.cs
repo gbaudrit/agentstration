@@ -239,6 +239,7 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
     public async Task EnabledDefinitionIsListedByMcpAndExecutesItsFlowIdempotently()
     {
         await using var factory = Factory();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
         var requestContext = await GetBootstrapContextAsync(factory);
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
         var contract = await CreatePublishedFlowAsync(factory.Services, requestContext, "echo-tool-flow");

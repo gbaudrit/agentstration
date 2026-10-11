@@ -121,10 +121,8 @@ public sealed partial class FlowTests
         var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand("scoped-run", null, "1.0.0", true,
             new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"))), default);
         await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
-        var expressions = new FlowExpressionParser();
         var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(),
-            new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions,
-            new NullFlowRunEventSink(), new TestFlowRunExecutionScope(), TimeProvider.System);
+            new NullFlowRunEventSink(), TimeProvider.System);
         var otherTenantScope = TestScope with { TenantId = Guid.Parse("44444444-4444-4444-4444-444444444444") };
         var otherPrincipalScope = TestScope with { PrincipalId = Guid.Parse("55555555-5555-5555-5555-555555555555") };
         var otherWorkspaceScope = TestScope with { WorkspaceId = new(Guid.Parse("66666666-6666-6666-6666-666666666666")) };
@@ -217,9 +215,7 @@ public sealed partial class FlowTests
             new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"))), default);
         await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(),
-            new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), new FlowExpressionParser(),
-            new FlowExpressionParser(), new NullFlowRunEventSink(), new TestFlowRunExecutionScope(),
-            TimeProvider.System);
+            new NullFlowRunEventSink(), TimeProvider.System);
         using var input = JsonDocument.Parse("""{"prompt":"test"}""");
         var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "principal", "revoked", input.RootElement, TestScope, default);
         var assignment = new RuntimeWorkerAssignment
@@ -255,10 +251,8 @@ public sealed partial class FlowTests
         var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand("immutable-scope", null, "1.0.0", true,
             new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"))), default);
         await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
-        var expressions = new FlowExpressionParser();
         var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(),
-            new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions,
-            new NullFlowRunEventSink(), new TestFlowRunExecutionScope(), TimeProvider.System);
+            new NullFlowRunEventSink(), TimeProvider.System);
         using var input = JsonDocument.Parse("""{"prompt":"test"}""");
         var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "principal", "immutable", input.RootElement, TestScope, default);
         var changedScope = TestScope with { PrincipalId = Guid.Parse("55555555-5555-5555-5555-555555555555") };

@@ -549,14 +549,12 @@ public sealed class AwpAssignmentExecutorTests
         var researcher = AgentMaterial() with
         {
             ParticipantId = "researcher",
-            AgentName = "researcher",
-            ModelProfileName = "awp-participant:researcher"
+            AgentName = "researcher"
         };
         var reviewer = AgentMaterial() with
         {
             ParticipantId = "reviewer",
-            AgentName = "reviewer",
-            ModelProfileName = "awp-participant:reviewer"
+            AgentName = "reviewer"
         };
         using var credential = new AwpClientCredential(Guid.NewGuid(), Guid.NewGuid(), "test-instance",
             System.Text.Encoding.UTF8.GetBytes("test-worker-secret-material-at-least-32-bytes"));
@@ -584,6 +582,7 @@ public sealed class AwpAssignmentExecutorTests
         Assert.HasCount(2, result.Output?.GetProperty("participants").EnumerateArray().ToArray());
         CollectionAssert.AreEqual(new[] { "researcher", "reviewer" },
             handler.ModelRequests.Select(value => value.ParticipantId).ToArray());
+        Assert.IsTrue(material.Agents.All(value => value.ModelProfileName == "default-reasoning"));
         CollectionAssert.AreEquivalent(new[] { "Input", "researcher", "reviewer", "Output" },
             handler.Events.Where(value => value.Kind == AwpExecutionEventKind.StepCompleted)
                 .Select(value => value.Location.FlowStep?.StepDefinitionId).ToArray());
@@ -605,8 +604,7 @@ public sealed class AwpAssignmentExecutorTests
         var agent = AgentMaterial() with
         {
             ParticipantId = "agent-a",
-            AgentName = "agent-a",
-            ModelProfileName = "awp-participant:agent-a"
+            AgentName = "agent-a"
         };
         using var credential = new AwpClientCredential(Guid.NewGuid(), Guid.NewGuid(), "test-instance",
             System.Text.Encoding.UTF8.GetBytes("test-worker-secret-material-at-least-32-bytes"));
@@ -655,8 +653,7 @@ public sealed class AwpAssignmentExecutorTests
         var childAgent = AgentMaterial() with
         {
             ParticipantId = "agent-a",
-            AgentName = "agent-a",
-            ModelProfileName = "awp-participant:agent-a"
+            AgentName = "agent-a"
         };
         var handler = new GraphHandler(TestNow)
         {

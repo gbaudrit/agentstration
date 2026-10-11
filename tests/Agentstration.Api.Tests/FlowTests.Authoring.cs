@@ -239,12 +239,7 @@ public sealed partial class FlowTests
             fixture.Repository,
             queue,
             new TestCancellationRegistry(),
-            new TestAgentExecutor(),
-            new UnsupportedFlowOrchestrationEngine(),
-            new FlowExpressionParser(),
-            new FlowExpressionParser(),
             new NullFlowRunEventSink(),
-            new TestFlowRunExecutionScope(),
             TimeProvider.System);
         using var input = JsonDocument.Parse("""{"prompt":"Review this SQL query"}""");
 
@@ -401,8 +396,8 @@ public sealed partial class FlowTests
     {
         await using var fixture = await FlowFixture.CreateAsync();
         var queue = new TestFlowRunQueue();
-        var expressions = new FlowExpressionParser();
-        var runs = new FlowRunService(fixture.Repository, queue, new TestCancellationRegistry(), new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(), new TestFlowRunExecutionScope(), TimeProvider.System);
+        var runs = new FlowRunService(fixture.Repository, queue, new TestCancellationRegistry(),
+            new NullFlowRunEventSink(), TimeProvider.System);
 
         var routed = await SnapshotAsync("routed", new FlowGraphDefinition
         {

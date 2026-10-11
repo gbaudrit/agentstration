@@ -58,6 +58,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<RuntimeWorkerReadiness>();
 builder.Services.AddSingleton<AwpWorkerCredentialProvider>();
 builder.Services.AddSingleton<AwpAssignmentExecutor>();
+builder.Services.AddSingleton<AwpAssignmentRunner>();
 builder.Services.AddHostedService<AwpRuntimeWorkerService>();
 builder.Services.AddHealthChecks()
     .AddCheck<RuntimeWorkerLivenessCheck>("runtime-worker-live")

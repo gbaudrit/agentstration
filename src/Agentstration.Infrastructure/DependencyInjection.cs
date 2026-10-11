@@ -491,9 +491,6 @@ public static class DependencyInjection
         services.AddSingleton<IWorkplaceExternalInputResponder, WorkplaceFlowInputResponder>();
         services.AddSingleton<FlowRevisionRetentionService>();
         services.AddSingleton<IAgentRevisionRunRetention, AgentRevisionRunRetention>();
-        services.AddSingleton<IFlowAgentExecutor, ManagedFlowAgentExecutor>();
-        services.AddSingleton<AgentFrameworkFlowOrchestrationEngine>();
-        services.AddSingleton<IFlowOrchestrationEngine, ManagedFlowOrchestrationEngine>();
         services.AddSingleton<IFlowResourceReferenceResolver, ManagementFlowResourceReferenceResolver>();
         services.AddSingleton<FlowExpressionParser>();
         services.AddSingleton<IExpressionParser>(provider => provider.GetRequiredService<FlowExpressionParser>());

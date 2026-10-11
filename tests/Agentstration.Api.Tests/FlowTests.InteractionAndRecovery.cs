@@ -31,11 +31,9 @@ public sealed partial class FlowTests
                 [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
                 new HandoffOrchestrationPattern("agent-a", [new("agent-a", "agent-b")]))), default);
         await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
-        var expressions = new FlowExpressionParser();
         var firstService = new FlowRunService(
-            fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), new TestAgentExecutor(),
-            new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
-            new TestFlowRunExecutionScope(), TimeProvider.System);
+            fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(),
+            new NullFlowRunEventSink(), TimeProvider.System);
         using var input = JsonDocument.Parse("""{"prompt":"Need a name"}""");
 
         var pending = await firstService.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
@@ -48,18 +46,16 @@ public sealed partial class FlowTests
 
         var lostQueue = new TestFlowRunQueue();
         var reconstructed = new FlowRunService(
-            fixture.Repository, lostQueue, new TestCancellationRegistry(), new TestAgentExecutor(),
-            new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
-            new TestFlowRunExecutionScope(), TimeProvider.System);
+            fixture.Repository, lostQueue, new TestCancellationRegistry(),
+            new NullFlowRunEventSink(), TimeProvider.System);
         await reconstructed.RespondAsync(waiting.Id, request.Value.Id, JsonSerializer.SerializeToElement("Ada"), "principal-1", TestScope, default);
         await Assert.ThrowsExactlyAsync<InputRequestAlreadyResolvedException>(() => reconstructed.RespondAsync(
             waiting.Id, request.Value.Id, JsonSerializer.SerializeToElement("Grace"), "principal-2", TestScope, default));
 
         var recoveryQueue = new TestFlowRunQueue();
         var recovered = new FlowRunService(
-            fixture.Repository, recoveryQueue, new TestCancellationRegistry(), new TestAgentExecutor(),
-            new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
-            new TestFlowRunExecutionScope(), TimeProvider.System);
+            fixture.Repository, recoveryQueue, new TestCancellationRegistry(),
+            new NullFlowRunEventSink(), TimeProvider.System);
         await recovered.InitializeAsync(default);
         Assert.IsTrue(recoveryQueue.Enqueued.Any(item => item.RunId == waiting.Id));
         var answered = (await recovered.ListInputsAsync(waiting.Id, InputRequestStatus.Answered,
@@ -77,13 +73,10 @@ public sealed partial class FlowTests
                 [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
                 new HandoffOrchestrationPattern("agent-a", [new("agent-a", "agent-b")]))), default);
         await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
-        var expressions = new FlowExpressionParser();
         var cancellations = new TestCancellationRegistry();
         var events = new NullFlowRunEventSink();
         var runs = new FlowRunService(
-            fixture.Repository, new TestFlowRunQueue(), cancellations, new TestAgentExecutor(),
-            new UnsupportedFlowOrchestrationEngine(), expressions, expressions, events,
-            new TestFlowRunExecutionScope(), TimeProvider.System);
+            fixture.Repository, new TestFlowRunQueue(), cancellations, events, TimeProvider.System);
         using var input = JsonDocument.Parse("""{"prompt":"Need input"}""");
         var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
             "tester", "retention-correlation", input.RootElement, TestScope, default);
@@ -128,11 +121,9 @@ public sealed partial class FlowTests
                 new HandoffOrchestrationPattern("agent-a", [new("agent-a", "agent-b")]))), default);
         await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var clock = new AdvancingTimeProvider(new DateTimeOffset(2026, 8, 17, 8, 0, 0, TimeSpan.Zero));
-        var expressions = new FlowExpressionParser();
         var runs = new FlowRunService(
-            fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), new TestAgentExecutor(),
-            new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
-            new TestFlowRunExecutionScope(), clock,
+            fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(),
+            new NullFlowRunEventSink(), clock,
             new FlowRunExecutionOptions { InputRequestTimeout = TimeSpan.FromMinutes(1) });
         using var input = JsonDocument.Parse("""{"prompt":"Wait"}""");
         var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,

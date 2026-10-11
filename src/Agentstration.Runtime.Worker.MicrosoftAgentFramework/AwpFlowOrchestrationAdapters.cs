@@ -64,7 +64,11 @@ internal sealed class AwpFlowChatClientResolver(
     AwpRootFlowExecutionMaterial material,
     AwpFlowExecutionCoordinator coordinator) : IChatClientResolver
 {
+    private const string ParticipantProfilePrefix = "awp-participant:";
     private readonly string runId = material.RunId;
+
+    internal static string ProfileFor(string participantId) => ParticipantProfilePrefix + participantId;
+
     public ValueTask<IChatClient> ResolveAsync(string modelProfileName, CancellationToken cancellationToken = default) =>
         ValueTask.FromResult<IChatClient>(Create(modelProfileName));
 
@@ -73,10 +77,9 @@ internal sealed class AwpFlowChatClientResolver(
 
     private IChatClient Create(string profile)
     {
-        const string prefix = "awp-participant:";
-        if (!profile.StartsWith(prefix, StringComparison.Ordinal))
+        if (!profile.StartsWith(ParticipantProfilePrefix, StringComparison.Ordinal))
             throw new InvalidOperationException($"Worker-local model profile '{profile}' is invalid.");
-        var participantId = profile[prefix.Length..];
+        var participantId = profile[ParticipantProfilePrefix.Length..];
         return new CoordinatedChatClient(session, coordinator, coordinator.Agent(participantId), runId);
     }
 
@@ -152,7 +155,7 @@ internal sealed class AwpFlowAgentResolver(AwpRootFlowExecutionMaterial material
             Description = agent.Description,
             AgentVersion = agent.Generation,
             EffectiveInstructions = agent.Instructions,
-            ModelProfileName = agent.ModelProfileName,
+            ModelProfileName = AwpFlowChatClientResolver.ProfileFor(agent.ParticipantId),
             ModelProfileNamespace = ResourceNamespace.Parse(agent.ModelProfileNamespace),
             RuntimeProfileName = agent.RuntimeProfileName,
             RuntimeProfileNamespace = ResourceNamespace.Parse(agent.RuntimeProfileNamespace),
