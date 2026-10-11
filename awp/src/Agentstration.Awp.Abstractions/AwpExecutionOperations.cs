@@ -69,7 +69,8 @@ public sealed record AwpRootFlowExecutionMaterial(
     AwpFlowResumeMaterial? Resume = null,
     string? RootFlowRunId = null,
     string? ParentFlowRunId = null,
-    string? CorrelationId = null)
+    string? CorrelationId = null,
+    int OrchestrationTimeoutMilliseconds = 0)
     : AwpExecutionMaterial(MaterialId, SchemaVersion, Digest, RunId);
 
 public sealed record AwpFlowResumeMaterial(
@@ -138,7 +139,8 @@ public sealed record AwpInvokeModelResponse(
     string? ModelId,
     string? FinishReason,
     int? InputTokens,
-    int? OutputTokens);
+    int? OutputTokens,
+    string? ProviderType = null);
 
 public sealed record AwpInvokeToolRequest(
     AwpAssignmentCommandContext Context,

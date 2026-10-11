@@ -197,6 +197,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
     public async Task ParentAndToolDefinitionReuseDeliveryFlowWithoutNotificationRecursion()
     {
         await using var factory = Factory();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
         var context = await GetBootstrapContextAsync(factory);
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var workspaceId = new WorkspaceId(context.WorkspaceId);

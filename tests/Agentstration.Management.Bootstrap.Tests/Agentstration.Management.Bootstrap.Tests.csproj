@@ -16,6 +16,7 @@
     <ProjectReference Include="../../src/Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Knowledge.Contracts/Agentstration.Knowledge.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Knowledge/Agentstration.Knowledge.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj" Aliases="awpworker" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />

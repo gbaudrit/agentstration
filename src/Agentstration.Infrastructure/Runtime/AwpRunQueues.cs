@@ -77,14 +77,6 @@ public sealed class AwpFlowRunQueue(
             cancellationToken);
     }
 
-    public async IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        await Task.CompletedTask;
-        cancellationToken.ThrowIfCancellationRequested();
-        yield break;
-    }
-
     public async ValueTask RequestCancellationAsync(FlowRunQueueItem item, CancellationToken cancellationToken)
     {
         var run = await runs.GetRunAsync(item.Scope.WorkspaceId, item.RunId, cancellationToken);

@@ -31,6 +31,7 @@ internal sealed class AwpAssignmentSession
     public AwpRunAssignment Assignment { get; }
     public AwpClient Client { get; }
     public AwpAssignmentCommandContext Context { get; }
+    public TimeProvider TimeProvider => timeProvider;
     public long LastEventSequence => Interlocked.Read(ref eventSequence);
 
     public void ApplyHeartbeat(AwpHeartbeatResponse heartbeat)

@@ -345,7 +345,7 @@ public static class AwpRuntimeWorkerEndpoints
         var now = timeProvider.GetUtcNow();
         return Envelope(envelope.MessageId, now, new AwpInvokeModelResponse(now,
             response.Contents.Select(ToContract).ToArray(), response.ModelId,
-            response.FinishReason, response.InputTokens, response.OutputTokens));
+            response.FinishReason, response.InputTokens, response.OutputTokens, response.ProviderType));
     }, principal);
 
     private static async Task<IResult> InvokeToolAsync(
@@ -639,7 +639,8 @@ public static class AwpRuntimeWorkerEndpoints
                 flow.Resume.RespondedAt, flow.Resume.PrincipalId),
             flow.RootFlowRunId,
             flow.ParentFlowRunId,
-            flow.CorrelationId),
+            flow.CorrelationId,
+            checked((int)Math.Ceiling(flow.OrchestrationTimeout.TotalMilliseconds))),
         _ => throw new ArgumentOutOfRangeException(nameof(material))
     };
 

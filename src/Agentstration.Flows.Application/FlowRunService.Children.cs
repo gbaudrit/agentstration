@@ -38,6 +38,24 @@ public sealed partial class FlowRunService
         return await EnsureChildFlowRunAsync(parent.Value, call, input, childRunId, cancellationToken);
     }
 
+    private static FlowCallStepDefinition RepeatCall(RepeatFlowStepDefinition repeat) => new()
+    {
+        Name = repeat.Name,
+        DisplayName = repeat.DisplayName,
+        Description = repeat.Description,
+        Flow = repeat.Flow,
+        InputMapping = repeat.InputMapping
+    };
+
+    private static FlowCallStepDefinition ArtifactStorageCall(FlowStepDefinition step) => new()
+    {
+        Name = $"{step.Name}:artifact-storage",
+        DisplayName = $"Store Artifact from {step.DisplayName ?? step.Name}",
+        Flow = step.ArtifactOutput?.StorageFlow
+            ?? throw new FlowValidationException("flow_step_artifact_storage_flow_missing",
+                $"Step '{step.Name}' does not declare an Artifact storage Flow.")
+    };
+
     private static string ChildFlowRunId(FlowRun parent, string stepName, int attempt, int? iteration = null)
     {
         var identity = iteration is null

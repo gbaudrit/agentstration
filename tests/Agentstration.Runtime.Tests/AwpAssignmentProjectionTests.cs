@@ -75,10 +75,12 @@ public sealed class AwpAssignmentProjectionTests
                         Attempt = 1,
                         StartedAt = now
                     },
+                    new FlowStepRun { StepName = "agent", StepType = "agent" },
                     new FlowStepRun { StepName = "completed", StepType = "output" }
                 ]
             }, default);
             var stepExecutionId = Guid.NewGuid();
+            var agentStepExecutionId = Guid.NewGuid();
             var assignment = new RuntimeWorkerAssignment
             {
                 WorkspaceId = workspaceId,
@@ -107,6 +109,19 @@ public sealed class AwpAssignmentProjectionTests
                         StepName = "lookup",
                         StepType = "toolRoute",
                         DefinitionPosition = 0,
+                        OpenedAt = now
+                    },
+                    new RuntimeAssignmentStepExecution
+                    {
+                        CommandId = Guid.NewGuid(),
+                        Id = agentStepExecutionId,
+                        FlowRunId = runId,
+                        FlowVersion = "1.0",
+                        FlowDefinitionHash = "sha256:flow",
+                        StepDefinitionId = "agent",
+                        StepName = "agent",
+                        StepType = "agent",
+                        DefinitionPosition = 1,
                         OpenedAt = now
                     }
                 ]
@@ -149,6 +164,25 @@ public sealed class AwpAssignmentProjectionTests
                     RunId = runId,
                     StepExecutionId = stepExecutionId,
                     Payload = payload
+                },
+                new RuntimeAssignmentExecutionEvent
+                {
+                    EventId = Guid.NewGuid(),
+                    AttemptEventSequence = 2,
+                    OccurredAt = now.AddSeconds(2),
+                    Kind = "StepCompleted",
+                    RunId = runId,
+                    StepExecutionId = agentStepExecutionId,
+                    Payload = JsonSerializer.SerializeToElement(new
+                    {
+                        status = "succeeded",
+                        output = "done",
+                        agentResourceId = "sql-expert",
+                        agentVersion = 3L,
+                        modelProfileResourceId = "default-reasoning",
+                        provider = "Deterministic",
+                        usage = new { inputTokens = 12, outputTokens = 4 }
+                    })
                 }
             ], default);
 
@@ -165,6 +199,44 @@ public sealed class AwpAssignmentProjectionTests
             Assert.AreEqual("flow-artifact-1", artifact.ArtifactId);
             Assert.AreEqual("staged-artifact-1", artifact.LocalArtifactId);
             Assert.AreEqual(storageRunId, artifact.StorageFlowRunId);
+            var projectedAgent = (await repository.GetRunAsync(workspaceId, runId, default))!.Value
+                .Steps.Single(value => value.StepName == "agent");
+            Assert.AreEqual("sql-expert", projectedAgent.AgentResourceId);
+            Assert.AreEqual(3, projectedAgent.AgentVersion);
+            Assert.AreEqual("default-reasoning", projectedAgent.ModelProfileResourceId);
+            Assert.AreEqual("Deterministic", projectedAgent.Provider);
+            Assert.AreEqual(12, projectedAgent.Usage?.InputTokens);
+            Assert.AreEqual(4, projectedAgent.Usage?.OutputTokens);
+
+            var timedOutAssignment = assignment with
+            {
+                State = RuntimeAssignmentState.Failed,
+                Attempts =
+                [
+                    new RuntimeAssignmentAttempt
+                    {
+                        Id = new(Guid.NewGuid()),
+                        WorkerId = new(Guid.NewGuid()),
+                        WorkerSessionId = new(Guid.NewGuid()),
+                        FencingGeneration = 1,
+                        AcquiredAt = now,
+                        LeaseExpiresAt = now.AddMinutes(1),
+                        LastHeartbeatAt = now,
+                        State = RuntimeAssignmentAttemptState.Failed,
+                        CompletedAt = now.AddSeconds(2),
+                        ErrorCode = "flow_run_timed_out"
+                    }
+                ]
+            };
+            await projection.ProjectTerminalAsync(new(timedOutAssignment, RuntimeRunState.Failed, false), default);
+
+            var timedOut = (await repository.GetRunAsync(workspaceId, runId, default))!.Value;
+            Assert.AreEqual(FlowRunStatus.TimedOut, timedOut.Status);
+            Assert.AreEqual("flow_run_timed_out", timedOut.Error?.Code);
+            Assert.AreEqual(FlowStepRunStatus.Skipped,
+                timedOut.Steps.Single(value => value.StepName == "completed").Status);
+            Assert.IsTrue((await repository.ListRunEventsAsync(workspaceId, runId, 0, default))
+                .Any(value => value.Type == FlowRunEventType.FlowRunTimedOut));
         }
         finally
         {

@@ -243,9 +243,10 @@ public sealed class WorkplaceApiTests
                 builder.UseEnvironment("Testing");
                 builder.UseSetting("Data:Directory", dataDirectory);
                 builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
-                AddInProcessFlowTestHarness(builder);
+                AddAwpFlowTestHarness(builder);
             });
             using var client = factory.CreateClient();
+            await using var worker = await AwpTestWorker.StartAsync(factory);
 
             var apiFlowName = "specialized-agent-routing";
             using (var createdFlow = await client.PostAsJsonAsync("/api/flows/", new CreateFlowRequest(
@@ -609,9 +610,10 @@ public sealed class WorkplaceApiTests
                 builder.UseEnvironment("Testing");
                 builder.UseSetting("Data:Directory", dataDirectory);
                 builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
-                AddInProcessFlowTestHarness(builder);
+                AddAwpFlowTestHarness(builder);
             });
             using var client = factory.CreateClient();
+            await using var worker = await AwpTestWorker.StartAsync(factory);
             using var submittedResponse = await client.PostAsJsonAsync(
                 "/api/workspaces/default/entries/prepare-report/interactions",
                 new CreateInteractionRequest(new Dictionary<string, JsonElement>
@@ -713,9 +715,10 @@ public sealed class WorkplaceApiTests
                 builder.UseEnvironment("Testing");
                 builder.UseSetting("Data:Directory", dataDirectory);
                 builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
-                AddInProcessFlowTestHarness(builder);
+                AddAwpFlowTestHarness(builder);
             });
             using var client = factory.CreateClient();
+            await using var worker = await AwpTestWorker.StartAsync(factory);
             var taskCreated = new TaskCompletionSource<TaskCreatedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
             var taskStatusChanged = new TaskCompletionSource<TaskStatusChangedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
             var resultAdded = new TaskCompletionSource<TaskResultAddedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -836,34 +839,8 @@ public sealed class WorkplaceApiTests
         ["style"] = JsonSerializer.SerializeToElement(value)
     };
 
-    private static void AddInProcessFlowTestHarness(IWebHostBuilder builder) =>
-        builder.ConfigureTestServices(services =>
-        {
-            services.RemoveAll<IFlowRunQueue>();
-            services.AddSingleton<IFlowRunQueue, InProcessFlowTestQueue>();
-        });
-
-    private sealed class InProcessFlowTestQueue(IServiceProvider services) : IFlowRunQueue
-    {
-        public ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken)
-        {
-            _ = Task.Run(async () =>
-            {
-                using var scope = services.CreateScope();
-                await scope.ServiceProvider.GetRequiredService<FlowRunService>()
-                    .ExecuteAsync(item, CancellationToken.None);
-            }, CancellationToken.None);
-            return ValueTask.CompletedTask;
-        }
-
-        public async IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync(
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            await Task.CompletedTask;
-            cancellationToken.ThrowIfCancellationRequested();
-            yield break;
-        }
-    }
+    private static void AddAwpFlowTestHarness(IWebHostBuilder builder)
+        => AwpTestWorker.Configure(builder);
 
     private static async Task<(WorkTaskResult[] Results, WorkTaskArtifact[] Artifacts)> WaitForOutputsAsync(HttpClient client, Guid taskId, int count)
     {

@@ -24,6 +24,11 @@ internal sealed class AwpModelChatClient(
     AwpExecutionAgentMaterial agent,
     AwpAgentTurnLocation turn) : IChatClient
 {
+    private string? responseModelId;
+    private string? responseProviderType;
+    public string? LastModelId => responseModelId;
+    public string? LastProviderType => responseProviderType;
+
     public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
         CancellationToken cancellationToken = default)
     {
@@ -31,8 +36,18 @@ internal sealed class AwpModelChatClient(
         var request = new AwpInvokeModelRequest(session.Context, agent.ParticipantId, turn.TurnId,
             turn.Attempt.TurnAttemptId, messages.Select(ToContract).ToArray());
         var response = await session.Client.InvokeModelAsync(request, cancellationToken);
+        responseModelId = response.ModelId;
+        responseProviderType = response.ProviderType;
         var contents = response.Contents.Select(ToContent).ToList();
-        return new ChatResponse(new ChatMessage(ChatRole.Assistant, contents)) { ModelId = response.ModelId };
+        return new ChatResponse(new ChatMessage(ChatRole.Assistant, contents))
+        {
+            ModelId = response.ModelId,
+            Usage = response.InputTokens is null && response.OutputTokens is null ? null : new UsageDetails
+            {
+                InputTokenCount = response.InputTokens,
+                OutputTokenCount = response.OutputTokens
+            }
+        };
     }
 
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,

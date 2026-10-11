@@ -1,14 +1,17 @@
 extern alias crawl4ai;
+extern alias awpworker;
 
 using System.Text;
 using System.Text.Json;
 using Agentstration.Agents;
+using Agentstration.Awp.Abstractions;
 using Agentstration.DataSources;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Extensions;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
+using Agentstration.Identity;
 using Agentstration.Infrastructure.Assistant;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Knowledge;
@@ -16,13 +19,17 @@ using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Security.AspNetCoreIdentity;
+using Agentstration.Secrets.Abstractions;
 using Agentstration.Tools;
 using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Crawl4AiDataSourceProfileBundle = crawl4ai::Agentstration.Extensions.Crawl4AI.Crawl4AiDataSourceProfileBundle;
+using AwpWorker = awpworker::Agentstration.Runtime.Worker.MicrosoftAgentFramework;
 
 namespace Agentstration.Management.Tests;
 
@@ -83,27 +90,28 @@ public sealed class AgentstrationDocumentationEndToEndTests
         var sourceScope = ResourceScopeRef.Workspace(workspace.Id);
         var started = await acquisitions.StartAsync(ResourceNamespace.Default, "agentstration-documentation", sourceScope,
             JsonSerializer.SerializeToElement(new { }), "documentation-fixture", "documentation-fixture", default);
-        var flowScope = new FlowRunScope(tenant.Id, new WorkspaceId(workspace.Id), principal.Id);
-        await DrainAsync(services.GetRequiredService<FlowRunService>(), started.Value.FlowRunId, flowScope);
+        using var worker = await AwpTestWorker.CreateAsync(factory, services);
+        await worker.ExecuteAsync(started.Value.FlowRunId);
         var completed = await acquisitions.GetAsync(ResourceNamespace.Default, started.Value.Name, default);
         Assert.AreEqual(DataSourceAcquisitionState.Succeeded, completed.Value.State, completed.Value.ErrorMessage);
         var artifact = completed.Value.Manifest?.Artifacts.Single();
         Assert.IsNotNull(artifact);
         Assert.AreEqual(DataSourceArtifactDisposition.Publishable, artifact.Disposition);
 
-        var projection = await services.GetRequiredService<KnowledgeProjectionService>().StartAsync(
+        var projectionTask = services.GetRequiredService<KnowledgeProjectionService>().StartAsync(
             new("agentstration-documentation"),
             new StartKnowledgeProjectionRequest
             {
                 AcquisitionIds = new Dictionary<string, string> { ["documentation"] = completed.Value.Name },
                 CorrelationId = "documentation-fixture-projection"
             }, default);
+        var projection = await worker.AwaitAsync(projectionTask);
         Assert.AreEqual(KnowledgeProjectionState.Succeeded, projection.Value.State, projection.Value.ErrorMessage);
         Assert.IsNotNull(projection.Value.SnapshotName);
         _ = await services.GetRequiredService<KnowledgeSourceToolExposureService>().PublishAsync(
             new("agentstration-documentation"), "1.0.0", false, default);
 
-        var toolResult = await services.GetRequiredService<IToolDefinitionExecutor>().ExecuteAsync(
+        var toolExecution = services.GetRequiredService<IToolDefinitionExecutor>().ExecuteAsync(
             new ToolDefinitionInvocation(
                 tenant.Id,
                 new WorkspaceId(workspace.Id),
@@ -115,9 +123,10 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 JsonSerializer.SerializeToElement(new { request = new { query = "Workspace", limit = 5 } }),
                 ToolDefinitionCallerKind.Agent,
                 "agentstration-documentation-assistant"), default);
+        var toolResult = await worker.AwaitAsync(toolExecution);
         StringAssert.Contains(toolResult.Output!.Value.GetRawText(), "governed ownership");
 
-        var legacy = await services.GetRequiredService<AssistantDocumentationMcpTool>().ExecuteAsync(
+        var legacyExecution = services.GetRequiredService<AssistantDocumentationMcpTool>().ExecuteAsync(
             new InternalMcpToolInvocation(
                 tenant.Id,
                 new WorkspaceId(workspace.Id),
@@ -127,29 +136,81 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 JsonSerializer.SerializeToElement(new { query = "Workspace", maximumResults = 5 }),
                 ToolDefinitionCallerKind.Agent,
                 "assistant-help"), default);
+        var legacy = await worker.AwaitAsync(legacyExecution);
         Assert.AreEqual("available", legacy!.Value.GetProperty("availability").GetString());
         StringAssert.Contains(legacy.Value.GetRawText(), "governed ownership");
     }
 
-    private static async Task DrainAsync(FlowRunService runs, string runId, FlowRunScope scope)
+    private sealed class AwpTestWorker : IDisposable
     {
-        for (var attempt = 0; attempt < 100; attempt++)
+        private readonly AwpWorker::AwpClientCredential credential;
+        private readonly AwpWorker::AwpClient client;
+        private readonly AwpWorker::AwpAssignmentRunner runner;
+        private readonly AwpWorker::RuntimeWorkerOptions options = new() { LeaseSafetyMarginSeconds = 1 };
+
+        private AwpTestWorker(AwpWorker::AwpClientCredential credential, AwpWorker::AwpClient client)
         {
-            var current = await runs.GetAsync(scope.WorkspaceId, runId, default)
-                ?? throw new AssertFailedException($"FlowRun '{runId}' was not found.");
-            if (current.Value.Status.IsTerminal()) return;
-            if (current.Value.Status == FlowRunStatus.WaitingForChild)
-            {
-                foreach (var childId in current.Value.Steps
-                             .Select(step => step.ChildFlowRunId)
-                             .Where(value => value is not null)
-                             .Cast<string>()
-                             .Distinct(StringComparer.Ordinal))
-                    await DrainAsync(runs, childId, scope);
-            }
-            await runs.ExecuteAsync(new(runId, scope), default);
+            this.credential = credential;
+            this.client = client;
+            runner = new(
+                new AwpWorker::AwpAssignmentExecutor(NullLoggerFactory.Instance,
+                    NullLogger<AwpWorker::AwpAssignmentExecutor>.Instance),
+                TimeProvider.System,
+                NullLogger<AwpWorker::AwpRuntimeWorkerService>.Instance);
         }
-        Assert.Fail($"FlowRun '{runId}' did not reach a terminal state.");
+
+        public static async Task<AwpTestWorker> CreateAsync(
+            WebApplicationFactory<Program> factory,
+            IServiceProvider services)
+        {
+            var workerId = Guid.NewGuid();
+            var identities = services.GetRequiredService<AwpWorkerIdentityService>();
+            _ = await identities.AnnounceAsync(new(workerId, "Documentation test Worker",
+                AwpWorkerAuthentication.ProtocolVersion), default);
+            var pairing = await identities.IssuePairingCodeAsync(workerId, default);
+            var issued = await identities.ClaimAsync(new(workerId, pairing.Code), "bootstrap-test", default);
+            var credential = new AwpWorker::AwpClientCredential(issued.WorkerId, issued.CredentialId,
+                issued.InstanceId, Encoding.UTF8.GetBytes(issued.Secret));
+            var client = new AwpWorker::AwpClient(new Uri("https://localhost"), credential,
+                new(Guid.NewGuid()), TimeProvider.System, 0, factory.Server.CreateHandler());
+            var worker = new AwpTestWorker(credential, client);
+            await client.ActivateSessionAsync(default);
+            _ = await client.RegisterAsync(new([AwpProtocol.Version], new(client.WorkerId, client.SessionId,
+                "bootstrap-test", 1,
+                [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0"])])), default);
+            return worker;
+        }
+
+        public async Task ExecuteAsync(string expectedRunId)
+        {
+            var claim = await client.ClaimAsync(new(client.WorkerId, client.SessionId, 1, 1), default);
+            Assert.IsNotNull(claim.Assignment, $"No AWP assignment was available for FlowRun '{expectedRunId}'.");
+            Assert.IsInstanceOfType<AwpRootFlowRunTarget>(claim.Assignment.Target);
+            Assert.AreEqual(expectedRunId, ((AwpRootFlowRunTarget)claim.Assignment.Target).FlowRunId);
+            await RunAsync(claim);
+        }
+
+        public async Task<T> AwaitAsync<T>(Task<T> operation)
+        {
+            while (!operation.IsCompleted)
+            {
+                var claim = await client.ClaimAsync(new(client.WorkerId, client.SessionId, 1, 1), default);
+                if (claim.Assignment is not null) await RunAsync(claim);
+            }
+            return await operation;
+        }
+
+        private async Task RunAsync(AwpClaimResponse claim)
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await runner.RunAsync(client, claim.Assignment!, claim.ServerTime, options, timeout.Token);
+        }
+
+        public void Dispose()
+        {
+            client.Dispose();
+            credential.Dispose();
+        }
     }
 
     private static ResourceReference ToolReference(string toolName, Guid workspaceId) =>
@@ -178,9 +239,13 @@ public sealed class AgentstrationDocumentationEndToEndTests
             builder.UseSetting("Agentstration:Bootstrap:InitialBootstrapEnabled", "true");
             builder.UseSetting("Agentstration:Bootstrap:InitialProfiles:0", "initial");
             builder.UseSetting("Agentstration:Bootstrap:Secrets:AdminPassword", Password);
+            builder.UseSetting("Agentstration:AwpWorkerTrust:Enabled", "true");
+            builder.UseSetting("Agentstration:AwpWorkerTrust:InstanceId", "bootstrap-test");
             builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint", "http://127.0.0.1:1");
             builder.ConfigureServices(services =>
             {
+                services.RemoveAll<IMasterKeyProvider>();
+                services.AddSingleton<IMasterKeyProvider, DocumentationTestMasterKeyProvider>();
                 AddFixtureTool<FixtureCrawlTool>(services);
                 AddFixtureTool<FixtureReadTool>(services);
                 AddFixtureTool<FixtureDeleteTool>(services);
@@ -297,6 +362,12 @@ public sealed class AgentstrationDocumentationEndToEndTests
     }
 
     private static JsonElement Schema(object value) => JsonSerializer.SerializeToElement(value);
+
+    private sealed class DocumentationTestMasterKeyProvider : IMasterKeyProvider
+    {
+        public ValueTask<byte[]> GetKeyAsync(CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(Enumerable.Range(1, 32).Select(value => (byte)value).ToArray());
+    }
 
     private sealed class TemporaryCatalog : IDisposable
     {

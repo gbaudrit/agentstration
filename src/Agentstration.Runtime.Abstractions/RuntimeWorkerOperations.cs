@@ -22,7 +22,8 @@ public sealed record RuntimeGovernedModelResponse(
     string? ModelId,
     string? FinishReason,
     int? InputTokens,
-    int? OutputTokens);
+    int? OutputTokens,
+    string? ProviderType = null);
 
 public sealed record RuntimeGovernedToolRequest(
     RuntimeExecutionAgentMaterial Agent,

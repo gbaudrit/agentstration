@@ -1,34 +1,10 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
-using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
 
 namespace Agentstration.Flows.Application;
-
-public sealed record FlowAgentExecutionResult(
-    JsonElement Output,
-    string AgentResourceId,
-    long AgentVersion,
-    string? ModelProfileResourceId,
-    string? Provider,
-    FlowStepRunUsage? Usage,
-    IReadOnlyList<string> Tools,
-    IReadOnlyList<string> Logs);
-
-public sealed record FlowAgentExecutionRequest(
-    FlowRunScope Scope,
-    string RunId,
-    string StepName,
-    FlowTargetReference Target,
-    JsonElement Input,
-    string CorrelationId);
-
-public interface IFlowAgentExecutor
-{
-    Task<FlowAgentExecutionResult> ExecuteAsync(FlowAgentExecutionRequest request, CancellationToken cancellationToken);
-}
 
 public sealed record FlowToolExecutionRequest(
     FlowRunScope Scope,
@@ -127,7 +103,6 @@ public sealed class UnsupportedFlowToolExecutor : IFlowToolExecutor
 public interface IFlowRunQueue
 {
     ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken);
-    IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync(CancellationToken cancellationToken);
     ValueTask RequestCancellationAsync(FlowRunQueueItem item, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
 
@@ -205,17 +180,10 @@ public sealed partial class FlowRunService(
     IFlowRepository repository,
     IFlowRunQueue queue,
     IFlowRunCancellationRegistry cancellations,
-    IFlowAgentExecutor agents,
-    IFlowOrchestrationEngine orchestrations,
-    IExpressionParser expressionParser,
-    IExpressionEvaluator expressions,
     IFlowRunEventSink eventSink,
-    IFlowRunExecutionScope executionScope,
     TimeProvider timeProvider,
     FlowRunExecutionOptions? executionOptions = null,
     IFlowInputRequestSink? inputRequestSink = null,
-    IFlowToolExecutor? configuredToolExecutor = null,
-    IFlowToolSetResolver? configuredToolSetResolver = null,
     IEnumerable<IFlowRunDeletionGuard>? configuredRunDeletionGuards = null,
     IFlowStepArtifactCapture? configuredArtifactCapture = null)
 {
@@ -229,8 +197,6 @@ public sealed partial class FlowRunService(
           && executionOptions.MaximumDescendantRuns is >= 1 and <= 4096
             ? executionOptions
             : throw new ArgumentOutOfRangeException(nameof(executionOptions), "Execution and input timeouts must be positive, and the execution lease must exceed the orchestration timeout.");
-    private readonly IFlowToolExecutor toolExecutor = configuredToolExecutor ?? UnsupportedFlowToolExecutor.Instance;
-    private readonly IFlowToolSetResolver toolSetResolver = configuredToolSetResolver ?? UnsupportedFlowToolSetResolver.Instance;
     private readonly IReadOnlyList<IFlowRunDeletionGuard> runDeletionGuards =
         configuredRunDeletionGuards?.ToArray() ?? [];
     private readonly IFlowStepArtifactCapture artifactCapture =
@@ -238,9 +204,6 @@ public sealed partial class FlowRunService(
     public static readonly ActivitySource ActivitySource = new("Agentstration.Flows");
     public static readonly Meter Meter = new("Agentstration.Flows");
     private static readonly Counter<long> RunsCreated = Meter.CreateCounter<long>("agentstration.flow.runs.created");
-    private static readonly Counter<long> RunsCompleted = Meter.CreateCounter<long>("agentstration.flow.runs.completed");
-    private static readonly Counter<long> RunsFailed = Meter.CreateCounter<long>("agentstration.flow.runs.failed");
-    private static readonly Histogram<double> RunDuration = Meter.CreateHistogram<double>("agentstration.flow.run.duration", "s");
 
 
 
@@ -307,14 +270,6 @@ public sealed partial class FlowRunService(
 
 
 
-
-    private static (string Route, FlowResourceReference Agent, double Confidence, string Reason)? SelectRoute(RouterFlowStepDefinition router, JsonElement input)
-    {
-        var text = input.GetRawText();
-        foreach (var candidate in router.Candidates)
-            if (text.Contains(candidate.Route, StringComparison.OrdinalIgnoreCase) || (candidate.Examples?.Any(example => text.Contains(example, StringComparison.OrdinalIgnoreCase)) ?? false)) return (candidate.Route, candidate.Agent, 1, $"Input matched route '{candidate.Route}'.");
-        return router.Fallback is null ? null : ("fallback", router.Fallback, .5, "No rule matched; explicit fallback selected.");
-    }
 
 
 
