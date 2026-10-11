@@ -92,7 +92,7 @@ jobs:
         with:
           global-json-file: global.json
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
@@ -126,7 +126,7 @@ jobs:
           global-json-file: global.json
       - name: Cache NuGet packages
         if: needs.changes.outputs.dotnet == 'true'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', '.config/dotnet-tools.json', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
@@ -183,7 +183,7 @@ jobs:
         with:
           global-json-file: global.json
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
@@ -258,7 +258,7 @@ jobs:
         with:
           global-json-file: global.json
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', '.config/dotnet-tools.json', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
@@ -293,7 +293,7 @@ jobs:
         with:
           global-json-file: global.json
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', '.config/dotnet-tools.json', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
