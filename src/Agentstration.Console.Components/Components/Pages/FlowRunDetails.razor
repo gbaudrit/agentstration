@@ -159,6 +159,10 @@ else
                 <article class="panel io-panel flow-run-tab-card"><div class="panel-header"><h2>@T("Output")</h2></div><pre>@Pretty(run.Output)</pre></article>
             </section>
         }
+        else if (activeTab == RunTab.Worker)
+        {
+            <RuntimePlacementSummary TargetKind="RuntimeAssignmentTargetKind.FlowRun" RunId="@run.Id" />
+        }
         else
         {
             <FlowRunTimeline Events="eventBuffer.Snapshot()" IsLive="@(!run.Status.IsTerminal())" InferParticipantHandoffs="IsHandoffRun"
@@ -200,8 +204,8 @@ else
     private IReadOnlyList<FlowRunEvent>? replayEvents;
     private CancellationTokenSource? replayCancellation;
     private RunTab activeTab;
-    private static readonly RunTab[] StandardTabs = [RunTab.Summary, RunTab.Causality, RunTab.Activity, RunTab.InputOutput, RunTab.RawEvents];
-    private static readonly RunTab[] HandoffTabs = [RunTab.Summary, RunTab.Causality, RunTab.Activity, RunTab.Handoffs, RunTab.InputOutput, RunTab.RawEvents];
+    private static readonly RunTab[] StandardTabs = [RunTab.Summary, RunTab.Worker, RunTab.Causality, RunTab.Activity, RunTab.InputOutput, RunTab.RawEvents];
+    private static readonly RunTab[] HandoffTabs = [RunTab.Summary, RunTab.Worker, RunTab.Causality, RunTab.Activity, RunTab.Handoffs, RunTab.InputOutput, RunTab.RawEvents];
     private IReadOnlyList<RunTab> AvailableTabs => IsHandoffRun ? HandoffTabs : StandardTabs;
     private IReadOnlyDictionary<string, string> ParticipantUrls => BuildParticipantUrls();
     private FlowRunTimeline.TimelineView SelectedTimelineView => activeTab switch
@@ -221,6 +225,7 @@ else
     private string TabLabel(RunTab tab) => T(tab switch
     {
         RunTab.Summary => "Summary",
+        RunTab.Worker => "Worker",
         RunTab.Causality => "Causality",
         RunTab.Activity => "Activity",
         RunTab.Handoffs => "Handoffs",
@@ -547,5 +552,5 @@ else
         cancellation.Dispose();
     }
 
-    private enum RunTab { Summary, Causality, Activity, Handoffs, InputOutput, RawEvents }
+    private enum RunTab { Summary, Worker, Causality, Activity, Handoffs, InputOutput, RawEvents }
 }

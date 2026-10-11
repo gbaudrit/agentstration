@@ -6,9 +6,11 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Application.Work;
 using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Agentstration.Work.Storage.Abstractions;
@@ -16,6 +18,7 @@ using Agentstration.Work.Storage.Sqlite;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -1046,31 +1049,37 @@ public sealed class WorkPlaneTests
     }
 
     [TestMethod]
-    public async Task LocalRuntimeCompletesWorkAndExposesResultThroughCanonicalApi()
+    public async Task ExternalWorkerCompletesDirectAgentWorkAndExposesRuntimeRunResult()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+            AwpTestWorker.Configure(builder);
         });
         using var client = factory.CreateClient();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
         using var response = await client.PostAsJsonAsync("/api/work/workitems", new CreateWorkItemRequest("question", "How can I optimize a SQL query?"));
         response.EnsureSuccessStatusCode();
         var created = await response.Content.ReadFromJsonAsync<WorkItemResponse>();
         Assert.IsNotNull(created);
 
         WorkItemResponse? current = null;
-        for (var attempt = 0; attempt < 50; attempt++)
+        for (var attempt = 0; attempt < 200; attempt++)
         {
             current = await client.GetFromJsonAsync<WorkItemResponse>($"/api/work/workitems/{created.Id}");
             if (current?.Status is WorkItemStatus.Completed or WorkItemStatus.Failed) break;
-            await Task.Delay(20);
+            await Task.Delay(25);
         }
 
         Assert.AreEqual(WorkItemStatus.Completed, current!.Status);
         var result = await client.GetFromJsonAsync<WorkResultResponse>($"/api/work/workitems/{created.Id}/result");
         Assert.IsNotNull(result);
         Assert.IsFalse(string.IsNullOrWhiteSpace(result.Contents.Single().Text));
+        Assert.IsTrue(result.Metadata.TryGetValue("runtimeRunId", out var runtimeRunId));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(runtimeRunId));
+        var run = await client.GetFromJsonAsync<RuntimeRun>($"/api/runtime/runs/{runtimeRunId}");
+        Assert.AreEqual(RuntimeRunState.Succeeded, run?.Status.State);
         var events = await client.GetFromJsonAsync<WorkEventResponse[]>($"/api/work/workitems/{created.Id}/events");
         CollectionAssert.IsSubsetOf(new[] { "WorkItemSubmitted", "WorkItemQueued", "WorkItemStarted", "WorkItemCompleted" }, events!.Select(value => value.Type).ToArray());
     }
@@ -1082,8 +1091,10 @@ public sealed class WorkPlaneTests
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+            AwpTestWorker.Configure(builder);
         });
         using var client = factory.CreateClient();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
         var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces");
         var workspace = workspaces!.Single(value => value.Name == "default");
         Assert.IsFalse(string.IsNullOrWhiteSpace(workspace.OrganizationName));

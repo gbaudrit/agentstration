@@ -2,11 +2,60 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Flows.Storage.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Flows.Application;
 
 public sealed partial class FlowRunService
 {
+    public async Task<StoredFlowRun> CreateOrGetAssignedChildAsync(
+        WorkspaceId workspaceId,
+        string parentRunId,
+        string stepDefinitionId,
+        JsonElement input,
+        string purpose,
+        int? iteration,
+        CancellationToken cancellationToken)
+    {
+        var parent = await repository.GetRunAsync(workspaceId, parentRunId, cancellationToken)
+            ?? throw new FlowRunNotFoundException(parentRunId);
+        var step = parent.Value.DefinitionSnapshot.Graph?.Steps.SingleOrDefault(value =>
+            string.Equals(value.Name, stepDefinitionId, StringComparison.Ordinal))
+            ?? throw new FlowValidationException("child_flow_step_invalid", "The assigned StepDefinition was not found.");
+        var call = purpose switch
+        {
+            "flowCall" when step is FlowCallStepDefinition flowCall && iteration is null => flowCall,
+            "repeat" when step is RepeatFlowStepDefinition repeat
+                && iteration is >= 1 && iteration <= repeat.MaximumIterations => RepeatCall(repeat),
+            "artifactStorage" when step.ArtifactOutput?.StorageFlow is not null && iteration is null =>
+                ArtifactStorageCall(step),
+            _ => throw new FlowValidationException("child_flow_step_invalid",
+                "The child Flow purpose does not match the assigned StepDefinition.")
+        };
+        var attempt = Math.Max(1, parent.Value.Steps.Single(value => value.StepName == stepDefinitionId).Attempt);
+        var identity = purpose == "artifactStorage" ? $"{stepDefinitionId}:artifact-storage" : stepDefinitionId;
+        var childRunId = ChildFlowRunId(parent.Value, identity, attempt, iteration);
+        return await EnsureChildFlowRunAsync(parent.Value, call, input, childRunId, cancellationToken);
+    }
+
+    private static FlowCallStepDefinition RepeatCall(RepeatFlowStepDefinition repeat) => new()
+    {
+        Name = repeat.Name,
+        DisplayName = repeat.DisplayName,
+        Description = repeat.Description,
+        Flow = repeat.Flow,
+        InputMapping = repeat.InputMapping
+    };
+
+    private static FlowCallStepDefinition ArtifactStorageCall(FlowStepDefinition step) => new()
+    {
+        Name = $"{step.Name}:artifact-storage",
+        DisplayName = $"Store Artifact from {step.DisplayName ?? step.Name}",
+        Flow = step.ArtifactOutput?.StorageFlow
+            ?? throw new FlowValidationException("flow_step_artifact_storage_flow_missing",
+                $"Step '{step.Name}' does not declare an Artifact storage Flow.")
+    };
+
     private static string ChildFlowRunId(FlowRun parent, string stepName, int attempt, int? iteration = null)
     {
         var identity = iteration is null

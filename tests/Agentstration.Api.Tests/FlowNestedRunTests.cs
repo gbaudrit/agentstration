@@ -8,112 +8,6 @@ namespace Agentstration.Application.Tests;
 public sealed partial class FlowTests
 {
     [TestMethod]
-    public async Task NamedSuccessOutputPreservesItsPublicIdentityOnTheRun()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        var graph = new FlowGraphDefinition
-        {
-            EntryStep = "input",
-            Steps =
-            [
-                new InputFlowStepDefinition { Name = "input" },
-                new OutputFlowStepDefinition { Name = "approved", Outcome = FlowOutputOutcome.Success, OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") }
-            ],
-            Transitions = [new("input-approved", "input", "completed", "approved")]
-        };
-        var flow = await CreatePublishedGraphAsync(fixture, "named-success", graph);
-        var runs = Service(fixture, new TestFlowRunQueue());
-        var input = JsonSerializer.SerializeToElement(new { answer = "yes" });
-
-        var pending = await runs.CreateAsync(flow.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "named-success", input, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual("approved", completed.OutputName);
-        Assert.AreEqual(FlowOutputOutcome.Success, completed.OutputOutcome);
-        Assert.AreEqual("yes", completed.Output?.GetProperty("answer").GetString());
-    }
-
-    [TestMethod]
-    public async Task NamedErrorOutputFailsTheRunAndPreservesItsErrorContract()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        var graph = new FlowGraphDefinition
-        {
-            EntryStep = "input",
-            Steps =
-            [
-                new InputFlowStepDefinition { Name = "input" },
-                new OutputFlowStepDefinition { Name = "rejected", Outcome = FlowOutputOutcome.Error, Code = "REJECTED", Message = "The request was rejected.", DetailsExpression = "${input.reason}" }
-            ],
-            Transitions = [new("input-rejected", "input", "completed", "rejected")]
-        };
-        var flow = await CreatePublishedGraphAsync(fixture, "named-error", graph);
-        var runs = Service(fixture, new TestFlowRunQueue());
-        var input = JsonSerializer.SerializeToElement(new { reason = "policy" });
-
-        var pending = await runs.CreateAsync(flow.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "named-error", input, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var failed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Failed, failed.Status);
-        Assert.AreEqual("rejected", failed.OutputName);
-        Assert.AreEqual(FlowOutputOutcome.Error, failed.OutputOutcome);
-        Assert.AreEqual("REJECTED", failed.Error?.Code);
-        Assert.AreEqual("policy", failed.Error?.Details);
-    }
-
-    [TestMethod]
-    public async Task FlowCallRoutesByTheChildNamedOutput()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        var childGraph = new FlowGraphDefinition
-        {
-            EntryStep = "input",
-            Steps =
-            [
-                new InputFlowStepDefinition { Name = "input" },
-                new OutputFlowStepDefinition { Name = "approved", Outcome = FlowOutputOutcome.Success, OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") }
-            ],
-            Transitions = [new("input-approved", "input", "completed", "approved")]
-        };
-        var parentGraph = new FlowGraphDefinition
-        {
-            EntryStep = "input",
-            Steps =
-            [
-                new InputFlowStepDefinition { Name = "input" },
-                new FlowCallStepDefinition { Name = "review", Flow = new("named-child", FlowCallVersionStrategy.Exact, "1.0.0"), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
-                new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success, OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") }
-            ],
-            Transitions =
-            [
-                new("input-review", "input", "completed", "review"),
-                new("review-approved", "review", "approved", "completed")
-            ]
-        };
-        await CreatePublishedGraphAsync(fixture, "named-child", childGraph);
-        var parent = await CreatePublishedGraphAsync(fixture, "named-parent", parentGraph);
-        var runs = Service(fixture, new TestFlowRunQueue());
-        var input = JsonSerializer.SerializeToElement(new { answer = "yes" });
-
-        var pending = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "named-child-output", input, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        var childId = waiting.Steps.Single(step => step.StepName == "review").ChildFlowRunId!;
-        await runs.ExecuteAsync(new(childId, TestScope), default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        var child = (await runs.GetAsync(TestScope.WorkspaceId, childId, default))!.Value;
-        Assert.AreEqual("approved", child.OutputName);
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual("review-approved", completed.Steps.Single(step => step.StepName == "review").SelectedTransition);
-        Assert.AreEqual("completed", completed.OutputName);
-    }
-
-    [TestMethod]
     [DataRow("empty")]
     [DataRow("sequential")]
     public void NewDraftTemplatesUseTheIncomingTransitionOutput(string template)
@@ -136,20 +30,10 @@ public sealed partial class FlowTests
         Assert.IsNotNull(reloaded);
         Assert.AreEqual("${transition.output}", reloaded.Value.Graph!.Steps.OfType<OutputFlowStepDefinition>().Single(step => step.Outcome is not FlowOutputOutcome.Error).OutputMapping?.GetString());
         StringAssert.Contains(FlowDraftService.ToYaml(reloaded.Value.Graph), "${transition.output}");
-
-        var runs = Service(fixture, new TestFlowRunQueue());
-        var input = JsonSerializer.SerializeToElement(new { value = "root value" });
-        var pending = await runs.CreateAsync(created.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "direct-output",
-            input, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual("root value", completed.Output?.GetProperty("value").GetString());
     }
 
     [TestMethod]
-    public async Task FlowCallSuspendsCreatesOneDurableChildAndResumesWithItsOutput()
+    public async Task AssignedFlowCallCreatesOneDurableChildWithInheritedContextAndIdempotentIdentity()
     {
         await using var fixture = await FlowFixture.CreateAsync();
         await CreatePublishedGraphAsync(fixture, "child", ChildGraph());
@@ -161,368 +45,28 @@ public sealed partial class FlowTests
         var pending = await runs.CreateAsync(
             parent.Value.Id, "1.0.0", "local", FlowRunTrigger.WorkItem, "tester", "root-correlation", input.RootElement,
             null, "interaction-1", "task-1", "message-1", TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
+        var childInput = JsonSerializer.SerializeToElement(new { article = "new item" });
+        var first = await runs.CreateOrGetAssignedChildAsync(TestScope.WorkspaceId, pending.Value.Id,
+            "analyze", childInput, "flowCall", null, default);
+        var replay = await runs.CreateOrGetAssignedChildAsync(TestScope.WorkspaceId, pending.Value.Id,
+            "analyze", childInput, "flowCall", null, default);
 
-        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.WaitingForChild, waiting.Status);
-        Assert.IsNull(waiting.ExecutionLeaseId);
-        var callStep = waiting.Steps.Single(step => step.StepName == "analyze");
-        Assert.IsNotNull(callStep.ChildFlowRunId);
-        var child = (await runs.GetAsync(TestScope.WorkspaceId, callStep.ChildFlowRunId, default))!.Value;
-        Assert.AreEqual(waiting.Id, child.ParentFlowRunId);
-        Assert.AreEqual(waiting.Id, child.RootFlowRunId);
+        var child = first.Value;
+        Assert.AreEqual(first.Value.Id, replay.Value.Id);
+        Assert.AreEqual(pending.Value.Id, child.ParentFlowRunId);
+        Assert.AreEqual(pending.Value.Id, child.RootFlowRunId);
         Assert.AreEqual(1, child.NestingDepth);
         Assert.AreEqual("1.0.0", child.FlowVersion);
         Assert.AreEqual(FlowRunTrigger.Flow, child.Trigger);
-        Assert.AreEqual(waiting.Scope, child.Scope);
-        Assert.AreEqual(waiting.WorkTaskId, child.WorkTaskId);
-        Assert.AreEqual(waiting.InteractionId, child.InteractionId);
+        Assert.AreEqual(pending.Value.Scope, child.Scope);
+        Assert.AreEqual(pending.Value.WorkTaskId, child.WorkTaskId);
+        Assert.AreEqual(pending.Value.InteractionId, child.InteractionId);
         var otherWorkspace = TestScope with { WorkspaceId = new WorkspaceId(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")) };
         Assert.IsNull(await runs.GetAsync(child.Id, otherWorkspace, default));
-
-        await runs.ExecuteAsync(new(waiting.Id, TestScope), default);
-        var redelivered = (await runs.GetAsync(TestScope.WorkspaceId, waiting.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.WaitingForChild, redelivered.Status);
-        Assert.AreEqual(callStep.ChildFlowRunId, redelivered.Steps.Single(step => step.StepName == "analyze").ChildFlowRunId);
         Assert.HasCount(2, (await runs.ListAsync(null, null, 0, 20, TestScope, default)).Items);
-
-        await runs.ExecuteAsync(new(child.Id, TestScope), default);
-        var resumed = (await runs.GetAsync(TestScope.WorkspaceId, waiting.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Pending, resumed.Status);
-        await runs.ExecuteAsync(new(resumed.Id, TestScope), default);
-
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, waiting.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual("new item", completed.Output?.GetProperty("summary").GetString());
-        Assert.AreEqual("new item", completed.Steps.Single(step => step.StepName == "analyze").Output?.GetProperty("summary").GetString());
-        var events = await runs.ListEventsAsync(TestScope, completed.Id, 0, default);
+        Assert.IsTrue(queue.Enqueued.Any(item => item.RunId == child.Id));
+        var events = await runs.ListEventsAsync(TestScope, pending.Value.Id, 0, default);
         Assert.AreEqual(1, events.Count(item => item.Type == FlowRunEventType.ChildFlowRunCreated));
-        Assert.AreEqual(1, events.Count(item => item.Type == FlowRunEventType.FlowRunResumedFromChild));
-    }
-
-    [TestMethod]
-    public async Task FlowCallCanCaptureTheCompletedChildResultWithExactProvenance()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        await CreatePublishedGraphAsync(fixture, "child", ChildGraph());
-        var graph = ParentGraph() with
-        {
-            Steps = ParentGraph().Steps.Select(step => step is FlowCallStepDefinition call
-                ? call with { ArtifactOutput = new() { FileName = "child-result.json" } }
-                : step).ToArray()
-        };
-        var parent = await CreatePublishedGraphAsync(fixture, "parent-capture", graph);
-        var capture = new RecordingFlowStepArtifactCapture();
-        var runs = Service(fixture, new TestFlowRunQueue(), artifactCapture: capture);
-        using var input = JsonDocument.Parse("""{"article":"new item"}""");
-
-        var pending = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual,
-            "tester", "child-capture", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        var childId = waiting.Steps.Single(step => step.StepName == "analyze").ChildFlowRunId!;
-        await runs.ExecuteAsync(new(childId, TestScope), default);
-        await runs.ExecuteAsync(new(waiting.Id, TestScope), default);
-
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, waiting.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual("new item", capture.Request!.Content.GetProperty("summary").GetString());
-        Assert.AreEqual("subFlow", capture.Request.Provenance["invocationKind"]);
-        Assert.AreEqual(childId, capture.Request.Provenance["childFlowRunId"]);
-        Assert.AreEqual("child", capture.Request.Provenance["childFlowName"]);
-        Assert.AreEqual("1.0.0", capture.Request.Provenance["childFlowVersion"]);
-        Assert.AreEqual("artifact-1", completed.Steps.Single(step => step.StepName == "analyze")
-            .Artifacts.Single().ArtifactId);
-    }
-
-    [TestMethod]
-    public async Task ArtifactOutputCanPersistThroughAConfiguredStorageFlowWithoutReexecutingTheStep()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        await CreatePublishedGraphAsync(fixture, "artifact-storage", ArtifactStorageGraph());
-        var parent = await CreatePublishedGraphAsync(fixture, "artifact-parent", ArtifactParentGraph());
-        var agent = new CountingArtifactAgentExecutor();
-        var capture = new RecordingFlowStepArtifactCapture();
-        var runs = Service(fixture, new TestFlowRunQueue(), agents: agent, artifactCapture: capture);
-        var input = JsonSerializer.SerializeToElement(new { });
-
-        var pending = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual,
-            "tester", "artifact-storage", input, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.WaitingForChild, waiting.Status);
-        var producingStep = waiting.Steps.Single(step => step.StepName == "produce");
-        Assert.IsNotNull(producingStep.ArtifactStorageFlowRunId);
-        Assert.AreEqual("Produced result", capture.Request!.Definition.FileName);
-        Assert.AreEqual("application/json", capture.Request.Definition.MediaType);
-        Assert.AreEqual("captured", capture.Request.Content.GetProperty("message").GetString());
-        var storageRun = (await runs.GetAsync(TestScope.WorkspaceId,
-            producingStep.ArtifactStorageFlowRunId, default))!.Value;
-        Assert.AreEqual("artifact-1", storageRun.Input.GetProperty("stagedArtifactId").GetString());
-        Assert.AreEqual(waiting.Id, storageRun.Input.GetProperty("producerFlowRunId").GetString());
-        Assert.AreEqual("produce", storageRun.Input.GetProperty("producerFlowStepId").GetString());
-
-        await runs.ExecuteAsync(new(storageRun.Id, TestScope), default);
-        await runs.ExecuteAsync(new(waiting.Id, TestScope), default);
-
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, waiting.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual(1, agent.InvocationCount);
-        var artifact = completed.Steps.Single(step => step.StepName == "produce").Artifacts.Single();
-        Assert.AreEqual("11111111111111111111111111111111", artifact.ArtifactId);
-        Assert.AreEqual("durable", artifact.Kind);
-        Assert.AreEqual(storageRun.Id, artifact.StorageFlowRunId);
-        Assert.AreEqual("artifact-1", artifact.LocalArtifactId);
-        Assert.AreEqual("artifact-1", capture.CleanedArtifact?.LocalArtifactId);
-    }
-
-    [TestMethod]
-    public async Task AutomaticArtifactCleanupRunsWhenTheParentFlowFailsAfterStorage()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        await CreatePublishedGraphAsync(fixture, "artifact-storage", ArtifactStorageGraph());
-        var parent = await CreatePublishedGraphAsync(fixture, "artifact-parent-failure",
-            ArtifactParentGraph(failAfterStorage: true));
-        var capture = new RecordingFlowStepArtifactCapture();
-        var runs = Service(fixture, new TestFlowRunQueue(), agents: new CountingArtifactAgentExecutor(),
-            artifactCapture: capture);
-
-        var pending = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual,
-            "tester", "artifact-storage-failure", JsonSerializer.SerializeToElement(new { }), TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        var storageRunId = waiting.Steps.Single(step => step.StepName == "produce")
-            .ArtifactStorageFlowRunId!;
-
-        await runs.ExecuteAsync(new(storageRunId, TestScope), default);
-        await runs.ExecuteAsync(new(waiting.Id, TestScope), default);
-
-        var failed = (await runs.GetAsync(TestScope.WorkspaceId, waiting.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Failed, failed.Status);
-        Assert.AreEqual("artifact-1", capture.CleanedArtifact?.LocalArtifactId);
-    }
-
-    [TestMethod]
-    public async Task AutomaticArtifactCleanupRunsWhenAWaitingParentIsCancelled()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        await CreatePublishedGraphAsync(fixture, "artifact-storage", ArtifactStorageGraph());
-        var parent = await CreatePublishedGraphAsync(fixture, "artifact-parent-cancel", ArtifactParentGraph());
-        var capture = new RecordingFlowStepArtifactCapture();
-        var runs = Service(fixture, new TestFlowRunQueue(), agents: new CountingArtifactAgentExecutor(),
-            artifactCapture: capture);
-
-        var pending = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual,
-            "tester", "artifact-storage-cancel", JsonSerializer.SerializeToElement(new { }), TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var cancelled = await runs.CancelAsync(pending.Value.Id, TestScope, default);
-
-        Assert.AreEqual(FlowRunStatus.Cancelled, cancelled.Value.Status);
-        Assert.AreEqual("artifact-1", capture.CleanedArtifact?.ArtifactId);
-    }
-
-    [TestMethod]
-    public async Task FlowCallPassesTheIncomingTransitionOutputToTheChild()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        await CreatePublishedGraphAsync(fixture, "child", ChildGraph());
-        var parent = await CreatePublishedGraphAsync(fixture, "parent", AgentThenFlowGraph());
-        var runs = Service(fixture, new TestFlowRunQueue(), agents: new StructuredAgentExecutor());
-        using var input = JsonDocument.Parse("""{"article":"original item"}""");
-
-        var pending = await runs.CreateAsync(
-            parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "agent-child-input",
-            input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        var childId = waiting.Steps.Single(step => step.StepName == "deliver").ChildFlowRunId;
-        Assert.IsNotNull(childId);
-        var child = (await runs.GetAsync(TestScope.WorkspaceId, childId, default))!.Value;
-        Assert.AreEqual("analyzed item", child.Input.GetProperty("article").GetString());
-        Assert.AreEqual(0.9, child.Input.GetProperty("confidence").GetDouble());
-    }
-
-    [TestMethod]
-    public async Task FlowCallWithoutMappingPassesTheIncomingTransitionOutputToTheChild()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        await CreatePublishedGraphAsync(fixture, "child", ChildGraph());
-        var graph = AgentThenFlowGraph();
-        graph = graph with
-        {
-            Steps = graph.Steps.Select(step => step is FlowCallStepDefinition call
-                ? call with { InputMapping = null }
-                : step).ToArray()
-        };
-        var parent = await CreatePublishedGraphAsync(fixture, "parent", graph);
-        var runs = Service(fixture, new TestFlowRunQueue(), agents: new StructuredAgentExecutor());
-        using var input = JsonDocument.Parse("""{"article":"original item"}""");
-
-        var pending = await runs.CreateAsync(
-            parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "default-child-input",
-            input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        var childId = waiting.Steps.Single(step => step.StepName == "deliver").ChildFlowRunId;
-        Assert.IsNotNull(childId);
-        var child = (await runs.GetAsync(TestScope.WorkspaceId, childId, default))!.Value;
-        Assert.AreEqual("analyzed item", child.Input.GetProperty("article").GetString());
-        Assert.AreEqual(0.9, child.Input.GetProperty("confidence").GetDouble());
-    }
-
-    [TestMethod]
-    [DataRow(null, null, "transformed")]
-    [DataRow("${input}", null, "original")]
-    [DataRow(null, "${input}", "original")]
-    public async Task AgentAndOutputDefaultsPreserveExplicitMappings(string? agentMapping, string? outputMapping, string expectedOutput)
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        var graph = new FlowGraphDefinition
-        {
-            EntryStep = "input",
-            Steps =
-            [
-                new InputFlowStepDefinition { Name = "input" },
-                new TransformFlowStepDefinition { Name = "transform", Mapping = JsonSerializer.SerializeToElement(new { value = "transformed" }) },
-                new AgentFlowStepDefinition { Name = "agent", Agent = new("echo-agent"), InputMapping = agentMapping is null ? null : JsonSerializer.SerializeToElement(agentMapping) },
-                new OutputFlowStepDefinition { Name = "output", OutputMapping = outputMapping is null ? null : JsonSerializer.SerializeToElement(outputMapping) }
-            ],
-            Transitions =
-            [
-                new("input-transform", "input", "completed", "transform"),
-                new("transform-agent", "transform", "completed", "agent"),
-                new("agent-output", "agent", "success", "output")
-            ]
-        };
-        var flow = await CreatePublishedGraphAsync(fixture, "mapping-defaults", graph);
-        var runs = Service(fixture, new TestFlowRunQueue(), agents: new EchoAgentExecutor());
-        using var input = JsonDocument.Parse("""{"value":"original"}""");
-
-        var pending = await runs.CreateAsync(flow.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "mapping-defaults",
-            input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual(expectedOutput, completed.Output?.GetProperty("value").GetString());
-        Assert.AreEqual(agentMapping is null ? "transformed" : "original",
-            completed.Steps.Single(step => step.StepName == "agent").Output?.GetProperty("value").GetString());
-    }
-
-    [TestMethod]
-    [DataRow("left")]
-    [DataRow("right")]
-    public async Task ConvergingOutputUsesTheSelectedIncomingTransition(string route)
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        var graph = new FlowGraphDefinition
-        {
-            EntryStep = "input",
-            Steps =
-            [
-                new InputFlowStepDefinition { Name = "input" },
-                new ConditionFlowStepDefinition { Name = "branch", Left = "${input.route}", Operator = "equals", Right = "left" },
-                new TransformFlowStepDefinition { Name = "left", Mapping = JsonSerializer.SerializeToElement(new { route = "left" }) },
-                new TransformFlowStepDefinition { Name = "right", Mapping = JsonSerializer.SerializeToElement(new { route = "right" }) },
-                new OutputFlowStepDefinition { Name = "output" }
-            ],
-            Transitions =
-            [
-                new("input-branch", "input", "completed", "branch"),
-                new("branch-left", "branch", "true", "left"),
-                new("branch-right", "branch", "false", "right"),
-                new("left-output", "left", "completed", "output"),
-                new("right-output", "right", "completed", "output")
-            ]
-        };
-        var flow = await CreatePublishedGraphAsync(fixture, "converging-output", graph);
-        var runs = Service(fixture, new TestFlowRunQueue());
-        var input = JsonSerializer.SerializeToElement(new { route });
-
-        var pending = await runs.CreateAsync(flow.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", $"branch-{route}",
-            input, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-
-        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
-        Assert.AreEqual(route, completed.Output?.GetProperty("route").GetString());
-        Assert.AreEqual($"branch-{route}", completed.Steps.Single(step => step.StepName == "branch").SelectedTransition);
-    }
-
-    [TestMethod]
-    public async Task CancellingAWaitingParentPropagatesToItsActiveChild()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        await CreatePublishedGraphAsync(fixture, "child", ChildGraph());
-        var parent = await CreatePublishedGraphAsync(fixture, "parent", ParentGraph());
-        var runs = Service(fixture, new TestFlowRunQueue());
-        using var input = JsonDocument.Parse("""{"article":"new item"}""");
-        var pending = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "cancel-tree", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        var childId = waiting.Steps.Single(step => step.StepName == "analyze").ChildFlowRunId!;
-
-        await runs.CancelAsync(waiting.Id, TestScope, default);
-
-        Assert.AreEqual(FlowRunStatus.Cancelled, (await runs.GetAsync(TestScope.WorkspaceId, waiting.Id, default))!.Value.Status);
-        Assert.AreEqual(FlowRunStatus.Cancelled, (await runs.GetAsync(TestScope.WorkspaceId, childId, default))!.Value.Status);
-    }
-
-    [TestMethod]
-    public async Task RecoveryRequeuesAWaitingParentWhenItsDeterministicChildIsMissing()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        await CreatePublishedGraphAsync(fixture, "child", ChildGraph());
-        var parent = await CreatePublishedGraphAsync(fixture, "parent", ParentGraph());
-        var firstQueue = new TestFlowRunQueue();
-        var first = Service(fixture, firstQueue);
-        using var input = JsonDocument.Parse("""{"article":"new item"}""");
-        var pending = await first.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "recover-child", input.RootElement, TestScope, default);
-        await first.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-        var waiting = (await first.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!;
-        var childId = waiting.Value.Steps.Single(step => step.StepName == "analyze").ChildFlowRunId!;
-        var child = (await first.GetAsync(TestScope.WorkspaceId, childId, default))!;
-        await fixture.Repository.DeleteRunAsync(TestScope.WorkspaceId, childId, child.ETag, default);
-
-        var recoveryQueue = new TestFlowRunQueue();
-        var recovered = Service(fixture, recoveryQueue);
-        await recovered.InitializeAsync(default);
-        Assert.IsTrue(recoveryQueue.Enqueued.Any(item => item.RunId == waiting.Value.Id));
-
-        await recovered.ExecuteAsync(new(waiting.Value.Id, TestScope), default);
-        var recreated = await recovered.GetAsync(TestScope.WorkspaceId, childId, default);
-        Assert.IsNotNull(recreated);
-        Assert.AreEqual(waiting.Value.Id, recreated.Value.ParentFlowRunId);
-        Assert.HasCount(2, (await recovered.ListAsync(null, null, 0, 20, TestScope, default)).Items);
-    }
-
-    [TestMethod]
-    public async Task ChildFailureResumesTheExplicitFailedTransition()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        await CreatePublishedGraphAsync(fixture, "child", FailingChildGraph());
-        var parent = await CreatePublishedGraphAsync(fixture, "parent", ParentGraph());
-        var runs = Service(fixture, new TestFlowRunQueue());
-        using var input = JsonDocument.Parse("""{"article":"new item"}""");
-        var pending = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "child-failure", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
-        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
-        var childId = waiting.Steps.Single(step => step.StepName == "analyze").ChildFlowRunId!;
-
-        await runs.ExecuteAsync(new(childId, TestScope), default);
-        await runs.ExecuteAsync(new(waiting.Id, TestScope), default);
-
-        var failed = (await runs.GetAsync(TestScope.WorkspaceId, waiting.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Failed, failed.Status);
-        Assert.AreEqual("CHILD_FLOW_FAILED", failed.Error?.Code);
-        var call = failed.Steps.Single(step => step.StepName == "analyze");
-        Assert.AreEqual(FlowStepRunStatus.Failed, call.Status);
-        Assert.AreEqual("analyze-failed", call.SelectedTransition);
-        Assert.AreEqual("CHILD_FAILURE", call.Error?.Code);
     }
 
     [TestMethod]
@@ -535,15 +79,14 @@ public sealed partial class FlowTests
         var runs = Service(fixture, new TestFlowRunQueue(), new FlowRunExecutionOptions { MaximumNestingDepth = 1 });
         using var input = JsonDocument.Parse("""{"article":"new item"}""");
         var root = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "bounded", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(root.Value.Id, TestScope), default);
-        var parentWaiting = (await runs.GetAsync(TestScope.WorkspaceId, root.Value.Id, default))!.Value;
-        var childId = parentWaiting.Steps.Single(step => step.StepName == "analyze").ChildFlowRunId!;
+        var child = await runs.CreateOrGetAssignedChildAsync(TestScope.WorkspaceId, root.Value.Id,
+            "analyze", input.RootElement, "flowCall", null, default);
 
-        await runs.ExecuteAsync(new(childId, TestScope), default);
+        var failure = await Assert.ThrowsExactlyAsync<FlowValidationException>(() =>
+            runs.CreateOrGetAssignedChildAsync(TestScope.WorkspaceId, child.Value.Id,
+                "analyze", input.RootElement, "flowCall", null, default));
 
-        var failedChild = (await runs.GetAsync(TestScope.WorkspaceId, childId, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Failed, failedChild.Status);
-        Assert.AreEqual("flow_nesting_depth_exceeded", failedChild.Error?.Code);
+        Assert.AreEqual("flow_nesting_depth_exceeded", failure.Code);
         Assert.HasCount(2, (await runs.ListAsync(null, null, 0, 20, TestScope, default)).Items);
     }
 
@@ -556,72 +99,28 @@ public sealed partial class FlowTests
         var runs = Service(fixture, new TestFlowRunQueue(), new FlowRunExecutionOptions { MaximumDescendantRuns = 1 });
         using var input = JsonDocument.Parse("""{"article":"new item"}""");
         var root = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "bounded-count", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(root.Value.Id, TestScope), default);
-        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, root.Value.Id, default))!.Value;
-        var firstChildId = waiting.Steps.Single(step => step.StepName == "first").ChildFlowRunId!;
-        await runs.ExecuteAsync(new(firstChildId, TestScope), default);
-        await runs.ExecuteAsync(new(root.Value.Id, TestScope), default);
+        _ = await runs.CreateOrGetAssignedChildAsync(TestScope.WorkspaceId, root.Value.Id,
+            "first", input.RootElement, "flowCall", null, default);
 
-        var failed = (await runs.GetAsync(TestScope.WorkspaceId, root.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Failed, failed.Status);
-        Assert.AreEqual("flow_descendant_limit_exceeded", failed.Error?.Code);
+        var failure = await Assert.ThrowsExactlyAsync<FlowValidationException>(() =>
+            runs.CreateOrGetAssignedChildAsync(TestScope.WorkspaceId, root.Value.Id,
+                "second", input.RootElement, "flowCall", null, default));
+
+        Assert.AreEqual("flow_descendant_limit_exceeded", failure.Code);
         Assert.HasCount(2, (await runs.ListAsync(null, null, 0, 20, TestScope, default)).Items);
-    }
-
-    [TestMethod]
-    public async Task ChildTimeoutResumesTheExplicitTimeoutTransition()
-    {
-        await using var fixture = await FlowFixture.CreateAsync();
-        var child = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
-            "child",
-            null,
-            "1.0.0",
-            true,
-            new OrchestrationFlowDefinition(
-                [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
-                new SequentialOrchestrationPattern())), default);
-        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, child.Value.Id, "1.0.0", true, default);
-        var parent = await CreatePublishedGraphAsync(fixture, "parent", ParentGraph());
-        var runs = Service(
-            fixture,
-            new TestFlowRunQueue(),
-            new FlowRunExecutionOptions { OrchestrationTimeout = TimeSpan.FromMilliseconds(25) },
-            new StalledOrchestrationEngine());
-        using var input = JsonDocument.Parse("""{"article":"new item"}""");
-        var root = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "timeout-child", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(new(root.Value.Id, TestScope), default);
-        var waiting = (await runs.GetAsync(TestScope.WorkspaceId, root.Value.Id, default))!.Value;
-        var childId = waiting.Steps.Single(step => step.StepName == "analyze").ChildFlowRunId!;
-
-        await runs.ExecuteAsync(new(childId, TestScope), default);
-        await runs.ExecuteAsync(new(root.Value.Id, TestScope), default);
-
-        var failed = (await runs.GetAsync(TestScope.WorkspaceId, root.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Failed, failed.Status);
-        var call = failed.Steps.Single(step => step.StepName == "analyze");
-        Assert.AreEqual("analyze-timeout", call.SelectedTransition);
-        Assert.AreEqual("flow_run_timed_out", call.Error?.Code);
     }
 
     private static FlowRunService Service(
         FlowFixture fixture,
         TestFlowRunQueue queue,
         FlowRunExecutionOptions? options = null,
-        IFlowOrchestrationEngine? orchestration = null,
-        IFlowAgentExecutor? agents = null,
         IFlowStepArtifactCapture? artifactCapture = null)
     {
-        var expressions = new FlowExpressionParser();
         return new FlowRunService(
             fixture.Repository,
             queue,
             new TestCancellationRegistry(),
-            agents ?? new TestAgentExecutor(),
-            orchestration ?? new UnsupportedFlowOrchestrationEngine(),
-            expressions,
-            expressions,
             new NullFlowRunEventSink(),
-            new TestFlowRunExecutionScope(),
             TimeProvider.System,
             options,
             configuredArtifactCapture: artifactCapture);
@@ -658,95 +157,6 @@ public sealed partial class FlowTests
             new("input-summarize", "input", "completed", "summarize"),
             new("summarize-output", "summarize", "completed", "output")
         ]
-    };
-
-    private static FlowGraphDefinition ArtifactStorageGraph() => new()
-    {
-        EntryStep = "input",
-        InputSchema = JsonSerializer.SerializeToElement(new
-        {
-            type = "object",
-            properties = new
-            {
-                stagedArtifactId = new { type = "string" },
-                producerFlowRunId = new { type = "string" },
-                producerFlowStepId = new { type = "string" }
-            },
-            required = new[] { "stagedArtifactId", "producerFlowRunId", "producerFlowStepId" },
-            additionalProperties = false
-        }),
-        Steps =
-        [
-            new InputFlowStepDefinition { Name = "input" },
-            new TransformFlowStepDefinition
-            {
-                Name = "receipt",
-                Mapping = JsonSerializer.SerializeToElement(new
-                {
-                    flowRunArtifactId = "11111111111111111111111111111111"
-                })
-            },
-            new OutputFlowStepDefinition
-            {
-                Name = "output",
-                OutputMapping = JsonSerializer.SerializeToElement("${steps.receipt.output}")
-            }
-        ],
-        Transitions =
-        [
-            new("input-receipt", "input", "completed", "receipt"),
-            new("receipt-output", "receipt", "completed", "output")
-        ]
-    };
-
-    private static FlowGraphDefinition ArtifactParentGraph(bool failAfterStorage = false) => new()
-    {
-        EntryStep = "input",
-        Steps =
-        [
-            new InputFlowStepDefinition { Name = "input" },
-            new AgentFlowStepDefinition
-            {
-                Name = "produce",
-                DisplayName = "Produced result",
-                Agent = new("producer"),
-                ArtifactOutput = new()
-                {
-                    FileName = "${step.displayName}",
-                    MediaType = "application/json",
-                    ContentMapping = JsonSerializer.SerializeToElement("${step.output}"),
-                    StorageFlow = new("artifact-storage", FlowCallVersionStrategy.Exact, "1.0.0")
-                }
-            },
-            failAfterStorage
-                ? new FailureFlowStepDefinition
-                {
-                    Name = "failure",
-                    Code = "AFTER_STORAGE_FAILED",
-                    Message = "The parent failed after Artifact storage."
-                }
-                : new OutputFlowStepDefinition
-                {
-                    Name = "output",
-                    OutputMapping = JsonSerializer.SerializeToElement("${steps.produce.output}")
-                }
-        ],
-        Transitions =
-        [
-            new("input-produce", "input", "completed", "produce"),
-            new("produce-terminal", "produce", "completed", failAfterStorage ? "failure" : "output")
-        ]
-    };
-
-    private static FlowGraphDefinition FailingChildGraph() => new()
-    {
-        EntryStep = "input",
-        Steps =
-        [
-            new InputFlowStepDefinition { Name = "input" },
-            new FailureFlowStepDefinition { Name = "failure", Code = "CHILD_FAILURE", Message = "The child failed." }
-        ],
-        Transitions = [new("input-failure", "input", "completed", "failure")]
     };
 
     private static FlowGraphDefinition CallingGraph(string childName)
@@ -803,77 +213,4 @@ public sealed partial class FlowTests
         ]
     };
 
-    private static FlowGraphDefinition AgentThenFlowGraph() => new()
-    {
-        EntryStep = "input",
-        Steps =
-        [
-            new InputFlowStepDefinition { Name = "input" },
-            new AgentFlowStepDefinition { Name = "analyze", Agent = new("news-agent") },
-            new FlowCallStepDefinition
-            {
-                Name = "deliver",
-                Flow = new("child", FlowCallVersionStrategy.Exact, "1.0.0"),
-                InputMapping = JsonSerializer.SerializeToElement("${transition.output}")
-            }
-        ],
-        Transitions =
-        [
-            new("input-analyze", "input", "completed", "analyze"),
-            new("analyze-deliver", "analyze", "success", "deliver")
-        ]
-    };
-
-    private sealed class StructuredAgentExecutor : IFlowAgentExecutor
-    {
-        public Task<FlowAgentExecutionResult> ExecuteAsync(
-            FlowAgentExecutionRequest request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(new FlowAgentExecutionResult(
-                JsonSerializer.SerializeToElement(new { article = "analyzed item", confidence = 0.9 }),
-                $"/agents/{request.Target.Id}",
-                3,
-                "/profiles/default",
-                "Deterministic",
-                null,
-                [],
-                []));
-    }
-
-    private sealed class EchoAgentExecutor : IFlowAgentExecutor
-    {
-        public Task<FlowAgentExecutionResult> ExecuteAsync(
-            FlowAgentExecutionRequest request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(new FlowAgentExecutionResult(
-                request.Input.Clone(),
-                $"/agents/{request.Target.Id}",
-                1,
-                "/profiles/default",
-                "Deterministic",
-                null,
-                [],
-                []));
-    }
-
-    private sealed class CountingArtifactAgentExecutor : IFlowAgentExecutor
-    {
-        public int InvocationCount { get; private set; }
-
-        public Task<FlowAgentExecutionResult> ExecuteAsync(
-            FlowAgentExecutionRequest request,
-            CancellationToken cancellationToken)
-        {
-            InvocationCount++;
-            return Task.FromResult(new FlowAgentExecutionResult(
-                JsonSerializer.SerializeToElement(new { message = "captured" }),
-                $"/agents/{request.Target.Id}",
-                1,
-                "/profiles/default",
-                "Deterministic",
-                null,
-                [],
-                []));
-        }
-    }
 }

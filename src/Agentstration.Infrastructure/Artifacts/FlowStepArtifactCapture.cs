@@ -38,8 +38,20 @@ public sealed class FlowStepArtifactCapture(ArtifactManagementService artifacts)
     {
         try
         {
+            var stagedId = StagedArtifactId.Parse(artifact.LocalArtifactId ?? artifact.ArtifactId);
+            var staged = await artifacts.GetStagedAsync(stagedId, null,
+                ArtifactLeaseOperation.Inspect, cancellationToken)
+                ?? throw new FlowValidationException("flow_step_artifact_not_found",
+                    "The staged Artifact selected for cleanup was not found.");
+            if (staged.Value.Producer.Kind != ArtifactProducerKind.FlowRun
+                || !string.Equals(staged.Value.Producer.FlowRunId, flowRunId, StringComparison.Ordinal)
+                || !string.Equals(staged.Value.Producer.FlowStepId, stepName, StringComparison.Ordinal)
+                || !string.Equals(staged.Value.FileName, artifact.FileName, StringComparison.Ordinal)
+                || !string.Equals(staged.Value.MediaType, artifact.MediaType, StringComparison.OrdinalIgnoreCase))
+                throw new FlowValidationException("flow_step_artifact_cleanup_mismatch",
+                    "The staged Artifact does not belong to the assigned Flow step.");
             await artifacts.PurgeAsync(
-                StagedArtifactId.Parse(artifact.LocalArtifactId ?? artifact.ArtifactId),
+                stagedId,
                 cancellationToken);
         }
         catch (ArtifactValidationException exception)

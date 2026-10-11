@@ -503,7 +503,7 @@ public sealed class PackTests
     }
 
     [TestMethod]
-    public async Task RuntimeProfileBindingControlsThePackAgentsLocalDeployment()
+    public async Task RuntimeProfileBindingControlsThePackAgentsWorkerRevision()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         using var client = factory.CreateClient();
@@ -568,9 +568,9 @@ public sealed class PackTests
         Assert.IsNotNull(agent);
         Assert.AreEqual("pack-runtime", agent.Value.Definition.RuntimeProfile.Name);
         Assert.AreEqual(runtimeNamespace, agent.Value.Definition.RuntimeProfile.Namespace);
-        var deployment = await agents.PrepareLocalRuntimeAsync(packNamespace, "assistant", agent.Value.Generation, default);
-        Assert.AreEqual("pack-runtime", deployment.Value.RuntimeProfileName);
-        Assert.AreEqual(runtimeNamespace, deployment.Value.RuntimeProfileNamespace);
+        var revision = await agents.EnsureExecutionRevisionAsync(packNamespace, "assistant", agent.Value.Generation, default);
+        Assert.AreEqual("pack-runtime", revision.Value.Definition.RuntimeProfileName);
+        Assert.AreEqual(runtimeNamespace, revision.Value.Definition.RuntimeProfileNamespace);
         var runtimes = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
         Assert.HasCount(1, await runtimes.GetUsagesAsync(runtimeNamespace, "pack-runtime", default));
 
@@ -589,8 +589,8 @@ public sealed class PackTests
         var store = factory.Services.GetRequiredService<IResourceStore>();
         await store.DeleteAsync(new(AgentResourceKinds.Agent, "assistant", packNamespace), agent.ETag, default);
         await runtimeProfiles.DeleteAsync(runtimeNamespace, "pack-runtime", runtime.ETag, default);
-        Assert.IsNull(await store.GetAsync<AgentDeployment>(
-            new(AgentResourceKinds.AgentDeployment, deployment.Value.Metadata.Name, packNamespace), default));
+        Assert.IsNotNull(await store.GetAsync<AgentRevision>(
+            new(AgentResourceKinds.AgentRevision, revision.Value.Metadata.Name, packNamespace), default));
     }
 
     [TestMethod]
@@ -958,13 +958,17 @@ public sealed class PackTests
         Assert.AreEqual(HttpStatusCode.Accepted, runResponse.StatusCode, await runResponse.Content.ReadAsStringAsync());
         var run = await runResponse.Content.ReadFromJsonAsync<FlowRun>();
         Assert.IsNotNull(run);
-        for (var attempt = 0; attempt < 50 && !run.Status.IsTerminal(); attempt++)
-        {
-            await Task.Delay(100);
-            run = await client.GetFromJsonAsync<FlowRun>($"/api/flowRuns/{run.Id}");
-            Assert.IsNotNull(run);
-        }
-        Assert.AreEqual(FlowRunStatus.Succeeded, run.Status, run.Error?.Details ?? run.Error?.Message);
+        Assert.AreEqual(FlowRunStatus.Pending, run.Status);
+        var assignment = await factory.Services.GetRequiredService<RuntimeWorkerAssignmentService>()
+            .GetByTargetAsync(run.WorkspaceId, RuntimeAssignmentTargetKind.FlowRun, run.Id, default);
+        Assert.IsNotNull(assignment);
+        Assert.AreEqual(RuntimeAssignmentState.Pending, assignment.Value.State);
+        var material = await factory.Services.GetRequiredService<IRuntimeExecutionMaterialResolver>()
+            .ResolveAsync(assignment.Value, default);
+        var flowMaterial = Assert.IsInstanceOfType<RuntimeRootFlowExecutionMaterial>(material);
+        var materialAgent = flowMaterial.Agents.Single();
+        Assert.AreEqual("who-am-i-judge", materialAgent.AgentName);
+        Assert.IsGreaterThan(0, materialAgent.Generation);
 
         using var forkResponse = await client.PostAsJsonAsync(
             "/api/packs/agentstration/who-am-i/fork",

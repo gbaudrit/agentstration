@@ -57,7 +57,7 @@ export const TestIds = {
   resourceAdministration: {
     agents: 'resource-agents',
     namespacedAgentDetails: 'resource-namespaced-agent-details',
-    deployments: 'resource-deployments',
+    agentInstances: 'runtime-agent-instances',
     entries: 'resource-entries',
     modelProfiles: 'resource-model-profiles',
     modelProfileEditor: 'resource-model-profile-editor',

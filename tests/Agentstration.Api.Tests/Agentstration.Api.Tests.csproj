@@ -30,7 +30,8 @@
     <ProjectReference Include="../../src/Agentstration.Tools/Agentstration.Tools.csproj" />
     <ProjectReference Include="../../src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Runtime.MicrosoftAgentFramework/Agentstration.Runtime.MicrosoftAgentFramework.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj" Aliases="awpworker" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Contracts/Agentstration.Runtime.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Local/Agentstration.Runtime.Local.csproj" />

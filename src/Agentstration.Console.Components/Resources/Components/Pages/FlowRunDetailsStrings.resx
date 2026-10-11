@@ -75,6 +75,7 @@
   <data name="TimelineViewsAriaLabel"><value>Run progress views</value></data>
   <data name="RunViewsAriaLabel"><value>Flow Run views</value></data>
   <data name="Summary"><value>Summary</value></data>
+  <data name="Worker"><value>Worker</value></data>
   <data name="SummaryDuration"><value>Duration</value></data>
   <data name="SummaryCompletedSteps"><value>Completed steps</value></data>
   <data name="SummaryTurns"><value>Turns</value></data>

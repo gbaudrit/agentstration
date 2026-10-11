@@ -1,0 +1,99 @@
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimePlacementStrings> Localizer
+
+@if (loading)
+{
+    <LoadingState Message="@T("Loading")" />
+}
+else if (placement is not null)
+{
+    var effectiveAttempt = placement.Attempts
+        .OrderByDescending(attempt => attempt.AcquiredAt)
+        .FirstOrDefault(attempt => attempt.State == nameof(RuntimeAssignmentAttemptState.Active))
+        ?? placement.Attempts.OrderByDescending(attempt => attempt.AcquiredAt).FirstOrDefault();
+    <section class="panel runtime-placement" data-testid="runtime-placement">
+        <div class="panel-header runtime-placement-header"><div><p class="eyebrow">@T("Eyebrow")</p><h2>@T("Title")</h2></div><StatusBadge Text="@T($"State.{placement.State}")" Status="@PlatformDashboardService.ToStatus(placement.State)" /></div>
+        <div class="runtime-placement-overview">
+            <article class="runtime-worker-card">
+                <span class="field-label">@T("Worker")</span>
+                @if (effectiveAttempt is null)
+                {
+                    <strong>@T("NotAssigned")</strong>
+                }
+                else
+                {
+                    <a href="@WorkerUrl(effectiveAttempt.WorkerId)"><strong>@T("OpenWorker")</strong><code title="@effectiveAttempt.WorkerId.ToString("D")">@effectiveAttempt.WorkerId</code><span aria-hidden="true">→</span></a>
+                }
+            </article>
+            <article class="runtime-fact"><span class="field-label">@T("Runtime")</span><strong>@placement.RuntimeCapability</strong><small>@placement.RuntimeCapabilityVersion</small></article>
+            <article class="runtime-fact"><span class="field-label">@T("MaterialVersion")</span><strong>@placement.ExecutionMaterialVersion</strong></article>
+            <article class="runtime-fact"><span class="field-label">@T("Assignment")</span><code title="@placement.AssignmentId.ToString("D")">@placement.AssignmentId</code></article>
+        </div>
+        @if (placement.Attempts.Count > 0)
+        {
+            <section class="runtime-attempts" aria-label="@T("AttemptHistory", placement.Attempts.Count)">
+                <div class="runtime-section-heading"><div><h3>@T("AttemptHistoryTitle")</h3><p>@T("AttemptHistoryDescription")</p></div><span>@placement.Attempts.Count</span></div>
+                <ol class="runtime-attempt-grid">
+                    @foreach (var item in placement.Attempts.OrderByDescending(item => item.AcquiredAt).Select((attempt, index) => new { attempt, index }))
+                    {
+                        var attempt = item.attempt;
+                        <li class="runtime-attempt-card">
+                            <div class="runtime-attempt-header"><div><span class="field-label">@T("Attempt", placement.Attempts.Count - item.index)</span><a href="@WorkerUrl(attempt.WorkerId)"><code title="@attempt.WorkerId.ToString("D")">@attempt.WorkerId</code></a></div><StatusBadge Text="@T($"AttemptState.{attempt.State}")" Status="@PlatformDashboardService.ToStatus(attempt.State)" /></div>
+                            <dl class="details-list">
+                                <dt>@T("Session")</dt><dd><code>@attempt.WorkerSessionId</code></dd>
+                                <dt>@T("Acquired")</dt><dd>@attempt.AcquiredAt.LocalDateTime.ToString("g")</dd>
+                                <dt>@T("Heartbeat")</dt><dd>@attempt.LastHeartbeatAt.LocalDateTime.ToString("g")</dd>
+                                <dt>@T("LeaseExpires")</dt><dd>@attempt.LeaseExpiresAt.LocalDateTime.ToString("g")</dd>
+                                <dt>@T("Completed")</dt><dd>@(attempt.CompletedAt?.LocalDateTime.ToString("g") ?? "—")</dd>
+                                <dt>@T("ErrorCode")</dt><dd>@(attempt.ErrorCode ?? "—")</dd>
+                                <dt>@T("Fencing")</dt><dd>@attempt.FencingGeneration</dd>
+                            </dl>
+                        </li>
+                    }
+                </ol>
+            </section>
+        }
+    </section>
+}
+else if (unavailable)
+{
+    <div class="form-alert form-alert-warning" role="status">@T("Unavailable")</div>
+}
+
+@code {
+    [Parameter, EditorRequired] public RuntimeAssignmentTargetKind TargetKind { get; set; }
+    [Parameter, EditorRequired] public string RunId { get; set; } = string.Empty;
+
+    private RuntimeAssignmentPlacementResponse? placement;
+    private bool loading;
+    private bool unavailable;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        unavailable = false;
+        var runtimeClient = Services.GetService(typeof(IRuntimeApiClient)) as IRuntimeApiClient;
+        if (runtimeClient is null)
+        {
+            loading = false;
+            placement = null;
+            return;
+        }
+        try
+        {
+            placement = await runtimeClient.GetPlacementAsync(TargetKind, RunId, CancellationToken.None);
+        }
+        catch (HttpRequestException)
+        {
+            placement = null;
+            unavailable = true;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private static string WorkerUrl(Guid workerId) => $"/settings/runtime-workers/{workerId:D}";
+}

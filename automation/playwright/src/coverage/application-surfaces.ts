@@ -172,7 +172,7 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
     pageObject: 'src/pages/agent-editor.page.ts', journey: 'exercise-bootstrap-provenance',
     specification: 'tests/bootstrap-provenance.spec.ts', coverage: 'covered',
   },
-  partialResourceAdministration('deployments', `${consolePages}/Deployments.razor`, ['/deployments'], 414),
+  partialResourceAdministration('agent-instances', `${consolePages}/Deployments.razor`, ['/agent-instances'], 414),
 
   coveredFlow('flows', `${consolePages}/Flows.razor`, ['/flows']),
   coveredFlow('flow-details', `${consolePages}/FlowDetails.razor`, ['/flows/{FlowId}', '/namespaces/{FlowNamespace}/flows/{FlowId}'], ['flowId', 'flowNamespace']),

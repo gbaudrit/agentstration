@@ -26,12 +26,7 @@ public sealed class ResourceRuntimeAgentResolver(
             ?? throw new RuntimeAgentResolutionException("agent_not_found", $"Agent '{reference.Namespace}/{reference.ResourceId}' was not found.");
         var revision = await queries.FindRevisionAsync(agent.Value.Uid, reference.Version, cancellationToken)
             ?? throw new RuntimeAgentResolutionException("agent_version_not_found", $"Agent version '{reference.Version}' does not exist.");
-        var deployment = await queries.FindDeploymentByRevisionAsync(reference.Namespace, revision.Value.Metadata.Name, cancellationToken)
-            ?? throw new RuntimeAgentResolutionException("deployment_not_found", $"Agent generation '{reference.Version}' has no deployment.");
-        var ready = deployment.Value.DesiredState == DesiredAgentState.Running
-            && deployment.Value.OperationalState == OperationalState.Ready;
-        var modelProfileNamespace = deployment.Value.ModelProfileNamespace
-            ?? revision.Value.Definition.ModelProfileNamespace
+        var modelProfileNamespace = revision.Value.Definition.ModelProfileNamespace
             ?? (agent.Value.Generation == reference.Version
                 ? agent.Value.Definition.ModelProfile.Resolve(agent.Value.Namespace, ModelResourceKinds.ModelProfile).Namespace
                 : ResourceNamespace.Default);
@@ -39,16 +34,17 @@ public sealed class ResourceRuntimeAgentResolver(
             agent.Value.Uid,
             agent.Value.Metadata.Name,
             revision.Value.AgentVersion,
-            deployment.Value.Uid.ToString("N"),
+            string.Empty,
             revision.Value.Metadata.Name,
-            deployment.Value.RuntimeProfileName,
-            deployment.Value.ModelProfileName ?? revision.Value.Definition.ModelProfileName,
+            revision.Value.Definition.RuntimeProfileName,
+            revision.Value.Definition.ModelProfileName,
             RuntimeAgentDefinitionMapper.ToExecutable(revision.Value.Definition, modelProfileNamespace),
-            ready,
-            ready ? "Ready" : deployment.Value.OperationalState.ToString(),
-            ready ? null : deployment.Value.LastError ?? $"Deployment is {deployment.Value.OperationalState}.")
+            true,
+            "Ready",
+            null)
         {
-            RuntimeProfileNamespace = deployment.Value.RuntimeProfileNamespace,
+            AgentNamespace = reference.Namespace,
+            RuntimeProfileNamespace = revision.Value.Definition.RuntimeProfileNamespace,
             ModelProfileNamespace = modelProfileNamespace
         };
     }

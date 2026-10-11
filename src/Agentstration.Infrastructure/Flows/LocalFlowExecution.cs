@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using System.Threading.Channels;
 using Agentstration.Agents;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
@@ -11,29 +10,12 @@ using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.AgentFramework;
+using Agentstration.Runtime.MicrosoftAgentFramework;
 using Agentstration.Tools;
 using Agentstration.Tools.Mcp;
 using Agentstration.Work;
 
 namespace Agentstration.Infrastructure.Flows;
-
-public sealed class LocalFlowRunQueue : IFlowRunQueue
-{
-    private readonly Channel<FlowRunQueueItem> channel = Channel.CreateBounded<FlowRunQueueItem>(new BoundedChannelOptions(256)
-    {
-        FullMode = BoundedChannelFullMode.Wait,
-        SingleReader = true,
-        SingleWriter = false
-    });
-
-    public ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken) => channel.Writer.WriteAsync(item, cancellationToken);
-
-    public async IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync([EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        await foreach (var item in channel.Reader.ReadAllAsync(cancellationToken)) yield return item;
-    }
-}
 
 public sealed class WorkspaceFlowRunExecutionScope(
     IIdentityStore identities,
@@ -98,94 +80,6 @@ public sealed class LocalFlowRunCancellationRegistry : IFlowRunCancellationRegis
     {
         try { source.Cancel(); return true; }
         catch (ObjectDisposedException) { return false; }
-    }
-}
-
-public sealed class ManagedFlowAgentExecutor(
-    AgentExecutionCoordinator execution,
-    IResourceStore store,
-    IAgentResourceQueries agentQueries,
-    AgentManagementService agents) : IFlowAgentExecutor
-{
-    public async Task<FlowAgentExecutionResult> ExecuteAsync(FlowAgentExecutionRequest request, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        var target = request.Target;
-        var input = request.Input;
-        if (target.Kind != FlowTargetKind.Agent)
-            throw new FlowValidationException("flow_target_kind_unsupported", "Flow Runs currently execute explicit Agent targets.");
-
-        var prompt = input.ValueKind == JsonValueKind.Object && input.TryGetProperty("prompt", out var promptProperty) && promptProperty.ValueKind == JsonValueKind.String
-            ? promptProperty.GetString()!
-            : input.GetRawText();
-        var targetNamespace = target.Namespace ?? Agentstration.Resources.ResourceNamespace.Default;
-        var agent = await agents.GetAgentAsync(targetNamespace, ResourceName(target.Id), cancellationToken)
-            ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, ResourceName(target.Id), targetNamespace));
-        var prepared = await agents.PrepareLocalRuntimeAsync(targetNamespace, agent.Value.Metadata.Name, agent.Value.Generation, cancellationToken);
-        if (prepared.Value.OperationalState != OperationalState.Ready)
-            throw new InvalidOperationException(prepared.Value.LastError ?? $"Agent '{target.Id}' could not be prepared for local execution.");
-        var selected = await execution.SelectAgentAsync(prompt, ResourceName(target.Id), targetNamespace, cancellationToken);
-        var deployment = (await agentQueries.ListDeploymentsAsync(cancellationToken))
-            .SingleOrDefault(value => value.Value.AgentNamespace == targetNamespace && value.Value.Uid.ToString("N") == selected.DeploymentId)
-            ?? throw new InvalidOperationException("The selected agent deployment no longer exists.");
-        var revision = await store.GetAsync<AgentRevision>(new ResourceKey(AgentResourceKinds.AgentRevision, deployment.Value.RevisionName, targetNamespace), cancellationToken)
-            ?? throw new InvalidOperationException("The selected agent revision no longer exists.");
-        var result = await execution.ExecuteSelectedAsync(
-            selected,
-            new AgentExecutionRequest(
-                prompt,
-                request.RunId,
-                ToolExecution: new ToolExecutionScope
-                {
-                    OwnerKind = ToolExecutionOwnerKind.FlowRun,
-                    TenantId = request.Scope.TenantId,
-                    WorkspaceId = request.Scope.WorkspaceId,
-                    PrincipalId = request.Scope.PrincipalId,
-                    ExecutionId = request.RunId,
-                    FlowStepId = request.StepName,
-                    CorrelationId = request.CorrelationId,
-                    AgentGeneration = revision.Value.AgentVersion
-                }),
-            cancellationToken);
-        return new FlowAgentExecutionResult(
-            JsonSerializer.SerializeToElement(result.Output),
-            revision.Value.AgentName,
-            revision.Value.AgentVersion,
-            deployment.Value.ModelProfileName ?? revision.Value.Definition.ModelProfileName,
-            result.ProviderType,
-            result.Usage is null ? null : new FlowStepRunUsage(result.Usage.InputTokens, result.Usage.OutputTokens),
-            revision.Value.Definition.EffectiveToolNames.ToArray(),
-            [$"Runtime deployment {deployment.Value.Uid} executed for correlation {request.CorrelationId}.", $"Model: {result.ModelName ?? "unspecified"}."]);
-    }
-
-    private static string ResourceName(string id) => id;
-}
-
-public sealed class ManagedFlowOrchestrationEngine(
-    AgentFrameworkFlowOrchestrationEngine inner,
-    AgentManagementService agents) : IFlowOrchestrationEngine
-{
-    public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
-        FlowOrchestrationExecutionRequest request,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        var references = request.Definition.Participants.AsEnumerable();
-        if (request.Definition.Pattern is MagenticOrchestrationPattern magentic)
-            references = references.Append(magentic.Manager);
-
-        foreach (var reference in references.DistinctBy(target => (target.Namespace, target.Id)))
-        {
-            var targetNamespace = reference.Namespace ?? Agentstration.Resources.ResourceNamespace.Default;
-            var agent = await agents.GetAgentAsync(targetNamespace, reference.Id, cancellationToken)
-                ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, reference.Id, targetNamespace));
-            var prepared = await agents.PrepareLocalRuntimeAsync(targetNamespace, agent.Value.Metadata.Name, agent.Value.Generation, cancellationToken);
-            if (prepared.Value.OperationalState != OperationalState.Ready)
-                throw new InvalidOperationException(prepared.Value.LastError ?? $"Agent '{targetNamespace}/{reference.Id}' could not be prepared for local execution.");
-        }
-
-        await foreach (var executionEvent in inner.ExecuteAsync(request, cancellationToken))
-            yield return executionEvent;
     }
 }
 

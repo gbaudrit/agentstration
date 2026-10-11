@@ -28,37 +28,44 @@ Structural anchors: **API transport**, **Work and Workplace application**, and *
 
 ## Execute Flow
 
-A Flow Run owns graph progress and durable Flow events. Work owns the functional lifecycle; Runtime owns technical Agent invocation; the Tool pipeline owns governed Tool invocation.
+A Flow Run owns graph progress and durable Flow events. Work owns the functional lifecycle; the independent Runtime Worker owns transient MAF execution; Agentstration retains durable authority and every governed side effect.
 
 ```mermaid
 sequenceDiagram
-    participant Worker as Flow worker
-    participant Flow as Flow engine
+    participant Worker as Independent Runtime Worker
+    participant Flow as Authoritative Flow/AWP services
     participant FlowData as Flow data
-    participant Runtime as Runtime execution
+    participant Runtime as Model invocation
     participant Tools as Tool execution pipeline
     participant Work as Work application
-    Worker->>Flow: Claim pending Flow Run
-    Flow->>FlowData: Load exact validated snapshot and replay state
+    Worker->>Flow: Claim root Flow assignment
+    Flow->>FlowData: Load exact immutable material
+    Flow-->>Worker: Pinned AWP v1 material
     loop Typed graph steps
         alt Flow step
-            Flow->>FlowData: Create deterministic child Flow Run
-            Flow->>FlowData: Suspend parent until child completes
+            Worker->>Flow: Create deterministic child Flow Run
+            Flow->>FlowData: Persist child identity and causality
+            Flow-->>Worker: Pinned child material
+            Worker->>Worker: Execute child under root assignment
         else Agent step
-            Flow->>Runtime: Create technical Runtime Run
-            Runtime-->>Flow: Normalized result and events
+            Worker->>Flow: Invoke governed model/Agent operations
+            Flow->>Runtime: Resolve credentials and invoke model
+            Runtime-->>Worker: Normalized result
         else Tool step
-            Flow->>Tools: Execute governed Tool attempt
-            Tools-->>Flow: Result and governance events
+            Worker->>Flow: Invoke direct Tool or ToolRoute
+            Flow->>Tools: Resolve, authorize and execute attempt
+            Tools-->>Worker: Result and effective identities
         else Deterministic step
-            Flow->>Flow: Evaluate mapping, routing, or transform
+            Worker->>Worker: Evaluate mapping, routing, or transform
         end
-        Flow->>FlowData: Persist transition and differential events
+        Worker->>Flow: Append fenced idempotent events
+        Flow->>FlowData: Project step, transition and Artifact facts
     end
+    Worker->>Flow: Complete root assignment
     Flow->>Work: Project functional progress or terminal result
 ```
 
-Structural anchors: **Flow engine**, **Runtime execution**, **Tool execution pipeline**, and **Work and Workplace application**. Decisions: [ADR-0010](../../decisions/0010-independent-flow-module.md), [ADR-0019](../../decisions/0019-flow-run-resource-and-console.md), [ADR-0048](../../decisions/0048-flow-runs-carry-a-durable-execution-scope.md), [ADR-0054](../../decisions/0054-durable-interactive-flow-execution.md), and [ADR-0105](../../decisions/0105-flows-compose-flows-and-governed-tools.md).
+Structural anchors: **Flow engine**, **Runtime execution**, **Tool execution pipeline**, and **Work and Workplace application**. Decisions: [ADR-0010](../../decisions/0010-independent-flow-module.md), [ADR-0019](../../decisions/0019-flow-run-resource-and-console.md), [ADR-0048](../../decisions/0048-flow-runs-carry-a-durable-execution-scope.md), [ADR-0054](../../decisions/0054-durable-interactive-flow-execution.md), [ADR-0105](../../decisions/0105-flows-compose-flows-and-governed-tools.md), and [ADR-0168](../../decisions/0168-runtime-execution-is-placed-on-independent-awp-workers.md).
 
 ## Execute Agent
 

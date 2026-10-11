@@ -165,7 +165,6 @@ public sealed class ToolDefinitionExecutor(
         StoredFlowRun completed;
         try
         {
-            await runs.ExecuteAsync(new FlowRunQueueItem(submission.FlowRun.Run.Id, scope), timeout.Token);
             completed = await AwaitCompletionAsync(submission.FlowRun.Run.Id, scope, timeout.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -333,13 +332,6 @@ public sealed class ToolDefinitionExecutor(
             var stored = await runs.GetAsync(runId, scope, cancellationToken)
                 ?? throw new ToolDefinitionInvocationException("tool_definition_flow_run_missing", "The ToolDefinition Flow Run could not be reloaded.");
             if (stored.Value.Status.IsTerminal() || stored.Value.Status == FlowRunStatus.WaitingForInput) return stored;
-            if (stored.Value.Status == FlowRunStatus.WaitingForChild
-                && stored.Value.Steps.SingleOrDefault(step => step.ChildFlowRunId is not null)?.ChildFlowRunId is { } childRunId)
-            {
-                await runs.ExecuteAsync(new FlowRunQueueItem(childRunId, scope), cancellationToken);
-                await runs.ExecuteAsync(new FlowRunQueueItem(runId, scope), cancellationToken);
-                continue;
-            }
             await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
         }
     }

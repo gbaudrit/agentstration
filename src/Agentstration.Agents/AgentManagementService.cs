@@ -222,6 +222,29 @@ public sealed class AgentManagementService(
         }
     }
 
+    public async Task<StoredResource<AgentRevision>> EnsureExecutionRevisionAsync(
+        ResourceNamespace @namespace,
+        string agentName,
+        long generation,
+        CancellationToken cancellationToken)
+    {
+        var agent = await GetAgentAsync(@namespace, agentName, cancellationToken)
+            ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
+        var existing = await agentQueries.FindRevisionAsync(agent.Value.Uid, generation, cancellationToken);
+        if (existing is not null) return existing;
+        if (agent.Value.Generation != generation)
+            throw new ArgumentException($"Agent generation '{generation}' has no immutable revision.", nameof(generation));
+        var runtimeProfile = agent.Value.Definition.RuntimeProfile.Resolve(
+            agent.Value.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
+        return await CreateRevisionAsync(@namespace, agentName, new AgentDeploymentSpec
+        {
+            Environment = "worker",
+            RuntimeProfileName = runtimeProfile.Name,
+            RuntimeProfileNamespace = runtimeProfile.Namespace,
+            HostingMode = AgentHostingMode.DedicatedProcess
+        }, cancellationToken);
+    }
+
     private static bool Matches(AgentRevision revision, AgentResource agent, ResolvedAgentDefinition definition) =>
         revision.AgentUid == agent.Uid
         && revision.AgentVersion == agent.Generation
@@ -355,37 +378,6 @@ public sealed class AgentManagementService(
         return result.Changed
             ? await store.PutAsync(result.Deployment with { UpdatedAt = timeProvider.GetUtcNow() }, deployment.ETag, false, cancellationToken)
             : deployment;
-    }
-
-    public async Task<StoredResource<AgentDeployment>> PrepareLocalRuntimeAsync(string agentName, long generation, CancellationToken cancellationToken)
-        => await PrepareLocalRuntimeAsync(ResourceNamespace.Default, agentName, generation, cancellationToken);
-
-    public async Task<StoredResource<AgentDeployment>> PrepareLocalRuntimeAsync(ResourceNamespace @namespace, string agentName, long generation, CancellationToken cancellationToken)
-    {
-        var agent = await GetAgentAsync(@namespace, agentName, cancellationToken) ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
-        if (agent.Value.Generation != generation) throw new ArgumentException($"Only current agent generation '{agent.Value.Generation}' can be prepared.", nameof(generation));
-        var runtimeProfile = agent.Value.Definition.RuntimeProfile.Resolve(agent.Value.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
-        var spec = new AgentDeploymentSpec
-        {
-            Environment = "local",
-            RuntimeProfileName = runtimeProfile.Name,
-            RuntimeProfileNamespace = runtimeProfile.Namespace,
-            HostingMode = AgentHostingMode.InProcess
-        };
-        var revision = await agentQueries.FindRevisionAsync(agent.Value.Uid, generation, cancellationToken)
-            ?? await CreateRevisionAsync(@namespace, agentName, spec, cancellationToken);
-        var deployment = await agentQueries.FindDeploymentByRevisionAsync(@namespace, revision.Value.Metadata.Name, cancellationToken)
-            ?? await CreateDeploymentAsync(@namespace, $"{agentName}--g{generation:000000}", revision.Value.Metadata.Name, spec, cancellationToken);
-        if (deployment.Value.DesiredState != DesiredAgentState.Running) deployment = await StartAsync(deployment, cancellationToken);
-        var activated = await ReconcileAsync(deployment, cancellationToken);
-        if (activated.Value.OperationalState != OperationalState.Ready) return activated;
-
-        var current = await GetAgentAsync(@namespace, agentName, cancellationToken) ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
-        if (current.Value.Generation != generation) throw new ResourceConcurrencyException($"Agent '{agentName}' changed while generation '{generation}' was being activated.");
-        var deployments = await agentQueries.ListDeploymentsForAgentAsync(@namespace, agentName, cancellationToken);
-        foreach (var previous in deployments.Where(item => item.Value.Uid != activated.Value.Uid && item.Value.AgentName == agentName && item.Value.DesiredState != DesiredAgentState.Stopped))
-            _ = await ReconcileAsync(await StopAsync(previous, cancellationToken), cancellationToken);
-        return activated;
     }
 
     public async Task ReconcileAllAsync(CancellationToken cancellationToken)

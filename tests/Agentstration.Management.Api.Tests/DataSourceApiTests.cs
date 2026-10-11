@@ -174,6 +174,7 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
     public async Task DataSourceAcquisitionRunsWithoutAKnowledgeSourceAndPinsItsComposition()
     {
         await using var factory = Factory();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
         using var system = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
         var context = await GetBootstrapContextAsync(factory);
         var workspace = ResourceScopeRef.Workspace(context.WorkspaceId);
@@ -198,12 +199,12 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         Assert.AreEqual("1.0.0", started.Composition.Flow.Version);
         Assert.AreEqual(DataSourceFlowContracts.Acquisition, started.Composition.Flow.Contract);
 
-        await factory.Services.GetRequiredService<FlowRunService>().ExecuteAsync(
-            new FlowRunQueueItem(started.FlowRunId,
-                new FlowRunScope(context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId)), default);
-
         var current = started;
-        for (var attempt = 0; attempt < 50 && current.State is DataSourceAcquisitionState.Pending or DataSourceAcquisitionState.Running; attempt++)
+        for (var attempt = 0; attempt < 50
+            && current.State is DataSourceAcquisitionState.Pending
+                or DataSourceAcquisitionState.Running
+                or DataSourceAcquisitionState.WaitingForChild;
+            attempt++)
         {
             await Task.Delay(50);
             current = await client.GetFromJsonAsync<DataSourceAcquisitionResource>(

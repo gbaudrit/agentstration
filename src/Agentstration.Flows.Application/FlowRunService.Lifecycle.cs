@@ -262,6 +262,7 @@ public sealed partial class FlowRunService
     {
         var stored = await RequiredAsync(runId, scope, cancellationToken);
         if (stored.Value.Status.IsTerminal()) return stored;
+        await queue.RequestCancellationAsync(new(stored.Value.Id, stored.Value.Scope), cancellationToken);
         var cancelled = await CancelSingleAsync(stored, cancellationToken);
         foreach (var descendant in await ListActiveDescendantsAsync(cancelled.Value, cancellationToken))
             await CancelSingleAsync(descendant, cancellationToken);
