@@ -67,7 +67,7 @@ else
                     <h2 id="palette-steps-heading">@T("Steps")</h2>
                     @foreach (var entry in Palette)
                     {
-                        <button disabled="@ReadOnly" @onclick="() => AddStepAsync(entry)"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="@FlowStepIcons.Name(entry)" /></span><span>@T($"Step.{entry}")</span></button>
+                        <button data-testid="@($"flow-palette-{entry}")" disabled="@ReadOnly" @onclick="() => AddStepAsync(entry)"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="@FlowStepIcons.Name(entry)" /></span><span>@T($"Step.{entry}")</span></button>
                     }
                 </section>
                 <section class="step-palette-group palette-view" aria-labelledby="palette-view-heading">
@@ -80,7 +80,7 @@ else
             </aside>
 
             <div class="flow-canvas-wrap">
-                <FlowCanvas @ref="canvas" Document="Editor.State.Diagram" Revision="Editor.State.LocalRevision" FitRevision="layoutRevision"
+                <FlowCanvas @ref="canvas" Document="Editor.State.Diagram" Revision="Editor.State.LocalRevision" ResolvedOutputsRevision="flowCallRenderRevision" FitRevision="layoutRevision"
                             IsReadOnly="ReadOnly" EntryStep="@Editor.State.Resource.Definition.EntryStep" SelectedStepName="@Editor.State.Selection.StepName"
                             SelectedTransitionId="@Editor.State.Selection.TransitionId" ShowAllErrorTransitions="showAllErrorTransitions" SelectedStepChanged="SelectStepAsync"
                             SelectedTransitionChanged="SelectTransitionAsync"
@@ -99,7 +99,7 @@ else
                 {
                     <div class="inspector-details-group">
                         <div class="inspector-details-heading"><h3>@T("StepDetails")</h3><span class="inspector-step-type">@T($"Step.{SelectedStep.Type()}")</span></div>
-                        <label>@T("StepDisplayName")<input disabled="@ReadOnly" value="@(SelectedStep.DisplayName ?? SelectedStep.Name)" @onchange="UpdateDisplayNameAsync" /></label>
+                        <label>@T("StepDisplayName")<input data-testid="step-display-name" disabled="@ReadOnly" value="@(SelectedStep.DisplayName ?? SelectedStep.Name)" @onchange="UpdateDisplayNameAsync" /></label>
                         <label>@T("StepId")<input data-testid="step-name" disabled="@(ReadOnly || SelectedStep is not OutputFlowStepDefinition)" value="@SelectedStep.Name" @onchange="UpdateOutputNameAsync" /></label>
                     </div>
                     @if (SelectedStep is AgentFlowStepDefinition agent)
@@ -137,7 +137,7 @@ else
                                     <a class="inspector-resource-link" href="@FlowUrl(selectedFlow)" target="_blank" rel="noopener noreferrer" aria-label="@T("OpenFlowInNewTab")"><UiIcon Name="external-link" />@T("OpenFlow")</a>
                                 }
                             </div>
-                            <input id="flow-call-reference" disabled="@ReadOnly" list="flow-targets" value="@FlowKey(flowCall.Flow)" @onchange="UpdateFlowTargetAsync" />
+                            <input id="flow-call-reference" data-testid="flow-call-reference" disabled="@ReadOnly" list="flow-targets" value="@FlowKey(flowCall.Flow)" @onchange="UpdateFlowTargetAsync" />
                             <datalist id="flow-targets">
                                 @foreach (var item in flows.Where(item => item.Name != ResourceId || item.Namespace != Namespace))
                                 {
@@ -150,13 +150,13 @@ else
                             <p class="inspector-resource-id">@T("FlowId") <code>@referencedFlow.Name</code></p>
                         }
                         </div>
-                        <label>@T("VersionStrategy")<select disabled="@ReadOnly" value="@flowCall.Flow.VersionStrategy" @onchange="UpdateFlowVersionStrategyAsync">
+                        <label>@T("VersionStrategy")<select data-testid="flow-call-version-strategy" disabled="@ReadOnly" value="@flowCall.Flow.VersionStrategy" @onchange="UpdateFlowVersionStrategyAsync">
                             <option value="@FlowCallVersionStrategy.Active">@T("VersionStrategy.Active")</option>
                             <option value="@FlowCallVersionStrategy.Exact">@T("VersionStrategy.Exact")</option>
                         </select></label>
                         @if (flowCall.Flow.VersionStrategy == FlowCallVersionStrategy.Exact)
                         {
-                            <label>@T("ExactVersion")<select disabled="@ReadOnly" value="@flowCall.Flow.Version" @onchange="UpdateFlowExactVersionAsync">
+                            <label>@T("ExactVersion")<select data-testid="flow-call-exact-version" disabled="@ReadOnly" value="@flowCall.Flow.Version" @onchange="UpdateFlowExactVersionAsync">
                                 @foreach (var version in flowVersions) { <option value="@version.Version">@version.Version</option> }
                             </select></label>
                         }
@@ -280,14 +280,14 @@ else
                     }
                     else if (SelectedStep is OutputFlowStepDefinition output)
                     {
-                        <label>@T("OutputOutcome")<select disabled="@ReadOnly" value="@(output.Outcome ?? FlowOutputOutcome.Success)" @onchange="UpdateOutputOutcomeAsync"><option value="@FlowOutputOutcome.Success">@T("OutputOutcome.Success")</option><option value="@FlowOutputOutcome.Error">@T("OutputOutcome.Error")</option></select></label>
+                        <label>@T("OutputOutcome")<select data-testid="output-outcome" disabled="@ReadOnly" value="@(output.Outcome ?? FlowOutputOutcome.Success)" @onchange="UpdateOutputOutcomeAsync"><option value="@FlowOutputOutcome.Success">@T("OutputOutcome.Success")</option><option value="@FlowOutputOutcome.Error">@T("OutputOutcome.Error")</option></select></label>
                         <label>@T("OutputMapping")<textarea data-testid="output-mapping" disabled="@ReadOnly" value="@JsonText(output.OutputMapping)" @onchange="UpdateOutputMappingAsync"></textarea></label>
                         <label>@T("OutputSchema")<textarea data-testid="output-schema" disabled="@ReadOnly" value="@JsonText(output.Schema)" @onchange="UpdateOutputSchemaAsync"></textarea></label>
                         @if ((output.Outcome ?? FlowOutputOutcome.Success) == FlowOutputOutcome.Error)
                         {
-                            <label>@T("ErrorCode")<input disabled="@ReadOnly" value="@output.Code" @onchange="e => UpdateSelectedAsync(output with { Code = EmptyToNull(Text(e)) })" /></label>
-                            <label>@T("Message")<textarea disabled="@ReadOnly" value="@output.Message" @onchange="e => UpdateSelectedAsync(output with { Message = EmptyToNull(Text(e)) })"></textarea></label>
-                            <label>@T("ErrorDetailsExpression")<input disabled="@ReadOnly" value="@output.DetailsExpression" @onchange="e => UpdateSelectedAsync(output with { DetailsExpression = EmptyToNull(Text(e)) })" /></label>
+                            <label>@T("ErrorCode")<input data-testid="output-error-code" disabled="@ReadOnly" value="@output.Code" @onchange="e => UpdateSelectedAsync(output with { Code = EmptyToNull(Text(e)) })" /></label>
+                            <label>@T("Message")<textarea data-testid="output-error-message" disabled="@ReadOnly" value="@output.Message" @onchange="e => UpdateSelectedAsync(output with { Message = EmptyToNull(Text(e)) })"></textarea></label>
+                            <label>@T("ErrorDetailsExpression")<input data-testid="output-error-details" disabled="@ReadOnly" value="@output.DetailsExpression" @onchange="e => UpdateSelectedAsync(output with { DetailsExpression = EmptyToNull(Text(e)) })" /></label>
                         }
                     }
                     else if (SelectedStep is FailureFlowStepDefinition failure)
@@ -368,6 +368,7 @@ else
     private bool runInputValid = true;
     private bool loadingAgents;
     private long layoutRevision;
+    private long flowCallRenderRevision;
     private int toolPickerRevision;
     private string toolSearch = string.Empty;
 
@@ -771,7 +772,7 @@ else
             if (ResolveFlowVersion(call, versions) is { NamedOutputs.Count: > 0 } selected)
                 resolved[call.Name] = selected.NamedOutputs;
         }
-        Editor.SetFlowCallOutputs(resolved);
+        if (Editor.SetFlowCallOutputs(resolved)) flowCallRenderRevision++;
         if (!ReadOnly)
         {
             var revision = Editor.State.LocalRevision;
@@ -779,8 +780,11 @@ else
             if (Editor.State.LocalRevision != revision) ScheduleAutosave();
         }
     }
-    private void SyncFlowCallOutputs(FlowCallStepDefinition call, IReadOnlyList<FlowDesignerFlowVersion> versions) =>
-        Editor.SetFlowCallOutputs(call.Name, ResolveFlowVersion(call, versions)?.NamedOutputs ?? []);
+    private void SyncFlowCallOutputs(FlowCallStepDefinition call, IReadOnlyList<FlowDesignerFlowVersion> versions)
+    {
+        if (Editor.SetFlowCallOutputs(call.Name, ResolveFlowVersion(call, versions)?.NamedOutputs ?? []))
+            flowCallRenderRevision++;
+    }
     private FlowDesignerFlowVersion? ResolveFlowVersion(FlowCallStepDefinition call, IReadOnlyList<FlowDesignerFlowVersion> versions)
     {
         var version = call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact

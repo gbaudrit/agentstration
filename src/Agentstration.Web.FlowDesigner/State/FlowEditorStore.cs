@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Resources;
@@ -318,22 +319,37 @@ public sealed class FlowEditorStore
     public void SelectTransition(string? id) { State = State with { Selection = new FlowEditorSelection(null, id) }; Changed(); }
     public void SetMode(FlowEditorMode mode) { State = State with { Mode = mode }; Changed(); }
     public void SetIssues(IReadOnlyList<FlowValidationIssue> issues) { State = State with { Issues = issues }; Changed(); }
-    public void SetFlowCallOutputs(string stepName, IReadOnlyList<FlowDesignerOutput> outputs)
+    public bool SetFlowCallOutputs(string stepName, IReadOnlyList<FlowDesignerOutput> outputs)
     {
+        if ((flowCallOutputs.TryGetValue(stepName, out var current) && OutputsEqual(current, outputs)) ||
+            (!flowCallOutputs.ContainsKey(stepName) && outputs.Count == 0))
+            return false;
         var updated = new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(flowCallOutputs, StringComparer.Ordinal);
         if (outputs.Count == 0) updated.Remove(stepName); else updated[stepName] = outputs;
         flowCallOutputs = updated;
         if (State.Resource is not null)
             State = State with { Diagram = FlowDesignerDocument.From(State.Resource.Definition, flowCallOutputs) };
         Changed();
+        return true;
     }
-    public void SetFlowCallOutputs(IReadOnlyDictionary<string, IReadOnlyList<FlowDesignerOutput>> outputs)
+    public bool SetFlowCallOutputs(IReadOnlyDictionary<string, IReadOnlyList<FlowDesignerOutput>> outputs)
     {
+        if (flowCallOutputs.Count == outputs.Count && outputs.All(pair =>
+                flowCallOutputs.TryGetValue(pair.Key, out var current) && OutputsEqual(current, pair.Value)))
+            return false;
         flowCallOutputs = new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(outputs, StringComparer.Ordinal);
         if (State.Resource is not null)
             State = State with { Diagram = FlowDesignerDocument.From(State.Resource.Definition, flowCallOutputs) };
         Changed();
+        return true;
     }
+    private static bool OutputsEqual(IReadOnlyList<FlowDesignerOutput> left, IReadOnlyList<FlowDesignerOutput> right) =>
+        left.Count == right.Count && left.Zip(right).All(pair =>
+            pair.First.Name == pair.Second.Name &&
+            pair.First.DisplayName == pair.Second.DisplayName &&
+            pair.First.Outcome == pair.Second.Outcome &&
+            SchemaText(pair.First.Schema) == SchemaText(pair.Second.Schema));
+    private static string? SchemaText(JsonElement? schema) => schema?.GetRawText();
     public void SetSource(string source, string? error = null) { State = State with { SourceText = source, SourceError = error, IsDirty = error is null || State.IsDirty }; Changed(); }
     public void MarkSaving() { State = State with { SaveState = FlowSaveState.Saving }; Changed(); }
     public void MarkSaveFailed() { State = State with { SaveState = FlowSaveState.SaveFailed }; Changed(); }

@@ -829,6 +829,10 @@ public sealed class FlowDesignerReadOnlyTests
             Assert.IsFalse(store.State.Resource!.Definition.Transitions.Any(transition => transition.Event == "failure"));
             Assert.IsFalse(store.State.Resource.Definition.Transitions.Any(transition => transition.Event == "completed" && transition.FromStep == "deliver"));
             Assert.HasCount(2, store.State.Resource.Definition.Transitions.Where(transition => transition.FromStep == "deliver"));
+            var renderedNode = GetDiagram(rendered.FindComponent<FlowCanvas>().Instance).Nodes
+                .OfType<FlowDiagramNode>()
+                .Single(node => node.Source.Name == "deliver");
+            Assert.HasCount(2, renderedNode.Outputs);
         });
 
         rendered.Find("[data-testid='flow-designer-validate']").Click();
