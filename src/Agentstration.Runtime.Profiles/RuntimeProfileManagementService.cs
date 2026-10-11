@@ -9,11 +9,11 @@ namespace Agentstration.Runtime.Profiles;
 
 public sealed class RuntimeProfileValidationException(string message) : Exception(message);
 public sealed class RuntimeProfileInUseException(string profileName, IReadOnlyList<RuntimeProfileUsage> usages)
-    : Exception($"The runtime profile '{profileName}' is used by {usages.Count} deployment(s).")
+    : Exception($"The runtime profile '{profileName}' is used by {usages.Count} Agent revision(s).")
 {
     public IReadOnlyList<RuntimeProfileUsage> Usages { get; } = usages;
 }
-public sealed record RuntimeProfileUsage(Guid DeploymentUid, string Name, string Environment, string AgentName);
+public sealed record RuntimeProfileUsage(Guid ResourceUid, string Name, string Environment, string AgentName);
 
 public sealed class RuntimeProfileManagementService(
     IResourceStore store,
@@ -70,10 +70,18 @@ public sealed class RuntimeProfileManagementService(
     public async Task<IReadOnlyList<RuntimeProfileUsage>> GetUsagesAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
         var usages = new List<RuntimeProfileUsage>();
-        foreach (var deployment in await GetDeploymentsAsync(@namespace, name, cancellationToken))
+        var agents = (await store.ListAllAsync<AgentResource>(AgentResourceKinds.Agent, cancellationToken))
+            .ToDictionary(item => item.Value.Uid);
+        foreach (var revision in await store.ListAllAsync<AgentRevision>(AgentResourceKinds.AgentRevision, cancellationToken))
         {
-            if (!await HasOwningAgentAsync(deployment.Value, cancellationToken)) continue;
-            usages.Add(new(deployment.Value.Uid, deployment.Value.Metadata.Name, deployment.Value.Environment, deployment.Value.AgentName ?? string.Empty));
+            if (revision.Value.Definition.RuntimeProfileName != name
+                || revision.Value.Definition.RuntimeProfileNamespace != @namespace
+                || !agents.ContainsKey(revision.Value.AgentUid)) continue;
+            usages.Add(new(
+                revision.Value.Uid,
+                revision.Value.Metadata.Name,
+                "worker",
+                revision.Value.AgentName));
         }
         return usages;
     }

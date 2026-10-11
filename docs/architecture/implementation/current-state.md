@@ -298,33 +298,30 @@ PUT canonical Agentstration.Agents/agents resource
   -> preserve generation and ETag when identical, otherwise increment generation
   -> persist through the generic SQLite control-plane store
   -> publish AgentCreated or AgentUpdated (DELETE publishes AgentDeleted)
-Console save-and-apply / explicit Runtime reconcile
-  -> create or reuse the immutable revision and deployment for the current generation
-  -> provision and observe the replacement Runtime instance
-  -> when Ready, stop and deprovision every superseded deployment for the agent
-  -> on failure, keep the previous healthy generation running
+Console save-and-apply / explicit Runtime preparation
+  -> create or reuse the immutable revision for the current generation
+  -> expose readiness of the execution material required by an AWP Worker
+  -> do not instantiate or reconcile an Agent Runtime in the authoritative server
 ```
 
-Management never constructs an `AIAgent`, resolves credentials, injects a model client, instantiates tools, or executes an agent. `ResolvedAgentSpec` is the provider-neutral boundary for the direct Agent definition, model profile, and tools; concrete MAF materialization remains in `Agentstration.Runtime.MicrosoftAgentFramework`.
-
-Local activation is idempotent. During the short overlap needed for a safe replacement, routing selects the highest ready `AgentVersion` for each logical agent, so an older ready deployment cannot win because of storage enumeration order.
+Management never constructs an `AIAgent`, resolves credentials, injects a model client, instantiates tools, or executes an agent. Immutable revisions are the provider-neutral boundary for the direct Agent definition, model profile, and tools; concrete MAF materialization occurs only in `Agentstration.Runtime.Worker.MicrosoftAgentFramework`.
 
 ### Runtime Run vertical
 
 ```text
-Console / API / future Work or Flow adapter
+Console / API / Work / Flow adapter
   -> POST Runtime Run returns 202 Accepted
-  -> bounded local execution queue
-  -> resolve exact managed agent generation and ready deployment
-  -> IRuntimeRegistry executes the already materialized agent
-  -> persist ordered status, trace, response, tool and terminal events
+  -> create a durable AWP assignment for an exact immutable Agent revision
+  -> an independent Runtime Worker claims a fenced renewable lease
+  -> the Worker materializes and executes the MAF Agent outside the server process
+  -> AWP mutations persist ordered status, trace, response, tool and terminal events
   -> SSE /events with Last-Event-ID resumption
   -> terminal Run remains queryable and retry creates a new Run ID
 ```
 
 An interactive console Run is owned entirely by the Runtime Plane and does not create a Work Item. Runtime Run storage is independent from Management and Work storage.
 
-The Runtime store also owns durable Worker assignments exposed through the authenticated AWP dispatch path. A Worker registers its current process session, bounded capacity, Runtime capability versions and execution-material compatibility, then performs an immediate or bounded long-poll claim. The in-memory wake signal is only an optimization: each request rechecks durable eligibility, and reconnecting Workers register again after an API restart. Claim and capacity enforcement remain atomic in SQLite and PostgreSQL. A claim creates an AssignmentAttempt bound to one Worker process session, a cryptographically random opaque token whose digest alone is stored, a monotonically increasing fencing generation, and a renewable server-time lease. Heartbeat, cancellation, terminal outcome and expiry are conditional durable transitions. Registering a replacement session interrupts former-session assignments as `worker_lost`; ownership is not transferred. The authoritative server independently reaps expired leases with the same no-retry/no-recovery policy. AWP Workers authenticate with a dedicated signed-request scheme and receive no human or general Management authority. Until complete execution externalization is delivered, the existing local queue remains the active execution path and does not create these assignments.
+The Runtime store owns durable Worker assignments exposed through the authenticated AWP dispatch path. A Worker registers its current process session, bounded capacity, Runtime capability versions and execution-material compatibility, then performs an immediate or bounded long-poll claim. The in-memory wake signal is only an optimization: each request rechecks durable eligibility, and reconnecting Workers register again after an API restart. Claim and capacity enforcement remain atomic in SQLite and PostgreSQL. A claim creates an AssignmentAttempt bound to one Worker process session, a cryptographically random opaque token whose digest alone is stored, a monotonically increasing fencing generation, and a renewable server-time lease. Heartbeat, cancellation, terminal outcome and expiry are conditional durable transitions. Registering a replacement session interrupts former-session assignments as `worker_lost`; ownership is not transferred. The authoritative server independently reaps expired leases with the same no-retry/no-recovery policy. AWP Workers authenticate with a dedicated signed-request scheme and receive no human or general Management authority. Direct Agent Runs, Flow Runs, and direct Workplace Agent work all use this boundary; no in-process Runtime fallback is registered.
 
 ### AEP model-provider flow
 
@@ -395,7 +392,7 @@ Model behavior and runtime behavior are now separate canonical categories. `Mode
 
 Runtime adapters expose normalized `AgentExecutionEvent` values rather than MAF updates. Resolution carries dynamically observed provider and selected-model capabilities with the client. Before invocation, effective capability resolution intersects provider, selected model, runtime, and concrete adapter support and preserves `Unsupported`, `Native`, `Emulated`, or `Partial`. The MAF adapter maps canonical options to `ChatOptions`; each AEP extension validates and maps only its own native options. See ADR-0017 and ADR-0061.
 
-Agent CRUD and Agent Runner always use canonical Management and Runtime HTTP clients, independently of simulated dashboard projections. This prevents a simulated agent generation from being activated against a different persisted generation. Before enabling Run the console combines `/api/agents/{name}/model` with `/api/runtime/agents/{name}/readiness`. Save-and-apply or **Reconcile runtime** calls `/prepare`, which creates or reuses the current revision and local deployment and reconciles it. At execution time the MAF adapter resolves the current profile again, merges profile defaults with the only supported overrides (`temperature`, `maxOutputTokens`), selects the deployment model through `ChatOptions.ModelId`, and records the actual provider/model/effective options on the durable Run.
+Agent CRUD and Agent Runner always use canonical Management and Runtime HTTP clients, independently of simulated dashboard projections. Before enabling Run the console combines `/api/agents/{name}/model` with `/api/runtime/agents/{name}/readiness`. Save-and-apply or explicit preparation calls `/prepare`, which creates or reuses only the current immutable revision. At execution time an external Worker receives the exact material through AWP, resolves the current model profile through the narrow Worker API, merges the supported overrides (`temperature`, `maxOutputTokens`), and records the actual provider, model, effective options, Worker, session, and attempt on the durable Run.
 
 ## Observability
 
@@ -417,13 +414,13 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 
 1. **Delivered foundation:** solution conventions, explicit module boundaries, API/UI/MCP infrastructure, OTel, Aspire, and tests.
 2. **Delivered management vertical:** direct agent definitions, deterministic compilation, immutable revisions, SQLite control-plane storage, deployments, ETags, concise REST API, and pagination.
-3. **Delivered runtime vertical:** isolated Microsoft Agent Framework adapter, in-process/shared-host provisioners, runtime registry, periodic reconciliation, single-agent routing, execution, and standalone sample data.
+3. **Delivered runtime vertical:** isolated Microsoft Agent Framework adapter hosted only by independent Runtime Workers, durable AWP placement and fencing, single-agent routing, execution, and standalone sample data.
 4. **Retired legacy vertical:** the historical content ingestion, memory search and Mission monitoring stack was removed after the Management, Work, Flow, Runtime and Trigger modules superseded its responsibilities. See ADR-0071.
 5. **Delivered Work vertical:** domain-controlled lifecycle, typed identifiers, interactions, idempotent Runtime events, independent SQLite persistence, local execution gateway, canonical REST API, metrics, traces, and tests.
 6. **Delivered Flow authoring vertical:** independent projects, a finite typed graph vocabulary including the generic Flow-call authoring primitive, draft revisions and ETags, structural/resource/expression/schema/dependency validation, YAML/JSON source, immutable publication, visual authoring, Work references, OpenAPI, and SQLite.
 7. **Delivered Flow Runtime vertical:** durable FlowRun contracts and event history, immutable draft/published snapshots, bounded sequential typed-graph execution, input validation, cancellation, SignalR replay, telemetry, and the Flow-centered console.
 8. **Next Work increment:** durable execution dispatch/recovery, requester authorization, external artifact storage, cancel propagation, and retry/relaunch operations.
-9. **Delivered Runtime Run increment:** durable Run resources, local queue, exact agent-generation resolution, SQLite history, SSE observation, cancellation, retry, and Agent Runner console.
+9. **Delivered Runtime Run increment:** durable Run resources and AWP assignments, exact agent-generation resolution, SQLite history, SSE observation, cancellation, retry, Worker placement, and Agent Runner console.
 10. **Next management increment:** durable long-running operations, manifest importer, model/tool/connection/identity providers, and management authentication.
 11. **Next runtime increment:** provider-native streaming and tool telemetry, session storage, tool catalog policies, revision traffic splitting, dedicated process/container and remote endpoint adapters.
 12. **Delivered local model-provider increment:** provider-neutral resolver, the former in-process OllamaSharp adapter, Aspire-provisioned Ollama/model volume, Runner integration, development diagnostic, and offline tests; its adapter placement is superseded by AEP V1.
@@ -436,7 +433,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 19. **Delivered Tool Provider governance increment:** persistent AEP/MCP providers, STDIO and Streamable HTTP, manual discovery with durable diffs, secure-default Tool materialization, Console governance, Agent selection, and deterministic AEP utilities.
 20. **Delivered Pack distribution increment:** Packs are versioned Management/distribution artifacts above ordinary resources, never execution primitives; local ZIP validation, namespace-scoped coordinated installation, provenance, inventory, compensation, and safe uninstall are executable offline.
 21. **Delivered Pack authoring increment:** newly installed sources are content-addressed, installed Packs can be forked into workspace-owned Pack Projects, source and fork coexist in identity-derived namespaces, unchanged revisions build identical immutable archives, and stored builds can be previewed, downloaded, installed, or explicitly reinstalled in the current Workspace without a download/upload loop. Pack Flows preserve editable graph definitions.
-22. **Delivered Pack bindings increment:** Pack manifests declare logical Model Profile, Model Provider, Runtime Profile, and Secret requirements; installation resolves them to namespaced workspace resources without copying Secret values, and selections persist by Pack identity across uninstall and reinstall. Automatic local deployment uses the Runtime Profile selected for a Pack Agent. See ADR-0066.
+22. **Delivered Pack bindings increment:** Pack manifests declare logical Model Profile, Model Provider, Runtime Profile, and Secret requirements; installation resolves them to namespaced workspace resources without copying Secret values, and selections persist by Pack identity across uninstall and reinstall. The immutable execution revision pins the Runtime Profile selected for a Pack Agent. See ADR-0066 and ADR-0168.
 23. **Delivered Pack composition increment:** the Console catalogs current workspace resources, previews the complete Entry/Flow/Agent dependency closure, converts environment-specific Model Profile references into logical bindings, and creates a validated immutable Pack Project source snapshot without mutating the selected resources.
 24. **Delivered durable interactive execution increment:** Flow Runs persist exact participant revision/deployment bindings and opaque runtime checkpoints, expose durable input requests through REST and Workplace pending actions, recover through at-least-once leases, expire unanswered requests, and protect live revisions with impact-aware normal and forced purge operations. See ADR-0054.
 25. **Delivered governed Tool lifecycle projection:** the provider-neutral Tool execution pipeline emits started/completed/failed-or-cancelled facts. Runtime Runs project one `RuntimeToolCall` per logical call with physical attempt identity and count; Flow Runs append the same lifecycle to their durable journal. Arguments and results remain excluded from durable projections by default. See ADR-0055.

@@ -198,17 +198,9 @@ public static class DependencyInjection
         if (!useManagedProfileResolver)
             services.AddSingleton<IChatClientResolver, SingleChatClientResolver>();
         services.AddAgentstrationMcpTools();
-        services.AddSingleton<AgentRuntimeContext>();
-        services.AddSingleton<AgentFrameworkRuntimeFactory>();
-        services.AddSingleton<Agentstration.Runtime.Abstractions.IAgentRuntimeFactory>(services =>
-            services.GetRequiredService<AgentFrameworkRuntimeFactory>());
-        services.AddSingleton<IRuntimeRegistry, RuntimeRegistry>();
         services.AddSingleton<IRuntimeRunQueue, AwpRuntimeRunQueue>();
-        services.AddSingleton<IRuntimeRunCancellationRegistry, LocalRuntimeRunCancellationRegistry>();
         services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
-        services.AddSingleton<IAgentDeploymentProvisioner, InProcessAgentProvisioner>();
-        services.AddSingleton<IAgentDeploymentProvisioner, SharedHostAgentProvisioner>();
-        services.AddSingleton<IAgentDeploymentReconciler, LocalAgentDeploymentReconciler>();
+        services.AddSingleton<IAgentDeploymentReconciler, ExternalWorkerAgentDeploymentReconciler>();
         services.AddSingleton<IAgentRouter, AgentFrameworkAgentRouter>();
         services.AddSingleton(new AgentRevisionRetentionOptions());
         services.AddSingleton<AgentManagementService>();

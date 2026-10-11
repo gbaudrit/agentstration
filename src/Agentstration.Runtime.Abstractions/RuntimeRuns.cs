@@ -174,13 +174,6 @@ public interface IRuntimeRunExecutionScope
     IDisposable Enter(RuntimeRunScope scope);
 }
 
-public interface IRuntimeRunCancellationRegistry
-{
-    CancellationToken Register(RuntimeRunKey key, CancellationToken stoppingToken);
-    bool Cancel(RuntimeRunKey key);
-    void Complete(RuntimeRunKey key);
-}
-
 public sealed class RuntimeRunNotFoundException(string runId) : Exception($"Runtime run '{runId}' was not found.");
 public sealed class RuntimeRunConcurrencyException(string message) : Exception(message);
 public sealed class RuntimeRunValidationException(string code, string message) : Exception(message) { public string Code { get; } = code; }

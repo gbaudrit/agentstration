@@ -3,6 +3,7 @@ using Agentstration.Application.Work;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Infrastructure;
+using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Local;
 using Agentstration.Work;
 
@@ -38,11 +39,22 @@ public sealed class LocalWorkExecutionWorker(
                     Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId,
                     timeProvider.GetUtcNow(), selected.Route.AgentId);
                 await workItems.ApplyExecutionEventAsync(started, stoppingToken);
-                var runtimeResult = await agentExecution.ExecuteSelectedAsync(selected, execution.Request.Instruction, stoppingToken);
+                var runtimeScope = new RuntimeRunScope(scope.TenantId, scope.WorkspaceId, scope.PrincipalId);
+                var routed = await agentExecution.ExecuteSelectedAsync(
+                    runtimeScope,
+                    selected,
+                    execution.Request.Instruction,
+                    scope.PrincipalId.ToString("D"),
+                    RuntimeRunOrigin.WorkItem,
+                    stoppingToken);
                 var result = new WorkResult(
-                    [new WorkResultContent(runtimeResult.Output)],
+                    [new WorkResultContent(routed.Execution.Output)],
                     [],
-                    new Dictionary<string, string> { ["agentId"] = selected.Route.AgentId },
+                    new Dictionary<string, string>
+                    {
+                        ["agentId"] = selected.Route.AgentId,
+                        ["runtimeRunId"] = routed.RuntimeRunId
+                    },
                     timeProvider.GetUtcNow());
                 await workItems.ApplyExecutionEventAsync(new WorkExecutionCompleted(
                     Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId,

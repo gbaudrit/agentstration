@@ -1,7 +1,6 @@
 using Agentstration.Agents;
 using Agentstration.Extensions;
 using Agentstration.Models;
-using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Web.Hosting;
@@ -14,7 +13,6 @@ public static class ManagementDemoData
         var providers = services.GetRequiredService<ModelProviderManagementService>();
         var extensions = services.GetRequiredService<ExtensionRegistrationManagementService>();
         var profiles = services.GetRequiredService<ModelProfileManagementService>();
-        var store = services.GetRequiredService<IResourceStore>();
         var configuration = services.GetRequiredService<IConfiguration>();
         if (await extensions.GetAsync(ResourceNamespace.Default, "ollama-extension", cancellationToken) is not null
             && await providers.GetAsync("ollama-local", cancellationToken) is null)
@@ -88,13 +86,12 @@ public static class ManagementDemoData
 
         if (await profiles.GetAsync("reasoning-default", cancellationToken) is null) return;
 
-        await EnsureAgentAsync(agents, store, "dotnet-expert", "Specialized agent for .NET, C#, ASP.NET Core, and runtime diagnostics.", "Focus on .NET and C#. Provide safe, practical guidance.", ["dotnet", "csharp", "aspnet"], [], cancellationToken);
-        await EnsureAgentAsync(agents, store, "sql-expert", "Specialized agent for SQL query performance and database diagnostics.", "Focus on SQL performance and read-only diagnostics.", ["sql", "database", "query-performance"], [], cancellationToken);
+        await EnsureAgentAsync(agents, "dotnet-expert", "Specialized agent for .NET, C#, ASP.NET Core, and runtime diagnostics.", "Focus on .NET and C#. Provide safe, practical guidance.", ["dotnet", "csharp", "aspnet"], [], cancellationToken);
+        await EnsureAgentAsync(agents, "sql-expert", "Specialized agent for SQL query performance and database diagnostics.", "Focus on SQL performance and read-only diagnostics.", ["sql", "database", "query-performance"], [], cancellationToken);
     }
 
     internal static async Task EnsureAgentAsync(
         AgentManagementService management,
-        IResourceStore store,
         string name,
         string description,
         string instructions,
@@ -127,13 +124,7 @@ public static class ManagementDemoData
             }, null, true, cancellationToken);
         }
 
-        var revisions = await store.ListAllAsync<AgentRevision>(AgentResourceKinds.AgentRevision, cancellationToken);
-        var revision = revisions.Where(value => value.Value.AgentUid == agent.Value.Uid).OrderByDescending(value => value.Value.CreatedAt).FirstOrDefault();
-        var spec = new AgentDeploymentSpec { Environment = "local", RuntimeProfileName = "maf-builtin", HostingMode = AgentHostingMode.InProcess };
-        revision ??= await management.CreateRevisionAsync(name, spec, cancellationToken);
-        var deployment = await management.GetDeploymentAsync(name, cancellationToken)
-            ?? await management.CreateDeploymentAsync(name, revision.Value.Metadata.Name, spec, cancellationToken);
-        if (deployment.Value.OperationalState != OperationalState.Ready) await management.ReconcileAsync(deployment, cancellationToken);
+        _ = await management.EnsureExecutionRevisionAsync(ResourceNamespace.Default, name, agent.Value.Generation, cancellationToken);
     }
 
 }
