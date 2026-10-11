@@ -20,6 +20,7 @@ import { exerciseBootstrapProvenance, type ExerciseBootstrapProvenanceInput } fr
 import { inspectArtifactContent, type InspectArtifactContentInput } from './inspect-artifact-content.journey.js';
 import { exerciseToolExecution, type ExerciseToolExecutionInput } from './exercise-tool-execution.journey.js';
 import { exerciseFlowTransitionEditing, type ExerciseFlowTransitionEditingInput } from './exercise-flow-transition-editing.journey.js';
+import { exerciseFlowNamedOutputs, type ExerciseFlowNamedOutputsInput } from './exercise-flow-named-outputs.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -45,4 +46,5 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'inspect-artifact-content': (context, input) => inspectArtifactContent(context, input as unknown as InspectArtifactContentInput),
   'exercise-tool-execution': async (context, input) => { await exerciseToolExecution(context, input as unknown as ExerciseToolExecutionInput); },
   'exercise-flow-transition-editing': (context, input) => exerciseFlowTransitionEditing(context, input as unknown as ExerciseFlowTransitionEditingInput),
+  'exercise-flow-named-outputs': (context, input) => exerciseFlowNamedOutputs(context, input as unknown as ExerciseFlowNamedOutputsInput),
 };
