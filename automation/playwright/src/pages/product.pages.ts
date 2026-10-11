@@ -22,6 +22,7 @@ import { FoundrySecretBindingPage } from './foundry-secret-binding.page.js';
 import { ArtifactAdministrationPage } from './artifact-administration.page.js';
 import { PlatformOverviewPage } from './platform-overview.page.js';
 import { ToolExecutionPage } from './tool-execution.page.js';
+import { RuntimeWorkerObservabilityPage } from './runtime-worker-observability.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -46,6 +47,7 @@ export class ProductPages {
   public readonly artifacts: ArtifactAdministrationPage;
   public readonly platformOverview: PlatformOverviewPage;
   public readonly toolExecution: ToolExecutionPage;
+  public readonly runtimeWorkerObservability: RuntimeWorkerObservabilityPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -70,6 +72,7 @@ export class ProductPages {
     this.artifacts = new ArtifactAdministrationPage(page);
     this.platformOverview = new PlatformOverviewPage(page);
     this.toolExecution = new ToolExecutionPage(page);
+    this.runtimeWorkerObservability = new RuntimeWorkerObservabilityPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

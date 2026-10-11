@@ -1,0 +1,12 @@
+{
+  "journey": "inspect-runtime-worker-observability",
+  "captures": [
+    { "checkpoint": "runtime-worker-inventory-online", "file": "workers-online.png" },
+    { "checkpoint": "runtime-worker-successful-assignments", "file": "worker-assignments.png" },
+    { "checkpoint": "runtime-worker-run-placement", "file": "runtime-run-worker.png" },
+    { "checkpoint": "runtime-worker-flow-run-placement", "file": "flow-run-worker.png" },
+    { "checkpoint": "runtime-worker-offline", "file": "worker-offline.png" },
+    { "checkpoint": "runtime-worker-loss", "file": "worker-loss.png" },
+    { "checkpoint": "runtime-worker-reconnected", "file": "worker-reconnected.png" }
+  ]
+}

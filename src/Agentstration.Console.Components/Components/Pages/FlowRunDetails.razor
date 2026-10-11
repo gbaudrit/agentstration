@@ -31,7 +31,7 @@ else
     <nav class="section-tabs flow-run-page-tabs" role="tablist" aria-label="@T("RunViewsAriaLabel")">
         @foreach (var tab in AvailableTabs)
         {
-            <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="flow-run-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => SelectTabAsync(tab)">@TabLabel(tab)</button>
+            <button id="@TabId(tab)" data-testid="@(tab == RunTab.Worker ? "flow-run-worker-tab" : null)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="flow-run-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => SelectTabAsync(tab)">@TabLabel(tab)</button>
         }
     </nav>
     @if (run.Error is not null)

@@ -15,12 +15,21 @@ export interface ProductAddresses {
 
 export interface ProductHosts extends ProductAddresses {
   platformHealth?: PlatformHealthTestControl;
+  runtimeWorker?: RuntimeWorkerTestControl;
   stop(): Promise<void>;
 }
 
 export interface PlatformHealthTestControl {
   delayNextRuntimeStatus(milliseconds: number): void;
   setRuntimeUnavailable(unavailable: boolean): void;
+}
+
+export interface RuntimeWorkerTestControl {
+  readonly workerId: string;
+  delayNextModelInvocation(milliseconds: number): void;
+  waitForDelayedModelInvocation(): Promise<void>;
+  stop(): Promise<void>;
+  start(): Promise<void>;
 }
 
 interface ManagedProcess {
@@ -35,6 +44,13 @@ interface FakeOllama {
 
 interface ControlledRuntimeProxy extends PlatformHealthTestControl {
   url: string;
+  stop(): Promise<void>;
+}
+
+interface ControlledWorkerAuthorityProxy {
+  url: string;
+  delayNextModelInvocation(milliseconds: number): void;
+  waitForDelayedModelInvocation(): Promise<void>;
   stop(): Promise<void>;
 }
 
@@ -55,6 +71,7 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
   const foundryExtensionUrl = `http://127.0.0.1:${foundryExtensionPort}`;
   const bootstrapPath = path.join(repositoryRoot, 'deploy', 'bootstrap', 'profiles');
   const runtimeProxy = await startControlledRuntimeProxy(consoleUrl);
+  const workerAuthorityProxy = await startControlledWorkerAuthorityProxy(consoleUrl);
   const workerId = randomUUID();
   const credentialId = randomUUID();
   const workerKeyFile = path.join(workDirectory, 'runtime-worker.key');
@@ -120,6 +137,9 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
     Agentstration__AwpWorkerTrust__Credentials__0__WorkerId: workerId,
     Agentstration__AwpWorkerTrust__Credentials__0__CredentialId: credentialId,
     Agentstration__AwpWorkerTrust__Credentials__0__SharedKeyFile: workerKeyFile,
+    Agentstration__RuntimeWorker__Lease__HeartbeatInterval: '00:00:01',
+    Agentstration__RuntimeWorker__Lease__LeaseDuration: '00:00:06',
+    Agentstration__RuntimeWorker__Lease__MinimumSideEffectLeaseRemaining: '00:00:01',
   }, [
     '--Agentstration:Extensions:Agentstration.Extensions.Ollama:RegistrationName=ollama-extension',
     `--Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint=${extensionUrl}`,
@@ -131,20 +151,26 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
 
   let workplaceHost: ManagedProcess | undefined;
   let workerHost: ManagedProcess | undefined;
-  try {
-    await waitUntilHealthy(`${consoleUrl}/health/ready`, consoleHost);
+  const startRuntimeWorker = async (): Promise<void> => {
+    if (workerHost?.child.exitCode === null) return;
     workerHost = runDotnet('src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj', path.join(workDirectory, 'runtime-worker.log'), {
       ASPNETCORE_ENVIRONMENT: 'Development',
       ASPNETCORE_URLS: workerUrl,
       Logging__EventLog__LogLevel__Default: 'None',
-      Agentstration__RuntimeWorker__AuthorityUrl: consoleUrl,
+      Agentstration__RuntimeWorker__AuthorityUrl: workerAuthorityProxy.url,
       Agentstration__RuntimeWorker__WorkerId: workerId,
       Agentstration__RuntimeWorker__CredentialId: credentialId,
       Agentstration__RuntimeWorker__InstanceId: runId,
       Agentstration__RuntimeWorker__SharedKeyFile: workerKeyFile,
       Agentstration__RuntimeWorker__AllowInsecureHttp: 'true',
+      Agentstration__RuntimeWorker__ClaimWaitSeconds: '1',
+      Agentstration__RuntimeWorker__LeaseSafetyMarginSeconds: '1',
     });
     await waitUntilHealthy(`${workerUrl}/health/ready`, workerHost);
+  };
+  try {
+    await waitUntilHealthy(`${consoleUrl}/health/ready`, consoleHost);
+    await startRuntimeWorker();
     workplaceHost = runDotnet('src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj', path.join(workDirectory, 'workplace.log'), {
       ASPNETCORE_ENVIRONMENT: 'Development',
       ASPNETCORE_URLS: workplaceUrl,
@@ -162,6 +188,7 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
     await stopProcess(foundryExtension);
     await fakeOllama.stop();
     await runtimeProxy.stop();
+    await workerAuthorityProxy.stop();
     throw error;
   }
 
@@ -169,6 +196,16 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
     consoleUrl,
     workplaceUrl,
     platformHealth: runtimeProxy,
+    runtimeWorker: {
+      workerId,
+      delayNextModelInvocation: milliseconds => workerAuthorityProxy.delayNextModelInvocation(milliseconds),
+      waitForDelayedModelInvocation: () => workerAuthorityProxy.waitForDelayedModelInvocation(),
+      async stop() {
+        await stopProcess(workerHost);
+        workerHost = undefined;
+      },
+      start: startRuntimeWorker,
+    },
     async stop() {
       await stopProcess(workplaceHost);
       await stopProcess(workerHost);
@@ -178,8 +215,86 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
       await stopProcess(foundryExtension);
       await fakeOllama.stop();
       await runtimeProxy.stop();
+      await workerAuthorityProxy.stop();
     },
   };
+}
+
+async function startControlledWorkerAuthorityProxy(targetBaseUrl: string): Promise<ControlledWorkerAuthorityProxy> {
+  let nextModelDelayMilliseconds = 0;
+  let delayedInvocation: Promise<void> = Promise.resolve();
+  let delayedInvocationObserved: (() => void) | undefined;
+  const resetObservation = () => {
+    delayedInvocation = new Promise(resolve => { delayedInvocationObserved = resolve; });
+  };
+  resetObservation();
+
+  const server = createServer(async (incoming, outgoing) => {
+    const target = new URL(incoming.url ?? '/', targetBaseUrl);
+    if (target.pathname === '/api/awp/v1/assignments/model/invoke' && nextModelDelayMilliseconds > 0) {
+      const delay = nextModelDelayMilliseconds;
+      nextModelDelayMilliseconds = 0;
+      delayedInvocationObserved?.();
+      await cancellableDelay(delay, incoming, outgoing);
+      if (incoming.destroyed || outgoing.destroyed) return;
+    }
+
+    const headers = { ...incoming.headers, host: target.host };
+    const forwarded = createRequest(target, { method: incoming.method, headers }, response => {
+      outgoing.writeHead(response.statusCode ?? 502, response.headers);
+      response.pipe(outgoing);
+    });
+    forwarded.on('error', error => {
+      if (outgoing.headersSent) outgoing.destroy(error);
+      else {
+        outgoing.statusCode = 502;
+        outgoing.end('Worker authority proxy unavailable.');
+      }
+    });
+    incoming.pipe(forwarded);
+  });
+  const port = await listenOnLoopback(server);
+  return {
+    url: `http://127.0.0.1:${port}`,
+    delayNextModelInvocation(milliseconds) {
+      nextModelDelayMilliseconds = Math.max(1, milliseconds);
+      resetObservation();
+    },
+    waitForDelayedModelInvocation: async () => await withTimeout(
+      delayedInvocation,
+      30_000,
+      'Timed out waiting for the delayed Worker model invocation.',
+    ),
+    stop: async () => await closeServer(server),
+  };
+}
+
+async function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), milliseconds);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function cancellableDelay(milliseconds: number, incoming: Readable, outgoing: import('node:http').ServerResponse): Promise<void> {
+  await new Promise<void>(resolve => {
+    const timer = setTimeout(finish, milliseconds);
+    incoming.once('aborted', finish);
+    outgoing.once('close', finish);
+    function finish() {
+      clearTimeout(timer);
+      incoming.off('aborted', finish);
+      outgoing.off('close', finish);
+      resolve();
+    }
+  });
 }
 
 async function startControlledRuntimeProxy(targetBaseUrl: string): Promise<ControlledRuntimeProxy> {

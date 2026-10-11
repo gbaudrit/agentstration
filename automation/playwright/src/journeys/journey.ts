@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import type { ProductAddresses } from '../fixtures/product-hosts.js';
+import type { ProductAddresses, RuntimeWorkerTestControl } from '../fixtures/product-hosts.js';
 import type { ProductPages } from '../pages/product.pages.js';
 
 export interface JourneyCheckpoint {
@@ -10,6 +10,7 @@ export interface JourneyCheckpoint {
 
 export interface JourneyContext extends ProductAddresses {
   pages: ProductPages;
+  runtimeWorker?: RuntimeWorkerTestControl;
   theme?: 'light' | 'dark';
   checkpoint(checkpoint: JourneyCheckpoint): Promise<void>;
 }

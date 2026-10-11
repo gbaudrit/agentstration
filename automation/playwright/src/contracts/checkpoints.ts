@@ -68,6 +68,16 @@ export const Checkpoints = {
     agentRun: 'flow-observability-agent-run',
     events: 'flow-observability-events',
   },
+  runtimeWorkerObservability: {
+    inventoryOnline: 'runtime-worker-inventory-online',
+    successfulAssignments: 'runtime-worker-successful-assignments',
+    runPlacement: 'runtime-worker-run-placement',
+    flowRunPlacement: 'runtime-worker-flow-run-placement',
+    workerOffline: 'runtime-worker-offline',
+    workerLoss: 'runtime-worker-loss',
+    workerReconnected: 'runtime-worker-reconnected',
+    authorizationBoundaries: 'runtime-worker-authorization-boundaries',
+  },
   flowNamedOutputs: {
     activePorts: 'flow-named-outputs-active-ports',
     historicalPorts: 'flow-named-outputs-historical-ports',
