@@ -429,7 +429,6 @@ public sealed class DependencyTests
         Assert.AreEqual(1, CountOccurrences(composition, "MapAgentstrationApi("));
         foreach (var worker in new[]
                  {
-                     "AgentDeploymentReconciliationWorker",
                      "LocalWorkExecutionWorker",
                      "FlowRunRecoveryWorker",
                      "SourceRefreshWorker"
@@ -542,8 +541,22 @@ public sealed class DependencyTests
     [TestMethod]
     public void RuntimeAbstractionsDoNotReferenceMicrosoftAgentFramework()
     {
-        var references = typeof(IRuntimeRegistry).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        var references = typeof(IRuntimeAgentResolver).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void AuthoritativeServerHasNoInProcessRuntimeExecutionFallback()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var composition = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Agentstration.Infrastructure", "DependencyInjection.cs"));
+        var hostedServices = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Agentstration.Web", "Hosting", "StandaloneHostComposition.cs"));
+
+        Assert.DoesNotContain("AgentFrameworkRuntimeFactory", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("IRuntimeRegistry", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("LocalAgentDeploymentReconciler", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("AgentDeploymentReconciliationWorker", hostedServices, StringComparison.Ordinal);
+        Assert.IsNull(typeof(RuntimeRunService).GetMethod("ExecuteAsync"));
     }
 
     [TestMethod]

@@ -2,20 +2,17 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
-using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Runtime.Core;
 
 public sealed class RuntimeRunService(
     IRuntimeRunStore runs,
     IRuntimeRunQueue queue,
-    IRuntimeRunCancellationRegistry cancellations,
     IRuntimeRunExecutionScope executionScopes,
+    IAgentRuntimePreparationService preparation,
     IRuntimeAgentResolver agents,
-    IRuntimeRegistry runtimes,
     RuntimeRunStateManager stateManager,
-    TimeProvider timeProvider,
-    ILogger<RuntimeRunService> logger)
+    TimeProvider timeProvider)
 {
     public static readonly ActivitySource ActivitySource = new("Agentstration.Runtime");
 
@@ -53,6 +50,7 @@ public sealed class RuntimeRunService(
         {
             await executionScopes.ValidateAsync(scope, cancellationToken);
             using var requestScope = executionScopes.Enter(scope);
+            _ = await preparation.PrepareAsync(agentReference.Namespace, agentReference.ResourceId, agentReference.Version, cancellationToken);
             resolved = await agents.ResolveAsync(agentReference, cancellationToken);
         }
         catch (RuntimeAgentResolutionException exception) { throw new RuntimeRunValidationException(exception.Code, exception.Message); }
@@ -126,7 +124,7 @@ public sealed class RuntimeRunService(
                 generation,
                 ready,
                 ready ? "Ready" : resolved.State,
-                resolved.DeploymentId,
+                string.IsNullOrWhiteSpace(resolved.DeploymentId) ? null : resolved.DeploymentId,
                 resolved.RevisionId,
                 ready ? null : resolved.Error ?? $"Agent revision is {resolved.State}.",
                 resolved.RuntimeProfileName,
@@ -143,7 +141,6 @@ public sealed class RuntimeRunService(
         var stored = await GetRequiredAsync(workspaceId, runId, cancellationToken);
         if (stored.Value.Status.State.IsTerminal()) return stored;
         await queue.RequestCancellationAsync(new RuntimeRunQueueItem(stored.Value.Scope, runId), cancellationToken);
-        cancellations.Cancel(new RuntimeRunKey(workspaceId, runId));
         StoredRuntimeRun cancelled;
         try
         {
@@ -158,132 +155,6 @@ public sealed class RuntimeRunService(
         await stateManager.AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.StatusChanged, "Run cancelled", state: RuntimeRunState.Cancelled, cancellationToken: cancellationToken);
         await stateManager.AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.RunCompleted, "Run cancelled", state: RuntimeRunState.Cancelled, cancellationToken: cancellationToken);
         return cancelled;
-    }
-
-    public async Task ExecuteAsync(RuntimeRunQueueItem item, CancellationToken stoppingToken)
-    {
-        var runId = item.RunId;
-        var workspaceId = item.Scope.WorkspaceId;
-        var stored = await GetRequiredAsync(workspaceId, runId, stoppingToken);
-        if (stored.Value.Scope != item.Scope || stored.Value.WorkspaceId != workspaceId)
-            throw new RuntimeRunValidationException("execution_scope_mismatch", "The queued Runtime execution scope does not match the persisted Run.");
-        if (stored.Value.Status.State.IsTerminal()) return;
-        await executionScopes.ValidateAsync(stored.Value.Scope, stoppingToken);
-        using var requestScope = executionScopes.Enter(stored.Value.Scope);
-        using var activity = ActivitySource.StartActivity("runtime.run.execute", ActivityKind.Internal);
-        activity?.SetTag("agentstration.run.id", runId);
-        activity?.SetTag("agentstration.workspace.id", workspaceId.ToString());
-        activity?.SetTag("agentstration.agent.id", stored.Value.Properties.Agent.ResourceId);
-        activity?.SetTag("agentstration.agent.version", stored.Value.Properties.Agent.Version);
-        activity?.SetTag("agentstration.run.origin", stored.Value.Properties.Origin.ToString());
-        using var logScope = logger.BeginScope(new Dictionary<string, object?>
-        {
-            ["RunId"] = runId,
-            ["WorkspaceId"] = workspaceId.ToString(),
-            ["AgentId"] = stored.Value.Properties.Agent.ResourceId,
-            ["AgentVersion"] = stored.Value.Properties.Agent.Version
-        });
-        var startedAt = Stopwatch.GetTimestamp();
-        logger.LogInformation("Runtime run execution started");
-        var key = new RuntimeRunKey(workspaceId, runId);
-        var runToken = cancellations.Register(key, stoppingToken);
-        using var timeoutTimer = new CancellationTokenSource(TimeSpan.FromSeconds(stored.Value.Properties.Execution.TimeoutSeconds), timeProvider);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(runToken, timeoutTimer.Token);
-        try
-        {
-            stored = await stateManager.TransitionAsync(stored, RuntimeRunState.Running, null, null, stoppingToken);
-            await stateManager.AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.StatusChanged, "Run started", state: RuntimeRunState.Running, cancellationToken: stoppingToken);
-
-            var resolved = await agents.ResolveAsync(stored.Value.Properties.Agent, timeout.Token);
-            await stateManager.TraceStepAsync(workspaceId, runId, "Agent definition resolved", timeout.Token);
-            await stateManager.TraceStepAsync(workspaceId, runId, "Agent type resolved", timeout.Token);
-            await stateManager.TraceStepAsync(workspaceId, runId, "Model profile resolved", timeout.Token);
-
-            if (!resolved.Ready) throw new InvalidOperationException(resolved.Error ?? $"Deployment is {resolved.State}.");
-            activity?.SetTag("agentstration.deployment.uid", resolved.DeploymentId);
-            activity?.SetTag("agentstration.model.profile", stored.Value.Status.ModelProfile);
-            await stateManager.TraceStepAsync(workspaceId, runId, "Prompt composed", timeout.Token);
-            await stateManager.AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.StepStarted, "Model invocation started", "Model invoked", cancellationToken: timeout.Token);
-            var prompt = ComposePrompt(stored.Value.Properties.Input);
-            var executionOptions = ParseExecutionOptions(stored.Value.Properties.Execution);
-            AgentExecutionResult? execution = null;
-            await foreach (var executionEvent in runtimes.ExecuteEventsAsync(
-                resolved.DeploymentId,
-                new AgentExecutionRequest(
-                    prompt,
-                    runId,
-                    executionOptions,
-                    new AgentExecutionOptions { Streaming = stored.Value.Properties.Execution.Streaming },
-                    new ToolExecutionScope
-                    {
-                        OwnerKind = ToolExecutionOwnerKind.RuntimeRun,
-                        TenantId = stored.Value.Scope.TenantId,
-                        WorkspaceId = workspaceId,
-                        PrincipalId = stored.Value.Scope.PrincipalId,
-                        ExecutionId = runId,
-                        CorrelationId = Activity.Current?.TraceId.ToString(),
-                        AgentGeneration = stored.Value.Properties.Agent.Version,
-                        PersistArguments = stored.Value.Properties.Execution.PersistToolArguments
-                    }),
-                timeout.Token))
-            {
-                switch (executionEvent)
-                {
-                    case ContentDelta delta:
-                        await stateManager.AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.ResponseDelta, content: delta.Content, cancellationToken: timeout.Token);
-                        break;
-                    case ExecutionCompleted completed:
-                        execution = completed.Result;
-                        break;
-                    case ExecutionFailed failed:
-                        throw new InvalidOperationException(failed.Error.Message);
-                }
-            }
-            if (execution is null) throw new InvalidOperationException("The runtime completed without an execution result.");
-            activity?.SetTag("agentstration.model.provider", execution.ProviderType);
-            activity?.SetTag("agentstration.model.name", execution.ModelName);
-            activity?.SetTag("agentstration.model.temperature", execution.EffectiveOptions?.Temperature);
-            activity?.SetTag("agentstration.model.max_output_tokens", execution.EffectiveOptions?.MaxOutputTokens);
-            await stateManager.AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.StepCompleted, "Model invocation completed", "Model invoked", cancellationToken: timeout.Token);
-            stored = await GetRequiredAsync(workspaceId, runId, stoppingToken);
-            if (stored.Value.Status.State == RuntimeRunState.Cancelled) return;
-            await stateManager.TransitionAsync(
-                stored,
-                RuntimeRunState.Succeeded,
-                execution.Output,
-                null,
-                stoppingToken,
-                execution.ProviderType,
-                execution.ModelName,
-                execution.EffectiveOptions);
-            await stateManager.AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.StatusChanged, "Run succeeded", state: RuntimeRunState.Succeeded, cancellationToken: stoppingToken);
-            await stateManager.AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.RunCompleted, "Response completed", state: RuntimeRunState.Succeeded, cancellationToken: stoppingToken);
-            activity?.SetStatus(ActivityStatusCode.Ok);
-            if (logger.IsEnabled(LogLevel.Information))
-                logger.LogInformation("Runtime run execution succeeded in {DurationMs} ms", Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
-        }
-        catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
-        {
-            var state = runToken.IsCancellationRequested ? RuntimeRunState.Cancelled : RuntimeRunState.TimedOut;
-            activity?.SetStatus(ActivityStatusCode.Error, state.ToString());
-            activity?.SetTag("error.type", state.ToString());
-            if (logger.IsEnabled(LogLevel.Warning))
-                logger.LogWarning("Runtime run execution ended as {RunState} after {DurationMs} ms", state, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
-            if (state == RuntimeRunState.TimedOut)
-                await stateManager.CompleteFailureAsync(workspaceId, runId, state, "Run timed out.", stoppingToken);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            activity?.SetStatus(ActivityStatusCode.Error, exception.GetType().Name);
-            activity?.SetTag("error.type", exception.GetType().FullName);
-            if (logger.IsEnabled(LogLevel.Error))
-                logger.LogError(exception, "Runtime run execution failed after {DurationMs} ms", Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
-            await stateManager.CompleteFailureAsync(workspaceId, runId, RuntimeRunState.Failed, exception.Message, stoppingToken);
-        }
-        finally
-        {
-            cancellations.Complete(key);
-        }
     }
 
     public async IAsyncEnumerable<RuntimeRunEvent> ObserveAsync(
@@ -320,12 +191,6 @@ public sealed class RuntimeRunService(
 
     private async Task<StoredRuntimeRun> GetRequiredAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken) =>
         await runs.GetAsync(workspaceId, runId, cancellationToken) ?? throw new RuntimeRunNotFoundException(runId);
-
-    private static string ComposePrompt(RuntimeRunInput input)
-    {
-        var prompt = input.Messages.Last(message => message.Role == RuntimeMessageRole.User).Content;
-        return string.IsNullOrWhiteSpace(input.Context) ? prompt : $"{prompt}\n\nContext:\n{input.Context}";
-    }
 
     private static void Validate(RuntimeAgentReference agent, RuntimeRunInput input, RuntimeExecutionOptions execution, string initiator)
     {

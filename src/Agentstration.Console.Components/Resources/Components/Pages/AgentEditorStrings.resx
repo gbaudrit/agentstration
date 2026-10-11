@@ -31,7 +31,7 @@
   <data name="BehaviorAndModel"><value>Behavior and model</value></data>
   <data name="Description"><value>Description</value></data>
   <data name="RuntimeProfile"><value>Runtime profile</value></data>
-  <data name="RuntimeProfileHelp"><value>Used when this Agent is prepared for local execution.</value></data>
+  <data name="RuntimeProfileHelp"><value>Sent with the immutable Agent revision so an external Runtime Worker can execute it.</value></data>
   <data name="Instructions"><value>Instructions</value></data>
   <data name="ModelConfiguration"><value>Model configuration</value></data>
   <data name="DeclaredAndResolved"><value>Declared and resolved</value></data>
