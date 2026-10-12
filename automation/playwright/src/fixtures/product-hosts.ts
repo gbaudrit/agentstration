@@ -28,6 +28,7 @@ export interface RuntimeWorkerTestControl {
   readonly workerId: string;
   delayNextModelInvocation(milliseconds: number): void;
   waitForDelayedModelInvocation(): Promise<void>;
+  crash(): Promise<void>;
   stop(): Promise<void>;
   start(): Promise<void>;
 }
@@ -200,6 +201,10 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
       workerId,
       delayNextModelInvocation: milliseconds => workerAuthorityProxy.delayNextModelInvocation(milliseconds),
       waitForDelayedModelInvocation: () => workerAuthorityProxy.waitForDelayedModelInvocation(),
+      async crash() {
+        await crashProcess(workerHost);
+        workerHost = undefined;
+      },
       async stop() {
         await stopProcess(workerHost);
         workerHost = undefined;
@@ -450,6 +455,12 @@ async function stopProcess(process: ManagedProcess | undefined): Promise<void> {
     new Promise<void>(resolve => setTimeout(resolve, 5_000)),
   ]);
   if (process.child.exitCode === null) process.child.kill('SIGKILL');
+}
+
+async function crashProcess(process: ManagedProcess | undefined): Promise<void> {
+  if (!process || process.child.exitCode !== null) return;
+  process.child.kill('SIGKILL');
+  await new Promise<void>(resolve => process.child.once('exit', () => resolve()));
 }
 
 async function freePort(): Promise<number> {

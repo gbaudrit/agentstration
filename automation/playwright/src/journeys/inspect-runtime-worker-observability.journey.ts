@@ -57,7 +57,7 @@ export const inspectRuntimeWorkerObservability: Journey<InspectRuntimeWorkerObse
     'Keep this deterministic invocation active until the Worker-loss fixture stops the process.',
   );
   await control.waitForDelayedModelInvocation();
-  await control.stop();
+  await control.crash();
   try {
     await worker.waitForRuntimeRun(context.consoleUrl, workerLossRunId, 'Failed', 'worker_lost');
     await worker.waitForPresence(context.consoleUrl, control.workerId, 'Offline');
