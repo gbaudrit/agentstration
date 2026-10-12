@@ -12,13 +12,16 @@
 }
 else if (items.Count == 0)
 {
-    <EmptyState Title="@T("NoInstances")" Message="@T("NoInstancesMessage")" />
+    <section data-testid="runtime-agent-instances-empty">
+        <EmptyState Title="@T("NoInstances")" Message="@T("NoInstancesMessage")" />
+    </section>
 }
 else
 {
+    <section data-testid="runtime-agent-instances-list">
     <DataGrid TItem="AgentInstanceResponse" Items="items">
         <Header><tr><th>@T("Agent")</th><th>@T("Run")</th><th>@T("Execution")</th><th>@T("Worker")</th><th>@T("RuntimeProfile")</th><th>@T("Started")</th><th>@T("LastActivity")</th><th>@T("Lease")</th></tr></Header>
-        <Row Context="item"><tr id="@InstanceAnchor(item)">
+        <Row Context="item"><tr id="@InstanceAnchor(item)" data-testid="runtime-agent-instance-row" data-instance-id="@item.InstanceId" data-agent-name="@item.AgentName" data-agent-generation="@item.AgentGeneration" data-revision-id="@item.RevisionId" data-run-kind="@item.RunKind" data-run-id="@item.RunId" data-worker-id="@item.WorkerId.ToString("D")">
             <td><a class="resource-name-link" href="@AgentUrl(item)">@item.AgentName</a><br /><small><code>@item.AgentNamespace.Value</code> · @T("Generation", item.AgentGeneration)</small></td>
             <td><a class="text-button" href="@RunUrl(item)">@item.RunId</a><br /><small>@T($"RunKind.{item.RunKind}")</small></td>
             <td>@(item.ParticipantId ?? "—")<br /><small>@T("Turns", item.TurnCount)</small></td>
@@ -29,6 +32,7 @@ else
             <td>@item.LeaseExpiresAt.LocalDateTime.ToString("T")</td>
         </tr></Row>
     </DataGrid>
+    </section>
 }
 
 @code {

@@ -32,6 +32,8 @@ public sealed class RuntimeObservabilityConsoleTests
         StringAssert.Contains(cut.Markup, "concierge");
         StringAssert.Contains(cut.Markup, "2 turn(s)");
         StringAssert.Contains(cut.Markup, $"/settings/runtime-workers/{workerId:D}");
+        Assert.AreEqual("instance-1", cut.Find("[data-testid='runtime-agent-instance-row']").GetAttribute("data-instance-id"));
+        Assert.AreEqual("flowrun-1", cut.Find("[data-testid='runtime-agent-instance-row']").GetAttribute("data-run-id"));
         Assert.IsFalse(cut.Markup.Contains("In process", StringComparison.Ordinal));
     }
 
