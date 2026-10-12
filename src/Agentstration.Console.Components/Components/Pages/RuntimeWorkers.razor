@@ -12,7 +12,7 @@ else
     <section class="runtime-workers-grid">
     <DataGrid TItem="RuntimeWorkerSummaryResponse" Items="items">
         <Header><tr><th>@T("Worker")</th><th>@T("Presence")</th><th>@T("Session")</th><th>@T("Version")</th><th>@T("Capacity")</th><th>@T("Capabilities")</th><th>@T("LastSeen")</th></tr></Header>
-        <Row Context="item"><tr>
+        <Row Context="item"><tr data-testid="runtime-worker-row" data-worker-id="@item.WorkerId.ToString("D")" data-presence="@item.Presence" data-session-id="@item.SessionId?.ToString("D")">
             <td data-label="@T("Worker")"><a class="resource-name-link runtime-primary" href="@WorkerUrl(item)">@item.DisplayName</a><small><code class="runtime-token" title="@item.WorkerId.ToString("D")">@item.WorkerId</code></small></td>
             <td data-label="@T("Presence")"><StatusBadge Text="@T($"Presence.{item.Presence}")" Status="@PlatformDashboardService.ToStatus(item.Presence.ToString())" /><small>@T($"Enrollment.{item.EnrollmentState}")</small></td>
             <td data-label="@T("Session")"><code class="runtime-token" title="@item.SessionId?.ToString("D")">@(item.SessionId?.ToString("D") ?? "—")</code></td>

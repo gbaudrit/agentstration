@@ -15,7 +15,7 @@ else
     <nav class="section-tabs worker-detail-tabs" role="tablist" aria-label="@T("WorkerViewsAriaLabel")">
         @foreach (var tab in Enum.GetValues<WorkerTab>())
         {
-            <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="worker-detail-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@T($"Tab.{tab}")@if (tab == WorkerTab.Assignments) { <span class="worker-tab-count">@details.RecentAssignments.Count</span> }</button>
+            <button id="@TabId(tab)" data-testid="@(tab == WorkerTab.Overview ? "runtime-worker-overview-tab" : "runtime-worker-assignments-tab")" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="worker-detail-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@T($"Tab.{tab}")@if (tab == WorkerTab.Assignments) { <span class="worker-tab-count">@details.RecentAssignments.Count</span> }</button>
         }
     </nav>
     <main id="worker-detail-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
@@ -40,7 +40,7 @@ else
         }
         else
         {
-            <article class="panel worker-assignments">
+            <article class="panel worker-assignments" data-testid="runtime-worker-assignments">
                 <div class="panel-header"><div><h2>@T("Assignments")</h2><p>@T("AssignmentsDescription")</p></div><span class="worker-count">@details.RecentAssignments.Count</span></div>
                 @if (details.RecentAssignments.Count == 0) { <div class="worker-empty"><p>@T("NoAssignments")</p></div> }
                 else
@@ -48,7 +48,7 @@ else
                     <div class="worker-assignments-grid">
                     <DataGrid TItem="RuntimeAssignmentPlacementResponse" Items="details.RecentAssignments">
                         <Header><tr><th>@T("Run")</th><th>@T("State")</th><th>@T("Runtime")</th><th>@T("Attempts")</th><th>@T("Updated")</th></tr></Header>
-                        <Row Context="item"><tr><td data-label="@T("Run")"><a class="text-button worker-run-link" href="@RunUrl(item)">@item.RunId</a><small>@T($"TargetKind.{item.TargetKind}")</small></td><td data-label="@T("State")"><StatusBadge Text="@T($"AssignmentState.{item.State}")" Status="@PlatformDashboardService.ToStatus(item.State)" /></td><td data-label="@T("Runtime")">@item.RuntimeCapability · @item.RuntimeCapabilityVersion</td><td data-label="@T("Attempts")">@item.Attempts.Count</td><td data-label="@T("Updated")">@item.UpdatedAt.LocalDateTime.ToString("g")</td></tr></Row>
+                        <Row Context="item"><tr data-testid="runtime-worker-assignment-row" data-run-id="@item.RunId" data-assignment-id="@item.AssignmentId.ToString("D")" data-assignment-state="@item.State"><td data-label="@T("Run")"><a class="text-button worker-run-link" href="@RunUrl(item)">@item.RunId</a><small>@T($"TargetKind.{item.TargetKind}")</small></td><td data-label="@T("State")"><StatusBadge Text="@T($"AssignmentState.{item.State}")" Status="@PlatformDashboardService.ToStatus(item.State)" /></td><td data-label="@T("Runtime")">@item.RuntimeCapability · @item.RuntimeCapabilityVersion</td><td data-label="@T("Attempts")">@item.Attempts.Count</td><td data-label="@T("Updated")">@item.UpdatedAt.LocalDateTime.ToString("g")</td></tr></Row>
                     </DataGrid>
                     </div>
                     @foreach (var assignment in details.RecentAssignments.Where(item => item.Attempts.Count > 0))

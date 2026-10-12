@@ -1,0 +1,10 @@
+{
+  "journey": "inspect-agent-instance-observability",
+  "captures": [
+    { "checkpoint": "agent-instance-empty", "file": "agent-instances-empty.png" },
+    { "checkpoint": "agent-instance-direct-active", "file": "agent-instance-direct-active.png" },
+    { "checkpoint": "agent-instance-flow-participants", "file": "agent-instance-flow-participants.png" },
+    { "checkpoint": "agent-instance-concurrent-runs", "file": "agent-instance-concurrent-runs.png" },
+    { "checkpoint": "agent-instance-worker-loss-cleared", "file": "agent-instance-worker-loss-cleared.png" }
+  ]
+}

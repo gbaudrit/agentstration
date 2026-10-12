@@ -172,7 +172,11 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
     pageObject: 'src/pages/agent-editor.page.ts', journey: 'exercise-bootstrap-provenance',
     specification: 'tests/bootstrap-provenance.spec.ts', coverage: 'covered',
   },
-  partialResourceAdministration('agent-instances', `${consolePages}/Deployments.razor`, ['/agent-instances'], 414),
+  {
+    id: 'agent-instances', host: 'console', source: `${consolePages}/Deployments.razor`, routes: ['/agent-instances'], fixtureKeys: [],
+    pageObject: 'src/pages/agent-instance-observability.page.ts', journey: 'inspect-agent-instance-observability',
+    specification: 'tests/agent-instance-observability.spec.ts', coverage: 'covered',
+  },
 
   coveredFlow('flows', `${consolePages}/Flows.razor`, ['/flows']),
   coveredFlow('flow-details', `${consolePages}/FlowDetails.razor`, ['/flows/{FlowId}', '/namespaces/{FlowNamespace}/flows/{FlowId}'], ['flowId', 'flowNamespace']),
@@ -257,6 +261,18 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   coveredConsoleAdministration('organization-member-details', `${consolePages}/OrganizationMemberDetails.razor`, ['/settings/organization/members/{UserId:guid}'], ['userId']),
   coveredConsoleAdministration('organization-security-audit', `${consolePages}/OrganizationSecurityAudit.razor`, ['/settings/organization/security-audit']),
   coveredConsoleAdministration('workspaces', `${consolePages}/Workspaces.razor`, ['/workspaces']),
+  {
+    id: 'runtime-workers', host: 'console', source: `${consolePages}/RuntimeWorkers.razor`,
+    routes: ['/settings/runtime-workers'], fixtureKeys: [],
+    pageObject: 'src/pages/runtime-worker-observability.page.ts', journey: 'inspect-runtime-worker-observability',
+    specification: 'tests/runtime-worker-observability.spec.ts', coverage: 'covered',
+  },
+  {
+    id: 'runtime-worker-details', host: 'console', source: `${consolePages}/RuntimeWorkerDetails.razor`,
+    routes: ['/settings/runtime-workers/{WorkerId:guid}'], fixtureKeys: ['workerId'],
+    pageObject: 'src/pages/runtime-worker-observability.page.ts', journey: 'inspect-runtime-worker-observability',
+    specification: 'tests/runtime-worker-observability.spec.ts', coverage: 'covered',
+  },
 
   {
     id: 'workplace-home', host: 'workplace', source: `${workplacePages}/Home.razor`,
