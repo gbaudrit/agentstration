@@ -36,6 +36,7 @@ export interface RuntimeWorkerTestControl {
 interface ManagedProcess {
   child: ChildProcessByStdio<null, Readable, Readable>;
   output: string[];
+  hasIndependentProcessGroup: boolean;
 }
 
 interface FakeOllama {
@@ -166,7 +167,7 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
       Agentstration__RuntimeWorker__AllowInsecureHttp: 'true',
       Agentstration__RuntimeWorker__ClaimWaitSeconds: '1',
       Agentstration__RuntimeWorker__LeaseSafetyMarginSeconds: '1',
-    });
+    }, [], true);
     await waitUntilHealthy(`${workerUrl}/health/ready`, workerHost);
   };
   try {
@@ -402,7 +403,13 @@ async function closeServer(server: Server): Promise<void> {
   await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
 }
 
-function runDotnet(project: string, logFile: string, environment: NodeJS.ProcessEnv, applicationArguments: string[] = []): ManagedProcess {
+function runDotnet(
+  project: string,
+  logFile: string,
+  environment: NodeJS.ProcessEnv,
+  applicationArguments: string[] = [],
+  independentProcessGroup = false,
+): ManagedProcess {
   const argumentsList = [
     'run',
     '--project', project,
@@ -414,6 +421,7 @@ function runDotnet(project: string, logFile: string, environment: NodeJS.Process
 
   const child = spawn('dotnet', argumentsList, {
     cwd: repositoryRoot,
+    detached: independentProcessGroup && process.platform !== 'win32',
     env: { ...process.env, ...environment },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -427,7 +435,7 @@ function runDotnet(project: string, logFile: string, environment: NodeJS.Process
   child.stdout.on('data', record);
   child.stderr.on('data', record);
   child.once('exit', () => log.end());
-  return { child, output };
+  return { child, output, hasIndependentProcessGroup: independentProcessGroup };
 }
 
 async function waitUntilHealthy(url: string, process: ManagedProcess): Promise<void> {
@@ -457,10 +465,21 @@ async function stopProcess(process: ManagedProcess | undefined): Promise<void> {
   if (process.child.exitCode === null) process.child.kill('SIGKILL');
 }
 
-async function crashProcess(process: ManagedProcess | undefined): Promise<void> {
-  if (!process || process.child.exitCode !== null) return;
-  process.child.kill('SIGKILL');
-  await new Promise<void>(resolve => process.child.once('exit', () => resolve()));
+async function crashProcess(managedProcess: ManagedProcess | undefined): Promise<void> {
+  if (!managedProcess || managedProcess.child.exitCode !== null) return;
+  const exited = new Promise<void>(resolve => managedProcess.child.once('exit', () => resolve()));
+  if (process.platform === 'win32') {
+    await new Promise<void>((resolve, reject) => {
+      const terminator = spawn('taskkill', ['/PID', `${managedProcess.child.pid}`, '/T', '/F'], { stdio: 'ignore' });
+      terminator.once('error', reject);
+      terminator.once('exit', () => resolve());
+    });
+  } else if (managedProcess.hasIndependentProcessGroup) {
+    process.kill(-managedProcess.child.pid!, 'SIGKILL');
+  } else {
+    managedProcess.child.kill('SIGKILL');
+  }
+  await exited;
 }
 
 async function freePort(): Promise<number> {
