@@ -11,7 +11,7 @@ else if (placement is not null)
         .OrderByDescending(attempt => attempt.AcquiredAt)
         .FirstOrDefault(attempt => attempt.State == nameof(RuntimeAssignmentAttemptState.Active))
         ?? placement.Attempts.OrderByDescending(attempt => attempt.AcquiredAt).FirstOrDefault();
-    <section class="panel runtime-placement" data-testid="runtime-placement">
+    <section class="panel runtime-placement" data-testid="runtime-placement" data-assignment-id="@placement.AssignmentId.ToString("D")" data-run-id="@placement.RunId" data-target-kind="@placement.TargetKind" data-assignment-state="@placement.State">
         <div class="panel-header runtime-placement-header"><div><p class="eyebrow">@T("Eyebrow")</p><h2>@T("Title")</h2></div><StatusBadge Text="@T($"State.{placement.State}")" Status="@PlatformDashboardService.ToStatus(placement.State)" /></div>
         <div class="runtime-placement-overview">
             <article class="runtime-worker-card">
@@ -22,7 +22,7 @@ else if (placement is not null)
                 }
                 else
                 {
-                    <a href="@WorkerUrl(effectiveAttempt.WorkerId)"><strong>@T("OpenWorker")</strong><code title="@effectiveAttempt.WorkerId.ToString("D")">@effectiveAttempt.WorkerId</code><span aria-hidden="true">→</span></a>
+                    <a data-testid="runtime-placement-worker" data-worker-id="@effectiveAttempt.WorkerId.ToString("D")" href="@WorkerUrl(effectiveAttempt.WorkerId)"><strong>@T("OpenWorker")</strong><code title="@effectiveAttempt.WorkerId.ToString("D")">@effectiveAttempt.WorkerId</code><span aria-hidden="true">→</span></a>
                 }
             </article>
             <article class="runtime-fact"><span class="field-label">@T("Runtime")</span><strong>@placement.RuntimeCapability</strong><small>@placement.RuntimeCapabilityVersion</small></article>
@@ -37,7 +37,7 @@ else if (placement is not null)
                     @foreach (var item in placement.Attempts.OrderByDescending(item => item.AcquiredAt).Select((attempt, index) => new { attempt, index }))
                     {
                         var attempt = item.attempt;
-                        <li class="runtime-attempt-card">
+                        <li class="runtime-attempt-card" data-testid="runtime-placement-attempt" data-worker-id="@attempt.WorkerId.ToString("D")" data-session-id="@attempt.WorkerSessionId.ToString("D")" data-attempt-state="@attempt.State" data-error-code="@attempt.ErrorCode" data-fencing-generation="@attempt.FencingGeneration" data-lease-expires-at="@attempt.LeaseExpiresAt.ToString("O")">
                             <div class="runtime-attempt-header"><div><span class="field-label">@T("Attempt", placement.Attempts.Count - item.index)</span><a href="@WorkerUrl(attempt.WorkerId)"><code title="@attempt.WorkerId.ToString("D")">@attempt.WorkerId</code></a></div><StatusBadge Text="@T($"AttemptState.{attempt.State}")" Status="@PlatformDashboardService.ToStatus(attempt.State)" /></div>
                             <dl class="details-list">
                                 <dt>@T("Session")</dt><dd><code>@attempt.WorkerSessionId</code></dd>
