@@ -27,6 +27,7 @@ using Agentstration.Knowledge;
 using Agentstration.ModelProviders;
 using Agentstration.Packs;
 using Agentstration.Parameters;
+using Agentstration.Schemas;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Storage.PostgreSql;
 using Agentstration.ResourceManagement.Storage.Sqlite;
@@ -287,6 +288,7 @@ public static class DependencyInjection
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<ToolCategoryService>();
         services.AddSingleton<ToolSetService>();
+        services.AddSingleton<SchemaManagementService>();
         services.AddSingleton<ToolDefinitionService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<IToolExecutionHook, ArtifactStagingExecutionGuard>();

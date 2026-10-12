@@ -20,7 +20,7 @@ public sealed class MainLayoutNavigationTests
 
         AssertNavigation(rendered,
             (string.Empty, [("Overview", "/")]),
-            ("Design", [("Agents", "/agents"), ("Flows", "/flows"), ("Entries", "/entries"), ("Resource plans", "/resource-plans"), ("Model profiles", "/modelprofiles"), ("Data Source Profiles", "/data-source-profiles")]),
+            ("Design", [("Agents", "/agents"), ("Flows", "/flows"), ("Schemas", "/schemas"), ("Entries", "/entries"), ("Resource plans", "/resource-plans"), ("Model profiles", "/modelprofiles"), ("Data Source Profiles", "/data-source-profiles")]),
             ("Automate", [("Triggers", "/triggers")]),
             ("Operate", [("Conversations", "/conversations"), ("Tasks", "/tasks")]),
             ("Observe", [("Agent instances", "/agent-instances"), ("Agent runs", "/agent-runs"), ("Flow runs", "/flow-runs"), ("Run events", "/run-events")]),
@@ -50,6 +50,7 @@ public sealed class MainLayoutNavigationTests
         Assert.AreEqual("MCP & Outils", groups[7].QuerySelector("a")?.TextContent.Trim());
         Assert.AreEqual("Profils de source de données", groups[1].QuerySelector("a[href='/data-source-profiles']")?.TextContent.Trim());
         Assert.AreEqual("Sources de données", groups[6].QuerySelector("a[href='/data-sources']")?.TextContent.Trim());
+        Assert.AreEqual("Schémas", groups[1].QuerySelector("a[href='/schemas']")?.TextContent.Trim());
         Assert.AreEqual("Profil", rendered.Find(".topbar-actions a[href='/settings/profile']").GetAttribute("aria-label"));
     }
 
@@ -65,6 +66,7 @@ public sealed class MainLayoutNavigationTests
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/knowledge-source-profiles']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/data-source-profiles']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/data-sources']").Count);
+        Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/schemas']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/conversations']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/settings/resource-scopes']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/cleanup']").Count);

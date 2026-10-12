@@ -21,6 +21,7 @@ src/
   Agentstration.DataSources*/         Governed origins, profiles, acquisitions and API
   Agentstration.Knowledge*/           Projections, immutable Snapshots, retrieval and API
   Agentstration.Parameters*/          Scoped nonsecret Parameter resources
+  Agentstration.Schemas*/             Format-neutral Schema drafts and immutable versions
   Agentstration.ResourcePlanning*/    Resource Plan lifecycle and relational storage
   Agentstration.Runtime.*/            Runtime contracts, core, local and MAF adapters
   Agentstration.Tools.SourceRegistry/ Offline Source Version validation and digest .NET tool

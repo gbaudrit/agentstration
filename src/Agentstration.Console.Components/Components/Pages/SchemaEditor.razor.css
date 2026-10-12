@@ -1,0 +1,19 @@
+.schema-yaml-field {
+    display: grid;
+    gap: .5rem;
+    width: 100%;
+}
+
+.schema-yaml-field textarea {
+    box-sizing: border-box;
+    min-height: 32rem;
+    width: 100%;
+}
+
+.schema-version-details {
+    border-top: 1px solid var(--border-subtle);
+    display: grid;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+}

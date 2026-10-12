@@ -11,6 +11,7 @@ using Agentstration.Knowledge.Api;
 using Agentstration.Models.Api;
 using Agentstration.Packs.Api;
 using Agentstration.Parameters.Api;
+using Agentstration.Schemas.Api;
 using Agentstration.Resources.Api;
 using Agentstration.Runtime.Api;
 using Agentstration.Secrets.Api;
@@ -42,6 +43,7 @@ public static class ApiTransportServiceCollectionExtensions
         services.AddExtensionsApi();
         services.AddModelsApi();
         services.AddParametersApi();
+        services.AddSchemasApi();
         services.AddSecretsApi();
         services.AddTriggersApi();
         services.AddAgentstrationOpenApi();
