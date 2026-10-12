@@ -24,7 +24,8 @@ public sealed partial class ApiClientTests
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(resource) };
             response.Headers.ETag = EntityTagHeaderValue.Parse("\"schema-etag\"");
             return response;
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new SchemasApiClient(http);
 
         var current = await client.GetSchemaAsync(scope, resource.Namespace, resource.Name);
@@ -68,7 +69,8 @@ public sealed partial class ApiClientTests
                     ? JsonContent.Create(new Agentstration.Api.Contracts.ValueResponse<SchemaVersionResource>([version]))
                     : JsonContent.Create(version)
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new SchemasApiClient(http);
 
         _ = await client.GetVersionsAsync(scope, resource.Namespace, resource.Name);

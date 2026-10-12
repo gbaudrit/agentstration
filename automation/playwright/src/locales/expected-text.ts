@@ -55,7 +55,7 @@ export const ExpectedTextByLocale = {
       profile: 'Profile',
       groups: [
         { heading: '', links: [{ label: 'Overview', url: '/' }] },
-        { heading: 'Design', links: [{ label: 'Agents', url: '/agents' }, { label: 'Flows', url: '/flows' }, { label: 'Entries', url: '/entries' }, { label: 'Resource plans', url: '/resource-plans' }, { label: 'Model profiles', url: '/modelprofiles' }, { label: 'Data Source Profiles', url: '/data-source-profiles' }] },
+        { heading: 'Design', links: [{ label: 'Agents', url: '/agents' }, { label: 'Flows', url: '/flows' }, { label: 'Schemas', url: '/schemas' }, { label: 'Entries', url: '/entries' }, { label: 'Resource plans', url: '/resource-plans' }, { label: 'Model profiles', url: '/modelprofiles' }, { label: 'Data Source Profiles', url: '/data-source-profiles' }] },
         { heading: 'Automate', links: [{ label: 'Triggers', url: '/triggers' }] },
         { heading: 'Operate', links: [{ label: 'Conversations', url: '/conversations' }, { label: 'Tasks', url: '/tasks' }] },
         { heading: 'Observe', links: [{ label: 'Agent instances', url: '/agent-instances' }, { label: 'Agent runs', url: '/agent-runs' }, { label: 'Flow runs', url: '/flow-runs' }, { label: 'Run events', url: '/run-events' }] },
@@ -107,7 +107,7 @@ export const ExpectedTextByLocale = {
       profile: 'Profil',
       groups: [
         { heading: '', links: [{ label: 'Vue d’ensemble', url: '/' }] },
-        { heading: 'Concevoir', links: [{ label: 'Agents', url: '/agents' }, { label: 'Flows', url: '/flows' }, { label: 'Entrées', url: '/entries' }, { label: 'Plans de ressources', url: '/resource-plans' }, { label: 'Profils de modèle', url: '/modelprofiles' }, { label: 'Profils de source de données', url: '/data-source-profiles' }] },
+        { heading: 'Concevoir', links: [{ label: 'Agents', url: '/agents' }, { label: 'Flows', url: '/flows' }, { label: 'Schémas', url: '/schemas' }, { label: 'Entrées', url: '/entries' }, { label: 'Plans de ressources', url: '/resource-plans' }, { label: 'Profils de modèle', url: '/modelprofiles' }, { label: 'Profils de source de données', url: '/data-source-profiles' }] },
         { heading: 'Automatiser', links: [{ label: 'Déclencheurs', url: '/triggers' }] },
         { heading: 'Exploiter', links: [{ label: 'Conversations', url: '/conversations' }, { label: 'Tâches', url: '/tasks' }] },
         { heading: 'Observer', links: [{ label: 'Instances d’agent', url: '/agent-instances' }, { label: 'Exécutions d’agents', url: '/agent-runs' }, { label: 'Exécutions de Flows', url: '/flow-runs' }, { label: 'Événements d’exécution', url: '/run-events' }] },
