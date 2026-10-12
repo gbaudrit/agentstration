@@ -78,6 +78,13 @@ export const Checkpoints = {
     workerReconnected: 'runtime-worker-reconnected',
     authorizationBoundaries: 'runtime-worker-authorization-boundaries',
   },
+  agentInstanceObservability: {
+    empty: 'agent-instance-empty',
+    directActive: 'agent-instance-direct-active',
+    flowParticipants: 'agent-instance-flow-participants',
+    concurrentRuns: 'agent-instance-concurrent-runs',
+    workerLossCleared: 'agent-instance-worker-loss-cleared',
+  },
   flowNamedOutputs: {
     activePorts: 'flow-named-outputs-active-ports',
     historicalPorts: 'flow-named-outputs-historical-ports',
