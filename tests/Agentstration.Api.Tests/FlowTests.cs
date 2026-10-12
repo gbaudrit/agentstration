@@ -34,7 +34,7 @@ public sealed partial class FlowTests
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static FlowResource Definition(string name, FlowDefinition definition) => new(TestScope.WorkspaceId, new FlowId(name), name, null, "1.0.0", true, null, definition, new Dictionary<string, string>(), Now, Now);
+    private static FlowResource Definition(string name, FlowDefinition definition) => new(ResourceScopeRef.Workspace(TestScope.WorkspaceId.Value), new FlowId(name), name, null, "1.0.0", true, null, definition, new Dictionary<string, string>(), Now, Now);
 
     private sealed class FlowFixture : IAsyncDisposable
     {

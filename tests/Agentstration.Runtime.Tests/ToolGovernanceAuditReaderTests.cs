@@ -266,7 +266,7 @@ public sealed class ToolGovernanceAuditReaderTests
     private static FlowRun FlowRun()
     {
         var version = new FlowVersion(
-            Workspace,
+            ResourceScopeRef.Workspace(Workspace.Value),
             new FlowId("flow"),
             "1.0.0",
             null,

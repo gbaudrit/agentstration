@@ -64,6 +64,7 @@ public static class ResourceScopePolicy
         "ToolProvider" or "Tool" or "ToolCategory" or "ToolDefinition" or "ToolExecutionHook"
             or "KnowledgeSource"
             or "DataSourceAcquisition" => WorkspaceOnly,
+        "Flow" or "FlowVersion" => InstanceTenantWorkspace,
         "Agent" or "AgentRevision" or "AgentDeployment" or "Trigger" => WorkspaceOnly,
         "InstalledPack" or "ExtensionRegistration" => InstanceTenantWorkspace,
         "PackProject" or "PackProjectBuild" => WorkspaceOnly,

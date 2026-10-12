@@ -44,7 +44,12 @@ public sealed record InputRequest
     public InputResponse? Response { get; init; }
 }
 
-public sealed record FlowTargetReference(FlowTargetKind Kind, string Id, string? Version = null, ResourceNamespace? Namespace = null)
+public sealed record FlowTargetReference(
+    FlowTargetKind Kind,
+    string Id,
+    string? Version = null,
+    ResourceNamespace? Namespace = null,
+    ResourceScopeRef? ScopeRef = null)
 {
     public ResourceAddress Resolve(ResourceNamespace ownerNamespace) =>
         ResourceAddress.Create(Namespace ?? ownerNamespace, Kind == FlowTargetKind.Agent ? "Agent" : "Flow", Id);

@@ -260,7 +260,7 @@ public sealed class DashboardTests
             Scope = new FlowRunScope(Guid.Parse("22222222-2222-2222-2222-222222222222"), workspaceId, Guid.Parse("33333333-3333-3333-3333-333333333333")),
             Input = JsonSerializer.SerializeToElement(new { }),
             CreatedAt = Now,
-            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition, new Dictionary<string, string>(), Now)
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "1.0.0", null, definition, new Dictionary<string, string>(), Now)
         };
     }
 

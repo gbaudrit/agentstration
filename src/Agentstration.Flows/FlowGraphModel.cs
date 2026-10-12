@@ -7,7 +7,12 @@ namespace Agentstration.Flows;
 
 using Agentstration.Resources;
 
-public sealed record FlowResourceReference(string ResourceId, string VersionStrategy = "UseDeploymentVersion", long? Version = null, ResourceNamespace? Namespace = null);
+public sealed record FlowResourceReference(
+    string ResourceId,
+    string VersionStrategy = "UseDeploymentVersion",
+    long? Version = null,
+    ResourceNamespace? Namespace = null,
+    ResourceScopeRef? ScopeRef = null);
 public sealed record FlowNodePosition(double X, double Y);
 public sealed record FlowViewportMetadata(double X, double Y, double Zoom = 1);
 public sealed record FlowDesignerMetadata

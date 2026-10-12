@@ -213,7 +213,7 @@ public sealed class FlowDetailsDesignerTests
             Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
             Input = JsonSerializer.SerializeToElement(new { }),
             CreatedAt = FlowClientStub.Now,
-            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "2.0.0", null, definition, new Dictionary<string, string>(), FlowClientStub.Now)
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "2.0.0", null, definition, new Dictionary<string, string>(), FlowClientStub.Now)
         };
         const string logicalCallId = "flow:flowrun-news:step:notify";
         const string invocationId = "flow:flowrun-news:step:notify:attempt:1";
@@ -283,7 +283,7 @@ public sealed class FlowDetailsDesignerTests
             Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
             Input = JsonSerializer.SerializeToElement(new { }),
             CreatedAt = FlowClientStub.Now,
-            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition,
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "1.0.0", null, definition,
                 new Dictionary<string, string>(), FlowClientStub.Now)
         };
         var workerId = Guid.NewGuid();
@@ -374,7 +374,7 @@ public sealed class FlowDetailsDesignerTests
                 Scope = new FlowRunScope(Guid.NewGuid(), new WorkspaceId(Guid.NewGuid()), Guid.NewGuid()),
                 Input = request.Input.Clone(),
                 CreatedAt = Now,
-                DefinitionSnapshot = new FlowVersion(new WorkspaceId(Guid.NewGuid()), new FlowId(flowId), version, null, definition, new Dictionary<string, string>(), Now, Graph)
+                DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(Guid.NewGuid()), new FlowId(flowId), version, null, definition, new Dictionary<string, string>(), Now, Graph)
             });
         }
         public Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();

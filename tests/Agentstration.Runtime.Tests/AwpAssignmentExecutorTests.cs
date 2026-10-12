@@ -543,7 +543,7 @@ public sealed class AwpAssignmentExecutorTests
                 new FlowTargetReference(FlowTargetKind.Agent, "reviewer")
             ],
             new SequentialOrchestrationPattern());
-        var definition = new FlowVersion(new WorkspaceId(Guid.NewGuid()),
+        var definition = new FlowVersion(ResourceScopeRef.Workspace(Guid.NewGuid()),
             new FlowId("orchestration", ResourceNamespace.Default), "1.0", null, orchestration,
             new Dictionary<string, string>(), TestNow, null, "sha256:orchestration");
         var researcher = AgentMaterial() with
@@ -598,7 +598,7 @@ public sealed class AwpAssignmentExecutorTests
         var orchestration = new OrchestrationFlowDefinition(
             [new FlowTargetReference(FlowTargetKind.Agent, "agent-a")],
             new SequentialOrchestrationPattern());
-        var definition = new FlowVersion(new WorkspaceId(Guid.NewGuid()),
+        var definition = new FlowVersion(ResourceScopeRef.Workspace(Guid.NewGuid()),
             new FlowId("timeout", ResourceNamespace.Default), "1.0", null, orchestration,
             new Dictionary<string, string>(), TestNow, null, "sha256:timeout");
         var agent = AgentMaterial() with
@@ -681,7 +681,7 @@ public sealed class AwpAssignmentExecutorTests
     [TestMethod]
     public async Task DirectFlowUsesTheAssignedRunStepTurnAndAgentCoordinates()
     {
-        var definition = new FlowVersion(new WorkspaceId(Guid.NewGuid()),
+        var definition = new FlowVersion(ResourceScopeRef.Workspace(Guid.NewGuid()),
             new FlowId("direct", ResourceNamespace.Default), "1.0", null,
             new DirectFlowDefinition(new(FlowTargetKind.Agent, "assistant")),
             new Dictionary<string, string>(), TestNow, null, "sha256:direct");
@@ -740,7 +740,7 @@ public sealed class AwpAssignmentExecutorTests
     [TestMethod]
     public async Task RoutingFlowSelectsAnAgentFromAMeaningfulTargetNamePart()
     {
-        var definition = new FlowVersion(new WorkspaceId(Guid.NewGuid()),
+        var definition = new FlowVersion(ResourceScopeRef.Workspace(Guid.NewGuid()),
             new FlowId("routing", ResourceNamespace.Default), "1.0", null,
             new RoutingFlowDefinition(FlowRoutingStrategy.Deterministic,
             [
@@ -961,7 +961,7 @@ public sealed class AwpAssignmentExecutorTests
             ],
             Transitions = [new("lookup-completed", "lookup", "success", "completed")]
         };
-        var definition = new FlowVersion(new WorkspaceId(Guid.NewGuid()),
+        var definition = new FlowVersion(ResourceScopeRef.Workspace(Guid.NewGuid()),
             new FlowId("flow", ResourceNamespace.Default), "1.0", null,
             new DirectFlowDefinition(new(FlowTargetKind.Agent, "unused")),
             new Dictionary<string, string>(), now, graph, "sha256:flow");
@@ -1151,7 +1151,7 @@ public sealed class AwpAssignmentExecutorTests
     }
 
     private static FlowVersion Version(string name, FlowGraphDefinition graph, DateTimeOffset publishedAt) =>
-        new(new WorkspaceId(Guid.NewGuid()), new FlowId(name, ResourceNamespace.Default), "1.0", null,
+        new(ResourceScopeRef.Workspace(Guid.NewGuid()), new FlowId(name, ResourceNamespace.Default), "1.0", null,
             new DirectFlowDefinition(new(FlowTargetKind.Agent, "unused")),
             new Dictionary<string, string>(), publishedAt, graph, $"sha256:{name}");
 
@@ -1387,7 +1387,7 @@ public sealed class AwpAssignmentExecutorTests
                 };
             var definition = ChildDefinition is null
                 ? Version("child", graph, now)
-                : new FlowVersion(new WorkspaceId(Guid.NewGuid()),
+                : new FlowVersion(ResourceScopeRef.Workspace(Guid.NewGuid()),
                     new FlowId("child", ResourceNamespace.Default), "1.0", null, ChildDefinition,
                     new Dictionary<string, string>(), now, null, "sha256:child");
             var material = new AwpRootFlowExecutionMaterial($"material-{runId}", "1.0", "sha256:material",

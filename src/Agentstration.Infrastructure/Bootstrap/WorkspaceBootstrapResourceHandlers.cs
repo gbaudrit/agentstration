@@ -346,7 +346,7 @@ public sealed class FlowBootstrapResourceHandler(
             return new(BootstrapResourceDisposition.Skip);
         var now = timeProvider.GetUtcNow();
         FlowValidator.Validate(new(
-            workspaceId,
+            ResourceScopeRef.Workspace(workspaceId.Value),
             new(value.Metadata.Name, value.Metadata.Namespace),
             value.Metadata.Name,
             value.Definition.Description,

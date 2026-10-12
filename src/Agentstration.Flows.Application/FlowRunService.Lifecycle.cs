@@ -132,7 +132,7 @@ public sealed partial class FlowRunService
             throw new FlowValidationException("flow_run_scope_mismatch", "The Flow Draft and execution scope must belong to the same Workspace.");
         ValidateInput(draft.Definition.InputSchema, input);
         var validationVersion = $"0.0.0-draft.{draft.Revision}";
-        var snapshot = new FlowVersion(draft.WorkspaceId, draft.FlowId, validationVersion, draft.Description, FlowDraftSnapshotAdapter.ToRoutingDefinition(draft.Definition), draft.Tags,
+        var snapshot = new FlowVersion(ResourceScopeRef.Workspace(draft.WorkspaceId.Value), draft.FlowId, validationVersion, draft.Description, FlowDraftSnapshotAdapter.ToRoutingDefinition(draft.Definition), draft.Tags,
             timeProvider.GetUtcNow(), draft.Definition, draft.DefinitionHash);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun

@@ -47,6 +47,7 @@ public static class FlowValidator
     public static void ValidateReference(FlowReference reference)
     {
         ValidateName(reference.FlowId.Value, "flow_reference_invalid");
+        if (reference.ScopeRef is { } scopeRef) _ = scopeRef.Value;
         if (reference.Version is not null) ValidateVersion(reference.Version);
         if (reference.Version is null && !reference.UseActiveVersion)
             throw new FlowValidationException("flow_reference_unresolved", "A Flow reference must select a version or the active version.");

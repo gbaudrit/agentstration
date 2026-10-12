@@ -33,7 +33,7 @@ public sealed class RuntimeExecutionMaterialResolverTests
                 new AgentFlowStepDefinition { Name = "reviewer", Agent = new("reviewer") }
             ]
         };
-        var version = new FlowVersion(new WorkspaceId(Guid.NewGuid()),
+        var version = new FlowVersion(ResourceScopeRef.Workspace(Guid.NewGuid()),
             new FlowId("routed", ResourceNamespace.Default), "1.0", null,
             new DirectFlowDefinition(new(FlowTargetKind.Agent, "unused")),
             new Dictionary<string, string>(), DateTimeOffset.UtcNow, graph, "sha256:routed");

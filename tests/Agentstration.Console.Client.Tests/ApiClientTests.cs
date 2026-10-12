@@ -99,7 +99,7 @@ public sealed partial class ApiClientTests
             Scope = new FlowRunScope(Guid.Empty, TestWorkspaceId, Guid.Empty),
             Input = JsonSerializer.SerializeToElement(new { }),
             CreatedAt = now,
-            DefinitionSnapshot = new FlowVersion(TestWorkspaceId, flowId, "1.0.0", null, definition, new Dictionary<string, string>(), now)
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(TestWorkspaceId.Value), flowId, "1.0.0", null, definition, new Dictionary<string, string>(), now)
         };
     }
 

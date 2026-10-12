@@ -194,3 +194,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 166. [ADR-0166 — Flow contracts use one Flow-owned metadata key](0166-flow-contracts-use-one-flow-owned-metadata-key.md)
 167. [ADR-0167 — Knowledge Sources project Data Source artifacts](0167-knowledge-sources-project-data-source-artifacts.md)
 168. [ADR-0168 — Runtime execution is placed on independent AWP Workers](0168-runtime-execution-is-placed-on-independent-awp-workers.md)
+169. [ADR-0169 — Flow definitions use hierarchical resource ownership](0169-flow-definitions-use-hierarchical-resource-ownership.md)

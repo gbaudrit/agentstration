@@ -81,7 +81,7 @@ public sealed class StorageConcurrencyBenchmarkTests
                     var flowRunId = $"flow-{Guid.NewGuid():N}";
                     var flowScope = new FlowRunScope(tenantId, workspaceId, principalId);
                     var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "benchmark-agent"));
-                    var version = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition, new Dictionary<string, string>(), now);
+                    var version = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "1.0.0", null, definition, new Dictionary<string, string>(), now);
                     await flows.CreateRunAsync(new FlowRun
                     {
                         WorkspaceId = workspaceId,
