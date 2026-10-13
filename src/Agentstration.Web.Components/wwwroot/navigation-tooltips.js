@@ -1,4 +1,8 @@
 export function registerCollapsedNavigationTooltips(shell) {
+    if (!(shell instanceof Element)) {
+        return { dispose() {} };
+    }
+
     const tooltip = document.createElement("div");
     tooltip.className = "sidebar-nav-tooltip";
     tooltip.setAttribute("role", "tooltip");
@@ -42,14 +46,15 @@ export function registerCollapsedNavigationTooltips(shell) {
     };
 
     const findLink = target => target instanceof Element ? target.closest(".side-nav a[data-nav-tooltip]") : null;
-    const isInside = (link, target) => target instanceof Node && link.contains(target);
+    const isInside = (link, target) =>
+        link instanceof Element && target instanceof Node && link.contains(target);
     const onPointerOver = event => {
         const link = findLink(event.target);
         if (link && !isInside(link, event.relatedTarget)) show(link);
     };
     const onPointerOut = event => {
         const link = findLink(event.target);
-        if (link === activeLink && !isInside(link, event.relatedTarget)) hide();
+        if (link && link === activeLink && !isInside(link, event.relatedTarget)) hide();
     };
     const onFocusIn = event => {
         const link = findLink(event.target);
@@ -57,7 +62,7 @@ export function registerCollapsedNavigationTooltips(shell) {
     };
     const onFocusOut = event => {
         const link = findLink(event.target);
-        if (link === activeLink && !isInside(link, event.relatedTarget)) hide();
+        if (link && link === activeLink && !isInside(link, event.relatedTarget)) hide();
     };
 
     shell.addEventListener("pointerover", onPointerOver);
