@@ -12,6 +12,11 @@ internal static class SchemaEndpoints
     {
         var schemas = endpoints.MapGroup("/api/schemas");
         schemas.MapGet("/", ListAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        schemas.MapGet("/formats", ListFormatsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        schemas.MapPost("/formats/validate-definition", ValidateDefinitionAsync)
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        schemas.MapPost("/formats/validate-instance", ValidateInstanceAsync)
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
         schemas.MapGet("/{name}", GetAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         schemas.MapPost("/", CreateAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         schemas.MapPut("/{name}", PutAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
@@ -26,6 +31,23 @@ internal static class SchemaEndpoints
     private static async Task<IResult> ListAsync(SchemaManagementService service, CancellationToken token) =>
         Results.Ok(new ValueResponse<SchemaResource>((await service.ListAsync(token))
             .Select(value => value.Value).ToArray()));
+
+    private static IResult ListFormatsAsync(ISchemaFormatRegistry registry) => Results.Ok(
+        new ValueResponse<SchemaFormatDescriptor>(registry.List()));
+
+    private static Task<IResult> ValidateDefinitionAsync(ValidateSchemaDefinitionRequest body,
+        ISchemaFormatRegistry registry, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var handler = registry.Resolve(body.Format, SchemaFormatCapabilities.ValidateDefinition, body.Provider);
+        return Results.Ok(await handler.ValidateDefinitionAsync(body.Definition, body.Dialect, token));
+    });
+
+    private static Task<IResult> ValidateInstanceAsync(ValidateSchemaInstanceRequest body,
+        ISchemaFormatRegistry registry, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var handler = registry.Resolve(body.Format, SchemaFormatCapabilities.ValidateInstance, body.Provider);
+        return Results.Ok(await handler.ValidateInstanceAsync(body.Definition, body.Instance, body.Dialect, token));
+    });
 
     private static Task<IResult> GetAsync(string name, string? resourceNamespace, string scopeRef,
         HttpResponse response, SchemaManagementService service, CancellationToken token) => ExecuteAsync(async () =>
@@ -92,8 +114,19 @@ internal static class SchemaEndpoints
         { return Results.Problem(statusCode: 409, title: "Resource version conflict", detail: exception.Message); }
         catch (ResourceScopeAccessDeniedException exception)
         { return Results.Problem(statusCode: 403, title: "Resource scope access denied", detail: exception.Message); }
-        catch (Exception exception) when (exception is SchemaValidationException
-            or ResourceScopePolicyException or InvalidDescendantUseGrantException
+        catch (SchemaFormatResolutionException exception)
+        {
+            return Results.Problem(statusCode: 422, title: "Schema format unavailable", detail: exception.Message,
+                extensions: new Dictionary<string, object?> { ["code"] = exception.Code });
+        }
+        catch (SchemaValidationException exception)
+        {
+            var extensions = new Dictionary<string, object?> { ["code"] = exception.Code };
+            if (exception.Issues.Count > 0) extensions["issues"] = exception.Issues;
+            return Results.Problem(statusCode: 422, title: "Invalid Schema operation", detail: exception.Message,
+                extensions: extensions);
+        }
+        catch (Exception exception) when (exception is ResourceScopePolicyException or InvalidDescendantUseGrantException
             or ArgumentException or InvalidOperationException or FormatException)
         { return Results.Problem(statusCode: 422, title: "Invalid Schema operation", detail: exception.Message); }
     }

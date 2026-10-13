@@ -1,0 +1,12 @@
+.schema-source-monaco {
+    border: 1px solid var(--border-subtle);
+    border-radius: .75rem;
+    min-height: 30rem;
+    overflow: hidden;
+}
+
+.schema-source-monaco ::deep #schema-document-source-monaco,
+.schema-source-monaco ::deep .monaco-editor-container {
+    width: 100%;
+    min-height: 30rem;
+}

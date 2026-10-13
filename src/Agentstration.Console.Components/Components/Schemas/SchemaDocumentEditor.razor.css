@@ -1,0 +1,51 @@
+.schema-document-editor,
+.schema-visual-editor,
+.schema-instance-preview,
+.schema-definition-source {
+    display: grid;
+    gap: 1rem;
+}
+
+.schema-document-toolbar,
+.schema-visual-heading {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    justify-content: space-between;
+}
+
+.schema-property-card {
+    border: 1px solid var(--border-subtle);
+    border-radius: .75rem;
+    display: grid;
+    gap: .75rem;
+    padding: 1rem;
+}
+
+.schema-property-grid {
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.schema-property-wide {
+    grid-column: 1 / -1;
+}
+
+.schema-required,
+.schema-additional-properties {
+    align-items: center;
+    display: flex;
+    gap: .5rem;
+}
+
+.schema-required input,
+.schema-additional-properties input {
+    width: auto;
+}
+
+@media (max-width: 720px) {
+    .schema-property-grid { grid-template-columns: 1fr; }
+    .schema-property-wide { grid-column: auto; }
+}

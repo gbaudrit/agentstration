@@ -1,0 +1,66 @@
+@using BlazorMonaco.Editor
+@implements IDisposable
+@inject IJSRuntime JSRuntime
+@inject IServiceProvider Services
+
+<div class="schema-source-monaco" data-testid="schema-source-editor">
+    <StandaloneCodeEditor @ref="editor" Id="schema-document-source-monaco" ConstructionOptions="Options" OnDidChangeModelContent="Changed" />
+</div>
+
+@code {
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    private StandaloneCodeEditor? editor;
+    private UserPreferencesState? preferences;
+    private string editorValue = string.Empty;
+    private string? appliedTheme;
+    private string Theme => preferences?.IsDarkTheme == true ? "vs-dark" : "vs";
+
+    protected override void OnInitialized()
+    {
+        preferences = Services.GetService(typeof(UserPreferencesState)) as UserPreferencesState;
+        if (preferences is not null) preferences.Changed += PreferencesChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (editor is null) editorValue = Value;
+        else if (Value != editorValue)
+        {
+            editorValue = Value;
+            await editor.SetValue(Value);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (editor is null || appliedTheme == Theme) return;
+        await Global.SetTheme(JSRuntime, Theme);
+        appliedTheme = Theme;
+    }
+
+    private StandaloneEditorConstructionOptions Options(StandaloneCodeEditor _) => new()
+    {
+        AutomaticLayout = true,
+        Language = "json",
+        Value = Value,
+        Theme = Theme,
+        ReadOnly = ReadOnly,
+        Minimap = new EditorMinimapOptions { Enabled = false },
+        WordWrap = "on"
+    };
+
+    private async Task Changed(ModelContentChangedEvent _)
+    {
+        if (ReadOnly || editor is null) return;
+        editorValue = await editor.GetValue();
+        await ValueChanged.InvokeAsync(editorValue);
+    }
+
+    private void PreferencesChanged() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose()
+    {
+        if (preferences is not null) preferences.Changed -= PreferencesChanged;
+    }
+}

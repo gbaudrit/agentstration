@@ -41,6 +41,7 @@ const sidebars = {
         'concepts/model-providers',
         'concepts/model-profiles',
         'concepts/flows',
+        'concepts/schemas',
         'concepts/data-sources-and-knowledge',
         'concepts/flow-modes',
         'concepts/interactions',

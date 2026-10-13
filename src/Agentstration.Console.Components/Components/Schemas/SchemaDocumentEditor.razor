@@ -1,0 +1,343 @@
+@using System.Text.Json.Nodes
+@using Agentstration.Schemas
+@using Agentstration.Schemas.Contracts
+@inject ISchemasClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SchemaDocumentEditorStrings> Localizer
+
+<section class="schema-document-editor" data-testid="schema-document-editor">
+    <div class="schema-document-toolbar" role="tablist" aria-label="@Localizer["EditorMode"]">
+        @if (visualSupported)
+        {
+            <button type="button" role="tab" aria-selected="@(mode == EditorMode.Visual)" class="@(mode == EditorMode.Visual ? "button-primary" : "button-secondary")" data-testid="schema-visual-mode" @onclick="() => SetMode(EditorMode.Visual)">@Localizer["Visual"]</button>
+        }
+        <button type="button" role="tab" aria-selected="@(mode == EditorMode.Source)" class="@(mode == EditorMode.Source ? "button-primary" : "button-secondary")" data-testid="schema-definition-source-mode" @onclick="() => SetMode(EditorMode.Source)">@Localizer["Source"]</button>
+        @if (CanPreview)
+        {
+            <button type="button" role="tab" aria-selected="@(mode == EditorMode.Preview)" class="@(mode == EditorMode.Preview ? "button-primary" : "button-secondary")" data-testid="schema-preview-mode" @onclick="() => SetMode(EditorMode.Preview)">@Localizer["Preview"]</button>
+        }
+    </div>
+
+    @if (!visualSupported && IsJsonSchema)
+    {
+        <p class="inline-warning" role="status" data-testid="schema-source-only">@Localizer["SourceOnly"]</p>
+    }
+
+    @if (visualSupported)
+    {
+        <div class="schema-visual-editor" role="tabpanel" data-testid="schema-visual-editor" hidden="@(mode != EditorMode.Visual)">
+            <div class="schema-visual-heading">
+                <h3>@Localizer["Properties"]</h3>
+                <button type="button" class="button-secondary" disabled="@Disabled" data-testid="schema-add-property" @onclick="AddPropertyAsync">@Localizer["AddProperty"]</button>
+            </div>
+            <label class="schema-additional-properties"><input type="checkbox" checked="@AdditionalProperties" disabled="@Disabled" @onchange="ChangeAdditionalPropertiesAsync" /> <span>@Localizer["AdditionalProperties"]</span></label>
+            @if (Properties.Count == 0)
+            {
+                <p class="muted">@Localizer["EmptyProperties"]</p>
+            }
+            @foreach (var property in Properties)
+            {
+                var propertyName = property.Key;
+                var propertySchema = (JsonObject)property.Value!;
+                <article class="schema-property-card" data-testid="schema-property-row">
+                    <div class="schema-property-grid">
+                        <label><span>@Localizer["PropertyName"]</span><input value="@propertyName" disabled /></label>
+                        <label><span>@Localizer["Type"]</span><select value="@(Text(propertySchema, "type", "string"))" disabled="@Disabled" @onchange="@(args => ChangeTypeAsync(propertyName, args.Value?.ToString()))">@foreach (var type in Types) { <option value="@type">@type</option> }</select></label>
+                        <label class="schema-required"><input type="checkbox" checked="@IsRequired(propertyName)" disabled="@Disabled" @onchange="@(args => ChangeRequiredAsync(propertyName, args.Value is true))" /> <span>@Localizer["Required"]</span></label>
+                        <label class="schema-property-wide"><span>@Localizer["Description"]</span><input value="@(Text(propertySchema, "description"))" disabled="@Disabled" @onchange="@(args => SetTextAsync(propertyName, "description", args.Value?.ToString()))" /></label>
+                        <label><span>@Localizer["Default"]</span><input value="@(Raw(propertySchema, "default"))" disabled="@Disabled" @onchange="@(args => SetJsonAsync(propertyName, "default", args.Value?.ToString()))" /></label>
+                        <label><span>@Localizer["Enum"]</span><textarea rows="3" disabled="@Disabled" @onchange="@(args => SetEnumAsync(propertyName, args.Value?.ToString()))">@EnumText(propertySchema)</textarea></label>
+                        @if (Text(propertySchema, "type") is "integer" or "number")
+                        {
+                            <label><span>@Localizer["Minimum"]</span><input type="number" value="@(Raw(propertySchema, "minimum"))" disabled="@Disabled" @onchange="@(args => SetNumberAsync(propertyName, "minimum", args.Value?.ToString()))" /></label>
+                            <label><span>@Localizer["Maximum"]</span><input type="number" value="@(Raw(propertySchema, "maximum"))" disabled="@Disabled" @onchange="@(args => SetNumberAsync(propertyName, "maximum", args.Value?.ToString()))" /></label>
+                        }
+                        @if (Text(propertySchema, "type") == "string")
+                        {
+                            <label><span>@Localizer["MinimumLength"]</span><input type="number" min="0" value="@(Raw(propertySchema, "minLength"))" disabled="@Disabled" @onchange="@(args => SetIntegerAsync(propertyName, "minLength", args.Value?.ToString()))" /></label>
+                            <label><span>@Localizer["MaximumLength"]</span><input type="number" min="0" value="@(Raw(propertySchema, "maxLength"))" disabled="@Disabled" @onchange="@(args => SetIntegerAsync(propertyName, "maxLength", args.Value?.ToString()))" /></label>
+                        }
+                    </div>
+                    <button type="button" class="text-button text-danger" disabled="@Disabled" @onclick="() => RemovePropertyAsync(propertyName)">@Localizer["Remove"]</button>
+                </article>
+            }
+        </div>
+    }
+    @if (CanPreview)
+    {
+        <div class="schema-instance-preview" role="tabpanel" data-testid="schema-instance-preview" hidden="@(mode != EditorMode.Preview)">
+            <h3>@Localizer["InstancePreview"]</h3>
+            <p class="muted">@Localizer["InstancePreviewHelp"]</p>
+            <JsonSchemaInputEditor Schema="Value" Value="previewValue" ValueChanged="value => previewValue = value" Disabled="Disabled" />
+            <div class="form-actions"><button type="button" class="button-secondary" disabled="@Disabled" @onclick="ValidateInstanceAsync">@Localizer["ValidateInstance"]</button></div>
+            @if (instanceValidation is not null)
+            {
+                @ValidationResult(instanceValidation, Localizer["InstanceValid"], Localizer["InstanceInvalid"])
+            }
+        </div>
+    }
+    @if (sourceActivated)
+    {
+        <div role="tabpanel" class="schema-definition-source" hidden="@(mode != EditorMode.Source)">
+            <label><span>@Localizer["DefinitionSource"]</span></label>
+            <SchemaSourceEditor Value="source" ValueChanged="value => source = value" ReadOnly="Disabled" />
+            <div class="form-actions"><button type="button" class="button-secondary" disabled="@Disabled" data-testid="schema-apply-source" @onclick="ApplySourceAsync">@Localizer["ApplySource"]</button></div>
+        </div>
+    }
+
+    @if (sourceError is not null) { <p class="form-alert form-alert-danger" role="alert">@sourceError</p> }
+    @if (definitionValidation is not null)
+    {
+        @ValidationResult(definitionValidation, Localizer["DefinitionValid"], Localizer["DefinitionInvalid"])
+    }
+</section>
+
+@code {
+    [Parameter] public string Format { get; set; } = SchemaFormatIds.JsonSchema;
+    [Parameter] public string? Dialect { get; set; }
+    [Parameter] public JsonElement Value { get; set; }
+    [Parameter] public EventCallback<JsonElement> ValueChanged { get; set; }
+    [Parameter] public SchemaFormatDescriptor? Descriptor { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+
+    private static readonly string[] Types = ["string", "integer", "number", "boolean", "object", "array"];
+    private JsonObject document = [];
+    private string source = "{}", valueKey = string.Empty;
+    private string? sourceError;
+    private SchemaFormatValidationResult? definitionValidation, instanceValidation;
+    private JsonElement previewValue = JsonSerializer.SerializeToElement(new { });
+    private EditorMode mode = EditorMode.Visual;
+    private bool visualSupported, sourceActivated;
+    private bool IsJsonSchema => string.Equals(Format, SchemaFormatIds.JsonSchema, StringComparison.Ordinal);
+    private bool CanPreview => IsJsonSchema && (Descriptor?.Capabilities.HasFlag(SchemaFormatCapabilities.InstancePreview) ?? true);
+    private JsonObject Properties => document["properties"] as JsonObject ?? [];
+    private bool AdditionalProperties => document["additionalProperties"]?.GetValue<bool>() ?? true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var nextKey = Value.ValueKind == JsonValueKind.Undefined ? "{}" : Value.GetRawText();
+        if (nextKey == valueKey) return;
+        valueKey = nextKey;
+        source = Pretty(nextKey);
+        document = JsonNode.Parse(nextKey) as JsonObject ?? [];
+        visualSupported = IsJsonSchema && SupportsVisual(document);
+        if (!visualSupported && mode == EditorMode.Visual)
+        {
+            mode = EditorMode.Source;
+            sourceActivated = true;
+        }
+        await ValidateDefinitionAsync();
+    }
+
+    private void SetMode(EditorMode value)
+    {
+        if (value == EditorMode.Visual && !visualSupported) return;
+        if (value == EditorMode.Source) sourceActivated = true;
+        mode = value;
+        sourceError = null;
+    }
+
+    private async Task ApplySourceAsync()
+    {
+        sourceError = null;
+        try
+        {
+            document = JsonNode.Parse(source) as JsonObject
+                ?? throw new JsonException("The root value must be an object.");
+            visualSupported = IsJsonSchema && SupportsVisual(document);
+            await PublishAsync();
+        }
+        catch (JsonException exception)
+        {
+            sourceError = Localizer["InvalidJson", exception.Message];
+            definitionValidation = null;
+        }
+    }
+
+    private async Task AddPropertyAsync()
+    {
+        var properties = EnsureProperties();
+        var index = 1;
+        while (properties.ContainsKey($"field{index}")) index++;
+        properties[$"field{index}"] = new JsonObject { ["type"] = "string" };
+        await PublishAsync();
+    }
+
+    private async Task RemovePropertyAsync(string name)
+    {
+        EnsureProperties().Remove(name);
+        SetRequired(name, false);
+        await PublishAsync();
+    }
+
+    private async Task ChangeTypeAsync(string name, string? type)
+    {
+        if (EnsureProperties()[name] is not JsonObject schema || !Types.Contains(type, StringComparer.Ordinal)) return;
+        schema["type"] = type;
+        if (type == "object") schema["properties"] ??= new JsonObject();
+        if (type == "array") schema["items"] ??= new JsonObject { ["type"] = "string" };
+        await PublishAsync();
+    }
+
+    private async Task ChangeRequiredAsync(string name, bool required)
+    {
+        SetRequired(name, required);
+        await PublishAsync();
+    }
+
+    private async Task ChangeAdditionalPropertiesAsync(ChangeEventArgs args)
+    {
+        document["additionalProperties"] = args.Value is true;
+        await PublishAsync();
+    }
+
+    private async Task SetTextAsync(string property, string keyword, string? value)
+    {
+        if (EnsureProperties()[property] is not JsonObject schema) return;
+        if (string.IsNullOrWhiteSpace(value)) schema.Remove(keyword); else schema[keyword] = value;
+        await PublishAsync();
+    }
+
+    private async Task SetJsonAsync(string property, string keyword, string? value)
+    {
+        if (EnsureProperties()[property] is not JsonObject schema) return;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(value)) schema.Remove(keyword); else schema[keyword] = JsonNode.Parse(value);
+            sourceError = null;
+            await PublishAsync();
+        }
+        catch (JsonException exception) { sourceError = Localizer["InvalidJson", exception.Message]; }
+    }
+
+    private async Task SetEnumAsync(string property, string? value)
+    {
+        if (EnsureProperties()[property] is not JsonObject schema) return;
+        var values = (value ?? string.Empty).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (values.Length == 0) schema.Remove("enum");
+        else schema["enum"] = new JsonArray(values.Select(item => (JsonNode?)JsonValue.Create(item)).ToArray());
+        await PublishAsync();
+    }
+
+    private Task SetNumberAsync(string property, string keyword, string? value) =>
+        SetNumericAsync(property, keyword, value, integer: false);
+    private Task SetIntegerAsync(string property, string keyword, string? value) =>
+        SetNumericAsync(property, keyword, value, integer: true);
+
+    private async Task SetNumericAsync(string property, string keyword, string? value, bool integer)
+    {
+        if (EnsureProperties()[property] is not JsonObject schema) return;
+        if (string.IsNullOrWhiteSpace(value)) schema.Remove(keyword);
+        else if (integer && int.TryParse(value, System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture, out var whole)) schema[keyword] = whole;
+        else if (!integer && decimal.TryParse(value, System.Globalization.NumberStyles.Number,
+            System.Globalization.CultureInfo.InvariantCulture, out var number)) schema[keyword] = number;
+        else return;
+        await PublishAsync();
+    }
+
+    private async Task PublishAsync()
+    {
+        var next = JsonSerializer.SerializeToElement(document);
+        valueKey = next.GetRawText();
+        source = Pretty(valueKey);
+        visualSupported = IsJsonSchema && SupportsVisual(document);
+        await ValueChanged.InvokeAsync(next);
+        await ValidateDefinitionAsync();
+    }
+
+    private async Task ValidateDefinitionAsync()
+    {
+        try
+        {
+            definitionValidation = await Client.ValidateDefinitionAsync(
+                new(Format, Dialect, JsonSerializer.SerializeToElement(document)));
+        }
+        catch (Exception exception)
+        {
+            definitionValidation = new([new("$", "schema_validation_unavailable", exception.Message)]);
+        }
+    }
+
+    private async Task ValidateInstanceAsync()
+    {
+        try
+        {
+            instanceValidation = await Client.ValidateInstanceAsync(
+                new(Format, Dialect, JsonSerializer.SerializeToElement(document), previewValue));
+        }
+        catch (Exception exception)
+        {
+            instanceValidation = new([new("$", "schema_validation_unavailable", exception.Message)]);
+        }
+    }
+
+    private JsonObject EnsureProperties()
+    {
+        if (document["properties"] is JsonObject properties) return properties;
+        properties = [];
+        document["type"] ??= "object";
+        document["properties"] = properties;
+        return properties;
+    }
+
+    private bool IsRequired(string name) => document["required"] is JsonArray required
+        && required.Any(item => string.Equals(item?.GetValue<string>(), name, StringComparison.Ordinal));
+
+    private void SetRequired(string name, bool required)
+    {
+        var values = document["required"] as JsonArray ?? [];
+        var existing = values.FirstOrDefault(item => string.Equals(item?.GetValue<string>(), name, StringComparison.Ordinal));
+        if (required && existing is null) values.Add(name);
+        if (!required && existing is not null) values.Remove(existing);
+        if (values.Count == 0) document.Remove("required"); else document["required"] = values;
+    }
+
+    private static bool SupportsVisual(JsonObject schema)
+    {
+        var unsupported = schema.Any(property => property.Key is "$ref" or "$defs" or "oneOf" or "anyOf"
+            or "allOf" or "not" or "if" or "then" or "else" or "dependentSchemas" or "prefixItems");
+        if (unsupported) return false;
+        if (schema["type"] is JsonArray) return false;
+        if (schema["properties"] is JsonObject properties
+            && properties.Any(property => property.Value is not JsonObject value || !SupportsVisual(value))) return false;
+        return schema["items"] is not JsonObject items || SupportsVisual(items);
+    }
+
+    private static string? Text(JsonObject schema, string name, string? fallback = null) =>
+        schema[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : fallback;
+    private static string Raw(JsonObject schema, string name) => schema[name]?.ToJsonString() ?? string.Empty;
+    private static string EnumText(JsonObject schema) => schema["enum"] is JsonArray values
+        ? string.Join(Environment.NewLine, values.Select(value => value?.GetValue<string>())) : string.Empty;
+    private static string Pretty(string json)
+    {
+        using var parsed = JsonDocument.Parse(json);
+        return JsonSerializer.Serialize(parsed.RootElement, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    private enum EditorMode { Visual, Source, Preview }
+}
+
+@code {
+    private RenderFragment ValidationResult(SchemaFormatValidationResult Result, string ValidText, string InvalidText) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", Result.IsValid ? "form-alert form-alert-success" : "form-alert form-alert-danger");
+        builder.AddAttribute(2, "role", Result.IsValid ? "status" : "alert");
+        builder.OpenElement(3, "p");
+        builder.AddContent(4, Result.IsValid ? ValidText : InvalidText);
+        builder.CloseElement();
+        if (!Result.IsValid)
+        {
+            builder.OpenElement(5, "ul");
+            foreach (var issue in Result.Issues)
+            {
+                builder.OpenElement(6, "li");
+                builder.OpenElement(7, "code"); builder.AddContent(8, issue.Path); builder.CloseElement();
+                builder.AddContent(9, $" — {issue.Message}");
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    };
+}
