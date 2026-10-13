@@ -13,6 +13,7 @@ using Agentstration.Parameters.Api;
 using Agentstration.ResourcePlanning.Api;
 using Agentstration.Resources.Api;
 using Agentstration.Runtime.Api;
+using Agentstration.Schemas.Api;
 using Agentstration.Secrets.Api;
 using Agentstration.Sources.Api;
 using Agentstration.Tools.Api;
@@ -46,6 +47,7 @@ public static class ApiTransportEndpointRouteBuilderExtensions
         app.MapModelsApi();
         app.MapPacksApi();
         app.MapParametersApi();
+        app.MapSchemasApi();
         app.MapSecretsApi();
         app.MapToolsApi();
         app.MapResourcesApi();

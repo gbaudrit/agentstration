@@ -82,6 +82,9 @@ public static class SecurityAuditActions
     public const string ToolSetUpdated = "tool-set.updated";
     public const string ToolSetDeleted = "tool-set.deleted";
     public const string ToolSetVersionPublished = "tool-set.version-published";
+    public const string SchemaCreated = "schema.created";
+    public const string SchemaUpdated = "schema.updated";
+    public const string SchemaVersionPublished = "schema.version-published";
 }
 
 public sealed record SecurityAuditEvent(

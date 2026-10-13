@@ -20,4 +20,6 @@
   <data name="Nav.Artifacts" xml:space="preserve"><value>Artifacts</value></data>
   <data name="Nav.DataSources" xml:space="preserve"><value>Data Sources</value></data>
   <data name="Nav.DataSourceProfiles" xml:space="preserve"><value>Data Source Profiles</value></data>
+  <data name="Nav.Schemas" xml:space="preserve"><value>Schemas</value></data>
+  <data name="Command.CreateSchema" xml:space="preserve"><value>Create Schema</value></data>
 </root>

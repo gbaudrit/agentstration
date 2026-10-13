@@ -41,6 +41,7 @@ src/
   Agentstration.Packs.Contracts/    Pack installation, authoring and composition contracts
   Agentstration.Packs/            Pack authoring, installation and composition
   Agentstration.Parameters*/      scoped nonsecret Parameter resources, contracts and API
+  Agentstration.Schemas*/         format-neutral Schema drafts, immutable versions, contracts and API
   Agentstration.Sources/          Source and source-registry use cases
   Agentstration.ResourceManagement.Storage.Sqlite/
   Agentstration.ResourcePlanning*/ Resource Plan contracts, lifecycle, API and relational storage

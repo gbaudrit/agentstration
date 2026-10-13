@@ -41,6 +41,7 @@ using Agentstration.Runtime.MicrosoftAgentFramework;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Runtime.Storage.PostgreSql;
 using Agentstration.Runtime.Storage.Sqlite;
+using Agentstration.Schemas;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Secrets.Local;
@@ -287,6 +288,7 @@ public static class DependencyInjection
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<ToolCategoryService>();
         services.AddSingleton<ToolSetService>();
+        services.AddSingleton<SchemaManagementService>();
         services.AddSingleton<ToolDefinitionService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<IToolExecutionHook, ArtifactStagingExecutionGuard>();
