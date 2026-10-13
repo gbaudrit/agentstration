@@ -12,22 +12,22 @@ public partial class MainLayout
 {
 
     private sealed record NavigationItem(string LabelKey, string Url, string Icon, string Domain = "neutral", IReadOnlyList<string>? RequiredPermissions = null);
-    private sealed record NavigationGroup(string LabelKey, IReadOnlyList<NavigationItem> Items);
+    private sealed record NavigationGroup(string LabelKey, string Tone, IReadOnlyList<NavigationItem> Items);
     private sealed record CommandDefinition(string LabelKey, string Url, string Icon, string CategoryKey, string Keywords = "", IReadOnlyList<string>? RequiredPermissions = null);
     private sealed record CommandItem(string Label, string Url, string Icon, string Category, string Keywords = "", string? Detail = null, bool IsFallback = false);
 
     private static readonly NavigationGroup[] NavigationGroups =
     [
-        new("", [new("Nav.Overview", "/", "home")]),
-        new("Group.Design", [new("Nav.Agents", "/agents", "agent", "agent"), new("Nav.Flows", "/flows", "workflow", "flow"), new("Nav.Schemas", "/schemas", "document", "flow", ["resources/read"]), new("Nav.Entries", "/entries", "entry", "work"), new("Nav.ResourcePlans", "/resource-plans", "layers", "work", ["resources/read"]), new("Nav.ModelProfiles", "/modelprofiles", "adjustments", "model"), new("Nav.DataSourceProfiles", "/data-source-profiles", "database-cog", "tool", ["resources/read"])]),
-        new("Group.Automate", [new("Nav.Triggers", "/triggers", "clock", "work")]),
-        new("Group.Operate", [new("Nav.Conversations", "/conversations", "message-circle", "work", ["runs/read"]), new("Nav.Tasks", "/tasks", "tasks", "work")]),
-        new("Group.Observe", [new("Nav.AgentInstances", "/agent-instances", "server", "runtime"), new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
-        new("Group.Workplace", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work")]),
-        new("Group.Resources", [new("Nav.Packs", "/packs", "package"), new("Nav.DataSources", "/data-sources", "database", "tool", ["resources/read"]), new("Nav.KnowledgeSources", "/knowledge-sources", "brain", "tool", ["resources/read"]), new("Nav.Artifacts", "/artifacts", "file", "flow"), new("Nav.Sources", "/settings/sources", "books"), new("Nav.SourceRegistries", "/settings/source-registries", "database-search")]),
-        new("Group.Integrations", [new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.SourceProviders", "/sourceproviders", "plug-connected", "source")]),
-        new("Group.Configuration", [new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key"), new("Nav.ResourceScopes", "/settings/resource-scopes", "binary-tree", RequiredPermissions: ["resources/read"])]),
-        new("Group.System", [new("Nav.RuntimeWorkers", "/settings/runtime-workers", "server"), new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "cloud-upload"), new("Nav.Cleanup", "/cleanup", "trash", RequiredPermissions: ["resources/delete", "runs/delete"]), new("Nav.Settings", "/settings", "settings")])
+        new("", "overview", [new("Nav.Overview", "/", "home")]),
+        new("Group.Design", "design", [new("Nav.Agents", "/agents", "agent", "agent"), new("Nav.Flows", "/flows", "workflow", "flow"), new("Nav.Schemas", "/schemas", "document", "flow", ["resources/read"]), new("Nav.Entries", "/entries", "entry", "work"), new("Nav.ResourcePlans", "/resource-plans", "layers", "work", ["resources/read"]), new("Nav.ModelProfiles", "/modelprofiles", "adjustments", "model"), new("Nav.DataSourceProfiles", "/data-source-profiles", "database-cog", "tool", ["resources/read"])]),
+        new("Group.Automate", "automate", [new("Nav.Triggers", "/triggers", "clock", "work")]),
+        new("Group.Operate", "operate", [new("Nav.Conversations", "/conversations", "message-circle", "work", ["runs/read"]), new("Nav.Tasks", "/tasks", "tasks", "work")]),
+        new("Group.Observe", "observe", [new("Nav.AgentInstances", "/agent-instances", "server", "runtime"), new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
+        new("Group.Workplace", "workplace", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work")]),
+        new("Group.Resources", "resources", [new("Nav.Packs", "/packs", "package"), new("Nav.DataSources", "/data-sources", "database", "tool", ["resources/read"]), new("Nav.KnowledgeSources", "/knowledge-sources", "brain", "tool", ["resources/read"]), new("Nav.Artifacts", "/artifacts", "file", "flow"), new("Nav.Sources", "/settings/sources", "books"), new("Nav.SourceRegistries", "/settings/source-registries", "database-search")]),
+        new("Group.Integrations", "integrations", [new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.SourceProviders", "/sourceproviders", "plug-connected", "source")]),
+        new("Group.Configuration", "configuration", [new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key"), new("Nav.ResourceScopes", "/settings/resource-scopes", "binary-tree", RequiredPermissions: ["resources/read"])]),
+        new("Group.System", "system", [new("Nav.RuntimeWorkers", "/settings/runtime-workers", "server"), new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "cloud-upload"), new("Nav.Cleanup", "/cleanup", "trash", RequiredPermissions: ["resources/delete", "runs/delete"]), new("Nav.Settings", "/settings", "settings")])
     ];
 
     private static readonly CommandDefinition[] CommandDefinitions =
@@ -88,8 +88,11 @@ public partial class MainLayout
     private IJSObjectReference? commandModule;
     private IJSObjectReference? contextModule;
     private IJSObjectReference? themeModule;
+    private IJSObjectReference? navigationTooltipModule;
     private IJSObjectReference? commandRegistration;
+    private IJSObjectReference? navigationTooltipRegistration;
     private DotNetObjectReference<MainLayout>? selfReference;
+    private ElementReference shellElement;
     private ElementReference commandInput;
     private string commandQuery = string.Empty;
     private bool commandPaletteOpen;
@@ -151,11 +154,13 @@ public partial class MainLayout
             commandModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/command-palette.js");
             contextModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/context-selector.js");
             themeModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/theme-preferences.js");
+            navigationTooltipModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/navigation-tooltips.js");
             Preferences.SetSystemTheme(await themeModule.InvokeAsync<bool>("prefersDarkTheme"));
             themeReady = true;
             StateHasChanged();
             selfReference = DotNetObjectReference.Create(this);
             commandRegistration = await commandModule.InvokeAsync<IJSObjectReference>("registerCommandPalette", selfReference);
+            navigationTooltipRegistration = await navigationTooltipModule.InvokeAsync<IJSObjectReference>("registerCollapsedNavigationTooltips", shellElement);
             if (CultureNavigation.NavigateToPreferredCulture(NavigationManager, Preferences.Language)) return;
         }
 
@@ -308,9 +313,15 @@ public partial class MainLayout
                 await commandRegistration.InvokeVoidAsync("dispose");
                 await commandRegistration.DisposeAsync();
             }
+            if (navigationTooltipRegistration is not null)
+            {
+                await navigationTooltipRegistration.InvokeVoidAsync("dispose");
+                await navigationTooltipRegistration.DisposeAsync();
+            }
             if (commandModule is not null) await commandModule.DisposeAsync();
             if (contextModule is not null) await contextModule.DisposeAsync();
             if (themeModule is not null) await themeModule.DisposeAsync();
+            if (navigationTooltipModule is not null) await navigationTooltipModule.DisposeAsync();
         }
         catch (JSDisconnectedException) { }
         selfReference?.Dispose();

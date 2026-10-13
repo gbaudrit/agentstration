@@ -32,6 +32,10 @@ public sealed class MainLayoutNavigationTests
 
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/settings/profile']").Count);
         Assert.AreEqual("Profile", rendered.Find(".topbar-actions a[href='/settings/profile']").GetAttribute("aria-label"));
+        Assert.AreEqual("Resource plans", rendered.Find(".side-nav a[href='/resource-plans']").GetAttribute("data-nav-tooltip"));
+        Assert.IsTrue(rendered.Find(".side-nav a[href='/resource-plans']").Closest(".navigation-group")?.ClassList.Contains("navigation-group-design"));
+        Assert.IsTrue(rendered.Find(".side-nav a[href='/triggers']").Closest(".navigation-group")?.ClassList.Contains("navigation-group-automate"));
+        Assert.IsTrue(rendered.Find(".side-nav a[href='/flow-runs']").Closest(".navigation-group")?.ClassList.Contains("navigation-group-observe"));
     }
 
     [TestMethod]
