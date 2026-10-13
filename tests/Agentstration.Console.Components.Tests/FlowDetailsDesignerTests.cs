@@ -263,6 +263,65 @@ public sealed class FlowDetailsDesignerTests
     }
 
     [TestMethod]
+    public void FlowRunTopologyInitiallyFitsTheExecutedWorkflowSnapshot()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var flowId = new FlowId("manual-workflow");
+        var definition = new WorkflowFlowDefinition(
+            "input",
+            [new FlowNode("input", FlowNodeKind.Input), new FlowNode("agent", FlowNodeKind.Agent), new FlowNode("output", FlowNodeKind.Output)],
+            [new FlowEdge("input", "agent"), new FlowEdge("agent", "output")]);
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new AgentFlowStepDefinition { Name = "agent", Agent = new("welcome-agent") },
+                new OutputFlowStepDefinition { Name = "output" }
+            ],
+            Transitions =
+            [
+                new("input-agent", "input", "completed", "agent"),
+                new("agent-output", "agent", "success", "output")
+            ],
+            Designer = new FlowDesignerMetadata
+            {
+                NodePositions = new Dictionary<string, FlowNodePosition>
+                {
+                    ["input"] = new(0, 0),
+                    ["agent"] = new(900, 0),
+                    ["output"] = new(1800, 0)
+                }
+            }
+        };
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "flowrun-manual-workflow",
+            FlowId = flowId,
+            FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Succeeded,
+            Trigger = FlowRunTrigger.Manual,
+            CorrelationId = "manual-workflow-fit",
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition,
+                new Dictionary<string, string>(), FlowClientStub.Now, graph)
+        };
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
+        context.Services.AddSingleton(TimeProvider.System);
+
+        var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+
+        Assert.IsTrue(rendered.Find(".flow-run-overview-topology .topology-canvas").ClassList.Contains("fit"));
+    }
+
+    [TestMethod]
     public void FlowRunShowsWorkerPlacementInsideTheWorkerTab()
     {
         using var culture = new TestCultureScope("en-US");

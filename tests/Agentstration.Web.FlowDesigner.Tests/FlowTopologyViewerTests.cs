@@ -66,6 +66,33 @@ public sealed class FlowTopologyViewerTests
     }
 
     [TestMethod]
+    public void ViewerUsesInvariantSvgCoordinatesInFrenchCulture()
+    {
+        using var culture = new CultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var graph = new FlowTopologyGraph(
+            [
+                new("step:input", "input", "Input", "input", 0, 14.5),
+                new("step:output", "output", "Output", "output", 240.25, 80.75)
+            ],
+            [new("next", "step:input", "step:output", "completed")],
+            "graph",
+            "Localized workflow");
+
+        var rendered = context.Render<FlowTopologyViewer>(parameters => parameters
+            .Add(component => component.Graph, graph));
+
+        var canvas = rendered.Find("svg.topology-canvas");
+        Assert.DoesNotContain(",", canvas.GetAttribute("viewBox")!, StringComparison.Ordinal);
+        Assert.IsTrue(rendered.FindAll(".topology-node")
+            .All(node => !node.GetAttribute("transform")!.Contains(',', StringComparison.Ordinal)));
+        Assert.IsTrue(rendered.FindAll(".edge-label-wrap")
+            .SelectMany(label => new[] { label.GetAttribute("x"), label.GetAttribute("y"), label.GetAttribute("width") })
+            .All(value => value is not null && !value.Contains(',', StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public void ObservedHandoffsRemainVisibleOnGraphWithoutAPathOverlay()
     {
         using var culture = new CultureScope("fr-FR");
