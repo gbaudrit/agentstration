@@ -91,7 +91,8 @@ else
                 projectionFlowKey = TargetKey(snapshot.Value.Definition.ProjectionFlow, snapshot.Value.Namespace);
                 retrievalFlowKey = TargetKey(snapshot.Value.Definition.RetrievalFlow, snapshot.Value.Namespace);
                 bindings.Clear();
-                bindings.AddRange(snapshot.Value.Definition.DataSources.Select(value => BindingModel.From(value, snapshot.Value.Namespace)));
+                bindings.AddRange(snapshot.Value.Definition.DataSources.Select(value => BindingModel.From(
+                    value, snapshot.Value.Namespace, TargetKey(value.TransformationFlow, snapshot.Value.Namespace))));
             }
             else
             {
@@ -145,9 +146,9 @@ else
     private async Task LoadFlowsAsync()
     {
         var summaries = await Flows.GetFlowsAsync(cancellation.Token);
-        var details = await Task.WhenAll(summaries.Select(value => Flows.GetFlowAsync(value.Namespace, value.Id, cancellation.Token)));
-        var options = details.Where(value => value.Enabled && value.ActiveVersion is not null)
-            .Select(value => new FlowOption(value.Namespace, value.Id, value.DisplayName ?? value.Name,
+        var details = await Task.WhenAll(summaries.Select(value => Flows.GetFlowAsync(value.Namespace, value.Id, value.ScopeRef, cancellation.Token)));
+        var options = details.Where(value => value.Enabled && value.ActiveVersion is not null && value.ScopeRef is not null)
+            .Select(value => new FlowOption(value.ScopeRef!.Value, value.Namespace, value.Id, value.DisplayName ?? value.Name,
                 value.ActiveVersion!, value.Metadata.GetValueOrDefault("flow.contract"))).ToArray();
         projectionFlows = options.Where(value => value.Contract == KnowledgeFlowContracts.Projection).ToArray();
         retrievalFlows = options.Where(value => value.Contract == KnowledgeFlowContracts.Retrieval).ToArray();
@@ -197,17 +198,27 @@ else
         return new(parts[2], ResourceScopeRef.Parse(parts[0]), ResourceNamespace.Parse(parts[1]));
     }
     private static string FlowKey(FlowOption value) => value.Key;
-    private static string FlowLabel(FlowOption value) => $"{value.DisplayName} · {value.Namespace}/{value.Name}:{value.Version}";
+    private static string FlowLabel(FlowOption value) => $"{value.DisplayName} · {value.ScopeRef} · {value.Namespace}/{value.Name}:{value.Version}";
     private static KnowledgeFlowTarget? FlowTarget(string key)
     {
-        var parts = key.Split('|', 3);
-        return parts.Length != 3 ? null : new() { Namespace = ResourceNamespace.Parse(parts[0]), Name = parts[1], UseActiveVersion = false, Version = parts[2] };
+        var parts = key.Split('|', 4);
+        return parts.Length != 4 ? null : new() { ScopeRef = ResourceScopeRef.Parse(parts[0]), Namespace = ResourceNamespace.Parse(parts[1]), Name = parts[2], UseActiveVersion = false, Version = parts[3] };
     }
-    private static string TargetKey(KnowledgeFlowTarget? target, ResourceNamespace owner) => target is null ? string.Empty
-        : $"{(target.Namespace ?? owner).Value}|{target.Name}|{target.Version ?? "active"}";
-    private sealed record FlowOption(ResourceNamespace Namespace, string Name, string DisplayName, string Version, string? Contract)
+    private string TargetKey(KnowledgeFlowTarget? target, ResourceNamespace owner)
     {
-        public string Key => $"{Namespace.Value}|{Name}|{Version}";
+        if (target is null) return string.Empty;
+        var @namespace = target.Namespace ?? owner;
+        var version = target.Version ?? "active";
+        var exactScope = target.ScopeRef ?? AllFlowOptions()
+            .Where(value => value.Namespace == @namespace && value.Name == target.Name && value.Version == version)
+            .Select(value => (ResourceScopeRef?)value.ScopeRef)
+            .SingleOrDefault();
+        return exactScope is null ? string.Empty : $"{exactScope.Value.Value}|{@namespace.Value}|{target.Name}|{version}";
+    }
+    private IEnumerable<FlowOption> AllFlowOptions() => projectionFlows.Concat(retrievalFlows).Concat(transformationFlows).Distinct();
+    private sealed record FlowOption(ResourceScopeRef ScopeRef, ResourceNamespace Namespace, string Name, string DisplayName, string Version, string? Contract)
+    {
+        public string Key => $"{ScopeRef.Value}|{Namespace.Value}|{Name}|{Version}";
     }
     private sealed class BindingModel
     {
@@ -217,12 +228,12 @@ else
         public string ConfigurationJson { get; set; } = "{}";
         public bool Required { get; set; } = true;
         public string MaximumAgeText { get; set; } = string.Empty;
-        public static BindingModel From(KnowledgeDataSourceBinding value, ResourceNamespace owner) => new()
+        public static BindingModel From(KnowledgeDataSourceBinding value, ResourceNamespace owner, string transformationFlowKey) => new()
         {
             Name = value.Name,
             DataSourceKey = value.DataSource.ScopeRef is null ? string.Empty
                 : $"{value.DataSource.ScopeRef.Value.Value}|{(value.DataSource.Namespace ?? owner).Value}|{value.DataSource.Name}",
-            TransformationFlowKey = TargetKey(value.TransformationFlow, owner),
+            TransformationFlowKey = transformationFlowKey,
             ConfigurationJson = System.Text.Json.JsonSerializer.Serialize(value.Configuration, IndentedJson),
             Required = value.Required,
             MaximumAgeText = FormatMaximumAge(value.MaximumAge)

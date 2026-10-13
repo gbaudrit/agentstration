@@ -21,6 +21,7 @@ public sealed record DataSourceFlowTarget
 {
     public required string Name { get; init; }
     public ResourceNamespace? Namespace { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
     public string? Version { get; init; }
     public bool UseActiveVersion { get; init; } = true;
 }
@@ -101,7 +102,10 @@ public sealed record ResolvedDataSourceFlowBinding(
     bool UsesActiveVersion,
     JsonElement? InputSchema,
     JsonElement? OutputSchema,
-    string? Contract);
+    string? Contract)
+{
+    public ResourceScopeRef? ScopeRef { get; init; }
+}
 
 public sealed record ResolvedDataSourceToolBinding
 {

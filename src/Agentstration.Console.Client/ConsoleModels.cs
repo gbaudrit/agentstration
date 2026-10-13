@@ -36,8 +36,9 @@ public sealed record WorkSummary(Guid Id, string Title, string Type, string Stat
 public sealed record FlowSummary(string Id, string Name, string Kind, string Version, string Status, int Steps, int ActiveExecutions, DateTimeOffset UpdatedAt)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
     public string? ActiveVersion { get; init; }
-    public string DetailsUrl => ConsoleResourceUrls.Flow(new FlowId(Id, Namespace));
+    public string DetailsUrl => ConsoleResourceUrls.Flow(new FlowId(Id, Namespace), ScopeRef);
 }
 
 public static class ConsoleResourceUrls
@@ -45,9 +46,13 @@ public static class ConsoleResourceUrls
     public static string Deployment(ResourceNamespace @namespace, string name) =>
         $"/deployments#deployment-{Uri.EscapeDataString(@namespace.Value)}-{Uri.EscapeDataString(name)}";
 
-    public static string Flow(FlowId id) => id.Namespace.IsDefault
-        ? $"/flows/{Uri.EscapeDataString(id.Value)}"
-        : $"/namespaces/{Uri.EscapeDataString(id.Namespace.Value)}/flows/{Uri.EscapeDataString(id.Value)}";
+    public static string Flow(FlowId id, ResourceScopeRef? scopeRef = null)
+    {
+        var path = id.Namespace.IsDefault
+            ? $"/flows/{Uri.EscapeDataString(id.Value)}"
+            : $"/namespaces/{Uri.EscapeDataString(id.Namespace.Value)}/flows/{Uri.EscapeDataString(id.Value)}";
+        return scopeRef is null ? path : $"{path}?scopeRef={Uri.EscapeDataString(scopeRef.Value.Value)}";
+    }
 
     public static string Entry(EntryId id) => id.Namespace.IsDefault
         ? $"/entries/{Uri.EscapeDataString(id.Value)}"

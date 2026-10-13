@@ -16,13 +16,30 @@ public static partial class FlowEndpoints
     private static async Task<StoredFlow> RequiredAsync(WorkspaceId workspaceId, string id, FlowService service, CancellationToken token) =>
         await service.GetAsync(workspaceId, new FlowId(id), token) ?? throw new FlowNotFoundException(new FlowId(id));
 
+    private static async Task<StoredFlow> RequiredVisibleAsync(
+        FlowId id,
+        string? scopeRef,
+        FlowService service,
+        ICurrentRequestContext requestContext,
+        CancellationToken token) =>
+        await service.GetVisibleAsync(CurrentConsumerScope(requestContext), id, ParseScopeRef(scopeRef), token)
+        ?? throw new FlowNotFoundException(id);
+
     private static WorkspaceId CurrentWorkspace(ICurrentRequestContext requestContext) => CurrentScope(requestContext).WorkspaceId;
+    private static ResourceScopeRef CurrentConsumerScope(ICurrentRequestContext requestContext) => ResourceScopeRef.Workspace(CurrentWorkspace(requestContext).Value);
+    private static ResourceScopeRef? ParseScopeRef(string? value) => string.IsNullOrWhiteSpace(value) ? null : ResourceScopeRef.Parse(value);
+    private static void EnsureWorkspaceMutationScope(string? value, ICurrentRequestContext requestContext)
+    {
+        var requestedScope = ParseScopeRef(value);
+        if (requestedScope is not null && requestedScope != CurrentConsumerScope(requestContext))
+            throw new FlowValidationException("flow_scope_read_only", $"Flow scope '{requestedScope}' is read-only from the current Workspace.");
+    }
 
-    private static FlowResponse ToResponse(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Version, value.Enabled, value.ActiveVersion, value.Definition, value.Metadata, value.CreatedAt, value.UpdatedAt, value.Graph) { Namespace = value.Id.Namespace, DisplayName = value.DisplayName };
+    private static FlowResponse ToResponse(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Version, value.Enabled, value.ActiveVersion, value.Definition, value.Metadata, value.CreatedAt, value.UpdatedAt, value.Graph) { Namespace = value.Id.Namespace, ScopeRef = value.ScopeRef, DisplayName = value.DisplayName };
 
-    private static FlowSummaryResponse ToSummary(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Definition.Kind, value.Version, value.Enabled, value.ActiveVersion, value.UpdatedAt) { Namespace = value.Id.Namespace, DisplayName = value.DisplayName };
+    private static FlowSummaryResponse ToSummary(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Definition.Kind, value.Version, value.Enabled, value.ActiveVersion, value.UpdatedAt) { Namespace = value.Id.Namespace, ScopeRef = value.ScopeRef, DisplayName = value.DisplayName };
 
-    private static FlowVersionResponse ToVersion(FlowVersion value) => new(value.FlowId.Value, value.Version, value.Description, value.Definition, value.Metadata, value.PublishedAt, value.Graph, value.DefinitionHash, value.ReleaseNotes) { Namespace = value.FlowId.Namespace };
+    private static FlowVersionResponse ToVersion(FlowVersion value) => new(value.FlowId.Value, value.Version, value.Description, value.Definition, value.Metadata, value.PublishedAt, value.Graph, value.DefinitionHash, value.ReleaseNotes) { Namespace = value.FlowId.Namespace, ScopeRef = value.ScopeRef };
 
     private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {
@@ -32,6 +49,8 @@ public static partial class FlowEndpoints
         catch (FlowRunNotTerminalException exception) { return Results.Problem(statusCode: 409, title: "flow_run_not_terminal", detail: exception.Message); }
         catch (InputRequestAlreadyResolvedException exception) { return Results.Problem(statusCode: 409, title: "input_request_already_resolved", detail: exception.Message); }
         catch (FlowConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
+        catch (FlowReferenceOutsideScopeException exception) { return Results.Problem(statusCode: 400, title: "flow_reference_outside_scope", detail: exception.Message); }
+        catch (FlowReferenceAmbiguousException exception) { return Results.Problem(statusCode: 400, title: "flow_reference_ambiguous", detail: exception.Message); }
         catch (FlowValidationException exception) when (exception.Code == "flow_version_already_published") { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); }
         catch (FlowValidationException exception) when (exception.Code == "flow_run_in_use_by_knowledge_snapshot") { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); }
         catch (FlowValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }

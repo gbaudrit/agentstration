@@ -15,14 +15,27 @@ public interface IFlowRepository
 {
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<StoredFlow> CreateAsync(FlowResource resource, CancellationToken cancellationToken);
-    Task<StoredFlow?> GetAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken);
-    Task<FlowPage> ListAsync(WorkspaceId workspaceId, int skip, int take, CancellationToken cancellationToken);
-    Task<FlowPage> ListAsync(WorkspaceId workspaceId, ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken);
+    Task<StoredFlow?> GetExactAsync(ResourceScopeRef scopeRef, FlowId id, CancellationToken cancellationToken);
+    Task<FlowPage> ListExactAsync(ResourceScopeRef scopeRef, int skip, int take, CancellationToken cancellationToken);
+    Task<FlowPage> ListExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken);
     Task<StoredFlow> UpdateAsync(FlowResource resource, string expectedETag, CancellationToken cancellationToken);
-    Task DeleteAsync(WorkspaceId workspaceId, FlowId id, string? expectedETag, CancellationToken cancellationToken);
+    Task DeleteExactAsync(ResourceScopeRef scopeRef, FlowId id, string? expectedETag, CancellationToken cancellationToken);
     Task<StoredFlowVersion> CreateVersionAsync(FlowVersion version, CancellationToken cancellationToken);
-    Task<StoredFlowVersion?> GetVersionAsync(WorkspaceId workspaceId, FlowId id, string version, CancellationToken cancellationToken);
-    Task<IReadOnlyList<StoredFlowVersion>> ListVersionsAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken);
+    Task<StoredFlowVersion?> GetVersionExactAsync(ResourceScopeRef scopeRef, FlowId id, string version, CancellationToken cancellationToken);
+    Task<IReadOnlyList<StoredFlowVersion>> ListVersionsExactAsync(ResourceScopeRef scopeRef, FlowId id, CancellationToken cancellationToken);
+
+    Task<StoredFlow?> GetAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken) =>
+        GetExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), id, cancellationToken);
+    Task<FlowPage> ListAsync(WorkspaceId workspaceId, int skip, int take, CancellationToken cancellationToken) =>
+        ListExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), skip, take, cancellationToken);
+    Task<FlowPage> ListAsync(WorkspaceId workspaceId, ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken) =>
+        ListExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), @namespace, skip, take, cancellationToken);
+    Task DeleteAsync(WorkspaceId workspaceId, FlowId id, string? expectedETag, CancellationToken cancellationToken) =>
+        DeleteExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), id, expectedETag, cancellationToken);
+    Task<StoredFlowVersion?> GetVersionAsync(WorkspaceId workspaceId, FlowId id, string version, CancellationToken cancellationToken) =>
+        GetVersionExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), id, version, cancellationToken);
+    Task<IReadOnlyList<StoredFlowVersion>> ListVersionsAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken) =>
+        ListVersionsExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), id, cancellationToken);
     Task<StoredFlowRun> CreateRunAsync(FlowRun run, CancellationToken cancellationToken);
     /// <summary>
     /// Retrieves a Flow Run for trusted system and runtime processing. User-facing callers must use the

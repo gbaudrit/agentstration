@@ -22,7 +22,7 @@ public sealed class KnowledgeFlowResolver(FlowService flows) : IKnowledgeFlowRes
         if (scopeRef.Kind != ResourceScopeKind.Workspace || scopeRef.TargetId is not { } workspaceId)
             throw new KnowledgeSourceValidationException("knowledge_source_scope_invalid", "A KnowledgeSource must belong to a Workspace scope.");
         var flowNamespace = target.Namespace ?? ownerNamespace;
-        var reference = new FlowReference(new FlowId(target.Name, flowNamespace), target.Version, target.UseActiveVersion, flowNamespace);
+        var reference = new FlowReference(new FlowId(target.Name, flowNamespace), target.Version, target.UseActiveVersion, flowNamespace, target.ScopeRef);
         try
         {
             var resolved = await flows.ResolveAsync(new WorkspaceId(workspaceId), reference, ownerNamespace, cancellationToken);
@@ -34,7 +34,10 @@ public sealed class KnowledgeFlowResolver(FlowService flows) : IKnowledgeFlowRes
                 resolved.Graph?.InputSchema?.Clone(),
                 resolved.Graph?.OutputSchema?.Clone(),
                 resolved.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract),
-                Capabilities(resolved.Metadata.GetValueOrDefault(KnowledgeFlowContracts.CapabilitiesMetadataKey)));
+                Capabilities(resolved.Metadata.GetValueOrDefault(KnowledgeFlowContracts.CapabilitiesMetadataKey)))
+            {
+                ScopeRef = resolved.ScopeRef
+            };
         }
         catch (Exception exception) when (exception is FlowNotFoundException or FlowValidationException or ArgumentException)
         {
@@ -83,7 +86,10 @@ public sealed class KnowledgeRetrievalFlowGateway(FlowRunService runs) : IKnowle
                 null,
                 null,
                 null,
-                scope), cancellationToken);
+                scope)
+            {
+                DefinitionScopeRef = request.Flow.ScopeRef
+            }, cancellationToken);
             var completed = await AwaitCompletionAsync(stored.Value.Id, scope, cancellationToken);
             if (completed.Value.Status != FlowRunStatus.Succeeded)
                 throw new KnowledgeRetrievalException(

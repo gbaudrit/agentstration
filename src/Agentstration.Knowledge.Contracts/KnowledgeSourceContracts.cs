@@ -48,6 +48,7 @@ public sealed record KnowledgeFlowTarget
 {
     public required string Name { get; init; }
     public ResourceNamespace? Namespace { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
     public string? Version { get; init; }
     public bool UseActiveVersion { get; init; } = true;
 }
@@ -85,7 +86,10 @@ public sealed record ResolvedKnowledgeFlowBinding(
     JsonElement? InputSchema,
     JsonElement? OutputSchema,
     string? Contract = null,
-    IReadOnlyList<string>? Capabilities = null);
+    IReadOnlyList<string>? Capabilities = null)
+{
+    public ResourceScopeRef? ScopeRef { get; init; }
+}
 
 public sealed record KnowledgeSourceReadiness(
     bool Ready,

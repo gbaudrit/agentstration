@@ -185,7 +185,8 @@ public sealed partial class FlowRunService(
     FlowRunExecutionOptions? executionOptions = null,
     IFlowInputRequestSink? inputRequestSink = null,
     IEnumerable<IFlowRunDeletionGuard>? configuredRunDeletionGuards = null,
-    IFlowStepArtifactCapture? configuredArtifactCapture = null)
+    IFlowStepArtifactCapture? configuredArtifactCapture = null,
+    FlowService? flowDefinitions = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly FlowRunExecutionOptions executionOptions = executionOptions is null
@@ -201,9 +202,13 @@ public sealed partial class FlowRunService(
         configuredRunDeletionGuards?.ToArray() ?? [];
     private readonly IFlowStepArtifactCapture artifactCapture =
         configuredArtifactCapture ?? UnsupportedFlowStepArtifactCapture.Instance;
+    private readonly FlowService? flowDefinitions = flowDefinitions;
     public static readonly ActivitySource ActivitySource = new("Agentstration.Flows");
     public static readonly Meter Meter = new("Agentstration.Flows");
     private static readonly Counter<long> RunsCreated = Meter.CreateCounter<long>("agentstration.flow.runs.created");
+
+    private static string DefinitionSnapshotIdentity(FlowVersion version) =>
+        $"{version.ScopeRef.Value}:{version.FlowId.Namespace.Value}:{version.FlowId.Value}:{version.Version}:{version.DefinitionHash ?? "legacy"}";
 
 
 

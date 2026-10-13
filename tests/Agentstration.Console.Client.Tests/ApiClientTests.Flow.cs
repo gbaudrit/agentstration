@@ -22,14 +22,15 @@ public sealed partial class ApiClientTests
         var now = DateTimeOffset.UtcNow;
         var flowId = new FlowId("console-run");
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"));
-        var version = new FlowVersion(new WorkspaceId(Guid.NewGuid()), flowId, "1.0.0", null, definition, new Dictionary<string, string>(), now);
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var version = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "1.0.0", null, definition, new Dictionary<string, string>(), now);
         var run = new FlowRun
         {
-            WorkspaceId = version.WorkspaceId,
+            WorkspaceId = workspaceId,
             Id = "flowrun-console",
             FlowId = flowId,
             FlowVersion = version.Version,
-            Scope = new(Guid.NewGuid(), version.WorkspaceId, Guid.NewGuid()),
+            Scope = new(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
             Input = JsonSerializer.SerializeToElement(new { }),
             CreatedAt = now,
             DefinitionSnapshot = version

@@ -111,6 +111,7 @@ public sealed class KnowledgeSourceToolExposureService(
                     {
                         Name = retrieval.Name,
                         Namespace = retrieval.Namespace,
+                        ScopeRef = retrieval.ScopeRef,
                         Version = retrieval.Version,
                         UseActiveVersion = false
                     }

@@ -7,7 +7,12 @@ namespace Agentstration.Flows;
 
 using Agentstration.Resources;
 
-public sealed record FlowResourceReference(string ResourceId, string VersionStrategy = "UseDeploymentVersion", long? Version = null, ResourceNamespace? Namespace = null);
+public sealed record FlowResourceReference(
+    string ResourceId,
+    string VersionStrategy = "UseDeploymentVersion",
+    long? Version = null,
+    ResourceNamespace? Namespace = null,
+    ResourceScopeRef? ScopeRef = null);
 public sealed record FlowNodePosition(double X, double Y);
 public sealed record FlowViewportMetadata(double X, double Y, double Zoom = 1);
 public sealed record FlowDesignerMetadata
@@ -145,7 +150,8 @@ public sealed record FlowCallReference(
     string ResourceId,
     FlowCallVersionStrategy VersionStrategy = FlowCallVersionStrategy.Active,
     string? Version = null,
-    ResourceNamespace? Namespace = null)
+    ResourceNamespace? Namespace = null,
+    ResourceScopeRef? ScopeRef = null)
 {
     public FlowId Resolve(ResourceNamespace ownerNamespace) => new(ResourceId, Namespace ?? ownerNamespace);
 }
@@ -359,6 +365,12 @@ public static class FlowGraphDefinitionExtensions
 public static class FlowDefinitionHash
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    public static string Compute(FlowDefinition definition)
+    {
+        var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(definition, JsonOptions));
+        return Convert.ToHexStringLower(SHA256.HashData(bytes));
+    }
+
     public static string Compute(FlowGraphDefinition definition)
     {
         var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(definition, JsonOptions));

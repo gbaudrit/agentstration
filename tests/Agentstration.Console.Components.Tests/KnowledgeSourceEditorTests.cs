@@ -599,10 +599,13 @@ public sealed class KnowledgeSourceEditorTests
 
     private sealed class FlowClientStub : IFlowApiClient
     {
+        private static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(
+            Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+
         public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FlowSummary>>(
         [
-            new("knowledge-projection-builtin", "Knowledge projection", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0" },
-            new("knowledge-retrieval-builtin", "Knowledge retrieval", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0" }
+            new("knowledge-projection-builtin", "Knowledge projection", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0", ScopeRef = WorkspaceScope },
+            new("knowledge-retrieval-builtin", "Knowledge retrieval", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0", ScopeRef = WorkspaceScope }
         ]);
         public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken)
         {
@@ -611,7 +614,7 @@ public sealed class KnowledgeSourceEditorTests
             return Task.FromResult(new FlowResponse(flowId, flowId, null, "1.0.0", true, "1.0.0",
                 new WorkflowFlowDefinition("input", [], [], []),
                 new Dictionary<string, string> { [FlowMetadataKeys.Contract] = contract },
-                DateTimeOffset.UtcNow, DateTimeOffset.UtcNow));
+                DateTimeOffset.UtcNow, DateTimeOffset.UtcNow) { ScopeRef = WorkspaceScope });
         }
         public Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowResourceSnapshot> CreateFlowAsync(CreateFlowRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();

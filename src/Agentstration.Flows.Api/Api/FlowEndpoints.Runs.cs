@@ -27,7 +27,7 @@ public static partial class FlowEndpoints
             : FlowInvocationOrigin.Api;
         var submission = await service.SubmitAsync(new SubmitRootFlowCommand(
             scope.WorkspaceId,
-            new FlowReference(flowId, body.Version, body.Version is null, flowId.Namespace),
+            new FlowReference(flowId, body.Version, body.Version is null, flowId.Namespace, body.DefinitionScopeRef),
             body.Input,
             origin,
             startedBy,

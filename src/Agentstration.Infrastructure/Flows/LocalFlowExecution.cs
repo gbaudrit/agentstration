@@ -86,7 +86,8 @@ public sealed class LocalFlowRunCancellationRegistry : IFlowRunCancellationRegis
 public sealed class ManagementFlowResourceReferenceResolver(
     IResourceStore store,
     IFlowRepository flows,
-    ToolSetService? toolSets = null) : IFlowResourceReferenceResolver
+    ToolSetService? toolSets = null,
+    FlowService? flowService = null) : IFlowResourceReferenceResolver
 {
     public async Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken) =>
         await store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, resourceId, @namespace ?? ResourceNamespace.Default), cancellationToken) is not null;
@@ -98,10 +99,44 @@ public sealed class ManagementFlowResourceReferenceResolver(
         CancellationToken cancellationToken)
     {
         var id = reference.Resolve(ownerNamespace);
+        if (flowService is not null)
+        {
+            try
+            {
+                var resolved = await flowService.ResolveAsync(
+                    workspaceId,
+                    new FlowReference(
+                        id,
+                        reference.Version,
+                        reference.VersionStrategy == FlowCallVersionStrategy.Active,
+                        id.Namespace,
+                        reference.ScopeRef),
+                    cancellationToken);
+                return new ResolvedFlowCall(
+                    id,
+                    resolved.Version,
+                    resolved.Graph?.InputSchema,
+                    resolved.Graph?.OutputSchema,
+                    resolved.Graph?.GetOutputs())
+                {
+                    ScopeRef = resolved.ScopeRef
+                };
+            }
+            catch (FlowNotFoundException)
+            {
+                return null;
+            }
+            catch (FlowValidationException exception) when (exception.Code is "flow_active_version_missing" or "flow_version_not_found")
+            {
+                return null;
+            }
+        }
+
+        var scopeRef = reference.ScopeRef ?? ResourceScopeRef.Workspace(workspaceId.Value);
         var version = reference.Version;
         if (reference.VersionStrategy == FlowCallVersionStrategy.Active)
         {
-            var current = await flows.GetAsync(workspaceId, id, cancellationToken);
+            var current = await flows.GetExactAsync(scopeRef, id, cancellationToken);
             if (current is null || !current.Value.Enabled || current.Value.ActiveVersion is null) return null;
             version = current.Value.ActiveVersion;
         }
@@ -110,7 +145,7 @@ public sealed class ManagementFlowResourceReferenceResolver(
             return null;
         }
 
-        var published = await flows.GetVersionAsync(workspaceId, id, version, cancellationToken);
+        var published = await flows.GetVersionExactAsync(scopeRef, id, version, cancellationToken);
         return published is null
             ? null
             : new ResolvedFlowCall(
@@ -118,7 +153,10 @@ public sealed class ManagementFlowResourceReferenceResolver(
                 published.Value.Version,
                 published.Value.Graph?.InputSchema,
                 published.Value.Graph?.OutputSchema,
-                published.Value.Graph?.GetOutputs());
+                published.Value.Graph?.GetOutputs())
+            {
+                ScopeRef = published.Value.ScopeRef
+            };
     }
 
     public async Task<ResolvedFlowTool?> ResolveToolAsync(
@@ -185,19 +223,23 @@ public sealed class ManagementFlowResourceReferenceResolver(
         ResolvedFlowCall target,
         CancellationToken cancellationToken)
     {
-        var pending = new Queue<(FlowId Id, string Version)>();
-        var visited = new HashSet<(FlowId Id, string Version)>();
-        pending.Enqueue((target.FlowId, target.Version));
+        var pending = new Queue<(FlowId Id, string Version, ResourceScopeRef? ScopeRef)>();
+        var visited = new HashSet<(FlowId Id, string Version, ResourceScopeRef? ScopeRef)>();
+        pending.Enqueue((target.FlowId, target.Version, target.ScopeRef));
         while (pending.TryDequeue(out var current))
         {
             if (current.Id == ownerFlowId) return true;
             if (!visited.Add(current)) continue;
-            var published = await flows.GetVersionAsync(workspaceId, current.Id, current.Version, cancellationToken);
+            var published = await flows.GetVersionExactAsync(
+                current.ScopeRef ?? ResourceScopeRef.Workspace(workspaceId.Value),
+                current.Id,
+                current.Version,
+                cancellationToken);
             if (published?.Value.Graph is null) continue;
             foreach (var reference in published.Value.Graph.Steps.Select(FlowReference).Where(reference => reference is not null))
             {
                 var resolved = await ResolveFlowAsync(workspaceId, current.Id.Namespace, reference!, cancellationToken);
-                if (resolved is not null) pending.Enqueue((resolved.FlowId, resolved.Version));
+                if (resolved is not null) pending.Enqueue((resolved.FlowId, resolved.Version, resolved.ScopeRef));
             }
         }
         return false;

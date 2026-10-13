@@ -21,7 +21,8 @@ public sealed class FlowService(
     IFlowRepository repository,
     TimeProvider timeProvider,
     IEnumerable<IFlowDeletionGuard> deletionGuards,
-    IEnumerable<IFlowVersionActivationGuard>? activationGuards = null)
+    IEnumerable<IFlowVersionActivationGuard>? activationGuards = null,
+    IEnumerable<IFlowScopeHierarchy>? scopeHierarchies = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -31,26 +32,102 @@ public sealed class FlowService(
         => await CreateAsync(workspaceId, command, ResourceNamespace.Default, cancellationToken);
 
     public async Task<StoredFlow> CreateAsync(WorkspaceId workspaceId, CreateFlowCommand command, ResourceNamespace @namespace, CancellationToken cancellationToken)
+        => await CreateExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), command, @namespace, cancellationToken);
+
+    public async Task<StoredFlow> CreateExactAsync(ResourceScopeRef scopeRef, CreateFlowCommand command, ResourceNamespace @namespace, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
+        _ = scopeRef.Value;
         var now = timeProvider.GetUtcNow();
-        var resource = new FlowResource(workspaceId, new FlowId(command.Name, @namespace), command.Name, command.Description, command.Version, command.Enabled, null,
+        var resource = new FlowResource(scopeRef, new FlowId(command.Name, @namespace), command.Name, command.Description, command.Version, command.Enabled, null,
             command.Definition, Copy(command.Metadata), now, now, command.DisplayName, command.Graph);
         FlowValidator.Validate(resource);
         return await repository.CreateAsync(resource, cancellationToken);
     }
 
     public Task<StoredFlow?> GetAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken) => repository.GetAsync(workspaceId, id, cancellationToken);
+    public Task<StoredFlow?> GetExactAsync(ResourceScopeRef scopeRef, FlowId id, CancellationToken cancellationToken) => repository.GetExactAsync(scopeRef, id, cancellationToken);
+    public Task<FlowPage> ListExactAsync(ResourceScopeRef scopeRef, int skip, int take, CancellationToken cancellationToken) => repository.ListExactAsync(scopeRef, skip, take, cancellationToken);
+    public Task<FlowPage> ListExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken) => repository.ListExactAsync(scopeRef, @namespace, skip, take, cancellationToken);
     public Task<FlowPage> ListAsync(WorkspaceId workspaceId, int skip, int take, CancellationToken cancellationToken) => ListAsync(workspaceId, ResourceNamespace.Default, skip, take, cancellationToken);
     public Task<FlowPage> ListAsync(WorkspaceId workspaceId, ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken) => repository.ListAsync(workspaceId, @namespace, skip, take, cancellationToken);
     public Task<FlowPage> ListAllAsync(WorkspaceId workspaceId, int skip, int take, CancellationToken cancellationToken) => repository.ListAsync(workspaceId, skip, take, cancellationToken);
 
+    public async Task<StoredFlow?> GetVisibleAsync(
+        ResourceScopeRef consumerScopeRef,
+        FlowId id,
+        ResourceScopeRef? exactScopeRef,
+        CancellationToken cancellationToken)
+    {
+        var visibleScopes = await ListVisibleScopesAsync(consumerScopeRef, cancellationToken);
+        if (exactScopeRef is { } scopeRef)
+        {
+            if (!visibleScopes.Contains(scopeRef))
+                throw new FlowReferenceOutsideScopeException(scopeRef, consumerScopeRef);
+            return await repository.GetExactAsync(scopeRef, id, cancellationToken);
+        }
+
+        StoredFlow? result = null;
+        foreach (var visibleScope in visibleScopes)
+        {
+            var candidate = await repository.GetExactAsync(visibleScope, id, cancellationToken);
+            if (candidate is null) continue;
+            if (result is not null)
+                throw new FlowReferenceAmbiguousException(new FlowReference(id));
+            result = candidate;
+        }
+        return result;
+    }
+
+    public async Task<FlowPage> ListVisibleAsync(
+        ResourceScopeRef consumerScopeRef,
+        ResourceNamespace? @namespace,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 200);
+        var targetCount = checked(skip + take + 1);
+        var visibleScopes = await ListVisibleScopesAsync(consumerScopeRef, cancellationToken);
+        var scopeOrder = visibleScopes.Select((scope, index) => (scope, index)).ToDictionary(value => value.scope, value => value.index);
+        var values = new List<StoredFlow>();
+
+        foreach (var scopeRef in visibleScopes)
+        {
+            var offset = 0;
+            while (values.Count(value => value.Value.ScopeRef == scopeRef) < targetCount)
+            {
+                var pageSize = Math.Min(200, targetCount - offset);
+                var page = @namespace is null
+                    ? await repository.ListExactAsync(scopeRef, offset, pageSize, cancellationToken)
+                    : await repository.ListExactAsync(scopeRef, @namespace.Value, offset, pageSize, cancellationToken);
+                values.AddRange(page.Items);
+                offset += page.Items.Count;
+                if (!page.HasMore || page.Items.Count == 0) break;
+            }
+        }
+
+        var ordered = values
+            .OrderBy(value => value.Value.Id.Namespace.Value, StringComparer.Ordinal)
+            .ThenBy(value => value.Value.Id.Value, StringComparer.Ordinal)
+            .ThenBy(value => scopeOrder[value.Value.ScopeRef])
+            .Skip(skip)
+            .Take(take + 1)
+            .ToArray();
+        return new FlowPage(ordered.Take(take).ToArray(), ordered.Length > take);
+    }
+
     public async Task<StoredFlow> UpdateAsync(WorkspaceId workspaceId, FlowId id, UpdateFlowCommand command, string expectedETag, CancellationToken cancellationToken)
+        => await UpdateExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), id, command, expectedETag, cancellationToken);
+
+    public async Task<StoredFlow> UpdateExactAsync(ResourceScopeRef scopeRef, FlowId id, UpdateFlowCommand command, string expectedETag, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
-        var current = await repository.GetAsync(workspaceId, id, cancellationToken) ?? throw new FlowNotFoundException(id);
+        var current = await repository.GetExactAsync(scopeRef, id, cancellationToken) ?? throw new FlowNotFoundException(id);
         if (!string.Equals(current.ETag, expectedETag, StringComparison.Ordinal)) throw new FlowConcurrencyException("The supplied ETag does not match the current Flow version.");
-        var published = await repository.GetVersionAsync(workspaceId, id, command.Version, cancellationToken);
+        var published = await repository.GetVersionExactAsync(scopeRef, id, command.Version, cancellationToken);
         if (published is not null && JsonSerializer.Serialize(published.Value.Definition, JsonOptions) != JsonSerializer.Serialize(command.Definition, JsonOptions))
             throw new FlowValidationException("published_version_immutable", $"Published Flow version '{command.Version}' cannot be modified.");
         var updated = current.Value with
@@ -72,32 +149,43 @@ public sealed class FlowService(
         DeleteAsync(workspaceId, id, expectedETag, allowSystemManaged: false, cancellationToken);
 
     public async Task DeleteAsync(WorkspaceId workspaceId, FlowId id, string? expectedETag, bool allowSystemManaged, CancellationToken cancellationToken)
+        => await DeleteExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), id, expectedETag, allowSystemManaged, cancellationToken);
+
+    public async Task DeleteExactAsync(ResourceScopeRef scopeRef, FlowId id, string? expectedETag, bool allowSystemManaged, CancellationToken cancellationToken)
     {
-        var stored = await repository.GetAsync(workspaceId, id, cancellationToken) ?? throw new FlowNotFoundException(id);
+        var stored = await repository.GetExactAsync(scopeRef, id, cancellationToken) ?? throw new FlowNotFoundException(id);
         if (IsSystemManaged(stored.Value.Metadata)
             && (!allowSystemManaged || !IsDirectAgentFlow(stored.Value.Metadata)))
             throw new FlowValidationException("system_flow_managed", $"Flow '{id}' is managed by Agentstration and cannot be deleted independently.");
-        foreach (var guard in deletionGuards) await guard.ValidateDeleteAsync(workspaceId, id, cancellationToken);
-        await repository.DeleteAsync(workspaceId, id, expectedETag, cancellationToken);
+        if (scopeRef.Kind == ResourceScopeKind.Workspace)
+        {
+            var workspaceId = new WorkspaceId(scopeRef.TargetId!.Value);
+            foreach (var guard in deletionGuards) await guard.ValidateDeleteAsync(workspaceId, id, cancellationToken);
+        }
+        await repository.DeleteExactAsync(scopeRef, id, expectedETag, cancellationToken);
     }
 
     public async Task<StoredFlowVersion> PublishVersionAsync(WorkspaceId workspaceId, FlowId id, string version, bool activate, CancellationToken cancellationToken, string? releaseNotes = null)
+        => await PublishVersionExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), id, version, activate, cancellationToken, releaseNotes);
+
+    public async Task<StoredFlowVersion> PublishVersionExactAsync(ResourceScopeRef scopeRef, FlowId id, string version, bool activate, CancellationToken cancellationToken, string? releaseNotes = null)
     {
-        var stored = await repository.GetAsync(workspaceId, id, cancellationToken) ?? throw new FlowNotFoundException(id);
+        var stored = await repository.GetExactAsync(scopeRef, id, cancellationToken) ?? throw new FlowNotFoundException(id);
         if (!string.Equals(stored.Value.Version, version, StringComparison.Ordinal))
             throw new FlowValidationException("flow_version_mismatch", "The requested version must match the current Flow definition version.");
-        if (await repository.GetVersionAsync(workspaceId, id, version, cancellationToken) is not null)
+        if (await repository.GetVersionExactAsync(scopeRef, id, version, cancellationToken) is not null)
             throw new FlowValidationException("flow_version_already_published", $"Flow version '{version}' has already been published. Choose a new version.");
-        var published = new FlowVersion(workspaceId, id, version, stored.Value.Description, stored.Value.Definition, stored.Value.Metadata, timeProvider.GetUtcNow(), stored.Value.Graph,
-            stored.Value.Graph is null ? null : FlowDefinitionHash.Compute(stored.Value.Graph), releaseNotes);
+        var published = new FlowVersion(stored.Value.ScopeRef, id, version, stored.Value.Description, stored.Value.Definition, stored.Value.Metadata, timeProvider.GetUtcNow(), stored.Value.Graph,
+            stored.Value.Graph is null ? FlowDefinitionHash.Compute(stored.Value.Definition) : FlowDefinitionHash.Compute(stored.Value.Graph), releaseNotes);
         FlowValidator.ValidateVersion(published);
         if (activate)
-            foreach (var guard in activationGuards ?? []) await guard.ValidateActivationAsync(workspaceId, published, cancellationToken);
+            if (scopeRef.Kind == ResourceScopeKind.Workspace)
+                foreach (var guard in activationGuards ?? []) await guard.ValidateActivationAsync(new(scopeRef.TargetId!.Value), published, cancellationToken);
         StoredFlowVersion created;
         try { created = await repository.CreateVersionAsync(published, cancellationToken); }
         catch (FlowConcurrencyException)
         {
-            if (await repository.GetVersionAsync(workspaceId, id, version, cancellationToken) is not null)
+            if (await repository.GetVersionExactAsync(scopeRef, id, version, cancellationToken) is not null)
                 throw new FlowValidationException("flow_version_already_published", $"Flow version '{version}' has already been published. Choose a new version.");
             throw;
         }
@@ -110,32 +198,72 @@ public sealed class FlowService(
     }
 
     public Task<StoredFlowVersion?> GetVersionAsync(WorkspaceId workspaceId, FlowId id, string version, CancellationToken cancellationToken) => repository.GetVersionAsync(workspaceId, id, version, cancellationToken);
+    public Task<StoredFlowVersion?> GetVersionExactAsync(ResourceScopeRef scopeRef, FlowId id, string version, CancellationToken cancellationToken) => repository.GetVersionExactAsync(scopeRef, id, version, cancellationToken);
     public async Task<StoredFlow> ActivateVersionAsync(WorkspaceId workspaceId, FlowId id, string version, CancellationToken cancellationToken)
+        => await ActivateVersionExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), id, version, cancellationToken);
+
+    public async Task<StoredFlow> ActivateVersionExactAsync(ResourceScopeRef scopeRef, FlowId id, string version, CancellationToken cancellationToken)
     {
-        var stored = await repository.GetAsync(workspaceId, id, cancellationToken) ?? throw new FlowNotFoundException(id);
-        var published = await repository.GetVersionAsync(workspaceId, id, version, cancellationToken)
+        var stored = await repository.GetExactAsync(scopeRef, id, cancellationToken) ?? throw new FlowNotFoundException(id);
+        var published = await repository.GetVersionExactAsync(scopeRef, id, version, cancellationToken)
             ?? throw new FlowValidationException("flow_version_not_published", "The Flow version must be published before activation.");
         if (stored.Value.ActiveVersion == version) return stored;
-        foreach (var guard in activationGuards ?? []) await guard.ValidateActivationAsync(workspaceId, published.Value, cancellationToken);
+        if (scopeRef.Kind == ResourceScopeKind.Workspace)
+            foreach (var guard in activationGuards ?? []) await guard.ValidateActivationAsync(new(scopeRef.TargetId!.Value), published.Value, cancellationToken);
         return await repository.UpdateAsync(stored.Value with { ActiveVersion = version, Enabled = true, UpdatedAt = timeProvider.GetUtcNow() }, stored.ETag, cancellationToken);
     }
     public Task<IReadOnlyList<StoredFlowVersion>> ListVersionsAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken) => repository.ListVersionsAsync(workspaceId, id, cancellationToken);
+    public Task<IReadOnlyList<StoredFlowVersion>> ListVersionsExactAsync(ResourceScopeRef scopeRef, FlowId id, CancellationToken cancellationToken) => repository.ListVersionsExactAsync(scopeRef, id, cancellationToken);
 
     public async Task<FlowVersion> ResolveAsync(WorkspaceId workspaceId, FlowReference reference, CancellationToken cancellationToken)
         => await ResolveAsync(workspaceId, reference, reference.FlowId.Namespace, cancellationToken);
 
     public async Task<FlowVersion> ResolveAsync(WorkspaceId workspaceId, FlowReference reference, ResourceNamespace ownerNamespace, CancellationToken cancellationToken)
+        => await ResolveAsync(ResourceScopeRef.Workspace(workspaceId.Value), reference, ownerNamespace, cancellationToken);
+
+    public async Task<FlowVersion> ResolveAsync(ResourceScopeRef consumerScopeRef, FlowReference reference, ResourceNamespace ownerNamespace, CancellationToken cancellationToken)
     {
         FlowValidator.ValidateReference(reference);
         var flowId = reference.Resolve(ownerNamespace);
+        var visibleScopes = await ListVisibleScopesAsync(consumerScopeRef, cancellationToken);
+        StoredFlow? flow;
+        if (reference.ScopeRef is { } exactScopeRef)
+        {
+            if (!visibleScopes.Contains(exactScopeRef))
+                throw new FlowReferenceOutsideScopeException(exactScopeRef, consumerScopeRef);
+            flow = await repository.GetExactAsync(exactScopeRef, flowId, cancellationToken);
+        }
+        else
+        {
+            flow = null;
+            foreach (var visibleScope in visibleScopes)
+            {
+                var candidate = await repository.GetExactAsync(visibleScope, flowId, cancellationToken);
+                if (candidate is null) continue;
+                if (flow is not null) throw new FlowReferenceAmbiguousException(reference);
+                flow = candidate;
+            }
+        }
+        if (flow is null) throw new FlowNotFoundException(flowId);
+
         var version = reference.Version;
         if (version is null)
-        {
-            var flow = await repository.GetAsync(workspaceId, flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
             version = flow.Value.ActiveVersion ?? throw new FlowValidationException("flow_active_version_missing", "The referenced Flow has no active version.");
-        }
-        return (await repository.GetVersionAsync(workspaceId, flowId, version, cancellationToken))?.Value
+        return (await repository.GetVersionExactAsync(flow.Value.ScopeRef, flowId, version, cancellationToken))?.Value
             ?? throw new FlowValidationException("flow_version_not_found", $"Flow version '{flowId}:{version}' does not exist.");
+    }
+
+    private async Task<IReadOnlyList<ResourceScopeRef>> ListVisibleScopesAsync(
+        ResourceScopeRef consumerScopeRef,
+        CancellationToken cancellationToken)
+    {
+        var hierarchy = scopeHierarchies?.SingleOrDefault();
+        var visibleScopes = hierarchy is null
+            ? [consumerScopeRef]
+            : await hierarchy.ListVisibleAsync(consumerScopeRef, cancellationToken);
+        if (visibleScopes.Count == 0 || visibleScopes[0] != consumerScopeRef || visibleScopes.Distinct().Count() != visibleScopes.Count)
+            throw new InvalidOperationException($"The visible Flow scope chain for '{consumerScopeRef}' is invalid.");
+        return visibleScopes;
     }
 
     private static IReadOnlyDictionary<string, string> Copy(IReadOnlyDictionary<string, string>? source) =>

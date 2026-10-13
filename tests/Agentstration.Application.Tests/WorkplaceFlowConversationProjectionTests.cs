@@ -47,7 +47,7 @@ public sealed class WorkplaceFlowConversationProjectionTests
                 TaskId = taskId
             }, default);
             var definition = new FlowVersion(
-                workspaceId,
+                ResourceScopeRef.Workspace(workspaceId.Value),
                 new("game-flow"),
                 "1.0.0",
                 null,

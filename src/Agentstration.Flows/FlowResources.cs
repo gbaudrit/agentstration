@@ -10,7 +10,7 @@ public static class FlowResourceKinds
 }
 
 public sealed record FlowResource(
-    WorkspaceId WorkspaceId,
+    ResourceScopeRef ScopeRef,
     FlowId Id,
     string Name,
     string? Description,
@@ -25,7 +25,7 @@ public sealed record FlowResource(
     FlowGraphDefinition? Graph = null);
 
 public sealed record FlowVersion(
-    WorkspaceId WorkspaceId,
+    ResourceScopeRef ScopeRef,
     FlowId FlowId,
     string Version,
     string? Description,

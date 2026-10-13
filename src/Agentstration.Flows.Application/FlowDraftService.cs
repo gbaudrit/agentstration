@@ -40,7 +40,7 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
             UpdatedAt = now,
             UpdatedBy = command.UpdatedBy
         };
-        FlowValidator.Validate(new FlowResource(workspaceId, id, command.Name, command.Description, "0.1.0", true, null,
+        FlowValidator.Validate(new FlowResource(ResourceScopeRef.Workspace(workspaceId.Value), id, command.Name, command.Description, "0.1.0", true, null,
             FlowDraftSnapshotAdapter.ToRoutingDefinition(graph), Copy(command.Tags), now, now, command.DisplayName, graph));
         await flows.CreateAsync(workspaceId, new CreateFlowCommand(command.Name, command.Description, "0.1.0", true, FlowDraftSnapshotAdapter.ToRoutingDefinition(graph), command.Tags), cancellationToken);
         return await repository.CreateDraftAsync(draft, cancellationToken);

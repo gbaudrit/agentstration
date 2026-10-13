@@ -14,7 +14,7 @@ public sealed class RootFlowTargetResolver(FlowService flows) : IRootFlowTargetR
     {
         var resolved = await flows.ResolveAsync(scope.WorkspaceId, target, target.FlowId.Namespace, cancellationToken);
         FlowRunService.ValidateInput(resolved.Graph?.InputSchema, input);
-        return new(new FlowReference(resolved.FlowId, resolved.Version, false, resolved.FlowId.Namespace));
+        return new(new FlowReference(resolved.FlowId, resolved.Version, false, resolved.FlowId.Namespace, resolved.ScopeRef));
     }
 }
 
@@ -40,7 +40,10 @@ public sealed class RootFlowRunGateway(FlowRunService runs) : IRootFlowRunGatewa
             request.InteractionId,
             request.WorkTaskId,
             request.TriggerMessageId,
-            request.Scope), cancellationToken);
+            request.Scope)
+        {
+            DefinitionScopeRef = request.Target.ScopeRef
+        }, cancellationToken);
         return new(stored.Value, stored.ETag);
     }
 }

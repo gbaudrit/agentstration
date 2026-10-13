@@ -49,7 +49,7 @@ public sealed class AwpAssignmentProjectionTests
                 ],
                 Transitions = [new("lookup-completed", "lookup", "success", "completed")]
             };
-            var version = new FlowVersion(workspaceId, new("flow", ResourceNamespace.Default), "1.0", null,
+            var version = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), new("flow", ResourceNamespace.Default), "1.0", null,
                 new DirectFlowDefinition(new(FlowTargetKind.Agent, "unused")),
                 new Dictionary<string, string>(), now, graph, "sha256:flow");
             await repository.CreateRunAsync(new FlowRun

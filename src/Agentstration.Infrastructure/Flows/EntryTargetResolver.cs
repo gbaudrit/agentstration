@@ -41,13 +41,14 @@ public sealed class EntryTargetResolver(
         var resourceId = draft.Binding.ResourceId;
         var targetNamespace = draft.Binding.Namespace ?? draft.Id.Namespace;
         var flowId = FlowIdFrom(resourceId, targetNamespace);
-        var stored = await flows.GetAsync(draft.WorkspaceId, flowId, cancellationToken)
+        var consumerScope = ResourceScopeRef.Workspace(draft.WorkspaceId.Value);
+        var stored = await flows.GetVisibleAsync(consumerScope, flowId, draft.Binding.ScopeRef, cancellationToken)
             ?? throw new KeyNotFoundException($"Flow '{resourceId}' was not found.");
         var version = stored.Value.ActiveVersion
             ?? throw new WorkValidationException("entry_flow_not_published", $"Flow '{resourceId}' has no active published version.");
-        var resolved = await flows.ResolveAsync(draft.WorkspaceId, new FlowReference(flowId, version, UseActiveVersion: false, targetNamespace), draft.Id.Namespace, cancellationToken);
+        var resolved = await flows.ResolveAsync(draft.WorkspaceId, new FlowReference(flowId, version, UseActiveVersion: false, targetNamespace, stored.Value.ScopeRef), draft.Id.Namespace, cancellationToken);
         ValidateFlowInputs(draft, resolved);
-        return new EntryResolvedTarget(resourceId, version) { Namespace = targetNamespace };
+        return new EntryResolvedTarget(resourceId, version) { Namespace = targetNamespace, ScopeRef = resolved.ScopeRef };
     }
 
     private async Task<EntryResolvedTarget> ResolveAgentAsync(EntryDraft draft, CancellationToken cancellationToken)
@@ -86,7 +87,7 @@ public sealed class EntryTargetResolver(
 
         if (await flows.GetVersionAsync(draft.WorkspaceId, flowId, version, cancellationToken) is null)
             await flows.PublishVersionAsync(draft.WorkspaceId, flowId, version, activate: true, cancellationToken);
-        return new EntryResolvedTarget(flowId.Value, version) { Namespace = draft.Id.Namespace };
+        return new EntryResolvedTarget(flowId.Value, version) { Namespace = draft.Id.Namespace, ScopeRef = ResourceScopeRef.Workspace(draft.WorkspaceId.Value) };
     }
 
     private static FlowId FlowIdFrom(string resourceId, Agentstration.Resources.ResourceNamespace @namespace) => new(ResourceName(resourceId), @namespace);

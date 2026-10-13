@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Agentstration.Flows;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
@@ -62,44 +63,47 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
+        await MigrateLegacyDefinitionScopesAsync(context, cancellationToken);
     }
 
     public async Task<StoredFlow> CreateAsync(FlowResource definition, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
-        var document = Document(definition.WorkspaceId, DefinitionKey(definition.WorkspaceId, definition.Id), DefinitionKind, definition.Id, null, definition, now);
+        var document = Document(ScopeStorageId(definition.ScopeRef), DefinitionKey(definition.ScopeRef, definition.Id), DefinitionKind, definition.Id, null, definition, now);
         context.Documents.Add(document);
         await SaveCreateAsync(context, cancellationToken);
         return new StoredFlow(definition, document.ETag, now);
     }
 
-    public async Task<StoredFlow?> GetAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken)
+    public async Task<StoredFlow?> GetExactAsync(ResourceScopeRef scopeRef, FlowId id, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.Key == DefinitionKey(workspaceId, id), cancellationToken);
+        var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.Key == DefinitionKey(scopeRef, id), cancellationToken);
         return document is null ? null : ToFlow(document);
     }
 
-    public async Task<FlowPage> ListAsync(WorkspaceId workspaceId, int skip, int take, CancellationToken cancellationToken)
+    public async Task<FlowPage> ListExactAsync(ResourceScopeRef scopeRef, int skip, int take, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(skip);
         ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
         take = Math.Min(take, 200);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var documents = await context.Documents.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.Kind == DefinitionKind)
+        var prefix = ScopePrefix(scopeRef);
+        var documents = await context.Documents.AsNoTracking().Where(value => value.Key.StartsWith(prefix) && value.Kind == DefinitionKind)
             .OrderBy(value => value.Namespace).ThenBy(value => value.FlowId).Skip(skip).Take(take + 1).ToArrayAsync(cancellationToken);
         return new FlowPage(documents.Take(take).Select(ToFlow).ToArray(), documents.Length > take);
     }
 
-    public async Task<FlowPage> ListAsync(WorkspaceId workspaceId, ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken)
+    public async Task<FlowPage> ListExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(skip);
         ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
         take = Math.Min(take, 200);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var prefix = ScopePrefix(scopeRef);
         var documents = await context.Documents.AsNoTracking()
-            .Where(value => value.WorkspaceId == workspaceId.Value && value.Kind == DefinitionKind && value.Namespace == @namespace.Value)
+            .Where(value => value.Key.StartsWith(prefix) && value.Kind == DefinitionKind && value.Namespace == @namespace.Value)
             .OrderBy(value => value.FlowId).Skip(skip).Take(take + 1).ToArrayAsync(cancellationToken);
         return new FlowPage(documents.Take(take).Select(ToFlow).ToArray(), documents.Length > take);
     }
@@ -107,7 +111,7 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     public async Task<StoredFlow> UpdateAsync(FlowResource definition, string expectedETag, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Documents.SingleOrDefaultAsync(value => value.Key == DefinitionKey(definition.WorkspaceId, definition.Id), cancellationToken)
+        var document = await context.Documents.SingleOrDefaultAsync(value => value.Key == DefinitionKey(definition.ScopeRef, definition.Id), cancellationToken)
             ?? throw new FlowNotFoundException(definition.Id);
         if (!string.Equals(document.ETag, expectedETag, StringComparison.Ordinal)) throw new FlowConcurrencyException("The supplied ETag does not match the current Flow version.");
         var now = timeProvider.GetUtcNow();
@@ -118,19 +122,17 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         return new StoredFlow(definition, document.ETag, now);
     }
 
-    public async Task DeleteAsync(WorkspaceId workspaceId, FlowId id, string? expectedETag, CancellationToken cancellationToken)
+    public async Task DeleteExactAsync(ResourceScopeRef scopeRef, FlowId id, string? expectedETag, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var definition = await context.Documents.SingleOrDefaultAsync(value => value.Key == DefinitionKey(workspaceId, id), cancellationToken)
+        var definition = await context.Documents.SingleOrDefaultAsync(value => value.Key == DefinitionKey(scopeRef, id), cancellationToken)
             ?? throw new FlowNotFoundException(id);
         if (expectedETag is not null && !string.Equals(definition.ETag, expectedETag, StringComparison.Ordinal))
             throw new FlowConcurrencyException("The supplied ETag does not match the current Flow version.");
-        var namespaceValue = id.Namespace.Value;
+        var flowPrefix = FlowPrefix(scopeRef, id);
         var removable = await context.Documents.Where(value =>
-            value.WorkspaceId == workspaceId.Value
-            && value.Namespace == namespaceValue
-            && value.FlowId == id.Value
-            && (value.Kind == DefinitionKind || value.Kind == VersionKind || value.Kind == DraftKind)).ToArrayAsync(cancellationToken);
+            value.Key.StartsWith(flowPrefix)
+            && (value.Kind == DefinitionKind || value.Kind == VersionKind)).ToArrayAsync(cancellationToken);
         context.Documents.RemoveRange(removable);
         await SaveUpdateAsync(context, cancellationToken);
     }
@@ -139,24 +141,24 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
-        var document = Document(version.WorkspaceId, VersionKey(version.WorkspaceId, version.FlowId, version.Version), VersionKind, version.FlowId, version.Version, version, now);
+        var document = Document(ScopeStorageId(version.ScopeRef), VersionKey(version.ScopeRef, version.FlowId, version.Version), VersionKind, version.FlowId, version.Version, version, now);
         context.Documents.Add(document);
         await SaveCreateAsync(context, cancellationToken);
         return new StoredFlowVersion(version, document.ETag, now);
     }
 
-    public async Task<StoredFlowVersion?> GetVersionAsync(WorkspaceId workspaceId, FlowId id, string version, CancellationToken cancellationToken)
+    public async Task<StoredFlowVersion?> GetVersionExactAsync(ResourceScopeRef scopeRef, FlowId id, string version, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.Key == VersionKey(workspaceId, id, version), cancellationToken);
+        var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.Key == VersionKey(scopeRef, id, version), cancellationToken);
         return document is null ? null : ToVersion(document);
     }
 
-    public async Task<IReadOnlyList<StoredFlowVersion>> ListVersionsAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<StoredFlowVersion>> ListVersionsExactAsync(ResourceScopeRef scopeRef, FlowId id, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var namespaceValue = id.Namespace.Value;
-        var documents = await context.Documents.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.Namespace == namespaceValue && value.Kind == VersionKind && value.FlowId == id.Value)
+        var flowPrefix = FlowPrefix(scopeRef, id);
+        var documents = await context.Documents.AsNoTracking().Where(value => value.Key.StartsWith(flowPrefix) && value.Kind == VersionKind)
             .OrderBy(value => value.Version).ToArrayAsync(cancellationToken);
         return documents.Select(ToVersion).ToArray();
     }
@@ -381,8 +383,61 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     private static StoredFlowDraft ToDraft(FlowDocument document) => new(Deserialize<FlowDraft>(document), document.ETag, document.UpdatedAt);
     private static StoredInputRequest ToInputRequest(FlowDocument document) => new(Deserialize<InputRequest>(document), document.ETag, document.UpdatedAt);
     private static T Deserialize<T>(FlowDocument document) => JsonSerializer.Deserialize<T>(document.Payload, JsonOptions) ?? throw new InvalidOperationException($"Stored Flow resource '{document.Key}' is invalid.");
-    private static string DefinitionKey(WorkspaceId workspaceId, FlowId id) => $"workspace:{workspaceId}:flow:{id.Namespace.Value}:{id.Value}";
-    private static string VersionKey(WorkspaceId workspaceId, FlowId id, string version) => $"workspace:{workspaceId}:flow:{id.Namespace.Value}:{id.Value}:version:{version}";
+    private static async Task MigrateLegacyDefinitionScopesAsync(FlowDbContext context, CancellationToken cancellationToken)
+    {
+        var legacy = await context.Documents.Where(value =>
+                (value.Kind == DefinitionKind || value.Kind == VersionKind)
+                && value.Key.StartsWith("workspace:"))
+            .ToArrayAsync(cancellationToken);
+        if (legacy.Length == 0) return;
+
+        var replacements = legacy.Select(document =>
+        {
+            if (document.WorkspaceId == Guid.Empty)
+                throw new InvalidOperationException($"Legacy Flow resource '{document.Key}' has no Workspace owner.");
+            var workspaceId = new WorkspaceId(document.WorkspaceId);
+            var oldPrefix = $"workspace:{workspaceId}:";
+            if (!document.Key.StartsWith(oldPrefix, StringComparison.Ordinal))
+                throw new InvalidOperationException($"Legacy Flow resource key '{document.Key}' does not match its Workspace owner.");
+            var scopeRef = ResourceScopeRef.Workspace(document.WorkspaceId);
+            return new FlowDocument
+            {
+                WorkspaceId = document.WorkspaceId,
+                Key = $"scope:{scopeRef.Value}:{document.Key[oldPrefix.Length..]}",
+                Kind = document.Kind,
+                FlowId = document.FlowId,
+                Namespace = document.Namespace,
+                Version = document.Version,
+                TenantId = document.TenantId,
+                PrincipalId = document.PrincipalId,
+                Status = document.Status,
+                Payload = MigrateLegacyDefinitionPayload(document.Payload, scopeRef, document.Key),
+                ETag = document.ETag,
+                UpdatedAt = document.UpdatedAt
+            };
+        }).ToArray();
+        var replacementKeys = replacements.Select(value => value.Key).ToArray();
+        if (await context.Documents.AnyAsync(value => replacementKeys.Contains(value.Key), cancellationToken))
+            throw new InvalidOperationException("A legacy Flow definition cannot be migrated because its scoped identity already exists.");
+
+        context.Documents.RemoveRange(legacy);
+        context.Documents.AddRange(replacements);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static string MigrateLegacyDefinitionPayload(string payload, ResourceScopeRef scopeRef, string key)
+    {
+        var root = JsonNode.Parse(payload) as JsonObject
+            ?? throw new InvalidOperationException($"Legacy Flow resource '{key}' has an invalid payload.");
+        root.Remove("workspaceId");
+        root["scopeRef"] = scopeRef.Value;
+        return root.ToJsonString(JsonOptions);
+    }
+    private static WorkspaceId ScopeStorageId(ResourceScopeRef scopeRef) => new(scopeRef.TargetId ?? Guid.Empty);
+    private static string ScopePrefix(ResourceScopeRef scopeRef) => $"scope:{scopeRef.Value}:";
+    private static string FlowPrefix(ResourceScopeRef scopeRef, FlowId id) => $"{ScopePrefix(scopeRef)}flow:{id.Namespace.Value}:{id.Value}";
+    private static string DefinitionKey(ResourceScopeRef scopeRef, FlowId id) => FlowPrefix(scopeRef, id);
+    private static string VersionKey(ResourceScopeRef scopeRef, FlowId id, string version) => $"{FlowPrefix(scopeRef, id)}:version:{version}";
     private static string RunKey(WorkspaceId workspaceId, string id) => $"workspace:{workspaceId}:run:{id}";
     private static string DraftKey(WorkspaceId workspaceId, FlowId id) => $"workspace:{workspaceId}:flow:{id.Namespace.Value}:{id.Value}:draft";
     private static string RunEventKey(WorkspaceId workspaceId, string runId, long sequence) => $"workspace:{workspaceId}:run:{runId}:event:{sequence:D12}";

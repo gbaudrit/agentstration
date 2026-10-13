@@ -202,7 +202,7 @@ public sealed class RootFlowSubmissionTests
         {
             if (!runs.TryGetValue(request.RunId, out var result))
             {
-                var version = new FlowVersion(request.Scope.WorkspaceId, request.Target.FlowId, request.Target.Version!, null,
+                var version = new FlowVersion(ResourceScopeRef.Workspace(request.Scope.WorkspaceId.Value), request.Target.FlowId, request.Target.Version!, null,
                     new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant")), new Dictionary<string, string>(), DateTimeOffset.UtcNow);
                 var run = new FlowRun
                 {

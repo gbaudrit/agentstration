@@ -34,7 +34,7 @@ public sealed partial class FlowTests
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static FlowResource Definition(string name, FlowDefinition definition) => new(TestScope.WorkspaceId, new FlowId(name), name, null, "1.0.0", true, null, definition, new Dictionary<string, string>(), Now, Now);
+    private static FlowResource Definition(string name, FlowDefinition definition) => new(ResourceScopeRef.Workspace(TestScope.WorkspaceId.Value), new FlowId(name), name, null, "1.0.0", true, null, definition, new Dictionary<string, string>(), Now, Now);
 
     private sealed class FlowFixture : IAsyncDisposable
     {
@@ -42,8 +42,12 @@ public sealed partial class FlowTests
         private readonly ServiceProvider _provider;
         public FlowService Service => _provider.GetRequiredService<FlowService>();
         public IFlowRepository Repository => _provider.GetRequiredService<IFlowRepository>();
+        public IDbContextFactory<FlowDbContext> ContextFactory => _provider.GetRequiredService<IDbContextFactory<FlowDbContext>>();
         private FlowFixture(string directory, ServiceProvider provider) { _directory = directory; _provider = provider; }
-        public static async Task<FlowFixture> CreateAsync(DbCommandInterceptor? commandInterceptor = null, TimeProvider? timeProvider = null)
+        public static async Task<FlowFixture> CreateAsync(
+            DbCommandInterceptor? commandInterceptor = null,
+            TimeProvider? timeProvider = null,
+            IFlowScopeHierarchy? scopeHierarchy = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-flow-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
@@ -59,6 +63,7 @@ public sealed partial class FlowTests
                 services.AddDbContextFactory<FlowDbContext>(options => options.UseSqlite(connectionString).AddInterceptors(commandInterceptor));
                 services.AddSingleton<IFlowRepository, SqliteFlowRepository>();
             }
+            if (scopeHierarchy is not null) services.AddSingleton(scopeHierarchy);
             services.AddSingleton<FlowService>();
             var provider = services.BuildServiceProvider();
             var fixture = new FlowFixture(directory, provider);
