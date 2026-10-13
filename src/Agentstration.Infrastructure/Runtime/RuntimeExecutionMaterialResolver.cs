@@ -105,7 +105,9 @@ public sealed class RuntimeExecutionMaterialResolver(
         using var scope = flowScopes.Enter(run.Scope);
         if (!string.Equals(run.FlowVersion, run.DefinitionSnapshot.Version, StringComparison.Ordinal)
             || run.DefinitionHash is not null
-            && !string.Equals(run.DefinitionHash, run.DefinitionSnapshot.DefinitionHash, StringComparison.Ordinal))
+            && !string.Equals(run.DefinitionHash, run.DefinitionSnapshot.DefinitionHash, StringComparison.Ordinal)
+            || run.DefinitionScopeRef is { } definitionScopeRef
+            && definitionScopeRef != run.DefinitionSnapshot.ScopeRef)
             throw new RuntimeExecutionMaterialException("execution_material_drift", "The Flow Run snapshot no longer matches its immutable version and hash pins.");
 
         var references = ExecutionAgentReferences(run.DefinitionSnapshot);
@@ -156,7 +158,10 @@ public sealed class RuntimeExecutionMaterialResolver(
             run.RootFlowRunId ?? run.Id,
             run.ParentFlowRunId,
             run.CorrelationId,
-            flowOptions.Value.OrchestrationTimeout);
+            flowOptions.Value.OrchestrationTimeout)
+        {
+            FlowScopeRef = (run.DefinitionScopeRef ?? run.DefinitionSnapshot.ScopeRef).Value
+        };
     }
 
     private static bool BelongsToAssignment(RuntimeWorkerAssignment assignment, FlowRun run) =>

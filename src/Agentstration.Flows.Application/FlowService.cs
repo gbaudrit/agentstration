@@ -110,7 +110,7 @@ public sealed class FlowService(
         if (await repository.GetVersionExactAsync(scopeRef, id, version, cancellationToken) is not null)
             throw new FlowValidationException("flow_version_already_published", $"Flow version '{version}' has already been published. Choose a new version.");
         var published = new FlowVersion(stored.Value.ScopeRef, id, version, stored.Value.Description, stored.Value.Definition, stored.Value.Metadata, timeProvider.GetUtcNow(), stored.Value.Graph,
-            stored.Value.Graph is null ? null : FlowDefinitionHash.Compute(stored.Value.Graph), releaseNotes);
+            stored.Value.Graph is null ? FlowDefinitionHash.Compute(stored.Value.Definition) : FlowDefinitionHash.Compute(stored.Value.Graph), releaseNotes);
         FlowValidator.ValidateVersion(published);
         if (activate)
             if (scopeRef.Kind == ResourceScopeKind.Workspace)

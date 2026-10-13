@@ -640,7 +640,10 @@ public static class AwpRuntimeWorkerEndpoints
             flow.RootFlowRunId,
             flow.ParentFlowRunId,
             flow.CorrelationId,
-            checked((int)Math.Ceiling(flow.OrchestrationTimeout.TotalMilliseconds))),
+            checked((int)Math.Ceiling(flow.OrchestrationTimeout.TotalMilliseconds)))
+        {
+            FlowScopeRef = flow.FlowScopeRef
+        },
         _ => throw new ArgumentOutOfRangeException(nameof(material))
     };
 

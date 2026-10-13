@@ -15,7 +15,10 @@ public sealed record ResolvedFlowCall(
     string Version,
     JsonElement? InputSchema,
     JsonElement? OutputSchema,
-    IReadOnlyList<FlowOutputDefinition>? Outputs = null);
+    IReadOnlyList<FlowOutputDefinition>? Outputs = null)
+{
+    public ResourceScopeRef? ScopeRef { get; init; }
+}
 
 public sealed record ResolvedFlowTool(
     string ResourceId,

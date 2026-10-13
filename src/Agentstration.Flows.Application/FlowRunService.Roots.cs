@@ -22,7 +22,10 @@ public sealed record EnsureRootFlowRunCommand(
     string? InteractionId,
     string? WorkTaskId,
     string? TriggerMessageId,
-    FlowRunScope Scope);
+    FlowRunScope Scope)
+{
+    public ResourceScopeRef? DefinitionScopeRef { get; init; }
+}
 
 public sealed partial class FlowRunService
 {
@@ -38,7 +41,7 @@ public sealed partial class FlowRunService
             return existing;
         }
 
-        var resolved = await ResolveVersionAsync(command.Scope.WorkspaceId, command.FlowId, command.Version, cancellationToken);
+        var resolved = await ResolveVersionAsync(command.Scope.WorkspaceId, command.FlowId, command.Version, command.DefinitionScopeRef, cancellationToken);
         ValidateInput(resolved.Graph?.InputSchema, command.Input);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun
@@ -66,8 +69,9 @@ public sealed partial class FlowRunService
             CreatedAt = now,
             DefinitionSnapshot = resolved,
             DefinitionHash = resolved.DefinitionHash,
+            DefinitionScopeRef = resolved.ScopeRef,
             DefinitionState = FlowDefinitionState.Published,
-            DefinitionSnapshotId = $"{command.FlowId.Value}:{resolved.Version}:{resolved.DefinitionHash ?? "legacy"}",
+            DefinitionSnapshotId = DefinitionSnapshotIdentity(resolved),
             Steps = CreateSteps(resolved, command.Input)
         };
 

@@ -71,7 +71,10 @@ public sealed record AwpRootFlowExecutionMaterial(
     string? ParentFlowRunId = null,
     string? CorrelationId = null,
     int OrchestrationTimeoutMilliseconds = 0)
-    : AwpExecutionMaterial(MaterialId, SchemaVersion, Digest, RunId);
+    : AwpExecutionMaterial(MaterialId, SchemaVersion, Digest, RunId)
+{
+    public string? FlowScopeRef { get; init; }
+}
 
 public sealed record AwpFlowResumeMaterial(
     string RuntimeType,

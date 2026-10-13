@@ -133,6 +133,56 @@ public sealed partial class FlowTests
         Assert.AreEqual(scopeRef, migratedVersion.Value.ScopeRef);
     }
 
+    [TestMethod]
+    public async Task WorkspaceRunPinsResolvedAncestorDefinitionScopeVersionAndHash()
+    {
+        var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        await using var fixture = await FlowFixture.CreateAsync(scopeHierarchy: new TestFlowScopeHierarchy(tenantId));
+        var flowId = new FlowId("inherited-run");
+        await fixture.Service.CreateExactAsync(
+            ResourceScopeRef.Instance,
+            new CreateFlowCommand(
+                flowId.Value,
+                null,
+                "1.0.0",
+                true,
+                new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"))),
+            ResourceNamespace.Default,
+            default);
+        var published = await fixture.Service.PublishVersionExactAsync(
+            ResourceScopeRef.Instance,
+            flowId,
+            "1.0.0",
+            activate: true,
+            default);
+        var runs = new FlowRunService(
+            fixture.Repository,
+            new TestFlowRunQueue(),
+            new TestCancellationRegistry(),
+            new NullFlowRunEventSink(),
+            TimeProvider.System,
+            flowDefinitions: fixture.Service);
+        using var input = JsonDocument.Parse("""{"prompt":"test"}""");
+
+        var run = await runs.CreateAsync(
+            flowId,
+            null,
+            "local",
+            FlowRunTrigger.Manual,
+            "principal",
+            "inherited",
+            input.RootElement,
+            TestScope,
+            default);
+
+        Assert.AreEqual(ResourceScopeRef.Instance, run.Value.DefinitionScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Instance, run.Value.DefinitionSnapshot.ScopeRef);
+        Assert.AreEqual(published.Value.Version, run.Value.FlowVersion);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(run.Value.DefinitionHash));
+        Assert.AreEqual(published.Value.DefinitionHash, run.Value.DefinitionHash);
+        StringAssert.StartsWith(run.Value.DefinitionSnapshotId, $"{ResourceScopeRef.Instance.Value}:");
+    }
+
     private static async Task RewriteAsLegacyAsync(
         FlowDbContext context,
         string currentKey,

@@ -150,7 +150,8 @@ public sealed record FlowCallReference(
     string ResourceId,
     FlowCallVersionStrategy VersionStrategy = FlowCallVersionStrategy.Active,
     string? Version = null,
-    ResourceNamespace? Namespace = null)
+    ResourceNamespace? Namespace = null,
+    ResourceScopeRef? ScopeRef = null)
 {
     public FlowId Resolve(ResourceNamespace ownerNamespace) => new(ResourceId, Namespace ?? ownerNamespace);
 }
@@ -364,6 +365,12 @@ public static class FlowGraphDefinitionExtensions
 public static class FlowDefinitionHash
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    public static string Compute(FlowDefinition definition)
+    {
+        var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(definition, JsonOptions));
+        return Convert.ToHexStringLower(SHA256.HashData(bytes));
+    }
+
     public static string Compute(FlowGraphDefinition definition)
     {
         var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(definition, JsonOptions));

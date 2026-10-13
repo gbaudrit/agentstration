@@ -81,6 +81,7 @@ public sealed record FlowRun
     public long? DraftRevision { get; init; }
     public string? DefinitionSnapshotId { get; init; }
     public string? DefinitionHash { get; init; }
+    public ResourceScopeRef? DefinitionScopeRef { get; init; }
     public string? DeploymentResourceId { get; init; }
     public FlowRunStatus Status { get; init; } = FlowRunStatus.Pending;
     public FlowRunTrigger Trigger { get; init; }

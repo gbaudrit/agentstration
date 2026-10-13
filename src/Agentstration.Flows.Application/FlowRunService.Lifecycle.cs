@@ -93,7 +93,7 @@ public sealed partial class FlowRunService
         FlowRunScope scope,
         CancellationToken cancellationToken)
     {
-        var resolved = await ResolveVersionAsync(scope.WorkspaceId, flowId, version, cancellationToken);
+        var resolved = await ResolveVersionAsync(scope.WorkspaceId, flowId, version, null, cancellationToken);
         ValidateInput(resolved.Graph?.InputSchema, input);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun
@@ -115,8 +115,9 @@ public sealed partial class FlowRunService
             CreatedAt = now,
             DefinitionSnapshot = resolved,
             DefinitionHash = resolved.DefinitionHash,
+            DefinitionScopeRef = resolved.ScopeRef,
             DefinitionState = FlowDefinitionState.Published,
-            DefinitionSnapshotId = $"{flowId.Value}:{resolved.Version}:{resolved.DefinitionHash ?? "legacy"}",
+            DefinitionSnapshotId = DefinitionSnapshotIdentity(resolved),
             Steps = CreateSteps(resolved, input)
         };
         var stored = await repository.CreateRunAsync(run, cancellationToken);
@@ -144,6 +145,7 @@ public sealed partial class FlowRunService
             DefinitionState = FlowDefinitionState.Draft,
             DraftRevision = draft.Revision,
             DefinitionHash = draft.DefinitionHash,
+            DefinitionScopeRef = snapshot.ScopeRef,
             DefinitionSnapshotId = $"snapshot-{Guid.NewGuid():N}",
             DeploymentResourceId = "designer",
             Trigger = trigger,
@@ -293,15 +295,26 @@ public sealed partial class FlowRunService
         return cancelled;
     }
 
-    private async Task<FlowVersion> ResolveVersionAsync(WorkspaceId workspaceId, FlowId flowId, string? version, CancellationToken cancellationToken)
+    private async Task<FlowVersion> ResolveVersionAsync(
+        WorkspaceId workspaceId,
+        FlowId flowId,
+        string? version,
+        ResourceScopeRef? definitionScopeRef,
+        CancellationToken cancellationToken)
     {
+        if (flowDefinitions is not null)
+            return await flowDefinitions.ResolveAsync(
+                workspaceId,
+                new FlowReference(flowId, version, string.IsNullOrWhiteSpace(version), flowId.Namespace, definitionScopeRef),
+                cancellationToken);
+        var exactScopeRef = definitionScopeRef ?? ResourceScopeRef.Workspace(workspaceId.Value);
         if (!string.IsNullOrWhiteSpace(version))
-            return (await repository.GetVersionAsync(workspaceId, flowId, version, cancellationToken))?.Value
+            return (await repository.GetVersionExactAsync(exactScopeRef, flowId, version, cancellationToken))?.Value
                 ?? throw new FlowValidationException("flow_version_not_found", $"Published Flow version '{version}' was not found.");
-        var definition = await repository.GetAsync(workspaceId, flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
+        var definition = await repository.GetExactAsync(exactScopeRef, flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
         if (definition.Value.ActiveVersion is null)
             throw new FlowValidationException("flow_active_version_required", "A Flow Run requires a published active version.");
-        return (await repository.GetVersionAsync(workspaceId, flowId, definition.Value.ActiveVersion, cancellationToken))?.Value
+        return (await repository.GetVersionExactAsync(exactScopeRef, flowId, definition.Value.ActiveVersion, cancellationToken))?.Value
             ?? throw new FlowValidationException("flow_version_not_found", $"Published Flow version '{definition.Value.ActiveVersion}' was not found.");
     }
 

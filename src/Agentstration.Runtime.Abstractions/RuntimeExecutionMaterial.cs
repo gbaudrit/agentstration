@@ -84,7 +84,10 @@ public sealed record RuntimeRootFlowExecutionMaterial(
     string? ParentFlowRunId = null,
     string? CorrelationId = null,
     TimeSpan OrchestrationTimeout = default)
-    : RuntimeExecutionMaterial(MaterialId, SchemaVersion, Digest, RuntimeAssignmentTargetKind.FlowRun, WorkspaceId, TenantId, PrincipalId, RunId);
+    : RuntimeExecutionMaterial(MaterialId, SchemaVersion, Digest, RuntimeAssignmentTargetKind.FlowRun, WorkspaceId, TenantId, PrincipalId, RunId)
+{
+    public string? FlowScopeRef { get; init; }
+}
 
 public sealed record RuntimeFlowResumeMaterial(
     string RuntimeType,
