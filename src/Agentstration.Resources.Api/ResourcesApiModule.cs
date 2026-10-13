@@ -9,6 +9,7 @@ public static class ResourcesApiModule
     public static IEndpointRouteBuilder MapResourcesApi(this IEndpointRouteBuilder endpoints)
     {
         ResourceScopeEndpoints.Map(endpoints);
+        ResourceAccessPolicyEndpoints.Map(endpoints);
         return endpoints;
     }
 }

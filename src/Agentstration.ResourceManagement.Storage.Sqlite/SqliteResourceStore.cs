@@ -30,6 +30,7 @@ public sealed class ResourceManagementDbContext(DbContextOptions<ResourceManagem
     internal DbSet<SecurityAuditRow> SecurityAuditEvents => Set<SecurityAuditRow>();
     internal DbSet<PersonalAccessTokenRow> PersonalAccessTokens => Set<PersonalAccessTokenRow>();
     internal DbSet<TriggerOccurrenceRow> TriggerOccurrences => Set<TriggerOccurrenceRow>();
+    internal DbSet<ResourceAccessPolicyRow> ResourceAccessPolicies => Set<ResourceAccessPolicyRow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,6 +65,15 @@ public sealed class ResourceManagementDbContext(DbContextOptions<ResourceManagem
         occurrence.Property(value => value.WorkItemId).HasMaxLength(128);
         occurrence.Property(value => value.ErrorCode).HasMaxLength(128);
         occurrence.HasIndex(value => new { value.WorkspaceId, value.TriggerUid, value.ScheduledAt });
+        var accessPolicy = modelBuilder.Entity<ResourceAccessPolicyRow>();
+        accessPolicy.ToTable("ResourceAccessPolicies");
+        accessPolicy.HasKey(value => value.ResourceUid);
+        accessPolicy.Property(value => value.OwnerScopeRef).HasMaxLength(128);
+        accessPolicy.Property(value => value.Namespace).HasMaxLength(128);
+        accessPolicy.Property(value => value.Kind).HasMaxLength(256);
+        accessPolicy.Property(value => value.Version).HasMaxLength(128);
+        accessPolicy.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
+        accessPolicy.HasIndex(value => value.OwnerScopeRef);
         modelBuilder.ConfigureIdentityModel();
     }
 }
@@ -108,10 +118,11 @@ public sealed class SqliteResourceStore(
                 INSERT OR IGNORE INTO ResourceScopes (Ref, Kind, TargetKey, ParentScopeId)
                 VALUES ({ResourceScopeRef.Instance.Value}, {"instance"}, {ResourceScopeRef.Instance.TargetKey}, NULL)
                 """, cancellationToken);
+            _ = await context.ResourceAccessPolicies.AsNoTracking().AnyAsync(cancellationToken);
         }
         catch (System.Data.Common.DbException exception)
         {
-            throw new InvalidOperationException("The Management database schema is incompatible with explicit resource scopes. Delete the pre-release database and reseed the instance.", exception);
+            throw new InvalidOperationException("The Management database schema is incompatible with current resource scopes and access policies. Delete the pre-release database and reseed the instance.", exception);
         }
         await context.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS IX_ControlPlaneResources_AgentRevisionLookup ON ControlPlaneResources (ScopeId, Kind, json_extract(Payload, '$.agentUid'), json_extract(Payload, '$.agentVersion'))",
@@ -151,6 +162,23 @@ public sealed class SqliteResourceStore(
         var document = await context.Documents.AsNoTracking().Include(value => value.Scope).SingleOrDefaultAsync(value => value.Uid == uid, cancellationToken);
         if (document is null || !await CanReadAsync(context, document.Scope, cancellationToken)) return null;
         return Deserialize<T>(document);
+    }
+
+    public async Task<ResourceIdentitySnapshot?> GetIdentityByUidAsync(Guid uid, CancellationToken cancellationToken)
+    {
+        if (uid == Guid.Empty) throw new ArgumentException("A resource UID cannot be empty.", nameof(uid));
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Documents.AsNoTracking().Include(value => value.Scope)
+            .SingleOrDefaultAsync(value => value.Uid == uid, cancellationToken);
+        if (document is null || !await CanReadAsync(context, document.Scope, cancellationToken)) return null;
+        using var payload = JsonDocument.Parse(document.Payload);
+        var root = payload.RootElement;
+        var generation = root.TryGetProperty("generation", out var generationValue)
+            && generationValue.TryGetInt64(out var parsedGeneration) ? parsedGeneration : 0;
+        var version = root.TryGetProperty("version", out var versionValue)
+            && versionValue.ValueKind == JsonValueKind.String ? versionValue.GetString() : null;
+        return new(document.Uid, ResourceScopeRef.Parse(document.Scope.Ref),
+            ResourceNamespace.Parse(document.Namespace), document.Kind, document.Name, generation, version, document.ETag);
     }
 
     public async Task<StoredResource<T>?> GetExactAsync<T>(ScopedResourceAddress address, CancellationToken cancellationToken) where T : Resource
@@ -315,6 +343,9 @@ public sealed class SqliteResourceStore(
         };
         if (ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
             throw new ResourceConcurrencyException("The supplied ETag does not match the current resource version.");
+        var accessPolicy = await context.ResourceAccessPolicies
+            .SingleOrDefaultAsync(value => value.ResourceUid == existing.Uid, cancellationToken);
+        if (accessPolicy is not null) context.ResourceAccessPolicies.Remove(accessPolicy);
         context.Documents.Remove(existing);
         await SaveAsync(context, cancellationToken);
     }
@@ -328,6 +359,9 @@ public sealed class SqliteResourceStore(
             ?? throw new ResourceNotFoundException(new ResourceKey(address.Kind, address.Name, address.Namespace));
         if (ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
             throw new ResourceConcurrencyException("The supplied ETag does not match the current resource version.");
+        var accessPolicy = await context.ResourceAccessPolicies
+            .SingleOrDefaultAsync(value => value.ResourceUid == existing.Uid, cancellationToken);
+        if (accessPolicy is not null) context.ResourceAccessPolicies.Remove(accessPolicy);
         context.Documents.Remove(existing);
         await SaveAsync(context, cancellationToken);
     }
@@ -583,6 +617,7 @@ public static class SqliteResourceManagementServiceCollectionExtensions
         services.AddSingleton<IResourceStore, SqliteResourceStore>();
         services.AddSingleton<IAgentResourceQueries>(provider => (SqliteResourceStore)provider.GetRequiredService<IResourceStore>());
         services.AddSingleton<IResourceScopeResolver>(provider => (SqliteResourceStore)provider.GetRequiredService<IResourceStore>());
+        services.AddSingleton<IResourceAccessPolicyStore, SqliteResourceAccessPolicyStore>();
         services.AddSingleton<ITriggerOccurrenceStore, SqliteTriggerOccurrenceStore>();
         services.AddSingleton<SqliteIdentityStore>();
         services.AddSingleton<IIdentityStore>(provider => provider.GetRequiredService<SqliteIdentityStore>());

@@ -2,6 +2,7 @@ using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
@@ -23,16 +24,28 @@ public sealed class SecretManagementService(
     IResourceStore store,
     IResourceReferenceResolver references,
     IResourceScopeOperations scopeOperations,
+    ICurrentRequestContext currentRequestContext,
     IRequestContextScopeFactory requestContexts,
     DescendantResourceUseAuthorizer useAuthorizer,
+    IResourceAccessPolicyService accessPolicies,
     IEnumerable<ISecretVaultProvider> providers) : ISecretResolver, ISecretAccessAuthorizer
 {
-    public Task<IReadOnlyList<StoredResource<VaultResource>>> ListVaultsAsync(CancellationToken cancellationToken) => store.ListAllAsync<VaultResource>(SecretResourceKinds.Vault, cancellationToken);
+    public async Task<IReadOnlyList<StoredResource<VaultResource>>> ListVaultsAsync(CancellationToken cancellationToken)
+    {
+        var visible = new List<StoredResource<VaultResource>>();
+        foreach (var stored in await store.ListAllAsync<VaultResource>(SecretResourceKinds.Vault, cancellationToken))
+        {
+            var hydrated = await HydrateVaultAsync(stored, cancellationToken);
+            if (await CanDiscoverAsync(hydrated.Value, cancellationToken)) visible.Add(hydrated);
+        }
+        return visible;
+    }
     public async Task<IReadOnlyList<VaultView>> ListVaultViewsAsync(CancellationToken cancellationToken) =>
         await Task.WhenAll((await ListVaultsAsync(cancellationToken)).Select(value => ViewAsync(value.Value, cancellationToken)));
-    public Task<StoredResource<VaultResource>?> GetVaultAsync(string name, CancellationToken cancellationToken) => store.GetAsync<VaultResource>(new(SecretResourceKinds.Vault, name), cancellationToken);
-    public Task<StoredResource<VaultResource>?> GetVaultExactAsync(ResourceScopeRef scopeRef, string name, CancellationToken cancellationToken) =>
-        store.GetExactAsync<VaultResource>(ScopedResourceAddress.Create(scopeRef, ResourceNamespace.Default, SecretResourceKinds.Vault, name), cancellationToken);
+    public async Task<StoredResource<VaultResource>?> GetVaultAsync(string name, CancellationToken cancellationToken) =>
+        await HydrateVaultNullableAsync(await store.GetAsync<VaultResource>(new(SecretResourceKinds.Vault, name), cancellationToken), cancellationToken);
+    public async Task<StoredResource<VaultResource>?> GetVaultExactAsync(ResourceScopeRef scopeRef, string name, CancellationToken cancellationToken) =>
+        await HydrateVaultNullableAsync(await store.GetExactAsync<VaultResource>(ScopedResourceAddress.Create(scopeRef, ResourceNamespace.Default, SecretResourceKinds.Vault, name), cancellationToken), cancellationToken);
     public async Task<VaultView> GetVaultViewAsync(string name, CancellationToken cancellationToken) => await ViewAsync((await GetVaultAsync(name, cancellationToken))?.Value ?? throw new VaultResourceNotFoundException(name), cancellationToken);
     public async Task<VaultView> GetVaultViewExactAsync(ResourceScopeRef scopeRef, string name, CancellationToken cancellationToken) =>
         await ViewAsync((await GetVaultExactAsync(scopeRef, name, cancellationToken))?.Value ?? throw new VaultResourceNotFoundException(name), cancellationToken);
@@ -43,7 +56,15 @@ public sealed class SecretManagementService(
         {
             ValidateVault(resource);
             await useAuthorizer.ValidateAsync(scopeRef, resource.Definition.UsePolicy, token);
-            return await store.PutExactAsync(scopeRef, resource with { ScopeRef = scopeRef, Generation = 1, Status = Succeeded() }, null, true, token);
+            var stored = await store.PutExactAsync(scopeRef, resource with
+            {
+                ScopeRef = scopeRef,
+                Definition = resource.Definition with { UsePolicy = new() },
+                Generation = 1,
+                Status = Succeeded()
+            }, null, true, token);
+            await PersistLegacyPolicyAsync(stored.Value, resource.Definition.UsePolicy, token);
+            return await HydrateVaultAsync(stored, token);
         }, cancellationToken);
     }
     public async Task<StoredResource<VaultResource>> PutVaultAsync(string name, VaultProperties definition, string? etag, CancellationToken cancellationToken)
@@ -63,7 +84,14 @@ public sealed class SecretManagementService(
         {
             ValidateVault(existing.Value with { Definition = definition });
             await useAuthorizer.ValidateAsync(scopeRef, definition.UsePolicy, token);
-            return await store.PutExactAsync(scopeRef, existing.Value with { Definition = definition, Generation = checked(existing.Value.Generation + 1), Status = Succeeded() }, etag, false, token);
+            var stored = await store.PutExactAsync(scopeRef, existing.Value with
+            {
+                Definition = definition with { UsePolicy = new() },
+                Generation = checked(existing.Value.Generation + 1),
+                Status = Succeeded()
+            }, etag, false, token);
+            await PersistLegacyPolicyAsync(stored.Value, definition.UsePolicy, token);
+            return await HydrateVaultAsync(stored, token);
         }, cancellationToken);
     }
     public async Task DeleteVaultAsync(string name, string? etag, CancellationToken cancellationToken)
@@ -114,11 +142,21 @@ public sealed class SecretManagementService(
         return result.Created ? result : throw new VaultAlreadyInitializedException(vault.Name);
     }
 
-    public async Task<IReadOnlyList<SecretView>> ListSecretsAsync(CancellationToken cancellationToken) =>
-        await Task.WhenAll((await store.ListAllAsync<SecretResource>(SecretResourceKinds.Secret, cancellationToken)).Select(value => ViewAsync(value.Value, cancellationToken)));
-    public Task<StoredResource<SecretResource>?> GetSecretAsync(string name, CancellationToken cancellationToken) => store.GetAsync<SecretResource>(new(SecretResourceKinds.Secret, name), cancellationToken);
-    public Task<StoredResource<SecretResource>?> GetSecretExactAsync(ResourceScopeRef scopeRef, string name, CancellationToken cancellationToken) =>
-        store.GetExactAsync<SecretResource>(ScopedResourceAddress.Create(scopeRef, ResourceNamespace.Default, SecretResourceKinds.Secret, name), cancellationToken);
+    public async Task<IReadOnlyList<SecretView>> ListSecretsAsync(CancellationToken cancellationToken)
+    {
+        var visible = new List<SecretView>();
+        foreach (var stored in await store.ListAllAsync<SecretResource>(SecretResourceKinds.Secret, cancellationToken))
+        {
+            var secret = (await HydrateSecretAsync(stored, cancellationToken)).Value;
+            if (await CanDiscoverAsync(secret, cancellationToken))
+                visible.Add(await ViewAsync(secret, cancellationToken));
+        }
+        return visible;
+    }
+    public async Task<StoredResource<SecretResource>?> GetSecretAsync(string name, CancellationToken cancellationToken) =>
+        await HydrateSecretNullableAsync(await store.GetAsync<SecretResource>(new(SecretResourceKinds.Secret, name), cancellationToken), cancellationToken);
+    public async Task<StoredResource<SecretResource>?> GetSecretExactAsync(ResourceScopeRef scopeRef, string name, CancellationToken cancellationToken) =>
+        await HydrateSecretNullableAsync(await store.GetExactAsync<SecretResource>(ScopedResourceAddress.Create(scopeRef, ResourceNamespace.Default, SecretResourceKinds.Secret, name), cancellationToken), cancellationToken);
     public async Task<SecretView> GetSecretViewAsync(string name, CancellationToken cancellationToken) => await ViewAsync((await GetSecretAsync(name, cancellationToken))?.Value ?? throw new SecretResourceNotFoundException(name), cancellationToken);
     public async Task<SecretView> GetSecretViewExactAsync(ResourceScopeRef scopeRef, string name, CancellationToken cancellationToken) =>
         await ViewAsync((await GetSecretExactAsync(scopeRef, name, cancellationToken))?.Value ?? throw new SecretResourceNotFoundException(name), cancellationToken);
@@ -129,7 +167,14 @@ public sealed class SecretManagementService(
         return await scopeOperations.WriteAsync(scoped, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
             await ValidateSecretAsync(scoped, token);
-            return await store.PutExactAsync(scopeRef, scoped with { Generation = 1, Status = Succeeded() }, null, true, token);
+            var stored = await store.PutExactAsync(scopeRef, scoped with
+            {
+                Definition = scoped.Definition with { UsePolicy = new() },
+                Generation = 1,
+                Status = Succeeded()
+            }, null, true, token);
+            await PersistLegacyPolicyAsync(stored.Value, scoped.Definition.UsePolicy, token);
+            return await HydrateSecretAsync(stored, token);
         }, cancellationToken);
     }
     public async Task<StoredResource<SecretResource>> PutSecretAsync(string name, SecretProperties definition, string? etag, CancellationToken cancellationToken)
@@ -149,7 +194,14 @@ public sealed class SecretManagementService(
         return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
             await ValidateSecretAsync(changed, token);
-            return await store.PutExactAsync(scopeRef, changed with { Generation = checked(existing.Value.Generation + 1), Status = Succeeded() }, etag, false, token);
+            var stored = await store.PutExactAsync(scopeRef, changed with
+            {
+                Definition = definition with { UsePolicy = new() },
+                Generation = checked(existing.Value.Generation + 1),
+                Status = Succeeded()
+            }, etag, false, token);
+            await PersistLegacyPolicyAsync(stored.Value, definition.UsePolicy, token);
+            return await HydrateSecretAsync(stored, token);
         }, cancellationToken);
     }
     public async Task SetValueAsync(string name, SecretValue value, CancellationToken cancellationToken)
@@ -308,8 +360,8 @@ public sealed class SecretManagementService(
         var secret = (await store.GetExactAsync<SecretResource>(ScopedResourceAddress.Create(
             secretScope, reference.Address.Namespace, SecretResourceKinds.Secret, reference.Address.Name), cancellationToken))?.Value;
         if (secret is null) return null;
-        if (!await useAuthorizer.CanUseAsync(RequireScope(secret), resolution.ConsumerScopeRef,
-                secret.Definition.UsePolicy, cancellationToken))
+        if (!(await accessPolicies.EvaluateAsync(AccessIdentity(secret), resolution.ConsumerScopeRef,
+                ResourceAccessAction.Use, cancellationToken)).Allowed)
             throw new SecretAccessDeniedException(reference.Address);
         var (provider, context) = await ProviderAsync(secret, cancellationToken);
         return (secret, provider, context);
@@ -336,7 +388,8 @@ public sealed class SecretManagementService(
         var vault = (await store.GetExactAsync<VaultResource>(
             ScopedResourceAddress.Create(vaultScopeRef, address.Namespace, address.Kind, address.Name),
             cancellationToken))?.Value ?? throw new VaultResourceNotFoundException(address.Name);
-        if (!await useAuthorizer.CanUseAsync(vaultScopeRef, secretScopeRef, vault.Definition.UsePolicy, cancellationToken))
+        if (!(await accessPolicies.EvaluateAsync(AccessIdentity(vault), secretScopeRef,
+                ResourceAccessAction.Use, cancellationToken)).Allowed)
             throw new SecretAccessDeniedException(secret.Address);
         var provider = providers.SingleOrDefault(value => string.Equals(value.ProviderType, vault.Definition.ProviderType, StringComparison.OrdinalIgnoreCase)) ?? throw new SecretVaultUnavailableException(vault.Definition.ProviderType);
         return (provider, new(vaultScopeRef, vault.Address, vault.Definition.ProviderOptions));
@@ -363,8 +416,83 @@ public sealed class SecretManagementService(
         var vault = (await store.GetExactAsync<VaultResource>(ScopedResourceAddress.Create(vaultScope, @namespace,
             SecretResourceKinds.Vault, resource.Definition.Vault.Name), cancellationToken))?.Value
             ?? throw new VaultResourceNotFoundException(resource.Definition.Vault.Name);
-        if (!await useAuthorizer.CanUseAsync(vaultScope, scopeRef, vault.Definition.UsePolicy, cancellationToken))
+        if (!(await accessPolicies.EvaluateAsync(AccessIdentity(vault), scopeRef,
+                ResourceAccessAction.Use, cancellationToken)).Allowed)
             throw new SecretManagementException("The Secret's scope has no use grant for its Vault.");
+    }
+
+    private async Task<StoredResource<VaultResource>?> HydrateVaultNullableAsync(
+        StoredResource<VaultResource>? stored, CancellationToken cancellationToken) =>
+        stored is null ? null : await HydrateVaultAsync(stored, cancellationToken);
+
+    private async Task<StoredResource<VaultResource>> HydrateVaultAsync(
+        StoredResource<VaultResource> stored, CancellationToken cancellationToken)
+    {
+        var policy = await accessPolicies.GetAsync(stored.Value.Uid, cancellationToken);
+        return stored with { Value = stored.Value with
+        {
+            Definition = stored.Value.Definition with { UsePolicy = LegacyPolicy(policy) }
+        } };
+    }
+
+    private async Task<StoredResource<SecretResource>?> HydrateSecretNullableAsync(
+        StoredResource<SecretResource>? stored, CancellationToken cancellationToken) =>
+        stored is null ? null : await HydrateSecretAsync(stored, cancellationToken);
+
+    private async Task<StoredResource<SecretResource>> HydrateSecretAsync(
+        StoredResource<SecretResource> stored, CancellationToken cancellationToken)
+    {
+        var policy = await accessPolicies.GetAsync(stored.Value.Uid, cancellationToken);
+        return stored with { Value = stored.Value with
+        {
+            Definition = stored.Value.Definition with { UsePolicy = LegacyPolicy(policy) }
+        } };
+    }
+
+    private async Task PersistLegacyPolicyAsync(Resource resource, DescendantUsePolicy legacy,
+        CancellationToken cancellationToken)
+    {
+        var current = await accessPolicies.GetAsync(resource.Uid, cancellationToken);
+        if (Equivalent(legacy, LegacyPolicy(current))) return;
+        if (legacy.Grants.Count == 0)
+        {
+            if (current is not null && current.Policy.Grants.All(grant =>
+                    grant.Actions.Contains(ResourceAccessAction.Discover)
+                    && grant.Actions.Contains(ResourceAccessAction.Use)))
+                await accessPolicies.DeleteAsync(resource.Uid, current.ETag, cancellationToken);
+            return;
+        }
+        var policy = new ResourceAccessPolicy(AccessIdentity(resource), legacy.Grants.Select(grant =>
+            new ResourceAccessGrant(grant.ScopeRef,
+                [ResourceAccessAction.Discover, ResourceAccessAction.Use], grant.IncludeDescendants)).ToArray());
+        await accessPolicies.PutAsync(policy, current?.ETag, cancellationToken);
+    }
+
+    private static DescendantUsePolicy LegacyPolicy(ResourceAccessPolicyResponse? response) => new()
+    {
+        Grants = response?.Policy.Grants
+            .Where(grant => grant.Actions.Contains(ResourceAccessAction.Use))
+            .Select(grant => new DescendantUseGrant(grant.TargetScopeRef, grant.IncludeDescendants)).ToArray() ?? []
+    };
+
+    private static bool Equivalent(DescendantUsePolicy left, DescendantUsePolicy right) =>
+        left.Grants.Count == right.Grants.Count && left.Grants.All(grant => right.Grants.Any(candidate =>
+            candidate.ScopeRef == grant.ScopeRef && candidate.IncludeDescendants == grant.IncludeDescendants));
+
+    private static ResourceAccessIdentity AccessIdentity(Resource resource) => new(resource.Uid,
+        RequireScope(resource), resource.Namespace, resource.Kind);
+
+    private async Task<bool> CanDiscoverAsync(Resource resource, CancellationToken cancellationToken)
+    {
+        if (currentRequestContext.AccessMode == ControlPlaneAccessMode.System) return true;
+        var consumerScopeRef = currentRequestContext.AccessMode switch
+        {
+            ControlPlaneAccessMode.Tenant => ResourceScopeRef.Tenant(currentRequestContext.Current.TenantId),
+            ControlPlaneAccessMode.Workspace => ResourceScopeRef.Workspace(currentRequestContext.Current.WorkspaceId),
+            _ => default
+        };
+        return consumerScopeRef != default && (await accessPolicies.EvaluateAsync(AccessIdentity(resource),
+            consumerScopeRef, ResourceAccessAction.Discover, cancellationToken)).Allowed;
     }
 
     private static ResourceStatus Succeeded() => new() { ProvisioningState = ProvisioningState.Succeeded };

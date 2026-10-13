@@ -28,6 +28,7 @@ using Agentstration.ModelProviders;
 using Agentstration.Packs;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.ResourceManagement.Storage.PostgreSql;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.ResourcePlanning;
@@ -146,6 +147,8 @@ public static class DependencyInjection
             provider.GetRequiredService<IMasterKeyProvider>()));
         services.AddSingleton<ISecretVaultProvider, SharedKeyFileSecretVaultProvider>();
         services.AddSingleton<DescendantResourceUseAuthorizer>();
+        services.AddSingleton<ResourceAccessPolicyService>();
+        services.AddSingleton<IResourceAccessPolicyService>(provider => provider.GetRequiredService<ResourceAccessPolicyService>());
         services.AddSingleton<ParameterManagementService>();
         services.AddSingleton<DataSourceProfileService>();
         services.AddSingleton<DataSourceManagementService>();
