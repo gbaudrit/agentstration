@@ -72,7 +72,7 @@ public sealed class FlowDetailsDesignerTests
         };
         context.Services.AddSingleton<IFlowApiClient>(client);
 
-        var rendered = context.Render<Flows>();
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Flows>();
 
         var headers = rendered.FindAll("thead th").Select(header => header.TextContent.Trim()).ToArray();
         Assert.AreEqual("Status", headers[2]);
