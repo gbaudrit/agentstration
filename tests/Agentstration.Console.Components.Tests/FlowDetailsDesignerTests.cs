@@ -310,7 +310,7 @@ public sealed class FlowDetailsDesignerTests
             Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
             Input = JsonSerializer.SerializeToElement(new { }),
             CreatedAt = FlowClientStub.Now,
-            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition,
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "1.0.0", null, definition,
                 new Dictionary<string, string>(), FlowClientStub.Now, graph)
         };
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
