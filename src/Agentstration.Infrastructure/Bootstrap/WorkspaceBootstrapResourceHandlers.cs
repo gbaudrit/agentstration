@@ -332,7 +332,8 @@ public sealed class FlowBootstrapResourceHandler(
     TimeProvider timeProvider) : IBootstrapResourceHandler
 {
     public string Kind => FlowResourceKinds.Flow;
-    public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
+    public bool SupportsProfileScope(BootstrapProfileScope profileScope) => true;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
         BootstrapResourceDocument resource,
@@ -341,12 +342,12 @@ public sealed class FlowBootstrapResourceHandler(
         CancellationToken cancellationToken)
     {
         var value = WorkspaceBootstrapResource.Parse<DeclarativeResourceEnvelope<DeclarativeFlowDefinition>>(resource);
-        var workspaceId = WorkspaceBootstrapResource.Workspace(operation);
-        if (await service.GetAsync(workspaceId, new(value.Metadata.Name, value.Metadata.Namespace), cancellationToken) is not null)
+        var scopeRef = DataSourceProfileBootstrapResourceHandler.TargetScope(operation);
+        if (await service.GetExactAsync(scopeRef, new(value.Metadata.Name, value.Metadata.Namespace), cancellationToken) is not null)
             return new(BootstrapResourceDisposition.Skip);
         var now = timeProvider.GetUtcNow();
         FlowValidator.Validate(new(
-            ResourceScopeRef.Workspace(workspaceId.Value),
+            scopeRef,
             new(value.Metadata.Name, value.Metadata.Namespace),
             value.Metadata.Name,
             value.Definition.Description,
@@ -385,12 +386,12 @@ public sealed class FlowBootstrapResourceHandler(
         CancellationToken cancellationToken)
     {
         var value = WorkspaceBootstrapResource.Parse<DeclarativeResourceEnvelope<DeclarativeFlowDefinition>>(resource);
-        var workspaceId = WorkspaceBootstrapResource.Workspace(operation);
+        var scopeRef = DataSourceProfileBootstrapResourceHandler.TargetScope(operation);
         var flowId = new FlowId(value.Metadata.Name, value.Metadata.Namespace);
-        if (await service.GetAsync(workspaceId, flowId, cancellationToken) is not null)
+        if (await service.GetExactAsync(scopeRef, flowId, cancellationToken) is not null)
             return BootstrapResourceApplyResult.Skipped;
         var definition = value.Definition;
-        _ = await service.CreateAsync(workspaceId, new(
+        _ = await service.CreateExactAsync(scopeRef, new(
             value.Metadata.Name,
             definition.Description,
             definition.Version,
@@ -400,7 +401,7 @@ public sealed class FlowBootstrapResourceHandler(
             definition.Graph,
             definition.DisplayName), value.Metadata.Namespace, cancellationToken);
         if (definition.Publish)
-            _ = await service.PublishVersionAsync(workspaceId, flowId, definition.Version, definition.Activate, cancellationToken);
+            _ = await service.PublishVersionExactAsync(scopeRef, flowId, definition.Version, definition.Activate, cancellationToken);
         return BootstrapResourceApplyResult.Created;
     }
 }

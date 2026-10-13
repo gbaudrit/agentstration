@@ -441,6 +441,7 @@ public static class DependencyInjection
             flowConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "flow-plane.db")}";
             services.AddSqliteFlowStorage(flowConnectionString);
         }
+        services.AddSingleton<IFlowScopeHierarchy, ResourceFlowScopeHierarchy>();
         services.AddSingleton<FlowService>();
         services.AddSingleton<IEntryExecutionResolver, EntryExecutionResolver>();
         services.AddSingleton<IToolDefinitionFlowResolver, ToolDefinitionFlowResolver>();

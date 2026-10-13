@@ -35,7 +35,7 @@ using Microsoft.Extensions.Options;
 namespace Agentstration.Management.Tests;
 
 [TestClass]
-public sealed class DeclarativeBootstrapTests
+public sealed partial class DeclarativeBootstrapTests
 {
     private const string InitialPassword = "Initial123!Password";
     private const string ChangedPassword = "Changed123!Password";

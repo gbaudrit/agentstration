@@ -21,7 +21,8 @@ public sealed class FlowService(
     IFlowRepository repository,
     TimeProvider timeProvider,
     IEnumerable<IFlowDeletionGuard> deletionGuards,
-    IEnumerable<IFlowVersionActivationGuard>? activationGuards = null)
+    IEnumerable<IFlowVersionActivationGuard>? activationGuards = null,
+    IEnumerable<IFlowScopeHierarchy>? scopeHierarchies = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -152,18 +153,51 @@ public sealed class FlowService(
         => await ResolveAsync(workspaceId, reference, reference.FlowId.Namespace, cancellationToken);
 
     public async Task<FlowVersion> ResolveAsync(WorkspaceId workspaceId, FlowReference reference, ResourceNamespace ownerNamespace, CancellationToken cancellationToken)
+        => await ResolveAsync(ResourceScopeRef.Workspace(workspaceId.Value), reference, ownerNamespace, cancellationToken);
+
+    public async Task<FlowVersion> ResolveAsync(ResourceScopeRef consumerScopeRef, FlowReference reference, ResourceNamespace ownerNamespace, CancellationToken cancellationToken)
     {
         FlowValidator.ValidateReference(reference);
         var flowId = reference.Resolve(ownerNamespace);
-        var scopeRef = reference.ScopeRef ?? ResourceScopeRef.Workspace(workspaceId.Value);
+        var visibleScopes = await ListVisibleScopesAsync(consumerScopeRef, cancellationToken);
+        StoredFlow? flow;
+        if (reference.ScopeRef is { } exactScopeRef)
+        {
+            if (!visibleScopes.Contains(exactScopeRef))
+                throw new FlowReferenceOutsideScopeException(exactScopeRef, consumerScopeRef);
+            flow = await repository.GetExactAsync(exactScopeRef, flowId, cancellationToken);
+        }
+        else
+        {
+            flow = null;
+            foreach (var visibleScope in visibleScopes)
+            {
+                var candidate = await repository.GetExactAsync(visibleScope, flowId, cancellationToken);
+                if (candidate is null) continue;
+                if (flow is not null) throw new FlowReferenceAmbiguousException(reference);
+                flow = candidate;
+            }
+        }
+        if (flow is null) throw new FlowNotFoundException(flowId);
+
         var version = reference.Version;
         if (version is null)
-        {
-            var flow = await repository.GetExactAsync(scopeRef, flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
             version = flow.Value.ActiveVersion ?? throw new FlowValidationException("flow_active_version_missing", "The referenced Flow has no active version.");
-        }
-        return (await repository.GetVersionExactAsync(scopeRef, flowId, version, cancellationToken))?.Value
+        return (await repository.GetVersionExactAsync(flow.Value.ScopeRef, flowId, version, cancellationToken))?.Value
             ?? throw new FlowValidationException("flow_version_not_found", $"Flow version '{flowId}:{version}' does not exist.");
+    }
+
+    private async Task<IReadOnlyList<ResourceScopeRef>> ListVisibleScopesAsync(
+        ResourceScopeRef consumerScopeRef,
+        CancellationToken cancellationToken)
+    {
+        var hierarchy = scopeHierarchies?.SingleOrDefault();
+        var visibleScopes = hierarchy is null
+            ? [consumerScopeRef]
+            : await hierarchy.ListVisibleAsync(consumerScopeRef, cancellationToken);
+        if (visibleScopes.Count == 0 || visibleScopes[0] != consumerScopeRef || visibleScopes.Distinct().Count() != visibleScopes.Count)
+            throw new InvalidOperationException($"The visible Flow scope chain for '{consumerScopeRef}' is invalid.");
+        return visibleScopes;
     }
 
     private static IReadOnlyDictionary<string, string> Copy(IReadOnlyDictionary<string, string>? source) =>

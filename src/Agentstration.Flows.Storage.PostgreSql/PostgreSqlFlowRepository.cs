@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Agentstration.Flows;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
@@ -63,6 +64,7 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         if (!await context.Database.CanConnectAsync(cancellationToken)) throw new InvalidOperationException("The PostgreSQL Flow store is not accessible.");
+        await MigrateLegacyDefinitionScopesAsync(context, cancellationToken);
     }
 
     public async Task<StoredFlow> CreateAsync(FlowResource definition, CancellationToken cancellationToken)
@@ -398,6 +400,56 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
     private static StoredFlowDraft ToDraft(FlowDocument document) => new(Deserialize<FlowDraft>(document), document.ETag, document.UpdatedAt);
     private static StoredInputRequest ToInputRequest(FlowDocument document) => new(Deserialize<InputRequest>(document), document.ETag, document.UpdatedAt);
     private static T Deserialize<T>(FlowDocument document) => JsonSerializer.Deserialize<T>(document.Payload, JsonOptions) ?? throw new InvalidOperationException($"Stored Flow resource '{document.Key}' is invalid.");
+    private static async Task MigrateLegacyDefinitionScopesAsync(FlowDbContext context, CancellationToken cancellationToken)
+    {
+        var legacy = await context.Documents.Where(value =>
+                (value.Kind == DefinitionKind || value.Kind == VersionKind)
+                && value.Key.StartsWith("workspace:"))
+            .ToArrayAsync(cancellationToken);
+        if (legacy.Length == 0) return;
+
+        var replacements = legacy.Select(document =>
+        {
+            if (document.WorkspaceId == Guid.Empty)
+                throw new InvalidOperationException($"Legacy Flow resource '{document.Key}' has no Workspace owner.");
+            var workspaceId = new WorkspaceId(document.WorkspaceId);
+            var oldPrefix = $"workspace:{workspaceId}:";
+            if (!document.Key.StartsWith(oldPrefix, StringComparison.Ordinal))
+                throw new InvalidOperationException($"Legacy Flow resource key '{document.Key}' does not match its Workspace owner.");
+            var scopeRef = ResourceScopeRef.Workspace(document.WorkspaceId);
+            return new FlowDocument
+            {
+                WorkspaceId = document.WorkspaceId,
+                Key = $"scope:{scopeRef.Value}:{document.Key[oldPrefix.Length..]}",
+                Kind = document.Kind,
+                FlowId = document.FlowId,
+                Namespace = document.Namespace,
+                Version = document.Version,
+                TenantId = document.TenantId,
+                PrincipalId = document.PrincipalId,
+                Status = document.Status,
+                Payload = MigrateLegacyDefinitionPayload(document.Payload, scopeRef, document.Key),
+                ETag = document.ETag,
+                UpdatedAt = document.UpdatedAt
+            };
+        }).ToArray();
+        var replacementKeys = replacements.Select(value => value.Key).ToArray();
+        if (await context.Documents.AnyAsync(value => replacementKeys.Contains(value.Key), cancellationToken))
+            throw new InvalidOperationException("A legacy Flow definition cannot be migrated because its scoped identity already exists.");
+
+        context.Documents.RemoveRange(legacy);
+        context.Documents.AddRange(replacements);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static string MigrateLegacyDefinitionPayload(string payload, ResourceScopeRef scopeRef, string key)
+    {
+        var root = JsonNode.Parse(payload) as JsonObject
+            ?? throw new InvalidOperationException($"Legacy Flow resource '{key}' has an invalid payload.");
+        root.Remove("workspaceId");
+        root["scopeRef"] = scopeRef.Value;
+        return root.ToJsonString(JsonOptions);
+    }
     private static WorkspaceId ScopeStorageId(ResourceScopeRef scopeRef) => new(scopeRef.TargetId ?? Guid.Empty);
     private static string ScopePrefix(ResourceScopeRef scopeRef) => $"scope:{scopeRef.Value}:";
     private static string FlowPrefix(ResourceScopeRef scopeRef, FlowId id) => $"{ScopePrefix(scopeRef)}flow:{id.Namespace.Value}:{id.Value}";

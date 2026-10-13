@@ -39,6 +39,6 @@ Bootstrap may create Flow definitions at Instance, Tenant, or Workspace scope su
 - Flow APIs and Console surfaces must distinguish exact ownership from inherited visibility and must not offer edit or delete actions for an inherited definition.
 - Flow references and execution material must retain the resolved scope; a version string alone is insufficient.
 - Workspace-only compatibility methods may remain as wrappers over exact Workspace scope while callers migrate.
-- Existing persisted Workspace Flow definitions require an explicit compatibility migration because both their serialized ownership field and durable key predate `ResourceScopeRef`.
+- Storage initialization performs an idempotent compatibility migration for persisted Workspace Flow definitions and versions because both their serialized ownership field and durable key predate `ResourceScopeRef`; conflicting old and new identities fail startup rather than overwrite data.
 - Cross-scope authorization, deterministic ambiguity errors, bootstrap coverage, storage parity, and run-snapshot pinning require dedicated tests.
 - This decision supersedes the Workspace-only ownership portions of ADR-0053 and ADR-0080. Their Flow domain, immutable publication, and Workspace execution-state decisions remain in force. ADR-0105 remains authoritative for the general visibility hierarchy.

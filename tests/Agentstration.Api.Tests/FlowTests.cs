@@ -42,8 +42,12 @@ public sealed partial class FlowTests
         private readonly ServiceProvider _provider;
         public FlowService Service => _provider.GetRequiredService<FlowService>();
         public IFlowRepository Repository => _provider.GetRequiredService<IFlowRepository>();
+        public IDbContextFactory<FlowDbContext> ContextFactory => _provider.GetRequiredService<IDbContextFactory<FlowDbContext>>();
         private FlowFixture(string directory, ServiceProvider provider) { _directory = directory; _provider = provider; }
-        public static async Task<FlowFixture> CreateAsync(DbCommandInterceptor? commandInterceptor = null, TimeProvider? timeProvider = null)
+        public static async Task<FlowFixture> CreateAsync(
+            DbCommandInterceptor? commandInterceptor = null,
+            TimeProvider? timeProvider = null,
+            IFlowScopeHierarchy? scopeHierarchy = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-flow-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
@@ -59,6 +63,7 @@ public sealed partial class FlowTests
                 services.AddDbContextFactory<FlowDbContext>(options => options.UseSqlite(connectionString).AddInterceptors(commandInterceptor));
                 services.AddSingleton<IFlowRepository, SqliteFlowRepository>();
             }
+            if (scopeHierarchy is not null) services.AddSingleton(scopeHierarchy);
             services.AddSingleton<FlowService>();
             var provider = services.BuildServiceProvider();
             var fixture = new FlowFixture(directory, provider);
