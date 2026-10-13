@@ -13,6 +13,7 @@ using Agentstration.Parameters.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
+using Agentstration.Schemas;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Contracts;
 using Agentstration.Security.AspNetCoreIdentity;
@@ -404,6 +405,20 @@ internal static class OpenApiSuccessResponseCatalog
                     ? Json<ParameterResource>(201, "Create a Parameter")
                     : Json<IReadOnlyList<ParameterResource>>(200, "List Parameters");
             return Json<ParameterResource>(200, method == "PUT" ? "Update a Parameter" : "Get a Parameter");
+        }
+        if (path.StartsWith("/api/schemas", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path.Contains("/versions/", StringComparison.OrdinalIgnoreCase))
+                return Json<SchemaVersionResource>(200, "Get a published Schema version");
+            if (path.EndsWith("/versions", StringComparison.OrdinalIgnoreCase))
+                return method == "POST"
+                    ? Json<SchemaVersionResource>(201, "Publish a Schema version")
+                    : Json<ValueResponse<SchemaVersionResource>>(200, "List Schema versions");
+            if (path == "/api/schemas")
+                return method == "POST"
+                    ? Json<SchemaResource>(201, "Create a Schema draft")
+                    : Json<ValueResponse<SchemaResource>>(200, "List Schema drafts");
+            return Json<SchemaResource>(200, method == "PUT" ? "Update a Schema draft" : "Get a Schema draft");
         }
         if (path.StartsWith("/api/knowledgesources", StringComparison.OrdinalIgnoreCase))
         {

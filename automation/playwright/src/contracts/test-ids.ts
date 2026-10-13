@@ -58,6 +58,12 @@ export const TestIds = {
     placementWorker: 'runtime-placement-worker',
     placementAttempt: 'runtime-placement-attempt',
   },
+  agentInstanceObservability: {
+    page: 'runtime-agent-instances',
+    empty: 'runtime-agent-instances-empty',
+    list: 'runtime-agent-instances-list',
+    row: 'runtime-agent-instance-row',
+  },
   operations: {
     accessDenied: 'operations-access-denied',
     management: 'operations-management',

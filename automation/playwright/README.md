@@ -74,6 +74,14 @@ npm run capture -- --plan examples/inspect-runtime-worker-observability.capture-
 
 This journey requires the managed local fixture because it controls the independently hosted Worker process without changing product state through a test-only API. The Playwright specification additionally runs the Platform-administrator and cross-Workspace authorization assertions under local authentication.
 
+Agent instance observability covers the empty state, active direct and multi-Agent Flow executions, concurrent Runs of the same Agent, effective Run and Worker navigation, terminal cleanup, and Worker-loss cleanup:
+
+```powershell
+npm run capture -- --plan examples/inspect-agent-instance-observability.capture-plan.json --output .work/agent-instance-observability
+```
+
+This journey also requires the managed local fixture. It blocks deterministic model calls at the Worker authority proxy so the Console observes real active instances without a test-only product endpoint or timing sleeps.
+
 Console identity and administration can be captured across organization context, member access, profile preferences, personal access token lifecycle, and shell navigation:
 
 ```powershell

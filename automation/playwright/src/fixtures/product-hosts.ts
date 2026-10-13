@@ -26,6 +26,9 @@ export interface PlatformHealthTestControl {
 
 export interface RuntimeWorkerTestControl {
   readonly workerId: string;
+  blockNextModelInvocations(count: number): void;
+  waitForBlockedModelInvocations(): Promise<void>;
+  releaseBlockedModelInvocations(): void;
   delayNextModelInvocation(milliseconds: number): void;
   waitForDelayedModelInvocation(): Promise<void>;
   crash(): Promise<void>;
@@ -51,6 +54,9 @@ interface ControlledRuntimeProxy extends PlatformHealthTestControl {
 
 interface ControlledWorkerAuthorityProxy {
   url: string;
+  blockNextModelInvocations(count: number): void;
+  waitForBlockedModelInvocations(): Promise<void>;
+  releaseBlockedModelInvocations(): void;
   delayNextModelInvocation(milliseconds: number): void;
   waitForDelayedModelInvocation(): Promise<void>;
   stop(): Promise<void>;
@@ -167,6 +173,7 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
       Agentstration__RuntimeWorker__AllowInsecureHttp: 'true',
       Agentstration__RuntimeWorker__ClaimWaitSeconds: '1',
       Agentstration__RuntimeWorker__LeaseSafetyMarginSeconds: '1',
+      Agentstration__RuntimeWorker__MaximumConcurrentAssignments: '4',
     }, [], true);
     await waitUntilHealthy(`${workerUrl}/health/ready`, workerHost);
   };
@@ -200,6 +207,9 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
     platformHealth: runtimeProxy,
     runtimeWorker: {
       workerId,
+      blockNextModelInvocations: count => workerAuthorityProxy.blockNextModelInvocations(count),
+      waitForBlockedModelInvocations: () => workerAuthorityProxy.waitForBlockedModelInvocations(),
+      releaseBlockedModelInvocations: () => workerAuthorityProxy.releaseBlockedModelInvocations(),
       delayNextModelInvocation: milliseconds => workerAuthorityProxy.delayNextModelInvocation(milliseconds),
       waitForDelayedModelInvocation: () => workerAuthorityProxy.waitForDelayedModelInvocation(),
       async crash() {
@@ -227,6 +237,11 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
 }
 
 async function startControlledWorkerAuthorityProxy(targetBaseUrl: string): Promise<ControlledWorkerAuthorityProxy> {
+  let blockedInvocationsRemaining = 0;
+  let blockedInvocationsObserved: Promise<void> = Promise.resolve();
+  let blockedInvocationsObservedResolver: (() => void) | undefined;
+  let blockedInvocationsRelease: Promise<void> = Promise.resolve();
+  let blockedInvocationsReleaseResolver: (() => void) | undefined;
   let nextModelDelayMilliseconds = 0;
   let delayedInvocation: Promise<void> = Promise.resolve();
   let delayedInvocationObserved: (() => void) | undefined;
@@ -237,6 +252,12 @@ async function startControlledWorkerAuthorityProxy(targetBaseUrl: string): Promi
 
   const server = createServer(async (incoming, outgoing) => {
     const target = new URL(incoming.url ?? '/', targetBaseUrl);
+    if (target.pathname === '/api/awp/v1/assignments/model/invoke' && blockedInvocationsRemaining > 0) {
+      blockedInvocationsRemaining--;
+      if (blockedInvocationsRemaining === 0) blockedInvocationsObservedResolver?.();
+      await cancellableWait(blockedInvocationsRelease, incoming, outgoing);
+      if (incoming.destroyed || outgoing.destroyed) return;
+    }
     if (target.pathname === '/api/awp/v1/assignments/model/invoke' && nextModelDelayMilliseconds > 0) {
       const delay = nextModelDelayMilliseconds;
       nextModelDelayMilliseconds = 0;
@@ -262,6 +283,25 @@ async function startControlledWorkerAuthorityProxy(targetBaseUrl: string): Promi
   const port = await listenOnLoopback(server);
   return {
     url: `http://127.0.0.1:${port}`,
+    blockNextModelInvocations(count) {
+      if (!Number.isInteger(count) || count < 1) throw new Error('The blocked model invocation count must be a positive integer.');
+      if (blockedInvocationsRemaining > 0) throw new Error('A model invocation block is already active.');
+      blockedInvocationsRemaining = count;
+      blockedInvocationsObserved = new Promise(resolve => { blockedInvocationsObservedResolver = resolve; });
+      blockedInvocationsRelease = new Promise(resolve => { blockedInvocationsReleaseResolver = resolve; });
+    },
+    waitForBlockedModelInvocations: async () => await withTimeout(
+      blockedInvocationsObserved,
+      30_000,
+      'Timed out waiting for the blocked Worker model invocations.',
+    ),
+    releaseBlockedModelInvocations() {
+      blockedInvocationsRemaining = 0;
+      blockedInvocationsObservedResolver?.();
+      blockedInvocationsReleaseResolver?.();
+      blockedInvocationsObservedResolver = undefined;
+      blockedInvocationsReleaseResolver = undefined;
+    },
     delayNextModelInvocation(milliseconds) {
       nextModelDelayMilliseconds = Math.max(1, milliseconds);
       resetObservation();
@@ -301,6 +341,16 @@ async function cancellableDelay(milliseconds: number, incoming: Readable, outgoi
       resolve();
     }
   });
+}
+
+async function cancellableWait(wait: Promise<void>, incoming: Readable, outgoing: import('node:http').ServerResponse): Promise<void> {
+  await Promise.race([
+    wait,
+    new Promise<void>(resolve => {
+      incoming.once('aborted', resolve);
+      outgoing.once('close', resolve);
+    }),
+  ]);
 }
 
 async function startControlledRuntimeProxy(targetBaseUrl: string): Promise<ControlledRuntimeProxy> {
