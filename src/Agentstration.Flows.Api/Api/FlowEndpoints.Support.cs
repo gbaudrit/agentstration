@@ -16,7 +16,24 @@ public static partial class FlowEndpoints
     private static async Task<StoredFlow> RequiredAsync(WorkspaceId workspaceId, string id, FlowService service, CancellationToken token) =>
         await service.GetAsync(workspaceId, new FlowId(id), token) ?? throw new FlowNotFoundException(new FlowId(id));
 
+    private static async Task<StoredFlow> RequiredVisibleAsync(
+        FlowId id,
+        string? scopeRef,
+        FlowService service,
+        ICurrentRequestContext requestContext,
+        CancellationToken token) =>
+        await service.GetVisibleAsync(CurrentConsumerScope(requestContext), id, ParseScopeRef(scopeRef), token)
+        ?? throw new FlowNotFoundException(id);
+
     private static WorkspaceId CurrentWorkspace(ICurrentRequestContext requestContext) => CurrentScope(requestContext).WorkspaceId;
+    private static ResourceScopeRef CurrentConsumerScope(ICurrentRequestContext requestContext) => ResourceScopeRef.Workspace(CurrentWorkspace(requestContext).Value);
+    private static ResourceScopeRef? ParseScopeRef(string? value) => string.IsNullOrWhiteSpace(value) ? null : ResourceScopeRef.Parse(value);
+    private static void EnsureWorkspaceMutationScope(string? value, ICurrentRequestContext requestContext)
+    {
+        var requestedScope = ParseScopeRef(value);
+        if (requestedScope is not null && requestedScope != CurrentConsumerScope(requestContext))
+            throw new FlowValidationException("flow_scope_read_only", $"Flow scope '{requestedScope}' is read-only from the current Workspace.");
+    }
 
     private static FlowResponse ToResponse(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Version, value.Enabled, value.ActiveVersion, value.Definition, value.Metadata, value.CreatedAt, value.UpdatedAt, value.Graph) { Namespace = value.Id.Namespace, ScopeRef = value.ScopeRef, DisplayName = value.DisplayName };
 

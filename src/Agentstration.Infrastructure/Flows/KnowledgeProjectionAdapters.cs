@@ -148,7 +148,10 @@ public sealed class KnowledgeProjectionFlowGateway(FlowRunService runs) : IKnowl
                 null,
                 null,
                 null,
-                scope), cancellationToken);
+                scope)
+            {
+                DefinitionScopeRef = request.Flow.ScopeRef
+            }, cancellationToken);
             var completed = await AwaitCompletionAsync(stored.Value.Id, scope, cancellationToken);
             return Snapshot(completed.Value);
         }

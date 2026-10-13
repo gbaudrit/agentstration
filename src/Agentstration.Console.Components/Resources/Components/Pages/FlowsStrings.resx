@@ -6,6 +6,7 @@
   <data name="Flows" xml:space="preserve"><value>Flows</value></data>
   <data name="Flow" xml:space="preserve"><value>Flow</value></data>
   <data name="Scope" xml:space="preserve"><value>Scope</value></data>
+  <data name="InheritedReadOnly" xml:space="preserve"><value>Inherited · read-only</value></data>
   <data name="Description" xml:space="preserve"><value>Define orchestrations and inspect every execution from one operational workspace.</value></data>
   <data name="NewFlow" xml:space="preserve"><value>New flow</value></data>
   <data name="ViewAllRuns" xml:space="preserve"><value>View all runs</value></data>

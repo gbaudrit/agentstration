@@ -30,6 +30,7 @@ public sealed record EntryDependencyResponse(string ResourceId, string ResourceT
 public sealed record ResourcePickerItem(string ResourceId, string Name, string? Description, string Version, string State, string ResourceType, IReadOnlyDictionary<string, string>? Details = null)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
 }
 public sealed record CreateInteractionRequest(IReadOnlyDictionary<string, JsonElement> Values, IReadOnlyList<WorkAttachmentRequest>? Attachments = null);
 public sealed record EntrySubmissionResponse(InteractionResponse Interaction, WorkplaceAction Action, WorkTaskResponse? Task);

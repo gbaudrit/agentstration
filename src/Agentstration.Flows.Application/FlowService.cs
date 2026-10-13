@@ -53,6 +53,72 @@ public sealed class FlowService(
     public Task<FlowPage> ListAsync(WorkspaceId workspaceId, ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken) => repository.ListAsync(workspaceId, @namespace, skip, take, cancellationToken);
     public Task<FlowPage> ListAllAsync(WorkspaceId workspaceId, int skip, int take, CancellationToken cancellationToken) => repository.ListAsync(workspaceId, skip, take, cancellationToken);
 
+    public async Task<StoredFlow?> GetVisibleAsync(
+        ResourceScopeRef consumerScopeRef,
+        FlowId id,
+        ResourceScopeRef? exactScopeRef,
+        CancellationToken cancellationToken)
+    {
+        var visibleScopes = await ListVisibleScopesAsync(consumerScopeRef, cancellationToken);
+        if (exactScopeRef is { } scopeRef)
+        {
+            if (!visibleScopes.Contains(scopeRef))
+                throw new FlowReferenceOutsideScopeException(scopeRef, consumerScopeRef);
+            return await repository.GetExactAsync(scopeRef, id, cancellationToken);
+        }
+
+        StoredFlow? result = null;
+        foreach (var visibleScope in visibleScopes)
+        {
+            var candidate = await repository.GetExactAsync(visibleScope, id, cancellationToken);
+            if (candidate is null) continue;
+            if (result is not null)
+                throw new FlowReferenceAmbiguousException(new FlowReference(id));
+            result = candidate;
+        }
+        return result;
+    }
+
+    public async Task<FlowPage> ListVisibleAsync(
+        ResourceScopeRef consumerScopeRef,
+        ResourceNamespace? @namespace,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 200);
+        var targetCount = checked(skip + take + 1);
+        var visibleScopes = await ListVisibleScopesAsync(consumerScopeRef, cancellationToken);
+        var scopeOrder = visibleScopes.Select((scope, index) => (scope, index)).ToDictionary(value => value.scope, value => value.index);
+        var values = new List<StoredFlow>();
+
+        foreach (var scopeRef in visibleScopes)
+        {
+            var offset = 0;
+            while (values.Count(value => value.Value.ScopeRef == scopeRef) < targetCount)
+            {
+                var pageSize = Math.Min(200, targetCount - offset);
+                var page = @namespace is null
+                    ? await repository.ListExactAsync(scopeRef, offset, pageSize, cancellationToken)
+                    : await repository.ListExactAsync(scopeRef, @namespace.Value, offset, pageSize, cancellationToken);
+                values.AddRange(page.Items);
+                offset += page.Items.Count;
+                if (!page.HasMore || page.Items.Count == 0) break;
+            }
+        }
+
+        var ordered = values
+            .OrderBy(value => value.Value.Id.Namespace.Value, StringComparer.Ordinal)
+            .ThenBy(value => value.Value.Id.Value, StringComparer.Ordinal)
+            .ThenBy(value => scopeOrder[value.Value.ScopeRef])
+            .Skip(skip)
+            .Take(take + 1)
+            .ToArray();
+        return new FlowPage(ordered.Take(take).ToArray(), ordered.Length > take);
+    }
+
     public async Task<StoredFlow> UpdateAsync(WorkspaceId workspaceId, FlowId id, UpdateFlowCommand command, string expectedETag, CancellationToken cancellationToken)
         => await UpdateExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), id, command, expectedETag, cancellationToken);
 

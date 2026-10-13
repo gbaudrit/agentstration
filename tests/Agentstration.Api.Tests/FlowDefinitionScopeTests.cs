@@ -1,7 +1,11 @@
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Sqlite;
+using Agentstration.Infrastructure.Flows;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.Resources;
+using Agentstration.Tools;
+using Agentstration.Work;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
@@ -81,6 +85,95 @@ public sealed partial class FlowTests
 
         await Assert.ThrowsExactlyAsync<FlowReferenceAmbiguousException>(() =>
             fixture.Service.ResolveAsync(TestScope.WorkspaceId, new FlowReference(flowId), default));
+    }
+
+    [TestMethod]
+    public async Task VisibleAdministrationListIncludesEveryAncestorAndExactReadDisambiguates()
+    {
+        var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        await using var fixture = await FlowFixture.CreateAsync(scopeHierarchy: new TestFlowScopeHierarchy(tenantId));
+        var consumerScope = ResourceScopeRef.Workspace(TestScope.WorkspaceId.Value);
+        var flowId = new FlowId("governed-flow");
+        var command = new CreateFlowCommand(
+            flowId.Value,
+            null,
+            "1.0.0",
+            true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant")));
+
+        foreach (var scope in new[] { consumerScope, ResourceScopeRef.Tenant(tenantId), ResourceScopeRef.Instance })
+            await fixture.Service.CreateExactAsync(scope, command, ResourceNamespace.Default, default);
+
+        var page = await fixture.Service.ListVisibleAsync(consumerScope, ResourceNamespace.Default, 0, 10, default);
+
+        Assert.HasCount(3, page.Items);
+        CollectionAssert.AreEqual(
+            new[] { consumerScope, ResourceScopeRef.Tenant(tenantId), ResourceScopeRef.Instance },
+            page.Items.Select(value => value.Value.ScopeRef).ToArray());
+        Assert.AreEqual(
+            ResourceScopeRef.Tenant(tenantId),
+            (await fixture.Service.GetVisibleAsync(consumerScope, flowId, ResourceScopeRef.Tenant(tenantId), default))?.Value.ScopeRef);
+        await Assert.ThrowsExactlyAsync<FlowReferenceAmbiguousException>(() =>
+            fixture.Service.GetVisibleAsync(consumerScope, flowId, exactScopeRef: null, default));
+    }
+
+    [TestMethod]
+    public async Task GovernedFlowConsumersPreserveExactOwnerScope()
+    {
+        var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        await using var fixture = await FlowFixture.CreateAsync(scopeHierarchy: new TestFlowScopeHierarchy(tenantId));
+        var flowId = new FlowId("governed-consumer");
+        var command = new CreateFlowCommand(
+            flowId.Value,
+            null,
+            "1.0.0",
+            true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant")));
+        foreach (var scope in new[] { ResourceScopeRef.Instance, ResourceScopeRef.Tenant(tenantId) })
+        {
+            await fixture.Service.CreateExactAsync(scope, command, ResourceNamespace.Default, default);
+            await fixture.Service.PublishVersionExactAsync(scope, flowId, "1.0.0", activate: true, default);
+        }
+
+        var consumerScope = ResourceScopeRef.Workspace(TestScope.WorkspaceId.Value);
+        var expectedScope = ResourceScopeRef.Tenant(tenantId);
+        var tool = await new ToolDefinitionFlowResolver(fixture.Service).ResolveAsync(
+            consumerScope,
+            ResourceNamespace.Default,
+            new ToolDefinitionFlowTarget { Name = flowId.Value, ScopeRef = expectedScope },
+            default);
+        var knowledge = await new KnowledgeFlowResolver(fixture.Service).ResolveAsync(
+            consumerScope,
+            ResourceNamespace.Default,
+            new KnowledgeFlowTarget { Name = flowId.Value, ScopeRef = expectedScope },
+            default);
+        var entry = await new EntryTargetResolver(fixture.Service, null!, null!).ResolveAsync(
+            new EntryDraft
+            {
+                WorkspaceId = TestScope.WorkspaceId,
+                Id = new EntryId("governed-entry"),
+                Name = "governed-entry",
+                DisplayName = "Governed entry",
+                Binding = new EntryBinding(EntryBindingKind.Flow, flowId.Value, ScopeRef: expectedScope),
+                Presentation = new EntryPresentation
+                {
+                    Fields =
+                    [
+                        new EntryFieldDefinition
+                        {
+                            Name = "prompt",
+                            Type = EntryFieldType.Prompt,
+                            Required = true,
+                            Role = EntryFieldRole.PrimaryInput
+                        }
+                    ]
+                }
+            },
+            default);
+
+        Assert.AreEqual(expectedScope, tool.ScopeRef);
+        Assert.AreEqual(expectedScope, knowledge.ScopeRef);
+        Assert.AreEqual(expectedScope, entry.ScopeRef);
     }
 
     [TestMethod]

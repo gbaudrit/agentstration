@@ -12,7 +12,7 @@ else
 {
     <PageHeader Title="@flow.Name" Description="@(flow.Description ?? T("DefaultDescription"))">
         <Status><StatusBadge Text="@StatusLabel" Status="@PlatformDashboardService.ToStatus(Status)" /></Status>
-        <Actions>@if (!IsOrchestration) { <a class="button-primary flow-header-designer" href="@EditorUrl" data-enhance-nav="false"><UiIcon Name="workflow" />@EditorLabel</a> }</Actions>
+        <Actions>@if (!IsOrchestration && IsWorkspaceOwned) { <a class="button-primary flow-header-designer" href="@EditorUrl" data-enhance-nav="false"><UiIcon Name="workflow" />@EditorLabel</a> }</Actions>
     </PageHeader>
     <nav class="section-tabs" aria-label="@T("DetailsAriaLabel")">
         @foreach (var tab in AvailableTabs) { <button class="@(activeTab == tab ? "active" : null)" @onclick="() => SelectTabAsync(tab)">@TabLabel(tab)</button> }
@@ -24,19 +24,17 @@ else
             <div class="panel-header"><div><h2>@T("ExecutionPreview")</h2><p>@T("ExecutionPreviewHelp")</p></div>@if (IsOrchestration) { <StatusBadge Text="@StrategyLabel(Orchestration!.Strategy)" Status="UiStatus.Info" /> }</div>
             <FlowTopologyViewer Graph="PreviewTopology" Title="@T("FlowTopology")" InitiallyFit="true" />
         </section>
-        @if (!FlowResourceNamespace.IsDefault)
+        @if (!IsWorkspaceOwned)
         {
             <p class="muted">
-                @T("ManagedByNamespace") <code>@FlowResourceNamespace.Value</code>.
-                @T("PublishedVersionPrefix")
-                <a href="@EditorUrl" data-enhance-nav="false">@(IsOrchestration ? T("ReadOnlyOrchestrationView") : T("ReadOnlyDesigner"))</a>
-                @T("PublishedVersionSuffix")
+                @T("InheritedScope", FlowScopeRef.Value)
+                @T("InheritedReadOnlyHelp")
             </p>
         }
     }
     else if (activeTab == "Definition")
     {
-        @if (IsOrchestration)
+        @if (IsOrchestration && IsWorkspaceOwned)
         {
             <FlowOrchestrationEditor FlowId="@FlowId" FlowNamespace="@FlowNamespace" Embedded="true" />
         }
@@ -58,8 +56,8 @@ else
                 {
                     <form class="panel flow-definition-form" @onsubmit="SaveDefinitionAsync" @onsubmit:preventDefault="true" data-testid="flow-definition-form">
                         <div class="panel-header">
-                            <div><h3>@T("DefinitionIdentitySection")</h3><p>@T(FlowResourceNamespace.IsDefault ? "DefinitionDraftHelp" : "DefinitionPublishedHelp")</p></div>
-                            <StatusBadge Text="@T(FlowResourceNamespace.IsDefault ? "Status.Draft" : "ReadOnly")" Status="UiStatus.Neutral" />
+                            <div><h3>@T("DefinitionIdentitySection")</h3><p>@T(IsWorkspaceOwned ? "DefinitionDraftHelp" : "DefinitionPublishedHelp")</p></div>
+                            <StatusBadge Text="@T(IsWorkspaceOwned ? "Status.Draft" : "ReadOnly")" Status="UiStatus.Neutral" />
                         </div>
                         <div class="flow-definition-fields">
                             <label><span>@T("DisplayName")</span><input value="@definitionDisplayName" @oninput="args => definitionDisplayName = args.Value?.ToString() ?? string.Empty" disabled="@(!CanEditDefinition)" maxlength="200" data-testid="flow-definition-display-name" /></label>
@@ -70,7 +68,7 @@ else
                         </div>
                         @if (definitionError is not null) { <p class="error-panel" role="alert">@definitionError</p> }
                         @if (definitionSaved && !DefinitionDirty) { <p class="flow-definition-success" role="status">@T("DefinitionSaved")</p> }
-                        @if (FlowResourceNamespace.IsDefault)
+                        @if (IsWorkspaceOwned)
                         {
                             <div class="form-actions"><button class="button-primary" type="submit" disabled="@(!CanEditDefinition || definitionSaving || !DefinitionDirty)">@(definitionSaving ? T("Saving") : T("SaveDefinition"))</button></div>
                         }
@@ -91,9 +89,9 @@ else
     else
     {
         <section class="panel form-section" data-testid="flow-yaml-viewer">
-            <div class="panel-header"><div><p class="eyebrow">@T("RawDefinition")</p><h2>@T("FlowYaml")</h2><p>@T(FlowResourceNamespace.IsDefault ? "FlowYamlEditableHelp" : "FlowYamlReadOnlyHelp")</p></div><StatusBadge Text="@T(FlowResourceNamespace.IsDefault ? "Source" : "ReadOnly")" Status="UiStatus.Neutral" /></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("RawDefinition")</p><h2>@T("FlowYaml")</h2><p>@T(IsWorkspaceOwned ? "FlowYamlEditableHelp" : "FlowYamlReadOnlyHelp")</p></div><StatusBadge Text="@T(IsWorkspaceOwned ? "Source" : "ReadOnly")" Status="UiStatus.Neutral" /></div>
             <textarea class="form-code-editor runner-json" rows="30" readonly aria-label="@T("FlowYamlDefinition")">@FlowYaml</textarea>
-            @if (FlowResourceNamespace.IsDefault) { <div class="form-actions"><a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@T("OpenYamlEditor")</a></div> }
+            @if (IsWorkspaceOwned) { <div class="form-actions"><a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@T("OpenYamlEditor")</a></div> }
         </section>
     }
     @if (showRun)
@@ -105,6 +103,7 @@ else
 @code {
     [Parameter] public string FlowId { get; set; } = string.Empty;
     [Parameter] public string? FlowNamespace { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string TabLabel(string tab) => Localizer[$"Tab.{tab}"];
     private string StrategyLabel(FlowOrchestrationStrategy strategy) => Localizer[$"Strategy.{strategy}"];
@@ -123,6 +122,8 @@ else
     private string Status => flow?.ActiveVersion is not null ? "Published" : "Draft";
     private string StatusLabel => T($"Status.{Status}");
     private ResourceNamespace FlowResourceNamespace => string.IsNullOrWhiteSpace(FlowNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(FlowNamespace);
+    private ResourceScopeRef FlowScopeRef => flow?.ScopeRef ?? (string.IsNullOrWhiteSpace(ScopeRefValue) ? ResourceScopeRef.Workspace(Guid.Empty) : ResourceScopeRef.Parse(ScopeRefValue));
+    private bool IsWorkspaceOwned => FlowScopeRef.Kind == ResourceScopeKind.Workspace;
     private IReadOnlyList<string> AvailableTabs => Tabs;
     private OrchestrationFlowDefinition? Orchestration => flow?.Definition as OrchestrationFlowDefinition;
     private bool IsOrchestration => Orchestration is not null;
@@ -137,13 +138,11 @@ else
                 : $"/namespaces/{Uri.EscapeDataString(FlowResourceNamespace.Value)}/flows/{Uri.EscapeDataString(FlowId)}/{suffix}";
         }
     }
-    private string EditorLabel => IsOrchestration
-        ? FlowResourceNamespace.IsDefault ? T("OpenOrchestrationEditor") : T("ViewOrchestration")
-        : FlowResourceNamespace.IsDefault ? T("OpenFlowDesigner") : T("ViewInFlowDesigner");
+    private string EditorLabel => IsOrchestration ? T("OpenOrchestrationEditor") : T("OpenFlowDesigner");
     private FlowTopologyGraph Topology => flow is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.Project(flow.Definition, flow.Graph);
     private FlowTopologyGraph PreviewTopology => flow is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.ProjectPreview(flow.Definition, flow.Graph);
     private int TopologyNodeCount => Topology.Nodes.Count(node => node.Type is not "input" and not "output" and not "conversation" and not "manager");
-    private bool CanEditDefinition => FlowResourceNamespace.IsDefault && definitionDraft is not null;
+    private bool CanEditDefinition => IsWorkspaceOwned && definitionDraft is not null;
     private FlowVersionResponse? SelectedRunVersion => versions.SingleOrDefault(version => string.Equals(version.Version, runVersion, StringComparison.Ordinal));
     private bool DefinitionDirty => definitionDraft is not null &&
         (!string.Equals(definitionDisplayName.Trim(), definitionDraft.Value.DisplayName, StringComparison.Ordinal) ||
@@ -157,9 +156,10 @@ else
         definitionDraft = null;
         definitionError = null;
         definitionSaved = false;
-        flow = await Client.GetFlowAsync(FlowResourceNamespace, FlowId, cancellation.Token);
-        versions = await Client.GetFlowVersionsAsync(FlowResourceNamespace, FlowId, cancellation.Token);
-        runs = await Client.GetFlowRunsAsync(FlowResourceNamespace, FlowId, cancellation.Token);
+        ResourceScopeRef? requestedScope = string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
+        flow = await Client.GetFlowAsync(FlowResourceNamespace, FlowId, requestedScope, cancellation.Token);
+        versions = await Client.GetFlowVersionsAsync(FlowResourceNamespace, FlowId, flow.ScopeRef, cancellation.Token);
+        runs = await Client.GetFlowRunsAsync(FlowResourceNamespace, FlowId, flow.ScopeRef, cancellation.Token);
         runVersion = flow.ActiveVersion ?? versions.FirstOrDefault()?.Version ?? "";
         if (string.Equals(View, "definition", StringComparison.OrdinalIgnoreCase)) activeTab = "Definition";
         else if (string.Equals(View, "yaml", StringComparison.OrdinalIgnoreCase)) activeTab = "YAML";
@@ -179,9 +179,9 @@ else
         definitionError = null;
         try
         {
-            if (FlowResourceNamespace.IsDefault)
+            if (IsWorkspaceOwned)
             {
-                definitionDraft = await Client.GetDraftAsync(FlowId, cancellation.Token);
+                definitionDraft = await Client.GetDraftAsync(FlowResourceNamespace, FlowId, cancellation.Token);
                 definitionDisplayName = definitionDraft.Value.DisplayName;
                 definitionDescription = definitionDraft.Value.Description ?? string.Empty;
             }
@@ -246,7 +246,7 @@ else
     private void OpenRun(){activeTab="Runs";showRun=true;error=null;runInputValid=true;runInput=ParseInput(flow?.Metadata.TryGetValue("agentstration.io/sample-input",out var sampleInput)==true?sampleInput:"{}");}
     private void ChangeRunVersion(ChangeEventArgs arguments){runVersion=arguments.Value?.ToString()??string.Empty;error=null;}
     private Task UpdateRunInputValidation(JsonSchemaInputValidationState value){runInputValid=value.IsValid;return Task.CompletedTask;}
-    private async Task SubmitRunAsync(){if(!runInputValid)return;try{submitting=true;error=null;var run=await Client.CreateFlowRunAsync(FlowResourceNamespace,FlowId,new CreateFlowRunRequest(runInput.Clone(),runVersion,"local",FlowRunTrigger.Manual),cancellation.Token);Navigation.NavigateTo($"/flow-runs/{run.Id}");}catch(Exception exception){error=exception.Message;}finally{submitting=false;}}
+    private async Task SubmitRunAsync(){if(!runInputValid)return;try{submitting=true;error=null;var request=new CreateFlowRunRequest(runInput.Clone(),runVersion,"local",FlowRunTrigger.Manual){DefinitionScopeRef=flow?.ScopeRef};var run=await Client.CreateFlowRunAsync(FlowResourceNamespace,FlowId,request,cancellation.Token);Navigation.NavigateTo($"/flow-runs/{run.Id}");}catch(Exception exception){error=exception.Message;}finally{submitting=false;}}
     private static JsonElement ParseInput(string value){try{using var document=JsonDocument.Parse(value);return document.RootElement.ValueKind==JsonValueKind.Object?document.RootElement.Clone():JsonSerializer.SerializeToElement(new{});}catch(JsonException){return JsonSerializer.SerializeToElement(new{});}}
     public void Dispose(){cancellation.Cancel();cancellation.Dispose();}
 }

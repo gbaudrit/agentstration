@@ -91,10 +91,11 @@ public sealed record EntryPresentation
     public EntryResultsPresentation Results { get; init; } = new();
 }
 
-public sealed record EntryBinding(EntryBindingKind Kind, string ResourceId, ResourceNamespace? Namespace = null);
+public sealed record EntryBinding(EntryBindingKind Kind, string ResourceId, ResourceNamespace? Namespace = null, ResourceScopeRef? ScopeRef = null);
 public sealed record EntryResolvedTarget(string FlowResourceId, string Version, EntryVersionStrategy VersionStrategy = EntryVersionStrategy.Pinned)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
 }
 public sealed record EntryConversationBehavior(bool Enabled = true, EntryResolvedTarget? ContinuationTarget = null);
 public sealed record EntryBehavior(TaskCreationMode TaskCreationMode = TaskCreationMode.Automatic, bool AllowConversation = true, bool StreamResponse = true, EntryConversationBehavior? Conversation = null);

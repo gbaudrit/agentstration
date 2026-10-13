@@ -20,7 +20,7 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
     public async Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken)
     {
         var page = await ApiResponse.ReadAsync<FlowPageResponse>(httpClient, "api/flows?allNamespaces=true&top=100", cancellationToken);
-        return page.Value.Select(item => new FlowSummary(item.Id, item.Name, item.FlowKind.ToString(), item.ActiveVersion ?? item.Version, item.Enabled ? "Active" : "Disabled", 0, 0, item.UpdatedAt) { Namespace = item.Namespace, ActiveVersion = item.ActiveVersion }).ToArray();
+        return page.Value.Select(item => new FlowSummary(item.Id, item.Name, item.FlowKind.ToString(), item.ActiveVersion ?? item.Version, item.Enabled ? "Active" : "Disabled", 0, 0, item.UpdatedAt) { Namespace = item.Namespace, ScopeRef = item.ScopeRef, ActiveVersion = item.ActiveVersion }).ToArray();
     }
 
     public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) =>
@@ -28,6 +28,9 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
 
     public Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<FlowResponse>(httpClient, FlowPath(@namespace, flowId), cancellationToken);
+
+    public Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef? scopeRef, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<FlowResponse>(httpClient, FlowPath(@namespace, flowId, scopeRef), cancellationToken);
 
     public async Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken)
     {
@@ -66,8 +69,14 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
     public async Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<FlowVersionResponse[]>(httpClient, $"{FlowPath(@namespace, flowId)}/versions", cancellationToken);
 
+    public async Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef? scopeRef, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<FlowVersionResponse[]>(httpClient, $"{FlowPath(@namespace, flowId)}/versions{ScopeQuery(scopeRef)}", cancellationToken);
+
     public Task<FlowVersionResponse> GetFlowVersionAsync(ResourceNamespace @namespace, string flowId, string version, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<FlowVersionResponse>(httpClient, $"{FlowPath(@namespace, flowId)}/versions/{Uri.EscapeDataString(version)}", cancellationToken);
+
+    public Task<FlowVersionResponse> GetFlowVersionAsync(ResourceNamespace @namespace, string flowId, string version, ResourceScopeRef? scopeRef, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<FlowVersionResponse>(httpClient, $"{FlowPath(@namespace, flowId)}/versions/{Uri.EscapeDataString(version)}{ScopeQuery(scopeRef)}", cancellationToken);
 
     public async Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken)
     {
@@ -77,6 +86,11 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
 
     public async Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
         await GetAllFlowRunPagesAsync($"{FlowPath(@namespace, flowId)}/runs?top=200", cancellationToken);
+
+    public async Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef? definitionScopeRef, CancellationToken cancellationToken) =>
+        (await GetFlowRunsAsync(@namespace, flowId, cancellationToken))
+            .Where(run => definitionScopeRef is null || run.DefinitionScopeRef == definitionScopeRef)
+            .ToArray();
 
     private async Task<IReadOnlyList<FlowRun>> GetAllFlowRunPagesAsync(string initialPath, CancellationToken cancellationToken)
     {
@@ -167,9 +181,16 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
             ?? throw new AgentstrationApiException("Flow API returned an empty Run.", Guid.NewGuid().ToString("N"));
     }
 
-    private static string FlowPath(ResourceNamespace @namespace, string flowId) => @namespace.IsDefault
-        ? $"api/flows/{Uri.EscapeDataString(flowId)}"
-        : $"api/namespaces/{Uri.EscapeDataString(@namespace.Value)}/flows/{Uri.EscapeDataString(flowId)}";
+    private static string FlowPath(ResourceNamespace @namespace, string flowId, ResourceScopeRef? scopeRef = null)
+    {
+        var path = @namespace.IsDefault
+            ? $"api/flows/{Uri.EscapeDataString(flowId)}"
+            : $"api/namespaces/{Uri.EscapeDataString(@namespace.Value)}/flows/{Uri.EscapeDataString(flowId)}";
+        return scopeRef is null ? path : $"{path}{ScopeQuery(scopeRef)}";
+    }
+
+    private static string ScopeQuery(ResourceScopeRef? scopeRef) =>
+        scopeRef is null ? string.Empty : $"?scopeRef={Uri.EscapeDataString(scopeRef.Value.Value)}";
 
     public async Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken)
     {

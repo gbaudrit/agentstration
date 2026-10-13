@@ -29,7 +29,7 @@ public sealed class DataSourceAcquisitionCompositionResolver(
         {
             resolvedFlow = await flows.ResolveAsync(new WorkspaceId(workspaceId),
                 new FlowReference(new FlowId(target.Name, flowNamespace), target.Version,
-                    target.UseActiveVersion, flowNamespace), ownerNamespace, cancellationToken);
+                    target.UseActiveVersion, flowNamespace, target.ScopeRef), ownerNamespace, cancellationToken);
         }
         catch (Exception exception) when (exception is FlowNotFoundException or FlowValidationException or ArgumentException)
         {
@@ -95,7 +95,7 @@ public sealed class DataSourceAcquisitionCompositionResolver(
                 target.UseActiveVersion,
                 resolvedFlow.Graph?.InputSchema?.Clone(),
                 resolvedFlow.Graph?.OutputSchema?.Clone(),
-                resolvedFlow.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract)),
+                resolvedFlow.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract)) { ScopeRef = resolvedFlow.ScopeRef },
             Tools = tools,
             Limits = Clone(profile.Definition.Limits),
             Policies = Clone(profile.Definition.Policies)
@@ -134,7 +134,10 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs) : IDat
                 null,
                 null,
                 null,
-                Scope(request.WorkspaceId, request.TenantId, request.PrincipalId)), cancellationToken);
+                Scope(request.WorkspaceId, request.TenantId, request.PrincipalId))
+            {
+                DefinitionScopeRef = request.Flow.ScopeRef
+            }, cancellationToken);
             return Snapshot(stored.Value);
         }
         catch (Exception exception) when (exception is FlowValidationException or FlowNotFoundException)

@@ -24,7 +24,7 @@ public sealed class ToolDefinitionFlowResolver(FlowService flows) : IToolDefinit
         if (scopeRef.Kind != ResourceScopeKind.Workspace || scopeRef.TargetId is not { } workspaceId)
             throw new ToolDefinitionValidationException("tool_definition_scope_invalid", "A ToolDefinition must belong to a Workspace scope.");
         var flowNamespace = target.Namespace ?? ownerNamespace;
-        var reference = new FlowReference(new FlowId(target.Name, flowNamespace), target.Version, target.UseActiveVersion, flowNamespace);
+        var reference = new FlowReference(new FlowId(target.Name, flowNamespace), target.Version, target.UseActiveVersion, flowNamespace, target.ScopeRef);
         var resolved = await flows.ResolveAsync(new WorkspaceId(workspaceId), reference, ownerNamespace, cancellationToken);
         return Contract(resolved);
     }
@@ -34,7 +34,10 @@ public sealed class ToolDefinitionFlowResolver(FlowService flows) : IToolDefinit
         version.FlowId.Namespace,
         version.Version,
         version.Graph?.InputSchema?.Clone(),
-        version.Graph?.OutputSchema?.Clone());
+        version.Graph?.OutputSchema?.Clone())
+    {
+        ScopeRef = version.ScopeRef
+    };
 }
 
 public sealed class ToolDefinitionFlowActivationGuard(
@@ -136,7 +139,7 @@ public sealed class ToolDefinitionExecutor(
         {
             submission = await submissions.SubmitAsync(new SubmitRootFlowCommand(
                 invocation.WorkspaceId,
-                new FlowReference(new FlowId(target.Name, flowNamespace), target.Version, target.UseActiveVersion, flowNamespace),
+                new FlowReference(new FlowId(target.Name, flowNamespace), target.Version, target.UseActiveVersion, flowNamespace, target.ScopeRef),
                 flowInput,
                 origin,
                 callerId,

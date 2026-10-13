@@ -45,7 +45,7 @@ else
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("Target")</p><h2>@T("PublishedFlow")</h2></div></div>
             <div class="form-grid">
-                <label class="form-span-2"><span>@T("Flow")</span><InputSelect @bind-Value="model.FlowKey"><option value="">@T("SelectFlow")</option>@foreach (var flow in availableFlows) { <option value="@FlowKey(flow)">@flow.Name — @flow.Namespace.Value/@flow.Id · @flow.Status · @flow.Version</option> }</InputSelect><ValidationMessage For="() => model.FlowKey" /><small>@T("FlowResolutionHelp")</small></label>
+                <label class="form-span-2"><span>@T("Flow")</span><InputSelect @bind-Value="model.FlowKey"><option value="">@T("SelectFlow")</option>@foreach (var flow in availableFlows) { <option value="@FlowKey(flow)">@flow.Name — @flow.ScopeRef · @flow.Namespace.Value/@flow.Id · @flow.Status · @flow.Version</option> }</InputSelect><ValidationMessage For="() => model.FlowKey" /><small>@T("FlowResolutionHelp")</small></label>
             </div>
         </section>
 
@@ -150,7 +150,7 @@ else
         var (intervalValue, intervalUnit) = duration.TotalDays >= 1 && duration.TotalDays == Math.Truncate(duration.TotalDays) ? ((int)duration.TotalDays, "days") : duration.TotalHours >= 1 && duration.TotalHours == Math.Truncate(duration.TotalHours) ? ((int)duration.TotalHours, "hours") : (Math.Max(1, (int)duration.TotalMinutes), "minutes");
         cronPreset = PresetFor(schedule.Expression);
         var flow = resource.Definition.Target.Flow!;
-        return new() { Name = resource.Name, DisplayName = resource.Definition.DisplayName, Description = resource.Definition.Description, FlowKey = $"{(flow.Namespace ?? resource.Namespace).Value}/{flow.Name}", ScheduleType = schedule.Type, TimeZone = zone, LocalAt = TriggerUi.LocalInput(at, zone), IntervalValue = intervalValue, IntervalUnit = intervalUnit, CronExpression = schedule.Expression ?? "0 0 8 ? * MON-FRI", MisfirePolicy = resource.Definition.MisfirePolicy, ConcurrencyPolicy = resource.Definition.ConcurrencyPolicy, InputJson = resource.Definition.Input.GetRawText() };
+        return new() { Name = resource.Name, DisplayName = resource.Definition.DisplayName, Description = resource.Definition.Description, FlowKey = ExistingFlowKey(flow, resource.Namespace), ScheduleType = schedule.Type, TimeZone = zone, LocalAt = TriggerUi.LocalInput(at, zone), IntervalValue = intervalValue, IntervalUnit = intervalUnit, CronExpression = schedule.Expression ?? "0 0 8 ? * MON-FRI", MisfirePolicy = resource.Definition.MisfirePolicy, ConcurrencyPolicy = resource.Definition.ConcurrencyPolicy, InputJson = resource.Definition.Input.GetRawText() };
     }
 
     private void MarkDirty() => dirty = true;
@@ -181,7 +181,14 @@ else
     private void ApplyCronPreset(ChangeEventArgs args) { cronPreset = args.Value?.ToString() ?? "advanced"; if (cronPreset != "advanced") model!.CronExpression = CronFor(cronPreset); dirty = true; _ = PreviewAsync(); }
     private static string CronFor(string preset) => preset switch { "dailyMorning" => "0 0 8 ? * *", "weeklyMonday" => "0 0 9 ? * MON", _ => "0 0 8 ? * MON-FRI" };
     private static string PresetFor(string? expression) => expression switch { "0 0 8 ? * *" => "dailyMorning", "0 0 9 ? * MON" => "weeklyMonday", "0 0 8 ? * MON-FRI" => "weekdayMorning", _ => "advanced" };
-    private static string FlowKey(FlowSummary flow) => $"{flow.Namespace.Value}/{flow.Id}";
+    private static string FlowKey(FlowSummary flow) => flow.ScopeRef is null ? string.Empty : $"{flow.ScopeRef.Value.Value}|{flow.Namespace.Value}|{flow.Id}";
+    private string ExistingFlowKey(TriggerFlowTarget target, ResourceNamespace owner)
+    {
+        var @namespace = target.Namespace ?? owner;
+        var scopeRef = target.ScopeRef ?? availableFlows.Where(value => value.Namespace == @namespace && value.Id == target.Name)
+            .Select(value => value.ScopeRef).SingleOrDefault();
+        return scopeRef is null ? string.Empty : $"{scopeRef.Value.Value}|{@namespace.Value}|{target.Name}";
+    }
 
     private async Task SaveAsync()
     {
@@ -191,9 +198,9 @@ else
         {
             await PreviewAsync(); if (scheduleError is not null) return;
             var input = ParseInput();
-            var separator = model.FlowKey.IndexOf('/'); if (separator <= 0) throw new InvalidOperationException(T("SelectFlowTarget"));
-            var flowNamespace = ResourceNamespace.Parse(model.FlowKey[..separator]); var flowName = model.FlowKey[(separator + 1)..];
-            var definition = new TriggerProperties { DisplayName = model.DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), Enabled = existing?.Value.Definition.Enabled ?? false, Source = new() { Schedule = BuildSchedule() }, Target = new() { Flow = new() { Name = flowName, Namespace = flowNamespace } }, Input = input, MisfirePolicy = model.MisfirePolicy, ConcurrencyPolicy = model.ConcurrencyPolicy, ExecutionScope = existing?.Value.Definition.ExecutionScope };
+            var flowParts = model.FlowKey.Split('|', 3); if (flowParts.Length != 3) throw new InvalidOperationException(T("SelectFlowTarget"));
+            var flowScopeRef = ResourceScopeRef.Parse(flowParts[0]); var flowNamespace = ResourceNamespace.Parse(flowParts[1]); var flowName = flowParts[2];
+            var definition = new TriggerProperties { DisplayName = model.DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), Enabled = existing?.Value.Definition.Enabled ?? false, Source = new() { Schedule = BuildSchedule() }, Target = new() { Flow = new() { Name = flowName, Namespace = flowNamespace, ScopeRef = flowScopeRef } }, Input = input, MisfirePolicy = model.MisfirePolicy, ConcurrencyPolicy = model.ConcurrencyPolicy, ExecutionScope = existing?.Value.Definition.ExecutionScope };
             var resource = new TriggerResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = TriggerResourceKinds.Trigger, Metadata = new() { Name = model.Name.Trim() }, Definition = definition, ScopeRef = IsNew ? selectedScope : existing!.Value.ScopeRef };
             var saved = await Client.SaveAsync(resource, IsNew ? null : existing!.ETag, CancellationToken.None);
             Notifications.Add(new(Guid.NewGuid(), IsNew ? T("Notification.Created") : T("Notification.Updated"), saved.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success));

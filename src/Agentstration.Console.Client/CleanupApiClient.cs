@@ -182,6 +182,7 @@ public sealed class CleanupApiClient(IHttpClientFactory httpClientFactory) : ICl
             page => page.NextLink,
             cancellationToken);
         return values
+            .Where(flow => flow.ScopeRef is null or { Kind: ResourceScopeKind.Workspace })
             .Select(flow => new CleanupCandidate(
                 CleanupResourceKind.Flow,
                 flow.Id,

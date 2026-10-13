@@ -118,6 +118,43 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task FlowApiListsVisibleOwnersRequiresExactScopeOnCollisionAndRejectsInheritedMutation()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"));
+        var request = new CreateFlowRequest("scoped-collision", "Workspace", "1.0.0", true, definition);
+        using var workspaceResponse = await client.PostAsJsonAsync("/api/flows", request, JsonOptions);
+        Assert.AreEqual(HttpStatusCode.Created, workspaceResponse.StatusCode);
+
+        var service = factory.Services.GetRequiredService<FlowService>();
+        await service.CreateExactAsync(
+            ResourceScopeRef.Instance,
+            new CreateFlowCommand("scoped-collision", "Instance", "1.0.0", true, definition),
+            ResourceNamespace.Default,
+            default);
+        await service.PublishVersionExactAsync(ResourceScopeRef.Instance, new FlowId("scoped-collision"), "1.0.0", activate: true, default);
+
+        var page = await client.GetFromJsonAsync<FlowPageResponse>("/api/flows?allNamespaces=true&top=200", JsonOptions);
+        CollectionAssert.AreEquivalent(
+            new[] { ResourceScopeKind.Workspace, ResourceScopeKind.Instance },
+            page!.Value.Where(value => value.Id == "scoped-collision").Select(value => value.ScopeRef!.Value.Kind).ToArray());
+        Assert.AreEqual(HttpStatusCode.BadRequest, (await client.GetAsync("/api/flows/scoped-collision")).StatusCode);
+
+        var exactPath = $"/api/flows/scoped-collision?scopeRef={Uri.EscapeDataString(ResourceScopeRef.Instance.Value)}";
+        var inherited = await client.GetFromJsonAsync<FlowResponse>(exactPath, JsonOptions);
+        Assert.AreEqual(ResourceScopeRef.Instance, inherited?.ScopeRef);
+        using var mutation = new HttpRequestMessage(HttpMethod.Put, exactPath)
+        {
+            Content = JsonContent.Create(new UpdateFlowRequest("Changed", "1.0.0", true, definition), options: JsonOptions)
+        };
+        mutation.Headers.TryAddWithoutValidation("If-Match", workspaceResponse.Headers.ETag?.Tag);
+        using var rejected = await client.SendAsync(mutation);
+        Assert.AreEqual(HttpStatusCode.BadRequest, rejected.StatusCode);
+        StringAssert.Contains(await rejected.Content.ReadAsStringAsync(), "flow_scope_read_only");
+    }
+
+    [TestMethod]
     public async Task FlowRunsAreIsolatedByTheirCompleteDurableScope()
     {
         await using var fixture = await FlowFixture.CreateAsync();
