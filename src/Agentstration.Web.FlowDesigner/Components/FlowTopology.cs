@@ -68,6 +68,27 @@ public static class FlowTopologyProjector
     {
         if (graph is null) return Project(definition);
 
+        var (arranged, vertical) = ArrangePreview(graph);
+        return ProjectWorkflowGraph(arranged, null) with { Layout = vertical ? "vertical" : "horizontal" };
+    }
+
+    public static FlowTopologyGraph ProjectPreview(FlowRun run, IReadOnlyList<FlowRunEvent>? events = null)
+    {
+        var graph = run.DefinitionSnapshot.Graph;
+        if (graph is null) return Project(run, events);
+
+        var arranged = graph with
+        {
+            Designer = graph.Designer with
+            {
+                NodePositions = FlowGraphAutoLayout.Arrange(graph, vertical: false)
+            }
+        };
+        return ProjectWorkflowGraph(arranged, run) with { Layout = "horizontal" };
+    }
+
+    private static (FlowGraphDefinition Graph, bool Vertical) ArrangePreview(FlowGraphDefinition graph)
+    {
         var vertical = string.Equals(graph.Designer.PreferredLayout, "Vertical", StringComparison.OrdinalIgnoreCase);
         var arranged = graph with
         {
@@ -76,7 +97,7 @@ public static class FlowTopologyProjector
                 NodePositions = FlowGraphAutoLayout.Arrange(graph, vertical)
             }
         };
-        return ProjectWorkflowGraph(arranged, null) with { Layout = vertical ? "vertical" : "horizontal" };
+        return (arranged, vertical);
     }
 
     public static FlowTopologyGraph Project(FlowRun run, IReadOnlyList<FlowRunEvent>? events = null) =>

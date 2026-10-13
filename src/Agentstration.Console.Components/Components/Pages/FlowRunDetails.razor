@@ -88,7 +88,8 @@ else
                 <section class="designer-layout run-layout flow-run-overview-topology @(inspectorVisible ? null : "inspector-collapsed")">
                     <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
                                         ShowInspectorControl="true" InspectorVisible="inspectorVisible" InspectorVisibleChanged="SetInspectorVisible"
-                                        ReplayInProgress="replayInProgress" ReplayElapsed="replayElapsed" ReplayRequested="ReplaySequenceAsync" />
+                                        ReplayInProgress="replayInProgress" ReplayElapsed="replayElapsed" ReplayRequested="ReplaySequenceAsync"
+                                        InitiallyFit="true" />
                     @if (inspectorVisible)
                     {
                     <article class="panel inspector step-inspector">
@@ -220,7 +221,7 @@ else
         : replayEvents.Where(runEvent => runEvent.Sequence <= replaySequence.Value).ToArray();
     private FlowTopologyGraph Topology => run is null
         ? new([], [], "horizontal", T("FlowTopology"))
-        : FlowTopologyProjector.Project(replayEvents is null ? run : ReplaySnapshot(run, TopologyEvents), TopologyEvents);
+        : FlowTopologyProjector.ProjectPreview(replayEvents is null ? run : ReplaySnapshot(run, TopologyEvents), TopologyEvents);
 
     private string TabLabel(RunTab tab) => T(tab switch
     {
