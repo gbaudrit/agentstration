@@ -57,7 +57,7 @@
                             <label><span>@Localizer["MaximumLength"]</span><input type="number" min="0" value="@(Raw(propertySchema, "maxLength"))" disabled="@Disabled" @onchange="@(args => SetIntegerAsync(propertyName, "maxLength", args.Value?.ToString()))" /></label>
                         }
                     </div>
-                    <button type="button" class="text-button text-danger" disabled="@Disabled" @onclick="() => RemovePropertyAsync(propertyName)">@Localizer["Remove"]</button>
+                    <button type="button" class="text-button text-danger schema-remove-property" disabled="@Disabled" @onclick="() => RemovePropertyAsync(propertyName)">@Localizer["Remove"]</button>
                 </article>
             }
         </div>
