@@ -55,6 +55,52 @@ public sealed class MainLayoutNavigationTests
     }
 
     [TestMethod]
+    public void NavigationDistinguishesProfilesAndKnowledgeSourcesFromTheirRelatedResources()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(AllNavigationPermissions);
+
+        var rendered = RenderLayout(context);
+
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-adjustments",
+            rendered.Find(".side-nav a[href='/modelprofiles'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-database-cog",
+            rendered.Find(".side-nav a[href='/data-source-profiles'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-brain",
+            rendered.Find(".side-nav a[href='/knowledge-sources'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-plug-connected",
+            rendered.Find(".side-nav a[href='/sourceproviders'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-binary-tree",
+            rendered.Find(".side-nav a[href='/settings/resource-scopes'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-database-search",
+            rendered.Find(".side-nav a[href='/settings/source-registries'] use").GetAttribute("href"));
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/resource-plans'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/modelprofiles'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/data-sources'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/data-source-profiles'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/settings/sources'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/knowledge-sources'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/data-sources'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/sourceproviders'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/resource-plans'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/settings/resource-scopes'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/data-sources'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/settings/source-registries'] svg").InnerHtml);
+    }
+
+    [TestMethod]
     public void NavigationPreservesPermissionBasedVisibility()
     {
         using var culture = new CultureScope("en-US");

@@ -9,6 +9,7 @@ using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Triggers;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
@@ -22,6 +23,65 @@ namespace Agentstration.Web.Tests;
 [DoNotParallelize]
 public sealed class FlowDetailsDesignerTests
 {
+    [TestMethod]
+    public void FlowRunGridUsesFlowNameAsDetailsLinkAndPlacesStatusThird()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "reviewer"));
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "flowrun-review-1",
+            FlowId = new FlowId("multi-agent-review"),
+            FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Succeeded,
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            StartedAt = FlowClientStub.Now,
+            CompletedAt = FlowClientStub.Now.AddSeconds(2),
+            DefinitionSnapshot = new FlowVersion(workspaceId, new FlowId("multi-agent-review"), "1.0.0", null, definition, new Dictionary<string, string>(), FlowClientStub.Now)
+        };
+
+        var rendered = context.Render<RunGrid>(parameters => parameters.Add(component => component.Runs, [run]));
+
+        var headers = rendered.FindAll("thead th").Select(header => header.TextContent.Trim()).ToArray();
+        Assert.AreEqual("Status", headers[2]);
+        var link = rendered.Find("tbody .resource-name-link");
+        Assert.AreEqual("multi-agent-review", link.TextContent.Trim());
+        Assert.AreEqual("/flow-runs/flowrun-review-1", link.GetAttribute("href"));
+        Assert.IsEmpty(rendered.FindAll("tbody .text-button"));
+    }
+
+    [TestMethod]
+    public void FlowListUsesFlowNameAsDetailsLinkAndPlacesStatusThird()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FlowClientStub
+        {
+            FlowSummaries =
+            [
+                new FlowSummary("review", "Multi-agent review", "Direct", "1.0.0", "Active", 1, 0, FlowClientStub.Now)
+                {
+                    Namespace = new ResourceNamespace("samples")
+                }
+            ]
+        };
+        context.Services.AddSingleton<IFlowApiClient>(client);
+
+        var rendered = context.Render<Flows>();
+
+        var headers = rendered.FindAll("thead th").Select(header => header.TextContent.Trim()).ToArray();
+        Assert.AreEqual("Status", headers[2]);
+        var link = rendered.Find("tbody .resource-name-link");
+        Assert.AreEqual("Multi-agent review", link.TextContent.Trim());
+        Assert.AreEqual("/namespaces/samples/flows/review", link.GetAttribute("href"));
+        Assert.IsEmpty(rendered.FindAll("tbody .text-button"));
+    }
+
     [TestMethod]
     public void ManualRunUsesPublishedSchemaAndSubmitsValidatedInput()
     {
@@ -389,6 +449,7 @@ public sealed class FlowDetailsDesignerTests
         public int DraftLoadCount { get; private set; }
         public bool SimulateDraftConflict { get; init; }
         public CreateFlowRunRequest? LastRunRequest { get; private set; }
+        public IReadOnlyList<FlowSummary> FlowSummaries { get; init; } = [];
 
         public Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken)
         {
@@ -398,7 +459,7 @@ public sealed class FlowDetailsDesignerTests
         public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<FlowVersionResponse>>([new FlowVersionResponse(flowId, "1.0.0", null, definition, new Dictionary<string, string>(), Now, Graph) { Namespace = @namespace }]);
         public Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FlowRun>>([]);
-        public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FlowSummary>>([]);
+        public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => Task.FromResult(FlowSummaries);
         public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) =>
             GetFlowAsync(ResourceNamespace.Default, flowId, cancellationToken);
         public async Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken) =>
