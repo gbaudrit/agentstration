@@ -239,10 +239,12 @@ export class FlowDesignerPage {
   }
 
   public async expectTransition(text: string): Promise<void> {
+    await this.ensureInspectorVisible();
     await expect(this.page.locator('.transition-list li > button').filter({ hasText: text })).toBeVisible();
   }
 
   public async selectTransition(text: string): Promise<void> {
+    await this.ensureInspectorVisible();
     await expect(async () => {
       await this.page.locator('.transition-list li > button').filter({ hasText: text }).click();
       await expect(this.page.getByTestId(TestIds.flowObservability.selectedTransitionEditor)).toBeVisible({ timeout: 2_000 });

@@ -235,7 +235,7 @@ export const TestIds = {
     runSubmit: 'flow-run-submit',
     designer: 'flow-observability-designer',
     designerSave: 'flow-designer-save',
-    designerValidate: 'flow-designer-validate',
+    designerValidate: 'flow-designer-validation-run',
     designerPublish: 'flow-designer-publish',
     paletteOutput: 'flow-palette-output',
     selectedTransitionEditor: 'selected-transition-editor',
