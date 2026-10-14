@@ -357,6 +357,7 @@ public sealed class DataSourceManagementService(
     IResourceStore store,
     IResourceScopeOperations scopeOperations,
     DataSourceProfileService profiles,
+    IDataSourceAcquisitionCompositionResolver compositions,
     ICurrentRequestContext requestContext,
     ISecurityAuditWriter audit)
 {
@@ -434,7 +435,26 @@ public sealed class DataSourceManagementService(
                 resource.Definition.Profile, cancellationToken);
             var issues = DataSourceProfileService.ValidateConfiguration(profile.Definition.ConfigurationSchema,
                 resource.Definition.Configuration);
-            return new(issues.Count == 0, true, profile, issues);
+            if (issues.Count != 0) return new(false, true, profile, issues);
+
+            ResolvedDataSourceFlowBinding? acquisition = null;
+            if (requestContext.IsInitialized)
+            {
+                try
+                {
+                    acquisition = await compositions.ResolveFlowAsync(
+                        ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId), resource.Namespace, profile,
+                        cancellationToken);
+                }
+                catch (Exception exception) when (exception is DataSourceAcquisitionException
+                    or ResourceReferenceAmbiguousException or ResourceReferenceOutsideScopeException)
+                {
+                    // Flow metadata enriches readiness for schema-driven clients. Acquisition still performs
+                    // authoritative composition resolution, so an unavailable Flow must not invalidate a
+                    // Data Source that was valid before this optional metadata was exposed.
+                }
+            }
+            return new(true, true, profile, issues, acquisition);
         }
         catch (Exception exception) when (exception is DataSourceValidationException
             or ResourceReferenceAmbiguousException or ResourceReferenceOutsideScopeException)
