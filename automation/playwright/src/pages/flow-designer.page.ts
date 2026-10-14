@@ -210,16 +210,12 @@ export class FlowDesignerPage {
     await expect(this.node(output.displayName)).toBeVisible();
   }
 
-  public async arrangeHorizontally(): Promise<void> {
-    await this.ensurePaletteVisible();
-    await this.page.locator('.palette-view button').first().click();
-    await this.closePaletteDrawerIfOpen();
-  }
-
-  public async dragNamedOutputToInput(sourceDisplayName: string, event: string, targetDisplayName: string): Promise<void> {
-    const source = this.namedOutputHandle(sourceDisplayName, event);
-    const target = this.node(targetDisplayName).locator('.flow-port-handle.input');
-    await this.drag(source, target);
+  public async addTransition(from: string, event: string, to: string): Promise<void> {
+    await this.ensureInspectorVisible();
+    await this.page.getByTestId(TestIds.flowObservability.transitionNewFrom).selectOption(from);
+    await this.page.getByTestId(TestIds.flowObservability.transitionNewEvent).fill(event);
+    await this.page.getByTestId(TestIds.flowObservability.transitionNewTo).selectOption(to);
+    await this.page.getByTestId(TestIds.flowObservability.transitionNewAdd).click();
   }
 
   public async setSelectedTransitionPriority(priority: number): Promise<void> {
@@ -416,12 +412,6 @@ export class FlowDesignerPage {
     return this.page.locator('.flow-node').filter({ has: this.page.locator('strong').filter({ hasText: new RegExp(`^${escapeRegExp(name)}$`, 'i') }) }).first();
   }
 
-  private namedOutputHandle(nodeDisplayName: string, event: string): Locator {
-    return this.node(nodeDisplayName).locator('.flow-port-handle.output').filter({
-      has: this.page.locator('.flow-port-label').filter({ hasText: new RegExp(`(?:✓|!)\\s*${escapeRegExp(event)}$`) }),
-    });
-  }
-
   private async ensurePaletteVisible(): Promise<void> {
     const palette = this.page.locator('.step-palette');
     if (await palette.isVisible()) return;
@@ -438,13 +428,6 @@ export class FlowDesignerPage {
     await expect(toggle).toBeVisible();
     await toggle.click();
     await expect(inspector).toBeVisible();
-  }
-
-  private async closePaletteDrawerIfOpen(): Promise<void> {
-    const shell = this.page.locator('.flow-editor-shell');
-    if (!await shell.evaluate(element => element.classList.contains('palette-open'))) return;
-    await this.page.locator('.step-palette .designer-drawer-header button').click();
-    await expect(shell).not.toHaveClass(/\bpalette-open\b/);
   }
 
   private async ensureHistoryActionsVisible(): Promise<void> {

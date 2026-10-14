@@ -348,10 +348,10 @@ else
                         <button class="button-danger" disabled="@ReadOnly" @onclick="() => RemoveTransitionAsync(selectedTransition.Id)">@T("DeleteTransition")</button>
                     </section>
                 }
-                <label>@T("From")<select disabled="@ReadOnly" @bind="transitionFrom">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
-                <label>@T("Event")<input disabled="@ReadOnly" @bind="transitionEvent" /></label>
-                <label>@T("To")<select disabled="@ReadOnly" @bind="transitionTo">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
-                <button class="button-secondary" disabled="@ReadOnly" @onclick="AddTransitionAsync">@T("AddTransition")</button>
+                <label>@T("From")<select data-testid="transition-new-from" disabled="@ReadOnly" @bind="transitionFrom">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
+                <label>@T("Event")<input data-testid="transition-new-event" disabled="@ReadOnly" @bind="transitionEvent" /></label>
+                <label>@T("To")<select data-testid="transition-new-to" disabled="@ReadOnly" @bind="transitionTo">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
+                <button class="button-secondary" data-testid="transition-new-add" disabled="@ReadOnly" @onclick="AddTransitionAsync">@T("AddTransition")</button>
                 <ul class="transition-list">@foreach (var transition in Editor.State.Resource.Definition.Transitions) { <li><button class="@(Editor.State.Selection.TransitionId == transition.Id ? "selected" : null)" @onclick="() => SelectTransitionAsync(transition.Id)">@transition.FromStep —@transition.Event→ @transition.ToStep</button><button disabled="@ReadOnly" aria-label="@T("DeleteTransitionNamed", transition.Id)" @onclick="() => RemoveTransitionAsync(transition.Id)">×</button></li> }</ul>
             </aside>
         }
