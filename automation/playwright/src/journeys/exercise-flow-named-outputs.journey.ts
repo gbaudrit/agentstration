@@ -48,6 +48,7 @@ export const exerciseFlowNamedOutputs: Journey<ExerciseFlowNamedOutputsInput> = 
     schema: '{"type":"object","properties":{"retryable":{"type":"boolean"}}}',
     code: 'PARENT_PROVIDER_ERROR', message: 'The child provider failed.', details: '${transition.output.details}',
   });
+  await designer.arrangeHorizontally();
   await context.checkpoint({ name: Checkpoints.flowNamedOutputs.outputsAuthored, page: context.pages.page, target: designer.designer });
 
   await designer.dragNamedOutputToInput('Child review', 'approved', 'Approved parent');

@@ -210,6 +210,12 @@ export class FlowDesignerPage {
     await expect(this.node(output.displayName)).toBeVisible();
   }
 
+  public async arrangeHorizontally(): Promise<void> {
+    await this.ensurePaletteVisible();
+    await this.page.locator('.palette-view button').first().click();
+    await this.closePaletteDrawerIfOpen();
+  }
+
   public async dragNamedOutputToInput(sourceDisplayName: string, event: string, targetDisplayName: string): Promise<void> {
     const source = this.namedOutputHandle(sourceDisplayName, event);
     const target = this.node(targetDisplayName).locator('.flow-port-handle.input');
@@ -432,6 +438,13 @@ export class FlowDesignerPage {
     await expect(toggle).toBeVisible();
     await toggle.click();
     await expect(inspector).toBeVisible();
+  }
+
+  private async closePaletteDrawerIfOpen(): Promise<void> {
+    const shell = this.page.locator('.flow-editor-shell');
+    if (!await shell.evaluate(element => element.classList.contains('palette-open'))) return;
+    await this.page.locator('.step-palette .designer-drawer-header button').click();
+    await expect(shell).not.toHaveClass(/\bpalette-open\b/);
   }
 
   private async ensureHistoryActionsVisible(): Promise<void> {
