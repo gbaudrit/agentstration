@@ -81,8 +81,17 @@ else
         <main id="schema-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
             <section class="panel form-section" data-testid="schema-versions">
                 <div class="panel-header"><div><p class="eyebrow">@T("Publication")</p><h2>@T("PublishedVersions")</h2><p>@T("PublishedVersionsHelp")</p></div></div>
-                <div class="form-grid"><label><span>@T("Version")</span><input @bind="publishVersion" disabled="@busy" data-testid="schema-publish-version" /></label></div>
-                <div class="form-actions"><button class="button-primary" type="button" @onclick="PublishAsync" disabled="@busy" data-testid="schema-publish">@(busy ? T("Publishing") : T("Publish"))</button></div>
+                <section class="schema-publish-card" aria-labelledby="schema-publish-title">
+                    <div class="schema-publish-summary">
+                        <span class="schema-publish-icon" aria-hidden="true"><TablerIcon Name="upload" /></span>
+                        <div><h3 id="schema-publish-title">@T("PublishDraft")</h3><p>@T("PublishDraftHelp", schema.Generation)</p></div>
+                    </div>
+                    <div class="schema-publish-controls">
+                        <label><span>@T("Version")</span><input @bind="publishVersion" disabled="@busy" aria-describedby="schema-version-help" data-testid="schema-publish-version" /></label>
+                        <button class="button-primary" type="button" @onclick="PublishAsync" disabled="@busy" data-testid="schema-publish">@(busy ? T("Publishing") : T("Publish"))</button>
+                    </div>
+                    <p id="schema-version-help" class="muted schema-version-help">@T("VersionHelp")</p>
+                </section>
                 @if (versions.Count == 0) { <p class="muted">@T("NoPublishedVersions")</p> }
                 else
                 {
@@ -101,7 +110,12 @@ else
                                 <dt>@T("PublishedAt")</dt><dd>@selectedVersion.PublishedAt.ToLocalTime().ToString("g")</dd>
                                 <dt>@T("DefinitionHash")</dt><dd><code>@selectedVersion.DefinitionHash</code></dd>
                             </dl>
-                            <label class="schema-yaml-field"><span>@T("ImmutableContent")</span><textarea class="form-code-editor runner-json" rows="22" readonly data-testid="schema-version-content">@SelectedVersionContent</textarea></label>
+                            <div class="schema-version-editor">
+                                <div><h4>@T("ImmutableContent")</h4><p class="muted">@T("ImmutableContentHelp")</p></div>
+                                <SchemaDocumentEditor Format="@selectedVersion.Format" Dialect="@selectedVersion.Dialect"
+                                    Descriptor="@VersionFormatDescriptor(selectedVersion)" Value="@selectedVersion.Content"
+                                    ReadOnly="true" />
+                            </div>
                         </section>
                     }
                 }
@@ -199,8 +213,6 @@ else
         && value.IsDefault && string.Equals(value.Format, format, StringComparison.Ordinal))
         ?? formats.FirstOrDefault(value => value.IsAvailable && string.Equals(value.Format, format, StringComparison.Ordinal));
     private bool FormatAvailable => SelectedFormatDescriptor is not null;
-    private string SelectedVersionContent => selectedVersion is null ? string.Empty
-        : JsonSerializer.Serialize(selectedVersion.Content, new JsonSerializerOptions { WriteIndented = true });
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private static string TabId(SchemaTab tab) => $"schema-tab-{tab.ToString().ToLowerInvariant()}";
 
@@ -378,6 +390,9 @@ else
         + $"?scopeRef={Uri.EscapeDataString(value.ScopeRef!.Value.Value)}"
         + $"&namespace={Uri.EscapeDataString(value.Namespace.Value)}";
     private string VersionUrl(string version) => $"{EditUrl(schema!)}&view=versions&version={Uri.EscapeDataString(version)}";
+    private SchemaFormatDescriptor? VersionFormatDescriptor(SchemaVersionResource version) => formats.FirstOrDefault(value => value.IsAvailable
+        && value.IsDefault && string.Equals(value.Format, version.Format, StringComparison.Ordinal))
+        ?? formats.FirstOrDefault(value => value.IsAvailable && string.Equals(value.Format, version.Format, StringComparison.Ordinal));
     private void ChangeFormat(ChangeEventArgs args)
     {
         format = args.Value?.ToString() ?? string.Empty;

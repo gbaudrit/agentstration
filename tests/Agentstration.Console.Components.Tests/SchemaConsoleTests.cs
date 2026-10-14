@@ -32,6 +32,8 @@ public sealed class SchemaConsoleTests
             StringAssert.Contains(rendered.Markup, SchemaFormatIds.JsonSchema);
             StringAssert.Contains(rendered.Markup, Scope.Value);
             StringAssert.Contains(rendered.Find("[data-testid='schema-details-link']").GetAttribute("href"), "/schemas/contact");
+            Assert.HasCount(5, rendered.FindAll("[data-testid='schema-row'] td"));
+            Assert.HasCount(0, rendered.FindAll("[data-testid='schema-row'] .text-button"));
         });
     }
 
@@ -107,7 +109,11 @@ public sealed class SchemaConsoleTests
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual("2.1.0", client.RequestedVersion);
-            StringAssert.Contains(rendered.Find("[data-testid='schema-version-content']").TextContent, "object");
+            var editor = rendered.FindComponent<SchemaDocumentEditor>();
+            Assert.IsTrue(editor.Instance.ReadOnly);
+            StringAssert.Contains(editor.Instance.Value.GetRawText(), "object");
+            Assert.HasCount(0, rendered.FindAll("[data-testid='schema-add-property']"));
+            Assert.IsTrue(rendered.Find("[data-testid='schema-publish-version']").GetAttribute("aria-describedby") == "schema-version-help");
         });
     }
 
