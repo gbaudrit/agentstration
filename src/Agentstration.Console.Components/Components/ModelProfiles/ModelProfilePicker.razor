@@ -36,8 +36,9 @@
     @if (Selected is not null)
     {
         <article class="model-summary-card">
-            <div><p class="eyebrow">@T("SelectedModelProfile")</p><strong>@Selected.Properties.DisplayName</strong><code>@Selected.Namespace/@Selected.Name</code></div>
+            <div><p class="eyebrow">@T("SelectedModelProfile")</p><span class="resource-name-with-scope"><strong>@Selected.Properties.DisplayName</strong><ResourceScopeBadge ScopeRef="@Selected.ScopeRef" Compact /></span><code>@Selected.Namespace/@Selected.Name</code></div>
             <dl class="compact-details">
+                <dt>@T("Scope")</dt><dd><code>@(Selected.ScopeRef?.Value ?? T("Scope.Unknown"))</code></dd>
                 <dt>@T("Provider")</dt><dd>@(Selected.Properties.Provider.DisplayName ?? Selected.Properties.Provider.Name)</dd>
                 <dt>@T("Model")</dt><dd>@Selected.Properties.Model.Name</dd>
                 <dt>@T("Status")</dt><dd><StatusBadge Text="@StatusLabel(Selected.Properties.Status)" Status="@ModelManagementUi.Status(Selected.Properties.Status)" /></dd>
@@ -62,6 +63,7 @@
 @code {
     [Parameter] public string? Value { get; set; }
     [Parameter] public string Namespace { get; set; } = ResourceNamespace.Default.Value;
+    [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     [Parameter] public EventCallback<ModelProfileSummaryResponse?> SelectedChanged { get; set; }
     [Parameter] public bool SelectFirstWhenMissing { get; set; }
@@ -72,10 +74,18 @@
     private AgentstrationApiException? error;
     private string search = string.Empty;
     private bool loading;
-    private string CurrentValue => string.IsNullOrWhiteSpace(Value) ? string.Empty : $"{ResourceNamespace.Parse(Namespace).Value}:{Value}";
-    private ModelProfileSummaryResponse? Selected => profiles.FirstOrDefault(item =>
-        string.Equals(item.Name, Value, StringComparison.OrdinalIgnoreCase)
-        && string.Equals(item.Namespace, ResourceNamespace.Parse(Namespace).Value, StringComparison.Ordinal));
+    private string CurrentValue => Selected is { } selected ? ProfileValue(selected) : string.Empty;
+    private ModelProfileSummaryResponse? Selected
+    {
+        get
+        {
+            var matches = profiles.Where(item =>
+                string.Equals(item.Name, Value, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.Namespace, ResourceNamespace.Parse(Namespace).Value, StringComparison.Ordinal)
+                && (ScopeRef is null || item.ScopeRef == ScopeRef)).ToArray();
+            return matches.Length == 1 ? matches[0] : null;
+        }
+    }
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -119,12 +129,16 @@
     private string T(string key) => Localizer[key];
     private string StatusLabel(string? status) { var key = $"Status.{status ?? "unknown"}"; var localized = Localizer[key]; return localized.ResourceNotFound ? ModelManagementUi.Label(status) : localized.Value; }
     private string OptionLabel(ModelProfileSummaryResponse item) =>
-        $"{item.Properties.DisplayName} — {item.Namespace}/{item.Name} · {item.Properties.Provider.Name} / {item.Properties.Model.Name} · {StatusLabel(item.Properties.Status)}";
+        $"{item.Properties.DisplayName} — {ScopeLabel(item)} · {item.Namespace}/{item.Name} · {item.Properties.Provider.Name} / {item.Properties.Model.Name} · {StatusLabel(item.Properties.Status)}";
 
-    private static string ProfileValue(ModelProfileSummaryResponse item) => $"{item.Namespace}:{item.Name}";
+    private string ScopeLabel(ModelProfileSummaryResponse item) =>
+        item.ScopeRef is null ? T("Scope.Unknown") : T($"Scope.{item.ScopeRef.Value.Kind}");
+
+    private static string ProfileValue(ModelProfileSummaryResponse item) =>
+        $"{item.ScopeRef?.Value ?? string.Empty}|{item.Namespace}|{item.Name}";
 
     private static string ProfileUrl(ModelProfileSummaryResponse item) =>
-        ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(item.Namespace), ModelResourceKinds.ModelProfile, item.Name));
+        ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(item.Namespace), ModelResourceKinds.ModelProfile, item.Name), item.ScopeRef);
 
     public void Dispose()
     {

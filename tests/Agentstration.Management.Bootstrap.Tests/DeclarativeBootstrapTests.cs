@@ -565,14 +565,16 @@ public sealed partial class DeclarativeBootstrapTests
     {
         using var directory = new TemporaryDirectory();
         var initial = Directory.CreateDirectory(Path.Combine(directory.Path, "initial"));
+        var infrastructure = Directory.CreateDirectory(Path.Combine(directory.Path, "instance-resources"));
         var resources = Directory.CreateDirectory(Path.Combine(directory.Path, "workspace-resources"));
         await File.WriteAllTextAsync(Path.Combine(initial.FullName, "00-platform-admin.yaml"), PlatformAdministrator());
         await File.WriteAllTextAsync(Path.Combine(initial.FullName, "10-tenant.yaml"), Tenant("dev", "Development"));
         await File.WriteAllTextAsync(Path.Combine(initial.FullName, "20-workspace.yaml"), Workspace("default", "Default workspace", "dev"));
         await File.WriteAllTextAsync(Path.Combine(initial.FullName, "30-default-context.yaml"), DefaultContext("bootstrap-admin", "dev", "default"));
+        await File.WriteAllTextAsync(Path.Combine(infrastructure.FullName, "profile.yaml"), Profile("instance-resources", "instance"));
+        await File.WriteAllTextAsync(Path.Combine(infrastructure.FullName, "10-model-provider.yaml"), ModelProvider());
+        await File.WriteAllTextAsync(Path.Combine(infrastructure.FullName, "20-runtime-profile.yaml"), RuntimeProfile());
         await File.WriteAllTextAsync(Path.Combine(resources.FullName, "profile.yaml"), ProfileWithBinding("workspace-resources", includeDefault: true, defaultTargetName: "bootstrap-model"));
-        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "10-model-provider.yaml"), ModelProvider());
-        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "20-runtime-profile.yaml"), RuntimeProfile());
         await File.WriteAllTextAsync(Path.Combine(resources.FullName, "30-model-profile.yaml"), ModelProfile());
         await File.WriteAllTextAsync(Path.Combine(resources.FullName, "40-agent.yaml"), Agent());
         await File.WriteAllTextAsync(Path.Combine(resources.FullName, "50-flow.yaml"), Flow());
@@ -594,15 +596,38 @@ public sealed partial class DeclarativeBootstrapTests
         Assert.IsNotNull(tenant);
         var workspace = await identities.FindWorkspaceByNameAsync(tenant.Id, "default", default);
         Assert.IsNotNull(workspace);
-        using (scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>()
-            .Push(new RequestContext(principal.Id, tenant.Id, workspace.Id)))
+        var scopeFactory = scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>();
+        using (scopeFactory.PushSystem())
         {
             _ = await scope.ServiceProvider.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverAsync(default);
+        }
+        var management = scope.ServiceProvider.GetRequiredService<BootstrapProfileManagementService>();
+        var infrastructureSelection = new BootstrapProfileSelection(["instance-resources"]);
+        var infrastructurePreview = await management.PreviewAsync(infrastructureSelection, principal.Id, default);
+        Assert.IsTrue(infrastructurePreview.CanApply,
+            string.Join(Environment.NewLine, infrastructurePreview.Resources.Select(resource => $"{resource.Kind}/{resource.Name}: {resource.Message}")));
+        _ = await management.ApplyAsync(infrastructureSelection, infrastructurePreview.Digest, principal.Id, default);
+
+        using (scopeFactory.PushSystem())
+        {
+            var policies = scope.ServiceProvider.GetRequiredService<IResourceAccessPolicyService>();
+            var provider = await scope.ServiceProvider.GetRequiredService<ModelProviderManagementService>()
+                .GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "bootstrap-provider", default);
+            var runtime = await scope.ServiceProvider.GetRequiredService<RuntimeProfileManagementService>()
+                .GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "bootstrap-runtime", default);
+            Assert.IsNotNull(provider);
+            Assert.IsNotNull(runtime);
+            foreach (var resource in new Resource[] { provider.Value, runtime.Value })
+            {
+                _ = await policies.PutAsync(new ResourceAccessPolicy(
+                    new(resource.Uid, ResourceScopeRef.Instance, resource.Namespace, resource.Kind, resource.Generation),
+                    [new(ResourceScopeRef.Workspace(workspace.Id), [ResourceAccessAction.Discover, ResourceAccessAction.Use])]),
+                    null, default);
+            }
         }
         var selection = new BootstrapProfileSelection(
             ["workspace-resources"],
             new(tenant.Id, workspace.Id));
-        var management = scope.ServiceProvider.GetRequiredService<BootstrapProfileManagementService>();
 
         var bindingTargets = await management.GetBindingTargetsAsync(
             selection.Target,
@@ -618,12 +643,12 @@ public sealed partial class DeclarativeBootstrapTests
         Assert.IsTrue(
             preview.CanApply,
             string.Join(Environment.NewLine, preview.Resources.Select(resource => $"{resource.Kind}/{resource.Name}: {resource.Message}")));
-        Assert.HasCount(6, preview.Resources);
+        Assert.HasCount(4, preview.Resources);
         Assert.IsTrue(preview.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Create));
         var application = await management.ApplyAsync(selection, preview.Digest, principal.Id, default);
         Assert.AreEqual(BootstrapApplicationStatus.Succeeded, application.Definition.Status);
         Assert.AreEqual("bootstrap-model", application.Definition.Bindings.Single().Target.Name);
-        Assert.HasCount(6, application.Definition.Resources);
+        Assert.HasCount(4, application.Definition.Resources);
         Assert.IsTrue(application.Definition.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Create));
         var persistedBindingTargets = await management.GetBindingTargetsAsync(
             selection.Target,
@@ -690,7 +715,7 @@ public sealed partial class DeclarativeBootstrapTests
     }
 
     [TestMethod]
-    public async Task ParameterAndBoundModelProviderArePlannedAppliedAndReappliedTogether()
+    public async Task WorkspaceBoundModelProviderIsRejectedAcrossScopeHierarchy()
     {
         using var directory = new TemporaryDirectory();
         var initial = Directory.CreateDirectory(Path.Combine(directory.Path, "initial-parameter-binding"));
@@ -760,8 +785,7 @@ public sealed partial class DeclarativeBootstrapTests
         Assert.IsNotNull(tenant);
         var workspace = await identities.FindWorkspaceByNameAsync(tenant.Id, "default", default);
         Assert.IsNotNull(workspace);
-        using (scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>()
-            .Push(new RequestContext(principal.Id, tenant.Id, workspace.Id)))
+        using (scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
         {
             _ = await scope.ServiceProvider.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverAsync(default);
         }
@@ -781,26 +805,10 @@ public sealed partial class DeclarativeBootstrapTests
         Assert.IsTrue(planned.Planned);
         Assert.AreEqual(parameterScope, planned.ScopeRef);
         var preview = await management.PreviewAsync(selection, principal.Id, default);
-        Assert.IsTrue(preview.CanApply,
-            string.Join(Environment.NewLine, preview.Resources.Select(resource => resource.Message)));
-        Assert.IsTrue(preview.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Create));
-
-        var application = await management.ApplyAsync(selection, preview.Digest, principal.Id, default);
-        Assert.AreEqual(BootstrapApplicationStatus.Succeeded, application.Definition.Status);
-        using (scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>()
-            .Push(new RequestContext(principal.Id, tenant.Id, workspace.Id)))
-        {
-            var parameter = await scope.ServiceProvider.GetRequiredService<ParameterManagementService>()
-                .GetExactAsync(parameterScope, "provider-endpoint", default);
-            var provider = await scope.ServiceProvider.GetRequiredService<ModelProviderManagementService>()
-                .GetExactAsync(parameterScope, ResourceNamespace.Default, "bound-provider", default);
-            Assert.IsNotNull(parameter);
-            Assert.IsNotNull(provider);
-            Assert.AreEqual(parameterScope, provider.Value.Definition.ValueBindings.Single().Parameter?.ScopeRef);
-        }
-
-        var secondPreview = await management.PreviewAsync(selection, principal.Id, default);
-        Assert.IsTrue(secondPreview.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Skip));
+        Assert.IsFalse(preview.CanApply);
+        var providerPlan = preview.Resources.Single(resource => resource.Kind == ModelResourceKinds.ModelProvider);
+        Assert.AreEqual(BootstrapResourceDisposition.Invalid, providerPlan.Disposition);
+        StringAssert.Contains(providerPlan.Message, "Resource scope 'Instance' does not match profile scope 'Workspace'.");
     }
 
     [TestMethod]
@@ -1138,6 +1146,7 @@ public sealed partial class DeclarativeBootstrapTests
           displayName: Bootstrap model
           provider:
             name: bootstrap-provider
+            scopeRef: /instance
           model:
             name: qwen3:1.7b
           generation:
@@ -1156,6 +1165,7 @@ public sealed partial class DeclarativeBootstrapTests
             binding: agent-model
           runtimeProfile:
             name: bootstrap-runtime
+            scopeRef: /instance
           tools: []
         """;
 

@@ -76,8 +76,11 @@ public sealed class AepModelProvider(
         var providerScope = provider.ScopeRef is { } scopeRef && scopeRef != default
             ? scopeRef
             : throw new ModelProviderConfigurationException("AEP Value Bindings require a scoped Model Provider.");
-        var consumer = new ScopedResourceAddress(providerScope, provider.Namespace, ModelResourceKinds.ModelProvider, provider.Name);
-        var parameterContext = new ParameterResolutionContext(providerScope, consumer.Address);
+        var providerConsumer = new ScopedResourceAddress(providerScope, provider.Namespace, ModelResourceKinds.ModelProvider, provider.Name);
+        var parameterContext = new ParameterResolutionContext(providerScope, providerConsumer.Address);
+        var profileSecretRequirementIds = deployment.SecretBindings
+            .Select(binding => binding.RequirementId)
+            .ToHashSet(StringComparer.Ordinal);
         var secretBindings = bindings.Where(value => value.Kind == ModelProviderValueBindingKind.Secret).ToArray();
         Uri? secretEndpoint = null;
         ScopedResourceAddress extension = default;
@@ -125,6 +128,10 @@ public sealed class AepModelProvider(
                 }
 
                 var secretBinding = new SecretBinding(binding.RequirementId, binding.Secret!);
+                var consumer = profileSecretRequirementIds.Contains(binding.RequirementId)
+                    && deployment.ScopeRef is { } deploymentScope && deploymentScope != default
+                    ? new ScopedResourceAddress(deploymentScope, deployment.Namespace, ModelResourceKinds.ModelProfile, deployment.Name)
+                    : providerConsumer;
                 var context = new SecretCapabilityContext(extension, manifest.Extension.Id, consumer, binding.RequirementId, executionId);
                 var handle = await capabilities!.IssueAsync(context, secretBinding, declared, cancellationToken, cancellationToken);
                 handles.Add(handle);

@@ -55,8 +55,6 @@ public static class ConsoleHostServiceCollectionExtensions
         services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
         AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi, InternalDelegationAudiences.Work);
         AddClient<EntryAdministrationApiClient, IEntryAdministrationApiClient>(services, configured.WorkApi, InternalDelegationAudiences.Work);
-        AddClient(services, EntryAdministrationApiClient.AgentResourceCatalogClient, configured.ManagementApi, InternalDelegationAudiences.Management);
-        AddClient(services, EntryAdministrationApiClient.FlowResourceCatalogClient, configured.FlowApi, InternalDelegationAudiences.Flow);
         services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(
             new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"),
             provider.GetRequiredService<IConsoleRealtimeConnectionConfigurator>(),

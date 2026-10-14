@@ -341,14 +341,14 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         using var client = factory.CreateClient();
         var targets = (await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
             $"/api/resource-scopes/targets?kind={ParameterResourceKinds.Parameter}"))!;
-        var tenant = targets.Single(value => value.Kind == ResourceScopeKind.Tenant).ScopeRef;
+        var instance = targets.Single(value => value.Kind == ResourceScopeKind.Instance).ScopeRef;
         using var extension = await client.PostAsJsonAsync("/api/extensionregistrations",
             new CreateExtensionRegistrationRequest("binding-extension", new()
             {
                 DisplayName = "Binding extension",
                 Endpoint = new Uri("http://127.0.0.1:6789"),
                 ExpectedExtensionId = "binding-extension"
-            }, ScopeRef: tenant));
+            }, ScopeRef: instance));
         Assert.AreEqual(HttpStatusCode.Created, extension.StatusCode);
 
         using var parameter = await client.PostAsJsonAsync("/api/parameters", new CreateParameterRequest(
@@ -358,7 +358,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
                 DisplayName = "Provider endpoint",
                 ValueType = ParameterValueType.Text,
                 Value = JsonSerializer.SerializeToElement("https://provider.test")
-            }, tenant));
+            }, instance));
         Assert.AreEqual(HttpStatusCode.Created, parameter.StatusCode);
         using var disallowedParameter = await client.PostAsJsonAsync("/api/parameters", new CreateParameterRequest(
             "disallowed-endpoint",
@@ -367,20 +367,20 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
                 DisplayName = "Disallowed endpoint",
                 ValueType = ParameterValueType.Text,
                 Value = JsonSerializer.SerializeToElement("https://other.test")
-            }, tenant));
+            }, instance));
         Assert.AreEqual(HttpStatusCode.Created, disallowedParameter.StatusCode);
         var reference = new ParameterReference(
-            ResourceAddress.Create(ResourceNamespace.Default, ParameterResourceKinds.Parameter, "provider-endpoint"), tenant);
+            ResourceAddress.Create(ResourceNamespace.Default, ParameterResourceKinds.Parameter, "provider-endpoint"), instance);
         ModelProviderProperties Properties(string name, IReadOnlyList<ModelProviderValueBinding> bindings) => new()
         {
             DisplayName = name,
-            Extension = new ResourceReference("binding-extension", tenant),
+            Extension = new ResourceReference("binding-extension", instance),
             ContributionId = "discovered",
             ValueBindings = bindings
         };
 
         using var created = await client.PostAsJsonAsync("/api/modelproviders", new CreateModelProviderRequest(
-            "bound-provider", Properties("Bound provider", [ModelProviderValueBinding.FromParameter("endpoint", reference)]), ScopeRef: tenant));
+            "bound-provider", Properties("Bound provider", [ModelProviderValueBinding.FromParameter("endpoint", reference)]), ScopeRef: instance));
         Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
         var saved = await created.Content.ReadFromJsonAsync<ModelProviderResource>();
         Assert.AreEqual(reference, saved?.Definition.ValueBindings.Single().Parameter);
@@ -405,13 +405,13 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         for (var index = 0; index < invalidCases.Length; index++)
         {
             using var invalid = await client.PostAsJsonAsync("/api/modelproviders", new CreateModelProviderRequest(
-                $"invalid-binding-{index}", invalidCases[index], ScopeRef: tenant));
+                $"invalid-binding-{index}", invalidCases[index], ScopeRef: instance));
             Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
             Assert.IsFalse((await invalid.Content.ReadAsStringAsync()).Contains("https://other.test", StringComparison.Ordinal));
         }
 
         using var delete = new HttpRequestMessage(HttpMethod.Delete,
-            $"/api/parameters/provider-endpoint?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+            $"/api/parameters/provider-endpoint?scopeRef={Uri.EscapeDataString(instance.Value)}");
         delete.Headers.IfMatch.ParseAdd(parameter.Headers.ETag!.ToString());
         using var protectedDelete = await client.SendAsync(delete);
         Assert.AreEqual(HttpStatusCode.Conflict, protectedDelete.StatusCode);

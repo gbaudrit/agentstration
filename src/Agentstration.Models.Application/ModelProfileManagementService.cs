@@ -4,6 +4,7 @@ using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +16,7 @@ public sealed class ModelProfileManagementService(
     IResourceReferenceResolver references,
     ResourceScopeOperationService scopeOperations,
     ModelProviderManagementService providerConfigurations,
+    IResourceAccessPolicyService accessPolicies,
     ModelDiscoveryService modelDiscovery,
     IEnumerable<IModelProviderDiscovery> discoveries,
     IEnumerable<IModelProviderCapabilitiesResolver> capabilityResolvers,
@@ -47,13 +49,16 @@ public sealed class ModelProfileManagementService(
         => await PutAsync(ResourceNamespace.Default, name, definition, ifMatch, cancellationToken);
 
     public async Task<StoredResource<ModelProfileResource>> PutAsync(ResourceNamespace @namespace, string name, ModelProfileProperties definition, string? ifMatch, CancellationToken cancellationToken)
+        => await PutAsync(@namespace, name, null, definition, ifMatch, cancellationToken);
+
+    public async Task<StoredResource<ModelProfileResource>> PutAsync(ResourceNamespace @namespace, string name, ResourceScopeRef? scopeRef, ModelProfileProperties definition, string? ifMatch, CancellationToken cancellationToken)
     {
-        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, name, @namespace));
-        var scopeRef = existing.Value.ScopeRef ?? throw Invalid("scopeRef", "The model profile has no ownership scope.");
-        return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
+        var existing = await GetAsync(@namespace, name, scopeRef, cancellationToken) ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, name, @namespace));
+        var resolvedScopeRef = existing.Value.ScopeRef ?? throw Invalid("scopeRef", "The model profile has no ownership scope.");
+        return await scopeOperations.WriteAsync(existing.Value, resolvedScopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
-            await ValidateDefinitionAsync(existing.Value.Namespace, definition, scopeRef, token);
-            return await store.PutExactAsync(scopeRef, existing.Value with
+            await ValidateDefinitionAsync(existing.Value.Namespace, definition, resolvedScopeRef, token);
+            return await store.PutExactAsync(resolvedScopeRef, existing.Value with
             {
                 Generation = checked(existing.Value.Generation + 1),
                 Definition = definition,
@@ -65,6 +70,8 @@ public sealed class ModelProfileManagementService(
     public Task<StoredResource<ModelProfileResource>?> GetAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ModelProfileResource>(new ResourceKey(ModelResourceKinds.ModelProfile, name), cancellationToken);
     public Task<IReadOnlyList<StoredResource<ModelProfileResource>>> ListAsync(CancellationToken cancellationToken) => store.ListAllAsync<ModelProfileResource>(ModelResourceKinds.ModelProfile, cancellationToken);
     public Task<StoredResource<ModelProfileResource>?> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => store.GetAsync<ModelProfileResource>(new ResourceKey(ModelResourceKinds.ModelProfile, name, @namespace), cancellationToken);
+    public Task<StoredResource<ModelProfileResource>?> GetAsync(ResourceNamespace @namespace, string name, ResourceScopeRef? scopeRef, CancellationToken cancellationToken) =>
+        scopeRef is { } exact ? GetExactAsync(exact, @namespace, name, cancellationToken) : GetAsync(@namespace, name, cancellationToken);
     public Task<StoredResource<ModelProfileResource>?> GetExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         store.GetExactAsync<ModelProfileResource>(ScopedResourceAddress.Create(scopeRef, @namespace, ModelResourceKinds.ModelProfile, name), cancellationToken);
 
@@ -72,14 +79,17 @@ public sealed class ModelProfileManagementService(
         DeleteAsync(ResourceNamespace.Default, name, ifMatch, cancellationToken);
 
     public async Task DeleteAsync(ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
+        => await DeleteAsync(@namespace, name, null, ifMatch, cancellationToken);
+
+    public async Task DeleteAsync(ResourceNamespace @namespace, string name, ResourceScopeRef? scopeRef, string? ifMatch, CancellationToken cancellationToken)
     {
-        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, name, @namespace));
-        var usages = await GetUsagesAsync(@namespace, name, cancellationToken);
+        var existing = await GetAsync(@namespace, name, scopeRef, cancellationToken) ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, name, @namespace));
+        var usages = await GetUsagesAsync(existing.Value, cancellationToken);
         if (usages.Count > 0) throw new ModelProfileInUseException(name, usages);
-        var scopeRef = existing.Value.ScopeRef ?? throw Invalid("scopeRef", "The model profile has no ownership scope.");
-        await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
+        var resolvedScopeRef = existing.Value.ScopeRef ?? throw Invalid("scopeRef", "The model profile has no ownership scope.");
+        await scopeOperations.WriteAsync(existing.Value, resolvedScopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
-            await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, @namespace, ModelResourceKinds.ModelProfile, name), ifMatch, token);
+            await store.DeleteExactAsync(ScopedResourceAddress.Create(resolvedScopeRef, @namespace, ModelResourceKinds.ModelProfile, name), ifMatch, token);
             return true;
         }, cancellationToken);
     }
@@ -88,11 +98,36 @@ public sealed class ModelProfileManagementService(
         await GetUsagesAsync(ResourceNamespace.Default, profileName, cancellationToken);
 
     public async Task<IReadOnlyList<ModelProfileUsage>> GetUsagesAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) =>
-        (await store.ListAllAsync<AgentResource>(AgentResourceKinds.Agent, cancellationToken))
-            .Where(agent => agent.Value.Definition.ModelProfile.Resolve(agent.Value.Namespace, ModelResourceKinds.ModelProfile).Namespace == @namespace
-                && agent.Value.Definition.ModelProfile.Name == profileName)
-            .Select(agent => new ModelProfileUsage(agent.Value.Kind, agent.Value.Metadata.Name, agent.Value.Definition.DisplayName))
-            .ToArray();
+        await GetUsagesAsync(
+            (await GetAsync(@namespace, profileName, cancellationToken))?.Value
+                ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, profileName, @namespace)),
+            cancellationToken);
+
+    public async Task<IReadOnlyList<ModelProfileUsage>> GetUsagesAsync(ModelProfileResource profile, CancellationToken cancellationToken)
+    {
+        var usages = new List<ModelProfileUsage>();
+        foreach (var agent in await store.ListAllAsync<AgentResource>(AgentResourceKinds.Agent, cancellationToken))
+        {
+            if (agent.Value.ScopeRef is not { } agentScopeRef) continue;
+            StoredResource<ModelProfileResource>? resolved;
+            try
+            {
+                resolved = await references.ResolveAsync<ModelProfileResource>(
+                    agent.Value.Definition.ModelProfile,
+                    agent.Value.Namespace,
+                    ModelResourceKinds.ModelProfile,
+                    agentScopeRef,
+                    cancellationToken);
+            }
+            catch (ResourceReferenceAmbiguousException)
+            {
+                continue;
+            }
+            if (resolved?.Value.Uid == profile.Uid)
+                usages.Add(new(agent.Value.Kind, agent.Value.Metadata.Name, agent.Value.Definition.DisplayName));
+        }
+        return usages;
+    }
 
     public async Task<ModelProfileResolution> ResolveAsync(
         ModelProfileResource profile,
@@ -134,6 +169,8 @@ public sealed class ModelProfileManagementService(
             var deployment = new ModelDeploymentConfiguration
             {
                 Name = profile.Metadata.Name,
+                Namespace = profile.Namespace,
+                ScopeRef = profile.ScopeRef,
                 ProviderName = provider.Name,
                 ModelName = profile.Definition.Model.Name,
                 EffectiveSpecification = model.Specification,
@@ -218,6 +255,7 @@ public sealed class ModelProfileManagementService(
         return new()
         {
             Name = profile.Value.Metadata.Name,
+            Namespace = profile.Value.Namespace,
             ScopeRef = profile.Value.ScopeRef,
             ProviderName = providerReference.Name,
             ProviderNamespace = providerReference.Namespace,
@@ -229,24 +267,74 @@ public sealed class ModelProfileManagementService(
     }
 
     public async Task ValidateReferenceAsync(ResourceReference profileReference, ResourceNamespace ownerNamespace, ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken)
+        => _ = await ResolveReferenceAsync(profileReference, ownerNamespace, consumerScopeRef, cancellationToken);
+
+    public async Task<ResolvedResourceDependency> ResolveReferenceAsync(ResourceReference profileReference, ResourceNamespace ownerNamespace, ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken)
     {
-        var profile = await references.ResolveAsync<ModelProfileResource>(
-            profileReference, ownerNamespace, ModelResourceKinds.ModelProfile, consumerScopeRef, cancellationToken)
-            ?? throw Invalid("definition.modelProfileRef.name", "The referenced model profile does not exist.");
+        StoredResource<ModelProfileResource>? profile;
+        try
+        {
+            profile = await references.ResolveAsync<ModelProfileResource>(
+                profileReference, ownerNamespace, ModelResourceKinds.ModelProfile, consumerScopeRef, cancellationToken);
+        }
+        catch (ResourceReferenceAmbiguousException exception)
+        {
+            throw Invalid("definition.modelProfileRef.scopeRef", exception.Message);
+        }
+        catch (ResourceReferenceOutsideScopeException exception)
+        {
+            throw Invalid("definition.modelProfileRef.scopeRef", exception.Message);
+        }
+        if (profile is null)
+            throw Invalid("definition.modelProfileRef.name", "The referenced model profile does not exist.");
+        var profileScopeRef = profile.Value.ScopeRef ?? throw Invalid("scopeRef", "The model profile has no ownership scope.");
+        if (profileScopeRef != consumerScopeRef)
+        {
+            var access = await accessPolicies.EvaluateAsync(new ResourceAccessIdentity(
+                profile.Value.Uid, profileScopeRef, profile.Value.Namespace, ModelResourceKinds.ModelProfile,
+                profile.Value.Generation), consumerScopeRef, ResourceAccessAction.Use, cancellationToken);
+            if (!access.Allowed)
+                throw Invalid("definition.modelProfileRef.scopeRef",
+                    $"The model profile does not authorize use from '{consumerScopeRef}' ({access.ReasonCode}).");
+        }
         await ValidateDefinitionAsync(
             profile.Value.Namespace,
             profile.Value.Definition,
-            profile.Value.ScopeRef ?? throw Invalid("scopeRef", "The model profile has no ownership scope."),
+            profileScopeRef,
             cancellationToken);
+        return new(profile.Value.Uid, profileScopeRef, profile.Value.Namespace, ModelResourceKinds.ModelProfile,
+            profile.Value.Name, profile.Value.Generation);
     }
 
     Task IModelProfileReferenceValidator.ValidateAsync(ResourceReference profileReference, ResourceNamespace ownerNamespace, ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken) =>
         ValidateReferenceAsync(profileReference, ownerNamespace, consumerScopeRef, cancellationToken);
 
+    async Task<ResolvedResourceDependency?> IModelProfileReferenceValidator.ResolveAsync(
+        ResourceReference profileReference, ResourceNamespace ownerNamespace, ResourceScopeRef consumerScopeRef,
+        CancellationToken cancellationToken) =>
+        await ResolveReferenceAsync(profileReference, ownerNamespace, consumerScopeRef, cancellationToken);
+
     private async Task ValidateDefinitionAsync(ResourceNamespace ownerNamespace, ModelProfileProperties definition, ResourceScopeRef ownerScopeRef, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.DisplayName);
+        if (definition.Provider.ScopeRef != ResourceScopeRef.Instance)
+            throw Invalid("definition.provider.scopeRef", "A model profile requires an exact Instance Model Provider reference.");
+        var providerResource = await references.ResolveAsync<ModelProviderResource>(
+            definition.Provider, ownerNamespace, ModelResourceKinds.ModelProvider, ownerScopeRef, cancellationToken)
+            ?? throw Invalid("definition.provider.name", "The referenced model provider does not exist.");
+        if (ownerScopeRef != ResourceScopeRef.Instance)
+        {
+            var access = await accessPolicies.EvaluateAsync(new ResourceAccessIdentity(
+                providerResource.Value.Uid,
+                ResourceScopeRef.Instance,
+                providerResource.Value.Namespace,
+                ModelResourceKinds.ModelProvider,
+                providerResource.Value.Generation), ownerScopeRef, ResourceAccessAction.Use, cancellationToken);
+            if (!access.Allowed)
+                throw Invalid("definition.provider.scopeRef",
+                    $"The Instance Model Provider does not authorize use from '{ownerScopeRef}' ({access.ReasonCode}).");
+        }
         ModelProviderConfiguration provider;
         try { provider = await providerConfigurations.GetConfigurationRequiredAsync(definition.Provider, ownerNamespace, ownerScopeRef, cancellationToken); }
         catch (ModelProviderResolutionException) { throw Invalid("definition.provider.name", "The referenced model provider does not exist."); }

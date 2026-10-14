@@ -90,7 +90,7 @@ public sealed partial class ApiClientTests
             Metadata = CreateAgentResource("web-agent").Metadata with { Namespace = @namespace },
             Definition = CreateAgentResource("web-agent").Definition with
             {
-                ModelProfile = new ResourceReference("reasoning-shared", @namespace: new ResourceNamespace("shared.models"))
+                ModelProfile = new ResourceReference("reasoning-shared", ResourceScopeRef.Instance, new ResourceNamespace("shared.models"))
             }
         };
         var requestedPaths = new List<string>();
@@ -114,7 +114,8 @@ public sealed partial class ApiClientTests
         Assert.HasCount(1, agents);
         Assert.AreEqual(@namespace, agents[0].Namespace);
         Assert.AreEqual(new ResourceNamespace("shared.models"), agents[0].ModelProfileNamespace);
-        Assert.AreEqual("/modelprofiles/reasoning-shared?namespace=shared.models", ConsoleResourceUrls.ModelProfile(agents[0].ModelProfileAddress));
+        Assert.AreEqual(ResourceScopeRef.Instance, agents[0].ModelProfileScopeRef);
+        Assert.AreEqual("/modelprofiles/reasoning-shared?namespace=shared.models&scopeRef=%2Finstance", ConsoleResourceUrls.ModelProfile(agents[0].ModelProfileAddress, agents[0].ModelProfileScopeRef));
         Assert.AreEqual("/namespaces/agentstration.who-am-i/agents/web-agent", agents[0].DetailsUrl);
     }
 
@@ -411,6 +412,47 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task ModelProfilesClientPreservesExactScopeForHomonymousResources()
+    {
+        var scopeRef = ResourceScopeRef.Workspace(Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"));
+        var @namespace = new ResourceNamespace("shared.models");
+        var profile = CreateModelProfile("reasoning") with
+        {
+            Metadata = CreateModelProfile("reasoning").Metadata with { Namespace = @namespace },
+            ScopeRef = scopeRef
+        };
+        var requests = new List<(HttpMethod Method, string Path)>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add((request.Method, request.RequestUri!.PathAndQuery));
+            var response = new HttpResponseMessage(request.Method == HttpMethod.Delete ? HttpStatusCode.NoContent : HttpStatusCode.OK);
+            if (request.Method != HttpMethod.Delete)
+            {
+                response.Content = JsonContent.Create(profile);
+                response.Headers.ETag = new EntityTagHeaderValue("\"v2\"");
+            }
+            return response;
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new ModelProfilesApiClient(httpClient);
+
+        _ = await client.GetModelProfileAsync(@namespace, profile.Name, scopeRef, default);
+        _ = await client.UpdateModelProfileAsync(@namespace, profile.Name, scopeRef, new(profile.Definition), "\"v1\"", default);
+        await client.DeleteModelProfileAsync(@namespace, profile.Name, scopeRef, "\"v2\"", default);
+
+        var exactPath = "/api/modelprofiles/reasoning?resourceNamespace=shared.models&scopeRef=%2Fworkspaces%2Fcccccccc-cccc-cccc-cccc-cccccccccccc";
+        CollectionAssert.AreEqual(new[]
+        {
+            (HttpMethod.Get, exactPath),
+            (HttpMethod.Put, exactPath),
+            (HttpMethod.Delete, exactPath)
+        }, requests);
+        Assert.AreEqual(
+            "/modelprofiles/reasoning?namespace=shared.models&scopeRef=%2Fworkspaces%2Fcccccccc-cccc-cccc-cccc-cccccccccccc",
+            ConsoleResourceUrls.ModelProfile(profile.Address, scopeRef));
+    }
+
+    [TestMethod]
     public void ModelProfilePickerFilteringCoversNameProviderAndModelAndRejectsInvalidProfiles()
     {
         var ready = Summary("reasoning-default", "ollama-local", "qwen3:4b", "ready");
@@ -446,6 +488,30 @@ public sealed partial class ApiClientTests
         Assert.AreEqual("/api/secrets/openai-key/value", path);
         StringAssert.Contains(body, "sensitive-value");
         Assert.IsFalse(typeof(ISecretsClient).GetMethods().Any(value => value.Name.Contains("GetSecretValue", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task SecretsClientListsVaultsAndSecretsForTheExactConsumerScope()
+    {
+        var paths = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            paths.Add(request.RequestUri!.PathAndQuery);
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(Array.Empty<object>()) };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
+        var client = new SecretsApiClient(httpClient);
+
+        await client.GetVaultsAsync(ResourceScopeRef.Instance, default);
+        await client.GetSecretsAsync(ResourceScopeRef.Instance, default);
+
+        CollectionAssert.AreEqual(new[]
+        {
+            "/api/vaults?consumerScopeRef=%2Finstance",
+            "/api/secrets?consumerScopeRef=%2Finstance"
+        }, paths);
     }
 
     [TestMethod]

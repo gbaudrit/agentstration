@@ -2,6 +2,7 @@ using Agentstration.Agents;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Security.Contracts;
@@ -39,6 +40,7 @@ public sealed class AgentManagementService(
     IManagementEventPublisher eventBus,
     IModelProfileReferenceValidator modelProfiles,
     IResourceReferenceResolver references,
+    IResourceAccessPolicyService accessPolicies,
     ToolSetService toolSets,
     IResourceScopeOperations scopeOperations,
     TimeProvider timeProvider,
@@ -174,7 +176,18 @@ public sealed class AgentManagementService(
         await ValidateRuntimeProfileAsync(spec.RuntimeProfileNamespace, spec.RuntimeProfileName, cancellationToken);
         var agent = await GetAgentAsync(@namespace, agentName, cancellationToken) ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
         var (toolSetTools, toolSetAssignments) = await ResolveToolSetAssignmentsAsync(agent.Value, cancellationToken);
-        var resolved = compiler.Compile(agent.Value, spec, toolSetTools, toolSetAssignments);
+        var ownerScopeRef = agent.Value.ScopeRef
+            ?? throw new AgentDefinitionValidationException("agent_scope_invalid", "The Agent has no ownership scope.");
+        var modelProfilePin = await modelProfiles.ResolveAsync(
+            agent.Value.Definition.ModelProfile, agent.Value.Namespace, ownerScopeRef, cancellationToken)
+            ?? await ResolveDependencyAsync(agent.Value.Definition.ModelProfile, agent.Value.Namespace,
+                ModelResourceKinds.ModelProfile, ownerScopeRef, cancellationToken);
+        var runtimeReference = new ResourceReference(spec.RuntimeProfileName,
+            agent.Value.Definition.RuntimeProfile.ScopeRef, spec.RuntimeProfileNamespace);
+        var runtimeProfilePin = await ResolveDependencyAsync(runtimeReference, agent.Value.Namespace,
+            RuntimeProfileResourceKinds.RuntimeProfile, ownerScopeRef, cancellationToken);
+        var resolved = compiler.Compile(agent.Value, spec, toolSetTools, toolSetAssignments,
+            modelProfilePin, runtimeProfilePin);
         var number = agent.Value.Generation;
         var revisionName = $"{agentName}--{number:000000}";
         var existing = await store.GetAsync<AgentRevision>(new(AgentResourceKinds.AgentRevision, revisionName, @namespace), cancellationToken);
@@ -396,17 +409,51 @@ public sealed class AgentManagementService(
     private async Task ValidateReferencesAsync(AgentResource resource, ResourceScopeRef scopeRef, CancellationToken cancellationToken)
     {
         await modelProfiles.ValidateAsync(resource.Definition.ModelProfile, resource.Namespace, scopeRef, cancellationToken);
-        if (await references.ResolveAsync<RuntimeProfileResource>(
-                resource.Definition.RuntimeProfile,
-                resource.Namespace,
-                RuntimeProfileResourceKinds.RuntimeProfile,
-                scopeRef,
-                cancellationToken) is null)
-        {
-            var runtime = resource.Definition.RuntimeProfile.Resolve(resource.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
-            throw new ResourceNotFoundException(new(RuntimeProfileResourceKinds.RuntimeProfile, runtime.Name, runtime.Namespace));
-        }
+        _ = await ResolveDependencyAsync(resource.Definition.RuntimeProfile, resource.Namespace,
+            RuntimeProfileResourceKinds.RuntimeProfile, scopeRef, cancellationToken);
         _ = await ResolveToolSetAssignmentsAsync(resource with { ScopeRef = scopeRef }, cancellationToken);
+    }
+
+    private async Task<ResolvedResourceDependency> ResolveDependencyAsync(ResourceReference reference,
+        ResourceNamespace ownerNamespace, string kind, ResourceScopeRef consumerScopeRef,
+        CancellationToken cancellationToken)
+    {
+        Resource? stored;
+        try
+        {
+            stored = kind == ModelResourceKinds.ModelProfile
+                ? (Resource?)((await references.ResolveAsync<ModelProfileResource>(reference, ownerNamespace, kind,
+                    consumerScopeRef, cancellationToken))?.Value)
+                : (await references.ResolveAsync<RuntimeProfileResource>(reference, ownerNamespace, kind,
+                    consumerScopeRef, cancellationToken))?.Value;
+        }
+        catch (ResourceReferenceAmbiguousException exception)
+        {
+            throw new AgentDefinitionValidationException("dependency_reference_ambiguous", exception.Message);
+        }
+        catch (ResourceReferenceOutsideScopeException exception)
+        {
+            throw new AgentDefinitionValidationException("dependency_scope_invalid", exception.Message);
+        }
+        if (stored is null)
+        {
+            var address = reference.Resolve(ownerNamespace, kind);
+            throw new ResourceNotFoundException(new(kind, address.Name, address.Namespace));
+        }
+        var storedScopeRef = stored.ScopeRef
+            ?? throw new AgentDefinitionValidationException("dependency_scope_invalid",
+                $"Referenced {kind} '{stored.Address}' has no ownership scope.");
+        if (storedScopeRef != consumerScopeRef)
+        {
+            var access = await accessPolicies.EvaluateAsync(new ResourceAccessIdentity(
+                stored.Uid, storedScopeRef, stored.Namespace, kind, stored.Generation),
+                consumerScopeRef, ResourceAccessAction.Use, cancellationToken);
+            if (!access.Allowed)
+                throw new AgentDefinitionValidationException("resource_access_denied",
+                    $"Referenced {kind} '{stored.Address}' does not authorize use from '{consumerScopeRef}' ({access.ReasonCode}).");
+        }
+        return new(stored.Uid, storedScopeRef, stored.Namespace, kind,
+            stored.Name, stored.Generation);
     }
 
     private async Task<(IReadOnlyCollection<ResourceReference> Tools, IReadOnlyCollection<ResolvedAgentToolSetAssignment> Assignments)>

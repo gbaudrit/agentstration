@@ -62,18 +62,12 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
-    public async Task EntryResourcePickerLoadsFlowsFromCanonicalFlowApiInsteadOfWorkApi()
+    public async Task EntryResourcePickerLoadsFlowsFromWorkApiWithTheEntryWorkspaceContext()
     {
-        var requestedCatalogs = new List<string>();
         var workRequests = new List<string>();
         using var workClient = new HttpClient(new StubHandler(request =>
         {
             workRequests.Add(request.RequestUri!.AbsolutePath);
-            return new HttpResponseMessage(HttpStatusCode.InternalServerError);
-        }))
-        { BaseAddress = new Uri("http://work-api/") };
-        using var flowCatalog = new HttpClient(new StubHandler(request =>
-        {
             Assert.AreEqual("/api/resources", request.RequestUri!.AbsolutePath);
             Assert.AreEqual(FlowResourceKinds.Flow, Uri.UnescapeDataString(request.RequestUri.Query.Replace("?kind=", "", StringComparison.Ordinal)));
             return new HttpResponseMessage(HttpStatusCode.OK)
@@ -85,20 +79,14 @@ public sealed partial class ApiClientTests
                 })
             };
         }))
-        { BaseAddress = new Uri("http://flow-api/") };
-        var factory = new StubHttpClientFactory(name =>
-        {
-            requestedCatalogs.Add(name);
-            return flowCatalog;
-        });
-        var client = new EntryAdministrationApiClient(workClient, factory);
+        { BaseAddress = new Uri("http://work-api/") };
+        var client = new EntryAdministrationApiClient(workClient);
 
         var resources = await client.GetResourcesAsync(EntryBindingKind.Flow, CancellationToken.None);
 
         Assert.HasCount(2, resources);
         Assert.IsTrue(resources.Any(value => value.Name == "My flow"));
-        CollectionAssert.AreEqual(new[] { EntryAdministrationApiClient.FlowResourceCatalogClient }, requestedCatalogs);
-        Assert.IsEmpty(workRequests);
+        CollectionAssert.AreEqual(new[] { "/api/resources" }, workRequests);
     }
 
     [TestMethod]
@@ -133,9 +121,7 @@ public sealed partial class ApiClientTests
                 };
         }))
         { BaseAddress = new Uri("http://work-api/") };
-        IEntryAdministrationApiClient client = new EntryAdministrationApiClient(
-            httpClient,
-            new StubHttpClientFactory(_ => httpClient));
+        IEntryAdministrationApiClient client = new EntryAdministrationApiClient(httpClient);
 
         _ = await client.GetConsoleEntriesAsync(default);
         _ = await client.SubmitConsoleEntryAsync(

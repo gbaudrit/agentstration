@@ -37,7 +37,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     public async Task EnsureAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken)
     {
         using var systemScope = scopes.PushSystem();
-        await EnsureStandardRuntimeProfileAsync(ResourceScopeRef.Tenant(tenantId), cancellationToken);
+        await EnsureStandardRuntimeProfileAsync(cancellationToken);
         await internalTools.EnsureAsync(
             ResourceScopeRef.Workspace(workspaceId),
             ResourceNamespace.Default,
@@ -53,10 +53,11 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     public Task ProvisionAsync(Workspace workspace, CancellationToken cancellationToken) =>
         EnsureAsync(workspace.TenantId, workspace.Id, cancellationToken);
 
-    private async Task EnsureStandardRuntimeProfileAsync(ResourceScopeRef tenantScope, CancellationToken cancellationToken)
+    private async Task EnsureStandardRuntimeProfileAsync(CancellationToken cancellationToken)
     {
+        var instanceScope = ResourceScopeRef.Instance;
         var address = ScopedResourceAddress.Create(
-            tenantScope,
+            instanceScope,
             ResourceNamespace.Default,
             RuntimeProfileResourceKinds.RuntimeProfile,
             "maf-builtin");
@@ -73,7 +74,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
                     [ResourceProvenanceAnnotations.BuiltIn] = "true"
                 }
             },
-            ScopeRef = tenantScope,
+            ScopeRef = instanceScope,
             Generation = 1,
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
             Definition = new RuntimeProfileProperties
@@ -90,7 +91,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
         };
         try
         {
-            await resources.PutExactAsync(tenantScope, profile, null, true, cancellationToken);
+            await resources.PutExactAsync(instanceScope, profile, null, true, cancellationToken);
         }
         catch (ResourceConcurrencyException)
         {

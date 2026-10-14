@@ -116,11 +116,18 @@ export class EntryEditorPage {
   private async bindTarget(kind: 'Agent' | 'Flow', resourceName: string, namespace: string): Promise<void> {
     await this.page.getByTestId(TestIds.entryEditor.targetKind).selectOption(kind);
     const target = this.page.getByTestId(TestIds.entryEditor.targetResource);
+    const legacyValues = [`${namespace}:${resourceName}`, resourceName];
+    let selectedValue: string | undefined;
     await expect.poll(async () => {
-      const values = await target.locator('option').evaluateAll(elements => elements.map(element => (element as HTMLOptionElement).value));
-      return values.includes(`${namespace}:${resourceName}`) || values.includes(resourceName);
-    }).toBe(true);
-    await selectFirstAvailable(target, [`${namespace}:${resourceName}`, resourceName], `Entry target ${kind}`);
+      const values = await target.locator('option').evaluateAll(elements => elements
+        .map(element => (element as HTMLOptionElement).value)
+        .filter(Boolean));
+      const matches = values.filter(value => legacyValues.includes(value)
+        || value.endsWith(`|${namespace}|${resourceName}`));
+      if (matches.length === 1) selectedValue = matches[0];
+      return matches.length;
+    }).toBe(1);
+    await selectFirstAvailable(target, [selectedValue!], `Entry target ${kind}`);
   }
 
   public async configureBehavior(entry: Pick<EntryDefinition, 'taskCreationMode' | 'allowConversation' | 'streamResponse'>): Promise<void> {

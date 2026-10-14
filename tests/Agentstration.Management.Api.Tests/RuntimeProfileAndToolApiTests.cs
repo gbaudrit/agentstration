@@ -10,6 +10,7 @@ using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
@@ -146,6 +147,7 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
                 RuntimeType = "microsoft-agent-framework"
             }
         }, default);
+        await GrantRuntimeUseAsync(factory, requestContext, runtime.Value);
         var agent = await agents.PutAgentAsync(new AgentResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -242,6 +244,7 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
             Metadata = new ResourceMetadata { Name = runtimeName },
             Definition = new RuntimeProfileProperties { DisplayName = "Orphan cleanup test", RuntimeType = "microsoft-agent-framework" }
         }, default);
+        await GrantRuntimeUseAsync(factory, requestContext, runtime.Value);
         var agent = await agents.PutAgentAsync(new AgentResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -284,7 +287,8 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         using var extensionResponse = await client.PostAsJsonAsync("/api/extensionregistrations", new CreateExtensionRegistrationRequest(
             "team-ollama-extension",
             new ExtensionRegistrationProperties { DisplayName = "Team Ollama extension", Endpoint = new Uri("http://127.0.0.1:11439") },
-            resourceNamespace));
+            resourceNamespace,
+            ResourceScopeRef.Instance));
         Assert.AreEqual(HttpStatusCode.Created, extensionResponse.StatusCode);
 
         using var providerResponse = await client.PostAsJsonAsync("/api/modelproviders", new CreateModelProviderRequest(
@@ -295,7 +299,8 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
                 Extension = new ResourceReference("team-ollama-extension"),
                 ContributionId = "ollama"
             },
-            resourceNamespace));
+            resourceNamespace,
+            ResourceScopeRef.Instance));
         Assert.AreEqual(HttpStatusCode.Created, providerResponse.StatusCode);
 
         var provider = await client.GetFromJsonAsync<ModelProviderResource>($"/api/modelproviders/{providerName}?resourceNamespace={resourceNamespace}");
@@ -310,10 +315,11 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
             new ModelProfileProperties
             {
                 DisplayName = "Team profile",
-                Provider = new ResourceReference(providerName, @namespace: new ResourceNamespace(resourceNamespace)),
+                Provider = new ResourceReference(providerName, ResourceScopeRef.Instance, new ResourceNamespace(resourceNamespace)),
                 Model = new ModelSelection { Name = "qwen3:8b" }
             },
-            resourceNamespace));
+            resourceNamespace,
+            ResourceScopeRef.Instance));
         Assert.AreEqual(HttpStatusCode.Created, profileResponse.StatusCode);
         var profile = await client.GetFromJsonAsync<ModelProfileResource>($"/api/modelprofiles/{profileName}?resourceNamespace={resourceNamespace}");
         Assert.AreEqual(resourceNamespace, profile?.Namespace.Value);
@@ -389,6 +395,17 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         delete.Headers.IfMatch.Add(updatedResponse.Headers.ETag!);
         using var deleted = await client.SendAsync(delete);
         Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
+    }
+
+    private static async Task GrantRuntimeUseAsync(WebApplicationFactory<Program> factory,
+        RequestContext context, RuntimeProfileResource runtime)
+    {
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        _ = await policies.PutAsync(new ResourceAccessPolicy(
+            new(runtime.Uid, ResourceScopeRef.Instance, runtime.Namespace,
+                RuntimeProfileResourceKinds.RuntimeProfile, runtime.Generation),
+            [new(ResourceScopeRef.Workspace(context.WorkspaceId), [ResourceAccessAction.Use])]),
+            null, default);
     }
 
     [TestMethod]

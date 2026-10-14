@@ -16,7 +16,7 @@ export const exerciseFoundrySecretBinding: Journey<ExerciseFoundrySecretBindingI
   await context.pages.login.signIn(context.consoleUrl, input.username, input.password);
   await context.pages.organizationWorkspaces.selectByName(input.workspaceName);
   await context.pages.descendantSecrets.openNewVault(context.consoleUrl);
-  await context.pages.descendantSecrets.selectScope('tenant');
+  await context.pages.descendantSecrets.selectScope('instance');
   await context.pages.descendantSecrets.createVault(`${input.providerName}-vault`, `${input.providerDisplayName} Vault`);
   await context.pages.descendantSecrets.initializeVault();
   await page.createProvider(context.consoleUrl, input.providerName, input.providerDisplayName);

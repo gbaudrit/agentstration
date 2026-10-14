@@ -11,6 +11,7 @@ public sealed record AgentSummary(string Id, string Name, string Type, string Ve
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ScopeRef { get; init; }
     public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ModelProfileScopeRef { get; init; }
     public string? DeploymentId { get; init; }
     public ResourceAddress ModelProfileAddress => ResourceAddress.Create(ModelProfileNamespace, ModelResourceKinds.ModelProfile, ModelProfile);
     public string? DeploymentUrl => DeploymentId is null ? null : ConsoleResourceUrls.Deployment(Namespace, DeploymentId);
@@ -58,12 +59,13 @@ public static class ConsoleResourceUrls
         ? $"/entries/{Uri.EscapeDataString(id.Value)}"
         : $"/namespaces/{Uri.EscapeDataString(id.Namespace.Value)}/entries/{Uri.EscapeDataString(id.Value)}";
 
-    public static string ModelProfile(ResourceAddress address)
+    public static string ModelProfile(ResourceAddress address, ResourceScopeRef? scopeRef = null)
     {
         var path = $"/modelprofiles/{Uri.EscapeDataString(address.Name)}";
-        return address.Namespace.IsDefault
-            ? path
-            : $"{path}?namespace={Uri.EscapeDataString(address.Namespace.Value)}";
+        var query = new List<string>();
+        if (!address.Namespace.IsDefault) query.Add($"namespace={Uri.EscapeDataString(address.Namespace.Value)}");
+        if (scopeRef is not null) query.Add($"scopeRef={Uri.EscapeDataString(scopeRef.Value.Value)}");
+        return query.Count == 0 ? path : $"{path}?{string.Join('&', query)}";
     }
 
     public static string Model(ResourceAddress address)

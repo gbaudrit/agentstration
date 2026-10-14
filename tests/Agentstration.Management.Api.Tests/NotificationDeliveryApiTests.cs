@@ -399,7 +399,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             Definition = new ToolResourceProperties
             {
                 DisplayName = "Send external message",
-                Provider = new ResourceReference("third-party"),
+                Provider = new ResourceReference("third-party", ResourceScopeRef.Instance),
                 ExternalId = "messages.send",
                 Enabled = true,
                 Discovery = new ToolDiscoveryState { Available = true, FirstSeenAt = now, LastSeenAt = now },

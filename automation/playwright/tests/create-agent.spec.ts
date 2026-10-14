@@ -9,8 +9,8 @@ const agent: CreateAgentInput = {
   displayName: 'Playwright welcome agent',
   description: 'Welcomes users during the browser journey.',
   instructions: 'Welcome the user and answer concisely.',
-  modelProfile: ['default:missing-profile', 'default:reasoning-default'],
-  runtimeProfile: 'default:maf-builtin',
+  modelProfile: ['/instance|default|missing-profile', '/instance|default|reasoning-default'],
+  runtimeProfile: '/instance|default|maf-builtin',
 };
 
 test('an administrator can create and deploy an agent @smoke', async ({ page, product }) => {

@@ -194,7 +194,7 @@ public sealed class ToolSetApiTests : ModelManagementApiTestBase
             Definition = new ToolResourceProperties
             {
                 DisplayName = name,
-                Provider = new ResourceReference("test-provider"),
+                Provider = new ResourceReference("test-provider", ResourceScopeRef.Instance),
                 ExternalId = externalId,
                 Discovery = new ToolDiscoveryState { Available = true, FirstSeenAt = now, LastSeenAt = now },
                 Schema = new ToolSchema { Input = JsonSerializer.SerializeToElement(new { type = "object", properties = new { } }) }

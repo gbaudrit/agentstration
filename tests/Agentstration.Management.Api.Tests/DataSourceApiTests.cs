@@ -218,7 +218,8 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task LateralScopesAndBuiltInProfileMutationAreRejected()
     {
-        await using var factory = Factory();
+        await using var factory = Factory().WithWebHostBuilder(builder =>
+            builder.UseSetting("Agentstration:Authentication:DevelopmentGrantPlatformAdministrator", "false"));
         var context = await GetBootstrapContextAsync(factory);
         var workspace = ResourceScopeRef.Workspace(context.WorkspaceId);
         var foreignWorkspaceId = Guid.NewGuid();

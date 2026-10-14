@@ -504,6 +504,7 @@ public sealed class ModelProviderNavigationTests
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ModelResourceKinds.ModelProvider,
             Metadata = new ResourceMetadata { Name = name, Namespace = ProviderNamespace },
+            ScopeRef = ResourceScopeRef.Instance,
             Definition = new ModelProviderProperties
             {
                 DisplayName = "Local Ollama",

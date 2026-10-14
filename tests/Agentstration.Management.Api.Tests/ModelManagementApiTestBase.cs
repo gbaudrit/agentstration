@@ -207,7 +207,7 @@ public abstract class ModelManagementApiTestBase
         {
             DisplayName = name,
             Description = "API test profile",
-            Provider = new ResourceReference(ModelProviderManagementService.ModelProviderId("ollama-local")),
+            Provider = new ResourceReference(ModelProviderManagementService.ModelProviderId("ollama-local"), ResourceScopeRef.Instance),
             Model = new ModelSelection { Name = model },
             Generation = new ModelGenerationOptions { Temperature = 0.3, MaxOutputTokens = 512 }
         });
@@ -217,6 +217,7 @@ public abstract class ModelManagementApiTestBase
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             base.ConfigureWebHost(builder);
+            builder.UseSetting("Agentstration:Authentication:DevelopmentGrantPlatformAdministrator", "true");
             builder.UseSetting("ConnectionStrings:ollama-extension", "Endpoint=http://127.0.0.1:1");
             AwpTestWorker.Configure(builder);
             builder.ConfigureServices(services =>
