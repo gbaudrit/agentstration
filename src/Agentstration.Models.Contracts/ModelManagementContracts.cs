@@ -95,7 +95,12 @@ public sealed record ModelProfileSummaryResponse(
 public sealed record ModelProfileUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
 public sealed record ModelProfileUsagesResponse(IReadOnlyList<ModelProfileUsageResponse> Value, int Count);
 
-public sealed record ModelProfileIdentityResponse(string ResourceId, string Name, string? DisplayName = null, string Namespace = "default");
+public sealed record ModelProfileIdentityResponse(
+    string ResourceId,
+    string Name,
+    string? DisplayName = null,
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 public sealed record EffectiveModelOptionsResponse(
     ModelGenerationOptions Generation,
     ModelReasoningOptions Reasoning,

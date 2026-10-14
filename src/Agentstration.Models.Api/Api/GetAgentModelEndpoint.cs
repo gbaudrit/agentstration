@@ -45,7 +45,7 @@ internal sealed class GetAgentModelEndpoint : IModelManagementEndpoint
             var resolution = await profiles.ResolveAsync(profile.Value, cancellationToken);
             var mapped = ModelsApiHttp.Resolution(resolution);
             return Results.Ok(new AgentModelResponse(
-                new DeclaredAgentModelResponse(new ModelProfileIdentityResponse(profile.Value.Metadata.Name, profile.Value.Metadata.Name, profile.Value.Definition.DisplayName, profile.Value.Namespace.Value)),
+                new DeclaredAgentModelResponse(new ModelProfileIdentityResponse(profile.Value.Metadata.Name, profile.Value.Metadata.Name, profile.Value.Definition.DisplayName, profile.Value.Namespace.Value, profile.Value.ScopeRef)),
                 new ResolvedAgentModelResponse(mapped.Provider, mapped.Model, mapped.EffectiveOptions),
                 mapped.Status,
                 mapped.Warnings));

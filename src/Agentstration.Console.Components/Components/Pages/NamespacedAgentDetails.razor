@@ -152,7 +152,7 @@ else if (agent is not null)
     private ResourceNamespace AgentResourceNamespace => ResourceNamespace.Parse(AgentNamespace);
     private ResourceAddress ModelProfileAddress => agent?.Definition.ModelProfile.Resolve(AgentResourceNamespace, ModelResourceKinds.ModelProfile)
         ?? ResourceAddress.Create(ResourceNamespace.Default, ModelResourceKinds.ModelProfile, "unavailable");
-    private string ModelProfileUrl => ConsoleResourceUrls.ModelProfile(ModelProfileAddress);
+    private string ModelProfileUrl => ConsoleResourceUrls.ModelProfile(ModelProfileAddress, agent?.Definition.ModelProfile.ScopeRef);
     private ResourceAddress RuntimeProfileAddress => agent?.Definition.RuntimeProfile.Resolve(AgentResourceNamespace, RuntimeProfileResourceKinds.RuntimeProfile)
         ?? ResourceAddress.Create(ResourceNamespace.Default, RuntimeProfileResourceKinds.RuntimeProfile, "unavailable");
     private string RuntimeProfileUrl => ConsoleResourceUrls.RuntimeProfile(RuntimeProfileAddress);

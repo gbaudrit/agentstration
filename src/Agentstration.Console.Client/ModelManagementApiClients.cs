@@ -222,15 +222,20 @@ public interface IModelProfilesClient
     Task<IReadOnlyList<ModelProfileSummaryResponse>> GetModelProfilesAsync(string? search, string? provider, string? status, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(string profileName, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) => GetModelProfileAsync(profileName, cancellationToken);
+    Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetModelProfileAsync(@namespace, profileName, cancellationToken);
     Task<ResourceSnapshot<ModelProfileResource>> CreateModelProfileAsync(CreateModelProfileRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProfileResource>> UpdateModelProfileAsync(string profileName, PutModelProfileRequest request, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProfileResource>> UpdateModelProfileAsync(ResourceNamespace @namespace, string profileName, PutModelProfileRequest request, string etag, CancellationToken cancellationToken) => UpdateModelProfileAsync(profileName, request, etag, cancellationToken);
+    Task<ResourceSnapshot<ModelProfileResource>> UpdateModelProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, PutModelProfileRequest request, string etag, CancellationToken cancellationToken) => UpdateModelProfileAsync(@namespace, profileName, request, etag, cancellationToken);
     Task DeleteModelProfileAsync(string profileName, string etag, CancellationToken cancellationToken);
     Task DeleteModelProfileAsync(ResourceNamespace @namespace, string profileName, string etag, CancellationToken cancellationToken) => DeleteModelProfileAsync(profileName, etag, cancellationToken);
+    Task DeleteModelProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken) => DeleteModelProfileAsync(@namespace, profileName, etag, cancellationToken);
     Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(string profileName, CancellationToken cancellationToken);
     Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) => GetModelProfileUsagesAsync(profileName, cancellationToken);
+    Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetModelProfileUsagesAsync(@namespace, profileName, cancellationToken);
     Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(string profileName, CancellationToken cancellationToken);
     Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) => GetModelProfileResolutionAsync(profileName, cancellationToken);
+    Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetModelProfileResolutionAsync(@namespace, profileName, cancellationToken);
     Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProfileResource>> ApplyOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, string etag, CancellationToken cancellationToken);
 }
@@ -387,6 +392,12 @@ public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfil
         return await ReadResourceAsync(response, cancellationToken);
     }
 
+    public async Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(ProfilePath(@namespace, profileName, scopeRef: scopeRef), cancellationToken);
+        return await ReadResourceAsync(response, cancellationToken);
+    }
+
     public async Task<ResourceSnapshot<ModelProfileResource>> CreateModelProfileAsync(CreateModelProfileRequest request, CancellationToken cancellationToken)
     {
         using var response = await httpClient.PostAsJsonAsync("api/modelprofiles", request, cancellationToken);
@@ -404,6 +415,14 @@ public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfil
         return await ReadResourceAsync(response, cancellationToken);
     }
 
+    public async Task<ResourceSnapshot<ModelProfileResource>> UpdateModelProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, PutModelProfileRequest request, string etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Put, ProfilePath(@namespace, profileName, scopeRef: scopeRef)) { Content = JsonContent.Create(request) };
+        message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        return await ReadResourceAsync(response, cancellationToken);
+    }
+
     public async Task DeleteModelProfileAsync(string profileName, string etag, CancellationToken cancellationToken)
         => await DeleteModelProfileAsync(ResourceNamespace.Default, profileName, etag, cancellationToken);
 
@@ -415,17 +434,31 @@ public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfil
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public async Task DeleteModelProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Delete, ProfilePath(@namespace, profileName, scopeRef: scopeRef));
+        message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
+
     public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(string profileName, CancellationToken cancellationToken) =>
         GetModelProfileUsagesAsync(ResourceNamespace.Default, profileName, cancellationToken);
 
     public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<ModelProfileUsagesResponse>(httpClient, ProfilePath(@namespace, profileName, "usages"), cancellationToken);
 
+    public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<ModelProfileUsagesResponse>(httpClient, ProfilePath(@namespace, profileName, "usages", scopeRef), cancellationToken);
+
     public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(string profileName, CancellationToken cancellationToken) =>
         GetModelProfileResolutionAsync(ResourceNamespace.Default, profileName, cancellationToken);
 
     public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<ModelProfileResolutionResponse>(httpClient, ProfilePath(@namespace, profileName, "resolution"), cancellationToken);
+
+    public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<ModelProfileResolutionResponse>(httpClient, ProfilePath(@namespace, profileName, "resolution", scopeRef), cancellationToken);
 
     public async Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(
         ResourceNamespace @namespace,
@@ -456,11 +489,13 @@ public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfil
         return await ReadResourceAsync(response, cancellationToken);
     }
 
-    private static string ProfilePath(ResourceNamespace @namespace, string profileName, string? child = null)
+    private static string ProfilePath(ResourceNamespace @namespace, string profileName, string? child = null, ResourceScopeRef? scopeRef = null)
     {
         var path = $"api/modelprofiles/{Uri.EscapeDataString(profileName)}";
         if (child is not null) path += $"/{child}";
-        return $"{path}?resourceNamespace={Uri.EscapeDataString(@namespace.Value)}";
+        var query = $"resourceNamespace={Uri.EscapeDataString(@namespace.Value)}";
+        if (scopeRef is not null) query += $"&scopeRef={Uri.EscapeDataString(scopeRef.Value.Value)}";
+        return $"{path}?{query}";
     }
 
     private static void AddQuery(List<string> query, string name, string? value)

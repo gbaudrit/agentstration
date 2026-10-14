@@ -71,7 +71,7 @@ internal static class ModelsApiHttp
     public static ResourceNamespace Namespace(string? value) => ResourceNamespace.Parse(value);
 
     public static ModelProfileResolutionResponse Resolution(ModelProfileResolution resolution) => new(
-        new ModelProfileIdentityResponse(resolution.Profile.Metadata.Name, resolution.Profile.Metadata.Name, resolution.Profile.Definition.DisplayName, resolution.Profile.Namespace.Value),
+        new ModelProfileIdentityResponse(resolution.Profile.Metadata.Name, resolution.Profile.Metadata.Name, resolution.Profile.Definition.DisplayName, resolution.Profile.Namespace.Value, resolution.Profile.ScopeRef),
         resolution.Provider is null ? null : new ModelProviderReferenceResponse(
             resolution.Profile.Definition.Provider.Name,
             resolution.Provider.Name,

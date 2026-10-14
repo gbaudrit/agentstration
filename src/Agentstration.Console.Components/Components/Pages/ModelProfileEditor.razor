@@ -144,6 +144,7 @@ else
 @code {
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRef { get; set; }
     [SupplyParameterFromQuery(Name = "provider")] public string? SuggestedProvider { get; set; }
     [SupplyParameterFromQuery(Name = "providerNamespace")] public string? SuggestedProviderNamespace { get; set; }
     [SupplyParameterFromQuery(Name = "model")] public string? SuggestedModel { get; set; }
@@ -157,6 +158,7 @@ else
     private ResourceScopeRef? selectedScope;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
+    private ResourceScopeRef? RequestedScope => string.IsNullOrWhiteSpace(ScopeRef) ? null : ResourceScopeRef.Parse(ScopeRef);
     private string SelectedProvider => model is null || string.IsNullOrWhiteSpace(model.ProviderName) ? string.Empty : $"{model.ProviderNamespace}:{model.ProviderName}";
     private string Definition
     {
@@ -188,10 +190,16 @@ else
             }
             else
             {
-                var snapshot = await Client.GetModelProfileAsync(SelectedNamespace, Name!, cancellation.Token);
+                var snapshot = RequestedScope is { } requestedScope
+                    ? await Client.GetModelProfileAsync(SelectedNamespace, Name!, requestedScope, cancellation.Token)
+                    : await Client.GetModelProfileAsync(SelectedNamespace, Name!, cancellation.Token);
                 model = ModelProfileEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag;
-                usages = (await Client.GetModelProfileUsagesAsync(SelectedNamespace, Name!, cancellation.Token)).Value;
-                resolution = await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token);
+                usages = selectedScope is { } ownerScope
+                    ? (await Client.GetModelProfileUsagesAsync(SelectedNamespace, Name!, ownerScope, cancellation.Token)).Value
+                    : (await Client.GetModelProfileUsagesAsync(SelectedNamespace, Name!, cancellation.Token)).Value;
+                resolution = selectedScope is { } resolutionScope
+                    ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, resolutionScope, cancellation.Token)
+                    : await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token);
             }
             if (!string.IsNullOrWhiteSpace(model.ProviderName)) await LoadModelsAsync(clearSelection: false);
             ConfigureOptionEditor();
@@ -226,9 +234,9 @@ else
             if (!rawOptions && optionEditor?.CanGuide == true) model.ProviderOptionsJson = optionEditor.ToProviderOptionsJson();
             ResourceSnapshot<ModelProfileResource> snapshot = IsNew
                 ? await Client.CreateModelProfileAsync(model.ToCreateRequest() with { ScopeRef = selectedScope }, cancellation.Token)
-                : await Client.UpdateModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, model.ToPutRequest(), etag!, cancellation.Token);
+                : await Client.UpdateModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, selectedScope!.Value, model.ToPutRequest(), etag!, cancellation.Token);
             etag = snapshot.ETag; Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? T("CreatedNotification") : T("UpdatedNotification"), snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
-            Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name));
+            Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name, snapshot.Value.ScopeRef));
         }
         catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); }
         catch (AgentstrationApiException exception) { error = exception; }
@@ -237,7 +245,12 @@ else
     private async Task RefreshResolutionAsync()
     {
         if (IsNew || diagnosing) return; diagnosing = true; error = null;
-        try { resolution = await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token); }
+        try
+        {
+            resolution = selectedScope is { } scope
+                ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, scope, cancellation.Token)
+                : await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token);
+        }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { diagnosing = false; }
     }
@@ -245,7 +258,7 @@ else
     private async Task DeleteAsync()
     {
         if (model is null || etag is null) return; confirmDelete = false;
-        try { await Client.DeleteModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, etag, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), T("DeletedNotification"), model.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo("/modelprofiles"); }
+        try { await Client.DeleteModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, selectedScope!.Value, etag, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), T("DeletedNotification"), model.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo("/modelprofiles"); }
         catch (AgentstrationApiException exception) { error = exception; }
     }
     private static bool IsUnavailable(AvailableModelResponse model) => string.Equals(model.Status, "unavailable", StringComparison.OrdinalIgnoreCase);
@@ -303,6 +316,7 @@ else
     }}"];
     private static string AgentUrl(ModelProfileUsageResponse usage) => $"/agents/{Uri.EscapeDataString(usage.Name)}";
     private static string ProviderKey(ModelProviderResponse provider) => $"{provider.Namespace}:{provider.Name}";
-    private static string DetailsUrl(ResourceNamespace @namespace, string name) => $"/modelprofiles/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}";
+    private static string DetailsUrl(ResourceNamespace @namespace, string name, ResourceScopeRef? scopeRef) =>
+        ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(@namespace, ModelResourceKinds.ModelProfile, name), scopeRef);
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

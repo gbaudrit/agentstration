@@ -101,8 +101,8 @@ else
             <div class="panel-header"><div><p class="eyebrow">@T("Definition")</p><h2>@T("BehaviorAndModel")</h2></div></div>
             <div class="form-grid">
                 <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" rows="3" data-testid="agent-description" /></label>
-                <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" Namespace="@model.ModelProfileNamespace" ValueChanged="ModelProfileChanged" SelectedChanged="ModelProfileSelectionChanged" SelectFirstWhenMissing="@IsNew" /><ValidationMessage For="() => model.ModelProfileName" /></div>
-                <label class="form-span-2"><span>@T("RuntimeProfile")</span><select value="@RuntimeProfileValue" @onchange="RuntimeProfileChanged" data-testid="agent-runtime-profile">@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name</option> }</select><small>@T("RuntimeProfileHelp")</small></label>
+                <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" Namespace="@model.ModelProfileNamespace" ScopeRef="@model.ModelProfileScopeRef" ValueChanged="ModelProfileChanged" SelectedChanged="ModelProfileSelectionChanged" SelectFirstWhenMissing="@IsNew" /><ValidationMessage For="() => model.ModelProfileName" /></div>
+                <label class="form-span-2"><span>@T("RuntimeProfile")</span><select value="@RuntimeProfileValue" @onchange="RuntimeProfileChanged" data-testid="agent-runtime-profile">@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @(profile.ScopeRef?.Value ?? "?") · @profile.Namespace/@profile.Name</option> }</select><small>@T("RuntimeProfileHelp")</small></label>
                 <label class="form-span-2"><span>@T("Instructions")</span><InputTextArea @bind-Value="model.Instructions" rows="6" data-testid="agent-instructions" /><ValidationMessage For="() => model.Instructions" /></label>
             </div>
         </section>
@@ -195,7 +195,8 @@ else
     private string? ActiveRuntime => readiness?.RuntimeProfileId is null ? readiness?.DeploymentId : ResourceName(readiness.RuntimeProfileId);
     private string StateSummary => IsStateSynchronized ? T("GenerationReady", generation) : isDirty ? T("SaveOrApplyModified") : T("CurrentGenerationNotActive");
     private string HeaderStatus => readiness?.Ready == true ? T("Ready") : StatusPresentation.Label(provisioningStatus);
-    private string RuntimeProfileValue => model is null ? string.Empty : $"{model.RuntimeProfileNamespace}:{model.RuntimeProfileName}";
+    private string RuntimeProfileValue => model is null ? string.Empty :
+        $"{model.RuntimeProfileScopeRef?.Value ?? string.Empty}|{model.RuntimeProfileNamespace}|{model.RuntimeProfileName}";
     private UiStatus HeaderStatusTone => readiness?.Ready == true ? UiStatus.Success : StatusPresentation.Tone(provisioningStatus);
 
     protected override async Task OnParametersSetAsync()
@@ -223,6 +224,7 @@ else
                 {
                     model.RuntimeProfileName = runtimeProfile.Name;
                     model.RuntimeProfileNamespace = runtimeProfile.Namespace;
+                    model.RuntimeProfileScopeRef = runtimeProfile.ScopeRef;
                 }
             }
             else
@@ -385,20 +387,22 @@ else
         && value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name);
     private static string ProfileUrl(AgentModelResponse value)
     {
-        return ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(value.Declared.ModelProfile.Namespace), ModelResourceKinds.ModelProfile, value.Declared.ModelProfile.ResourceId));
+        return ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(value.Declared.ModelProfile.Namespace), ModelResourceKinds.ModelProfile, value.Declared.ModelProfile.ResourceId), value.Declared.ModelProfile.ScopeRef);
     }
 
     private void RuntimeProfileChanged(ChangeEventArgs args)
     {
         if (model is null) return;
-        var parts = args.Value?.ToString()?.Split(':', 2);
-        if (parts is not { Length: 2 }) return;
-        model.RuntimeProfileNamespace = parts[0];
-        model.RuntimeProfileName = parts[1];
+        var parts = args.Value?.ToString()?.Split('|', 3);
+        if (parts is not { Length: 3 }) return;
+        model.RuntimeProfileScopeRef = string.IsNullOrWhiteSpace(parts[0]) ? null : ResourceScopeRef.Parse(parts[0]);
+        model.RuntimeProfileNamespace = parts[1];
+        model.RuntimeProfileName = parts[2];
         isDirty = true;
     }
 
-    private static string RuntimeProfileValueFor(RuntimeProfileSummaryResponse profile) => $"{profile.Namespace}:{profile.Name}";
+    private static string RuntimeProfileValueFor(RuntimeProfileSummaryResponse profile) =>
+        $"{profile.ScopeRef?.Value ?? string.Empty}|{profile.Namespace}|{profile.Name}";
     private static string ProviderUrl(AgentModelResponse value)
     {
         var provider = value.Resolved.Provider!;

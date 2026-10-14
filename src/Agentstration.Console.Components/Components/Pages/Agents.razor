@@ -119,7 +119,7 @@ else
 
     private static string EditUrl(AgentSummary item) => item.DetailsUrl;
     private static string RunUrl(AgentSummary item) => $"{EditUrl(item)}/run";
-    private static string ModelProfileUrl(AgentSummary item) => ConsoleResourceUrls.ModelProfile(item.ModelProfileAddress);
+    private static string ModelProfileUrl(AgentSummary item) => ConsoleResourceUrls.ModelProfile(item.ModelProfileAddress, item.ModelProfileScopeRef);
     private static string TechnicalName(AgentSummary item) => item.Id;
     private static string ResourceName(string resourceId) => resourceId;
     private string LastActivity(DateTimeOffset value) => value == DateTimeOffset.MinValue ? T("NoActivityReported") : value.LocalDateTime.ToString("g");
