@@ -126,9 +126,4 @@ public sealed partial class ApiClientTests
         }
     }
 
-    private sealed class StubHttpClientFactory(Func<string, HttpClient> factory) : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name) => factory(name);
-    }
-
 }

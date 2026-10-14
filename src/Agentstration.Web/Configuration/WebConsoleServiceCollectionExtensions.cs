@@ -44,8 +44,6 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi);
         AddClient<EntryAdministrationApiClient, IEntryAdministrationApiClient>(services, configured.WorkApi);
         AddClient<ConsoleEntryInteractionApiClient, IConsoleEntryInteractionApiClient>(services, configured.WorkApi);
-        AddClient(services, EntryAdministrationApiClient.AgentResourceCatalogClient, configured.ManagementApi);
-        AddClient(services, EntryAdministrationApiClient.FlowResourceCatalogClient, configured.FlowApi);
         services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(
             new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"),
             provider.GetRequiredService<ConsoleRealtimeSession>(),
