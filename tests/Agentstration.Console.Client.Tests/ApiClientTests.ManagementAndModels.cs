@@ -491,6 +491,30 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task SecretsClientListsVaultsAndSecretsForTheExactConsumerScope()
+    {
+        var paths = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            paths.Add(request.RequestUri!.PathAndQuery);
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(Array.Empty<object>()) };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
+        var client = new SecretsApiClient(httpClient);
+
+        await client.GetVaultsAsync(ResourceScopeRef.Instance, default);
+        await client.GetSecretsAsync(ResourceScopeRef.Instance, default);
+
+        CollectionAssert.AreEqual(new[]
+        {
+            "/api/vaults?consumerScopeRef=%2Finstance",
+            "/api/secrets?consumerScopeRef=%2Finstance"
+        }, paths);
+    }
+
+    [TestMethod]
     public async Task VaultInitializationPostsToDedicatedEndpointWithoutReturningKeyMaterial()
     {
         HttpMethod? method = null;

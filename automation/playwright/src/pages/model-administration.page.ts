@@ -70,6 +70,7 @@ export class ModelAdministrationPage {
     await this.waitForInteractive(TestIds.modelAdministration.profileForm);
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.profileName), definition.profileName);
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.profileDisplayName), definition.profileDisplayName);
+    await this.page.getByTestId(TestIds.secretGrants.scopePicker).selectOption('/instance');
     await selectMatchingOption(this.page.getByTestId(TestIds.modelAdministration.profileProvider), definition.providerName);
     await selectFirstOption(this.page.getByTestId(TestIds.modelAdministration.profileModel));
     await this.page.getByTestId(TestIds.modelAdministration.profileSave).click();

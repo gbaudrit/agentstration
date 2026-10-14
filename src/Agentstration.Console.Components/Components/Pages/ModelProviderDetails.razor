@@ -135,12 +135,14 @@ else
         {
             var loadedExtensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token);
             var loadedParameters = await ParametersClient.GetParametersAsync(cancellation.Token);
-            var loadedSecrets = await SecretsClient.GetSecretsAsync(cancellation.Token);
+            var loadedSecrets = IsNew
+                ? await SecretsClient.GetSecretsAsync(cancellation.Token)
+                : null;
             if (IsNew)
             {
                 extensions = loadedExtensions;
                 parameters = loadedParameters;
-                secrets = loadedSecrets;
+                secrets = loadedSecrets ?? [];
                 var extensionNamespace = SuggestedExtensionNamespace ?? SelectedNamespace.Value;
                 model = new ModelProviderEditorModel { Namespace = SelectedNamespace.Value, ExtensionId = string.IsNullOrWhiteSpace(SuggestedExtension) ? string.Empty : $"{extensionNamespace}:{SuggestedExtension}", ContributionId = SuggestedContributionId ?? string.Empty, DisplayName = SuggestedDisplayName ?? string.Empty };
                 SyncBindings();
@@ -151,9 +153,11 @@ else
             var loadedUsages = (await Client.GetModelProviderUsagesAsync(SelectedNamespace, Name!, cancellation.Token)).Value;
             extensions = loadedExtensions;
             parameters = loadedParameters;
-            secrets = loadedSecrets;
             model = ModelProviderEditorModel.FromResource(snapshot.Value);
-            selectedScope = snapshot.Value.ScopeRef;
+            var providerScope = snapshot.Value.ScopeRef
+                ?? throw new InvalidOperationException("A Model Provider must expose its ownership scope.");
+            selectedScope = providerScope;
+            secrets = await SecretsClient.GetSecretsAsync(providerScope, cancellation.Token);
             etag = snapshot.ETag;
             usages = loadedUsages;
             SyncBindings();
@@ -265,7 +269,7 @@ else
         if (creationBinding.Kind == ModelProviderValueBindingKind.Parameter)
             parameters = await ParametersClient.GetParametersAsync(cancellation.Token);
         else
-            secrets = await SecretsClient.GetSecretsAsync(cancellation.Token);
+            secrets = await SecretsClient.GetSecretsAsync(address.ScopeRef, cancellation.Token);
         CloseValueCreator();
     }
     private void CloseValueCreator() { creationBinding = null; creationContext = null; }

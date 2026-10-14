@@ -42,6 +42,19 @@ public sealed class SecretManagementService(
     }
     public async Task<IReadOnlyList<VaultView>> ListVaultViewsAsync(CancellationToken cancellationToken) =>
         await Task.WhenAll((await ListVaultsAsync(cancellationToken)).Select(value => ViewAsync(value.Value, cancellationToken)));
+    public async Task<IReadOnlyList<VaultView>> ListVaultViewsAsync(ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken)
+    {
+        await EnsureReadableScopeAsync(SecretResourceKinds.Vault, consumerScopeRef, cancellationToken);
+        var visible = new List<VaultView>();
+        foreach (var stored in await store.ListAllAsync<VaultResource>(SecretResourceKinds.Vault, cancellationToken))
+        {
+            var vault = (await HydrateVaultAsync(stored, cancellationToken)).Value;
+            if ((await accessPolicies.EvaluateAsync(AccessIdentity(vault), consumerScopeRef,
+                    ResourceAccessAction.Discover, cancellationToken)).Allowed)
+                visible.Add(await ViewAsync(vault, cancellationToken));
+        }
+        return visible;
+    }
     public async Task<StoredResource<VaultResource>?> GetVaultAsync(string name, CancellationToken cancellationToken) =>
         await HydrateVaultNullableAsync(await store.GetAsync<VaultResource>(new(SecretResourceKinds.Vault, name), cancellationToken), cancellationToken);
     public async Task<StoredResource<VaultResource>?> GetVaultExactAsync(ResourceScopeRef scopeRef, string name, CancellationToken cancellationToken) =>
@@ -149,6 +162,19 @@ public sealed class SecretManagementService(
         {
             var secret = (await HydrateSecretAsync(stored, cancellationToken)).Value;
             if (await CanDiscoverAsync(secret, cancellationToken))
+                visible.Add(await ViewAsync(secret, cancellationToken));
+        }
+        return visible;
+    }
+    public async Task<IReadOnlyList<SecretView>> ListSecretsAsync(ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken)
+    {
+        await EnsureReadableScopeAsync(SecretResourceKinds.Secret, consumerScopeRef, cancellationToken);
+        var visible = new List<SecretView>();
+        foreach (var stored in await store.ListAllAsync<SecretResource>(SecretResourceKinds.Secret, cancellationToken))
+        {
+            var secret = (await HydrateSecretAsync(stored, cancellationToken)).Value;
+            if ((await accessPolicies.EvaluateAsync(AccessIdentity(secret), consumerScopeRef,
+                    ResourceAccessAction.Discover, cancellationToken)).Allowed)
                 visible.Add(await ViewAsync(secret, cancellationToken));
         }
         return visible;
@@ -493,6 +519,13 @@ public sealed class SecretManagementService(
         };
         return consumerScopeRef != default && (await accessPolicies.EvaluateAsync(AccessIdentity(resource),
             consumerScopeRef, ResourceAccessAction.Discover, cancellationToken)).Allowed;
+    }
+
+    private async Task EnsureReadableScopeAsync(string kind, ResourceScopeRef scopeRef, CancellationToken cancellationToken)
+    {
+        var target = (await scopeOperations.ListTargetsAsync(kind, AuthorizationPermissions.ResourcesRead,
+            cancellationToken)).SingleOrDefault(value => value.ScopeRef == scopeRef);
+        if (target is null || !target.CanWrite) throw new ResourceScopeAccessDeniedException(scopeRef);
     }
 
     private static ResourceStatus Succeeded() => new() { ProvisioningState = ProvisioningState.Succeeded };

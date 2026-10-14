@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 
-export type SecretResourceScope = 'tenant' | 'workspace';
+export type SecretResourceScope = 'instance' | 'tenant' | 'workspace';
 
 export class DescendantSecretsPage {
   public constructor(private readonly page: Page) {}
@@ -27,7 +27,7 @@ export class DescendantSecretsPage {
 
   public async selectScope(kind: SecretResourceScope): Promise<string> {
     const picker = this.page.getByTestId(TestIds.secretGrants.scopePicker);
-    const prefix = kind === 'tenant' ? '/tenants/' : '/workspaces/';
+    const prefix = kind === 'instance' ? '/instance' : kind === 'tenant' ? '/tenants/' : '/workspaces/';
     await picker.locator(`option[value^="${prefix}"]`).first().waitFor({ state: 'attached' });
     const options = await picker.locator('option').evaluateAll(elements => elements.map(element => ({
       value: (element as HTMLOptionElement).value,
