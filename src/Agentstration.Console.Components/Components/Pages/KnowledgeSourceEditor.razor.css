@@ -66,3 +66,15 @@
 .knowledge-binding-card + .knowledge-binding-card {
     margin-top: 1rem;
 }
+
+.knowledge-transformation-configuration {
+    display: grid;
+    gap: .45rem;
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.knowledge-transformation-configuration small {
+    font-weight: 400;
+}

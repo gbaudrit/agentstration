@@ -55,7 +55,7 @@ else if (source is not null && readiness is not null)
     {
         <section class="panel form-section" data-testid="knowledge-projections">
             <div class="panel-header"><div><p class="eyebrow">@T("Projection")</p><h2>@T("ProjectionHistory")</h2><p>@T("ProjectionHelp")</p></div><button class="button-primary" type="button" disabled="@(!CanStartProjection)" data-testid="knowledge-start-projection" @onclick="StartProjectionAsync">@T("StartProjection")</button></div>
-            <label class="knowledge-projection-parameters"><span>@T("ProjectionParameters")</span><textarea class="form-code-editor runner-json" rows="8" @bind="projectionParameters" data-testid="knowledge-projection-parameters"></textarea><small>@T("JsonObjectHelp")</small></label>
+            <div class="knowledge-projection-parameters"><span>@T("ProjectionParameters")</span><div data-testid="knowledge-projection-parameters"><JsonSchemaInputEditor Schema="ProjectionParametersSchema" Value="projectionParameters" ValueChanged="value => projectionParameters = value" ValidationChanged="state => projectionParametersValid = state.IsValid" Disabled="busy" /></div><small>@T("JsonObjectHelp")</small></div>
             @if (projections.Count == 0) { <p class="muted">@T("NoProjections")</p> }
             else
             {
@@ -187,17 +187,20 @@ else if (source is not null && readiness is not null)
     private IReadOnlyList<KnowledgeSnapshotView> snapshots = [];
     private KnowledgeSnapshotView? selectedSnapshot;
     private KnowledgeRetrievalResult? retrievalResult;
-    private bool loading = true, busy, failed, requiresApproval, confirmDelete;
+    private bool loading = true, busy, failed, requiresApproval, confirmDelete, projectionParametersValid = true;
     private DetailsTab activeTab;
-    private string version = "1.0.0", projectionParameters = "{}", retrievalOperation = "search", retrievalText = string.Empty, retrievalSnapshot = string.Empty,
+    private string version = "1.0.0", retrievalOperation = "search", retrievalText = string.Empty, retrievalSnapshot = string.Empty,
         rawYaml = string.Empty;
+    private JsonElement projectionParameters = JsonSerializer.SerializeToElement(new { });
     private string? etag, error, message, rawError;
     private ResourceNamespace SourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
     private static readonly IReadOnlyList<DetailsTab> VisibleTabs = [DetailsTab.Overview, DetailsTab.Definition, DetailsTab.Projections, DetailsTab.Snapshots, DetailsTab.Retrieval, DetailsTab.Tools, DetailsTab.Yaml];
     private string ToolSetUrl => exposure is null ? "/tools/sets" : exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
         ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
         : $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}?namespace={Uri.EscapeDataString((exposure.ToolSet.Namespace ?? SourceNamespace).Value)}";
-    private bool CanStartProjection => readiness?.Ready == true && !busy;
+    private bool CanStartProjection => readiness?.Ready == true && projectionParametersValid && !busy;
+    private JsonElement? ProjectionParametersSchema => JsonSchemaInputSchema.ObjectProperty(
+        readiness?.Projection?.InputSchema, "parameters");
     private KnowledgeSnapshotView? ActiveSnapshot => snapshots.FirstOrDefault(value => value.LifecycleState == KnowledgeSnapshotLifecycleState.Active);
     private KnowledgeSnapshotView? EffectiveRetrievalSnapshot => string.IsNullOrWhiteSpace(retrievalSnapshot)
         ? snapshots.FirstOrDefault(value => value.LifecycleState == KnowledgeSnapshotLifecycleState.Active)
@@ -345,10 +348,8 @@ else if (source is not null && readiness is not null)
     }
     private Task StartProjectionAsync() => RunActionAsync(async () =>
     {
-        using var document = System.Text.Json.JsonDocument.Parse(projectionParameters);
-        if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object) throw new ArgumentException(T("JsonObjectRequired"));
         await Client.StartProjectionAsync(SourceNamespace, Name,
-            new StartKnowledgeProjectionRequest { Parameters = document.RootElement.Clone() }, cancellation.Token);
+            new StartKnowledgeProjectionRequest { Parameters = projectionParameters.Clone() }, cancellation.Token);
     }, "ProjectionCompleted");
     private Task SelectSnapshotAsync(KnowledgeSnapshotView value) => RunActionAsync(async () => { await Client.SelectActiveSnapshotAsync(SourceNamespace, Name, value.Snapshot.Name, cancellation.Token); }, "SnapshotActivated");
     private void ChangeRetrievalOperation(ChangeEventArgs arguments)

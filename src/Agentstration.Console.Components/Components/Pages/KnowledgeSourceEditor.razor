@@ -41,13 +41,13 @@ else
                         <label><span>@T("TransformationFlowOptional")</span><select @bind="binding.TransformationFlowKey"><option value="">@T("IdentityTransformation")</option>@foreach (var flow in transformationFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
                         <label class="knowledge-choice"><input type="checkbox" @bind="binding.Required" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("RequiredInput")</strong><small>@T("RequiredInputHelp")</small></span></label>
                         <label><span>@T("MaximumAge")</span><input type="text" inputmode="numeric" placeholder="hh:mm:ss" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" title="@T("MaximumAgeFormat")" @bind="binding.MaximumAgeText" data-testid="knowledge-source-binding-maximum-age" /><small>@T("MaximumAgeHelp")</small></label>
-                        <label class="form-span-2"><span>@T("TransformationConfiguration")</span><textarea class="runner-json" rows="5" @bind="binding.ConfigurationJson"></textarea><small>@T("TransformationConfigurationHelp")</small></label>
+                        <div class="form-span-2 knowledge-transformation-configuration"><span>@T("TransformationConfiguration")</span><JsonSchemaInputEditor Schema="TransformationConfigurationSchema(binding)" Value="binding.Configuration" ValueChanged="value => binding.Configuration = value" ValidationChanged="state => binding.ConfigurationValid = state.IsValid" Disabled="busy" /><small>@T("TransformationConfigurationHelp")</small></div>
                         <div class="form-actions form-span-2"><button class="text-button" type="button" @onclick="() => RemoveBinding(binding)">@T("Remove")</button></div>
                     </div>
                 }
             </section>
         </div>
-        <div class="form-actions"><button class="button-primary" type="submit" disabled="@busy">@(busy ? T("Saving") : T("Save"))</button></div>
+        <div class="form-actions"><button class="button-primary" type="submit" disabled="@(busy || bindings.Any(value => !value.ConfigurationValid))">@(busy ? T("Saving") : T("Save"))</button></div>
     </EditForm>
 }
 
@@ -64,7 +64,6 @@ else
         description = string.Empty, projectionFlowKey = string.Empty, retrievalFlowKey = string.Empty;
     private string? etag, message;
     private bool enabled, busy, loading = true;
-    private static readonly System.Text.Json.JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace ExistingNamespace => ResourceNamespace.Parse(Namespace);
     private string DetailsUrl => ExistingNamespace.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(Name!)}" : $"/knowledge-sources/{Uri.EscapeDataString(Name!)}?namespace={Uri.EscapeDataString(ExistingNamespace.Value)}";
@@ -146,9 +145,15 @@ else
     {
         var summaries = await Flows.GetFlowsAsync(cancellation.Token);
         var details = await Task.WhenAll(summaries.Select(value => Flows.GetFlowAsync(value.Namespace, value.Id, cancellation.Token)));
-        var options = details.Where(value => value.Enabled && value.ActiveVersion is not null)
-            .Select(value => new FlowOption(value.Namespace, value.Id, value.DisplayName ?? value.Name,
-                value.ActiveVersion!, value.Metadata.GetValueOrDefault("flow.contract"))).ToArray();
+        var active = details.Where(value => value.Enabled && value.ActiveVersion is not null).ToArray();
+        var versions = await Task.WhenAll(active.Select(async value => new
+        {
+            Flow = value,
+            Version = await Flows.GetFlowVersionAsync(value.Namespace, value.Id, value.ActiveVersion!, cancellation.Token)
+        }));
+        var options = versions.Select(value => new FlowOption(value.Flow.Namespace, value.Flow.Id,
+            value.Flow.DisplayName ?? value.Flow.Name, value.Version.Version,
+            value.Version.Metadata.GetValueOrDefault("flow.contract"), value.Version.Graph?.InputSchema?.Clone())).ToArray();
         projectionFlows = options.Where(value => value.Contract == KnowledgeFlowContracts.Projection).ToArray();
         retrievalFlows = options.Where(value => value.Contract == KnowledgeFlowContracts.Retrieval).ToArray();
         transformationFlows = options.Where(value => value.Contract == KnowledgeFlowContracts.ArtifactTransformation).ToArray();
@@ -157,10 +162,10 @@ else
     private void RemoveBinding(BindingModel binding) => bindings.Remove(binding);
     private KnowledgeDataSourceBinding ToBinding(BindingModel value)
     {
-        using var document = System.Text.Json.JsonDocument.Parse(value.ConfigurationJson);
-        if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object) throw new ArgumentException(T("JsonObjectRequired"));
+        if (!value.ConfigurationValid || value.Configuration.ValueKind != System.Text.Json.JsonValueKind.Object)
+            throw new ArgumentException(T("JsonObjectRequired"));
         return new() { Name = value.Name.Trim(), DataSource = DataSourceReference(value.DataSourceKey),
-            TransformationFlow = FlowTarget(value.TransformationFlowKey), Configuration = document.RootElement.Clone(), Required = value.Required,
+            TransformationFlow = FlowTarget(value.TransformationFlowKey), Configuration = value.Configuration.Clone(), Required = value.Required,
             MaximumAge = ParseMaximumAge(value.MaximumAgeText) };
     }
     private TimeSpan? ParseMaximumAge(string value)
@@ -205,7 +210,9 @@ else
     }
     private static string TargetKey(KnowledgeFlowTarget? target, ResourceNamespace owner) => target is null ? string.Empty
         : $"{(target.Namespace ?? owner).Value}|{target.Name}|{target.Version ?? "active"}";
-    private sealed record FlowOption(ResourceNamespace Namespace, string Name, string DisplayName, string Version, string? Contract)
+    private JsonElement? TransformationConfigurationSchema(BindingModel value) => JsonSchemaInputSchema.ObjectProperty(
+        transformationFlows.FirstOrDefault(flow => flow.Key == value.TransformationFlowKey)?.InputSchema, "configuration");
+    private sealed record FlowOption(ResourceNamespace Namespace, string Name, string DisplayName, string Version, string? Contract, JsonElement? InputSchema)
     {
         public string Key => $"{Namespace.Value}|{Name}|{Version}";
     }
@@ -214,7 +221,8 @@ else
         public string Name { get; set; } = string.Empty;
         public string DataSourceKey { get; set; } = string.Empty;
         public string TransformationFlowKey { get; set; } = string.Empty;
-        public string ConfigurationJson { get; set; } = "{}";
+        public JsonElement Configuration { get; set; } = JsonSerializer.SerializeToElement(new { });
+        public bool ConfigurationValid { get; set; } = true;
         public bool Required { get; set; } = true;
         public string MaximumAgeText { get; set; } = string.Empty;
         public static BindingModel From(KnowledgeDataSourceBinding value, ResourceNamespace owner) => new()
@@ -223,7 +231,7 @@ else
             DataSourceKey = value.DataSource.ScopeRef is null ? string.Empty
                 : $"{value.DataSource.ScopeRef.Value.Value}|{(value.DataSource.Namespace ?? owner).Value}|{value.DataSource.Name}",
             TransformationFlowKey = TargetKey(value.TransformationFlow, owner),
-            ConfigurationJson = System.Text.Json.JsonSerializer.Serialize(value.Configuration, IndentedJson),
+            Configuration = value.Configuration.Clone(),
             Required = value.Required,
             MaximumAgeText = FormatMaximumAge(value.MaximumAge)
         };
