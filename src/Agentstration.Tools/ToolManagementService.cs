@@ -39,6 +39,8 @@ public sealed class ToolManagementService(
         ValidateProvider(resource);
         var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ToolResourceKinds.ToolProvider);
         ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
+        if (scopeRef.Kind != ResourceScopeKind.Workspace && resource.Definition.ProviderType != ToolProviderType.Aep)
+            throw new ToolResourceValidationException("Only AEP ToolProviders may be owned by an Instance or Tenant scope.");
         return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
             var existing = await GetProviderExactAsync(scopeRef, resource.Name, resource.Namespace, token);
@@ -192,6 +194,8 @@ public sealed class ToolManagementService(
         ValidateTool(resource);
         var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ToolResourceKinds.Tool);
         ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
+        if (scopeRef.Kind != ResourceScopeKind.Workspace)
+            throw new ToolResourceValidationException("Instance- and Tenant-owned Tools must be materialized by AEP discovery.");
         return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
             await store.PutExactAsync(scopeRef, resource with { ScopeRef = scopeRef, Generation = Math.Max(1, resource.Generation), Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded } }, ifMatch, ifNoneMatch, token), cancellationToken);
     }

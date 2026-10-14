@@ -54,9 +54,13 @@ public sealed class ToolDiscoveryTests
     }
 
     [TestMethod]
-    public async Task AepProviderPinsAnEnabledExtensionRegistrationInTheSameScope()
+    [DataRow(ResourceScopeKind.Instance)]
+    [DataRow(ResourceScopeKind.Tenant)]
+    [DataRow(ResourceScopeKind.Workspace)]
+    public async Task AepProviderPinsAnEnabledExtensionRegistrationInTheSameScope(ResourceScopeKind scopeKind)
     {
-        var extension = ExtensionRegistration(WorkspaceScope);
+        var scopeRef = Scope(scopeKind);
+        var extension = ExtensionRegistration(scopeRef);
         var service = new ToolManagementService(
             new MemoryStore(),
             new TestReferenceResolver(extension),
@@ -64,10 +68,10 @@ public sealed class ToolDiscoveryTests
             [new SequenceDiscovery([])],
             new FixedTimeProvider());
 
-        var stored = await service.PutProviderAsync(AepProvider(), null, true, default);
+        var stored = await service.PutProviderAsync(AepProvider() with { ScopeRef = scopeRef }, null, true, default);
 
-        Assert.AreEqual(WorkspaceScope, stored.Value.ScopeRef);
-        Assert.AreEqual(WorkspaceScope, stored.Value.Definition.Aep!.Extension.ScopeRef);
+        Assert.AreEqual(scopeRef, stored.Value.ScopeRef);
+        Assert.AreEqual(scopeRef, stored.Value.Definition.Aep!.Extension.ScopeRef);
         Assert.AreEqual(ResourceNamespace.Default, stored.Value.Definition.Aep.Extension.Namespace);
         Assert.AreEqual("utilities-extension", stored.Value.Definition.Aep.Extension.Name);
     }
@@ -98,6 +102,70 @@ public sealed class ToolDiscoveryTests
 
         StringAssert.Contains(ancestorException.Message, "same scope");
         StringAssert.Contains(disabledException.Message, "disabled");
+    }
+
+    [TestMethod]
+    public async Task AepProviderRejectsAnAmbiguousUnscopedRegistrationReference()
+    {
+        var service = new ToolManagementService(
+            new MemoryStore(),
+            new AmbiguousReferenceResolver(),
+            new TestScopeOperations(),
+            [new SequenceDiscovery([])],
+            new FixedTimeProvider());
+
+        var exception = await Assert.ThrowsAsync<ToolResourceValidationException>(async () =>
+            await service.PutProviderAsync(AepProvider(), null, true, default));
+
+        StringAssert.Contains(exception.Message, "more than one ownership scope");
+    }
+
+    [TestMethod]
+    [DataRow(ResourceScopeKind.Instance)]
+    [DataRow(ResourceScopeKind.Tenant)]
+    public async Task NonAepProvidersRemainWorkspaceOwned(ResourceScopeKind scopeKind)
+    {
+        var service = new ToolManagementService(
+            new MemoryStore(),
+            new UnusedReferenceResolver(),
+            new TestScopeOperations(),
+            [new SequenceDiscovery([])],
+            new FixedTimeProvider());
+
+        var exception = await Assert.ThrowsAsync<ToolResourceValidationException>(async () =>
+            await service.PutProviderAsync(Provider() with { ScopeRef = Scope(scopeKind) }, null, true, default));
+
+        StringAssert.Contains(exception.Message, "Only AEP ToolProviders");
+    }
+
+    [TestMethod]
+    [DataRow(ResourceScopeKind.Instance)]
+    [DataRow(ResourceScopeKind.Tenant)]
+    public async Task BroadScopeToolsCanOnlyBeMaterializedByAepDiscovery(ResourceScopeKind scopeKind)
+    {
+        var service = new ToolManagementService(
+            new MemoryStore(),
+            new UnusedReferenceResolver(),
+            new TestScopeOperations(),
+            [new SequenceDiscovery([])],
+            new FixedTimeProvider());
+        var tool = new ToolResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.Tool,
+            Metadata = new ResourceMetadata { Name = "manual-tool" },
+            ScopeRef = Scope(scopeKind),
+            Definition = new ToolResourceProperties
+            {
+                DisplayName = "Manual tool",
+                ToolType = new ToolTypeReference("extension.test", "manual")
+            }
+        };
+
+        var exception = await Assert.ThrowsAsync<ToolResourceValidationException>(async () =>
+            await service.PutToolAsync(tool, null, true, default));
+
+        StringAssert.Contains(exception.Message, "AEP discovery");
     }
 
     private static ToolProviderResource Provider() => new()
@@ -133,6 +201,14 @@ public sealed class ToolDiscoveryTests
             Enabled = true,
             ExpectedExtensionId = "Agentstration.Extensions.Utilities"
         }
+    };
+
+    private static ResourceScopeRef Scope(ResourceScopeKind kind) => kind switch
+    {
+        ResourceScopeKind.Instance => ResourceScopeRef.Instance,
+        ResourceScopeKind.Tenant => ResourceScopeRef.Tenant(Guid.Parse("22222222-2222-2222-2222-222222222222")),
+        ResourceScopeKind.Workspace => WorkspaceScope,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
     private static DiscoveredToolDescriptor Descriptor(string id, string display) => new(id, display, $"{display} description", JsonSerializer.SerializeToElement(new { type = "object", properties = new { value = new { type = "string" } } }), null, new Dictionary<string, JsonElement>());
@@ -186,6 +262,12 @@ public sealed class ToolDiscoveryTests
                 : null;
             return Task.FromResult(result);
         }
+    }
+
+    private sealed class AmbiguousReferenceResolver : IResourceReferenceResolver
+    {
+        public Task<StoredResource<T>?> ResolveAsync<T>(ResourceReference reference, ResourceNamespace ownerNamespace, string kind, ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken) where T : Resource =>
+            throw new ResourceReferenceAmbiguousException(reference, kind);
     }
 
     private sealed class TestScopeOperations : IResourceScopeOperations
