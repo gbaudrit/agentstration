@@ -179,6 +179,8 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         Assert.AreEqual(HttpStatusCode.OK, valueRead.StatusCode);
         Assert.AreEqual(HttpStatusCode.OK, valueList.StatusCode);
         Assert.AreEqual(HttpStatusCode.OK, valueUsages.StatusCode);
+        Assert.IsEmpty((await valueList.Content.ReadFromJsonAsync<SecretResponse[]>())!,
+            "An ancestor Secret without a discover grant must not appear in an effective list.");
         foreach (var response in new[] { valueRead, valueList, valueUsages })
             Assert.IsFalse((await response.Content.ReadAsStringAsync()).Contains(secretValue, StringComparison.Ordinal));
 
@@ -214,7 +216,10 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         Assert.AreEqual(HttpStatusCode.OK, granted.StatusCode);
         using var savedSecretResponse = await client.GetAsync($"/api/secrets/resolution-secret?scopeRef={Uri.EscapeDataString(tenant.Value)}");
         var savedSecret = await savedSecretResponse.Content.ReadFromJsonAsync<SecretResponse>();
-        Assert.AreEqual(workspace, savedSecret?.Resource.Definition.UsePolicy.Grants.Single().ScopeRef);
+        Assert.IsNotNull(savedSecret);
+        Assert.AreEqual(workspace, savedSecret.Resource.Definition.UsePolicy.Grants.Single().ScopeRef);
+        var visibleAfterGrant = await client.GetFromJsonAsync<SecretResponse[]>("/api/secrets");
+        Assert.IsTrue(visibleAfterGrant!.Any(value => value.Resource.Uid == savedSecret.Resource.Uid));
 
         var capabilities = factory.Services.GetRequiredService<ISecretCapabilityService>();
         var capabilityContext = new SecretCapabilityContext(

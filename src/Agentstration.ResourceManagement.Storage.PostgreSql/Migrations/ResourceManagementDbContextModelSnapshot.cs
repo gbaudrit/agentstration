@@ -75,6 +75,54 @@ namespace Agentstration.ResourceManagement.Storage.PostgreSql.Migrations
                     b.ToTable("ControlPlaneResources", "management");
                 });
 
+            modelBuilder.Entity("Agentstration.ResourceManagement.Storage.PostgreSql.ResourceAccessPolicyRow", b =>
+                {
+                    b.Property<Guid>("ResourceUid")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ETag")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long?>("Generation")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("GrantsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Namespace")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("OwnerScopeRef")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Version")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("ResourceUid");
+
+                    b.HasIndex("OwnerScopeRef");
+
+                    b.ToTable("ResourceAccessPolicies", "management");
+                });
+
             modelBuilder.Entity("Agentstration.ResourceManagement.Storage.PostgreSql.ExternalIdentityRow", b =>
                 {
                     b.Property<Guid>("Id")

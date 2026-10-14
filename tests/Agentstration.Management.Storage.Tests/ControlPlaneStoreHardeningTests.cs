@@ -1,6 +1,7 @@
 using Agentstration.Agents;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -250,6 +251,40 @@ public sealed class ControlPlaneStoreHardeningTests
     }
 
     [TestMethod]
+    public async Task ResourceAccessPoliciesPersistOutsideResourcesAndEnforceTheirOwnConcurrency()
+    {
+        var tenantId = Guid.NewGuid();
+        await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
+        await fixture.EnsureTenantAsync(tenantId);
+        var resource = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance,
+            Resource("shared") with { Generation = 3 }, null, true, default);
+        var identity = await fixture.Store.GetIdentityByUidAsync(resource.Value.Uid, default);
+
+        Assert.IsNotNull(identity);
+        Assert.AreEqual(3, identity.Generation);
+        var policy = new ResourceAccessPolicy(
+            new(resource.Value.Uid, ResourceScopeRef.Instance, ResourceNamespace.Default, "MemoryProvider", 3),
+            [new(ResourceScopeRef.Tenant(tenantId), [ResourceAccessAction.Discover, ResourceAccessAction.Use])]);
+        var created = await fixture.PolicyStore.PutAsync(policy, null, default);
+        var loaded = await fixture.PolicyStore.GetAsync(resource.Value.Uid, ResourceScopeRef.Instance, default);
+
+        Assert.IsNotNull(loaded);
+        Assert.AreEqual(created.ETag, loaded.ETag);
+        Assert.AreEqual(resource.ETag, (await fixture.Store.GetByUidAsync<ExtensionResource>(resource.Value.Uid, default))?.ETag,
+            "Changing the access overlay must not mutate the governed resource.");
+        await Assert.ThrowsExactlyAsync<ResourceConcurrencyException>(() => fixture.PolicyStore.PutAsync(
+            policy with { Grants = [] }, "\"stale\"", default));
+        var updated = await fixture.PolicyStore.PutAsync(policy with { Grants = [] }, created.ETag, default);
+        Assert.AreNotEqual(created.ETag, updated.ETag);
+        Assert.IsEmpty(updated.Policy.Grants);
+
+        await fixture.Store.DeleteExactAsync(ScopedResourceAddress.Create(ResourceScopeRef.Instance,
+            ResourceNamespace.Default, "MemoryProvider", "shared"), resource.ETag, default);
+        Assert.IsNull(await fixture.PolicyStore.GetAsync(resource.Value.Uid, ResourceScopeRef.Instance, default),
+            "Deleting a resource must atomically remove its access overlay.");
+    }
+
+    [TestMethod]
     public async Task RuntimeResolverReturnsWorkerExecutionMaterialForExactGeneration()
     {
         await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
@@ -407,6 +442,7 @@ public sealed class ControlPlaneStoreHardeningTests
         public IResourceStore Store { get; } = store;
         public IAgentResourceQueries Queries { get; } = queries;
         public IResourceScopeResolver ScopeResolver => Provider.GetRequiredService<IResourceScopeResolver>();
+        public IResourceAccessPolicyStore PolicyStore => Provider.GetRequiredService<IResourceAccessPolicyStore>();
         public ICurrentRequestContext RequestContext => Provider.GetRequiredService<ICurrentRequestContext>();
 
         public async Task EnsureTenantAsync(Guid tenantId)

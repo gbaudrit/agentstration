@@ -17,11 +17,22 @@ public sealed record ResourceInventoryEntry(
     string Name,
     DateTimeOffset UpdatedAt);
 
+public sealed record ResourceIdentitySnapshot(
+    Guid Uid,
+    ResourceScopeRef ScopeRef,
+    ResourceNamespace Namespace,
+    string Kind,
+    string Name,
+    long Generation,
+    string? Version,
+    string ETag);
+
 public interface IResourceStore
 {
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource;
     Task<StoredResource<T>?> GetByUidAsync<T>(Guid uid, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException("This store does not support UID lookup.");
+    Task<ResourceIdentitySnapshot?> GetIdentityByUidAsync(Guid uid, CancellationToken cancellationToken) => throw new NotSupportedException("This store does not support resource identity lookup.");
     Task<StoredResource<T>?> GetExactAsync<T>(ScopedResourceAddress address, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException("This store does not support exact-scope lookup.");
     Task<IReadOnlyList<StoredResource<T>>> ListExactAsync<T>(ResourceScopeRef scopeRef, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException("This store does not support exact-scope enumeration.");
     Task<IReadOnlyList<StoredResource<T>>> ListVisibleAsync<T>(ResourceScopeRef targetScopeRef, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException("This store does not support descendant-visible enumeration.");
