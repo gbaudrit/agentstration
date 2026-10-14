@@ -187,6 +187,13 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         var source = await sources.CreateAsync(SourceResource("origin", workspace, new("generic", workspace)), default);
 
         using var client = factory.CreateClient();
+        var readiness = await client.GetFromJsonAsync<DataSourceReadiness>(
+            $"/api/datasources/origin/readiness?scopeRef={Uri.EscapeDataString(workspace.Value)}");
+        Assert.AreEqual("generic-acquire", readiness?.Acquisition?.Name);
+        Assert.AreEqual("1.0.0", readiness?.Acquisition?.Version);
+        Assert.AreEqual("string", readiness?.Acquisition?.InputSchema?.GetProperty("properties")
+            .GetProperty("parameters").GetProperty("properties").GetProperty("query").GetProperty("type").GetString());
+
         using var startedResponse = await client.PostAsJsonAsync(
             $"/api/datasources/origin/acquisitions?scopeRef={Uri.EscapeDataString(workspace.Value)}",
             new StartDataSourceAcquisitionRequest { DataSourceScopeRef = workspace });
@@ -394,7 +401,11 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
                 dataSourceGeneration = new { type = "integer" },
                 profile = new { type = "object" },
                 sourceConfiguration = new { type = "object" },
-                parameters = new { type = "object" },
+                parameters = new
+                {
+                    type = "object",
+                    properties = new { query = new { type = "string" } }
+                },
                 caller = new { type = "object" },
                 correlationId = new { type = "string" },
                 acquisitionId = new { type = "string" }

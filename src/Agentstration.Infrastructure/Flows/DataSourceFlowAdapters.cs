@@ -14,7 +14,7 @@ public sealed class DataSourceAcquisitionCompositionResolver(
     FlowService flows,
     IResourceReferenceResolver references) : IDataSourceAcquisitionCompositionResolver
 {
-    public async Task<ResolvedDataSourceAcquisitionComposition> ResolveAsync(
+    public async Task<ResolvedDataSourceFlowBinding> ResolveFlowAsync(
         ResourceScopeRef executionScope,
         ResourceNamespace ownerNamespace,
         ResolvedDataSourceProfile profile,
@@ -37,6 +37,23 @@ public sealed class DataSourceAcquisitionCompositionResolver(
                 $"Flow binding '{flowNamespace}/{target.Name}' is unavailable: {exception.Message}");
         }
 
+        return new(
+            resolvedFlow.FlowId.Value,
+            resolvedFlow.FlowId.Namespace,
+            resolvedFlow.Version,
+            target.UseActiveVersion,
+            resolvedFlow.Graph?.InputSchema?.Clone(),
+            resolvedFlow.Graph?.OutputSchema?.Clone(),
+            resolvedFlow.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract));
+    }
+
+    public async Task<ResolvedDataSourceAcquisitionComposition> ResolveAsync(
+        ResourceScopeRef executionScope,
+        ResourceNamespace ownerNamespace,
+        ResolvedDataSourceProfile profile,
+        CancellationToken cancellationToken)
+    {
+        var flow = await ResolveFlowAsync(executionScope, ownerNamespace, profile, cancellationToken);
         var tools = new List<ResolvedDataSourceToolBinding>(profile.Definition.ToolBindings.Count);
         foreach (var binding in profile.Definition.ToolBindings)
         {
@@ -88,14 +105,7 @@ public sealed class DataSourceAcquisitionCompositionResolver(
         return new()
         {
             Profile = profile,
-            Flow = new(
-                resolvedFlow.FlowId.Value,
-                resolvedFlow.FlowId.Namespace,
-                resolvedFlow.Version,
-                target.UseActiveVersion,
-                resolvedFlow.Graph?.InputSchema?.Clone(),
-                resolvedFlow.Graph?.OutputSchema?.Clone(),
-                resolvedFlow.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract)),
+            Flow = flow,
             Tools = tools,
             Limits = Clone(profile.Definition.Limits),
             Policies = Clone(profile.Definition.Policies)
