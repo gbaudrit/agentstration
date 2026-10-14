@@ -42,15 +42,15 @@ else
             {
                 <button class="button-secondary" @onclick="OpenRun">@T("RunDraft")</button>
                 <button class="button-primary" data-testid="flow-designer-save" disabled="@saving" @onclick="SaveAsync">@T("Save")</button>
-                <details class="designer-more-actions">
-                    <summary class="button-secondary" aria-label="@T("MoreActions")"><UiIcon Name="dots" /><span>@T("MoreActions")</span></summary>
+                <div class="designer-more-actions @(moreActionsOpen ? "open" : null)">
+                    <button type="button" class="button-secondary designer-more-toggle" aria-label="@T("MoreActions")" aria-expanded="@moreActionsOpen" @onclick="() => moreActionsOpen = !moreActionsOpen"><UiIcon Name="dots" /><span>@T("MoreActions")</span></button>
                     <div class="designer-more-menu">
                         <button class="button-secondary" disabled="@(!Editor.CanUndo)" @onclick="Undo">@T("Undo")</button>
                         <button class="button-secondary" disabled="@(!Editor.CanRedo)" @onclick="Redo">@T("Redo")</button>
                         <label class="publish-version">@T("Version")<input aria-label="@T("PublishVersion")" @bind="publishVersion" /></label>
                         <button class="button-primary" data-testid="flow-designer-publish" disabled="@publishing" aria-busy="@publishing" @onclick="PublishAsync">@T(publishing ? "Publishing" : "Publish")</button>
                     </div>
-                </details>
+                </div>
             }
         </div>
     </header>
@@ -417,6 +417,7 @@ else
     private bool loadingAgents;
     private bool focusMode;
     private bool validationExpanded;
+    private bool moreActionsOpen;
     private bool? paletteVisibility;
     private bool? inspectorVisibility;
     private long layoutRevision;

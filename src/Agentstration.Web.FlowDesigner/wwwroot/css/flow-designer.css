@@ -98,7 +98,7 @@
 .flow-editor-shell{position:relative}
 .flow-canvas-wrap{position:relative}
 .designer-more-actions{display:contents}
-.designer-more-actions>summary{display:none}
+.designer-more-toggle{display:none}
 .designer-more-menu{display:flex!important;align-items:center;gap:6px;flex-wrap:wrap}
 .designer-view-controls{position:absolute;z-index:50;top:12px;left:12px;display:flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--border);border-radius:8px;background:color-mix(in srgb,var(--surface) 94%,transparent);box-shadow:var(--shadow);transition:left .16s ease}
 .designer-view-controls button,.designer-drawer-header button{display:grid;place-items:center;width:32px;height:30px;padding:0;border:1px solid var(--border);border-radius:5px;background:var(--surface-2);color:var(--muted);cursor:pointer}
@@ -151,7 +151,9 @@
     .flow-editor-shell.palette-open>.step-palette{left:0;width:var(--palette-drawer-width);border-right:1px solid var(--border)}
     .flow-editor-shell.palette-open .designer-view-controls{left:calc(var(--palette-drawer-width) + 12px)}
     .flow-editor-shell.inspector-open>.flow-inspector{right:0;border-left:1px solid var(--border)}
-    .flow-editor-shell.split>.source-editor{grid-column:1;min-height:420px}
+    .flow-editor-shell.split{grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr)}
+    .flow-editor-shell.split>.flow-canvas-wrap{grid-column:1}
+    .flow-editor-shell.split>.source-editor{grid-column:2;min-height:420px}
     .designer-view-controls .desktop-panel-toggle{display:none}
     .designer-view-controls .compact-panel-toggle{display:grid}
     .designer-focus-toolbar .focus-workspace-controls .desktop-panel-toggle{display:none}
@@ -164,10 +166,9 @@
     .flow-designer-page .designer-toolbar{grid-template-columns:minmax(0,1fr)}
     .flow-designer-page .designer-modes,.flow-designer-page .designer-actions{justify-content:flex-start}
     .designer-more-actions{position:relative;display:block}
-    .designer-more-actions>summary{display:flex;align-items:center;gap:7px;min-height:38px;list-style:none;cursor:pointer}
-    .designer-more-actions>summary::-webkit-details-marker{display:none}
-    .designer-more-menu,.designer-more-actions:not([open])>.designer-more-menu{display:none!important}
-    .designer-more-actions[open]>.designer-more-menu{position:absolute;z-index:55;top:calc(100% + 6px);right:0;display:grid!important;min-width:230px;padding:10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);box-shadow:0 14px 36px rgba(8,19,35,.2)}
+    .designer-more-toggle{display:flex;align-items:center;gap:7px;min-height:38px;cursor:pointer}
+    .designer-more-menu{display:none!important}
+    .designer-more-actions.open>.designer-more-menu{position:absolute;z-index:55;top:calc(100% + 6px);right:0;display:grid!important;min-width:230px;padding:10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);box-shadow:0 14px 36px rgba(8,19,35,.2)}
     .designer-more-menu>*{width:100%}
     .designer-more-menu .publish-version{display:grid;gap:5px}
     .designer-more-menu .publish-version input{width:100%}
@@ -175,13 +176,16 @@
 
 @container flow-designer (max-width:620px){
     .flow-editor-shell{--palette-drawer-width:min(210px,56%)}
+    .flow-editor-shell.split{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(460px,1fr) minmax(420px,auto)}
+    .flow-editor-shell.split>.flow-canvas-wrap{grid-column:1;grid-row:1}
+    .flow-editor-shell.split>.source-editor{grid-column:1;grid-row:2}
     .designer-focus-toolbar{right:10px;left:10px;justify-content:flex-start;max-width:none;overflow-x:auto;transform:none}
     .designer-focus-toolbar .focus-exit span{display:none}
     .flow-designer-page .designer-toolbar{padding:12px}
     .flow-designer-page .designer-toolbar h1{display:block;margin-bottom:6px}
     .flow-designer-page .designer-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
-    .flow-designer-page .designer-actions>button,.designer-more-actions,.designer-more-actions>summary{width:100%}
-    .designer-more-actions>summary{justify-content:center}
+    .flow-designer-page .designer-actions>button,.designer-more-actions,.designer-more-toggle{width:100%}
+    .designer-more-toggle{justify-content:center}
     .flow-designer-page .flow-editor-shell{display:grid}
     .flow-canvas-wrap{height:calc(100dvh - 300px);min-height:460px}
     .validation-header{grid-template-columns:minmax(0,1fr) auto auto;gap:6px}
