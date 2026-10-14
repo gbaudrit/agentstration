@@ -2,7 +2,7 @@
 
 A Schema is a reusable, scoped contract resource. Its identity, ownership scope, namespace, format and dialect remain stable while its draft content can be edited with optimistic concurrency. Publishing creates an immutable version containing an independent content snapshot and deterministic digest.
 
-The Console Schema library is available under **Design > Schemas**. A definition can be edited in three modes:
+The Console Schema library is available under **Design > Schemas**. The **Definition** tab owns identity and description, while the **Designer** tab edits the native document in three modes:
 
 - **Visual** uses a compact recursive property tree and a single inspector for the selected node. Properties can be renamed, reordered among siblings, nested under objects, marked as required, and configured with primitive or collection types, descriptions, defaults, string enums, and basic numeric or string bounds.
 - **Source** uses the local Monaco editor and preserves the complete native document.

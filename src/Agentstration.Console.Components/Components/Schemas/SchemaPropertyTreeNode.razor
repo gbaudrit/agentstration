@@ -2,9 +2,9 @@
 
 <li class="schema-tree-item" role="treeitem" aria-selected="@IsSelected" data-testid="schema-property-tree-item">
     <button type="button" class="schema-tree-node @(IsSelected ? "is-selected" : null)"
-            style="--schema-tree-depth: @Depth" disabled="@Disabled"
+            disabled="@Disabled"
             data-testid="schema-property-node" @onclick="SelectAsync">
-        <span class="schema-tree-branch" aria-hidden="true">@(IsObject ? "⌄" : "·")</span>
+        <span class="schema-tree-branch" aria-hidden="true">@(IsObject ? "▾" : string.Empty)</span>
         <span class="schema-tree-name">@Name</span>
         <span class="schema-tree-type">@Type</span>
     </button>

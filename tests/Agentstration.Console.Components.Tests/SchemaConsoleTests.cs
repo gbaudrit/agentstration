@@ -48,7 +48,7 @@ public sealed class SchemaConsoleTests
     }
 
     [TestMethod]
-    public void DetailsExposeOverviewDefinitionAndYamlTabs()
+    public void DetailsSeparateDefinitionDesignerAndYamlTabs()
     {
         using var context = Context(new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema)]));
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
@@ -60,11 +60,15 @@ public sealed class SchemaConsoleTests
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='schema-overview']")));
         Assert.HasCount(1, rendered.FindAll("[data-testid='schema-editor'] .resource-icon svg.ui-icon"));
         CollectionAssert.AreEqual(
-            new[] { strings["Tab.Overview"].Value, strings["Tab.Definition"].Value, strings["Tab.Versions"].Value, strings["Tab.Yaml"].Value },
+            new[] { strings["Tab.Overview"].Value, strings["Tab.Definition"].Value, strings["Tab.Designer"].Value, strings["Tab.Versions"].Value, strings["Tab.Yaml"].Value },
             rendered.FindAll("[role='tab']").Select(tab => tab.TextContent.Trim()).ToArray());
 
         rendered.Find("[data-testid='schema-tab-definition']").Click();
-        Assert.HasCount(1, rendered.FindAll("[data-testid='schema-source']"));
+        Assert.HasCount(1, rendered.FindAll("[data-testid='schema-definition']"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid='schema-visual-editor']"));
+
+        rendered.Find("[data-testid='schema-tab-designer']").Click();
+        Assert.HasCount(1, rendered.FindAll("[data-testid='schema-designer']"));
         Assert.HasCount(1, rendered.FindAll("[data-testid='schema-visual-editor']"));
         Assert.HasCount(1, rendered.FindAll("[data-testid='schema-preview-mode']"));
 
@@ -142,6 +146,7 @@ public sealed class SchemaConsoleTests
         rendered.Find("[data-testid='schema-tab-definition']").Click();
         Assert.IsTrue(rendered.FindAll("input[disabled]")
             .Any(input => input.GetAttribute("value") == "application/protobuf"));
+        rendered.Find("[data-testid='schema-tab-designer']").Click();
         StringAssert.Contains(rendered.FindComponent<SchemaDocumentEditor>().Instance.Value.GetRawText(), "object");
     }
 
@@ -154,7 +159,7 @@ public sealed class SchemaConsoleTests
             $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
         var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
 
-        rendered.WaitForElement("[data-testid='schema-tab-definition']").Click();
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
         rendered.Find("[data-testid='schema-add-property']").Click();
         rendered.Find("[data-testid='schema-save']").Click();
 
@@ -172,7 +177,7 @@ public sealed class SchemaConsoleTests
             $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
         var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
 
-        rendered.WaitForElement("[data-testid='schema-tab-definition']").Click();
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
         rendered.Find("[data-testid='schema-property-name']").Change("customerName");
         rendered.Find("[data-testid='schema-save']").Click();
 
@@ -195,7 +200,7 @@ public sealed class SchemaConsoleTests
             $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
         var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
 
-        rendered.WaitForElement("[data-testid='schema-tab-definition']").Click();
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
         rendered.Find("[data-testid='schema-property-name']").Change("second");
 
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[role='alert']")));
@@ -213,7 +218,7 @@ public sealed class SchemaConsoleTests
             $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
         var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
 
-        rendered.WaitForElement("[data-testid='schema-tab-definition']").Click();
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
         rendered.Find("[data-testid='schema-add-property']").Click();
         rendered.Find("[data-testid='schema-property-type']").Change("object");
         rendered.Find("[data-testid='schema-property-name']").Change("address");
@@ -239,7 +244,7 @@ public sealed class SchemaConsoleTests
             $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
         var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
 
-        rendered.WaitForElement("[data-testid='schema-tab-definition']").Click();
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
         rendered.FindAll("[data-testid='schema-property-node']")[1].Click();
         rendered.Find("[data-testid='schema-property-move-up']").Click();
         rendered.Find("[data-testid='schema-save']").Click();
@@ -258,7 +263,7 @@ public sealed class SchemaConsoleTests
             $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
         var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
 
-        rendered.WaitForElement("[data-testid='schema-tab-definition']").Click();
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
         rendered.Find("[data-testid='schema-definition-source-mode']").Click();
 
         var source = rendered.FindComponent<SchemaSourceEditor>().Instance.Value;
@@ -275,7 +280,7 @@ public sealed class SchemaConsoleTests
             $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
         var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
 
-        rendered.WaitForElement("[data-testid='schema-tab-definition']").Click();
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
 
         Assert.HasCount(1, rendered.FindAll("[data-testid='schema-source-only']"));
         Assert.HasCount(0, rendered.FindAll("[data-testid='schema-visual-mode']"));
@@ -291,7 +296,7 @@ public sealed class SchemaConsoleTests
             $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
         var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
 
-        rendered.WaitForElement("[data-testid='schema-tab-definition']").Click();
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
         rendered.Find("[data-testid='schema-definition-source-mode']").Click();
         var sourceEditor = rendered.FindComponent<SchemaSourceEditor>();
         await rendered.InvokeAsync(() => sourceEditor.Instance.ValueChanged.InvokeAsync("not-json"));

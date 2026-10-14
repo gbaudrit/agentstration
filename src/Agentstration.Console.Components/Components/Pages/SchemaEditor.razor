@@ -108,21 +108,38 @@ else
             </section>
         </main>
     }
+    else if (!IsNew && activeTab == SchemaTab.Designer && schema is not null)
+    {
+        <main id="schema-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
+            <section class="schema-definition-sheet">
+                <div class="schema-definition-heading">
+                    <p class="eyebrow">@T("DesignerEyebrow")</p>
+                    <h2>@T("DesignerTitle")</h2>
+                    <p>@T("DesignerHelp")</p>
+                </div>
+                <section class="panel schema-designer-panel" data-testid="schema-designer">
+                    <SchemaDocumentEditor Format="@format" Dialect="@dialect" Descriptor="SelectedFormatDescriptor" Value="content" ValueChanged="ChangeContent" Disabled="busy" />
+                    <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></div>
+                </section>
+            </section>
+        </main>
+    }
     else
     {
         <main id="@(!IsNew ? "schema-tab-panel" : null)" role="@(!IsNew ? "tabpanel" : null)" aria-labelledby="@(!IsNew ? TabId(activeTab) : null)" tabindex="@(!IsNew ? "0" : null)">
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("Coordinates")</h2></div></div>
-                <div class="form-grid">
-                    <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="schema-display-name" TechnicalNameTestId="schema-name" />
-                    <label><span>@T("Namespace")</span><input @bind="resourceNamespace" disabled="@(!IsNew || busy)" /></label>
-                    @if (IsNew) { <ResourceScopeFormField ResourceKind="@SchemaResourceKinds.Schema" @bind-Value="selectedScope" Disabled="@busy" /> }
-                    else { <label><span>@T("Scope")</span><span><ResourceScopeBadge ScopeRef="selectedScope" /></span></label> }
+            <section class="schema-definition-sheet">
+                <div class="schema-definition-heading">
+                    <p class="eyebrow">@T("DefinitionIdentityEyebrow")</p>
+                    <h2>@T("DefinitionIdentityTitle")</h2>
+                    <p>@T("DefinitionIdentityHelp")</p>
                 </div>
-            </section>
-            <section class="panel form-section" data-testid="schema-definition">
-                <div class="panel-header"><div><p class="eyebrow">@T("Definition")</p><h2>@T("NativeContent")</h2></div></div>
-                <div class="form-grid">
+                <section class="panel schema-definition-form" data-testid="schema-definition">
+                    <div class="panel-header"><div><h3>@T("IdentityAndDescription")</h3><p>@T("DefinitionDraftHelp")</p></div>@if (!IsNew) { <StatusBadge Text="@T("Draft")" Status="UiStatus.Neutral" /> }</div>
+                    <div class="schema-definition-fields">
+                        <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="schema-display-name" TechnicalNameTestId="schema-name" />
+                        <label><span>@T("Namespace")</span><input @bind="resourceNamespace" disabled="@(!IsNew || busy)" /></label>
+                        @if (IsNew) { <ResourceScopeFormField ResourceKind="@SchemaResourceKinds.Schema" @bind-Value="selectedScope" Disabled="@busy" /> }
+                        else { <label><span>@T("Scope")</span><span class="schema-scope-field"><ResourceScopeBadge ScopeRef="selectedScope" /></span></label> }
                     @if (FormatAvailable)
                     {
                         <label><span>@T("Format")</span><select value="@format" disabled="@(!IsNew || busy)" @onchange="ChangeFormat">@foreach (var descriptor in AvailableFormats) { <option value="@descriptor.Format">@descriptor.DisplayName (@descriptor.Format)</option> }</select></label>
@@ -133,10 +150,21 @@ else
                         <label><span>@T("Format")</span><input value="@format" disabled /></label>
                         <label><span>@T("Dialect")</span><input value="@dialect" disabled /></label>
                     }
-                    <label class="form-grid-full"><span>@T("DescriptionLabel")</span><textarea rows="3" @bind="description" disabled="@busy"></textarea></label>
-                </div>
-                <div class="form-grid-full" data-testid="schema-source"><SchemaDocumentEditor Format="@format" Dialect="@dialect" Descriptor="SelectedFormatDescriptor" Value="content" ValueChanged="ChangeContent" Disabled="busy" /></div>
-                <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></div>
+                        <label class="schema-definition-description"><span>@T("DescriptionLabel")</span><textarea rows="4" @bind="description" disabled="@busy"></textarea></label>
+                    </div>
+                    @if (!IsNew)
+                    {
+                        <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></div>
+                    }
+                </section>
+                @if (IsNew)
+                {
+                    <section class="panel schema-designer-panel" data-testid="schema-designer">
+                        <div class="panel-header"><div><p class="eyebrow">@T("DesignerEyebrow")</p><h3>@T("DesignerTitle")</h3><p>@T("DesignerHelp")</p></div></div>
+                        <SchemaDocumentEditor Format="@format" Dialect="@dialect" Descriptor="SelectedFormatDescriptor" Value="content" ValueChanged="ChangeContent" Disabled="busy" />
+                        <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></div>
+                    </section>
+                }
             </section>
         </main>
     }
@@ -209,7 +237,7 @@ else
             versions = await Client.GetVersionsAsync(schema.ScopeRef!.Value, schema.Namespace, schema.Name, cancellation.Token);
             publishVersion = NextVersion(versions);
             PrepareRawYaml();
-            activeTab = View?.ToLowerInvariant() switch { "definition" => SchemaTab.Definition, "yaml" => SchemaTab.Yaml, "versions" => SchemaTab.Versions, _ => SchemaTab.Overview };
+            activeTab = View?.ToLowerInvariant() switch { "definition" => SchemaTab.Definition, "designer" => SchemaTab.Designer, "yaml" => SchemaTab.Yaml, "versions" => SchemaTab.Versions, _ => SchemaTab.Overview };
             selectedVersion = activeTab == SchemaTab.Versions && !string.IsNullOrWhiteSpace(Version)
                 ? await Client.GetVersionAsync(schema.ScopeRef.Value, schema.Namespace, schema.Name, Version, cancellation.Token)
                 : null;
@@ -358,7 +386,7 @@ else
     private void ChangeDialect(ChangeEventArgs args) => dialect = args.Value?.ToString() ?? string.Empty;
     private Task ChangeContent(JsonElement value) { content = value.Clone(); return Task.CompletedTask; }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
-    private enum SchemaTab { Overview, Definition, Versions, Yaml }
+    private enum SchemaTab { Overview, Definition, Designer, Versions, Yaml }
     private sealed record RawSchemaResource
     {
         public required string ApiVersion { get; init; }

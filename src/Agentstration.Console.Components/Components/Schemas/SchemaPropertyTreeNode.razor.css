@@ -5,7 +5,11 @@
     padding: 0;
 }
 
-.schema-tree-group { position: relative; }
+.schema-tree-group {
+    border-left: 1px solid var(--border);
+    margin-left: 1rem;
+    padding-left: .45rem;
+}
 
 .schema-tree-node {
     align-items: center;
@@ -19,7 +23,7 @@
     gap: .45rem;
     grid-template-columns: 1rem minmax(0, 1fr) auto;
     margin: .1rem 0;
-    padding: .5rem .55rem .5rem calc(.55rem + (var(--schema-tree-depth) * 1rem));
+    padding: .5rem .55rem;
     text-align: left;
     width: 100%;
 }
