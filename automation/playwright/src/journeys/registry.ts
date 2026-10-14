@@ -23,6 +23,7 @@ import { exerciseFlowTransitionEditing, type ExerciseFlowTransitionEditingInput 
 import { exerciseFlowNamedOutputs, type ExerciseFlowNamedOutputsInput } from './exercise-flow-named-outputs.journey.js';
 import { inspectRuntimeWorkerObservability, type InspectRuntimeWorkerObservabilityInput } from './inspect-runtime-worker-observability.journey.js';
 import { inspectAgentInstanceObservability, type InspectAgentInstanceObservabilityInput } from './inspect-agent-instance-observability.journey.js';
+import { exerciseSchemaDrivenSources, type ExerciseSchemaDrivenSourcesInput } from './exercise-schema-driven-sources.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -51,4 +52,5 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'exercise-flow-named-outputs': (context, input) => exerciseFlowNamedOutputs(context, input as unknown as ExerciseFlowNamedOutputsInput),
   'inspect-runtime-worker-observability': (context, input) => inspectRuntimeWorkerObservability(context, input as unknown as InspectRuntimeWorkerObservabilityInput),
   'inspect-agent-instance-observability': (context, input) => inspectAgentInstanceObservability(context, input as unknown as InspectAgentInstanceObservabilityInput),
+  'exercise-schema-driven-sources': (context, input) => exerciseSchemaDrivenSources(context, input as unknown as ExerciseSchemaDrivenSourcesInput),
 };

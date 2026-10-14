@@ -35,19 +35,19 @@ else
                 @if (bindings.Count == 0) { <p class="muted">@T("NoDataSourceBindings")</p> }
                 @foreach (var binding in bindings)
                 {
-                    <div class="form-grid knowledge-binding-card">
+                    <div class="form-grid knowledge-binding-card" data-testid="knowledge-source-binding">
                         <label><span>@T("BindingName")</span><input @bind="binding.Name" maxlength="128" /></label>
-                        <label><span>@T("DataSource")</span><select @bind="binding.DataSourceKey" required><option value="">@T("SelectDataSource")</option>@foreach (var dataSource in dataSources) { <option value="@DataSourceKey(dataSource)">@DataSourceLabel(dataSource)</option> }</select></label>
-                        <label><span>@T("TransformationFlowOptional")</span><select @bind="binding.TransformationFlowKey"><option value="">@T("IdentityTransformation")</option>@foreach (var flow in transformationFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
+                        <label><span>@T("DataSource")</span><select @bind="binding.DataSourceKey" required data-testid="knowledge-source-binding-data-source"><option value="">@T("SelectDataSource")</option>@foreach (var dataSource in dataSources) { <option value="@DataSourceKey(dataSource)">@DataSourceLabel(dataSource)</option> }</select></label>
+                        <label><span>@T("TransformationFlowOptional")</span><select @bind="binding.TransformationFlowKey" data-testid="knowledge-source-binding-transformation-flow"><option value="">@T("IdentityTransformation")</option>@foreach (var flow in transformationFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
                         <label class="knowledge-choice"><input type="checkbox" @bind="binding.Required" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("RequiredInput")</strong><small>@T("RequiredInputHelp")</small></span></label>
                         <label><span>@T("MaximumAge")</span><input type="text" inputmode="numeric" placeholder="hh:mm:ss" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" title="@T("MaximumAgeFormat")" @bind="binding.MaximumAgeText" data-testid="knowledge-source-binding-maximum-age" /><small>@T("MaximumAgeHelp")</small></label>
-                        <div class="form-span-2 knowledge-transformation-configuration"><span>@T("TransformationConfiguration")</span><JsonSchemaInputEditor Schema="TransformationConfigurationSchema(binding)" Value="binding.Configuration" ValueChanged="value => binding.Configuration = value" ValidationChanged="state => binding.ConfigurationValid = state.IsValid" Disabled="busy" /><small>@T("TransformationConfigurationHelp")</small></div>
+                        <div class="form-span-2 knowledge-transformation-configuration" data-testid="knowledge-source-transformation-configuration"><span>@T("TransformationConfiguration")</span><JsonSchemaInputEditor Schema="TransformationConfigurationSchema(binding)" Value="binding.Configuration" ValueChanged="value => binding.Configuration = value" ValidationChanged="state => binding.ConfigurationValid = state.IsValid" Disabled="busy" /><small>@T("TransformationConfigurationHelp")</small></div>
                         <div class="form-actions form-span-2"><button class="text-button" type="button" @onclick="() => RemoveBinding(binding)">@T("Remove")</button></div>
                     </div>
                 }
             </section>
         </div>
-        <div class="form-actions"><button class="button-primary" type="submit" disabled="@(busy || bindings.Any(value => !value.ConfigurationValid))">@(busy ? T("Saving") : T("Save"))</button></div>
+        <div class="form-actions"><button class="button-primary" type="submit" data-testid="knowledge-source-save" disabled="@(busy || bindings.Any(value => !value.ConfigurationValid))">@(busy ? T("Saving") : T("Save"))</button></div>
     </EditForm>
 }
 

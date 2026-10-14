@@ -76,10 +76,23 @@
     display: grid;
     gap: .45rem;
     width: min(48rem, 100%);
+    min-width: 0;
     margin-bottom: 1rem;
     color: var(--muted);
     font-size: .78rem;
     font-weight: 700;
+}
+
+[data-testid="knowledge-projections"] {
+    min-width: 0;
+    overflow: hidden;
+}
+
+[data-testid="knowledge-projections"] ::deep .data-grid-wrap {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
 }
 
 .knowledge-projection-parameters textarea {
