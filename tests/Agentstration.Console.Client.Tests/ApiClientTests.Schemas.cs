@@ -83,6 +83,50 @@ public sealed partial class ApiClientTests
         Assert.AreEqual((HttpMethod.Post, expected), requests[2]);
     }
 
+    [TestMethod]
+    public async Task SchemaClientListsFormatsAndUsesGovernedValidationEndpoints()
+    {
+        var descriptor = new SchemaFormatDescriptor(SchemaFormatIds.JsonSchema, "JSON Schema",
+            new(BuiltinJsonSchemaFormatHandler.ProviderId, BuiltinJsonSchemaFormatHandler.ProviderVersion),
+            [BuiltinJsonSchemaFormatHandler.Draft202012],
+            SchemaFormatCapabilities.ValidateDefinition | SchemaFormatCapabilities.ValidateInstance, true);
+        var requests = new List<(HttpMethod Method, string Path)>();
+        using var http = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add((request.Method, request.RequestUri!.AbsolutePath));
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = request.Method == HttpMethod.Get
+                    ? JsonContent.Create(new Agentstration.Api.Contracts.ValueResponse<SchemaFormatDescriptor>([descriptor]))
+                    : JsonContent.Create(SchemaFormatValidationResult.Valid)
+            };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new SchemasApiClient(http);
+        var definition = JsonSerializer.SerializeToElement(new { type = "object" });
+
+        var formats = await client.GetFormatsAsync();
+        var definitionResult = await client.ValidateDefinitionAsync(
+            new(SchemaFormatIds.JsonSchema, BuiltinJsonSchemaFormatHandler.Draft202012, definition));
+        var instanceResult = await client.ValidateInstanceAsync(
+            new(SchemaFormatIds.JsonSchema, BuiltinJsonSchemaFormatHandler.Draft202012, definition,
+                JsonSerializer.SerializeToElement(new { })));
+
+        var returned = formats.Single();
+        Assert.AreEqual(descriptor.Format, returned.Format);
+        Assert.AreEqual(descriptor.Provider, returned.Provider);
+        CollectionAssert.AreEqual(descriptor.Dialects.ToArray(), returned.Dialects.ToArray());
+        Assert.AreEqual(descriptor.Capabilities, returned.Capabilities);
+        Assert.IsTrue(definitionResult.IsValid);
+        Assert.IsTrue(instanceResult.IsValid);
+        CollectionAssert.AreEqual(new[]
+        {
+            (HttpMethod.Get, "/api/schemas/formats"),
+            (HttpMethod.Post, "/api/schemas/formats/validate-definition"),
+            (HttpMethod.Post, "/api/schemas/formats/validate-instance")
+        }, requests);
+    }
+
     private static SchemaResource Schema(ResourceScopeRef scope, ResourceNamespace @namespace) => new()
     {
         ApiVersion = ResourceApiVersions.CoreV1,
