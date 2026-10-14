@@ -1,0 +1,45 @@
+.schema-tree-item,
+.schema-tree-group {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.schema-tree-group { position: relative; }
+
+.schema-tree-node {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: .55rem;
+    color: var(--text);
+    cursor: pointer;
+    display: grid;
+    font: inherit;
+    gap: .45rem;
+    grid-template-columns: 1rem minmax(0, 1fr) auto;
+    margin: .1rem 0;
+    padding: .5rem .55rem .5rem calc(.55rem + (var(--schema-tree-depth) * 1rem));
+    text-align: left;
+    width: 100%;
+}
+
+.schema-tree-node:hover { background: var(--surface-2); }
+
+.schema-tree-node.is-selected {
+    background: var(--primary-soft);
+    box-shadow: inset 3px 0 0 var(--primary);
+    color: var(--primary);
+}
+
+.schema-tree-branch { color: var(--muted); text-align: center; }
+.schema-tree-name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.schema-tree-type {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    padding: .12rem .4rem;
+}

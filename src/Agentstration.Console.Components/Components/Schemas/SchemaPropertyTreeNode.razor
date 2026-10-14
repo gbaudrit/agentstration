@@ -1,0 +1,39 @@
+@using System.Text.Json.Nodes
+
+<li class="schema-tree-item" role="treeitem" aria-selected="@IsSelected" data-testid="schema-property-tree-item">
+    <button type="button" class="schema-tree-node @(IsSelected ? "is-selected" : null)"
+            style="--schema-tree-depth: @Depth" disabled="@Disabled"
+            data-testid="schema-property-node" @onclick="SelectAsync">
+        <span class="schema-tree-branch" aria-hidden="true">@(IsObject ? "⌄" : "·")</span>
+        <span class="schema-tree-name">@Name</span>
+        <span class="schema-tree-type">@Type</span>
+    </button>
+    @if (IsObject && Properties.Count > 0)
+    {
+        <ul class="schema-tree-group" role="group">
+            @foreach (var property in Properties)
+            {
+                var childSchema = (JsonObject)property.Value!;
+                <SchemaPropertyTreeNode @key="childSchema" ParentSchema="Schema" Name="@property.Key"
+                    Schema="childSchema" Depth="@(Depth + 1)" SelectedSchema="SelectedSchema"
+                    Disabled="Disabled" Selected="Selected" />
+            }
+        </ul>
+    }
+</li>
+
+@code {
+    [Parameter, EditorRequired] public JsonObject ParentSchema { get; set; } = null!;
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public JsonObject Schema { get; set; } = null!;
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public JsonObject? SelectedSchema { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback<SchemaPropertySelection> Selected { get; set; }
+
+    private string Type => Schema["type"]?.GetValue<string>() ?? "string";
+    private bool IsObject => Type == "object";
+    private bool IsSelected => ReferenceEquals(Schema, SelectedSchema);
+    private JsonObject Properties => Schema["properties"] as JsonObject ?? [];
+    private Task SelectAsync() => Selected.InvokeAsync(new(ParentSchema, Name, Schema, Depth));
+}

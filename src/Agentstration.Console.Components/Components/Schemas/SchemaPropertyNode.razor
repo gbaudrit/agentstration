@@ -1,7 +1,14 @@
 @using System.Text.Json.Nodes
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SchemaDocumentEditorStrings> Localizer
 
-<article class="schema-property-card" data-testid="schema-property-row" data-schema-depth="@Depth">
+<section class="schema-property-inspector" data-testid="schema-property-row">
+    <header class="schema-inspector-header">
+        <div><span class="eyebrow">@Localizer["SelectedProperty"]</span><h4>@Name</h4></div>
+        <div class="schema-order-actions" aria-label="@Localizer["PropertyOrder"]">
+            <button type="button" class="button-secondary button-compact" disabled="@(Disabled || !CanMoveUp)" data-testid="schema-property-move-up" @onclick="() => MoveAsync(-1)">↑ @Localizer["MoveUp"]</button>
+            <button type="button" class="button-secondary button-compact" disabled="@(Disabled || !CanMoveDown)" data-testid="schema-property-move-down" @onclick="() => MoveAsync(1)">↓ @Localizer["MoveDown"]</button>
+        </div>
+    </header>
     <div class="schema-property-grid">
         <label><span>@Localizer["PropertyName"]</span><input value="@Name" disabled="@Disabled" data-testid="schema-property-name" @onchange="RenameAsync" /></label>
         <label><span>@Localizer["Type"]</span><select value="@(Text(Schema, "type", "string"))" disabled="@Disabled" data-testid="schema-property-type" @onchange="ChangeTypeAsync">@foreach (var type in Types) { <option value="@type">@type</option> }</select></label>
@@ -20,31 +27,15 @@
             <label><span>@Localizer["MaximumLength"]</span><input type="number" min="0" value="@(Raw(Schema, "maxLength"))" disabled="@Disabled" @onchange="@(args => SetIntegerAsync("maxLength", args.Value?.ToString()))" /></label>
         }
     </div>
-
     @if (Text(Schema, "type") == "object")
     {
-        <details class="schema-property-children" open>
-            <summary>@Localizer["NestedProperties"]</summary>
-            <div class="schema-property-children-toolbar">
-                <label class="schema-additional-properties"><input type="checkbox" checked="@AdditionalProperties" disabled="@Disabled" @onchange="ChangeAdditionalPropertiesAsync" /> <span>@Localizer["AdditionalProperties"]</span></label>
-                <button type="button" class="button-secondary" disabled="@Disabled" data-testid="schema-add-child-property" @onclick="AddChildAsync">@Localizer["AddChildProperty"]</button>
-            </div>
-            <div class="schema-property-tree">
-                @if (Properties.Count == 0)
-                {
-                    <p class="muted">@Localizer["EmptyNestedProperties"]</p>
-                }
-                @foreach (var property in Properties)
-                {
-                    var childSchema = (JsonObject)property.Value!;
-                    <SchemaPropertyNode @key="childSchema" ParentSchema="Schema" Name="@property.Key" Schema="childSchema" Depth="@(Depth + 1)" Disabled="Disabled" Changed="Changed" Error="Error" />
-                }
-            </div>
-        </details>
+        <div class="schema-object-options">
+            <label class="schema-additional-properties"><input type="checkbox" checked="@AdditionalProperties" disabled="@Disabled" @onchange="ChangeAdditionalPropertiesAsync" /> <span>@Localizer["AdditionalProperties"]</span></label>
+            <button type="button" class="button-secondary" disabled="@Disabled" data-testid="schema-add-child-property" @onclick="AddChildAsync">@Localizer["AddChildProperty"]</button>
+        </div>
     }
-
-    <button type="button" class="text-button text-danger schema-remove-property" disabled="@Disabled" @onclick="RemoveAsync">@Localizer["Remove"]</button>
-</article>
+    <footer class="schema-inspector-footer"><button type="button" class="text-button text-danger" disabled="@Disabled" @onclick="RemoveAsync">@Localizer["Remove"]</button></footer>
+</section>
 
 @code {
     [Parameter, EditorRequired] public JsonObject ParentSchema { get; set; } = null!;
@@ -54,33 +45,39 @@
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public EventCallback Changed { get; set; }
     [Parameter] public EventCallback<string> Error { get; set; }
+    [Parameter] public EventCallback<SchemaPropertySelection?> SelectionChanged { get; set; }
 
     private static readonly string[] Types = ["string", "integer", "number", "boolean", "object", "array"];
-    private JsonObject Properties => Schema["properties"] as JsonObject ?? [];
     private bool AdditionalProperties => Schema["additionalProperties"]?.GetValue<bool>() ?? true;
+    private int PropertyIndex => EnsureProperties(ParentSchema).IndexOf(Name);
+    private bool CanMoveUp => PropertyIndex > 0;
+    private bool CanMoveDown => PropertyIndex >= 0 && PropertyIndex < EnsureProperties(ParentSchema).Count - 1;
 
     private async Task RenameAsync(ChangeEventArgs args)
     {
         var nextName = args.Value?.ToString()?.Trim();
-        if (string.IsNullOrWhiteSpace(nextName))
-        {
-            await Error.InvokeAsync(Localizer["PropertyNameRequired"]);
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(nextName)) { await Error.InvokeAsync(Localizer["PropertyNameRequired"]); return; }
         if (string.Equals(nextName, Name, StringComparison.Ordinal)) return;
-
         var properties = EnsureProperties(ParentSchema);
-        if (properties.ContainsKey(nextName))
-        {
-            await Error.InvokeAsync(Localizer["PropertyNameAlreadyExists", nextName]);
-            return;
-        }
-
+        if (properties.ContainsKey(nextName)) { await Error.InvokeAsync(Localizer["PropertyNameAlreadyExists", nextName]); return; }
+        var index = properties.IndexOf(Name);
         var required = IsRequired(ParentSchema, Name);
         properties.Remove(Name);
-        properties[nextName] = Schema;
+        properties.Insert(index, nextName, Schema);
         SetRequired(ParentSchema, Name, false);
         SetRequired(ParentSchema, nextName, required);
+        await SelectionChanged.InvokeAsync(new(ParentSchema, nextName, Schema, Depth));
+        await NotifyChangedAsync();
+    }
+
+    private async Task MoveAsync(int offset)
+    {
+        var properties = EnsureProperties(ParentSchema);
+        var current = properties.IndexOf(Name);
+        var target = current + offset;
+        if (current < 0 || target < 0 || target >= properties.Count) return;
+        properties.RemoveAt(current);
+        properties.Insert(target, Name, Schema);
         await NotifyChangedAsync();
     }
 
@@ -94,93 +91,52 @@
         await NotifyChangedAsync();
     }
 
-    private async Task ChangeRequiredAsync(ChangeEventArgs args)
-    {
-        SetRequired(ParentSchema, Name, args.Value is true);
-        await NotifyChangedAsync();
-    }
-
-    private async Task ChangeAdditionalPropertiesAsync(ChangeEventArgs args)
-    {
-        Schema["additionalProperties"] = args.Value is true;
-        await NotifyChangedAsync();
-    }
-
+    private async Task ChangeRequiredAsync(ChangeEventArgs args) { SetRequired(ParentSchema, Name, args.Value is true); await NotifyChangedAsync(); }
+    private async Task ChangeAdditionalPropertiesAsync(ChangeEventArgs args) { Schema["additionalProperties"] = args.Value is true; await NotifyChangedAsync(); }
     private async Task AddChildAsync()
     {
         var properties = EnsureProperties(Schema);
         var index = 1;
         while (properties.ContainsKey($"field{index}")) index++;
-        properties[$"field{index}"] = new JsonObject { ["type"] = "string" };
+        var name = $"field{index}";
+        var child = new JsonObject { ["type"] = "string" };
+        properties[name] = child;
+        await SelectionChanged.InvokeAsync(new(Schema, name, child, Depth + 1));
         await NotifyChangedAsync();
     }
-
     private async Task RemoveAsync()
     {
         EnsureProperties(ParentSchema).Remove(Name);
         SetRequired(ParentSchema, Name, false);
+        await SelectionChanged.InvokeAsync(null);
         await NotifyChangedAsync();
     }
-
-    private async Task SetTextAsync(string keyword, string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) Schema.Remove(keyword); else Schema[keyword] = value;
-        await NotifyChangedAsync();
-    }
-
+    private async Task SetTextAsync(string keyword, string? value) { if (string.IsNullOrWhiteSpace(value)) Schema.Remove(keyword); else Schema[keyword] = value; await NotifyChangedAsync(); }
     private async Task SetJsonAsync(string keyword, string? value)
     {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(value)) Schema.Remove(keyword); else Schema[keyword] = JsonNode.Parse(value);
-            await NotifyChangedAsync();
-        }
-        catch (JsonException exception)
-        {
-            await Error.InvokeAsync(Localizer["InvalidJson", exception.Message]);
-        }
+        try { if (string.IsNullOrWhiteSpace(value)) Schema.Remove(keyword); else Schema[keyword] = JsonNode.Parse(value); await NotifyChangedAsync(); }
+        catch (JsonException exception) { await Error.InvokeAsync(Localizer["InvalidJson", exception.Message]); }
     }
-
     private async Task SetEnumAsync(ChangeEventArgs args)
     {
         var values = (args.Value?.ToString() ?? string.Empty).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (values.Length == 0) Schema.Remove("enum");
-        else Schema["enum"] = new JsonArray(values.Select(item => (JsonNode?)JsonValue.Create(item)).ToArray());
+        if (values.Length == 0) Schema.Remove("enum"); else Schema["enum"] = new JsonArray(values.Select(item => (JsonNode?)JsonValue.Create(item)).ToArray());
         await NotifyChangedAsync();
     }
-
-    private Task SetNumberAsync(string keyword, string? value) => SetNumericAsync(keyword, value, integer: false);
-    private Task SetIntegerAsync(string keyword, string? value) => SetNumericAsync(keyword, value, integer: true);
-
+    private Task SetNumberAsync(string keyword, string? value) => SetNumericAsync(keyword, value, false);
+    private Task SetIntegerAsync(string keyword, string? value) => SetNumericAsync(keyword, value, true);
     private async Task SetNumericAsync(string keyword, string? value, bool integer)
     {
         if (string.IsNullOrWhiteSpace(value)) Schema.Remove(keyword);
-        else if (integer && int.TryParse(value, System.Globalization.NumberStyles.Integer,
-            System.Globalization.CultureInfo.InvariantCulture, out var whole)) Schema[keyword] = whole;
-        else if (!integer && decimal.TryParse(value, System.Globalization.NumberStyles.Number,
-            System.Globalization.CultureInfo.InvariantCulture, out var number)) Schema[keyword] = number;
+        else if (integer && int.TryParse(value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var whole)) Schema[keyword] = whole;
+        else if (!integer && decimal.TryParse(value, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var number)) Schema[keyword] = number;
         else return;
         await NotifyChangedAsync();
     }
 
-    private async Task NotifyChangedAsync()
-    {
-        await Error.InvokeAsync(string.Empty);
-        await Changed.InvokeAsync();
-    }
-
-    private static JsonObject EnsureProperties(JsonObject schema)
-    {
-        if (schema["properties"] is JsonObject properties) return properties;
-        properties = [];
-        schema["type"] ??= "object";
-        schema["properties"] = properties;
-        return properties;
-    }
-
-    private static bool IsRequired(JsonObject parent, string name) => parent["required"] is JsonArray required
-        && required.Any(item => string.Equals(item?.GetValue<string>(), name, StringComparison.Ordinal));
-
+    private async Task NotifyChangedAsync() { await Error.InvokeAsync(string.Empty); await Changed.InvokeAsync(); }
+    private static JsonObject EnsureProperties(JsonObject schema) { if (schema["properties"] is JsonObject properties) return properties; properties = []; schema["type"] ??= "object"; schema["properties"] = properties; return properties; }
+    private static bool IsRequired(JsonObject parent, string name) => parent["required"] is JsonArray required && required.Any(item => string.Equals(item?.GetValue<string>(), name, StringComparison.Ordinal));
     private static void SetRequired(JsonObject parent, string name, bool required)
     {
         var values = parent["required"] as JsonArray ?? [];
@@ -189,10 +145,7 @@
         if (!required && existing is not null) values.Remove(existing);
         if (values.Count == 0) parent.Remove("required"); else parent["required"] = values;
     }
-
-    private static string? Text(JsonObject schema, string name, string? fallback = null) =>
-        schema[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : fallback;
+    private static string? Text(JsonObject schema, string name, string? fallback = null) => schema[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : fallback;
     private static string Raw(JsonObject schema, string name) => schema[name]?.ToJsonString() ?? string.Empty;
-    private static string EnumText(JsonObject schema) => schema["enum"] is JsonArray values
-        ? string.Join(Environment.NewLine, values.Select(value => value?.GetValue<string>())) : string.Empty;
+    private static string EnumText(JsonObject schema) => schema["enum"] is JsonArray values ? string.Join(Environment.NewLine, values.Select(value => value?.GetValue<string>())) : string.Empty;
 }

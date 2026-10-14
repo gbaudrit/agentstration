@@ -4,7 +4,7 @@ A Schema is a reusable, scoped contract resource. Its identity, ownership scope,
 
 The Console Schema library is available under **Design > Schemas**. A definition can be edited in three modes:
 
-- **Visual** authors a recursive object-property tree with editable property names, primitive and collection types, required fields, descriptions, defaults, string enums, and basic numeric or string bounds.
+- **Visual** uses a compact recursive property tree and a single inspector for the selected node. Properties can be renamed, reordered among siblings, nested under objects, marked as required, and configured with primitive or collection types, descriptions, defaults, string enums, and basic numeric or string bounds.
 - **Source** uses the local Monaco editor and preserves the complete native document.
 - **Preview** renders a sample instance form and validates the sample against the current definition.
 

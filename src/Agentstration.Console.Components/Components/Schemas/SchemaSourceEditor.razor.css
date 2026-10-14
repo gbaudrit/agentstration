@@ -1,5 +1,5 @@
 .schema-source-monaco {
-    border: 1px solid var(--border-subtle);
+    border: 1px solid var(--border);
     border-radius: .75rem;
     min-height: 30rem;
     overflow: hidden;

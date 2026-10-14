@@ -26,20 +26,46 @@
     {
         <div class="schema-visual-editor" role="tabpanel" data-testid="schema-visual-editor" hidden="@(mode != EditorMode.Visual)">
             <div class="schema-visual-heading">
-                <h3>@Localizer["Properties"]</h3>
+                <div><h3>@Localizer["Properties"]</h3><p class="muted">@Localizer["PropertyTreeHelp"]</p></div>
                 <button type="button" class="button-secondary" disabled="@Disabled" data-testid="schema-add-property" @onclick="AddPropertyAsync">@Localizer["AddProperty"]</button>
             </div>
-            <label class="schema-additional-properties"><input type="checkbox" checked="@AdditionalProperties" disabled="@Disabled" @onchange="ChangeAdditionalPropertiesAsync" /> <span>@Localizer["AdditionalProperties"]</span></label>
-            @if (Properties.Count == 0)
-            {
-                <p class="muted">@Localizer["EmptyProperties"]</p>
-            }
-            <div class="schema-property-tree schema-property-tree-root">
-                @foreach (var property in Properties)
-                {
-                    var propertySchema = (JsonObject)property.Value!;
-                    <SchemaPropertyNode @key="propertySchema" ParentSchema="document" Name="@property.Key" Schema="propertySchema" Disabled="Disabled" Changed="PublishAsync" Error="SetEditorError" />
-                }
+            <div class="schema-visual-workbench">
+                <aside class="schema-tree-panel">
+                    <label class="schema-additional-properties"><input type="checkbox" checked="@AdditionalProperties" disabled="@Disabled" @onchange="ChangeAdditionalPropertiesAsync" /> <span>@Localizer["AdditionalProperties"]</span></label>
+                    @if (Properties.Count == 0)
+                    {
+                        <p class="muted schema-tree-empty">@Localizer["EmptyProperties"]</p>
+                    }
+                    else
+                    {
+                        <ul class="schema-property-tree" role="tree" aria-label="@Localizer["PropertyTree"]">
+                            @foreach (var property in Properties)
+                            {
+                                var propertySchema = (JsonObject)property.Value!;
+                                <SchemaPropertyTreeNode @key="propertySchema" ParentSchema="document" Name="@property.Key"
+                                    Schema="propertySchema" SelectedSchema="selectedProperty?.Schema" Disabled="Disabled"
+                                    Selected="SelectProperty" />
+                            }
+                        </ul>
+                    }
+                </aside>
+                <main class="schema-inspector-panel">
+                    @if (selectedProperty is not null)
+                    {
+                        <SchemaPropertyNode @key="selectedProperty.Schema" ParentSchema="selectedProperty.ParentSchema"
+                            Name="@selectedProperty.Name" Schema="selectedProperty.Schema" Depth="selectedProperty.Depth"
+                            Disabled="Disabled" Changed="PublishAsync" Error="SetEditorError"
+                            SelectionChanged="SelectProperty" />
+                    }
+                    else
+                    {
+                        <div class="schema-inspector-empty" data-testid="schema-property-empty-selection">
+                            <span aria-hidden="true">↖</span>
+                            <strong>@Localizer["SelectProperty"]</strong>
+                            <p class="muted">@Localizer["SelectPropertyHelp"]</p>
+                        </div>
+                    }
+                </main>
             </div>
         </div>
     }
@@ -60,7 +86,7 @@
     {
         <div role="tabpanel" class="schema-definition-source" hidden="@(mode != EditorMode.Source)">
             <label><span>@Localizer["DefinitionSource"]</span></label>
-            <SchemaSourceEditor Value="source" ValueChanged="value => source = value" ReadOnly="Disabled" />
+            <SchemaSourceEditor Value="@source" ValueChanged="value => source = value" ReadOnly="Disabled" />
             <div class="form-actions"><button type="button" class="button-secondary" disabled="@Disabled" data-testid="schema-apply-source" @onclick="ApplySourceAsync">@Localizer["ApplySource"]</button></div>
         </div>
     }
@@ -87,6 +113,7 @@
     private JsonElement previewValue = JsonSerializer.SerializeToElement(new { });
     private EditorMode mode = EditorMode.Visual;
     private bool visualSupported, sourceActivated;
+    private SchemaPropertySelection? selectedProperty;
     private bool IsJsonSchema => string.Equals(Format, SchemaFormatIds.JsonSchema, StringComparison.Ordinal);
     private bool CanPreview => IsJsonSchema && (Descriptor?.Capabilities.HasFlag(SchemaFormatCapabilities.InstancePreview) ?? true);
     private JsonObject Properties => document["properties"] as JsonObject ?? [];
@@ -100,6 +127,7 @@
         source = Pretty(nextKey);
         document = JsonNode.Parse(nextKey) as JsonObject ?? [];
         visualSupported = IsJsonSchema && SupportsVisual(document);
+        selectedProperty = FirstProperty(document);
         if (!visualSupported && mode == EditorMode.Visual)
         {
             mode = EditorMode.Source;
@@ -139,6 +167,7 @@
         var index = 1;
         while (properties.ContainsKey($"field{index}")) index++;
         properties[$"field{index}"] = new JsonObject { ["type"] = "string" };
+        selectedProperty = new(document, $"field{index}", (JsonObject)properties[$"field{index}"]!, 0);
         await PublishAsync();
     }
 
@@ -149,6 +178,7 @@
     }
 
     private void SetEditorError(string message) => sourceError = string.IsNullOrEmpty(message) ? null : message;
+    private void SelectProperty(SchemaPropertySelection? selection) => selectedProperty = selection;
 
     private async Task PublishAsync()
     {
@@ -193,6 +223,13 @@
         document["type"] ??= "object";
         document["properties"] = properties;
         return properties;
+    }
+
+    private static SchemaPropertySelection? FirstProperty(JsonObject schema)
+    {
+        if (schema["properties"] is not JsonObject properties || properties.Count == 0) return null;
+        var first = properties.First();
+        return first.Value is JsonObject value ? new(schema, first.Key, value, 0) : null;
     }
 
     private static bool SupportsVisual(JsonObject schema)

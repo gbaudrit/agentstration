@@ -218,7 +218,7 @@ public sealed class SchemaConsoleTests
         rendered.Find("[data-testid='schema-property-type']").Change("object");
         rendered.Find("[data-testid='schema-property-name']").Change("address");
         rendered.Find("[data-testid='schema-add-child-property']").Click();
-        rendered.FindAll("[data-testid='schema-property-name']")[1].Change("city");
+        rendered.Find("[data-testid='schema-property-name']").Change("city");
         rendered.Find("[data-testid='schema-save']").Click();
 
         rendered.WaitForAssertion(() =>
@@ -227,6 +227,43 @@ public sealed class SchemaConsoleTests
             Assert.AreEqual("object", address.GetProperty("type").GetString());
             Assert.AreEqual("string", address.GetProperty("properties").GetProperty("city").GetProperty("type").GetString());
         });
+    }
+
+    [TestMethod]
+    public void DefinitionEditorReordersSiblingProperties()
+    {
+        const string content = "{\"type\":\"object\",\"properties\":{\"first\":{\"type\":\"string\"},\"second\":{\"type\":\"number\"}}}";
+        var client = new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema, content)]);
+        using var context = Context(client);
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
+        var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+
+        rendered.WaitForElement("[data-testid='schema-tab-definition']").Click();
+        rendered.FindAll("[data-testid='schema-property-node']")[1].Click();
+        rendered.Find("[data-testid='schema-property-move-up']").Click();
+        rendered.Find("[data-testid='schema-save']").Click();
+
+        rendered.WaitForAssertion(() => CollectionAssert.AreEqual(
+            new[] { "second", "first" },
+            client.UpdatedProperties!.Content.GetProperty("properties").EnumerateObject().Select(value => value.Name).ToArray()));
+    }
+
+    [TestMethod]
+    public void SourceEditorReceivesTheCurrentDefinition()
+    {
+        const string content = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}}}";
+        using var context = Context(new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema, content)]));
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
+        var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+
+        rendered.WaitForElement("[data-testid='schema-tab-definition']").Click();
+        rendered.Find("[data-testid='schema-definition-source-mode']").Click();
+
+        var source = rendered.FindComponent<SchemaSourceEditor>().Instance.Value;
+        StringAssert.Contains(source, "\"properties\"");
+        StringAssert.Contains(source, "\"name\"");
     }
 
     [TestMethod]
