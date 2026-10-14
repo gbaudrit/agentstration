@@ -46,9 +46,10 @@ public sealed class FlowDetailsDesignerTests
         };
 
         var rendered = context.Render<RunGrid>(parameters => parameters.Add(component => component.Runs, [run]));
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunsStrings>>();
 
         var headers = rendered.FindAll("thead th").Select(header => header.TextContent.Trim()).ToArray();
-        Assert.AreEqual("Status", headers[2]);
+        Assert.AreEqual(strings["Status"].Value, headers[2]);
         var link = rendered.Find("tbody .resource-name-link");
         Assert.AreEqual("multi-agent-review", link.TextContent.Trim());
         Assert.AreEqual("/flow-runs/flowrun-review-1", link.GetAttribute("href"));
@@ -73,9 +74,10 @@ public sealed class FlowDetailsDesignerTests
         context.Services.AddSingleton<IFlowApiClient>(client);
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Flows>();
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowsStrings>>();
 
         var headers = rendered.FindAll("thead th").Select(header => header.TextContent.Trim()).ToArray();
-        Assert.AreEqual("Status", headers[2]);
+        Assert.AreEqual(strings["Status"].Value, headers[2]);
         var link = rendered.Find("tbody .resource-name-link");
         Assert.AreEqual("Multi-agent review", link.TextContent.Trim());
         Assert.AreEqual("/namespaces/samples/flows/review", link.GetAttribute("href"));

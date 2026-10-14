@@ -50,7 +50,7 @@ export const exerciseFlowNamedOutputs: Journey<ExerciseFlowNamedOutputsInput> = 
   });
   await context.checkpoint({ name: Checkpoints.flowNamedOutputs.outputsAuthored, page: context.pages.page, target: designer.designer });
 
-  await designer.dragNamedOutputToInput('Child review', 'approved', 'Approved parent');
+  await designer.addTransition('review', 'approved', 'approved-parent');
   await designer.expectTransition('review —approved→ approved-parent');
   await designer.selectTransition('review —approved→ approved-parent');
   await designer.setSelectedTransitionPriority(7);
@@ -66,7 +66,7 @@ export const exerciseFlowNamedOutputs: Journey<ExerciseFlowNamedOutputsInput> = 
   await designer.redo();
   await designer.expectTransition('review —rejected→ final-approved');
 
-  await designer.dragNamedOutputToInput('Child review', 'provider-error', 'Error parent');
+  await designer.addTransition('review', 'provider-error', 'error-parent');
   await designer.expectTransition('review —provider-error→ error-parent');
   await designer.expectInvalidDropDoesNotChangeTransitionCount('Child review');
   await designer.validate();

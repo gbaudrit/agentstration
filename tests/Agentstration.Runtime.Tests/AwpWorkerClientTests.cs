@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Agentstration.Awp.Abstractions;
 using Agentstration.Identity.Contracts;
@@ -119,6 +120,53 @@ public sealed class AwpWorkerClientTests
         Assert.AreEqual(2, session.LastEventSequence);
     }
 
+    [TestMethod]
+    public async Task ModelStreamPreservesOrderedTypedEvents()
+    {
+        using var credential = Credential();
+        var handler = new ModelStreamHandler(includeTerminal: true);
+        using var client = new AwpClient(new Uri("https://authority.test"), credential,
+            new(Guid.NewGuid()), TimeProvider.System, 0, handler);
+
+        var events = new List<AwpModelStreamEvent>();
+        await foreach (var streamEvent in client.StreamModelAsync(ModelRequest(client), CancellationToken.None))
+            events.Add(streamEvent);
+
+        Assert.HasCount(5, events);
+        Assert.IsInstanceOfType<AwpModelStreamStarted>(events[0]);
+        Assert.AreEqual("hel", Assert.IsInstanceOfType<AwpModelTextDelta>(events[1]).Text);
+        Assert.AreEqual("lo", Assert.IsInstanceOfType<AwpModelTextDelta>(events[2]).Text);
+        Assert.IsInstanceOfType<AwpModelUsage>(events[3]);
+        Assert.IsInstanceOfType<AwpModelStreamCompleted>(events[4]);
+        CollectionAssert.AreEqual(new long[] { 0, 1, 2, 3, 4 },
+            events.Select(streamEvent => streamEvent.SequenceNumber).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ModelStreamRejectsMissingTerminalEvent()
+    {
+        using var credential = Credential();
+        using var client = new AwpClient(new Uri("https://authority.test"), credential,
+            new(Guid.NewGuid()), TimeProvider.System, 0, new ModelStreamHandler(includeTerminal: false));
+
+        var exception = await Assert.ThrowsExactlyAsync<AwpModelStreamException>(async () =>
+        {
+            await foreach (var _ in client.StreamModelAsync(ModelRequest(client), CancellationToken.None)) { }
+        });
+
+        Assert.AreEqual("incomplete_response", exception.Code);
+    }
+
+    private static AwpClientCredential Credential() => new(
+        Guid.NewGuid(), Guid.NewGuid(), "test-instance",
+        Encoding.UTF8.GetBytes("test-worker-secret-material-at-least-32-bytes"));
+
+    private static AwpInvokeModelRequest ModelRequest(AwpClient client) => new(
+        new(client.WorkerId, client.SessionId, new(Guid.NewGuid(), Guid.NewGuid().ToString("D")),
+            new(Guid.NewGuid()), new(Guid.NewGuid()), "ownership-token", 1),
+        "agent", new(Guid.NewGuid()), new(Guid.NewGuid()),
+        [new("user", [new AwpModelTextContent("Hello")])]);
+
     private static AwpRunAssignment Assignment(DateTimeOffset expiresAt) => new(
         new(Guid.NewGuid()), new(Guid.NewGuid()), new(Guid.NewGuid(), Guid.NewGuid().ToString("D")),
         new AwpDirectAgentRunTarget("run-1"), new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", "1.0"),
@@ -203,6 +251,36 @@ public sealed class AwpWorkerClientTests
                     now,
                     new(now, now.AddSeconds(45), AwpCancellationDirective.None)),
                     options: AwpProtocol.JsonOptions)
+            };
+        }
+    }
+
+    private sealed class ModelStreamHandler(bool includeTerminal) : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Assert.AreEqual(AwpProtocol.StreamModelPath, request.RequestUri!.AbsolutePath);
+            Assert.AreEqual("text/event-stream", request.Headers.Accept.Single().MediaType);
+            var envelope = await request.Content!.ReadFromJsonAsync<AwpEnvelope<AwpInvokeModelRequest>>(
+                AwpProtocol.JsonOptions, cancellationToken);
+            var streamId = Guid.NewGuid();
+            var now = DateTimeOffset.UtcNow;
+            var events = new List<AwpModelStreamEvent>
+            {
+                new AwpModelStreamStarted(streamId, 0, now),
+                new AwpModelTextDelta(streamId, 1, now, "hel", "model", "provider"),
+                new AwpModelTextDelta(streamId, 2, now, "lo", "model", "provider"),
+                new AwpModelUsage(streamId, 3, now, 2, 1)
+            };
+            if (includeTerminal)
+                events.Add(new AwpModelStreamCompleted(streamId, 4, now, "model", "provider", "stop"));
+            var frames = string.Concat(events.Select(streamEvent =>
+                $"data: {JsonSerializer.Serialize(new AwpEnvelope<AwpModelStreamEvent>(
+                    AwpProtocol.Version, envelope!.MessageId, now, streamEvent), AwpProtocol.JsonOptions)}\n\n"));
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(frames, Encoding.UTF8, "text/event-stream")
             };
         }
     }

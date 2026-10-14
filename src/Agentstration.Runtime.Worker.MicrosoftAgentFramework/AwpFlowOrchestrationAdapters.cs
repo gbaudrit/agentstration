@@ -113,8 +113,29 @@ internal sealed class AwpFlowChatClientResolver(
             IEnumerable<ChatMessage> messages, ChatOptions? options = null,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            var response = await GetResponseAsync(messages, options, cancellationToken);
-            foreach (var update in response.ToChatResponseUpdates()) yield return update;
+            var turn = await coordinator.OpenTurnAsync(agent.ParticipantId, cancellationToken);
+            using var client = new AwpModelChatClient(session, agent, turn);
+            var updates = new List<ChatResponseUpdate>();
+            await foreach (var update in client.GetStreamingResponseAsync(messages, options, cancellationToken))
+            {
+                updates.Add(update);
+                if (!string.IsNullOrEmpty(update.Text))
+                    await session.AppendEventAsync(AwpExecutionEventKind.ResponseDelta,
+                        new(runId, await coordinator.StepAsync(agent.ParticipantId, cancellationToken), turn),
+                        JsonSerializer.SerializeToElement(new
+                        {
+                            participantId = agent.ParticipantId,
+                            content = update.Text
+                        }), null, cancellationToken);
+                yield return update;
+            }
+
+            var response = updates.ToChatResponse();
+            coordinator.CaptureCalls(agent.ParticipantId, turn, response);
+            await session.AppendEventAsync(AwpExecutionEventKind.TurnCompleted,
+                new(runId, await coordinator.StepAsync(agent.ParticipantId, cancellationToken), turn),
+                JsonSerializer.SerializeToElement(new { participantId = agent.ParticipantId }), null,
+                cancellationToken);
         }
 
         public object? GetService(Type serviceType, object? serviceKey = null) =>

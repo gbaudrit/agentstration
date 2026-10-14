@@ -13,14 +13,18 @@
   <data name="Mode.Designer"><value>Designer</value></data>
   <data name="Mode.Definition"><value>Definition</value></data>
   <data name="Mode.Split"><value>Split</value></data>
+  <data name="EditorModes"><value>Designer view modes</value></data>
   <data name="Undo"><value>Undo</value></data><data name="Redo"><value>Redo</value></data>
-  <data name="Validate"><value>Validate</value></data><data name="RunDraft"><value>Run draft</value></data><data name="RunningDraft"><value>Starting draft run…</value></data>
+  <data name="Validate"><value>Check</value></data><data name="RunDraft"><value>Run draft</value></data><data name="RunningDraft"><value>Starting draft run…</value></data>
   <data name="Save"><value>Save</value></data><data name="Version"><value>Version</value></data>
+  <data name="MoreActions"><value>More actions</value></data>
   <data name="PublishVersion"><value>Publish version</value></data><data name="Publish"><value>Publish</value></data><data name="Publishing"><value>Publishing…</value></data>
   <data name="ActionFailed"><value>Action could not be completed</value></data><data name="DismissError"><value>Dismiss error</value></data>
   <data name="PublishVersionExists"><value>Version {0} is already published. Choose another version.</value></data><data name="InvalidSourceBeforePublish"><value>Correct the YAML definition errors before publishing.</value></data>
   <data name="Steps"><value>Steps</value></data>
+  <data name="StepPalette"><value>Step palette</value></data><data name="ShowStepPalette"><value>Show step palette</value></data><data name="HideStepPalette"><value>Hide step palette</value></data><data name="CloseStepPalette"><value>Close step palette</value></data>
   <data name="ViewControls"><value>View</value></data>
+  <data name="WorkspaceControls"><value>Designer workspace controls</value></data><data name="ShowInspector"><value>Show inspector</value></data><data name="HideInspector"><value>Hide inspector</value></data><data name="CloseInspector"><value>Close inspector</value></data><data name="EnterFocusMode"><value>Enter full screen mode</value></data><data name="ExitFocusMode"><value>Exit</value></data>
   <data name="Step.input"><value>Input</value></data><data name="Step.agent"><value>Agent</value></data>
   <data name="Step.router"><value>Router</value></data><data name="Step.condition"><value>Condition</value></data>
   <data name="Step.transform"><value>Transform</value></data><data name="Step.output"><value>Output</value></data>
@@ -52,9 +56,9 @@
   <data name="Transitions"><value>Transitions</value></data><data name="From"><value>From</value></data><data name="Event"><value>Event</value></data><data name="To"><value>To</value></data><data name="AddTransition"><value>Add transition</value></data>
   <data name="TransitionDetails"><value>Selected transition</value></data><data name="TransitionId"><value>Transition ID</value></data><data name="TransitionCondition"><value>Condition</value></data><data name="TransitionPriority"><value>Priority</value></data><data name="DeleteTransition"><value>Delete transition</value></data><data name="DeleteTransitionNamed"><value>Delete transition {0}</value></data>
   <data name="InputConnectionHandle"><value>Incoming transition handle</value></data><data name="OutputConnectionHandle"><value>Outgoing transition handle</value></data><data name="NamedOutputConnectionHandle"><value>Outgoing {0} transition handle</value></data><data name="NamedOutputConnectionHandleWithOutcome"><value>Outgoing {0} transition handle ({1})</value></data>
-  <data name="Validation"><value>Validation</value></data><data name="IssueCount.One"><value>{0} issue</value></data><data name="IssueCount.Many"><value>{0} issues</value></data>
+  <data name="Validation"><value>Verification</value></data><data name="RunValidation"><value>Run verification</value></data><data name="ShowValidationDetails"><value>Show verification details</value></data><data name="HideValidationDetails"><value>Hide verification details</value></data><data name="IssueCount.One"><value>{0} issue</value></data><data name="IssueCount.Many"><value>{0} issues</value></data>
   <data name="PublishedDefinitionHelp"><value>This published definition is displayed without creating a Draft.</value></data>
-  <data name="ValidationHelp"><value>Validate the Draft to check structure, reachability, expressions and resources.</value></data>
+  <data name="ValidationHelp"><value>Check the Draft structure, reachability, expressions and resources.</value></data>
   <data name="RunDraftRevision"><value>Run Draft revision {0}</value></data><data name="InputJson"><value>Input JSON</value></data><data name="Cancel"><value>Cancel</value></data>
   <data name="SaveState.Saving"><value>Saving…</value></data><data name="SaveState.UnsavedChanges"><value>Unsaved changes</value></data><data name="SaveState.SaveFailed"><value>Save failed</value></data><data name="SaveState.Saved"><value>Saved</value></data>
   <data name="FlowDiagram"><value>Flow diagram</value></data><data name="DiagramZoomControls"><value>Diagram zoom controls</value></data>

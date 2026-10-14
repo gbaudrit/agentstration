@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Agentstration.Runtime.Abstractions;
 
@@ -122,6 +123,40 @@ public sealed class RuntimeWorkerExecutionService(
             : new RuntimeExecutionOptions();
         return await operations.InvokeModelAsync(new RuntimeGovernedModelRequest(
             agent, messages, options, material.TenantId, material.WorkspaceId, material.PrincipalId), lease.Token);
+    }
+
+    public async Task<IAsyncEnumerable<RuntimeGovernedModelUpdate>> StreamModelAsync(
+        RuntimeAssignmentOwnershipProof proof,
+        string participantId,
+        Guid turnId,
+        Guid turnAttemptId,
+        IReadOnlyList<RuntimeGovernedModelMessage> messages,
+        CancellationToken cancellationToken)
+    {
+        if (messages.Count is < 1 or > 256 || ModelPayloadLength(messages) > 1_048_576)
+            throw new RuntimeExecutionMaterialException("model_request_too_large",
+                "A model request must contain between 1 and 256 messages and cannot exceed 1 MiB.");
+        var (authorization, material, agent) = await AuthorizeParticipantSideEffectAsync(
+            proof, participantId, turnId, cancellationToken);
+        _ = authorization.Assignment.Turns.SingleOrDefault(value => value.Id == turnId
+            && value.AttemptId == turnAttemptId && string.Equals(value.ParticipantId, participantId, StringComparison.Ordinal))
+            ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid",
+                "The model stream does not reference an authorized Turn and TurnAttempt.");
+        var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
+        try
+        {
+            var options = material is RuntimeDirectAgentExecutionMaterial direct
+                ? direct.Execution
+                : new RuntimeExecutionOptions();
+            var stream = operations.StreamModelAsync(new RuntimeGovernedModelRequest(
+                agent, messages, options, material.TenantId, material.WorkspaceId, material.PrincipalId), lease.Token);
+            return GuardStream(stream, lease, cancellationToken);
+        }
+        catch
+        {
+            lease.Dispose();
+            throw;
+        }
     }
 
     public async Task<JsonElement?> InvokeToolAsync(
@@ -325,4 +360,16 @@ public sealed class RuntimeWorkerExecutionService(
             RuntimeGovernedModelToolResult result => (long)result.CallId.Length + result.Result.GetRawText().Length,
             _ => 0L
         });
+
+    private static async IAsyncEnumerable<RuntimeGovernedModelUpdate> GuardStream(
+        IAsyncEnumerable<RuntimeGovernedModelUpdate> stream,
+        RuntimeAssignmentLeaseGuard lease,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        using (lease)
+        {
+            await foreach (var update in stream.WithCancellation(cancellationToken))
+                yield return update;
+        }
+    }
 }
