@@ -163,6 +163,73 @@ public sealed class SchemaConsoleTests
     }
 
     [TestMethod]
+    public void DefinitionEditorRenamesAPropertyAndItsRequiredReference()
+    {
+        const string content = "{\"type\":\"object\",\"properties\":{\"field1\":{\"type\":\"string\"}},\"required\":[\"field1\"]}";
+        var client = new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema, content)]);
+        using var context = Context(client);
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
+        var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+
+        rendered.WaitForElement("[data-testid='schema-tab-definition']").Click();
+        rendered.Find("[data-testid='schema-property-name']").Change("customerName");
+        rendered.Find("[data-testid='schema-save']").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var updated = client.UpdatedProperties!.Content;
+            Assert.IsTrue(updated.GetProperty("properties").TryGetProperty("customerName", out _));
+            Assert.IsFalse(updated.GetProperty("properties").TryGetProperty("field1", out _));
+            CollectionAssert.AreEqual(new[] { "customerName" }, updated.GetProperty("required")
+                .EnumerateArray().Select(value => value.GetString()).ToArray());
+        });
+    }
+
+    [TestMethod]
+    public void DefinitionEditorRejectsDuplicatePropertyNamesAtTheSameLevel()
+    {
+        const string content = "{\"type\":\"object\",\"properties\":{\"first\":{\"type\":\"string\"},\"second\":{\"type\":\"string\"}}}";
+        using var context = Context(new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema, content)]));
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
+        var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+
+        rendered.WaitForElement("[data-testid='schema-tab-definition']").Click();
+        rendered.Find("[data-testid='schema-property-name']").Change("second");
+
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[role='alert']")));
+        var properties = rendered.FindComponent<SchemaDocumentEditor>().Instance.Value.GetProperty("properties");
+        Assert.IsTrue(properties.TryGetProperty("first", out _));
+        Assert.IsTrue(properties.TryGetProperty("second", out _));
+    }
+
+    [TestMethod]
+    public void DefinitionEditorBuildsNestedObjectProperties()
+    {
+        var client = new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema)]);
+        using var context = Context(client);
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
+        var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+
+        rendered.WaitForElement("[data-testid='schema-tab-definition']").Click();
+        rendered.Find("[data-testid='schema-add-property']").Click();
+        rendered.Find("[data-testid='schema-property-type']").Change("object");
+        rendered.Find("[data-testid='schema-property-name']").Change("address");
+        rendered.Find("[data-testid='schema-add-child-property']").Click();
+        rendered.FindAll("[data-testid='schema-property-name']")[1].Change("city");
+        rendered.Find("[data-testid='schema-save']").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var address = client.UpdatedProperties!.Content.GetProperty("properties").GetProperty("address");
+            Assert.AreEqual("object", address.GetProperty("type").GetString());
+            Assert.AreEqual("string", address.GetProperty("properties").GetProperty("city").GetProperty("type").GetString());
+        });
+    }
+
+    [TestMethod]
     public void ComplexJsonSchemaUsesSourceOnlyWithoutChangingTheDocument()
     {
         const string advanced = "{\"type\":\"object\",\"oneOf\":[{\"required\":[\"email\"]},{\"required\":[\"phone\"]}]}";
