@@ -66,10 +66,35 @@ public sealed class FlowToolExecutorTests
         Assert.HasCount(0, pipeline.Contexts);
     }
 
+    [TestMethod]
+    public async Task ToolSetRouteExecutesTheExactPinnedToolAndFailsClosedWhenItIsStale()
+    {
+        var store = await StoreAsync();
+        var pipeline = new RecordingPipeline();
+        var executor = new ManagedFlowToolExecutor(store, pipeline);
+        var request = Request(JsonSerializer.SerializeToElement(new { message = "hello" }), 1) with
+        {
+            Route = Route()
+        };
+
+        _ = await executor.ExecuteAsync(request, default);
+        var context = pipeline.Contexts.Single();
+        Assert.AreEqual(WorkspaceScope, context.ToolScopeRef);
+        Assert.AreEqual(WorkspaceScope, context.ToolProviderScopeRef);
+        Assert.AreEqual(Route().ToolUid, context.ToolUid);
+        Assert.AreEqual(Route().ProviderUid, context.ToolProviderUid);
+
+        var exception = await Assert.ThrowsExactlyAsync<FlowValidationException>(() =>
+            executor.ExecuteAsync(request with { Route = Route() with { ToolGeneration = 3 } }, default));
+        Assert.AreEqual("tool_set_member_stale", exception.Code);
+    }
+
     private static readonly FlowRunScope Scope = new(
         Guid.Parse("11111111-1111-1111-1111-111111111111"),
         new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222")),
         Guid.Parse("33333333-3333-3333-3333-333333333333"));
+    private static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(Scope.WorkspaceId.Value);
+    private static readonly Guid ProviderUid = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
     private static FlowToolExecutionRequest Request(JsonElement arguments, int attempt) => new(
         Scope,
@@ -81,6 +106,25 @@ public sealed class FlowToolExecutorTests
         new("notification.send"),
         arguments);
 
+    private static ResolvedFlowToolRoute Route() => new(
+        new("notification.send"),
+        "notifications",
+        ResourceNamespace.Default,
+        "1.0.0",
+        "notification.create",
+        "default",
+        WorkspaceScope,
+        Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        4,
+        "internal",
+        ResourceNamespace.Default,
+        WorkspaceScope,
+        ProviderUid,
+        2,
+        Tool().Definition.Schema!.Input,
+        null,
+        false);
+
     private static async Task<MemoryStore> StoreAsync(ToolProviderType providerType = ToolProviderType.Mcp)
     {
         var store = new MemoryStore();
@@ -88,13 +132,18 @@ public sealed class FlowToolExecutorTests
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ToolResourceKinds.ToolProvider,
+            Uid = ProviderUid,
+            Generation = 2,
             Metadata = new ResourceMetadata { Name = "internal" },
+            ScopeRef = WorkspaceScope,
             Definition = new ToolProviderProperties
             {
                 DisplayName = "Test provider",
                 ProviderType = providerType,
                 Mcp = providerType == ToolProviderType.Mcp ? new McpToolProviderConfiguration { Internal = true } : null,
-                Aep = providerType == ToolProviderType.Aep ? new AepToolProviderConfiguration { ExtensionId = "extension-1" } : null
+                Aep = providerType == ToolProviderType.Aep
+                    ? new AepToolProviderConfiguration { Extension = new ResourceReference("extension-1") }
+                    : null
             }
         }, null, true, default);
         await store.PutAsync(Tool(), null, true, default);
@@ -108,12 +157,13 @@ public sealed class FlowToolExecutorTests
         Uid = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
         Generation = 4,
         Metadata = new ResourceMetadata { Name = "notification.send" },
+        ScopeRef = WorkspaceScope,
         Definition = new ToolResourceProperties
         {
             DisplayName = "Send notification",
             Enabled = true,
             RequiresApproval = requiresApproval,
-            Provider = new("internal"),
+            Provider = new("internal", WorkspaceScope),
             ExternalId = "notification_send",
             Discovery = new ToolDiscoveryState
             {
@@ -155,6 +205,13 @@ public sealed class FlowToolExecutorTests
             Task.FromResult(values.TryGetValue(key, out var entry) && entry.Value is T typed
                 ? new StoredResource<T>(typed, entry.ETag, entry.At)
                 : null);
+
+        public Task<StoredResource<T>?> GetExactAsync<T>(ScopedResourceAddress address, CancellationToken cancellationToken) where T : Resource =>
+            Task.FromResult(values.TryGetValue(new ResourceKey(address.Address.Kind, address.Address.Name, address.Address.Namespace), out var entry)
+                && entry.Value is T typed
+                && entry.Value.ScopeRef == address.ScopeRef
+                    ? new StoredResource<T>(typed, entry.ETag, entry.At)
+                    : null);
 
         public Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
             Task.FromResult<IReadOnlyList<StoredResource<T>>>([]);

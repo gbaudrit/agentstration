@@ -26,34 +26,27 @@ public sealed class ResourceAepExtensionRegistrationResolver(
         ToolProviderResource provider,
         CancellationToken cancellationToken)
     {
-        var extensionId = provider.Definition.Aep?.ExtensionId;
-        if (string.IsNullOrWhiteSpace(extensionId))
-            throw new ToolResolutionException("extension_invalid", "An AEP ToolProvider requires an Extension ID.");
+        var extensionReference = provider.Definition.Aep?.Extension;
+        if (extensionReference is null || string.IsNullOrWhiteSpace(extensionReference.Name))
+            throw new ToolResolutionException("extension_invalid", "An AEP ToolProvider requires an Extension Registration reference.");
         if (provider.ScopeRef is not { } providerScope || providerScope == default)
             throw new ToolResolutionException("extension_scope_required", "An AEP ToolProvider requires an ownership scope to resolve its extension registration.");
+        if (extensionReference.ScopeRef is not { } extensionScope || extensionScope == default)
+            throw new ToolResolutionException("extension_scope_required", "An AEP ToolProvider must pin the Extension Registration scope.");
+        if (extensionScope != providerScope)
+            throw new ToolResolutionException("extension_scope_mismatch", $"Extension Registration '{extensionReference.Name}' must belong to the same scope as ToolProvider '{provider.Address}'.");
 
-        const int pageSize = 200;
-        var matches = new List<StoredResource<ExtensionRegistrationResource>>();
-        for (var skip = 0; ; skip += pageSize)
-        {
-            var page = await store.ListVisibleAsync<ExtensionRegistrationResource>(
-                providerScope,
-                ExtensionKinds.ExtensionRegistration,
-                skip,
-                pageSize,
-                cancellationToken);
-            matches.AddRange(page.Where(value =>
-                value.Value.Definition.Enabled
-                && string.Equals(value.Value.Definition.ExpectedExtensionId, extensionId, StringComparison.Ordinal)));
-            if (page.Count < pageSize) break;
-        }
-
-        if (matches.Count == 0)
-            throw new ToolResolutionException("extension_unavailable", $"No enabled AEP extension registration for '{extensionId}' is visible from ToolProvider '{provider.Address}'.");
-        if (matches.Count > 1)
-            throw new ToolResolutionException("extension_registration_ambiguous", $"More than one enabled AEP extension registration for '{extensionId}' is visible from ToolProvider '{provider.Address}'.");
-
-        var registration = matches[0].Value;
+        var extensionNamespace = extensionReference.Namespace ?? provider.Namespace;
+        var stored = await store.GetExactAsync<ExtensionRegistrationResource>(
+            ScopedResourceAddress.Create(extensionScope, extensionNamespace, ExtensionKinds.ExtensionRegistration, extensionReference.Name),
+            cancellationToken);
+        if (stored is null)
+            throw new ToolResolutionException("extension_unavailable", $"Extension Registration '{extensionReference.Name}' was not found in scope '{extensionScope}'.");
+        var registration = stored.Value;
+        if (!registration.Definition.Enabled)
+            throw new ToolResolutionException("extension_disabled", $"Extension Registration '{registration.Address}' is disabled.");
+        if (string.IsNullOrWhiteSpace(registration.Definition.ExpectedExtensionId))
+            throw new ToolResolutionException("extension_identity_required", $"Extension Registration '{registration.Address}' does not declare its expected AEP identity.");
         return new ResolvedAepExtension(registration, AepToolExtensionCredentials.Create(registration, secrets));
     }
 }

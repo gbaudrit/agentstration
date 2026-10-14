@@ -14,7 +14,8 @@ public sealed record FlowToolExecutionRequest(
     int Attempt,
     string CorrelationId,
     FlowToolReference Tool,
-    JsonElement Arguments);
+    JsonElement Arguments,
+    ResolvedFlowToolRoute? Route = null);
 
 public sealed record FlowToolExecutionResult(
     JsonElement? Output,

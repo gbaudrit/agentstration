@@ -203,10 +203,14 @@ public sealed class ManagementFlowResourceReferenceResolver(
                 selected.ToolSetVersion,
                 member.Capability,
                 member.Route,
+                member.ToolScopeRef,
                 member.ToolUid,
                 member.ToolGeneration,
                 member.ProviderName,
                 member.ProviderNamespace,
+                member.ProviderScopeRef,
+                member.ProviderUid,
+                member.ProviderGeneration,
                 member.InputSchema.Clone(),
                 member.OutputSchema?.Clone(),
                 member.RequiresApproval);
@@ -275,10 +279,14 @@ public sealed class ManagementFlowToolSetResolver(ToolSetService toolSets) : IFl
                 selected.ToolSetVersion,
                 member.Capability,
                 member.Route,
+                member.ToolScopeRef,
                 member.ToolUid,
                 member.ToolGeneration,
                 member.ProviderName,
                 member.ProviderNamespace,
+                member.ProviderScopeRef,
+                member.ProviderUid,
+                member.ProviderGeneration,
                 member.InputSchema.Clone(),
                 member.OutputSchema?.Clone(),
                 member.RequiresApproval);
@@ -359,13 +367,18 @@ public sealed class ManagedFlowToolExecutor(
     {
         ArgumentNullException.ThrowIfNull(request);
         var toolNamespace = request.Tool.ResolveNamespace(request.OwnerFlowId.Namespace);
-        var stored = await store.GetAsync<ToolResource>(
-            new ResourceKey(ToolResourceKinds.Tool, request.Tool.ResourceId, toolNamespace),
-            cancellationToken);
+        var stored = request.Route is { } route
+            ? await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
+                route.ToolScopeRef, toolNamespace, ToolResourceKinds.Tool, request.Tool.ResourceId), cancellationToken)
+            : await store.GetAsync<ToolResource>(
+                new ResourceKey(ToolResourceKinds.Tool, request.Tool.ResourceId, toolNamespace), cancellationToken);
         if (stored is null)
             throw Error("tool_not_found", $"Tool resource '{toolNamespace}/{request.Tool.ResourceId}' was not found.");
 
         var tool = stored.Value;
+        if (request.Route is { } pinnedTool
+            && (tool.Uid != pinnedTool.ToolUid || tool.Generation != pinnedTool.ToolGeneration))
+            throw Error("tool_set_member_stale", $"Tool resource '{tool.Address}' no longer matches the published ToolSet member.");
         if (!tool.Definition.Enabled)
             throw Error("tool_disabled", $"Tool resource '{tool.Address}' is disabled.");
         if (tool.Definition.Discovery?.Available != true)
@@ -375,11 +388,20 @@ public sealed class ManagedFlowToolExecutor(
         var providerId = tool.Definition.Provider?.Name
             ?? throw Error("tool_mapping_invalid", $"Tool resource '{tool.Address}' has no ToolProvider mapping.");
         var providerNamespace = tool.Definition.Provider!.Namespace ?? tool.Metadata.Namespace;
-        var provider = await store.GetAsync<ToolProviderResource>(
-            new ResourceKey(ToolResourceKinds.ToolProvider, providerId, providerNamespace),
-            cancellationToken)
-            ?? throw Error("tool_provider_not_found",
+        var provider = request.Route is { } pinnedProvider
+            ? await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
+                pinnedProvider.ProviderScopeRef, providerNamespace, ToolResourceKinds.ToolProvider, providerId), cancellationToken)
+            : await store.GetAsync<ToolProviderResource>(
+                new ResourceKey(ToolResourceKinds.ToolProvider, providerId, providerNamespace), cancellationToken);
+        if (provider is null)
+            throw Error("tool_provider_not_found",
                 $"ToolProvider resource '{providerNamespace}/{providerId}' was not found.");
+        if (request.Route is { } pinnedProviderIdentity
+            && (provider.Value.Uid != pinnedProviderIdentity.ProviderUid
+                || provider.Value.Generation != pinnedProviderIdentity.ProviderGeneration))
+            throw Error("tool_set_member_stale", $"ToolProvider resource '{provider.Value.Address}' no longer matches the published ToolSet member.");
+        if (!provider.Value.Definition.Enabled)
+            throw Error("tool_provider_disabled", $"ToolProvider resource '{provider.Value.Address}' is disabled.");
         var externalId = tool.Definition.ExternalId
             ?? throw Error("tool_mapping_invalid", $"Tool resource '{tool.Address}' has no external Tool identity.");
         var schema = tool.Definition.Schema?.Input
@@ -397,9 +419,15 @@ public sealed class ManagedFlowToolExecutor(
                 InvocationId = invocationId,
                 ToolId = tool.Metadata.Name,
                 ToolNamespace = tool.Metadata.Namespace,
+                ToolScopeRef = tool.ScopeRef,
+                ToolUid = tool.Uid,
+                ToolGeneration = tool.Generation,
                 ToolName = externalId,
                 ToolProviderId = providerId,
                 ToolProviderNamespace = tool.Definition.Provider!.Namespace ?? tool.Metadata.Namespace,
+                ToolProviderScopeRef = provider.Value.ScopeRef,
+                ToolProviderUid = provider.Value.Uid,
+                ToolProviderGeneration = provider.Value.Generation,
                 ExternalToolId = externalId,
                 TenantId = request.Scope.TenantId,
                 WorkspaceId = request.Scope.WorkspaceId,

@@ -103,8 +103,8 @@ public sealed class ToolProviderAdapter(
 
     private async Task<(AepManifest Descriptor, ResolvedAepExtension Extension)> DiscoverAepAsync(ToolProviderResource provider, CancellationToken cancellationToken)
     {
-        var extensionId = provider.Definition.Aep!.ExtensionId;
         var extension = await extensionRegistrations.ResolveAsync(provider, cancellationToken);
+        var extensionId = extension.Registration.Definition.ExpectedExtensionId!;
         using var http = CreateHttpClient(
             McpToolServiceCollectionExtensions.AepClientName,
             extension.Registration.Definition.Endpoint,
@@ -423,8 +423,16 @@ public sealed class McpToolInvoker(
         ToolExecutionContext context,
         CancellationToken cancellationToken)
     {
-        var tool = await store.GetAsync<ToolResource>(new ResourceKey(ToolResourceKinds.Tool, context.ToolId, context.ToolNamespace ?? default), cancellationToken)
-            ?? throw new ToolResolutionException("tool_not_found", $"Tool resource '{context.ToolId}' was not found.");
+        var toolNamespace = context.ToolNamespace ?? default;
+        var tool = context.ToolScopeRef is { } toolScopeRef
+            ? await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
+                toolScopeRef, toolNamespace, ToolResourceKinds.Tool, context.ToolId), cancellationToken)
+            : await store.GetAsync<ToolResource>(new ResourceKey(ToolResourceKinds.Tool, context.ToolId, toolNamespace), cancellationToken);
+        if (tool is null)
+            throw new ToolResolutionException("tool_not_found", $"Tool resource '{context.ToolId}' was not found.");
+        if (context.ToolUid is { } toolUid && tool.Value.Uid != toolUid
+            || context.ToolGeneration is { } toolGeneration && tool.Value.Generation != toolGeneration)
+            throw new ToolResolutionException("tool_stale", $"Tool resource '{context.ToolId}' no longer matches the resolved execution material.");
         if (!tool.Value.Definition.Enabled) throw new ToolResolutionException("tool_disabled", $"Tool resource '{context.ToolId}' is disabled.");
         if (tool.Value.Definition.Discovery?.Available != true) throw new ToolResolutionException("tool_unavailable", $"Tool resource '{context.ToolId}' is no longer available from its provider.");
         var providerId = tool.Value.Definition.Provider?.Name
@@ -433,8 +441,16 @@ public sealed class McpToolInvoker(
             throw new ToolResolutionException("tool_provider_mismatch", $"Tool resource '{context.ToolId}' no longer maps to provider '{context.ToolProviderId}'.");
         if (context.ExternalToolId is not null && !string.Equals(context.ExternalToolId, tool.Value.Definition.ExternalId, StringComparison.Ordinal))
             throw new ToolResolutionException("external_tool_mismatch", $"Tool resource '{context.ToolId}' no longer maps to external Tool '{context.ExternalToolId}'.");
-        var provider = await store.GetAsync<ToolProviderResource>(new ResourceKey(ToolResourceKinds.ToolProvider, providerId, context.ToolProviderNamespace ?? default), cancellationToken)
-            ?? throw new ToolResolutionException("tool_provider_not_found", $"ToolProvider '{providerId}' was not found.");
+        var providerNamespace = context.ToolProviderNamespace ?? default;
+        var provider = context.ToolProviderScopeRef is { } providerScopeRef
+            ? await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
+                providerScopeRef, providerNamespace, ToolResourceKinds.ToolProvider, providerId), cancellationToken)
+            : await store.GetAsync<ToolProviderResource>(new ResourceKey(ToolResourceKinds.ToolProvider, providerId, providerNamespace), cancellationToken);
+        if (provider is null)
+            throw new ToolResolutionException("tool_provider_not_found", $"ToolProvider '{providerId}' was not found.");
+        if (context.ToolProviderUid is { } providerUid && provider.Value.Uid != providerUid
+            || context.ToolProviderGeneration is { } providerGeneration && provider.Value.Generation != providerGeneration)
+            throw new ToolResolutionException("tool_provider_stale", $"ToolProvider '{providerId}' no longer matches the resolved execution material.");
         if (!provider.Value.Definition.Enabled) throw new ToolResolutionException("tool_provider_disabled", $"ToolProvider '{providerId}' is disabled.");
         return (tool.Value, provider.Value);
     }

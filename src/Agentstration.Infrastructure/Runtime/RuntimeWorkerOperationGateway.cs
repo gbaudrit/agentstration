@@ -121,6 +121,7 @@ public sealed class RuntimeWorkerOperationGateway(
                 "The Flow Tool StepDefinition is not present in the assigned Flow snapshot.");
         var attempt = Math.Max(1, run.Steps.Single(value => value.StepName == stepDefinitionId).Attempt);
         FlowToolReference tool;
+        ResolvedFlowToolRoute? resolvedRoute = null;
         RuntimeGovernedFlowToolRoute? route = null;
         switch (step)
         {
@@ -128,11 +129,11 @@ public sealed class RuntimeWorkerOperationGateway(
                 tool = direct.Tool;
                 break;
             case ToolRouteFlowStepDefinition routed:
-                var resolved = await flowToolSetResolver.ResolveAsync(workspaceId, run.FlowId.Namespace,
+                resolvedRoute = await flowToolSetResolver.ResolveAsync(workspaceId, run.FlowId.Namespace,
                     routed, cancellationToken);
-                tool = resolved.Tool;
-                route = new(resolved.ToolSetName, resolved.ToolSetNamespace, resolved.ToolSetVersion,
-                    resolved.Capability, resolved.Route);
+                tool = resolvedRoute.Tool;
+                route = new(resolvedRoute.ToolSetName, resolvedRoute.ToolSetNamespace, resolvedRoute.ToolSetVersion,
+                    resolvedRoute.Capability, resolvedRoute.Route);
                 break;
             default:
                 throw new RuntimeExecutionMaterialException("flow_tool_step_invalid",
@@ -147,7 +148,8 @@ public sealed class RuntimeWorkerOperationGateway(
             attempt,
             run.CorrelationId ?? run.Id,
             tool,
-            arguments), cancellationToken);
+            arguments,
+            resolvedRoute), cancellationToken);
         return new(
             result.Output?.Clone(),
             result.ToolName,

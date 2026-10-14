@@ -294,9 +294,15 @@ public sealed record ToolExecutionContext
     public required string InvocationId { get; init; }
     public required string ToolId { get; init; }
     public ResourceNamespace? ToolNamespace { get; init; }
+    public ResourceScopeRef? ToolScopeRef { get; init; }
+    public Guid? ToolUid { get; init; }
+    public long? ToolGeneration { get; init; }
     public required string ToolName { get; init; }
     public string? ToolProviderId { get; init; }
     public ResourceNamespace? ToolProviderNamespace { get; init; }
+    public ResourceScopeRef? ToolProviderScopeRef { get; init; }
+    public Guid? ToolProviderUid { get; init; }
+    public long? ToolProviderGeneration { get; init; }
     public string? ExternalToolId { get; init; }
     public Guid? TenantId { get; init; }
     public WorkspaceId? WorkspaceId { get; init; }
