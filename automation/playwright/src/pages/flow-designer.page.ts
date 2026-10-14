@@ -190,6 +190,7 @@ export class FlowDesignerPage {
   }
 
   public async addNamedOutput(output: NamedOutputAuthoring): Promise<void> {
+    await this.ensurePaletteVisible();
     await this.page.getByTestId(TestIds.flowObservability.paletteOutput).click();
     await expect(this.page.getByTestId(TestIds.flowObservability.stepDisplayName)).toHaveValue('Output');
     // Complete the add-step save before editing the new node. On a busy smoke run, letting that
@@ -209,10 +210,12 @@ export class FlowDesignerPage {
     await expect(this.node(output.displayName)).toBeVisible();
   }
 
-  public async dragNamedOutputToInput(sourceDisplayName: string, event: string, targetDisplayName: string): Promise<void> {
-    const source = this.namedOutputHandle(sourceDisplayName, event);
-    const target = this.node(targetDisplayName).locator('.flow-port-handle.input');
-    await this.drag(source, target);
+  public async addTransition(from: string, event: string, to: string): Promise<void> {
+    await this.ensureInspectorVisible();
+    await this.page.getByTestId(TestIds.flowObservability.transitionNewFrom).selectOption(from);
+    await this.page.getByTestId(TestIds.flowObservability.transitionNewEvent).fill(event);
+    await this.page.getByTestId(TestIds.flowObservability.transitionNewTo).selectOption(to);
+    await this.page.getByTestId(TestIds.flowObservability.transitionNewAdd).click();
   }
 
   public async setSelectedTransitionPriority(priority: number): Promise<void> {
@@ -238,10 +241,12 @@ export class FlowDesignerPage {
   }
 
   public async expectTransition(text: string): Promise<void> {
+    await this.ensureInspectorVisible();
     await expect(this.page.locator('.transition-list li > button').filter({ hasText: text })).toBeVisible();
   }
 
   public async selectTransition(text: string): Promise<void> {
+    await this.ensureInspectorVisible();
     await expect(async () => {
       await this.page.locator('.transition-list li > button').filter({ hasText: text }).click();
       await expect(this.page.getByTestId(TestIds.flowObservability.selectedTransitionEditor)).toBeVisible({ timeout: 2_000 });
@@ -279,10 +284,12 @@ export class FlowDesignerPage {
   }
 
   public async undo(): Promise<void> {
+    await this.ensureHistoryActionsVisible();
     await this.page.getByRole('button', { name: 'Undo', exact: true }).click();
   }
 
   public async redo(): Promise<void> {
+    await this.ensureHistoryActionsVisible();
     await this.page.getByRole('button', { name: 'Redo', exact: true }).click();
   }
 
@@ -393,6 +400,7 @@ export class FlowDesignerPage {
   public async selectFirstInspectorTransition(): Promise<void> {
     const linkPath = this.page.locator('svg .diagram-link path').first();
     const initialStroke = await linkPath.getAttribute('stroke');
+    await this.ensureInspectorVisible();
     await this.page.locator('.transition-list li > button:first-child').click();
     await expect(this.page.locator('.transition-editor')).toBeVisible();
     await expect.poll(async () => await linkPath.getAttribute('stroke')).not.toBe(initialStroke);
@@ -404,10 +412,29 @@ export class FlowDesignerPage {
     return this.page.locator('.flow-node').filter({ has: this.page.locator('strong').filter({ hasText: new RegExp(`^${escapeRegExp(name)}$`, 'i') }) }).first();
   }
 
-  private namedOutputHandle(nodeDisplayName: string, event: string): Locator {
-    return this.node(nodeDisplayName).locator('.flow-port-handle.output').filter({
-      has: this.page.locator('.flow-port-label').filter({ hasText: new RegExp(`(?:✓|!)\\s*${escapeRegExp(event)}$`) }),
-    });
+  private async ensurePaletteVisible(): Promise<void> {
+    const palette = this.page.locator('.step-palette');
+    if (await palette.isVisible()) return;
+    const toggle = this.page.locator('.designer-view-controls .compact-panel-toggle').nth(0);
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+    await expect(palette).toBeVisible();
+  }
+
+  private async ensureInspectorVisible(): Promise<void> {
+    const inspector = this.page.locator('.flow-inspector');
+    if (await inspector.isVisible()) return;
+    const toggle = this.page.locator('.designer-view-controls .compact-panel-toggle').nth(1);
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+    await expect(inspector).toBeVisible();
+  }
+
+  private async ensureHistoryActionsVisible(): Promise<void> {
+    const undo = this.page.getByRole('button', { name: 'Undo', exact: true });
+    if (await undo.isVisible()) return;
+    await this.page.locator('.designer-more-toggle').click();
+    await expect(undo).toBeVisible();
   }
 
   private async changeField(testId: string, value: string): Promise<void> {

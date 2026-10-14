@@ -3,6 +3,7 @@
 @inject IFlowDesignerResourceProvider Resources
 @inject FlowEditorStore Editor
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 @inject IStringLocalizer<FlowDesignerStrings> Localizer
 
 @if (Editor.State.Resource is null && error is not null)
@@ -15,7 +16,7 @@ else if (Editor.State.Resource is null)
 }
 else
 {
-    <header class="designer-toolbar">
+    <header class="designer-toolbar @(focusMode ? "designer-focus" : null)">
         <div>
             <p class="eyebrow"><a href="/flows">@T("Flows")</a> / <code>@Editor.State.Namespace.Value</code> / @ResourceId / @(ReadOnly ? T("Published", Editor.State.PublishedVersion ?? string.Empty) : T("Draft"))</p>
             <h1>@Editor.State.Resource.DisplayName</h1>
@@ -39,16 +40,40 @@ else
         <div class="designer-actions">
             @if (!ReadOnly)
             {
-                <button class="button-secondary" disabled="@(!Editor.CanUndo)" @onclick="Undo">@T("Undo")</button>
-                <button class="button-secondary" disabled="@(!Editor.CanRedo)" @onclick="Redo">@T("Redo")</button>
-                <button class="button-secondary" data-testid="flow-designer-validate" @onclick="ValidateAsync">@T("Validate")</button>
                 <button class="button-secondary" @onclick="OpenRun">@T("RunDraft")</button>
                 <button class="button-primary" data-testid="flow-designer-save" disabled="@saving" @onclick="SaveAsync">@T("Save")</button>
-                <label class="publish-version">@T("Version")<input aria-label="@T("PublishVersion")" @bind="publishVersion" /></label>
-                <button class="button-primary" data-testid="flow-designer-publish" disabled="@publishing" aria-busy="@publishing" @onclick="PublishAsync">@T(publishing ? "Publishing" : "Publish")</button>
+                <div class="designer-more-actions @(moreActionsOpen ? "open" : null)">
+                    <button type="button" class="button-secondary designer-more-toggle" aria-label="@T("MoreActions")" aria-expanded="@moreActionsOpen" @onclick="() => moreActionsOpen = !moreActionsOpen"><UiIcon Name="dots" /><span>@T("MoreActions")</span></button>
+                    <div class="designer-more-menu">
+                        <button class="button-secondary" disabled="@(!Editor.CanUndo)" @onclick="Undo">@T("Undo")</button>
+                        <button class="button-secondary" disabled="@(!Editor.CanRedo)" @onclick="Redo">@T("Redo")</button>
+                        <label class="publish-version">@T("Version")<input aria-label="@T("PublishVersion")" @bind="publishVersion" /></label>
+                        <button class="button-primary" data-testid="flow-designer-publish" disabled="@publishing" aria-busy="@publishing" @onclick="PublishAsync">@T(publishing ? "Publishing" : "Publish")</button>
+                    </div>
+                </div>
             }
         </div>
     </header>
+
+    @if (focusMode)
+    {
+        <nav class="designer-focus-toolbar" aria-label="@T("EditorModes")">
+            <div class="focus-workspace-controls" role="group" aria-label="@T("WorkspaceControls")">
+                @if (Editor.State.Mode is FlowEditorMode.Designer or FlowEditorMode.Split)
+                {
+                    <button type="button" class="desktop-panel-toggle" aria-label="@T(paletteVisibility is false ? "ShowStepPalette" : "HideStepPalette")" aria-pressed="@(paletteVisibility is not false)" @onclick="ToggleDesktopPalette"><UiIcon Name="layout-sidebar-right" Class="panel-icon-left" /></button>
+                    <button type="button" class="compact-panel-toggle" aria-label="@T(paletteVisibility is true ? "HideStepPalette" : "ShowStepPalette")" aria-pressed="@(paletteVisibility is true)" @onclick="ToggleCompactPalette"><UiIcon Name="layout-sidebar-right" Class="panel-icon-left" /></button>
+                    <button type="button" class="desktop-panel-toggle" aria-label="@T(inspectorVisibility is false ? "ShowInspector" : "HideInspector")" aria-pressed="@(inspectorVisibility is not false)" @onclick="ToggleDesktopInspector"><UiIcon Name="layout-sidebar-right" /></button>
+                    <button type="button" class="compact-panel-toggle" aria-label="@T(inspectorVisibility is true ? "HideInspector" : "ShowInspector")" aria-pressed="@(inspectorVisibility is true)" @onclick="ToggleCompactInspector"><UiIcon Name="layout-sidebar-right" /></button>
+                }
+                <button type="button" class="focus-exit" aria-label="@T("ExitFocusMode")" aria-keyshortcuts="Escape" @onclick="ToggleFocusMode"><UiIcon Name="minimize" /></button>
+            </div>
+            @foreach (var mode in Enum.GetValues<FlowEditorMode>())
+            {
+                <button type="button" class="@(Editor.State.Mode == mode ? "active" : null)" aria-pressed="@(Editor.State.Mode == mode)" @onclick="() => Editor.SetMode(mode)">@T($"Mode.{mode}")</button>
+            }
+        </nav>
+    }
 
     @if (error is not null)
     {
@@ -59,10 +84,11 @@ else
         </div>
     }
 
-    <section class="flow-editor-shell @Editor.State.Mode.ToString().ToLowerInvariant()">
+    <section class="flow-editor-shell @WorkspaceClasses">
         @if (Editor.State.Mode is FlowEditorMode.Designer or FlowEditorMode.Split)
         {
             <aside class="step-palette">
+                <header class="designer-drawer-header"><strong>@T("StepPalette")</strong><button type="button" aria-label="@T("CloseStepPalette")" @onclick="ClosePaletteDrawer"><UiIcon Name="x" /></button></header>
                 <section class="step-palette-group" aria-labelledby="palette-steps-heading">
                     <h2 id="palette-steps-heading">@T("Steps")</h2>
                     @foreach (var entry in Palette)
@@ -80,6 +106,13 @@ else
             </aside>
 
             <div class="flow-canvas-wrap">
+                <div class="designer-view-controls" role="toolbar" aria-label="@T("WorkspaceControls")">
+                    <button type="button" class="desktop-panel-toggle" aria-label="@T(paletteVisibility is false ? "ShowStepPalette" : "HideStepPalette")" aria-pressed="@(paletteVisibility is not false)" @onclick="ToggleDesktopPalette"><UiIcon Name="layout-sidebar-right" Class="panel-icon-left" /></button>
+                    <button type="button" class="compact-panel-toggle" aria-label="@T(paletteVisibility is true ? "HideStepPalette" : "ShowStepPalette")" aria-pressed="@(paletteVisibility is true)" @onclick="ToggleCompactPalette"><UiIcon Name="layout-sidebar-right" Class="panel-icon-left" /></button>
+                    <button type="button" class="desktop-panel-toggle" aria-label="@T(inspectorVisibility is false ? "ShowInspector" : "HideInspector")" aria-pressed="@(inspectorVisibility is not false)" @onclick="ToggleDesktopInspector"><UiIcon Name="layout-sidebar-right" /></button>
+                    <button type="button" class="compact-panel-toggle" aria-label="@T(inspectorVisibility is true ? "HideInspector" : "ShowInspector")" aria-pressed="@(inspectorVisibility is true)" @onclick="ToggleCompactInspector"><UiIcon Name="layout-sidebar-right" /></button>
+                    <button type="button" aria-label="@T(focusMode ? "ExitFocusMode" : "EnterFocusMode")" aria-pressed="@focusMode" @onclick="ToggleFocusMode"><UiIcon Name="@(focusMode ? "minimize" : "maximize")" /></button>
+                </div>
                 <FlowCanvas @ref="canvas" Document="Editor.State.Diagram" Revision="Editor.State.LocalRevision" ResolvedOutputsRevision="flowCallRenderRevision" FitRevision="layoutRevision"
                             IsReadOnly="ReadOnly" EntryStep="@Editor.State.Resource.Definition.EntryStep" SelectedStepName="@Editor.State.Selection.StepName"
                             SelectedTransitionId="@Editor.State.Selection.TransitionId" ShowAllErrorTransitions="showAllErrorTransitions" SelectedStepChanged="SelectStepAsync"
@@ -90,6 +123,7 @@ else
             </div>
 
             <aside class="flow-inspector">
+                <header class="designer-drawer-header"><strong>@T("Inspector")</strong><button type="button" aria-label="@T("CloseInspector")" @onclick="CloseInspectorDrawer"><UiIcon Name="x" /></button></header>
                 <h2>@T("Inspector")</h2>
                 @if (SelectedStep is null)
                 {
@@ -314,10 +348,10 @@ else
                         <button class="button-danger" disabled="@ReadOnly" @onclick="() => RemoveTransitionAsync(selectedTransition.Id)">@T("DeleteTransition")</button>
                     </section>
                 }
-                <label>@T("From")<select disabled="@ReadOnly" @bind="transitionFrom">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
-                <label>@T("Event")<input disabled="@ReadOnly" @bind="transitionEvent" /></label>
-                <label>@T("To")<select disabled="@ReadOnly" @bind="transitionTo">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
-                <button class="button-secondary" disabled="@ReadOnly" @onclick="AddTransitionAsync">@T("AddTransition")</button>
+                <label>@T("From")<select data-testid="transition-new-from" disabled="@ReadOnly" @bind="transitionFrom">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
+                <label>@T("Event")<input data-testid="transition-new-event" disabled="@ReadOnly" @bind="transitionEvent" /></label>
+                <label>@T("To")<select data-testid="transition-new-to" disabled="@ReadOnly" @bind="transitionTo">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
+                <button class="button-secondary" data-testid="transition-new-add" disabled="@ReadOnly" @onclick="AddTransitionAsync">@T("AddTransition")</button>
                 <ul class="transition-list">@foreach (var transition in Editor.State.Resource.Definition.Transitions) { <li><button class="@(Editor.State.Selection.TransitionId == transition.Id ? "selected" : null)" @onclick="() => SelectTransitionAsync(transition.Id)">@transition.FromStep —@transition.Event→ @transition.ToStep</button><button disabled="@ReadOnly" aria-label="@T("DeleteTransitionNamed", transition.Id)" @onclick="() => RemoveTransitionAsync(transition.Id)">×</button></li> }</ul>
             </aside>
         }
@@ -329,10 +363,21 @@ else
         }
     </section>
 
-    <section class="validation-dock">
-        <header><strong>@T("Validation")</strong><span>@T(Editor.State.Issues.Count == 1 ? "IssueCount.One" : "IssueCount.Many", Editor.State.Issues.Count)</span></header>
-        @if (Editor.State.Issues.Count == 0) { <p class="muted">@(ReadOnly ? T("PublishedDefinitionHelp") : T("ValidationHelp"))</p> }
-        else { <ul>@foreach (var issue in Editor.State.Issues) { <li class="@issue.Severity.ToString().ToLowerInvariant()"><button @onclick="() => SelectIssue(issue)"><strong>@issue.Severity</strong> @issue.Message <code>@issue.Code</code></button></li> }</ul> }
+    <section class="validation-dock @(validationExpanded ? "expanded" : null)">
+        <header class="validation-header">
+            <button type="button" class="validation-summary" aria-expanded="@validationExpanded" @onclick="ToggleValidation"><strong>@T("Validation")</strong></button>
+            @if (!ReadOnly)
+            {
+                <button type="button" class="button-secondary validation-run" data-testid="flow-designer-validation-run" @onclick="ValidateAsync"><UiIcon Name="check" /><span>@T("RunValidation")</span></button>
+            }
+            <span class="validation-count">@T(Editor.State.Issues.Count == 1 ? "IssueCount.One" : "IssueCount.Many", Editor.State.Issues.Count)</span>
+            <button type="button" class="validation-toggle" aria-label="@T(validationExpanded ? "HideValidationDetails" : "ShowValidationDetails")" aria-expanded="@validationExpanded" @onclick="ToggleValidation"><UiIcon Name="chevron-down" /></button>
+        </header>
+        @if (validationExpanded)
+        {
+            @if (Editor.State.Issues.Count == 0) { <p class="muted">@(ReadOnly ? T("PublishedDefinitionHelp") : T("ValidationHelp"))</p> }
+            else { <ul>@foreach (var issue in Editor.State.Issues) { <li class="@issue.Severity.ToString().ToLowerInvariant()"><button @onclick="() => SelectIssue(issue)"><strong>@issue.Severity</strong> @issue.Message <code>@issue.Code</code></button></li> }</ul> }
+        }
     </section>
 
     @if (showRun)
@@ -346,6 +391,9 @@ else
     private readonly CancellationTokenSource cancellation = new();
     private CancellationTokenSource? autosave;
     private FlowCanvas? canvas;
+    private IJSObjectReference? workspaceModule;
+    private IJSObjectReference? keyboardRegistration;
+    private DotNetObjectReference<FlowDesigner>? selfReference;
     private IReadOnlyList<FlowDesignerAgent> agents = [];
     private IReadOnlyList<FlowDesignerAgent> routerAgents = [];
     private IReadOnlyList<FlowDesignerFlow> flows = [];
@@ -367,6 +415,11 @@ else
     private bool runningDraft;
     private bool runInputValid = true;
     private bool loadingAgents;
+    private bool focusMode;
+    private bool validationExpanded;
+    private bool moreActionsOpen;
+    private bool? paletteVisibility;
+    private bool? inspectorVisibility;
     private long layoutRevision;
     private long flowCallRenderRevision;
     private int toolPickerRevision;
@@ -378,6 +431,14 @@ else
     [Parameter, EditorRequired] public string ResourceId { get; set; } = string.Empty;
     [Parameter] public bool IsReadOnly { get; set; }
     [Parameter] public ResourceNamespace Namespace { get; set; } = ResourceNamespace.Default;
+
+    private string WorkspaceClasses => string.Join(' ', new[]
+    {
+        Editor.State.Mode.ToString().ToLowerInvariant(),
+        paletteVisibility is true ? "palette-open" : paletteVisibility is false ? "palette-closed" : null,
+        inspectorVisibility is true ? "inspector-open" : inspectorVisibility is false ? "inspector-closed" : null,
+        focusMode ? "focus-mode" : null
+    }.Where(value => value is not null));
 
     private FlowStepDefinition? SelectedStep => Editor.State.Resource?.Definition.Steps.FirstOrDefault(step => step.Name == Editor.State.Selection.StepName);
     private FlowDesignerAgent? SelectedAgent => SelectedStep is AgentFlowStepDefinition step
@@ -431,6 +492,16 @@ else
         }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        workspaceModule = await JS.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Agentstration.Web.FlowDesigner/js/flow-designer-workspace.js?v=20261013-1");
+        selfReference = DotNetObjectReference.Create(this);
+        keyboardRegistration = await workspaceModule.InvokeAsync<IJSObjectReference>("registerKeyboardShortcuts", selfReference);
+    }
+
     private async Task DispatchAsync(IFlowEditorCommand command)
     {
         if (ReadOnly) return;
@@ -458,6 +529,11 @@ else
     private async Task SelectStepAsync(string? name)
     {
         Editor.SelectStep(name);
+        if (name is not null)
+        {
+            inspectorVisibility = true;
+            paletteVisibility = null;
+        }
         toolSearch = string.Empty;
         toolPickerRevision++;
         if (!ReadOnly && SelectedStep is AgentFlowStepDefinition agent
@@ -473,6 +549,30 @@ else
     }
     private void Center() => canvas?.Center();
     private void ToggleErrorTransitions() => showAllErrorTransitions = !showAllErrorTransitions;
+    private void ToggleDesktopPalette() => paletteVisibility = paletteVisibility is false ? null : false;
+    private void ToggleDesktopInspector() => inspectorVisibility = inspectorVisibility is false ? null : false;
+    private void ToggleCompactPalette()
+    {
+        paletteVisibility = paletteVisibility is true ? null : true;
+        if (paletteVisibility is true) inspectorVisibility = null;
+    }
+    private void ToggleCompactInspector()
+    {
+        inspectorVisibility = inspectorVisibility is true ? null : true;
+        if (inspectorVisibility is true) paletteVisibility = null;
+    }
+    private void ClosePaletteDrawer() => paletteVisibility = null;
+    private void CloseInspectorDrawer() => inspectorVisibility = null;
+    private void ToggleFocusMode() => focusMode = !focusMode;
+
+    [JSInvokable]
+    public Task ExitFullScreenAsync()
+    {
+        if (!focusMode || showRun) return Task.CompletedTask;
+        focusMode = false;
+        return InvokeAsync(StateHasChanged);
+    }
+    private void ToggleValidation() => validationExpanded = !validationExpanded;
     private void EditorChanged(object? sender, EventArgs args) => _ = InvokeAsync(StateHasChanged);
     private void SourceChanged(string source) { if (ReadOnly) return; sourceText = source; Editor.SetSource(source, Editor.State.SourceError); }
 
@@ -497,6 +597,7 @@ else
         await SaveAsync();
         if (error is not null) return;
         Editor.SetIssues((await Backend.ValidateAsync(Target, cancellation.Token)).Issues);
+        validationExpanded = true;
     }
     private async Task PublishAsync()
     {
@@ -875,10 +976,23 @@ else
     private const string UnconfiguredFlow = "unconfigured";
     private const string UnconfiguredTool = "unconfigured";
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         Editor.StateChanged -= EditorChanged;
         autosave?.Cancel(); autosave?.Dispose(); cancellation.Cancel(); cancellation.Dispose();
-        return ValueTask.CompletedTask;
+        try
+        {
+            if (keyboardRegistration is not null)
+                await keyboardRegistration.InvokeVoidAsync("dispose");
+            if (keyboardRegistration is not null)
+                await keyboardRegistration.DisposeAsync();
+            if (workspaceModule is not null)
+                await workspaceModule.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+            // The browser circuit can close before the component is disposed.
+        }
+        selfReference?.Dispose();
     }
 }
