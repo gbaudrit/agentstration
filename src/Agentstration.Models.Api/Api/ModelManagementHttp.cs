@@ -29,6 +29,8 @@ internal static class ModelsApiHttp
         }
         catch (ResourceNotFoundException exception) { return Problem("model-profile-not-found", "Resource not found", 404, exception.Message); }
         catch (ResourceConcurrencyException exception) { return Problem("resource-version-conflict", "Resource version conflict", 409, exception.Message); }
+        catch (ResourceScopeAccessDeniedException exception) { return Problem("resource-scope-access-denied", "Resource scope access denied", 403, exception.Message); }
+        catch (ResourceScopePolicyException exception) { return Problem("resource-scope-invalid", "Invalid resource scope", 422, exception.Message); }
         catch (ModelProfileInUseException exception)
         {
             return Problem("model-profile-in-use", "Model profile is in use", 409, exception.Message, new Dictionary<string, object?>

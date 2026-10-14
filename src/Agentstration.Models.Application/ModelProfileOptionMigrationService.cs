@@ -28,10 +28,18 @@ public sealed class ModelProfileOptionMigrationService(
         ResourceNamespace @namespace,
         string profileName,
         string targetVersion,
+        CancellationToken cancellationToken) =>
+        await PreviewAsync(@namespace, profileName, null, targetVersion, cancellationToken);
+
+    public async Task<ModelProfileOptionMigrationPreview> PreviewAsync(
+        ResourceNamespace @namespace,
+        string profileName,
+        ResourceScopeRef? scopeRef,
+        string targetVersion,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetVersion);
-        var profile = await profiles.GetAsync(@namespace, profileName, cancellationToken)
+        var profile = await profiles.GetAsync(@namespace, profileName, scopeRef, cancellationToken)
             ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, profileName, @namespace));
         var providerAddress = profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ModelResourceKinds.ModelProvider);
         var provider = await providers.GetConfigurationRequiredAsync(providerAddress.Namespace, providerAddress.Name, cancellationToken);
@@ -77,14 +85,23 @@ public sealed class ModelProfileOptionMigrationService(
         string profileName,
         string targetVersion,
         string? ifMatch,
+        CancellationToken cancellationToken) =>
+        await ApplyAsync(@namespace, profileName, null, targetVersion, ifMatch, cancellationToken);
+
+    public async Task<StoredResource<ModelProfileResource>> ApplyAsync(
+        ResourceNamespace @namespace,
+        string profileName,
+        ResourceScopeRef? scopeRef,
+        string targetVersion,
+        string? ifMatch,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(ifMatch))
             throw new ResourceConcurrencyException("Applying an option migration requires If-Match.");
-        var preview = await PreviewAsync(@namespace, profileName, targetVersion, cancellationToken);
+        var preview = await PreviewAsync(@namespace, profileName, scopeRef, targetVersion, cancellationToken);
         if (!string.Equals(ifMatch, preview.ProfileETag, StringComparison.Ordinal))
             throw new ResourceConcurrencyException($"Model profile '{@namespace}/{profileName}' was modified before the migration could be applied.");
-        var profile = await profiles.GetAsync(@namespace, profileName, cancellationToken)
+        var profile = await profiles.GetAsync(@namespace, profileName, scopeRef, cancellationToken)
             ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, profileName, @namespace));
         var options = new Dictionary<string, VersionedExtensionOptions>(profile.Value.Definition.ProviderOptions, StringComparer.Ordinal)
         {
@@ -93,6 +110,7 @@ public sealed class ModelProfileOptionMigrationService(
         return await profiles.PutAsync(
             @namespace,
             profileName,
+            scopeRef,
             profile.Value.Definition with { ProviderOptions = options },
             ifMatch,
             cancellationToken);

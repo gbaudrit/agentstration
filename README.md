@@ -14,7 +14,7 @@ It is built on the Microsoft .NET AI stack and currently executes agents through
 
 ### Governed agent platform
 
-- declarative, workspace-scoped Agents, model providers, Model Profiles, deployments, Extension registrations and tool catalogs;
+- declarative, scoped Agents, Model Profiles, deployments, Extension registrations and tool catalogs, with Instance-owned model and runtime infrastructure;
 - Ollama, llama.cpp and LocalAI integrations through autonomous, versioned AEP contributions;
 - governed Tool execution with enablement checks, ordered hooks, workspace guards, human approval and durable audit records;
 - local Secrets and Vault management;
@@ -165,7 +165,7 @@ definition:
   bindings: []
 ```
 
-A Workspace profile may also create ordinary `ModelProvider`, `RuntimeProfile`, `ModelProfile`, `Agent`, `Flow`, and `Entry` resources directly from their normal YAML manifests. Unlike resources installed from a Pack, these resources have no Pack provenance and remain editable through their usual Console and API surfaces. Files and YAML documents are evaluated in lexical order, so dependencies must precede their consumers: provider and runtime profile, then model profile, agent, flow, and entry. A Model Provider must reference an Extension Registration already available in the target Workspace. A published Entry targeting a Flow requires that Flow to already have, or create earlier in the same application, an active published version.
+A Bootstrap profile may create ordinary resources directly from their normal YAML manifests. `ModelProvider` and `RuntimeProfile` are Instance-only and must be declared in an Instance profile. `ModelProfile` follows the profile target and may be Instance-, Tenant-, or Workspace-owned; `Agent` and `Entry` remain Workspace-owned, while Flow supports the hierarchy. Narrower consumers require explicit access grants to protected ancestor resources. Unlike resources installed from a Pack, directly created resources have no Pack provenance and remain editable through their usual Console and API surfaces. Files and YAML documents are evaluated in lexical order, and an Instance infrastructure profile must be applied before a narrower consumer profile. A published Entry targeting a Flow requires that Flow to already have, or create earlier in the same application, an active published version.
 
 For example, this creates an editable Agent using resources declared earlier in the same profile:
 
@@ -181,6 +181,7 @@ definition:
     name: support-model
   runtimeProfile:
     name: local-runtime
+    scopeRef: /instance
   tools: []
 ```
 

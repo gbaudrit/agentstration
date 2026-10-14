@@ -34,9 +34,14 @@ internal sealed class GetAgentModelEndpoint : IModelManagementEndpoint
         {
             var agent = await agents.GetAgentAsync(@namespace, agentName, cancellationToken)
                 ?? throw new ResourceNotFoundException(ResourceKey.Create(AgentResourceKinds.Agent, agentName, @namespace));
-            var profileAddress = agent.Value.Definition.ModelProfile.Resolve(agent.Value.Namespace, ModelResourceKinds.ModelProfile);
-            var profile = await profiles.GetAsync(profileAddress.Namespace, profileAddress.Name, cancellationToken)
-                ?? throw new ResourceNotFoundException(ResourceKey.Create(ModelResourceKinds.ModelProfile, profileAddress.Name, profileAddress.Namespace));
+            var agentScopeRef = agent.Value.ScopeRef
+                ?? throw new InvalidOperationException($"Agent '{agent.Value.Address}' has no ownership scope.");
+            var profilePin = await profiles.ResolveReferenceAsync(agent.Value.Definition.ModelProfile,
+                agent.Value.Namespace, agentScopeRef, cancellationToken);
+            var profile = await profiles.GetExactAsync(profilePin.ScopeRef, profilePin.Namespace,
+                    profilePin.Name, cancellationToken)
+                ?? throw new ResourceNotFoundException(ResourceKey.Create(ModelResourceKinds.ModelProfile,
+                    profilePin.Name, profilePin.Namespace));
             var resolution = await profiles.ResolveAsync(profile.Value, cancellationToken);
             var mapped = ModelsApiHttp.Resolution(resolution);
             return Results.Ok(new AgentModelResponse(

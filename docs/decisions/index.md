@@ -197,3 +197,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 169. [ADR-0169 — Schemas are format-neutral versioned resources](0169-schemas-are-format-neutral-versioned-resources.md)
 170. [ADR-0170 — Flow definitions use hierarchical resource ownership](0170-flow-definitions-use-hierarchical-resource-ownership.md)
 171. [ADR-0171 — Descendant resource access is a local administrative overlay](0171-resource-access-is-a-local-administrative-overlay.md)
+172. [ADR-0172 — Model infrastructure is Instance-owned and Model Profiles are hierarchical](0172-model-infrastructure-is-instance-owned.md)

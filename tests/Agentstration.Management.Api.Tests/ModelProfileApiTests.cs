@@ -54,7 +54,7 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
                 Definition = new ModelProfileProperties
                 {
                     DisplayName = name,
-                    Provider = new ResourceReference("ollama-local"),
+                    Provider = new ResourceReference("ollama-local", ResourceScopeRef.Instance),
                     Model = new ModelSelection { Name = "test-model" },
                     SecretBindings = [new("credential", new(new(ResourceNamespace.Default, "Secret", secretName), scope))]
                 }
@@ -125,7 +125,7 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
             Definition = new ModelProfileProperties
             {
                 DisplayName = "Migration profile",
-                Provider = new ResourceReference(ModelProviderManagementService.ModelProviderId("ollama-local")),
+                Provider = new ResourceReference(ModelProviderManagementService.ModelProviderId("ollama-local"), ResourceScopeRef.Instance),
                 Model = new ModelSelection { Name = "test-model" },
                 ProviderOptions = new Dictionary<string, VersionedExtensionOptions>
                 {
@@ -263,7 +263,7 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
             Namespace = profileNamespace.Value,
             Properties = Request("shared-reasoning", "qwen3:4b").Properties with
             {
-                Provider = new ResourceReference("ollama-local", @namespace: ResourceNamespace.Default)
+                Provider = new ResourceReference("ollama-local", ResourceScopeRef.Instance, ResourceNamespace.Default)
             }
         };
         using var createdProfile = await client.PostAsJsonAsync("/api/modelprofiles", profileRequest);
@@ -339,7 +339,7 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
 
         using var response = await client.PutAsJsonAsync(path, request);
 
-        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.AreEqual("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
@@ -393,7 +393,7 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
         {
             Properties = Request("ignored", "qwen3:1.7b").Properties with
             {
-                Provider = new ResourceReference(ModelProviderManagementService.ModelProviderId("missing-provider"))
+                Provider = new ResourceReference(ModelProviderManagementService.ModelProviderId("missing-provider"), ResourceScopeRef.Instance)
             }
         };
 
@@ -418,7 +418,7 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
             Definition = new ModelProfileProperties
             {
                 DisplayName = "Canonical profile",
-                Provider = new ResourceReference(ModelProviderManagementService.ModelProviderId("ollama-local")),
+                Provider = new ResourceReference(ModelProviderManagementService.ModelProviderId("ollama-local"), ResourceScopeRef.Instance),
                 Model = new ModelSelection { Name = "qwen3:8b" },
                 Generation = new ModelGenerationOptions { Temperature = 0.2, TopP = 0.8, TopK = 20, MaxOutputTokens = 4096 },
                 Reasoning = new ModelReasoningOptions { Mode = ReasoningMode.Enabled, Effort = ReasoningEffort.Medium },
@@ -468,11 +468,11 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
             new ModelProfileProperties
             {
                 DisplayName = "Incompatible profile",
-                Provider = new ResourceReference("diagnostic-local"),
+                Provider = new ResourceReference("diagnostic-local", ResourceScopeRef.Instance),
                 Model = new ModelSelection { Name = "local-model" },
                 Reasoning = new ModelReasoningOptions { Mode = ReasoningMode.Enabled },
                 Output = new ModelOutputOptions { Format = ModelOutputFormat.JsonObject }
-            }));
+            }, ScopeRef: ResourceScopeRef.Instance));
         Assert.AreEqual(HttpStatusCode.Created, profileResponse.StatusCode);
 
         var resolution = await client.GetFromJsonAsync<ModelProfileResolutionResponse>("/api/modelprofiles/incompatible-profile/resolution");

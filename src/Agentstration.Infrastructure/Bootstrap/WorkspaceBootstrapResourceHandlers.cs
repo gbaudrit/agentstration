@@ -61,7 +61,7 @@ internal static class WorkspaceBootstrapResource
 public sealed class ModelProviderBootstrapResourceHandler(ModelProviderManagementService service) : IBootstrapResourceHandler
 {
     public string Kind => ModelResourceKinds.ModelProvider;
-    public BootstrapProfileScope Scope => BootstrapProfileScope.Tenant;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
         BootstrapResourceDocument resource,
@@ -106,8 +106,7 @@ public sealed class ModelProviderBootstrapResourceHandler(ModelProviderManagemen
     }
 
     private static ResourceScopeRef TargetScope(BootstrapResourceOperationContext operation) =>
-        ResourceScopeRef.Tenant(operation.Target?.TenantId
-            ?? throw new InvalidOperationException("A Model Provider bootstrap resource requires an explicit Tenant target."));
+        ResourceScopeRef.Instance;
 }
 
 public sealed class ParameterBootstrapResourceHandler(ParameterManagementService service) : IBootstrapResourceHandler
@@ -152,7 +151,7 @@ public sealed class ParameterBootstrapResourceHandler(ParameterManagementService
 public sealed class RuntimeProfileBootstrapResourceHandler(RuntimeProfileManagementService service) : IBootstrapResourceHandler
 {
     public string Kind => RuntimeProfileResourceKinds.RuntimeProfile;
-    public BootstrapProfileScope Scope => BootstrapProfileScope.Tenant;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
         BootstrapResourceDocument resource,
@@ -160,8 +159,8 @@ public sealed class RuntimeProfileBootstrapResourceHandler(RuntimeProfileManagem
         BootstrapPlanningContext planning,
         CancellationToken cancellationToken)
     {
-        var value = WorkspaceBootstrapResource.Parse<RuntimeProfileResource>(resource);
-        if (await service.GetAsync(value.Namespace, value.Name, cancellationToken) is not null)
+        var value = WorkspaceBootstrapResource.Parse<RuntimeProfileResource>(resource) with { ScopeRef = ResourceScopeRef.Instance };
+        if (await service.GetExactAsync(ResourceScopeRef.Instance, value.Namespace, value.Name, cancellationToken) is not null)
             return new(BootstrapResourceDisposition.Skip);
         service.ValidateForCreate(value);
         return WorkspaceBootstrapResource.Created(planning, Kind, value.Name, value.Namespace);
@@ -172,8 +171,8 @@ public sealed class RuntimeProfileBootstrapResourceHandler(RuntimeProfileManagem
         BootstrapResourceOperationContext operation,
         CancellationToken cancellationToken)
     {
-        var value = WorkspaceBootstrapResource.Parse<RuntimeProfileResource>(resource);
-        if (await service.GetAsync(value.Namespace, value.Name, cancellationToken) is not null)
+        var value = WorkspaceBootstrapResource.Parse<RuntimeProfileResource>(resource) with { ScopeRef = ResourceScopeRef.Instance };
+        if (await service.GetExactAsync(ResourceScopeRef.Instance, value.Namespace, value.Name, cancellationToken) is not null)
             return BootstrapResourceApplyResult.Skipped;
         _ = await service.CreateAsync(value, cancellationToken);
         return BootstrapResourceApplyResult.Created;
@@ -185,7 +184,8 @@ public sealed class ModelProfileBootstrapResourceHandler(
     ModelProviderManagementService providers) : IBootstrapResourceHandler
 {
     public string Kind => ModelResourceKinds.ModelProfile;
-    public BootstrapProfileScope Scope => BootstrapProfileScope.Tenant;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
+    public bool SupportsProfileScope(BootstrapProfileScope profileScope) => true;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
         BootstrapResourceDocument resource,
@@ -194,11 +194,14 @@ public sealed class ModelProfileBootstrapResourceHandler(
         CancellationToken cancellationToken)
     {
         var value = WorkspaceBootstrapResource.Parse<ModelProfileResource>(resource);
-        if (await service.GetAsync(value.Namespace, value.Name, cancellationToken) is not null)
+        var scopeRef = value.ScopeRef ?? TargetScope(operation);
+        value = value with { ScopeRef = scopeRef };
+        if (await service.GetExactAsync(scopeRef, value.Namespace, value.Name, cancellationToken) is not null)
             return new(BootstrapResourceDisposition.Skip);
         ValidateBasic(value);
         var provider = value.Definition.Provider.Resolve(value.Namespace, ModelResourceKinds.ModelProvider);
-        var existingProvider = await providers.GetAsync(provider.Namespace, provider.Name, cancellationToken);
+        var providerScope = value.Definition.Provider.ScopeRef ?? ResourceScopeRef.Instance;
+        var existingProvider = await providers.GetExactAsync(providerScope, provider.Namespace, provider.Name, cancellationToken);
         if (existingProvider is null
             && !WorkspaceBootstrapResource.IsAvailable(planning, provider.Kind, provider.Name, provider.Namespace))
             throw new InvalidOperationException($"Referenced model provider '{provider}' does not exist and was not planned earlier.");
@@ -213,7 +216,9 @@ public sealed class ModelProfileBootstrapResourceHandler(
         CancellationToken cancellationToken)
     {
         var value = WorkspaceBootstrapResource.Parse<ModelProfileResource>(resource);
-        if (await service.GetAsync(value.Namespace, value.Name, cancellationToken) is not null)
+        var scopeRef = value.ScopeRef ?? TargetScope(operation);
+        value = value with { ScopeRef = scopeRef };
+        if (await service.GetExactAsync(scopeRef, value.Namespace, value.Name, cancellationToken) is not null)
             return BootstrapResourceApplyResult.Skipped;
         _ = await service.CreateAsync(value, cancellationToken);
         return BootstrapResourceApplyResult.Created;
@@ -227,6 +232,17 @@ public sealed class ModelProfileBootstrapResourceHandler(
         if (resource.Definition.Generation.Temperature is < 0 or > 2)
             throw new InvalidOperationException("Model profile temperature must be between 0 and 2.");
     }
+
+    private static ResourceScopeRef TargetScope(BootstrapResourceOperationContext operation) =>
+        operation.ProfileScope switch
+        {
+            BootstrapProfileScope.Instance => ResourceScopeRef.Instance,
+            BootstrapProfileScope.Tenant => ResourceScopeRef.Tenant(operation.Target?.TenantId
+                ?? throw new InvalidOperationException("A Tenant Model Profile requires an explicit Tenant target.")),
+            BootstrapProfileScope.Workspace => ResourceScopeRef.Workspace(operation.Target?.WorkspaceId
+                ?? throw new InvalidOperationException("A Workspace Model Profile requires an explicit Workspace target.")),
+            _ => throw new InvalidOperationException($"Unsupported Model Profile scope '{operation.ProfileScope}'.")
+        };
 }
 
 public sealed class ToolSetBootstrapResourceHandler(ToolSetService service) : IBootstrapResourceHandler

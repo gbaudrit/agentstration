@@ -28,8 +28,17 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
     public void ResourceScopePolicyMatchesTheInitialOwnershipModel()
     {
         CollectionAssert.AreEquivalent(
-            new[] { ResourceScopeKind.Tenant },
+            new[] { ResourceScopeKind.Instance },
             ResourceScopePolicy.AllowedScopes(ModelResourceKinds.ModelProvider).ToArray());
+        CollectionAssert.AreEquivalent(
+            new[] { ResourceScopeKind.Instance },
+            ResourceScopePolicy.AllowedScopes(ModelResourceKinds.Model).ToArray());
+        CollectionAssert.AreEquivalent(
+            new[] { ResourceScopeKind.Instance },
+            ResourceScopePolicy.AllowedScopes(RuntimeProfileResourceKinds.RuntimeProfile).ToArray());
+        CollectionAssert.AreEquivalent(
+            new[] { ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace },
+            ResourceScopePolicy.AllowedScopes(ModelResourceKinds.ModelProfile).ToArray());
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Workspace },
             ResourceScopePolicy.AllowedScopes(AgentResourceKinds.Agent).ToArray());
@@ -367,17 +376,118 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         using var client = factory.CreateClient();
         var targets = await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
             $"/api/resource-scopes/targets?kind={RuntimeProfileResourceKinds.RuntimeProfile}");
-        var tenant = targets!.Single();
+        var instance = targets!.Single();
+        Assert.IsTrue(instance.CanWrite);
 
         using var created = await client.PostAsJsonAsync(
             "/api/runtimeprofiles",
             new CreateRuntimeProfileRequest(
                 "explicit-scope-runtime",
                 new RuntimeProfileProperties { DisplayName = "Explicit scope runtime", RuntimeType = "microsoft-agent-framework" },
-                ScopeRef: tenant.ScopeRef));
+                ScopeRef: instance.ScopeRef));
 
         Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
         var resource = await created.Content.ReadFromJsonAsync<RuntimeProfileResource>();
-        Assert.AreEqual(tenant.ScopeRef, resource?.ScopeRef);
+        Assert.AreEqual(instance.ScopeRef, resource?.ScopeRef);
+    }
+
+    [TestMethod]
+    public async Task HierarchicalModelProfileRequiresAccessAndAgentRevisionPinsExactDependencies()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var profiles = factory.Services.GetRequiredService<ModelProfileManagementService>();
+        var agents = factory.Services.GetRequiredService<AgentManagementService>();
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        var tenantScope = ResourceScopeRef.Tenant(context.TenantId);
+        var workspaceScope = ResourceScopeRef.Workspace(context.WorkspaceId);
+
+        var profile = await profiles.CreateAsync(new ModelProfileResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ModelResourceKinds.ModelProfile,
+            Metadata = new ResourceMetadata { Name = "tenant-reasoning" },
+            ScopeRef = tenantScope,
+            Definition = new ModelProfileProperties
+            {
+                DisplayName = "Tenant reasoning",
+                Provider = new ResourceReference("ollama-local", ResourceScopeRef.Instance),
+                Model = new ModelSelection { Name = "test-model" }
+            }
+        }, default);
+        var instanceProfile = await profiles.GetExactAsync(ResourceScopeRef.Instance,
+            ResourceNamespace.Default, "reasoning-default", default);
+        Assert.IsNotNull(instanceProfile);
+        var workspaceProfile = await profiles.CreateAsync(new ModelProfileResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ModelResourceKinds.ModelProfile,
+            Metadata = new ResourceMetadata { Name = profile.Value.Name },
+            ScopeRef = workspaceScope,
+            Definition = profile.Value.Definition with { DisplayName = "Workspace reasoning" }
+        }, default);
+        Assert.AreEqual(ResourceScopeRef.Instance, instanceProfile.Value.ScopeRef);
+        Assert.AreEqual(tenantScope, profile.Value.ScopeRef);
+        Assert.AreEqual(workspaceScope, workspaceProfile.Value.ScopeRef);
+        var agent = new AgentResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
+            Metadata = new ResourceMetadata { Name = "pinned-model-agent" },
+            ScopeRef = workspaceScope,
+            Definition = new AgentProperties
+            {
+                DisplayName = "Pinned model Agent",
+                Instructions = "Use the pinned profile.",
+                ModelProfile = new ResourceReference(profile.Value.Name, tenantScope),
+                RuntimeProfile = new ResourceReference("maf-builtin", ResourceScopeRef.Instance)
+            }
+        };
+
+        var ambiguousAgent = agent with
+        {
+            Metadata = new ResourceMetadata { Name = "ambiguous-model-agent" },
+            Definition = agent.Definition with { ModelProfile = new ResourceReference(profile.Value.Name) }
+        };
+        await Assert.ThrowsExactlyAsync<ModelProfileValidationException>(async () =>
+            await agents.PutAgentAsync(ambiguousAgent, null, true, default));
+
+        await Assert.ThrowsExactlyAsync<ModelProfileValidationException>(async () =>
+            await agents.PutAgentAsync(agent, null, true, default));
+
+        _ = await policies.PutAsync(new ResourceAccessPolicy(
+            new(profile.Value.Uid, tenantScope, profile.Value.Namespace, profile.Value.Kind,
+                profile.Value.Generation),
+            [new(workspaceScope, [ResourceAccessAction.Use])]), null, default);
+        var runtime = await factory.Services.GetRequiredService<IResourceStore>()
+            .GetExactAsync<RuntimeProfileResource>(ScopedResourceAddress.Create(ResourceScopeRef.Instance,
+                ResourceNamespace.Default, RuntimeProfileResourceKinds.RuntimeProfile, "maf-builtin"), default);
+        Assert.IsNotNull(runtime);
+        if (await policies.GetAsync(runtime.Value.Uid, default) is null)
+        {
+            _ = await policies.PutAsync(new ResourceAccessPolicy(
+                new(runtime.Value.Uid, ResourceScopeRef.Instance, runtime.Value.Namespace,
+                    RuntimeProfileResourceKinds.RuntimeProfile, runtime.Value.Generation),
+                [new(workspaceScope, [ResourceAccessAction.Use])]), null, default);
+        }
+        var storedAgent = await agents.PutAgentAsync(agent, null, true, default);
+        var revision = await agents.EnsureExecutionRevisionAsync(ResourceNamespace.Default,
+            storedAgent.Value.Name, storedAgent.Value.Generation, default);
+
+        Assert.AreEqual(profile.Value.Uid, revision.Value.Definition.ModelProfilePin?.Uid);
+        Assert.AreEqual(tenantScope, revision.Value.Definition.ModelProfilePin?.ScopeRef);
+        Assert.AreEqual(profile.Value.Generation, revision.Value.Definition.ModelProfilePin?.Generation);
+        Assert.AreEqual(ResourceScopeRef.Instance, revision.Value.Definition.RuntimeProfilePin?.ScopeRef);
+        Assert.AreEqual("maf-builtin", revision.Value.Definition.RuntimeProfilePin?.Name);
+
+        _ = await profiles.PutAsync(profile.Value.Namespace, profile.Value.Name, tenantScope,
+            profile.Value.Definition with { Description = "Generation two" }, profile.ETag, default);
+        var staleAgent = agent with
+        {
+            Metadata = new ResourceMetadata { Name = "stale-model-agent" }
+        };
+        await Assert.ThrowsExactlyAsync<ModelProfileValidationException>(async () =>
+            await agents.PutAgentAsync(staleAgent, null, true, default));
     }
 }
