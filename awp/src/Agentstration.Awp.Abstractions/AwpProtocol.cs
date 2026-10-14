@@ -19,6 +19,7 @@ public static class AwpProtocol
     public const string CompleteAssignmentPath = BasePath + "/assignments/complete";
     public const string FailAssignmentPath = BasePath + "/assignments/fail";
     public const string InvokeModelPath = BasePath + "/assignments/model/invoke";
+    public const string StreamModelPath = BasePath + "/assignments/model/stream";
     public const string InvokeToolPath = BasePath + "/assignments/tools/invoke";
     public const string InvokeFlowToolPath = BasePath + "/assignments/flow-tools/invoke";
     public const string CaptureFlowArtifactPath = BasePath + "/assignments/flow-artifacts/capture";
