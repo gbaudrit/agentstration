@@ -694,6 +694,9 @@ public sealed class RuntimeWorkerAssignmentTests
             public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
             public Task<RuntimeGovernedModelResponse> InvokeModelAsync(RuntimeGovernedModelRequest request, CancellationToken cancellationToken) => Unexpected<RuntimeGovernedModelResponse>();
+            public IAsyncEnumerable<RuntimeGovernedModelUpdate> StreamModelAsync(
+                RuntimeGovernedModelRequest request,
+                CancellationToken cancellationToken) => throw new AssertFailedException("Unexpected operation.");
             public Task<System.Text.Json.JsonElement?> InvokeToolAsync(RuntimeGovernedToolRequest request, CancellationToken cancellationToken) => Unexpected<System.Text.Json.JsonElement?>();
             public Task<RuntimeGovernedFlowToolResult> InvokeFlowToolAsync(WorkspaceId workspaceId,
                 string flowRunId, string stepDefinitionId, System.Text.Json.JsonElement arguments,

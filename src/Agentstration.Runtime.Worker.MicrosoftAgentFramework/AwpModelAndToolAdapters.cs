@@ -53,8 +53,65 @@ internal sealed class AwpModelChatClient(
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
         ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var response = await GetResponseAsync(messages, options, cancellationToken);
-        foreach (var update in response.ToChatResponseUpdates()) yield return update;
+        await session.EnsureCanStartMutationAsync(cancellationToken);
+        var request = new AwpInvokeModelRequest(session.Context, agent.ParticipantId, turn.TurnId,
+            turn.Attempt.TurnAttemptId, messages.Select(ToContract).ToArray());
+        var calls = new Dictionary<string, ToolCallBuffer>(StringComparer.Ordinal);
+        await foreach (var streamEvent in session.Client.StreamModelAsync(request, cancellationToken))
+        {
+            switch (streamEvent)
+            {
+                case AwpModelStreamStarted:
+                    break;
+                case AwpModelTextDelta text:
+                    yield return Update(text.StreamId, text.ModelId,
+                        [new TextContent(text.Text)]);
+                    break;
+                case AwpModelToolCallStarted started:
+                    if (!calls.TryAdd(started.CallId, new(started.Name)))
+                        throw InvalidStream("The AWP model stream contains a duplicate Tool call.");
+                    break;
+                case AwpModelToolCallArgumentsDelta arguments:
+                    if (!calls.TryGetValue(arguments.CallId, out var call))
+                        throw InvalidStream("The AWP model stream contains Tool arguments before Tool-call start.");
+                    call.Arguments.Append(arguments.Delta);
+                    if (call.Arguments.Length > 64 * 1024)
+                        throw InvalidStream("The AWP model stream Tool arguments exceed their size limit.");
+                    break;
+                case AwpModelToolCallDone done:
+                    if (!calls.Remove(done.CallId, out var completedCall))
+                        throw InvalidStream("The AWP model stream completes an unknown Tool call.");
+                    yield return Update(done.StreamId, null,
+                        [new FunctionCallContent(done.CallId, completedCall.Name, ParseArguments(completedCall.Arguments))]);
+                    break;
+                case AwpModelToolResult result:
+                    yield return Update(result.StreamId, null,
+                        [new FunctionResultContent(result.CallId, result.Result.Deserialize<object?>())]);
+                    break;
+                case AwpModelUsage usage:
+                    yield return Update(usage.StreamId, null,
+                        [new UsageContent(new UsageDetails
+                        {
+                            InputTokenCount = usage.InputTokens,
+                            OutputTokenCount = usage.OutputTokens
+                        })]);
+                    break;
+                case AwpModelStreamCompleted completed:
+                    if (calls.Count != 0)
+                        throw InvalidStream("The AWP model stream ended with incomplete Tool calls.");
+                    responseModelId = completed.ModelId;
+                    responseProviderType = completed.ProviderType;
+                    yield return new ChatResponseUpdate(ChatRole.Assistant, [])
+                    {
+                        ResponseId = completed.StreamId.ToString("D"),
+                        ModelId = completed.ModelId,
+                        FinishReason = completed.FinishReason is null ? null : new(completed.FinishReason)
+                    };
+                    break;
+                case AwpModelStreamFailed failed:
+                    throw new AwpModelStreamException(failed.Code, failed.Message);
+            }
+        }
     }
 
     public object? GetService(Type serviceType, object? serviceKey = null) =>
@@ -87,6 +144,35 @@ internal sealed class AwpModelChatClient(
             result.Result.Deserialize<object?>()),
         _ => throw new ArgumentOutOfRangeException(nameof(content))
     };
+
+    private static ChatResponseUpdate Update(Guid streamId, string? modelId, IList<AIContent> contents) => new(
+        ChatRole.Assistant, contents)
+    {
+        ResponseId = streamId.ToString("D"),
+        ModelId = modelId
+    };
+
+    private static Dictionary<string, object?> ParseArguments(StringBuilder arguments)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, object?>>(arguments.ToString())
+                ?? throw InvalidStream("The AWP model stream returned empty Tool arguments.");
+        }
+        catch (JsonException exception)
+        {
+            throw new AwpModelStreamException("invalid_response",
+                "The AWP model stream returned invalid Tool arguments.", exception);
+        }
+    }
+
+    private static AwpModelStreamException InvalidStream(string message) =>
+        new("invalid_response", message);
+
+    private sealed record ToolCallBuffer(string Name)
+    {
+        public StringBuilder Arguments { get; } = new();
+    }
 }
 
 internal sealed record AwpAgentTool(AwpExecutionToolMaterial Material) : IAgentTool

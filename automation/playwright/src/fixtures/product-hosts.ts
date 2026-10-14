@@ -252,13 +252,15 @@ async function startControlledWorkerAuthorityProxy(targetBaseUrl: string): Promi
 
   const server = createServer(async (incoming, outgoing) => {
     const target = new URL(incoming.url ?? '/', targetBaseUrl);
-    if (target.pathname === '/api/awp/v1/assignments/model/invoke' && blockedInvocationsRemaining > 0) {
+    const isModelInvocation = target.pathname === '/api/awp/v1/assignments/model/invoke'
+      || target.pathname === '/api/awp/v1/assignments/model/stream';
+    if (isModelInvocation && blockedInvocationsRemaining > 0) {
       blockedInvocationsRemaining--;
       if (blockedInvocationsRemaining === 0) blockedInvocationsObservedResolver?.();
       await cancellableWait(blockedInvocationsRelease, incoming, outgoing);
       if (incoming.destroyed || outgoing.destroyed) return;
     }
-    if (target.pathname === '/api/awp/v1/assignments/model/invoke' && nextModelDelayMilliseconds > 0) {
+    if (isModelInvocation && nextModelDelayMilliseconds > 0) {
       const delay = nextModelDelayMilliseconds;
       nextModelDelayMilliseconds = 0;
       delayedInvocationObserved?.();

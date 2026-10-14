@@ -25,6 +25,14 @@ public sealed record RuntimeGovernedModelResponse(
     int? OutputTokens,
     string? ProviderType = null);
 
+public sealed record RuntimeGovernedModelUpdate(
+    IReadOnlyList<RuntimeGovernedModelContent> Contents,
+    string? ModelId,
+    string? FinishReason,
+    int? InputTokens,
+    int? OutputTokens,
+    string? ProviderType = null);
+
 public sealed record RuntimeGovernedToolRequest(
     RuntimeExecutionAgentMaterial Agent,
     RuntimeExecutionToolMaterial Tool,
@@ -82,6 +90,9 @@ public sealed record RuntimeGovernedChildFlow(
 public interface IRuntimeWorkerOperationGateway
 {
     Task<RuntimeGovernedModelResponse> InvokeModelAsync(RuntimeGovernedModelRequest request, CancellationToken cancellationToken);
+    IAsyncEnumerable<RuntimeGovernedModelUpdate> StreamModelAsync(
+        RuntimeGovernedModelRequest request,
+        CancellationToken cancellationToken);
     Task<JsonElement?> InvokeToolAsync(RuntimeGovernedToolRequest request, CancellationToken cancellationToken);
     Task<RuntimeGovernedFlowToolResult> InvokeFlowToolAsync(
         WorkspaceId workspaceId,
