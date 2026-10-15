@@ -47,6 +47,12 @@ public interface IDataSourceAcquisitionCompositionResolver
         ResourceNamespace ownerNamespace,
         ResolvedDataSourceProfile profile,
         CancellationToken cancellationToken);
+
+    Task<ResolvedDataSourceDiscoveryComposition> ResolveDiscoveryAsync(
+        ResourceScopeRef executionScope,
+        ResourceNamespace ownerNamespace,
+        ResolvedDataSourceProfile profile,
+        CancellationToken cancellationToken);
 }
 
 public interface IDataSourceAcquisitionFlowGateway
@@ -69,6 +75,7 @@ public sealed class DataSourceAcquisitionService(
     ISecurityAuditWriter audit,
     DataSourceManagementService sources,
     DataSourceProfileService profiles,
+    DataSourceAcquisitionTargetService targets,
     IDataSourceAcquisitionCompositionResolver compositions,
     IDataSourceAcquisitionFlowGateway flowRuns,
     IDataSourceArtifactReferenceValidator artifacts,
@@ -80,6 +87,11 @@ public sealed class DataSourceAcquisitionService(
     public const int MaximumParametersBytes = 64 * 1024;
     public const int MaximumIdempotencyKeyLength = 200;
 
+    public Task<StoredResource<DataSourceAcquisitionResource>> StartAsync(
+        ResourceNamespace sourceNamespace, string sourceName, ResourceScopeRef? sourceScope,
+        JsonElement parameters, string? correlationId, string? idempotencyKey, CancellationToken cancellationToken) =>
+        StartAsync(sourceNamespace, sourceName, sourceScope, parameters, correlationId, idempotencyKey, null, cancellationToken);
+
     public async Task<StoredResource<DataSourceAcquisitionResource>> StartAsync(
         ResourceNamespace sourceNamespace,
         string sourceName,
@@ -87,6 +99,7 @@ public sealed class DataSourceAcquisitionService(
         JsonElement parameters,
         string? correlationId,
         string? idempotencyKey,
+        string? targetName,
         CancellationToken cancellationToken)
     {
         var context = RequireContext();
@@ -95,6 +108,7 @@ public sealed class DataSourceAcquisitionService(
             ?? throw Error("data_source_not_found", $"Data Source '{sourceNamespace}/{sourceName}' was not found.");
         var sourceOwnerScope = source.Value.ScopeRef
             ?? throw Error("data_source_scope_required", "The Data Source has no ownership scope.");
+        EnsureVisible(sourceOwnerScope, context);
         var gate = startGates.GetOrAdd((context.WorkspaceId, source.Value.Uid), _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(cancellationToken);
         try
@@ -109,6 +123,28 @@ public sealed class DataSourceAcquisitionService(
                 throw Error("data_source_configuration_invalid", string.Join(' ', configurationIssues));
 
             var executionScope = ResourceScopeRef.Workspace(context.WorkspaceId);
+            DataSourceAcquisitionTargetResource? target = null;
+            if (profile.Definition.DiscoveryFlow is not null)
+            {
+                if (string.IsNullOrWhiteSpace(targetName))
+                    throw Error("data_source_acquisition_target_required", "This Data Source requires an explicit acquisition target.");
+                var targetStored = await store.GetExactAsync<DataSourceAcquisitionTargetResource>(
+                    ScopedResourceAddress.Create(executionScope, source.Value.Namespace,
+                        DataSourceResourceKinds.DataSourceAcquisitionTarget, targetName), cancellationToken)
+                    ?? throw Error("data_source_acquisition_target_not_found", $"Acquisition target '{targetName}' was not found.");
+                target = targetStored.Value;
+                if (target.DataSourceUid != source.Value.Uid || target.DataSourceScopeRef != sourceOwnerScope)
+                    throw Error("data_source_acquisition_target_mismatch", $"Acquisition target '{targetName}' belongs to another Data Source.");
+                if (!target.Enabled)
+                    throw Error("data_source_acquisition_target_disabled", $"Acquisition target '{targetName}' is disabled.");
+                var targetViews = await targets.ListAsync(source.Value.Namespace,
+                    source.Value.Name, sourceOwnerScope, cancellationToken);
+                var view = targetViews.Single(value => value.Target.Uid == target.Uid);
+                if (view.Stale)
+                    throw Error("data_source_acquisition_target_stale", string.Join(' ', view.StalenessReasons));
+            }
+            else if (!string.IsNullOrWhiteSpace(targetName))
+                throw Error("data_source_acquisition_target_not_supported", "This Data Source profile does not define discovery.");
             var composition = await compositions.ResolveAsync(executionScope, source.Value.Namespace, profile, cancellationToken);
             ValidateContract(composition.Flow);
             var requestHash = Hash(JsonSerializer.SerializeToElement(new
@@ -127,6 +163,7 @@ public sealed class DataSourceAcquisitionService(
                 tools = composition.Tools,
                 composition.Limits,
                 composition.Policies,
+                target = target is null ? null : new { target.Uid, target.Generation, target.DiscoveryUid, target.ChoiceId, target.Selector },
                 parameters
             }));
             var existing = await store.ListExactAsync<DataSourceAcquisitionResource>(executionScope,
@@ -143,7 +180,8 @@ public sealed class DataSourceAcquisitionService(
                     return await SynchronizeAsync(match, context, cancellationToken);
                 }
             }
-            foreach (var active in existing.Where(item => item.Value.DataSourceUid == source.Value.Uid))
+            foreach (var active in existing.Where(item => item.Value.DataSourceUid == source.Value.Uid
+                && item.Value.Target?.Uid == target?.Uid))
             {
                 var synchronized = await SynchronizeAsync(active, context, cancellationToken);
                 if (!IsTerminal(synchronized.Value.State))
@@ -167,6 +205,7 @@ public sealed class DataSourceAcquisitionService(
                 Caller = new(context.PrincipalId, context.TenantId, context.WorkspaceId),
                 CorrelationId = effectiveCorrelationId,
                 AcquisitionId = acquisitionId
+                ,Target = target
             });
             var resource = new DataSourceAcquisitionResource
             {
@@ -181,6 +220,7 @@ public sealed class DataSourceAcquisitionService(
                 DataSourceName = source.Value.Name,
                 DataSourceNamespace = source.Value.Namespace,
                 DataSourceGeneration = source.Value.Generation,
+                Target = target,
                 Composition = composition,
                 FlowRunId = runId,
                 State = DataSourceAcquisitionState.Pending,
@@ -246,6 +286,7 @@ public sealed class DataSourceAcquisitionService(
                 sourceScope, cancellationToken)
                 ?? throw Error("data_source_not_found",
                     $"Data Source '{sourceNamespace ?? ResourceNamespace.Default}/{sourceName}' was not found.");
+            EnsureVisible(source.Value.ScopeRef!.Value, context);
             selected = stored.Where(item => item.Value.DataSourceUid == source.Value.Uid
                 && item.Value.DataSourceScopeRef == source.Value.ScopeRef);
         }
@@ -293,7 +334,8 @@ public sealed class DataSourceAcquisitionService(
         if (!IsTerminal(original.Value.State))
             throw Error("data_source_acquisition_retry_not_terminal", "Only a terminal acquisition can be retried.");
         var retried = await StartAsync(original.Value.DataSourceNamespace, original.Value.DataSourceName,
-            original.Value.DataSourceScopeRef, original.Value.Parameters, correlationId, null, cancellationToken);
+            original.Value.DataSourceScopeRef, original.Value.Parameters, correlationId, null,
+            original.Value.Target?.Name, cancellationToken);
         var updated = retried.Value with
         {
             RetriedFrom = original.Value.Name,
@@ -328,6 +370,7 @@ public sealed class DataSourceAcquisitionService(
                 Caller = new(value.CreatedBy, value.TenantId, workspaceId),
                 CorrelationId = value.CorrelationId,
                 AcquisitionId = value.Name
+                ,Target = value.Target
             });
             try
             {
@@ -423,11 +466,15 @@ public sealed class DataSourceAcquisitionService(
         }
     }
 
-    private static DataSourceAcquisitionManifest ParseManifest(JsonElement? output)
+    internal static DataSourceAcquisitionManifest ParseArtifactManifest(JsonElement? output, bool artifactsOptional = false)
     {
         if (output is not { ValueKind: JsonValueKind.Object }
-            || !output.Value.TryGetProperty("artifacts", out var values)
-            || values.ValueKind != JsonValueKind.Array)
+            || !output.Value.TryGetProperty("artifacts", out var values))
+        {
+            if (artifactsOptional && output is { ValueKind: JsonValueKind.Object }) return new();
+            throw Error("data_source_acquisition_manifest_invalid", "The acquisition Flow must return an artifacts array.");
+        }
+        if (values.ValueKind != JsonValueKind.Array)
             throw Error("data_source_acquisition_manifest_invalid", "The acquisition Flow must return an artifacts array.");
         var entries = values.EnumerateArray().ToArray();
         if (entries.Length > MaximumManifestArtifacts)
@@ -457,44 +504,49 @@ public sealed class DataSourceAcquisitionService(
         return new() { Artifacts = result };
     }
 
+    private static DataSourceAcquisitionManifest ParseManifest(JsonElement? output) => ParseArtifactManifest(output);
+
     private static void ValidateContract(ResolvedDataSourceFlowBinding flow)
     {
         if (!string.Equals(flow.Contract, DataSourceFlowContracts.Acquisition, StringComparison.Ordinal))
             throw Error("data_source_acquisition_contract_required",
                 $"Flow '{flow.Namespace}/{flow.Name}:{flow.Version}' must declare contract '{DataSourceFlowContracts.Acquisition}'.");
-        RequireProperties(flow.InputSchema,
+        RequireContractProperties(flow.InputSchema,
             ["dataSourceId", "dataSourceUid", "dataSourceGeneration", "profile", "sourceConfiguration",
-                "parameters", "caller", "correlationId", "acquisitionId"], "input");
-        RequireProperties(flow.OutputSchema, ["artifacts"], "output");
+                "parameters", "caller", "correlationId", "acquisitionId"], "input", DataSourceFlowContracts.Acquisition,
+            "data_source_acquisition_contract_invalid");
+        RequireContractProperties(flow.OutputSchema, ["artifacts"], "output", DataSourceFlowContracts.Acquisition,
+            "data_source_acquisition_contract_invalid");
     }
 
-    private static void RequireProperties(JsonElement? schema, IReadOnlyList<string> names, string direction)
+    internal static void RequireContractProperties(JsonElement? schema, IReadOnlyList<string> names, string direction,
+        string contract, string errorCode)
     {
         if (schema is not { ValueKind: JsonValueKind.Object }
             || !schema.Value.TryGetProperty("type", out var type) || type.GetString() != "object"
             || !schema.Value.TryGetProperty("properties", out var properties) || properties.ValueKind != JsonValueKind.Object
             || !schema.Value.TryGetProperty("required", out var required) || required.ValueKind != JsonValueKind.Array)
-            throw Error("data_source_acquisition_contract_invalid",
-                $"The {DataSourceFlowContracts.Acquisition} {direction} schema must be an object with properties and required arrays.");
+            throw Error(errorCode, $"The {contract} {direction} schema must be an object with properties and required arrays.");
         var requiredNames = required.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String)
             .Select(item => item.GetString()!).ToHashSet(StringComparer.Ordinal);
         foreach (var name in names)
             if (!properties.TryGetProperty(name, out _) || !requiredNames.Contains(name))
-                throw Error("data_source_acquisition_contract_invalid",
-                    $"The {DataSourceFlowContracts.Acquisition} {direction} schema must require property '{name}'.");
+                throw Error(errorCode, $"The {contract} {direction} schema must require property '{name}'.");
     }
 
-    private static void ValidateRequest(JsonElement parameters, string? idempotencyKey)
+    internal static void ValidateBoundedRequest(JsonElement parameters, string? idempotencyKey, string label)
     {
         if (parameters.ValueKind is not JsonValueKind.Object and not JsonValueKind.Null)
-            throw Error("data_source_acquisition_parameters_invalid", "Acquisition parameters must be a JSON object.");
+            throw Error("data_source_request_parameters_invalid", $"{label} parameters must be a JSON object.");
         if (Encoding.UTF8.GetByteCount(parameters.GetRawText()) > MaximumParametersBytes)
-            throw Error("data_source_acquisition_parameters_too_large",
-                $"Acquisition parameters cannot exceed {MaximumParametersBytes} bytes.");
+            throw Error("data_source_request_parameters_too_large", $"{label} parameters cannot exceed {MaximumParametersBytes} bytes.");
         if (idempotencyKey?.Length > MaximumIdempotencyKeyLength)
             throw Error("data_source_acquisition_idempotency_key_too_long",
                 $"Idempotency keys cannot exceed {MaximumIdempotencyKeyLength} characters.");
     }
+
+    private static void ValidateRequest(JsonElement parameters, string? idempotencyKey) =>
+        ValidateBoundedRequest(parameters, idempotencyKey, "Acquisition");
 
     private Task AuditAsync(string action, string reason, RequestContext context, CancellationToken cancellationToken) =>
         audit.WriteAsync(new(action, ActorPrincipalId: context.PrincipalId, TenantId: context.TenantId,
@@ -502,6 +554,12 @@ public sealed class DataSourceAcquisitionService(
     private RequestContext RequireContext() => requestContext.IsInitialized
         ? requestContext.Current
         : throw Error("data_source_acquisition_context_required", "A Workspace request context is required.");
+    internal static void EnsureVisible(ResourceScopeRef scope, RequestContext context)
+    {
+        if (scope.Kind == ResourceScopeKind.Workspace && scope.TargetId != context.WorkspaceId
+            || scope.Kind == ResourceScopeKind.Tenant && scope.TargetId != context.TenantId)
+            throw new ResourceScopeAccessDeniedException(scope);
+    }
     private static bool IsTerminal(DataSourceAcquisitionState state) => state is DataSourceAcquisitionState.Succeeded
         or DataSourceAcquisitionState.Failed or DataSourceAcquisitionState.Cancelled or DataSourceAcquisitionState.TimedOut;
     private static string? OptionalString(JsonElement value, string name) =>
