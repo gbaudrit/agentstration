@@ -62,7 +62,7 @@ public static class Crawl4AiDataSourceProfileBundle
               - type: toolRoute
                 name: write
                 displayName: Write staged content
-                toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0 }
+                toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0, scopeRef: /instance }
                 capability: staged-artifact.write
                 route: default
                 argumentsMapping: { artifactId: "${input.stagedArtifactId}", offset: "${steps.read.output.structuredContent.offset}", contentBase64: "${steps.read.output.structuredContent.contentBase64}" }
@@ -129,7 +129,7 @@ public static class Crawl4AiDataSourceProfileBundle
               - type: toolRoute
                 name: create
                 displayName: Create staged corpus
-                toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0 }
+                toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0, scopeRef: /instance }
                 capability: staged-artifact.create
                 route: default
                 argumentsMapping: { fileName: crawl4ai-content.md, mediaType: "${steps.crawl.output.structuredContent.corpus.mediaType}" }
@@ -144,14 +144,14 @@ public static class Crawl4AiDataSourceProfileBundle
               - type: toolRoute
                 name: seal
                 displayName: Seal staged corpus
-                toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0 }
+                toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0, scopeRef: /instance }
                 capability: staged-artifact.seal
                 route: default
                 argumentsMapping: { artifactId: "${steps.create.output.artifactReference}" }
               - type: flow
                 name: persist
                 displayName: Persist acquired corpus
-                flow: { resourceId: artifact-storage-filesystem-write-builtin, versionStrategy: active }
+                flow: { resourceId: artifact-storage-filesystem-write-builtin, scopeRef: /instance, versionStrategy: exact, version: 1.0.0 }
                 inputMapping: { stagedArtifactId: "${steps.create.output.artifactReference}", producerFlowRunId: "${execution.flowRunId}", producerFlowStepId: seal }
               - type: toolRoute
                 name: cleanup

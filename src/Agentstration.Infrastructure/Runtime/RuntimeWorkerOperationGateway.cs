@@ -5,6 +5,7 @@ using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Tools;
 using Agentstration.Work;
@@ -150,7 +151,8 @@ public sealed class RuntimeWorkerOperationGateway(
                 tool = direct.Tool;
                 break;
             case ToolRouteFlowStepDefinition routed:
-                resolvedRoute = await flowToolSetResolver.ResolveAsync(workspaceId, run.FlowId.Namespace,
+                resolvedRoute = await flowToolSetResolver.ResolveAsync(workspaceId,
+                    run.DefinitionScopeRef ?? ResourceScopeRef.Workspace(run.Scope.WorkspaceId.Value), run.FlowId.Namespace,
                     routed, cancellationToken);
                 tool = resolvedRoute.Tool;
                 route = new(resolvedRoute.ToolSetName, resolvedRoute.ToolSetNamespace, resolvedRoute.ToolSetVersion,
@@ -168,6 +170,7 @@ public sealed class RuntimeWorkerOperationGateway(
                 run.Scope,
                 run.Id,
                 run.FlowId,
+                run.DefinitionScopeRef ?? ResourceScopeRef.Workspace(run.Scope.WorkspaceId.Value),
                 step.Name,
                 attempt,
                 run.CorrelationId ?? run.Id,

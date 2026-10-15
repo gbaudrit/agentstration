@@ -62,9 +62,15 @@ public sealed class ToolSetArtifactStagingExecutor(ToolSetService toolSets, IToo
             InvocationId = $"{context.CallId}:attempt:1",
             ToolId = member.ToolName,
             ToolNamespace = member.ToolNamespace,
+            ToolScopeRef = member.ToolScopeRef,
+            ToolUid = member.ToolUid,
+            ToolGeneration = member.ToolGeneration,
             ToolName = member.ExternalToolId,
             ToolProviderId = member.ProviderName,
             ToolProviderNamespace = member.ProviderNamespace,
+            ToolProviderScopeRef = member.ProviderScopeRef,
+            ToolProviderUid = member.ProviderUid,
+            ToolProviderGeneration = member.ProviderGeneration,
             ExternalToolId = member.ExternalToolId,
             TenantId = context.TenantId,
             WorkspaceId = context.WorkspaceId,
@@ -81,7 +87,9 @@ public sealed class ToolSetArtifactStagingExecutor(ToolSetService toolSets, IToo
 
     private Task<ToolSetRouteSelection> ResolveAsync(ArtifactStagingBindingResource binding, string capability, CancellationToken cancellationToken) =>
         toolSets.ResolveRouteExactAsync(
-            binding.ScopeRef ?? throw Error("artifact_staging_binding_scope_invalid", "The Artifact staging binding has no Workspace scope."),
+            binding.Definition.ToolSet.ScopeRef
+                ?? binding.ScopeRef
+                ?? throw Error("artifact_staging_binding_scope_invalid", "The Artifact staging binding and ToolSet reference have no scope."),
             binding.Definition.ToolSet.Namespace ?? binding.Namespace, binding.Definition.ToolSet.Name,
             binding.Definition.ToolSetVersion, capability, "default", cancellationToken);
 

@@ -674,10 +674,13 @@ public sealed partial class DeclarativeBootstrapTests
             var entry = await scope.ServiceProvider.GetRequiredService<IWorkplaceRepository>()
                 .GetEntryAsync(new(workspace.Id), new("bootstrap-entry"), default);
             var resourceStore = scope.ServiceProvider.GetRequiredService<IResourceStore>();
-            var internalProvider = await resourceStore.GetAsync<ToolProviderResource>(
-                new(ToolResourceKinds.ToolProvider, AgentstrationToolProvider.Name), default);
-            var planningTool = await resourceStore.GetAsync<ToolResource>(
-                new(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.ResourcePlanCreate)), default);
+            var workspaceScope = ResourceScopeRef.Workspace(workspace.Id);
+            var internalProvider = await resourceStore.GetExactAsync<ToolProviderResource>(
+                ScopedResourceAddress.Create(workspaceScope, ResourceNamespace.Default,
+                    ToolResourceKinds.ToolProvider, AgentstrationToolProvider.Name), default);
+            var planningTool = await resourceStore.GetExactAsync<ToolResource>(
+                ScopedResourceAddress.Create(workspaceScope, ResourceNamespace.Default, ToolResourceKinds.Tool,
+                    AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.ResourcePlanCreate)), default);
 
             Assert.IsNotNull(provider);
             Assert.IsNotNull(runtime);
