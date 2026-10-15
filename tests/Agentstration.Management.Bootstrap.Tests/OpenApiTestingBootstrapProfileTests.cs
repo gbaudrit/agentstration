@@ -40,6 +40,12 @@ public sealed class OpenApiTestingBootstrapProfileTests
         Assert.IsTrue(resources
             .Where(value => value.Kind == "Flow")
             .All(value => value.Definition.GetProperty("spec").GetProperty("flowKind").GetString() == "workflow"));
+        var discovery = resources.Single(value => value.Kind == "Flow"
+            && value.Metadata.Name == "openapi-discovery");
+        Assert.AreEqual("1.0.1", discovery.Definition.GetProperty("version").GetString());
+        var dataSourceProfile = resources.Single(value => value.Kind == "DataSourceProfile");
+        Assert.AreEqual("1.0.1", dataSourceProfile.Definition.GetProperty("discoveryFlow")
+            .GetProperty("version").GetString());
     }
 
     private static string FindRepositoryRoot()
