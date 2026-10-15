@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agentstration.Artifacts;
 using Agentstration.Tools;
 
 namespace Agentstration.Runtime.Tests;
@@ -48,5 +49,30 @@ public sealed class ToolInputSchemaValidatorTests
             ToolInputSchemaValidator.Validate(CreateSchema(), JsonSerializer.SerializeToElement(new { }))).Code);
         Assert.AreEqual("tool_argument_unknown", Assert.ThrowsExactly<ToolInputValidationException>(() =>
             ToolInputSchemaValidator.Validate(CreateSchema(), JsonSerializer.SerializeToElement(new { prompt = "hello", extra = true }))).Code);
+    }
+
+    [TestMethod]
+    public void ArtifactStagingPayloadAtMaximumChunkSizeIsAccepted()
+    {
+        var arguments = JsonSerializer.SerializeToElement(new
+        {
+            backendReference = "test-reference",
+            offset = 0,
+            contentBase64 = Convert.ToBase64String(new byte[ArtifactManagementService.MaximumChunkBytes])
+        });
+
+        ToolInputSchemaValidator.Validate(null, arguments);
+    }
+
+    [TestMethod]
+    public void PayloadsLargerThanTwoMebibytesAreRejected()
+    {
+        var arguments = JsonSerializer.SerializeToElement(new { contentBase64 = new string('x', 2 * 1024 * 1024) });
+
+        var exception = Assert.ThrowsExactly<ToolInputValidationException>(() =>
+            ToolInputSchemaValidator.Validate(null, arguments));
+
+        Assert.AreEqual("tool_arguments_too_large", exception.Code);
+        Assert.AreEqual("$", exception.Path);
     }
 }
