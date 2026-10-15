@@ -20,7 +20,8 @@ test('an administrator can create and deploy an agent @smoke', async ({ page, pr
     checkpoint: ignoreCheckpoints,
   }, agent);
 
-  await expect(page).toHaveURL(new RegExp(`/agents/${agent.name}$`));
+  await expect(page).toHaveURL(url =>
+    url.pathname === `/agents/${agent.name}` && url.searchParams.has('scopeRef'));
   await expect(page.getByTestId(TestIds.agentEditor.name)).toHaveValue(agent.name);
   await expect(page.getByTestId(TestIds.agentEditor.name)).toBeDisabled();
 });

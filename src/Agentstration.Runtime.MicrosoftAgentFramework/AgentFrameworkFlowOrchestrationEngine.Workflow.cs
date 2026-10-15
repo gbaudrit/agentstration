@@ -27,7 +27,8 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine
                 ? await agentResolver.ResolveLatestAsync(reference.Id, @namespace, cancellationToken)
                 : await agentResolver.ResolveAsync(new RuntimeAgentReference(binding.AgentResourceId, binding.AgentGeneration)
                 {
-                    Namespace = binding.AgentNamespace
+                    Namespace = binding.AgentNamespace,
+                    ScopeRef = binding.AgentScopeRef
                 }, cancellationToken);
             if (binding is null && !resolved.Ready)
                 throw new FlowValidationException("flow_participant_not_ready", $"Agent '{reference.Id}' is not ready: {resolved.Error ?? resolved.State}.");
@@ -48,10 +49,14 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine
             {
                 ParticipantId = reference.Id,
                 AgentNamespace = @namespace,
+                AgentScopeRef = resolved.AgentScopeRef,
+                AgentUid = resolved.AgentId,
                 AgentResourceId = resolved.AgentName,
                 AgentGeneration = resolved.Generation,
                 DeploymentId = resolved.DeploymentId,
                 RevisionId = resolved.RevisionId,
+                RevisionUid = resolved.RevisionUid,
+                DefinitionHash = resolved.Definition.DefinitionHash,
                 RuntimeProfileName = resolved.RuntimeProfileName,
                 RuntimeProfileNamespace = resolved.RuntimeProfileNamespace,
                 ModelProfileName = resolved.ModelProfileName

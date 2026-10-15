@@ -17,12 +17,19 @@ public interface IFlowVersionActivationGuard
     Task ValidateActivationAsync(WorkspaceId workspaceId, FlowVersion version, CancellationToken cancellationToken);
 }
 
+public interface IFlowAgentReferenceResolver
+{
+    Task<FlowTargetReference> ResolveAsync(ResourceScopeRef ownerScopeRef, ResourceNamespace ownerNamespace,
+        FlowTargetReference reference, CancellationToken cancellationToken);
+}
+
 public sealed class FlowService(
     IFlowRepository repository,
     TimeProvider timeProvider,
     IEnumerable<IFlowDeletionGuard> deletionGuards,
     IEnumerable<IFlowVersionActivationGuard>? activationGuards = null,
-    IEnumerable<IFlowScopeHierarchy>? scopeHierarchies = null)
+    IEnumerable<IFlowScopeHierarchy>? scopeHierarchies = null,
+    IFlowAgentReferenceResolver? agentReferences = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -128,7 +135,9 @@ public sealed class FlowService(
         var current = await repository.GetExactAsync(scopeRef, id, cancellationToken) ?? throw new FlowNotFoundException(id);
         if (!string.Equals(current.ETag, expectedETag, StringComparison.Ordinal)) throw new FlowConcurrencyException("The supplied ETag does not match the current Flow version.");
         var published = await repository.GetVersionExactAsync(scopeRef, id, command.Version, cancellationToken);
-        if (published is not null && JsonSerializer.Serialize(published.Value.Definition, JsonOptions) != JsonSerializer.Serialize(command.Definition, JsonOptions))
+        if (published is not null
+            && (JsonSerializer.Serialize(current.Value.Definition, JsonOptions) != JsonSerializer.Serialize(command.Definition, JsonOptions)
+                || JsonSerializer.Serialize(current.Value.Graph, JsonOptions) != JsonSerializer.Serialize(command.Graph, JsonOptions)))
             throw new FlowValidationException("published_version_immutable", $"Published Flow version '{command.Version}' cannot be modified.");
         var updated = current.Value with
         {
@@ -175,8 +184,10 @@ public sealed class FlowService(
             throw new FlowValidationException("flow_version_mismatch", "The requested version must match the current Flow definition version.");
         if (await repository.GetVersionExactAsync(scopeRef, id, version, cancellationToken) is not null)
             throw new FlowValidationException("flow_version_already_published", $"Flow version '{version}' has already been published. Choose a new version.");
-        var published = new FlowVersion(stored.Value.ScopeRef, id, version, stored.Value.Description, stored.Value.Definition, stored.Value.Metadata, timeProvider.GetUtcNow(), stored.Value.Graph,
-            stored.Value.Graph is null ? FlowDefinitionHash.Compute(stored.Value.Definition) : FlowDefinitionHash.Compute(stored.Value.Graph), releaseNotes);
+        var definition = await PinAgentsAsync(scopeRef, id.Namespace, stored.Value.Definition, cancellationToken);
+        var graph = stored.Value.Graph is null ? null : await PinAgentsAsync(scopeRef, id.Namespace, stored.Value.Graph, cancellationToken);
+        var published = new FlowVersion(stored.Value.ScopeRef, id, version, stored.Value.Description, definition, stored.Value.Metadata, timeProvider.GetUtcNow(), graph,
+            graph is null ? FlowDefinitionHash.Compute(definition) : FlowDefinitionHash.Compute(graph), releaseNotes);
         FlowValidator.ValidateVersion(published);
         if (activate)
             if (scopeRef.Kind == ResourceScopeKind.Workspace)
@@ -195,6 +206,73 @@ public sealed class FlowService(
             await repository.UpdateAsync(activated, stored.ETag, cancellationToken);
         }
         return created;
+    }
+
+    private async Task<FlowDefinition> PinAgentsAsync(ResourceScopeRef ownerScopeRef, ResourceNamespace ownerNamespace,
+        FlowDefinition definition, CancellationToken cancellationToken)
+    {
+        if (agentReferences is null) return definition;
+        async Task<FlowTargetReference> Resolve(FlowTargetReference reference) => reference.Kind == FlowTargetKind.Agent
+            ? await agentReferences.ResolveAsync(ownerScopeRef, ownerNamespace, reference, cancellationToken)
+            : reference;
+        return definition switch
+        {
+            DirectFlowDefinition direct => direct with { Target = await Resolve(direct.Target) },
+            RoutingFlowDefinition routing => routing with
+            {
+                Destinations = await Task.WhenAll(routing.Destinations.Select(Resolve)),
+                Fallback = routing.Fallback is null ? null : await Resolve(routing.Fallback)
+            },
+            WorkflowFlowDefinition workflow => workflow with
+            {
+                Nodes = await Task.WhenAll(workflow.Nodes.Select(async node => node.Target is null
+                    ? node
+                    : node with { Target = await Resolve(node.Target) }))
+            },
+            OrchestrationFlowDefinition orchestration => orchestration with
+            {
+                Participants = await Task.WhenAll(orchestration.Participants.Select(Resolve)),
+                Pattern = orchestration.Pattern is MagenticOrchestrationPattern magentic
+                    ? magentic with { Manager = await Resolve(magentic.Manager) }
+                    : orchestration.Pattern
+            },
+            _ => definition
+        };
+    }
+
+    private async Task<FlowGraphDefinition> PinAgentsAsync(ResourceScopeRef ownerScopeRef, ResourceNamespace ownerNamespace,
+        FlowGraphDefinition graph, CancellationToken cancellationToken)
+    {
+        if (agentReferences is null) return graph;
+        async Task<FlowResourceReference> Resolve(FlowResourceReference reference)
+        {
+            var resolved = await agentReferences.ResolveAsync(ownerScopeRef, ownerNamespace,
+                new(FlowTargetKind.Agent, reference.ResourceId,
+                    reference.Version?.ToString(System.Globalization.CultureInfo.InvariantCulture), reference.Namespace,
+                    reference.ScopeRef), cancellationToken);
+            return reference with
+            {
+                Namespace = resolved.Namespace,
+                ScopeRef = resolved.ScopeRef,
+                Version = long.Parse(resolved.Version!, System.Globalization.CultureInfo.InvariantCulture),
+                ResourceUid = resolved.ResourceUid,
+                RevisionUid = resolved.RevisionUid,
+                DefinitionHash = resolved.DefinitionHash
+            };
+        }
+        var steps = await Task.WhenAll(graph.Steps.Select(async step => step switch
+        {
+            AgentFlowStepDefinition agent when !agent.Agent.ResourceId.StartsWith("${", StringComparison.Ordinal) =>
+                agent with { Agent = await Resolve(agent.Agent) },
+            RouterFlowStepDefinition router => router with
+            {
+                Candidates = await Task.WhenAll(router.Candidates.Select(async candidate =>
+                    candidate with { Agent = await Resolve(candidate.Agent) })),
+                Fallback = router.Fallback is null ? null : await Resolve(router.Fallback)
+            },
+            _ => step
+        }));
+        return graph with { Steps = steps };
     }
 
     public Task<StoredFlowVersion?> GetVersionAsync(WorkspaceId workspaceId, FlowId id, string version, CancellationToken cancellationToken) => repository.GetVersionAsync(workspaceId, id, version, cancellationToken);

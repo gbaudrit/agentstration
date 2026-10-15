@@ -93,6 +93,12 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
         return await ReadResourceAsync<AgentResource>(response, cancellationToken);
     }
 
+    public async Task<ResourceSnapshot<AgentResource>> GetAgentAsync(ResourceNamespace @namespace, string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(AgentPath(@namespace, name, scopeRef), cancellationToken);
+        return await ReadResourceAsync<AgentResource>(response, cancellationToken);
+    }
+
     public async Task<ResourceSnapshot<AgentRevision>> GetAgentRevisionAsync(
         ResourceNamespace @namespace,
         string agentName,
@@ -126,6 +132,14 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public async Task DeleteAgentAsync(ResourceNamespace @namespace, string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Delete, AgentPath(@namespace, name, scopeRef));
+        message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
+
     public async Task<ManagementSummary> GetSummaryAsync(CancellationToken cancellationToken)
     {
         var agentsTask = GetAgentsAsync(cancellationToken);
@@ -138,6 +152,9 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
     private static string AgentPath(ResourceNamespace @namespace, string name) => @namespace.IsDefault
         ? $"api/agents/{Uri.EscapeDataString(name)}"
         : $"api/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(name)}";
+
+    private static string AgentPath(ResourceNamespace @namespace, string name, ResourceScopeRef scopeRef) =>
+        $"{AgentPath(@namespace, name)}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}";
 
     private static async Task<ResourceSnapshot<T>> ReadResourceAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {

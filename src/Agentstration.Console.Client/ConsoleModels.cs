@@ -15,9 +15,7 @@ public sealed record AgentSummary(string Id, string Name, string Type, string Ve
     public string? DeploymentId { get; init; }
     public ResourceAddress ModelProfileAddress => ResourceAddress.Create(ModelProfileNamespace, ModelResourceKinds.ModelProfile, ModelProfile);
     public string? DeploymentUrl => DeploymentId is null ? null : ConsoleResourceUrls.Deployment(Namespace, DeploymentId);
-    public string DetailsUrl => Namespace.IsDefault
-        ? $"/agents/{Uri.EscapeDataString(Id)}"
-        : $"/namespaces/{Uri.EscapeDataString(Namespace.Value)}/agents/{Uri.EscapeDataString(Id)}";
+    public string DetailsUrl => ConsoleResourceUrls.Agent(Namespace, Id, ScopeRef);
 }
 public sealed record ResourceSnapshot<T>(T Value, string ETag);
 public sealed record DeploymentSummary(
@@ -44,6 +42,14 @@ public sealed record FlowSummary(string Id, string Name, string Kind, string Ver
 
 public static class ConsoleResourceUrls
 {
+    public static string Agent(ResourceNamespace @namespace, string name, ResourceScopeRef? scopeRef = null)
+    {
+        var path = @namespace.IsDefault
+            ? $"/agents/{Uri.EscapeDataString(name)}"
+            : $"/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(name)}";
+        return scopeRef is null ? path : $"{path}?scopeRef={Uri.EscapeDataString(scopeRef.Value.Value)}";
+    }
+
     public static string Deployment(ResourceNamespace @namespace, string name) =>
         $"/deployments#deployment-{Uri.EscapeDataString(@namespace.Value)}-{Uri.EscapeDataString(name)}";
 

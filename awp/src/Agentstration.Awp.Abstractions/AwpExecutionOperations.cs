@@ -10,7 +10,15 @@ public sealed record AwpExecutionToolMaterial(
     string? Description,
     JsonElement InputSchema,
     JsonElement? OutputSchema,
-    bool RequiresApproval);
+    bool RequiresApproval)
+{
+    public string? ScopeRef { get; init; }
+    public Guid? Uid { get; init; }
+    public long? Generation { get; init; }
+    public string? ProviderScopeRef { get; init; }
+    public Guid? ProviderUid { get; init; }
+    public long? ProviderGeneration { get; init; }
+}
 
 public sealed record AwpExecutionAgentMaterial(
     string MaterialId,

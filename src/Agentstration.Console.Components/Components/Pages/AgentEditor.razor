@@ -143,6 +143,7 @@ else
 @code {
     [Parameter] public string? Name { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "namespace")] public string? AgentNamespace { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
 
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string ModelStatusLabel(string? status) => Localizer[$"Status.{status?.ToLowerInvariant() switch { "available" => "Available", "ready" => "Ready", "succeeded" => "Succeeded", "starting" => "Starting", "providerunavailable" => "ProviderUnavailable", "modelunavailable" => "ModelUnavailable", "unavailable" => "Unavailable", "invalidconfiguration" => "InvalidConfiguration", "incompatible" => "Incompatible", "failed" => "Failed", _ => "Unknown" }}"];
@@ -229,10 +230,13 @@ else
             }
             else
             {
-                var snapshot = await Client.GetAgentAsync(AgentResourceNamespace, Name!, cancellation.Token);
+                ResourceScopeRef? requestedScope = string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
+                var snapshot = requestedScope is null
+                    ? await Client.GetAgentAsync(AgentResourceNamespace, Name!, cancellation.Token)
+                    : await Client.GetAgentAsync(AgentResourceNamespace, Name!, requestedScope.Value, cancellation.Token);
                 if (!AgentResourceNamespace.IsDefault && IsPackManaged(snapshot.Value))
                 {
-                    Navigation.NavigateTo($"/namespaces/{Uri.EscapeDataString(AgentResourceNamespace.Value)}/agents/{Uri.EscapeDataString(Name!)}", replace: true);
+                    Navigation.NavigateTo(ConsoleResourceUrls.Agent(AgentResourceNamespace, Name!, snapshot.Value.ScopeRef), replace: true);
                     return;
                 }
                 model = AgentEditorModel.FromResource(snapshot.Value);
@@ -423,7 +427,9 @@ else
         activeRevision = null;
         try
         {
-            readiness = await RuntimeClient.GetAgentReadinessAsync(AgentResourceNamespace, name, desiredGeneration, cancellation.Token);
+            readiness = selectedScope is { } scopeRef
+                ? await RuntimeClient.GetAgentReadinessAsync(AgentResourceNamespace, name, scopeRef, desiredGeneration, cancellation.Token)
+                : await RuntimeClient.GetAgentReadinessAsync(AgentResourceNamespace, name, desiredGeneration, cancellation.Token);
             if (readiness.Ready && !string.IsNullOrWhiteSpace(readiness.RevisionId))
                 activeRevision = (await Client.GetAgentRevisionAsync(
                     AgentResourceNamespace,
@@ -454,12 +460,14 @@ else
             isDirty = false;
             if (applyRuntime)
             {
-                var activation = await RuntimeClient.PrepareAgentAsync(snapshot.Value.Namespace, snapshot.Value.Name, snapshot.Value.Generation, cancellation.Token);
+                var activation = snapshot.Value.ScopeRef is { } scopeRef
+                    ? await RuntimeClient.PrepareAgentAsync(snapshot.Value.Namespace, snapshot.Value.Name, scopeRef, snapshot.Value.Generation, cancellation.Token)
+                    : await RuntimeClient.PrepareAgentAsync(snapshot.Value.Namespace, snapshot.Value.Name, snapshot.Value.Generation, cancellation.Token);
                 if (!string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
                 {
                     var message = T("ActivationFailedMessage", snapshot.Value.Generation, activation.State);
                     Notifications.Add(new NotificationItem(Guid.NewGuid(), T("ActivationFailed"), message, DateTimeOffset.Now, UiStatus.Warning));
-                    if (wasNew) Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.Name)}");
+                    if (wasNew) Navigation.NavigateTo(ConsoleResourceUrls.Agent(snapshot.Value.Namespace, snapshot.Value.Name, snapshot.Value.ScopeRef));
                     else { errorMessage = message; await LoadAgentModelAsync(snapshot.Value.Name); await LoadReadinessAsync(snapshot.Value.Name, snapshot.Value.Generation); }
                     return;
                 }
@@ -468,7 +476,7 @@ else
             successMessage = wasNew ? (applyRuntime ? T("AgentCreatedDeployed") : T("AgentDraftCreated")) : applyRuntime ? T("AgentUpdatedActivated", snapshot.Value.Generation) : T("GenerationSavedWithoutDeployment", snapshot.Value.Generation);
             Notifications.Add(new NotificationItem(Guid.NewGuid(), successMessage, snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
             if (wasNew)
-                Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.Name)}");
+                Navigation.NavigateTo(ConsoleResourceUrls.Agent(snapshot.Value.Namespace, snapshot.Value.Name, snapshot.Value.ScopeRef));
             else
             {
                 await LoadAgentModelAsync(snapshot.Value.Name);

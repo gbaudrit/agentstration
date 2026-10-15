@@ -28,6 +28,10 @@ public enum RuntimeRunEventKind { RunCreated, StatusChanged, StepStarted, StepCo
 public sealed record RuntimeAgentReference(string ResourceId, long Version)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
+    public Guid? ResourceUid { get; init; }
+    public Guid? RevisionUid { get; init; }
+    public string? DefinitionHash { get; init; }
 }
 public sealed record RuntimeRunMessage(RuntimeMessageRole Role, string Content);
 public sealed record RuntimeRunScope(Guid TenantId, WorkspaceId WorkspaceId, Guid PrincipalId);

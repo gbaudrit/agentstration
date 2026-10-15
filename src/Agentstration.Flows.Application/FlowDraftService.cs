@@ -78,7 +78,7 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
         var validation = await validator.ValidateAsync(draft.Value.Definition, new FlowValidationContext(true, workspaceId, flowId), cancellationToken);
         if (!validation.IsValid) throw new FlowValidationException("flow_validation_failed", "The Flow Draft contains validation errors and cannot be published.");
         var definition = await repository.GetAsync(workspaceId, flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
-        await flows.UpdateAsync(workspaceId, flowId, new UpdateFlowCommand(draft.Value.Description, version, true, FlowDraftSnapshotAdapter.ToRoutingDefinition(draft.Value.Definition), draft.Value.Tags,
+        await flows.UpdateAsync(workspaceId, flowId, new UpdateFlowCommand(draft.Value.Description, version, true, FlowDraftSnapshotAdapter.ToPublishedDefinition(draft.Value.Definition), draft.Value.Tags,
             draft.Value.Definition, draft.Value.DisplayName), definition.ETag, cancellationToken);
         return await flows.PublishVersionAsync(workspaceId, flowId, version, activate, cancellationToken, releaseNotes);
     }

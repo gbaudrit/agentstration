@@ -18,7 +18,15 @@ public sealed record RuntimeExecutionToolMaterial(
     bool RequiresApproval,
     string? ProviderId,
     ResourceNamespace? ProviderNamespace,
-    string? ExternalId);
+    string? ExternalId)
+{
+    public ResourceScopeRef? ScopeRef { get; init; }
+    public Guid? Uid { get; init; }
+    public long? Generation { get; init; }
+    public ResourceScopeRef? ProviderScopeRef { get; init; }
+    public Guid? ProviderUid { get; init; }
+    public long? ProviderGeneration { get; init; }
+}
 
 public sealed record RuntimeExecutionAgentMaterial(
     string MaterialId,
@@ -37,6 +45,8 @@ public sealed record RuntimeExecutionAgentMaterial(
     IReadOnlyList<RuntimeExecutionToolMaterial> Tools)
 {
     public ResourceNamespace AgentNamespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? AgentScopeRef { get; init; }
+    public Guid RevisionUid { get; init; }
     public string RuntimeProfileName { get; init; } = string.Empty;
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
 }

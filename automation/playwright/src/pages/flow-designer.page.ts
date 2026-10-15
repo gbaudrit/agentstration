@@ -325,27 +325,22 @@ export class FlowDesignerPage {
   }
 
   public async publishAsReadOnlyFixture(consoleUrl: string, name: string): Promise<void> {
+    const draft = await this.getDraft(consoleUrl, name);
+    const update = await this.page.request.put(`${consoleUrl}/api/flows/${encodeURIComponent(name)}/draft`, {
+      headers: { 'If-Match': draft.eTag },
+      data: {
+        displayName: draft.value.displayName,
+        description: draft.value.description,
+        tags: { ...(draft.value.tags as Record<string, string>), 'agentstration.io/pack.name': 'flow-transition-ux-fixture' },
+        definition: draft.value.definition,
+      },
+    });
+    expect(update.status(), await update.text()).toBe(200);
+
     const publish = await this.page.request.post(`${consoleUrl}/api/flows/${encodeURIComponent(name)}/publish`, {
       data: { version: '1.0.0', activate: true },
     });
     expect(publish.status(), await publish.text()).toBe(201);
-
-    const current = await this.page.request.get(`${consoleUrl}/api/flows/${encodeURIComponent(name)}`);
-    const currentBody = await current.text();
-    expect(current.status(), currentBody).toBe(200);
-    const flow = JSON.parse(currentBody);
-    const update = await this.page.request.put(`${consoleUrl}/api/flows/${encodeURIComponent(name)}`, {
-      headers: { 'If-Match': current.headers()['etag'] },
-      data: {
-        description: flow.description,
-        version: flow.version,
-        enabled: flow.enabled,
-        definition: flow.definition,
-        metadata: { ...flow.metadata, 'agentstration.io/pack.name': 'flow-transition-ux-fixture' },
-        displayName: flow.displayName,
-      },
-    });
-    expect(update.status(), await update.text()).toBe(200);
   }
 
   public async expectReadOnlyPublished(consoleUrl: string, namespace: string, name: string): Promise<void> {

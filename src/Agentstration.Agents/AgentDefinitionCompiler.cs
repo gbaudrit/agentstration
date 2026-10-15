@@ -14,6 +14,7 @@ public interface IAgentDefinitionCompiler
         AgentDeploymentSpec deployment,
         IReadOnlyCollection<ResourceReference>? toolSetTools = null,
         IReadOnlyCollection<ResolvedAgentToolSetAssignment>? toolSetAssignments = null,
+        IReadOnlyCollection<ResolvedResourceDependency>? toolPins = null,
         ResolvedResourceDependency? modelProfilePin = null,
         ResolvedResourceDependency? runtimeProfilePin = null);
 }
@@ -35,6 +36,7 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
         AgentDeploymentSpec deployment,
         IReadOnlyCollection<ResourceReference>? toolSetTools = null,
         IReadOnlyCollection<ResolvedAgentToolSetAssignment>? toolSetAssignments = null,
+        IReadOnlyCollection<ResolvedResourceDependency>? toolPins = null,
         ResolvedResourceDependency? modelProfilePin = null,
         ResolvedResourceDependency? runtimeProfilePin = null)
     {
@@ -71,6 +73,7 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
             RuntimeProfilePin = runtimeProfilePin,
             deployment.HostingMode,
             Tools = tools,
+            ToolPins = toolPins ?? [],
             ToolSetAssignments = toolSetAssignments ?? [],
             Middleware = middleware,
             ContextProviders = contextProviders,
@@ -94,6 +97,7 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
             RuntimeProfileNamespace = deployment.RuntimeProfileNamespace,
             RuntimeProfilePin = runtimeProfilePin,
             EffectiveToolNames = tools,
+            ToolPins = toolPins ?? [],
             ToolSetAssignments = toolSetAssignments ?? [],
             MiddlewareIds = middleware,
             ContextProviderIds = contextProviders,

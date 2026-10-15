@@ -105,8 +105,13 @@ else
         pendingDelete = null;
         try
         {
-            var snapshot = await Client.GetAgentAsync(deleted.Id, cancellation.Token);
-            await Client.DeleteAgentAsync(deleted.Id, snapshot.ETag, cancellation.Token);
+            var snapshot = deleted.ScopeRef is { } scopeRef
+                ? await Client.GetAgentAsync(deleted.Namespace, deleted.Id, scopeRef, cancellation.Token)
+                : await Client.GetAgentAsync(deleted.Namespace, deleted.Id, cancellation.Token);
+            if (deleted.ScopeRef is { } exactScopeRef)
+                await Client.DeleteAgentAsync(deleted.Namespace, deleted.Id, exactScopeRef, snapshot.ETag, cancellation.Token);
+            else
+                await Client.DeleteAgentAsync(deleted.Id, snapshot.ETag, cancellation.Token);
             Notifications.Add(new NotificationItem(Guid.NewGuid(), T("AgentDeleted"), deleted.Name, DateTimeOffset.Now, UiStatus.Success));
             await LoadAsync();
         }
