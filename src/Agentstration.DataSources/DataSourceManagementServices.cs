@@ -268,9 +268,15 @@ public sealed class DataSourceProfileService(
             throw Error("data_source_profile_description_too_long", "Profile descriptions cannot exceed 2000 characters.");
         ValidateVersion(resource.Definition.Version);
         ValidateSchema(resource.Definition.ConfigurationSchema);
-        ValidateFlow(resource.Definition.AcquisitionFlow);
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var binding in resource.Definition.ToolBindings)
+        ValidateFlow(resource.Definition.AcquisitionFlow, "acquisition");
+        if (resource.Definition.DiscoveryFlow is { } discoveryFlow) ValidateFlow(discoveryFlow, "discovery");
+        ValidateBindings(resource.Definition.ToolBindings, new(StringComparer.Ordinal));
+        ValidateBindings(resource.Definition.DiscoveryToolBindings, new(StringComparer.Ordinal));
+    }
+
+    private static void ValidateBindings(IReadOnlyList<DataSourceProfileToolBinding> bindings, HashSet<string> names)
+    {
+        foreach (var binding in bindings)
         {
             ValidateToken(binding.Name, "Tool binding name");
             ValidateToken(binding.Capability, "Tool binding capability");
@@ -314,11 +320,11 @@ public sealed class DataSourceProfileService(
             throw Error("data_source_profile_schema_invalid", "Configuration schemas must be bounded JSON objects.");
     }
 
-    private static void ValidateFlow(DataSourceFlowTarget target)
+    private static void ValidateFlow(DataSourceFlowTarget target, string purpose)
     {
-        ValidateToken(target.Name, "acquisition Flow name");
+        ValidateToken(target.Name, $"{purpose} Flow name");
         if (target.UseActiveVersion == (target.Version is not null))
-            throw Error("data_source_profile_flow_reference_invalid", "Acquisition Flow references must select either the active version or one exact version.");
+            throw Error("data_source_profile_flow_reference_invalid", $"{purpose} Flow references must select either the active version or one exact version.");
     }
 
     private static void ValidateToken(string value, string label)
@@ -438,6 +444,7 @@ public sealed class DataSourceManagementService(
             if (issues.Count != 0) return new(false, true, profile, issues);
 
             ResolvedDataSourceFlowBinding? acquisition = null;
+            ResolvedDataSourceFlowBinding? discovery = null;
             if (requestContext.IsInitialized)
             {
                 try
@@ -445,6 +452,10 @@ public sealed class DataSourceManagementService(
                     acquisition = await compositions.ResolveFlowAsync(
                         ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId), resource.Namespace, profile,
                         cancellationToken);
+                    if (profile.Definition.DiscoveryFlow is not null)
+                        discovery = (await compositions.ResolveDiscoveryAsync(
+                            ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId), resource.Namespace, profile,
+                            cancellationToken)).Flow;
                 }
                 catch (Exception exception) when (exception is DataSourceAcquisitionException
                     or ResourceReferenceAmbiguousException or ResourceReferenceOutsideScopeException)
@@ -454,7 +465,7 @@ public sealed class DataSourceManagementService(
                     // Data Source that was valid before this optional metadata was exposed.
                 }
             }
-            return new(true, true, profile, issues, acquisition);
+            return new(true, true, profile, issues, acquisition, discovery);
         }
         catch (Exception exception) when (exception is DataSourceValidationException
             or ResourceReferenceAmbiguousException or ResourceReferenceOutsideScopeException)

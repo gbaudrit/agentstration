@@ -13,6 +13,7 @@ namespace Agentstration.Infrastructure.Flows;
 public sealed class KnowledgeProjectionInputResolver(
     IResourceReferenceResolver references,
     DataSourceAcquisitionService acquisitions,
+    DataSourceAcquisitionTargetService targets,
     TimeProvider timeProvider) : IKnowledgeProjectionInputResolver
 {
     public async Task<KnowledgeDataSourceBindingReadiness> GetReadinessAsync(
@@ -29,7 +30,9 @@ public sealed class KnowledgeProjectionInputResolver(
                     $"Data Source '{source.Value.Address}' is disabled.", null);
             var values = await acquisitions.ListAsync(source.Value.Namespace, source.Value.Name,
                 source.Value.ScopeRef, cancellationToken);
-            var latest = values.FirstOrDefault(value => value.State == DataSourceAcquisitionState.Succeeded
+            var target = await ResolveTargetAsync(executionScope, ownerNamespace, source.Value, binding, cancellationToken);
+            var latest = values.FirstOrDefault(value => value.Target?.Uid == target?.Uid
+                && value.State == DataSourceAcquisitionState.Succeeded
                 && value.Manifest is not null && value.Manifest.Artifacts.Count != 0);
             if (latest is null)
                 return new(binding.Name, source.Value.ScopeRef, source.Value.Uid, false,
@@ -58,6 +61,8 @@ public sealed class KnowledgeProjectionInputResolver(
             throw Error("knowledge_projection_data_source_disabled", $"Data Source '{source.Value.Address}' is disabled.");
         var available = await acquisitions.ListAsync(source.Value.Namespace, source.Value.Name,
             source.Value.ScopeRef, cancellationToken);
+        var target = await ResolveTargetAsync(executionScope, ownerNamespace, source.Value, binding, cancellationToken);
+        available = available.Where(value => value.Target?.Uid == target?.Uid).ToArray();
         var acquisition = string.IsNullOrWhiteSpace(acquisitionId)
             ? available.FirstOrDefault(value => value.State == DataSourceAcquisitionState.Succeeded
                 && value.Manifest is not null && value.Manifest.Artifacts.Count != 0)
@@ -95,6 +100,10 @@ public sealed class KnowledgeProjectionInputResolver(
             DataSourceName = source.Value.Name,
             DataSourceNamespace = source.Value.Namespace,
             DataSourceGeneration = source.Value.Generation,
+            AcquisitionTargetName = target?.Name,
+            AcquisitionTargetUid = target?.Uid,
+            DiscoveryId = target?.DiscoveryId,
+            ChoiceId = target?.ChoiceId,
             AcquisitionId = acquisition.Name,
             AcquisitionUid = acquisition.Uid,
             AcquisitionFlowRunId = acquisition.FlowRunId,
@@ -117,6 +126,27 @@ public sealed class KnowledgeProjectionInputResolver(
         ownerNamespace, DataSourceResourceKinds.DataSource, executionScope, cancellationToken)
         ?? throw Error("knowledge_projection_data_source_missing",
             $"Binding '{binding.Name}' cannot resolve Data Source '{binding.DataSource.Name}'.");
+
+    private async Task<DataSourceAcquisitionTargetResource?> ResolveTargetAsync(
+        ResourceScopeRef executionScope, ResourceNamespace ownerNamespace, DataSourceResource source,
+        KnowledgeDataSourceBinding binding, CancellationToken cancellationToken)
+    {
+        if (binding.AcquisitionTarget is null) return null;
+        var stored = await references.ResolveAsync<DataSourceAcquisitionTargetResource>(binding.AcquisitionTarget,
+            ownerNamespace, DataSourceResourceKinds.DataSourceAcquisitionTarget, executionScope, cancellationToken)
+            ?? throw Error("knowledge_projection_acquisition_target_missing",
+                $"Binding '{binding.Name}' cannot resolve acquisition target '{binding.AcquisitionTarget.Name}'.");
+        if (stored.Value.DataSourceUid != source.Uid || stored.Value.DataSourceScopeRef != source.ScopeRef)
+            throw Error("knowledge_projection_acquisition_target_mismatch",
+                $"Acquisition target '{stored.Value.Name}' belongs to another Data Source.");
+        if (!stored.Value.Enabled)
+            throw Error("knowledge_projection_acquisition_target_disabled", $"Acquisition target '{stored.Value.Name}' is disabled.");
+        var views = await targets.ListAsync(source.Namespace, source.Name, source.ScopeRef, cancellationToken);
+        var view = views.Single(value => value.Target.Uid == stored.Value.Uid);
+        if (view.Stale)
+            throw Error("knowledge_projection_acquisition_target_stale", string.Join(' ', view.StalenessReasons));
+        return stored.Value;
+    }
 
     private static KnowledgeProjectionException Error(string code, string message) => new(code, message);
 }

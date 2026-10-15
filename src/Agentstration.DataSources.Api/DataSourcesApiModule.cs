@@ -12,6 +12,8 @@ public static class DataSourcesApiModule
         var sources = endpoints.MapGroup("/api/datasources");
         DataSourceEndpoints.Map(sources);
         DataSourceAcquisitionEndpoints.Map(sources, endpoints.MapGroup("/api/datasourceacquisitions"));
+        DataSourceDiscoveryEndpoints.Map(sources, endpoints.MapGroup("/api/datasourcediscoveries"),
+            endpoints.MapGroup("/api/datasourceacquisitiontargets"));
         return endpoints;
     }
 }

@@ -18,11 +18,19 @@ public sealed class DataSourceAcquisitionCompositionResolver(
         ResourceScopeRef executionScope,
         ResourceNamespace ownerNamespace,
         ResolvedDataSourceProfile profile,
+        CancellationToken cancellationToken) =>
+        await ResolveFlowCoreAsync(executionScope, ownerNamespace, profile.Definition.AcquisitionFlow,
+            "acquisition", cancellationToken);
+
+    private async Task<ResolvedDataSourceFlowBinding> ResolveFlowCoreAsync(
+        ResourceScopeRef executionScope,
+        ResourceNamespace ownerNamespace,
+        DataSourceFlowTarget target,
+        string purpose,
         CancellationToken cancellationToken)
     {
         if (executionScope is not { Kind: ResourceScopeKind.Workspace, TargetId: { } workspaceId })
             throw Error("data_source_acquisition_scope_invalid", "Data Source acquisitions execute in a Workspace scope.");
-        var target = profile.Definition.AcquisitionFlow;
         var flowNamespace = target.Namespace ?? ownerNamespace;
         FlowVersion resolvedFlow;
         try
@@ -33,8 +41,8 @@ public sealed class DataSourceAcquisitionCompositionResolver(
         }
         catch (Exception exception) when (exception is FlowNotFoundException or FlowValidationException or ArgumentException)
         {
-            throw Error("data_source_acquisition_flow_unavailable",
-                $"Flow binding '{flowNamespace}/{target.Name}' is unavailable: {exception.Message}");
+            throw Error($"data_source_{purpose}_flow_unavailable",
+                $"{purpose} Flow binding '{flowNamespace}/{target.Name}' is unavailable: {exception.Message}");
         }
 
         return new(
@@ -47,6 +55,21 @@ public sealed class DataSourceAcquisitionCompositionResolver(
             resolvedFlow.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract)) { ScopeRef = resolvedFlow.ScopeRef };
     }
 
+    public async Task<ResolvedDataSourceDiscoveryComposition> ResolveDiscoveryAsync(
+        ResourceScopeRef executionScope,
+        ResourceNamespace ownerNamespace,
+        ResolvedDataSourceProfile profile,
+        CancellationToken cancellationToken)
+    {
+        var target = profile.Definition.DiscoveryFlow
+            ?? throw Error("data_source_discovery_not_supported", $"Profile '{profile.Name}' does not define discovery.");
+        var flow = await ResolveFlowCoreAsync(executionScope, ownerNamespace, target, "discovery", cancellationToken);
+        var tools = await ResolveToolsAsync(executionScope, ownerNamespace, profile.Definition.DiscoveryToolBindings,
+            "discovery", cancellationToken);
+        return new() { Profile = profile, Flow = flow, Tools = tools,
+            Limits = Clone(profile.Definition.Limits), Policies = Clone(profile.Definition.Policies) };
+    }
+
     public async Task<ResolvedDataSourceAcquisitionComposition> ResolveAsync(
         ResourceScopeRef executionScope,
         ResourceNamespace ownerNamespace,
@@ -54,12 +77,29 @@ public sealed class DataSourceAcquisitionCompositionResolver(
         CancellationToken cancellationToken)
     {
         var flow = await ResolveFlowAsync(executionScope, ownerNamespace, profile, cancellationToken);
-        var tools = new List<ResolvedDataSourceToolBinding>(profile.Definition.ToolBindings.Count);
-        foreach (var binding in profile.Definition.ToolBindings)
+        var tools = await ResolveToolsAsync(executionScope, ownerNamespace, profile.Definition.ToolBindings,
+            "acquisition", cancellationToken);
+
+        return new()
+        {
+            Profile = profile,
+            Flow = flow,
+            Tools = tools,
+            Limits = Clone(profile.Definition.Limits),
+            Policies = Clone(profile.Definition.Policies)
+        };
+    }
+
+    private async Task<IReadOnlyList<ResolvedDataSourceToolBinding>> ResolveToolsAsync(
+        ResourceScopeRef executionScope, ResourceNamespace ownerNamespace,
+        IReadOnlyList<DataSourceProfileToolBinding> bindings, string purpose, CancellationToken cancellationToken)
+    {
+        var tools = new List<ResolvedDataSourceToolBinding>(bindings.Count);
+        foreach (var binding in bindings)
         {
             var storedTool = await references.ResolveAsync<ToolResource>(binding.Tool, ownerNamespace,
                 ToolResourceKinds.Tool, executionScope, cancellationToken)
-                ?? throw Error("data_source_acquisition_tool_missing",
+                ?? throw Error($"data_source_{purpose}_tool_missing",
                     $"Tool binding '{binding.Name}' cannot resolve Tool '{binding.Tool.Name}'.");
             var tool = storedTool.Value;
             if (!tool.Definition.Enabled || tool.Definition.Discovery?.Available != true)
@@ -102,14 +142,7 @@ public sealed class DataSourceAcquisitionCompositionResolver(
             });
         }
 
-        return new()
-        {
-            Profile = profile,
-            Flow = flow,
-            Tools = tools,
-            Limits = Clone(profile.Definition.Limits),
-            Policies = Clone(profile.Definition.Policies)
-        };
+        return tools;
     }
 
     private static IReadOnlyDictionary<string, System.Text.Json.JsonElement> Clone(
@@ -243,17 +276,25 @@ public sealed class DataSourceFlowActivationGuard : IFlowVersionActivationGuard
             return Task.CompletedTask;
         if (!contract.StartsWith("datasource.", StringComparison.Ordinal))
             return Task.CompletedTask;
+        if (string.Equals(contract, DataSourceFlowContracts.Discovery, StringComparison.Ordinal))
+        {
+            Require(version.Graph?.InputSchema,
+                ["dataSourceId", "dataSourceUid", "dataSourceGeneration", "profile", "sourceConfiguration",
+                    "parameters", "caller", "correlationId", "discoveryId"], "input", contract);
+            Require(version.Graph?.OutputSchema, ["choices"], "output", contract);
+            return Task.CompletedTask;
+        }
         if (!string.Equals(contract, DataSourceFlowContracts.Acquisition, StringComparison.Ordinal))
             throw new FlowValidationException("data_source_flow_contract_unknown",
                 $"Data Source Flow contract '{contract}' is not supported.");
         Require(version.Graph?.InputSchema,
             ["dataSourceId", "dataSourceUid", "dataSourceGeneration", "profile", "sourceConfiguration",
-                "parameters", "caller", "correlationId", "acquisitionId"], "input");
-        Require(version.Graph?.OutputSchema, ["artifacts"], "output");
+                "parameters", "caller", "correlationId", "acquisitionId"], "input", contract);
+        Require(version.Graph?.OutputSchema, ["artifacts"], "output", contract);
         return Task.CompletedTask;
     }
 
-    private static void Require(System.Text.Json.JsonElement? schema, IReadOnlyList<string> names, string direction)
+    private static void Require(System.Text.Json.JsonElement? schema, IReadOnlyList<string> names, string direction, string contract)
     {
         if (schema is not { ValueKind: System.Text.Json.JsonValueKind.Object }
             || !schema.Value.TryGetProperty("type", out var type) || type.GetString() != "object"
@@ -261,16 +302,15 @@ public sealed class DataSourceFlowActivationGuard : IFlowVersionActivationGuard
             || properties.ValueKind != System.Text.Json.JsonValueKind.Object
             || !schema.Value.TryGetProperty("required", out var required)
             || required.ValueKind != System.Text.Json.JsonValueKind.Array)
-            throw Invalid(direction, "must be an object schema with properties and required arrays");
+            throw Invalid(direction, "must be an object schema with properties and required arrays", contract);
         var requiredNames = required.EnumerateArray()
             .Where(item => item.ValueKind == System.Text.Json.JsonValueKind.String)
             .Select(item => item.GetString()!).ToHashSet(StringComparer.Ordinal);
         foreach (var name in names)
             if (!properties.TryGetProperty(name, out _) || !requiredNames.Contains(name))
-                throw Invalid(direction, $"must require property '{name}'");
+                throw Invalid(direction, $"must require property '{name}'", contract);
     }
 
-    private static FlowValidationException Invalid(string direction, string detail) =>
-        new("data_source_acquisition_contract_invalid",
-            $"The {DataSourceFlowContracts.Acquisition} {direction} schema {detail}.");
+    private static FlowValidationException Invalid(string direction, string detail, string contract) =>
+        new("data_source_flow_contract_invalid", $"The {contract} {direction} schema {detail}.");
 }

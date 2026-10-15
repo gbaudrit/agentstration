@@ -67,6 +67,7 @@ public sealed record KnowledgeDataSourceBinding
 {
     public required string Name { get; init; }
     public required ResourceReference DataSource { get; init; }
+    public ResourceReference? AcquisitionTarget { get; init; }
     public KnowledgeFlowTarget? TransformationFlow { get; init; }
     public JsonElement Configuration { get; init; } = JsonSerializer.SerializeToElement(new { });
     public bool Required { get; init; } = true;
@@ -185,6 +186,10 @@ public sealed record KnowledgeProjectionInputEvidence
     public required string DataSourceName { get; init; }
     public required ResourceNamespace DataSourceNamespace { get; init; }
     public required long DataSourceGeneration { get; init; }
+    public string? AcquisitionTargetName { get; init; }
+    public Guid? AcquisitionTargetUid { get; init; }
+    public string? DiscoveryId { get; init; }
+    public string? ChoiceId { get; init; }
     public required string AcquisitionId { get; init; }
     public required Guid AcquisitionUid { get; init; }
     public required string AcquisitionFlowRunId { get; init; }

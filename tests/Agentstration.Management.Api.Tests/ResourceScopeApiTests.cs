@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Agents;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
@@ -59,6 +60,10 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Workspace },
             ResourceScopePolicy.AllowedScopes(TriggerResourceKinds.Trigger).ToArray());
+        CollectionAssert.AreEquivalent(new[] { ResourceScopeKind.Workspace },
+            ResourceScopePolicy.AllowedScopes(DataSourceResourceKinds.DataSourceDiscovery).ToArray());
+        CollectionAssert.AreEquivalent(new[] { ResourceScopeKind.Workspace },
+            ResourceScopePolicy.AllowedScopes(DataSourceResourceKinds.DataSourceAcquisitionTarget).ToArray());
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Instance },
             ResourceScopePolicy.AllowedScopes(SourceRegistryKinds.SourceRegistryRegistration).ToArray());
