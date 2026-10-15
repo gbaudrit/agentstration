@@ -209,6 +209,28 @@ public sealed class ToolManagementService(
     public async Task<StoredResource<ToolResource>> SetToolEnabledAsync(string name, ResourceNamespace @namespace, bool enabled, string? ifMatch, CancellationToken cancellationToken)
     {
         var stored = await GetToolAsync(name, @namespace, cancellationToken) ?? throw new ResourceNotFoundException(new(ToolResourceKinds.Tool, name, @namespace));
+        return await SetToolEnabledAsync(stored, enabled, ifMatch, cancellationToken);
+    }
+
+    public async Task<StoredResource<ToolResource>> SetToolEnabledExactAsync(
+        ResourceScopeRef scopeRef,
+        string name,
+        ResourceNamespace @namespace,
+        bool enabled,
+        string? ifMatch,
+        CancellationToken cancellationToken)
+    {
+        var stored = await GetToolExactAsync(scopeRef, name, @namespace, cancellationToken)
+            ?? throw new ResourceNotFoundException(new(ToolResourceKinds.Tool, name, @namespace));
+        return await SetToolEnabledAsync(stored, enabled, ifMatch, cancellationToken);
+    }
+
+    private async Task<StoredResource<ToolResource>> SetToolEnabledAsync(
+        StoredResource<ToolResource> stored,
+        bool enabled,
+        string? ifMatch,
+        CancellationToken cancellationToken)
+    {
         var scopeRef = stored.Value.ScopeRef
             ?? throw new ToolResourceValidationException("The Tool has no ownership scope.");
         return await scopeOperations.WriteAsync(stored.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>

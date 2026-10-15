@@ -78,6 +78,42 @@ var foundryEnabledSetting = builder.Configuration["Foundry:Enabled"];
 if (foundryEnabledSetting is not null && !bool.TryParse(foundryEnabledSetting, out _))
     throw new InvalidOperationException("Foundry:Enabled must be true or false.");
 var foundryEnabled = bool.TryParse(foundryEnabledSetting, out var configuredFoundryEnabled) && configuredFoundryEnabled;
+var openApiEnabledSetting = builder.Configuration["OpenApi:Enabled"];
+if (openApiEnabledSetting is not null && !bool.TryParse(openApiEnabledSetting, out _))
+    throw new InvalidOperationException("OpenApi:Enabled must be true or false.");
+var openApiEnabled = bool.TryParse(openApiEnabledSetting, out var configuredOpenApiEnabled) && configuredOpenApiEnabled;
+var openApiAllowedDomains = builder.Configuration.GetSection("OpenApi:AllowedDomains")
+    .GetChildren()
+    .Select(value => value.Value)
+    .Where(value => !string.IsNullOrWhiteSpace(value))
+    .Cast<string>()
+    .ToArray();
+if (openApiEnabled && openApiAllowedDomains.Length == 0)
+    throw new InvalidOperationException("OpenApi:AllowedDomains must contain at least one domain when OpenAPI is enabled.");
+var openApiAllowedPorts = builder.Configuration.GetSection("OpenApi:AllowedPorts")
+    .GetChildren()
+    .Select(value => value.Value)
+    .Where(value => !string.IsNullOrWhiteSpace(value))
+    .Cast<string>()
+    .ToArray();
+var openApiAllowedMethods = builder.Configuration.GetSection("OpenApi:AllowedMethods")
+    .GetChildren()
+    .Select(value => value.Value)
+    .Where(value => !string.IsNullOrWhiteSpace(value))
+    .Cast<string>()
+    .ToArray();
+var openApiAllowedContractMediaTypes = builder.Configuration.GetSection("OpenApi:AllowedContractMediaTypes")
+    .GetChildren()
+    .Select(value => value.Value)
+    .Where(value => !string.IsNullOrWhiteSpace(value))
+    .Cast<string>()
+    .ToArray();
+var openApiAllowedResponseMediaTypes = builder.Configuration.GetSection("OpenApi:AllowedResponseMediaTypes")
+    .GetChildren()
+    .Select(value => value.Value)
+    .Where(value => !string.IsNullOrWhiteSpace(value))
+    .Cast<string>()
+    .ToArray();
 var crawl4AiEnabledSetting = builder.Configuration["Crawl4AI:Enabled"];
 if (crawl4AiEnabledSetting is not null && !bool.TryParse(crawl4AiEnabledSetting, out _))
     throw new InvalidOperationException("Crawl4AI:Enabled must be true or false.");
@@ -161,6 +197,34 @@ if (foundryEnabled)
     }
     developmentExtensions.Add(new DevelopmentAepExtension(
         "Agentstration.Extensions.Foundry", "foundry-extension", foundryExtension));
+}
+if (openApiEnabled)
+{
+    var openApiExtension = builder.AddProject<Projects.Agentstration_Extensions_OpenApi>("openapi-extension")
+        .WithEnvironment("Agentstration__Slot", slot)
+        .WithHttpHealthCheck("/health")
+        .WithDynamicHostPorts(dynamicApplicationPorts);
+    for (var index = 0; index < openApiAllowedDomains.Length; index++)
+        openApiExtension.WithEnvironment($"OpenApi__AllowedDomains__{index}", openApiAllowedDomains[index]);
+    for (var index = 0; index < openApiAllowedPorts.Length; index++)
+        openApiExtension.WithEnvironment($"OpenApi__AllowedPorts__{index}", openApiAllowedPorts[index]);
+    for (var index = 0; index < openApiAllowedMethods.Length; index++)
+        openApiExtension.WithEnvironment($"OpenApi__AllowedMethods__{index}", openApiAllowedMethods[index]);
+    for (var index = 0; index < openApiAllowedContractMediaTypes.Length; index++)
+        openApiExtension.WithEnvironment($"OpenApi__AllowedContractMediaTypes__{index}", openApiAllowedContractMediaTypes[index]);
+    for (var index = 0; index < openApiAllowedResponseMediaTypes.Length; index++)
+        openApiExtension.WithEnvironment($"OpenApi__AllowedResponseMediaTypes__{index}", openApiAllowedResponseMediaTypes[index]);
+    foreach (var key in new[]
+    {
+        "AllowPrivateAddresses", "MaximumCandidatePaths", "MaximumDocumentBytes", "MaximumResponseBytes",
+        "MaximumOperations", "MaximumReferences", "MaximumReferenceDepth", "MaximumPages", "TimeoutSeconds"
+    })
+    {
+        if (builder.Configuration[$"OpenApi:{key}"] is { } value)
+            openApiExtension.WithEnvironment($"OpenApi__{key}", value);
+    }
+    developmentExtensions.Add(new DevelopmentAepExtension(
+        "Agentstration.Extensions.OpenApi", "openapi-extension", openApiExtension));
 }
 if (crawl4AiEnabled)
 {

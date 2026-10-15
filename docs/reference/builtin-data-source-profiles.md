@@ -39,3 +39,5 @@ An AEP extension may contribute a declarative Data Source Profile bundle contain
 
 The optional Crawl4AI extension contributes `crawl4ai-web`. Installing that bundle is an explicit operation today. Automatic installation in the extension's scope during enrollment is tracked independently by [#696](https://github.com/gbaudrit/agentstration/issues/696).
 
+The optional OpenAPI extension contributes `openapi-governed`. Its discovery Flow returns bounded hierarchical operation choices, and its acquisition Flow requires an explicitly promoted current target before invoking and persisting a response. See [Governed OpenAPI extension](openapi-extension.md).
+

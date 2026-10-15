@@ -1,0 +1,54 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata: { name: crawl4ai-web-transfer-chunk }
+definition:
+  displayName: Transfer one Crawl4AI content chunk
+  description: Reads one bounded Crawl4AI chunk and appends it to governed staging.
+  version: 1.0.0
+  enabled: true
+  spec:
+    flowKind: workflow
+    entryNodeId: input
+    nodes: [{ id: input, kind: input }]
+    edges: []
+  graph:
+    entryStep: input
+    inputSchema:
+      type: object
+      properties: { contentReference: { type: string }, stagedArtifactId: { type: string }, offset: { type: integer, minimum: 0 } }
+      required: [contentReference, stagedArtifactId, offset]
+      additionalProperties: false
+    steps:
+      - { type: input, name: input, displayName: Chunk request }
+      - type: toolRoute
+        name: read
+        displayName: Read Crawl4AI content
+        toolSet: { resourceId: crawl4ai-web-acquisition, version: 1.0.0 }
+        capability: content.read
+        route: default
+        argumentsMapping: { contentReference: "${input.contentReference}", offset: "${input.offset}" }
+      - type: toolRoute
+        name: write
+        displayName: Write staged content
+        toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0 }
+        capability: staged-artifact.write
+        route: default
+        argumentsMapping: { artifactId: "${input.stagedArtifactId}", offset: "${steps.read.output.structuredContent.offset}", contentBase64: "${steps.read.output.structuredContent.contentBase64}" }
+      - type: output
+        name: output
+        displayName: Chunk progress
+        outputMapping: { contentReference: "${input.contentReference}", stagedArtifactId: "${input.stagedArtifactId}", nextOffset: "${steps.read.output.structuredContent.nextOffset}", endOfContent: "${steps.read.output.structuredContent.endOfContent}" }
+      - { type: failure, name: failure, displayName: Transfer failed }
+    transitions:
+      - { id: input-read, fromStep: input, event: completed, toStep: read }
+      - { id: read-write, fromStep: read, event: success, toStep: write }
+      - { id: read-failure, fromStep: read, event: error, toStep: failure }
+      - { id: write-output, fromStep: write, event: success, toStep: output }
+      - { id: write-failure, fromStep: write, event: error, toStep: failure }
+    outputSchema:
+      type: object
+      properties: { contentReference: { type: string }, stagedArtifactId: { type: string }, nextOffset: { type: integer }, endOfContent: { type: boolean } }
+      required: [contentReference, stagedArtifactId, nextOffset, endOfContent]
+      additionalProperties: false
+  publish: true
+  activate: true

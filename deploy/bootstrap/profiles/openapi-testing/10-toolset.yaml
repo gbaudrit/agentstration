@@ -1,0 +1,11 @@
+apiVersion: agentstration.io/v1
+kind: ToolSet
+metadata: { name: openapi-governed }
+definition:
+  displayName: Governed OpenAPI
+  description: Technical discovery and explicit invocation Tools supplied by the OpenAPI extension.
+  version: 1.0.0
+  publish: true
+  members:
+    - { tool: { binding: openapi.contract.discover }, capability: openapi.discover, route: default }
+    - { tool: { binding: openapi.operation.invoke }, capability: openapi.invoke, route: default }

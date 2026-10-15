@@ -1,0 +1,55 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata: { name: openapi-discovery }
+definition:
+  displayName: Discover governed OpenAPI operations
+  description: Discovers only configured same-origin contract candidates and returns bounded hierarchical choices.
+  version: 1.0.2
+  enabled: true
+  metadata: { flow.contract: datasource.discovery/v1 }
+  spec:
+    flowKind: workflow
+    entryNodeId: input
+    nodes: [{ id: input, kind: input }]
+    edges: []
+  graph:
+    entryStep: input
+    inputSchema:
+      type: object
+      properties:
+        discoveryId: { type: string }
+        dataSourceId: { type: string }
+        dataSourceUid: { type: string }
+        dataSourceGeneration: { type: integer }
+        profile: { type: object }
+        sourceConfiguration: { type: object }
+        parameters: { type: object }
+        caller: { type: object }
+        correlationId: { type: string }
+      required: [discoveryId, dataSourceId, dataSourceUid, dataSourceGeneration, profile, sourceConfiguration, parameters, caller, correlationId]
+      additionalProperties: false
+    steps:
+      - { type: input, name: input, displayName: Discovery request }
+      - type: toolRoute
+        name: discover
+        displayName: Discover OpenAPI contracts
+        toolSet: { resourceId: openapi-governed, version: 1.0.0 }
+        capability: openapi.discover
+        route: default
+        argumentsMapping: { origin: "${input.sourceConfiguration.origin}", candidatePaths: "${input.sourceConfiguration.candidatePaths}", includeContracts: false, correlationId: "${input.correlationId}" }
+      - type: output
+        name: output
+        displayName: Discovered operations
+        outputMapping: { choices: "${steps.discover.output.structuredContent.choices}", artifacts: [], diagnostics: "${steps.discover.output.structuredContent.diagnostics}" }
+      - { type: failure, name: failure, displayName: Discovery failed }
+    transitions:
+      - { id: input-discover, fromStep: input, event: completed, toStep: discover }
+      - { id: discover-output, fromStep: discover, event: success, toStep: output }
+      - { id: discover-failure, fromStep: discover, event: error, toStep: failure }
+    outputSchema:
+      type: object
+      properties: { choices: { type: array, items: { type: object } }, artifacts: { type: array, items: { type: object } }, diagnostics: { type: array, items: { type: object } } }
+      required: [choices, artifacts]
+      additionalProperties: false
+  publish: true
+  activate: true

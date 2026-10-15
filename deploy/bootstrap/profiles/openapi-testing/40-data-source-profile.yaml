@@ -1,0 +1,26 @@
+apiVersion: agentstration.io/v1
+kind: DataSourceProfile
+metadata: { name: openapi-governed }
+definition:
+  displayName: Governed OpenAPI
+  description: Discovers bounded contracts and acquires only explicitly promoted operations.
+  enabled: true
+  version: 1.0.0
+  configurationSchema:
+    type: object
+    properties:
+      origin: { type: string, format: uri, minLength: 8, maxLength: 2048 }
+      candidatePaths: { type: array, minItems: 1, maxItems: 8, items: { type: string, maxLength: 512 } }
+      credentialId: { type: string, maxLength: 128 }
+      maximumPages: { type: integer, minimum: 1, maximum: 10 }
+      fixedBindings: { type: object }
+    required: [origin, candidatePaths, maximumPages]
+    additionalProperties: false
+  discoveryFlow: { name: openapi-discovery, version: 1.0.2, useActiveVersion: false }
+  discoveryToolBindings:
+    - { name: discover, capability: openapi.discover, tool: { binding: openapi.contract.discover } }
+  acquisitionFlow: { name: openapi-acquisition, version: 1.0.0, useActiveVersion: false }
+  toolBindings:
+    - { name: invoke, capability: openapi.invoke, tool: { binding: openapi.operation.invoke } }
+  limits: { maximumPages: 10, maximumResponseBytes: 4194304 }
+  policies: { publicNetworkOnly: true, redirects: deny, explicitOperationSelection: true }
