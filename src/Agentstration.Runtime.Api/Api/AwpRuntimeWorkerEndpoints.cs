@@ -134,12 +134,15 @@ public static class AwpRuntimeWorkerEndpoints
         var tenantId = claimed.Assignment.TenantId;
         if (claimed.Assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
         {
-            var run = await runs.GetAsync(claimed.Assignment.WorkspaceId, claimed.Assignment.TargetRunId, cancellationToken)
+            var run = await runs.GetExactAsync(claimed.Assignment.ExecutionScopeRef, claimed.Assignment.TargetRunId, cancellationToken)
                 ?? throw new RuntimeRunNotFoundException(claimed.Assignment.TargetRunId);
             tenantId = run.Value.Scope.TenantId;
         }
-        if (tenantId == Guid.Empty)
+        if (claimed.Assignment.ExecutionScopeRef.Kind != ResourceScopeKind.Instance && tenantId == Guid.Empty)
             throw new RuntimeWorkerDispatchException(AwpErrorCodes.InvalidRequest, "The assignment Tenant identity is missing.");
+        if (claimed.Assignment.ExecutionScopeRef is { Kind: ResourceScopeKind.Tenant, TargetId: { } scopedTenantId }
+            && tenantId != scopedTenantId)
+            throw new RuntimeWorkerDispatchException(AwpErrorCodes.InvalidRequest, "The assignment Tenant identity does not match its execution scope.");
         return Envelope(envelope.MessageId, now, new AwpClaimResponse(now, ToContract(claimed, tenantId)));
     }, principal);
 
@@ -669,7 +672,8 @@ public static class AwpRuntimeWorkerEndpoints
         var scopeRef = ResourceScopeRef.Parse(scope.ScopeRef);
         var coordinatesMatch = scopeRef.Kind switch
         {
-            ResourceScopeKind.Instance => string.IsNullOrWhiteSpace(scope.WorkspaceId),
+            ResourceScopeKind.Instance => scope.TenantId == Guid.Empty
+                && string.IsNullOrWhiteSpace(scope.WorkspaceId),
             ResourceScopeKind.Tenant => string.IsNullOrWhiteSpace(scope.WorkspaceId)
                 && scopeRef.TargetId == scope.TenantId,
             ResourceScopeKind.Workspace => Guid.TryParseExact(scope.WorkspaceId, "D", out var workspaceId)

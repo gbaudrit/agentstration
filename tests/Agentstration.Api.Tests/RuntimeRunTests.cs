@@ -364,6 +364,54 @@ public sealed class RuntimeRunTests
     }
 
     [TestMethod]
+    public async Task AwpWorkerCanClaimAnInstanceScopedRuntimeRun()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+            builder.UseSetting("Agentstration:Authentication:DevelopmentGrantPlatformAdministrator", "true");
+            AwpTestWorker.Configure(builder);
+        });
+        using var client = factory.CreateClient();
+        var template = await client.GetFromJsonAsync<AgentResource>("/api/agents/sql-expert");
+        Assert.IsNotNull(template);
+        var agentRequest = new AgentResourceRequest
+        {
+            ApiVersion = template.ApiVersion,
+            Kind = template.Kind,
+            Metadata = new ResourceMetadata { Name = "awp-instance-claim" },
+            Definition = template.Definition with { DisplayName = "AWP instance claim" },
+            ScopeRef = ResourceScopeRef.Instance
+        };
+        using var agentResponse = await client.PutAsJsonAsync("/api/agents/awp-instance-claim", agentRequest);
+        Assert.AreEqual(HttpStatusCode.OK, agentResponse.StatusCode, await agentResponse.Content.ReadAsStringAsync());
+        var agent = await agentResponse.Content.ReadFromJsonAsync<AgentResource>();
+        Assert.IsNotNull(agent);
+
+        using var runResponse = await client.PostAsJsonAsync("/api/runtime/runs", new CreateRuntimeRunRequest
+        {
+            Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation)
+            {
+                ScopeRef = ResourceScopeRef.Instance,
+                ResourceUid = agent.Uid
+            },
+            ExecutionScopeRef = ResourceScopeRef.Instance,
+            Input = Input("instance claim"),
+            Origin = RuntimeRunOrigin.Api
+        });
+        Assert.AreEqual(HttpStatusCode.Accepted, runResponse.StatusCode, await runResponse.Content.ReadAsStringAsync());
+
+        await using var worker = await AwpTestWorker.StartAsync(factory, processAssignments: false);
+        var claim = await worker.ClaimAsync();
+
+        Assert.IsNotNull(claim.Assignment);
+        Assert.AreEqual(ResourceScopeRef.Instance.Value, claim.Assignment.Scope.ScopeRef);
+        Assert.AreEqual(Guid.Empty, claim.Assignment.Scope.TenantId);
+        Assert.AreEqual(string.Empty, claim.Assignment.Scope.WorkspaceId);
+    }
+
+    [TestMethod]
     public async Task RoutingInvokeExecutesTheSelectedAgentThroughAwpWorker()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>

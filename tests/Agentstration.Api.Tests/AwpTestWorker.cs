@@ -22,7 +22,10 @@ internal sealed class AwpTestWorker : IAsyncDisposable
     private readonly CancellationTokenSource shutdown = new();
     private readonly Task processing;
 
-    private AwpTestWorker(AwpWorker.AwpClientCredential credential, AwpWorker.AwpClient client)
+    private AwpTestWorker(
+        AwpWorker.AwpClientCredential credential,
+        AwpWorker.AwpClient client,
+        bool processAssignments)
     {
         this.credential = credential;
         this.client = client;
@@ -32,7 +35,9 @@ internal sealed class AwpTestWorker : IAsyncDisposable
                 NullLogger<AwpWorker.AwpAssignmentExecutor>.Instance),
             TimeProvider.System,
             NullLogger<AwpWorker.AwpRuntimeWorkerService>.Instance);
-        processing = Task.Run(ProcessAsync, CancellationToken.None);
+        processing = processAssignments
+            ? Task.Run(ProcessAsync, CancellationToken.None)
+            : Task.CompletedTask;
     }
 
     public static void Configure(IWebHostBuilder builder)
@@ -46,7 +51,9 @@ internal sealed class AwpTestWorker : IAsyncDisposable
         });
     }
 
-    public static async Task<AwpTestWorker> StartAsync(WebApplicationFactory<Program> factory)
+    public static async Task<AwpTestWorker> StartAsync(
+        WebApplicationFactory<Program> factory,
+        bool processAssignments = true)
     {
         _ = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>()
             .EnsureInitializedAsync(default);
@@ -73,8 +80,11 @@ internal sealed class AwpTestWorker : IAsyncDisposable
             [AwpProtocol.Version],
             new(client.WorkerId, client.SessionId, "api-test", 1,
                 [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0"])])), default);
-        return new AwpTestWorker(credential, client);
+        return new AwpTestWorker(credential, client, processAssignments);
     }
+
+    public Task<AwpClaimResponse> ClaimAsync(int maximumWaitSeconds = 5, CancellationToken cancellationToken = default) =>
+        client.ClaimAsync(new(client.WorkerId, client.SessionId, 1, maximumWaitSeconds), cancellationToken);
 
     private async Task ProcessAsync()
     {
