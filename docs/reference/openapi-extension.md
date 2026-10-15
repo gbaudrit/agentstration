@@ -19,6 +19,14 @@ The Development profile listens on `http://localhost:5310`. Enroll that endpoint
 
 Bundle installation remains explicit until extension-scoped installation from #696 is delivered.
 
+For the Aspire development topology, set `OpenApi:Enabled=true` and provide at least one `OpenApi:AllowedDomains` entry. The flag is `false` by default, so the standalone topology remains offline and does not launch this optional extension. The AppHost forwards the configured domain, port, method, media-type and execution bounds, enrolls the extension through the selected development AEP enrollment mode, and registers it with the Console automatically.
+
+```powershell
+$env:OpenApi__Enabled = "true"
+$env:OpenApi__AllowedDomains__0 = "api.example.test"
+dotnet run --project src/Agentstration.AppHost
+```
+
 ## Data Source configuration
 
 The contributed profile accepts:
