@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 namespace Agentstration.Flows;
 
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 
 public sealed record FlowResourceReference(string ResourceId, string VersionStrategy = "UseDeploymentVersion", long? Version = null, ResourceNamespace? Namespace = null);
 public sealed record FlowNodePosition(double X, double Y);
@@ -95,6 +96,7 @@ public enum FlowStepArtifactContentEncoding
 public sealed record InputFlowStepDefinition : FlowStepDefinition
 {
     public JsonElement? Schema { get; init; }
+    public SchemaBinding? SchemaBinding { get; init; }
 }
 
 public sealed record AgentFlowStepDefinition : FlowStepDefinition
@@ -210,6 +212,8 @@ public sealed record OutputFlowStepDefinition : FlowStepDefinition
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? Schema { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaBinding? SchemaBinding { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Code { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Message { get; init; }
@@ -243,9 +247,11 @@ public sealed record FlowGraphDefinition
 {
     public required string EntryStep { get; init; }
     public JsonElement? InputSchema { get; init; }
+    public SchemaBinding? InputSchemaBinding { get; init; }
     public IReadOnlyList<FlowStepDefinition> Steps { get; init; } = [];
     public IReadOnlyList<FlowTransitionDefinition> Transitions { get; init; } = [];
     public JsonElement? OutputSchema { get; init; }
+    public SchemaBinding? OutputSchemaBinding { get; init; }
     public FlowDesignerMetadata Designer { get; init; } = new();
 }
 

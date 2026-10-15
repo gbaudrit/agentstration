@@ -197,3 +197,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 169. [ADR-0169 — Schemas are format-neutral versioned resources](0169-schemas-are-format-neutral-versioned-resources.md)
 170. [ADR-0170 — Schema format resolution is explicit](0170-schema-format-resolution-is-explicit.md)
 171. [ADR-0171 — AEP Schema formats use governed MCP operations](0171-aep-schema-formats-use-governed-mcp-operations.md)
+173. [ADR-0173 — Schema bindings resolve at consumer publication](0173-schema-bindings-resolve-at-consumer-publication.md)

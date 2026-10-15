@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Flows.Application;
 
@@ -21,6 +22,7 @@ public sealed class FlowService(
     IFlowRepository repository,
     TimeProvider timeProvider,
     IEnumerable<IFlowDeletionGuard> deletionGuards,
+    ISchemaBindingResolver schemaBindingResolver,
     IEnumerable<IFlowVersionActivationGuard>? activationGuards = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -88,8 +90,17 @@ public sealed class FlowService(
             throw new FlowValidationException("flow_version_mismatch", "The requested version must match the current Flow definition version.");
         if (await repository.GetVersionAsync(workspaceId, id, version, cancellationToken) is not null)
             throw new FlowValidationException("flow_version_already_published", $"Flow version '{version}' has already been published. Choose a new version.");
-        var published = new FlowVersion(workspaceId, id, version, stored.Value.Description, stored.Value.Definition, stored.Value.Metadata, timeProvider.GetUtcNow(), stored.Value.Graph,
-            stored.Value.Graph is null ? null : FlowDefinitionHash.Compute(stored.Value.Graph), releaseNotes);
+        var graph = stored.Value.Graph;
+        IReadOnlyDictionary<string, SchemaBindingSnapshot>? schemaBindings = null;
+        if (graph is not null)
+        {
+            var resolved = await new FlowSchemaBindingSnapshotter(schemaBindingResolver)
+                .ResolveAsync(workspaceId, id, graph, cancellationToken);
+            graph = resolved.Graph;
+            schemaBindings = resolved.Snapshots;
+        }
+        var published = new FlowVersion(workspaceId, id, version, stored.Value.Description, stored.Value.Definition, stored.Value.Metadata, timeProvider.GetUtcNow(), graph,
+            graph is null ? null : FlowDefinitionHash.Compute(graph), releaseNotes, schemaBindings);
         FlowValidator.ValidateVersion(published);
         if (activate)
             foreach (var guard in activationGuards ?? []) await guard.ValidateActivationAsync(workspaceId, published, cancellationToken);

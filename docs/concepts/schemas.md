@@ -2,6 +2,14 @@
 
 A Schema is a reusable, scoped contract resource. Its identity, ownership scope, namespace, format and dialect remain stable while its draft content can be edited with optimistic concurrency. Publishing creates an immutable version containing an independent content snapshot and deterministic digest.
 
+## Consumer bindings
+
+A Flow draft can keep its historical inline JSON Schema fields or use a `SchemaBinding`. A binding contains exactly one inline definition or one exact published Schema-version reference. References default to the Flow's Workspace and namespace when their scope or namespace is omitted; an explicit parent-scope reference is usable only when the Schema grants descendant use.
+
+Flow publication resolves bindings using the format registry and requires `json-schema`, the format understood by Flow execution. The published Flow stores the effective JSON contract in its legacy runtime fields plus provenance containing the source address, version, UID, generation and digest. Execution never resolves a Schema again, so changing a Schema draft or losing an AEP format provider cannot change an already-published Flow version.
+
+Missing versions, denied scopes, incompatible formats, unavailable providers and invalid definitions fail publication with stable diagnostics. Bindings do not compose or transform schemas.
+
 The Console Schema library is available under **Design > Schemas**. The **Definition** tab owns identity and description, while the **Designer** tab edits the native document in three modes:
 
 - **Visual** uses a compact recursive property tree and a single inspector for the selected node. Properties can be renamed, reordered among siblings, nested under objects, marked as required, and configured with primitive or collection types, descriptions, defaults, string enums, and basic numeric or string bounds.

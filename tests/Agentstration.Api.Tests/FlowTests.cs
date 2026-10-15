@@ -10,6 +10,7 @@ using Agentstration.Infrastructure.Flows;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Work;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -59,6 +60,7 @@ public sealed partial class FlowTests
                 services.AddDbContextFactory<FlowDbContext>(options => options.UseSqlite(connectionString).AddInterceptors(commandInterceptor));
                 services.AddSingleton<IFlowRepository, SqliteFlowRepository>();
             }
+            services.AddSingleton<ISchemaBindingResolver, TestSchemaBindingResolver>();
             services.AddSingleton<FlowService>();
             var provider = services.BuildServiceProvider();
             var fixture = new FlowFixture(directory, provider);
@@ -153,5 +155,17 @@ public sealed partial class FlowTests
     private sealed class ExistingResourceResolver : IFlowResourceReferenceResolver
     {
         public Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken) => Task.FromResult(true);
+    }
+
+    private sealed class TestSchemaBindingResolver : ISchemaBindingResolver
+    {
+        public ValueTask<SchemaBindingSnapshot> ResolveAsync(string path, SchemaBinding binding,
+            SchemaBindingResolutionContext context, CancellationToken cancellationToken)
+        {
+            var inline = binding.Inline ?? throw new SchemaBindingResolutionException(
+                "schema_reference_not_supported", "This test fixture only supports inline bindings.");
+            return ValueTask.FromResult(new SchemaBindingSnapshot(path, inline.Format, inline.Dialect,
+                inline.Content.Clone(), $"test:{inline.Content.GetRawText()}"));
+        }
     }
 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Flows.Application;
 
@@ -85,6 +86,10 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
     {
         ArgumentNullException.ThrowIfNull(definition);
         var issues = new List<FlowValidationIssue>();
+        ValidateSchemaContract(definition.InputSchema, definition.InputSchemaBinding,
+            "inputSchema", null, issues);
+        ValidateSchemaContract(definition.OutputSchema, definition.OutputSchemaBinding,
+            "outputSchema", null, issues);
         var steps = new Dictionary<string, FlowStepDefinition>(StringComparer.Ordinal);
         foreach (var step in definition.Steps)
         {
@@ -149,6 +154,9 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         await ValidateArtifactOutputAsync(step, transitions, context, issues, token);
         switch (step)
         {
+            case InputFlowStepDefinition input:
+                ValidateSchemaContract(input.Schema, input.SchemaBinding, "schema", input.Name, issues);
+                break;
             case AgentFlowStepDefinition agent:
                 await ValidateResourceAsync(agent.Agent.ResourceId, agent.Agent.Namespace, step.Name, "agent.resourceId", context, issues, token);
                 ValidateJsonExpressions(agent.InputMapping, issues, step.Name, "inputMapping");
@@ -203,6 +211,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 ValidateJsonExpressions(output.DetailsExpression is null ? null : JsonSerializer.SerializeToElement(output.DetailsExpression), issues, step.Name, "detailsExpression");
                 if (!ValidContractSchema(output.Schema))
                     issues.Add(Error("flow_output_schema_invalid", "The named output has an invalid or unsupported schema.", step.Name, property: "schema"));
+                ValidateSchemaContract(output.Schema, output.SchemaBinding, "schema", output.Name, issues);
                 if (output.Outcome == FlowOutputOutcome.Error && output.Code is not null && string.IsNullOrWhiteSpace(output.Code))
                     issues.Add(Error("flow_output_error_code_invalid", "An error output code cannot be empty.", step.Name, property: "code"));
                 if (output.Outcome == FlowOutputOutcome.Error && output.Message is not null && string.IsNullOrWhiteSpace(output.Message))
@@ -473,6 +482,37 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         if (schema.Value.TryGetProperty("type", out var type)
             && (type.ValueKind != JsonValueKind.String || !string.Equals(type.GetString(), "object", StringComparison.Ordinal))) return false;
         return !schema.Value.TryGetProperty("properties", out var properties) || properties.ValueKind == JsonValueKind.Object;
+    }
+
+    private static void ValidateSchemaContract(JsonElement? legacy, SchemaBinding? binding,
+        string property, string? stepName, List<FlowValidationIssue> issues)
+    {
+        if (legacy is not null && binding is not null)
+        {
+            issues.Add(Error("schema_binding_ambiguous",
+                "A Flow contract cannot declare both a legacy JSON schema and a Schema binding.",
+                stepName, property: property));
+            return;
+        }
+        if (binding is null) return;
+        var forms = (binding.Inline is null ? 0 : 1) + (binding.Reference is null ? 0 : 1);
+        if (forms != 1)
+        {
+            issues.Add(Error("schema_binding_invalid",
+                "A Schema binding must contain exactly one inline definition or version reference.",
+                stepName, property: property));
+            return;
+        }
+        if (binding.Inline is { } inline
+            && (string.IsNullOrWhiteSpace(inline.Format)
+                || inline.Content.ValueKind == JsonValueKind.Undefined))
+            issues.Add(Error("schema_binding_inline_invalid",
+                "An inline Schema binding requires a format and content.", stepName, property: property));
+        if (binding.Reference is { } reference
+            && (string.IsNullOrWhiteSpace(reference.Name) || string.IsNullOrWhiteSpace(reference.Version)))
+            issues.Add(Error("schema_binding_reference_invalid",
+                "A Schema reference requires a name and an exact published version.",
+                stepName, property: property));
     }
 
     private async Task ValidateResourceAsync(string resourceId, ResourceNamespace? @namespace, string step, string property, FlowValidationContext context, List<FlowValidationIssue> issues, CancellationToken token)
