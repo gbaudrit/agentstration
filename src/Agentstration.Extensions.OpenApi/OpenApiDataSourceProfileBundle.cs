@@ -66,7 +66,7 @@ public static class OpenApiDataSourceProfileBundle
               - type: output
                 name: output
                 displayName: Discovered operations
-                outputMapping: { choices: "${steps.discover.output.structuredContent.choices}", artifacts: [] }
+                outputMapping: { choices: "${steps.discover.output.structuredContent.choices}", artifacts: [], diagnostics: "${steps.discover.output.structuredContent.diagnostics}" }
               - { type: failure, name: failure, displayName: Discovery failed }
             transitions:
               - { id: input-discover, fromStep: input, event: completed, toStep: discover }
@@ -74,7 +74,7 @@ public static class OpenApiDataSourceProfileBundle
               - { id: discover-failure, fromStep: discover, event: error, toStep: failure }
             outputSchema:
               type: object
-              properties: { choices: { type: array, items: { type: object } }, artifacts: { type: array, items: { type: object } } }
+              properties: { choices: { type: array, items: { type: object } }, artifacts: { type: array, items: { type: object } }, diagnostics: { type: array, items: { type: object } } }
               required: [choices, artifacts]
               additionalProperties: false
           publish: true
