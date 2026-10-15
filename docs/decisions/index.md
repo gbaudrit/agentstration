@@ -201,3 +201,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 173. [ADR-0173 — Model infrastructure is Instance-owned and Model Profiles are hierarchical](0173-model-infrastructure-is-instance-owned.md)
 174. [ADR-0174 — Agent definitions use hierarchical resource ownership](0174-agent-definitions-use-hierarchical-resource-ownership.md)
 175. [ADR-0175 — AEP Schema formats use governed MCP operations](0175-aep-schema-formats-use-governed-mcp-operations.md)
+176. [ADR-0176 — Data Source profiles pin owner-scoped dependencies](0176-data-source-profiles-pin-owner-scoped-dependencies.md)

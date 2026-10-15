@@ -64,9 +64,12 @@ public sealed record DataSourceProfileRevisionResource : Resource, IImmutableRes
     public required long ProfileGeneration { get; init; }
     public required string Version { get; init; }
     public required string DefinitionHash { get; init; }
+    public required string DependencyHash { get; init; }
     public required DateTimeOffset PublishedAt { get; init; }
     public required Guid PublishedBy { get; init; }
     public required DataSourceProfileProperties Definition { get; init; }
+    public required ResolvedDataSourceFlowBinding AcquisitionFlow { get; init; }
+    public IReadOnlyList<ResolvedDataSourceToolBinding> ToolBindings { get; init; } = [];
 }
 
 public sealed record DataSourceProperties
@@ -81,6 +84,7 @@ public sealed record DataSourceProperties
 public sealed record DataSourceResource : Resource
 {
     public DataSourceProperties Definition { get; init; } = null!;
+    public Guid? ProfileUid { get; init; }
 }
 
 public sealed record ResolvedDataSourceProfile
@@ -92,7 +96,10 @@ public sealed record ResolvedDataSourceProfile
     public required long Generation { get; init; }
     public required string Version { get; init; }
     public required string DefinitionHash { get; init; }
+    public required string DependencyHash { get; init; }
     public required DataSourceProfileProperties Definition { get; init; }
+    public required ResolvedDataSourceFlowBinding AcquisitionFlow { get; init; }
+    public IReadOnlyList<ResolvedDataSourceToolBinding> ToolBindings { get; init; } = [];
 }
 
 public sealed record ResolvedDataSourceFlowBinding(
@@ -102,7 +109,8 @@ public sealed record ResolvedDataSourceFlowBinding(
     bool UsesActiveVersion,
     JsonElement? InputSchema,
     JsonElement? OutputSchema,
-    string? Contract)
+    string? Contract,
+    string DefinitionHash)
 {
     public ResourceScopeRef? ScopeRef { get; init; }
 }
@@ -123,6 +131,10 @@ public sealed record ResolvedDataSourceToolBinding
     public required long ProviderGeneration { get; init; }
     public required string ExternalToolId { get; init; }
 }
+
+public sealed record ResolvedDataSourceProfileDependencies(
+    ResolvedDataSourceFlowBinding AcquisitionFlow,
+    IReadOnlyList<ResolvedDataSourceToolBinding> ToolBindings);
 
 public sealed record ResolvedDataSourceAcquisitionComposition
 {

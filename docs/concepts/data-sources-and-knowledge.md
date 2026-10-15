@@ -21,7 +21,7 @@ origin
 
 A Data Source owns the origin identity, configuration, enabled state, and profile reference. Its Data Source Profile owns the reusable configuration schema, acquisition Flow, governed Tool bindings, limits, and policies. Profiles have editable drafts, immutable published revisions, and one active revision.
 
-Data Sources and profiles may be owned at instance, tenant, or Workspace scope. References follow ancestor-only visibility: a Workspace may consume a Workspace, tenant, or instance Data Source; a tenant resource cannot depend on a Workspace resource. The accepted acquisition pins the exact source, active profile revision, Flow, Tools, providers, limits, policies, and returned Artifact manifest in the consuming Workspace.
+Data Sources and profiles may be owned at instance, tenant, or Workspace scope. References follow ancestor-only visibility and explicit descendant-use grants: a Workspace may consume an authorized Workspace, tenant, or instance resource, while a tenant resource cannot depend on a Workspace resource. Profile publication resolves dependencies from the profile owner scope and pins the exact Flow version and integrity hash plus Tool and provider identities and generations. The acquisition Flow currently has to share the profile's exact scope because #751 has not yet exposed Flow identities to the shared access-policy overlay; ancestor Flows fail closed instead of inheriting visibility as authorization. The consuming Workspace validates those immutable pins without rebinding names, then records the exact source, active profile revision, limits, policies, and returned Artifact manifest in its isolated acquisition state.
 
 The acquisition Flow declares:
 

@@ -37,14 +37,19 @@ public sealed record DataSourceFlowRunSnapshot(
 public interface IDataSourceAcquisitionCompositionResolver
 {
     Task<ResolvedDataSourceFlowBinding> ResolveFlowAsync(
-        ResourceScopeRef executionScope,
+        ResourceScopeRef ownerScope,
         ResourceNamespace ownerNamespace,
-        ResolvedDataSourceProfile profile,
+        DataSourceProfileProperties definition,
         CancellationToken cancellationToken);
 
-    Task<ResolvedDataSourceAcquisitionComposition> ResolveAsync(
-        ResourceScopeRef executionScope,
+    Task<ResolvedDataSourceProfileDependencies> ResolveDependenciesAsync(
+        ResourceScopeRef ownerScope,
         ResourceNamespace ownerNamespace,
+        DataSourceProfileProperties definition,
+        CancellationToken cancellationToken);
+
+    Task ValidatePinnedAsync(
+        ResourceScopeRef ownerScope,
         ResolvedDataSourceProfile profile,
         CancellationToken cancellationToken);
 }
@@ -91,8 +96,9 @@ public sealed class DataSourceAcquisitionService(
     {
         var context = RequireContext();
         ValidateRequest(parameters, idempotencyKey);
-        var source = await sources.GetAsync(sourceNamespace, sourceName, sourceScope, cancellationToken)
-            ?? throw Error("data_source_not_found", $"Data Source '{sourceNamespace}/{sourceName}' was not found.");
+        var executionScope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var source = await sources.ResolveForUseAsync(sourceNamespace, sourceName, sourceScope,
+            executionScope, cancellationToken);
         var sourceOwnerScope = source.Value.ScopeRef
             ?? throw Error("data_source_scope_required", "The Data Source has no ownership scope.");
         var gate = startGates.GetOrAdd((context.WorkspaceId, source.Value.Uid), _ => new SemaphoreSlim(1, 1));
@@ -101,15 +107,27 @@ public sealed class DataSourceAcquisitionService(
         {
             if (!source.Value.Definition.Enabled)
                 throw Error("data_source_disabled", $"Data Source '{source.Value.Address}' is disabled.");
+            var profileUid = source.Value.ProfileUid
+                ?? throw Error("data_source_profile_pin_missing",
+                    $"Data Source '{source.Value.Address}' does not pin an exact Data Source Profile identity.");
             var profile = await profiles.ResolveActiveAsync(sourceOwnerScope, source.Value.Namespace,
-                source.Value.Definition.Profile, cancellationToken);
+                source.Value.Definition.Profile, profileUid, cancellationToken);
             var configurationIssues = DataSourceProfileService.ValidateConfiguration(
                 profile.Definition.ConfigurationSchema, source.Value.Definition.Configuration);
             if (configurationIssues.Count != 0)
                 throw Error("data_source_configuration_invalid", string.Join(' ', configurationIssues));
 
-            var executionScope = ResourceScopeRef.Workspace(context.WorkspaceId);
-            var composition = await compositions.ResolveAsync(executionScope, source.Value.Namespace, profile, cancellationToken);
+            await compositions.ValidatePinnedAsync(sourceOwnerScope, profile, cancellationToken);
+            var composition = new ResolvedDataSourceAcquisitionComposition
+            {
+                Profile = profile,
+                Flow = profile.AcquisitionFlow,
+                Tools = profile.ToolBindings,
+                Limits = profile.Definition.Limits.ToDictionary(
+                    item => item.Key, item => item.Value.Clone(), StringComparer.Ordinal),
+                Policies = profile.Definition.Policies.ToDictionary(
+                    item => item.Key, item => item.Value.Clone(), StringComparer.Ordinal)
+            };
             ValidateContract(composition.Flow);
             var requestHash = Hash(JsonSerializer.SerializeToElement(new
             {
@@ -121,9 +139,17 @@ public sealed class DataSourceAcquisitionService(
                     composition.Profile.Uid,
                     composition.Profile.Generation,
                     composition.Profile.Version,
-                    composition.Profile.DefinitionHash
+                    composition.Profile.DefinitionHash,
+                    composition.Profile.DependencyHash
                 },
-                flow = new { composition.Flow.Name, composition.Flow.Namespace, composition.Flow.Version },
+                flow = new
+                {
+                    composition.Flow.ScopeRef,
+                    composition.Flow.Name,
+                    composition.Flow.Namespace,
+                    composition.Flow.Version,
+                    composition.Flow.DefinitionHash
+                },
                 tools = composition.Tools,
                 composition.Limits,
                 composition.Policies,
