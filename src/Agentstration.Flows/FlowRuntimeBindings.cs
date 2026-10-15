@@ -8,10 +8,14 @@ public sealed record RuntimeExecutionBinding
 {
     public required string ParticipantId { get; init; }
     public required ResourceNamespace AgentNamespace { get; init; }
+    public ResourceScopeRef? AgentScopeRef { get; init; }
+    public Guid AgentUid { get; init; }
     public required string AgentResourceId { get; init; }
     public required long AgentGeneration { get; init; }
     public required string DeploymentId { get; init; }
     public required string RevisionId { get; init; }
+    public Guid RevisionUid { get; init; }
+    public string? DefinitionHash { get; init; }
     public required string RuntimeProfileName { get; init; }
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required string ModelProfileName { get; init; }
@@ -49,7 +53,10 @@ public sealed record FlowTargetReference(
     string Id,
     string? Version = null,
     ResourceNamespace? Namespace = null,
-    ResourceScopeRef? ScopeRef = null)
+    ResourceScopeRef? ScopeRef = null,
+    Guid? ResourceUid = null,
+    Guid? RevisionUid = null,
+    string? DefinitionHash = null)
 {
     public ResourceAddress Resolve(ResourceNamespace ownerNamespace) =>
         ResourceAddress.Create(Namespace ?? ownerNamespace, Kind == FlowTargetKind.Agent ? "Agent" : "Flow", Id);

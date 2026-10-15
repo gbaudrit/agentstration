@@ -729,10 +729,10 @@ public sealed class PackTests
                   enabled: true
                   metadata: { flow.contract: datasource.acquisition/v1 }
                   spec:
-                    flowKind: direct
-                    target:
-                      kind: agent
-                      id: unused
+                    flowKind: workflow
+                    entryNodeId: input
+                    nodes: [{ id: input, kind: input }]
+                    edges: []
                   graph:
                     entryStep: input
                     inputSchema:
@@ -769,7 +769,7 @@ public sealed class PackTests
                   version: 1.0.0
                   enabled: true
                   metadata: { flow.contract: knowledge.projection/v1 }
-                  spec: { flowKind: direct, target: { kind: agent, id: unused } }
+                  spec: { flowKind: workflow, entryNodeId: input, nodes: [{ id: input, kind: input }], edges: [] }
                   graph:
                     entryStep: input
                     inputSchema:
@@ -794,7 +794,7 @@ public sealed class PackTests
                   version: 1.0.0
                   enabled: true
                   metadata: { flow.contract: knowledge.retrieval/v1, knowledge.capabilities: knowledge.search/v1 }
-                  spec: { flowKind: direct, target: { kind: agent, id: unused } }
+                  spec: { flowKind: workflow, entryNodeId: input, nodes: [{ id: input, kind: input }], edges: [] }
                   graph:
                     entryStep: input
                     inputSchema:

@@ -38,7 +38,11 @@ public static class Crawl4AiDataSourceProfileBundle
           description: Reads one bounded Crawl4AI chunk and appends it to governed staging.
           version: 1.0.0
           enabled: true
-          spec: { flowKind: direct, target: { kind: agent, id: unused-graph-target } }
+          spec:
+            flowKind: workflow
+            entryNodeId: input
+            nodes: [{ id: input, kind: input }]
+            edges: []
           graph:
             entryStep: input
             inputSchema:
@@ -92,7 +96,11 @@ public static class Crawl4AiDataSourceProfileBundle
           version: 1.0.0
           enabled: true
           metadata: { flow.contract: datasource.acquisition/v1 }
-          spec: { flowKind: direct, target: { kind: agent, id: unused-graph-target } }
+          spec:
+            flowKind: workflow
+            entryNodeId: input
+            nodes: [{ id: input, kind: input }]
+            edges: []
           graph:
             entryStep: input
             inputSchema:

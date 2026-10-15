@@ -12,7 +12,10 @@ public sealed record FlowResourceReference(
     string VersionStrategy = "UseDeploymentVersion",
     long? Version = null,
     ResourceNamespace? Namespace = null,
-    ResourceScopeRef? ScopeRef = null);
+    ResourceScopeRef? ScopeRef = null,
+    Guid? ResourceUid = null,
+    Guid? RevisionUid = null,
+    string? DefinitionHash = null);
 public sealed record FlowNodePosition(double X, double Y);
 public sealed record FlowViewportMetadata(double X, double Y, double Zoom = 1);
 public sealed record FlowDesignerMetadata

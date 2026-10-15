@@ -385,11 +385,16 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
             null,
             "1.0.0",
             true,
-            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
+            GraphOnlyDefinition(),
             Graph: Graph(input, output)), ns, default);
         await flows.PublishVersionAsync(workspaceId, new FlowId(name, ns), "1.0.0", true, default);
         return (input, output);
     }
+
+    private static WorkflowFlowDefinition GraphOnlyDefinition() => new(
+        "input",
+        [new FlowNode("input", FlowNodeKind.Input)],
+        []);
 
     private static FlowGraphDefinition Graph(JsonElement input, JsonElement output) => new()
     {

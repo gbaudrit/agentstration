@@ -25,10 +25,14 @@ public interface IManagementApiClient
     Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken);
     Task<ResourceSnapshot<AgentResource>> GetAgentAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetAgentAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Agents.");
+    Task<ResourceSnapshot<AgentResource>> GetAgentAsync(ResourceNamespace @namespace, string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        GetAgentAsync(@namespace, name, cancellationToken);
     Task<ResourceSnapshot<AgentRevision>> GetAgentRevisionAsync(ResourceNamespace @namespace, string agentName, string revisionName, CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Agent revision inspection.");
     Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken);
     Task DeleteAgentAsync(string name, string etag, CancellationToken cancellationToken);
+    Task DeleteAgentAsync(ResourceNamespace @namespace, string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? DeleteAgentAsync(name, etag, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Agents.");
     Task<ManagementSummary> GetSummaryAsync(CancellationToken cancellationToken);
 }
 
@@ -62,9 +66,13 @@ public interface IAgentRunnerRuntimeClient : IRuntimeApiClient
     Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(string agentName, long generation, CancellationToken cancellationToken);
     Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(ResourceNamespace @namespace, string agentName, long generation, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetAgentReadinessAsync(agentName, generation, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Agent runtime readiness.");
+    Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(ResourceNamespace @namespace, string agentName, ResourceScopeRef scopeRef, long generation, CancellationToken cancellationToken) =>
+        GetAgentReadinessAsync(@namespace, agentName, generation, cancellationToken);
     Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(string agentName, long generation, CancellationToken cancellationToken);
     Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(ResourceNamespace @namespace, string agentName, long generation, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? PrepareAgentAsync(agentName, generation, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Agent runtime preparation.");
+    Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(ResourceNamespace @namespace, string agentName, ResourceScopeRef scopeRef, long generation, CancellationToken cancellationToken) =>
+        PrepareAgentAsync(@namespace, agentName, generation, cancellationToken);
 }
 
 public sealed record ToolGovernanceAuditFilters

@@ -725,7 +725,15 @@ public static class AwpRuntimeWorkerEndpoints
             value.Description,
             value.InputSchema,
             value.OutputSchema,
-            value.RequiresApproval)).ToArray())
+            value.RequiresApproval)
+        {
+            ScopeRef = value.ScopeRef?.ToString(),
+            Uid = value.Uid,
+            Generation = value.Generation,
+            ProviderScopeRef = value.ProviderScopeRef?.ToString(),
+            ProviderUid = value.ProviderUid,
+            ProviderGeneration = value.ProviderGeneration
+        }).ToArray())
     {
         AgentNamespace = agent.AgentNamespace.ToString(),
         RuntimeProfileName = agent.RuntimeProfileName,

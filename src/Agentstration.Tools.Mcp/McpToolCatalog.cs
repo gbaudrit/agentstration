@@ -292,22 +292,66 @@ public sealed class McpToolCatalog(IResourceStore store, ToolProviderAdapter pro
             resources.Add(tool.Value);
         }
 
-        var resolved = new List<IAgentTool>();
-        foreach (var group in resources.GroupBy(value => (
-                     value.Definition.Provider!.Name,
-                     Namespace: value.Definition.Provider.Namespace ?? value.Namespace)))
+        return await ResolveAsync(resources, cancellationToken);
+    }
+
+    public async ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(
+        IEnumerable<RuntimeToolReference> tools,
+        CancellationToken cancellationToken = default)
+    {
+        var resources = new List<ToolResource>();
+        foreach (var reference in tools.DistinctBy(value => value.Uid))
         {
-            var provider = await store.GetAsync<ToolProviderResource>(new ResourceKey(ToolResourceKinds.ToolProvider, group.Key.Name, group.Key.Namespace), cancellationToken) ?? throw new ToolResolutionException("tool_provider_not_found", $"ToolProvider '{group.Key.Name}' was not found.");
+            var tool = await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
+                reference.ScopeRef, reference.Namespace, ToolResourceKinds.Tool,
+                ToolResourceIdentity.ParseCatalogId(reference.Id).Name), cancellationToken)
+                ?? throw new ToolResolutionException("tool_not_found", $"Tool resource '{reference.Id}' was not found.");
+            if (tool.Value.Uid != reference.Uid || tool.Value.Generation != reference.Generation)
+                throw new ToolResolutionException("tool_stale", $"Tool resource '{reference.Id}' no longer matches the Agent revision.");
+            if (!tool.Value.Definition.Enabled) throw new ToolResolutionException("tool_disabled", $"Tool resource '{reference.Id}' is disabled.");
+            if (tool.Value.Definition.Discovery?.Available != true) throw new ToolResolutionException("tool_unavailable", $"Tool resource '{reference.Id}' is no longer available from its provider.");
+            if (tool.Value.Definition.Provider is null) throw new ToolResolutionException("tool_mapping_invalid", $"Tool resource '{reference.Id}' has no ToolProvider mapping.");
+            resources.Add(tool.Value);
+        }
+
+        return await ResolveAsync(resources, cancellationToken);
+    }
+
+    private async ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(
+        IReadOnlyCollection<ToolResource> resources,
+        CancellationToken cancellationToken)
+    {
+        var mappings = new List<(ToolResource Tool, ToolProviderResource Provider)>();
+        foreach (var tool in resources)
+        {
+            var providerReference = tool.Definition.Provider!;
+            var providerAddress = providerReference.Resolve(tool.Namespace, ToolResourceKinds.ToolProvider);
+            var provider = providerReference.ScopeRef is { } providerScopeRef
+                ? await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
+                    providerScopeRef, providerAddress.Namespace, ToolResourceKinds.ToolProvider,
+                    providerAddress.Name), cancellationToken)
+                : await store.GetAsync<ToolProviderResource>(new ResourceKey(
+                    ToolResourceKinds.ToolProvider, providerAddress.Name, providerAddress.Namespace), cancellationToken);
+            if (provider is null) throw new ToolResolutionException("tool_provider_not_found", $"ToolProvider '{providerAddress.Name}' was not found.");
             if (!provider.Value.Definition.Enabled) throw new ToolResolutionException("tool_provider_disabled", $"ToolProvider '{provider.Value.Metadata.Name}' is disabled.");
-            if (provider.Value.Definition.Mcp?.Internal == true)
-                resolved.AddRange(group.Select(Tool));
+            mappings.Add((tool, provider.Value));
+        }
+
+        var resolved = new List<IAgentTool>();
+        foreach (var group in mappings.GroupBy(value => value.Provider.Uid))
+        {
+            var provider = group.First().Provider;
+            if (provider.Definition.Mcp?.Internal == true)
+                resolved.AddRange(group.Select(value => Tool(value.Tool, provider)));
             else
-                resolved.AddRange(await providers.ResolveAsync(provider.Value, group.ToArray(), cancellationToken));
+                resolved.AddRange((await providers.ResolveAsync(provider, group.Select(value => value.Tool).ToArray(), cancellationToken))
+                    .Select(value => new ExactAgentTool(value, group.Single(mapping =>
+                        mapping.Tool.Name == value.Id && mapping.Tool.Namespace == value.Namespace).Tool, provider)));
         }
         return resolved;
     }
 
-    private static IAgentTool Tool(ToolResource resource) => new McpAgentTool(
+    private static IAgentTool Tool(ToolResource resource, ToolProviderResource provider) => new McpAgentTool(
         resource.Name,
         resource.Definition.ExternalId ?? resource.Name,
         resource.Definition.Description,
@@ -317,7 +361,15 @@ public sealed class McpToolCatalog(IResourceStore store, ToolProviderAdapter pro
         resource.Definition.ExternalId,
         resource.Definition.Schema?.Input ?? JsonSerializer.SerializeToElement(new { type = "object" }),
         resource.Definition.Schema?.Output,
-        resource.Definition.RequiresApproval);
+        resource.Definition.RequiresApproval)
+    {
+        ScopeRef = resource.ScopeRef,
+        Uid = resource.Uid,
+        Generation = resource.Generation,
+        ProviderScopeRef = provider.ScopeRef,
+        ProviderUid = provider.Uid,
+        ProviderGeneration = provider.Generation
+    };
 }
 
 internal sealed record McpAgentTool(
@@ -330,7 +382,35 @@ internal sealed record McpAgentTool(
     string? ExternalId,
     JsonElement InputSchema,
     JsonElement? OutputSchema,
-    bool RequiresApproval) : IAgentTool;
+    bool RequiresApproval) : IAgentTool
+{
+    public ResourceScopeRef? ScopeRef { get; init; }
+    public Guid? Uid { get; init; }
+    public long? Generation { get; init; }
+    public ResourceScopeRef? ProviderScopeRef { get; init; }
+    public Guid? ProviderUid { get; init; }
+    public long? ProviderGeneration { get; init; }
+}
+
+internal sealed record ExactAgentTool(IAgentTool Inner, ToolResource Tool, ToolProviderResource Provider) : IAgentTool
+{
+    public string Id => Inner.Id;
+    public string Name => Inner.Name;
+    public string? Description => Inner.Description;
+    public string? ProviderId => Inner.ProviderId;
+    public ResourceNamespace? Namespace => Inner.Namespace;
+    public ResourceNamespace? ProviderNamespace => Inner.ProviderNamespace;
+    public string? ExternalId => Inner.ExternalId;
+    public JsonElement InputSchema => Inner.InputSchema;
+    public JsonElement? OutputSchema => Inner.OutputSchema;
+    public bool RequiresApproval => Inner.RequiresApproval;
+    public ResourceScopeRef? ScopeRef => Tool.ScopeRef;
+    public Guid? Uid => Tool.Uid;
+    public long? Generation => Tool.Generation;
+    public ResourceScopeRef? ProviderScopeRef => Provider.ScopeRef;
+    public Guid? ProviderUid => Provider.Uid;
+    public long? ProviderGeneration => Provider.Generation;
+}
 
 public sealed class McpToolInvoker(
     IResourceStore store,

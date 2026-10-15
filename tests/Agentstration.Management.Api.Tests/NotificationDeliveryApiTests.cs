@@ -279,10 +279,15 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             null,
             version,
             true,
-            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
+            GraphOnlyDefinition(),
             Graph: graph), ResourceNamespace.Default, default);
         await flows.PublishVersionAsync(workspaceId, new FlowId(name), version, activate, default);
     }
+
+    private static WorkflowFlowDefinition GraphOnlyDefinition() => new(
+        "input",
+        [new FlowNode("input", FlowNodeKind.Input)],
+        []);
 
     private static ToolDefinitionResource NotificationToolDefinition(
         string name,

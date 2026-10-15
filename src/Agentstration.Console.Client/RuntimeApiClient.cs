@@ -118,6 +118,11 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
             $"{RuntimeAgentPath(@namespace, agentName)}/readiness?generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
             cancellationToken);
 
+    public Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(ResourceNamespace @namespace, string agentName, ResourceScopeRef scopeRef, long generation, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<AgentRuntimeReadinessResponse>(httpClient,
+            $"{RuntimeAgentPath(@namespace, agentName)}/readiness?generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}&scopeRef={Uri.EscapeDataString(scopeRef.Value)}",
+            cancellationToken);
+
     public async Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(string agentName, long generation, CancellationToken cancellationToken)
         => await PrepareAgentAsync(ResourceNamespace.Default, agentName, generation, cancellationToken);
 
@@ -125,6 +130,17 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
     {
         using var response = await httpClient.PostAsync(
             $"{RuntimeAgentPath(@namespace, agentName)}/prepare?generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            null,
+            cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<PrepareAgentRuntimeResponse>(cancellationToken)
+            ?? throw new AgentstrationApiException("Runtime returned an empty preparation response.", Guid.NewGuid().ToString("N"));
+    }
+
+    public async Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(ResourceNamespace @namespace, string agentName, ResourceScopeRef scopeRef, long generation, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync(
+            $"{RuntimeAgentPath(@namespace, agentName)}/prepare?generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}&scopeRef={Uri.EscapeDataString(scopeRef.Value)}",
             null,
             cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);

@@ -425,7 +425,7 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         var workspace = new WorkspaceId(context.WorkspaceId);
         await flows.CreateAsync(workspace, new CreateFlowCommand(
             name, null, "1.0.0", true,
-            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
+            GraphOnlyDefinition(),
             new Dictionary<string, string> { [FlowMetadataKeys.Contract] = DataSourceFlowContracts.Acquisition },
             new FlowGraphDefinition
             {
@@ -441,4 +441,9 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             }), default, default);
         await flows.PublishVersionAsync(workspace, new(name), "1.0.0", true, default);
     }
+
+    private static WorkflowFlowDefinition GraphOnlyDefinition() => new(
+        "input",
+        [new FlowNode("input", FlowNodeKind.Input)],
+        []);
 }

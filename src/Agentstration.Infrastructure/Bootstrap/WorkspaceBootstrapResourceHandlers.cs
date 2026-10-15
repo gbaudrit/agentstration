@@ -289,7 +289,8 @@ public sealed class AgentBootstrapResourceHandler(
     ToolSetService serviceToolSets) : IBootstrapResourceHandler
 {
     public string Kind => AgentResourceKinds.Agent;
-    public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
+    public bool SupportsProfileScope(BootstrapProfileScope profileScope) => true;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
         BootstrapResourceDocument resource,
@@ -297,8 +298,11 @@ public sealed class AgentBootstrapResourceHandler(
         BootstrapPlanningContext planning,
         CancellationToken cancellationToken)
     {
-        var value = WorkspaceBootstrapResource.Parse<AgentResource>(resource);
-        if (await service.GetAgentAsync(value.Namespace, value.Name, cancellationToken) is not null)
+        var value = WorkspaceBootstrapResource.Parse<AgentResource>(resource) with
+        {
+            ScopeRef = DataSourceProfileBootstrapResourceHandler.TargetScope(operation)
+        };
+        if (await service.GetAgentExactAsync(value.ScopeRef.Value, value.Namespace, value.Name, cancellationToken) is not null)
             return new(BootstrapResourceDisposition.Skip);
         ValidateBasic(value);
         var model = value.Definition.ModelProfile.Resolve(value.Namespace, ModelResourceKinds.ModelProfile);
@@ -328,8 +332,11 @@ public sealed class AgentBootstrapResourceHandler(
         BootstrapResourceOperationContext operation,
         CancellationToken cancellationToken)
     {
-        var value = WorkspaceBootstrapResource.Parse<AgentResource>(resource);
-        if (await service.GetAgentAsync(value.Namespace, value.Name, cancellationToken) is not null)
+        var value = WorkspaceBootstrapResource.Parse<AgentResource>(resource) with
+        {
+            ScopeRef = DataSourceProfileBootstrapResourceHandler.TargetScope(operation)
+        };
+        if (await service.GetAgentExactAsync(value.ScopeRef.Value, value.Namespace, value.Name, cancellationToken) is not null)
             return BootstrapResourceApplyResult.Skipped;
         _ = await service.PutAgentAsync(value, null, true, cancellationToken);
         return BootstrapResourceApplyResult.Created;

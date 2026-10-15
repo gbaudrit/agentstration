@@ -85,6 +85,8 @@ public sealed class ToolSetApiTests : ModelManagementApiTestBase
         var sets = factory.Services.GetRequiredService<ToolSetService>();
         var v1 = await sets.CreateAsync(ToolSet(scopeRef, "docs", "1.0.0",
             [Member("docs.search", "knowledge.search", "search")]), default);
+        var v1Version = await sets.GetVersionExactAsync(scopeRef, default, "docs", "1.0.0", default);
+        Assert.IsNotNull(v1Version);
         var agents = factory.Services.GetRequiredService<AgentManagementService>();
         _ = await agents.PutAgentAsync(Agent("docs-agent", "1.0.0", ["docs.search"]), null, true, default);
         var spec = new AgentDeploymentSpec
@@ -107,8 +109,18 @@ public sealed class ToolSetApiTests : ModelManagementApiTestBase
 
         CollectionAssert.AreEqual(new[] { "docs.search" }, revision.Value.Definition.EffectiveToolNames.ToArray());
         Assert.HasCount(1, revision.Value.Definition.ToolSetAssignments);
-        Assert.AreEqual("1.0.0", revision.Value.Definition.ToolSetAssignments.Single().Version);
-        CollectionAssert.AreEqual(new[] { "docs.search" }, revision.Value.Definition.ToolSetAssignments.Single().Members.ToArray());
+        var assignment = revision.Value.Definition.ToolSetAssignments.Single();
+        Assert.AreEqual("1.0.0", assignment.Version);
+        Assert.AreEqual(v1Version.Value.Uid, assignment.ToolSetUid);
+        Assert.AreEqual(scopeRef, assignment.ToolSetScopeRef);
+        Assert.AreEqual(v1Version.Value.Generation, assignment.ToolSetGeneration);
+        CollectionAssert.AreEqual(new[] { "docs.search" }, assignment.Members.ToArray());
+        Assert.HasCount(1, revision.Value.Definition.ToolPins);
+        var toolPin = revision.Value.Definition.ToolPins.Single();
+        Assert.AreEqual("docs.search", toolPin.Name);
+        Assert.AreEqual(scopeRef, toolPin.ScopeRef);
+        Assert.AreNotEqual(Guid.Empty, toolPin.Uid);
+        Assert.AreEqual(1L, toolPin.Generation);
         var inUse = await Assert.ThrowsAsync<ToolSetValidationException>(() =>
             sets.DeleteAsync(default, "docs", null, default));
         Assert.AreEqual("tool_set_in_use_by_agent", inUse.Code);

@@ -114,10 +114,13 @@ public sealed class RuntimeRunService(
         => await GetReadinessAsync(ResourceNamespace.Default, agentResourceId, generation, cancellationToken);
 
     public async Task<AgentRuntimeReadiness> GetReadinessAsync(ResourceNamespace @namespace, string agentResourceId, long generation, CancellationToken cancellationToken)
+        => await GetReadinessAsync(@namespace, agentResourceId, null, generation, cancellationToken);
+
+    public async Task<AgentRuntimeReadiness> GetReadinessAsync(ResourceNamespace @namespace, string agentResourceId, ResourceScopeRef? scopeRef, long generation, CancellationToken cancellationToken)
     {
         try
         {
-            var resolved = await agents.ResolveAsync(new RuntimeAgentReference(agentResourceId, generation) { Namespace = @namespace }, cancellationToken);
+            var resolved = await agents.ResolveAsync(new RuntimeAgentReference(agentResourceId, generation) { Namespace = @namespace, ScopeRef = scopeRef }, cancellationToken);
             var ready = resolved.Ready;
             return new AgentRuntimeReadiness(
                 agentResourceId,

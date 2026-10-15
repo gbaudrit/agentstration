@@ -122,7 +122,7 @@ public sealed partial class FlowTests
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         using var client = factory.CreateClient();
-        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"));
+        var definition = GraphOnlyDefinition();
         var request = new CreateFlowRequest("scoped-collision", "Workspace", "1.0.0", true, definition);
         using var workspaceResponse = await client.PostAsJsonAsync("/api/flows", request, JsonOptions);
         Assert.AreEqual(HttpStatusCode.Created, workspaceResponse.StatusCode);
@@ -558,7 +558,7 @@ public sealed partial class FlowTests
         var scope = new FlowRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId);
         var flows = factory.Services.GetRequiredService<FlowService>();
         var runs = factory.Services.GetRequiredService<FlowRunService>();
-        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"));
+        var definition = GraphOnlyDefinition();
         var defaultFlow = await flows.CreateAsync(scope.WorkspaceId, new CreateFlowCommand("paged-default", null, "1.0.0", true, definition), default);
         var namespacedFlow = await flows.CreateAsync(scope.WorkspaceId, new CreateFlowCommand("paged-namespaced", null, "1.0.0", true, definition), new ResourceNamespace("team-a"), default);
         await flows.PublishVersionAsync(scope.WorkspaceId, defaultFlow.Value.Id, "1.0.0", true, default);
@@ -675,10 +675,15 @@ public sealed partial class FlowTests
         var version = await publishResponse.Content.ReadFromJsonAsync<FlowVersionResponse>(JsonOptions);
         Assert.AreEqual("Initial designer release", version!.ReleaseNotes);
         Assert.IsNotNull(version.Graph);
-        Assert.AreEqual(replaced.Value.DefinitionHash, version.DefinitionHash);
+        Assert.AreNotEqual(replaced.Value.DefinitionHash, version.DefinitionHash,
+            "Publishing must hash the graph after Agent references are pinned to immutable generations.");
         var routing = Assert.IsInstanceOfType<RoutingFlowDefinition>(version.Definition);
         CollectionAssert.AreEqual(new[] { "sql-expert", "dotnet-expert" }, routing.Destinations.Select(target => target.Id).ToArray());
         Assert.AreEqual("dotnet-expert", routing.Fallback?.Id);
+        Assert.IsTrue(routing.Destinations.All(target => target.ScopeRef?.Kind == ResourceScopeKind.Workspace
+            && long.TryParse(target.Version, out var generation) && generation > 0));
+        Assert.IsTrue(routing.Fallback?.ScopeRef?.Kind == ResourceScopeKind.Workspace);
+        Assert.IsTrue(long.TryParse(routing.Fallback?.Version, out var fallbackGeneration) && fallbackGeneration > 0);
 
         var current = await client.GetFromJsonAsync<FlowResponse>("/api/flows/designer-api-flow", JsonOptions);
         Assert.IsNotNull(current);
@@ -692,5 +697,9 @@ public sealed partial class FlowTests
         Assert.AreEqual(3L, recreated!.Value.Revision);
     }
 
+    private static WorkflowFlowDefinition GraphOnlyDefinition() => new(
+        "input",
+        [new FlowNode("input", FlowNodeKind.Input)],
+        []);
 }
 
