@@ -161,13 +161,13 @@ public sealed class ToolDefinitionService(
     private async Task EnsureProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, CancellationToken cancellationToken)
     {
         var key = new ResourceKey(ToolResourceKinds.ToolProvider, AgentstrationToolProvider.Name, @namespace);
-        if (await store.GetAsync<ToolProviderResource>(key, cancellationToken) is { } existing)
+        if (await store.GetExactAsync<ToolProviderResource>(key.AtScope(scopeRef), cancellationToken) is { } existing)
         {
             if (existing.Value.Definition.Mcp?.Internal != true || existing.Value.ScopeRef != scopeRef)
                 throw new ToolDefinitionValidationException("tool_definition_provider_conflict", "The reserved Agentstration ToolProvider identity is already in use.");
             return;
         }
-        await store.PutAsync(new ToolProviderResource
+        await store.PutExactAsync(scopeRef, new ToolProviderResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ToolResourceKinds.ToolProvider,
@@ -190,7 +190,8 @@ public sealed class ToolDefinitionService(
         var now = timeProvider.GetUtcNow();
         var name = AgentstrationToolProvider.ToolResourceName(definition.Name);
         var key = new ResourceKey(ToolResourceKinds.Tool, name, definition.Namespace);
-        var existing = await store.GetAsync<ToolResource>(key, cancellationToken);
+        var scopeRef = definition.ScopeRef!.Value;
+        var existing = await store.GetExactAsync<ToolResource>(key.AtScope(scopeRef), cancellationToken);
         var firstSeen = existing?.Value.Definition.Discovery?.FirstSeenAt ?? now;
         var resource = new ToolResource
         {
@@ -218,6 +219,6 @@ public sealed class ToolDefinitionService(
                 }
             }
         };
-        await store.PutAsync(resource, existing?.ETag, existing is null, cancellationToken);
+        await store.PutExactAsync(scopeRef, resource, existing?.ETag, existing is null, cancellationToken);
     }
 }

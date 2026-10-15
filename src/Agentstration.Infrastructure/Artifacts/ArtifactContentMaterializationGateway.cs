@@ -34,12 +34,15 @@ public sealed class ArtifactContentMaterializationGateway(
         var flowName = string.IsNullOrWhiteSpace(request.FlowName)
             ? ArtifactPlatformResourceProvisioner.StorageReadFlowName
             : request.FlowName.Trim();
+        var flowScopeRef = string.IsNullOrWhiteSpace(request.FlowName)
+            ? ResourceScopeRef.Workspace(current.WorkspaceId)
+            : (ResourceScopeRef?)null;
         var flowNamespace = ResourceNamespace.Parse(request.FlowNamespace);
         var input = JsonSerializer.SerializeToElement(new { flowRunArtifactId = artifactId.ToString() });
         try
         {
             var requestedFlow = new FlowReference(new FlowId(flowName, flowNamespace), request.FlowVersion,
-                string.IsNullOrWhiteSpace(request.FlowVersion), flowNamespace);
+                string.IsNullOrWhiteSpace(request.FlowVersion), flowNamespace, flowScopeRef);
             var resolvedFlow = await flows.ResolveAsync(new WorkspaceId(current.WorkspaceId), requestedFlow,
                 flowNamespace, cancellationToken);
             if (!resolvedFlow.Metadata.TryGetValue(FlowMetadataKeys.Contract, out var contract)
@@ -48,7 +51,8 @@ public sealed class ArtifactContentMaterializationGateway(
                     $"Flow '{resolvedFlow.FlowId}' does not implement '{ArtifactFlowContracts.StorageRead}'.");
             var submission = await submissions.SubmitAsync(new SubmitRootFlowCommand(
                 new WorkspaceId(current.WorkspaceId),
-                new FlowReference(resolvedFlow.FlowId, resolvedFlow.Version, false, resolvedFlow.FlowId.Namespace),
+                new FlowReference(resolvedFlow.FlowId, resolvedFlow.Version, false,
+                    resolvedFlow.FlowId.Namespace, resolvedFlow.ScopeRef),
                 input,
                 FlowInvocationOrigin.Console,
                 current.PrincipalId.ToString("D"),

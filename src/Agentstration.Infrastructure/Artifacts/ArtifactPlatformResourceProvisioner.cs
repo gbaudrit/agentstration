@@ -22,17 +22,17 @@ public sealed class ArtifactPlatformResourceProvisioner(IResourceStore store, Fl
 
     private const string LegacyDefaultBindingName = "filesystem-default";
 
-    public async Task EnsureAsync(ResourceScopeRef workspaceScope, CancellationToken cancellationToken)
+    public async Task EnsureAsync(ResourceScopeRef scope, CancellationToken cancellationToken)
     {
-        if (workspaceScope is not { Kind: ResourceScopeKind.Workspace, TargetId: { } workspaceId })
-            throw new InvalidOperationException("Built-in Artifact resources require a Workspace scope.");
-        var toolSet = await EnsureToolSetAsync(workspaceScope, cancellationToken);
-        await EnsureVersionAsync(workspaceScope, toolSet, cancellationToken);
-        var broker = await EnsureBrokerToolSetAsync(workspaceScope, cancellationToken);
-        await EnsureBrokerVersionAsync(workspaceScope, broker, cancellationToken);
-        await DemoteLegacyDefaultBindingAsync(workspaceScope, cancellationToken);
-        await EnsureBindingAsync(workspaceScope, cancellationToken);
-        await EnsureStorageFlowsAsync(new WorkspaceId(workspaceId), cancellationToken);
+        if (scope.Kind is not ResourceScopeKind.Instance and not ResourceScopeKind.Workspace)
+            throw new InvalidOperationException("Built-in Artifact resources require an Instance or Workspace scope.");
+        var toolSet = await EnsureToolSetAsync(scope, cancellationToken);
+        await EnsureVersionAsync(scope, toolSet, cancellationToken);
+        var broker = await EnsureBrokerToolSetAsync(scope, cancellationToken);
+        await EnsureBrokerVersionAsync(scope, broker, cancellationToken);
+        await DemoteLegacyDefaultBindingAsync(scope, cancellationToken);
+        await EnsureBindingAsync(scope, cancellationToken);
+        await EnsureStorageFlowsAsync(scope, cancellationToken);
     }
 
     private async Task<ToolSetResource> EnsureToolSetAsync(ResourceScopeRef scope, CancellationToken cancellationToken)
@@ -308,9 +308,9 @@ public sealed class ArtifactPlatformResourceProvisioner(IResourceStore store, Fl
 
     private static ResourceStatus Succeeded() => new() { ProvisioningState = ProvisioningState.Succeeded };
 
-    private async Task EnsureStorageFlowsAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
+    private async Task EnsureStorageFlowsAsync(ResourceScopeRef scope, CancellationToken cancellationToken)
     {
-        await EnsureStorageFlowAsync(workspaceId, StorageWriteFlowName, "Filesystem Artifact storage write · Built-in",
+        await EnsureStorageFlowAsync(scope, StorageWriteFlowName, "Filesystem Artifact storage write · Built-in",
             ArtifactFlowContracts.StorageWrite, ArtifactStorageWriteMcpTool.Name, WriteInputSchema(),
             JsonSerializer.SerializeToElement(new
             {
@@ -318,16 +318,16 @@ public sealed class ArtifactPlatformResourceProvisioner(IResourceStore store, Fl
                 producerFlowRunId = "${input.producerFlowRunId}",
                 producerFlowStepId = "${input.producerFlowStepId}"
             }), cancellationToken);
-        await EnsureStorageFlowAsync(workspaceId, StorageReadFlowName, "Filesystem Artifact storage read · Built-in",
+        await EnsureStorageFlowAsync(scope, StorageReadFlowName, "Filesystem Artifact storage read · Built-in",
             ArtifactFlowContracts.StorageRead, ArtifactStorageReadMcpTool.Name, ReadInputSchema(),
             JsonSerializer.SerializeToElement(new { flowRunArtifactId = "${input.flowRunArtifactId}" }), cancellationToken);
     }
 
-    private async Task EnsureStorageFlowAsync(WorkspaceId workspaceId, string name, string displayName, string contract,
+    private async Task EnsureStorageFlowAsync(ResourceScopeRef scope, string name, string displayName, string contract,
         string externalToolId, JsonElement inputSchema, JsonElement arguments, CancellationToken cancellationToken)
     {
         var id = new FlowId(name);
-        if (await flows.GetAsync(workspaceId, id, cancellationToken) is not null) return;
+        if (await flows.GetExactAsync(scope, id, cancellationToken) is not null) return;
         var toolStep = "storage";
         var graph = new FlowGraphDefinition
         {
@@ -362,7 +362,7 @@ public sealed class ArtifactPlatformResourceProvisioner(IResourceStore store, Fl
         ], [new("input", toolStep), new(toolStep, "output")], ["output"]);
         try
         {
-            _ = await flows.CreateAsync(workspaceId, new CreateFlowCommand(name,
+            _ = await flows.CreateExactAsync(scope, new CreateFlowCommand(name,
                 $"Built-in implementation of {contract}.", DefaultToolSetVersion, true, legacy,
                 new Dictionary<string, string>
                 {
@@ -370,13 +370,13 @@ public sealed class ArtifactPlatformResourceProvisioner(IResourceStore store, Fl
                     ["systemKind"] = "ArtifactStorageFlow",
                     [ResourceProvenanceAnnotations.BuiltIn] = "true",
                     [FlowMetadataKeys.Contract] = contract
-                }, graph, displayName), cancellationToken);
-            _ = await flows.PublishVersionAsync(workspaceId, id, DefaultToolSetVersion, true, cancellationToken,
+                }, graph, displayName), ResourceNamespace.Default, cancellationToken);
+            _ = await flows.PublishVersionExactAsync(scope, id, DefaultToolSetVersion, true, cancellationToken,
                 "Built-in local-first Artifact storage contract implementation.");
         }
         catch (FlowConcurrencyException)
         {
-            if (await flows.GetAsync(workspaceId, id, cancellationToken) is null) throw;
+            if (await flows.GetExactAsync(scope, id, cancellationToken) is null) throw;
         }
     }
 

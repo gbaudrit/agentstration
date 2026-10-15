@@ -20,9 +20,12 @@ Acquisition uses only the pins stored in the active immutable profile revision. 
 
 Pre-release databases containing profile revisions without dependency pins must be reseeded. No compatibility fallback may resolve those revisions from the execution Workspace.
 
+The core Web, REST, and Artifact-import profiles and their complete acquisition composition are reconciled at instance scope. Agentstration grants each tenant propagated `discover` and `use` access to those profiles, while acquisition records, Flow Runs, staging, and durable Artifacts remain owned by the invoking Workspace. This avoids duplicating platform-owned definitions in every Workspace without weakening execution-state isolation.
+
 ## Consequences
 
 - A Workspace-local resource cannot shadow or rebind any dependency of an inherited Data Source or profile.
+- Core built-in profiles have one instance-owned identity and revision graph instead of one mutable copy per Workspace.
 - Publishing a profile fails until its Flow, Tools, providers, contracts, and required descendant grants are valid; ancestor Flows remain denied until #751 supplies their exact access-policy identity.
 - Changing a Tool or provider generation makes revisions that pinned the prior generation explicitly stale; authors publish a new profile revision after reviewing the new graph.
 - Activating another already-published profile revision continues to affect only future acquisitions.

@@ -261,6 +261,7 @@ public sealed class ManagementFlowToolSetResolver(ToolSetService toolSets) : IFl
 {
     public async Task<ResolvedFlowToolRoute> ResolveAsync(
         WorkspaceId workspaceId,
+        ResourceScopeRef ownerScopeRef,
         ResourceNamespace ownerNamespace,
         ToolRouteFlowStepDefinition step,
         CancellationToken cancellationToken)
@@ -269,7 +270,7 @@ public sealed class ManagementFlowToolSetResolver(ToolSetService toolSets) : IFl
         try
         {
             var toolSetNamespace = step.ToolSet.ResolveNamespace(ownerNamespace);
-            var selected = await toolSets.ResolveRouteAsync(toolSetNamespace, step.ToolSet.ResourceId,
+            var selected = await toolSets.ResolveRouteExactAsync(ownerScopeRef, toolSetNamespace, step.ToolSet.ResourceId,
                 step.ToolSet.Version, step.Capability, step.Route, cancellationToken);
             var member = selected.Member;
             return new ResolvedFlowToolRoute(
@@ -367,11 +368,9 @@ public sealed class ManagedFlowToolExecutor(
     {
         ArgumentNullException.ThrowIfNull(request);
         var toolNamespace = request.Tool.ResolveNamespace(request.OwnerFlowId.Namespace);
-        var stored = request.Route is { } route
-            ? await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
-                route.ToolScopeRef, toolNamespace, ToolResourceKinds.Tool, request.Tool.ResourceId), cancellationToken)
-            : await store.GetAsync<ToolResource>(
-                new ResourceKey(ToolResourceKinds.Tool, request.Tool.ResourceId, toolNamespace), cancellationToken);
+        var toolScope = request.Route?.ToolScopeRef ?? request.DefinitionScopeRef;
+        var stored = await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
+            toolScope, toolNamespace, ToolResourceKinds.Tool, request.Tool.ResourceId), cancellationToken);
         if (stored is null)
             throw Error("tool_not_found", $"Tool resource '{toolNamespace}/{request.Tool.ResourceId}' was not found.");
 
@@ -388,11 +387,9 @@ public sealed class ManagedFlowToolExecutor(
         var providerId = tool.Definition.Provider?.Name
             ?? throw Error("tool_mapping_invalid", $"Tool resource '{tool.Address}' has no ToolProvider mapping.");
         var providerNamespace = tool.Definition.Provider!.Namespace ?? tool.Metadata.Namespace;
-        var provider = request.Route is { } pinnedProvider
-            ? await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
-                pinnedProvider.ProviderScopeRef, providerNamespace, ToolResourceKinds.ToolProvider, providerId), cancellationToken)
-            : await store.GetAsync<ToolProviderResource>(
-                new ResourceKey(ToolResourceKinds.ToolProvider, providerId, providerNamespace), cancellationToken);
+        var providerScope = request.Route?.ProviderScopeRef ?? tool.Definition.Provider.ScopeRef ?? toolScope;
+        var provider = await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
+            providerScope, providerNamespace, ToolResourceKinds.ToolProvider, providerId), cancellationToken);
         if (provider is null)
             throw Error("tool_provider_not_found",
                 $"ToolProvider resource '{providerNamespace}/{providerId}' was not found.");

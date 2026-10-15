@@ -38,12 +38,15 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     {
         using var systemScope = scopes.PushSystem();
         await EnsureStandardRuntimeProfileAsync(cancellationToken);
+        await internalTools.EnsureAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, cancellationToken);
+        await artifacts.EnsureAsync(ResourceScopeRef.Instance, cancellationToken);
         await internalTools.EnsureAsync(
             ResourceScopeRef.Workspace(workspaceId),
             ResourceNamespace.Default,
             cancellationToken);
         await artifacts.EnsureAsync(ResourceScopeRef.Workspace(workspaceId), cancellationToken);
-        await knowledge.EnsureAsync(ResourceScopeRef.Workspace(workspaceId), cancellationToken);
+        await knowledge.EnsureAsync(ResourceScopeRef.Tenant(tenantId),
+            ResourceScopeRef.Workspace(workspaceId), cancellationToken);
         var workspace = await identities.GetWorkspaceAsync(tenantId, workspaceId, cancellationToken)
             ?? throw new InvalidOperationException($"Workspace '{workspaceId:D}' no longer exists.");
         if (workspace.Status == WorkspaceStatus.Initializing)

@@ -10,6 +10,7 @@ public sealed record FlowToolExecutionRequest(
     FlowRunScope Scope,
     string RunId,
     FlowId OwnerFlowId,
+    ResourceScopeRef DefinitionScopeRef,
     string StepName,
     int Attempt,
     string CorrelationId,
@@ -37,6 +38,7 @@ public interface IFlowToolSetResolver
 {
     Task<ResolvedFlowToolRoute> ResolveAsync(
         WorkspaceId workspaceId,
+        ResourceScopeRef ownerScopeRef,
         ResourceNamespace ownerNamespace,
         ToolRouteFlowStepDefinition step,
         CancellationToken cancellationToken);
@@ -88,7 +90,8 @@ public sealed class UnsupportedFlowToolSetResolver : IFlowToolSetResolver
 {
     public static UnsupportedFlowToolSetResolver Instance { get; } = new();
     private UnsupportedFlowToolSetResolver() { }
-    public Task<ResolvedFlowToolRoute> ResolveAsync(WorkspaceId workspaceId, ResourceNamespace ownerNamespace,
+    public Task<ResolvedFlowToolRoute> ResolveAsync(WorkspaceId workspaceId, ResourceScopeRef ownerScopeRef,
+        ResourceNamespace ownerNamespace,
         ToolRouteFlowStepDefinition step, CancellationToken cancellationToken) =>
         Task.FromException<ResolvedFlowToolRoute>(new FlowValidationException("flow_tool_set_resolver_unavailable", "No ToolSet resolver is configured for Flow Runs."));
 }
