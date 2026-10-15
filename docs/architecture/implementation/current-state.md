@@ -52,6 +52,7 @@ src/
   Agentstration.Extensions.LocalAI/  autonomous AEP-to-LocalAI service
   Agentstration.Extensions.Git/      bounded AEP Git Source Provider service
   Agentstration.Extensions.Crawl4AI/ optional bounded AEP web-acquisition Tool Provider service
+  Agentstration.Extensions.OpenApi/ optional bounded AEP OpenAPI schema-format and acquisition service
   Agentstration.ModelProviders/      provider-neutral model-provider resolution through AEP
   Agentstration.Tools.Mcp/           Tool catalog, AEP-to-MCP resolution, official MCP client
   Agentstration.Runtime.Abstractions/
@@ -107,6 +108,7 @@ Extensions.Ollama -> Aep.AspNetCore + OllamaSharp
 Extensions.LlamaCpp -> Aep.AspNetCore + native HTTP
 Extensions.LocalAI -> Aep.AspNetCore + native HTTP
 Extensions.Git -> Aep.AspNetCore + bounded Git process
+Extensions.OpenApi -> Aep.AspNetCore + governed MCP + bounded HTTP/OpenAPI parser
 AppHost -> provider extensions (configured local inference endpoints)
 Awp.Abstractions -> BCL JSON contracts only
 Runtime.MicrosoftAgentFramework -> runtime abstractions + ModelProviders + Microsoft Agent Framework
