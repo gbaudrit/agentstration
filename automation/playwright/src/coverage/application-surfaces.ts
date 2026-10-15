@@ -193,6 +193,18 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   coveredFlow('task-details', `${consolePages}/TaskDetails.razor`, ['/tasks/{TaskId:guid}'], ['taskId'], 'inspect-flow-observability'),
   coveredFlow('task-flow-run-details', `${consolePages}/TaskFlowRunDetails.razor`, ['/tasks/{TaskId:guid}/flowruns/{RunId}'], ['taskId', 'runId'], 'inspect-flow-observability'),
 
+  {
+    id: 'schemas', host: 'console', source: `${consolePages}/Schemas.razor`, routes: ['/schemas'], fixtureKeys: [],
+    pageObject: 'src/pages/schema-administration.page.ts', journey: 'exercise-schema-administration',
+    specification: 'tests/schema-administration.spec.ts', coverage: 'covered',
+  },
+  {
+    id: 'schema-editor', host: 'console', source: `${consolePages}/SchemaEditor.razor`,
+    routes: ['/schemas/new', '/schemas/{Name}'], fixtureKeys: ['name'],
+    pageObject: 'src/pages/schema-administration.page.ts', journey: 'exercise-schema-administration',
+    specification: 'tests/schema-administration.spec.ts', coverage: 'covered',
+  },
+
   partialResourceAdministration('entries', `${consolePages}/Entries.razor`, ['/entries'], 415),
   coveredModelAdministration('model-profiles', `${consolePages}/ModelProfiles.razor`, ['/modelprofiles']),
   coveredModelAdministration('model-profile-editor', `${consolePages}/ModelProfileEditor.razor`, ['/modelprofiles/new', '/modelprofiles/{Name}'], ['name']),

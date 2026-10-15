@@ -9,8 +9,8 @@
 </PageHeader>
 
 <ResourceToolbar Label="@T("Filters")">
-    <label><span>@T("Scope")</span><select @bind="scopeFilter"><option value="">@T("AllScopes")</option>@foreach (var scope in scopes) { <option value="@scope.Value">@scope.Value</option> }</select></label>
-    <label><span>@T("Namespace")</span><input @bind="namespaceFilter" placeholder="@T("AllNamespaces")" /></label>
+    <label><span>@T("Scope")</span><select data-testid="schema-scope-filter" @bind="scopeFilter"><option value="">@T("AllScopes")</option>@foreach (var scope in scopes) { <option value="@scope.Value">@scope.Value</option> }</select></label>
+    <label><span>@T("Namespace")</span><input data-testid="schema-namespace-filter" @bind="namespaceFilter" placeholder="@T("AllNamespaces")" /></label>
 </ResourceToolbar>
 
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
