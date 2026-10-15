@@ -570,7 +570,7 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         var flows = services.GetRequiredService<FlowService>();
         var workspace = new WorkspaceId(context.WorkspaceId);
         await flows.CreateAsync(workspace, new CreateFlowCommand(name, null, "1.0.0", true,
-            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
+            GraphOnlyDefinition(),
             new Dictionary<string, string> { [FlowMetadataKeys.Contract] = DataSourceFlowContracts.Discovery },
             new FlowGraphDefinition
             {
