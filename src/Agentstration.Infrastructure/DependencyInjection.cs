@@ -3,6 +3,7 @@ using Agentstration.Application.Work;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.DataSources;
+using Agentstration.Extensions.Aep;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.PostgreSql;
 using Agentstration.Flows.Storage.Sqlite;
@@ -289,6 +290,7 @@ public static class DependencyInjection
         services.AddSingleton<SourceRegistryDiscoveryService>();
         services.AddSingleton<ISourceVerificationEvidenceProvider>(services => services.GetRequiredService<SourceRegistryTrustEvaluationService>());
         services.AddSingleton<ToolManagementService>();
+        services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentToolProvisioner>();
         services.AddSingleton<ToolCategoryService>();
         services.AddSingleton<ToolSetService>();
         services.AddSingleton<ISchemaFormatHandler, BuiltinJsonSchemaFormatHandler>();

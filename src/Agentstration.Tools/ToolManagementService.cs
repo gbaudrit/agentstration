@@ -69,6 +69,24 @@ public sealed class ToolManagementService(
     {
         var storedProvider = await GetProviderAsync(providerName, cancellationToken)
             ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolProvider, providerName));
+        return await RefreshDiscoveryAsync(storedProvider, cancellationToken);
+    }
+
+    public async Task<ToolDiscoveryDiff> RefreshDiscoveryExactAsync(
+        ResourceScopeRef scopeRef,
+        string providerName,
+        ResourceNamespace @namespace,
+        CancellationToken cancellationToken)
+    {
+        var storedProvider = await GetProviderExactAsync(scopeRef, providerName, @namespace, cancellationToken)
+            ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolProvider, providerName, @namespace));
+        return await RefreshDiscoveryAsync(storedProvider, cancellationToken);
+    }
+
+    private async Task<ToolDiscoveryDiff> RefreshDiscoveryAsync(
+        StoredResource<ToolProviderResource> storedProvider,
+        CancellationToken cancellationToken)
+    {
         var provider = storedProvider.Value;
         var providerScope = provider.ScopeRef
             ?? throw new ToolResourceValidationException("The ToolProvider has no ownership scope.");
@@ -81,20 +99,18 @@ public sealed class ToolManagementService(
             try { result = await DiscoveryFor(provider).DiscoverAsync(provider, token); }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
+                var discovery = provider.Definition.Discovery with { LastDiscoveryAt = now, Status = "error", ErrorCode = "discovery_failed", ErrorMessage = exception.Message };
                 await store.PutExactAsync(providerScope, provider with
                 {
-                    Generation = checked(provider.Generation + 1),
-                    Definition = provider.Definition with
-                    {
-                        Discovery = provider.Definition.Discovery with { LastDiscoveryAt = now, Status = "error", ErrorCode = "discovery_failed", ErrorMessage = exception.Message }
-                    }
+                    Generation = DiscoveryStateEquals(provider.Definition.Discovery, discovery) ? provider.Generation : checked(provider.Generation + 1),
+                    Definition = provider.Definition with { Discovery = discovery }
                 }, storedProvider.ETag, false, token);
                 throw new ToolProviderDiscoveryFailedException(exception.Message, exception);
             }
 
             var existing = (await store.ListExactAsync<ToolResource>(providerScope, ToolResourceKinds.Tool, 0, int.MaxValue, token))
                 .Where(value => value.Value.Namespace == provider.Namespace
-                    && value.Value.Definition.Provider?.Name == providerName
+                    && value.Value.Definition.Provider?.Name == provider.Name
                     && value.Value.Definition.Provider.ScopeRef == providerScope)
                 .ToDictionary(value => value.Value.Definition.ExternalId!, StringComparer.Ordinal);
             var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -121,7 +137,7 @@ public sealed class ToolManagementService(
                 }
                 else
                 {
-                    var name = ToolResourceName(providerName, descriptor.ExternalId);
+                    var name = ToolResourceName(provider.Name, descriptor.ExternalId);
                     await store.PutExactAsync(providerScope, new ToolResource
                     {
                         ApiVersion = ResourceApiVersions.CoreV1,
@@ -134,7 +150,7 @@ public sealed class ToolManagementService(
                         {
                             DisplayName = descriptor.DisplayName,
                             Description = descriptor.Description,
-                            Provider = new ResourceReference(providerName, providerScope, provider.Namespace),
+                            Provider = new ResourceReference(provider.Name, providerScope, provider.Namespace),
                             ExternalId = descriptor.ExternalId,
                             Enabled = false,
                             Discovery = new ToolDiscoveryState { Available = true, FirstSeenAt = now, LastSeenAt = now },
@@ -158,24 +174,34 @@ public sealed class ToolManagementService(
                 unavailable++;
             }
 
+            var providerDiscovery = new ToolProviderDiscoveryState
+            {
+                LastDiscoveryAt = now,
+                Status = "connected",
+                ToolCount = result.Tools.Count,
+                Capabilities = result.Capabilities,
+                ServerMetadata = result.ServerMetadata
+            };
             await store.PutExactAsync(providerScope, provider with
             {
-                Generation = checked(provider.Generation + 1),
-                Definition = provider.Definition with
-                {
-                    Discovery = new ToolProviderDiscoveryState
-                    {
-                        LastDiscoveryAt = now,
-                        Status = "connected",
-                        ToolCount = result.Tools.Count,
-                        Capabilities = result.Capabilities,
-                        ServerMetadata = result.ServerMetadata
-                    }
-                }
+                Generation = DiscoveryStateEquals(provider.Definition.Discovery, providerDiscovery) ? provider.Generation : checked(provider.Generation + 1),
+                Definition = provider.Definition with { Discovery = providerDiscovery }
             }, storedProvider.ETag, false, token);
             return new ToolDiscoveryDiff(newCount, changed, unchanged, unavailable, result.Tools.Count);
         }, cancellationToken);
     }
+
+    private static bool DiscoveryStateEquals(ToolProviderDiscoveryState left, ToolProviderDiscoveryState right) =>
+        string.Equals(left.Status, right.Status, StringComparison.Ordinal)
+        && string.Equals(left.ErrorCode, right.ErrorCode, StringComparison.Ordinal)
+        && string.Equals(left.ErrorMessage, right.ErrorMessage, StringComparison.Ordinal)
+        && left.ToolCount == right.ToolCount
+        && DictionaryEquals(left.Capabilities, right.Capabilities)
+        && DictionaryEquals(left.ServerMetadata, right.ServerMetadata);
+
+    private static bool DictionaryEquals<T>(IReadOnlyDictionary<string, T> left, IReadOnlyDictionary<string, T> right) =>
+        left.Count == right.Count
+        && left.All(pair => right.TryGetValue(pair.Key, out var value) && EqualityComparer<T>.Default.Equals(pair.Value, value));
 
     public async Task<StoredResource<ToolResource>> SetToolEnabledAsync(string name, bool enabled, string? ifMatch, CancellationToken cancellationToken)
         => await SetToolEnabledAsync(name, default, enabled, ifMatch, cancellationToken);
