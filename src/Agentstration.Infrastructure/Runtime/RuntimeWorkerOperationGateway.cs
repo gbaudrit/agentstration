@@ -6,6 +6,7 @@ using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Tools;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Microsoft.Extensions.AI;
@@ -153,15 +154,23 @@ public sealed class RuntimeWorkerOperationGateway(
                     "The assigned StepDefinition is not a Tool or ToolRoute step.");
         }
 
-        var result = await flowToolExecutor.ExecuteAsync(new(
-            run.Scope,
-            run.Id,
-            run.FlowId,
-            step.Name,
-            attempt,
-            run.CorrelationId ?? run.Id,
-            tool,
-            arguments), cancellationToken);
+        FlowToolExecutionResult result;
+        try
+        {
+            result = await flowToolExecutor.ExecuteAsync(new(
+                run.Scope,
+                run.Id,
+                run.FlowId,
+                step.Name,
+                attempt,
+                run.CorrelationId ?? run.Id,
+                tool,
+                arguments), cancellationToken);
+        }
+        catch (ToolDefinitionInvocationException exception)
+        {
+            throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception);
+        }
         return new(
             result.Output?.Clone(),
             result.ToolName,

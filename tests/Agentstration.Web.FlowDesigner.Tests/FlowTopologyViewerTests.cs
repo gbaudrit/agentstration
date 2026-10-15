@@ -124,6 +124,31 @@ public sealed class FlowTopologyViewerTests
     }
 
     [TestMethod]
+    public void ViewerRendersFailedTransitionWithDedicatedMarkerAndLocalizedLegend()
+    {
+        using var culture = new CultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var graph = new FlowTopologyGraph(
+            [
+                new("step:fetch", "fetch", "Fetch", "tool", 0, 0),
+                new("step:failure", "failure", "Failure", "failure", 220, 0)
+            ],
+            [new("fetch-failure", "step:fetch", "step:failure", "error", State: FlowTopologyEdgeState.Failed)],
+            "graph",
+            "Failed workflow");
+
+        var rendered = context.Render<FlowTopologyViewer>(parameters => parameters
+            .Add(component => component.Graph, graph));
+
+        var edge = rendered.Find(".topology-edge.failed");
+        StringAssert.Contains(edge.GetAttribute("marker-end")!, "-failed");
+        StringAssert.Contains(edge.QuerySelector("title")!.TextContent, "erreur observée");
+        StringAssert.Contains(rendered.Find(".topology-legend").TextContent, "Erreur");
+        Assert.HasCount(1, rendered.FindAll("marker.failed-marker"));
+    }
+
+    [TestMethod]
     public void ViewerSupportsExpandedModeAndInspectorToggle()
     {
         using var context = new BunitContext();

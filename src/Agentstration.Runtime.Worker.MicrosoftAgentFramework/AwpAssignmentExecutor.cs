@@ -430,7 +430,7 @@ internal sealed class AwpAssignmentExecutor(
                             outcome == FlowOutputOutcome.Error ? "error" : "success",
                             errorCode, errorMessage,
                             outputStep.DetailsExpression is null ? null
-                                : (await ResolveStringAsync(outputStep.DetailsExpression, context, cancellationToken)));
+                                : await ResolveFailureDetailsAsync(outputStep.DetailsExpression, context, cancellationToken));
                         break;
                     case FailureFlowStepDefinition failure:
                         output = JsonSerializer.SerializeToElement(new { error = failure.Message, code = failure.Code });
@@ -438,7 +438,8 @@ internal sealed class AwpAssignmentExecutor(
                         errorCode = failure.Code;
                         errorMessage = failure.Message;
                         final = new(output, null, "error", failure.Code, failure.Message,
-                            failure.DetailsExpression);
+                            failure.DetailsExpression is null ? null
+                                : await ResolveFailureDetailsAsync(failure.DetailsExpression, context, cancellationToken));
                         break;
                     default:
                         throw new AwpExecutionNotSupportedException("flow_step_type_unsupported",
@@ -724,6 +725,18 @@ internal sealed class AwpAssignmentExecutor(
         source.StartsWith("${", StringComparison.Ordinal)
             ? (await EvaluateExpressionAsync(source, context, cancellationToken))?.ToString()
             : source;
+
+    private static async Task<string?> ResolveFailureDetailsAsync(string source,
+        FlowExecutionContext context, CancellationToken cancellationToken)
+    {
+        if (!source.StartsWith("${", StringComparison.Ordinal)) return source;
+        var value = await EvaluateExpressionAsync(source, context, cancellationToken);
+        return value is { ValueKind: JsonValueKind.Object }
+            && value.Value.TryGetProperty("error", out var error)
+            && error.ValueKind == JsonValueKind.String
+                ? error.GetString()
+                : value?.ToString();
+    }
 
     private static FlowExecutionContext ExecutionContext(
         AwpRootFlowExecutionMaterial material,
