@@ -44,6 +44,7 @@ export interface SchemaDrivenSourceFixture {
 
 export class SchemaDrivenSourcesPage {
   public lastFixture?: SchemaDrivenSourceFixture;
+  private fixtureScopeRef?: string;
 
   public constructor(private readonly page: Page) {}
 
@@ -52,6 +53,7 @@ export class SchemaDrivenSourcesPage {
     const suffix = Date.now().toString(36);
     const workspaceId = await this.workspaceId();
     const scopeRef = `/workspaces/${workspaceId}`;
+    this.fixtureScopeRef = scopeRef;
     const durableArtifactId = await this.createDurableArtifact(consoleUrl, suffix);
     const acquisitionFlow = `schema-input-acquisition-${suffix}`;
     const transformationFlow = `schema-input-transform-${suffix}`;
@@ -133,8 +135,7 @@ export class SchemaDrivenSourcesPage {
     await expect(endpoint).toHaveAttribute('type', 'url');
     await expect(endpoint).toHaveAttribute('minlength', '8');
     const dataSourceEditor = persisted.getByTestId(TestIds.common.schemaInputEditor);
-    await dataSourceEditor.getByTestId(TestIds.common.schemaRawMode).click();
-    const dataSourceRaw = dataSourceEditor.locator('textarea.runner-json');
+    const dataSourceRaw = await switchToRaw(dataSourceEditor);
     await dataSourceRaw.fill(JSON.stringify({ endpoint: 'x', mode: 'full', options: { retries: 4 } }, null, 2));
     await expect(dataSourceRaw).toHaveValue(/"endpoint": "x"/);
     await expect(dataSourceEditor.getByRole('alert').first()).toBeVisible();
@@ -173,8 +174,7 @@ export class SchemaDrivenSourcesPage {
     await expect(start).toBeDisabled();
     await expect(field(parameters, '$.query').locator('input')).toHaveAttribute('minlength', '3');
     const parametersEditor = parameters.getByTestId(TestIds.common.schemaInputEditor);
-    await parametersEditor.getByTestId(TestIds.common.schemaRawMode).click();
-    const parametersRaw = parametersEditor.locator('textarea.runner-json');
+    const parametersRaw = await switchToRaw(parametersEditor);
     await parametersRaw.fill(JSON.stringify({ query: 'x', limit: 4 }, null, 2));
     await expect(parametersRaw).toHaveValue(/"query": "x"/);
     await expect(parametersEditor.getByRole('alert').first()).toBeVisible();
@@ -208,8 +208,7 @@ export class SchemaDrivenSourcesPage {
     const save = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceSave);
     await expect(field(configuration, '$.prefix').locator('input')).toHaveAttribute('minlength', '3');
     const configurationEditor = configuration.getByTestId(TestIds.common.schemaInputEditor);
-    await configurationEditor.getByTestId(TestIds.common.schemaRawMode).click();
-    const configurationRaw = configurationEditor.locator('textarea.runner-json');
+    const configurationRaw = await switchToRaw(configurationEditor);
     await configurationRaw.fill(JSON.stringify({ prefix: 'x', mode: 'compact' }, null, 2));
     await expect(configurationRaw).toHaveValue(/"prefix": "x"/);
     await expect(configurationEditor.getByRole('alert').first()).toBeVisible();
@@ -251,8 +250,7 @@ export class SchemaDrivenSourcesPage {
     await expect(start).toBeDisabled();
     await expect(field(parameters, '$.audience').locator('input')).toHaveAttribute('minlength', '3');
     const parametersEditor = parameters.getByTestId(TestIds.common.schemaInputEditor);
-    await parametersEditor.getByTestId(TestIds.common.schemaRawMode).click();
-    const parametersRaw = parametersEditor.locator('textarea.runner-json');
+    const parametersRaw = await switchToRaw(parametersEditor);
     await parametersRaw.fill(JSON.stringify({ audience: 'x', includeMetadata: true }, null, 2));
     await expect(parametersRaw).toHaveValue(/"audience": "x"/);
     await expect(parametersEditor.getByRole('alert').first()).toBeVisible();
@@ -293,8 +291,7 @@ export class SchemaDrivenSourcesPage {
 
   private async assertRawRoundTrip(container: Locator, fragments: readonly string[]): Promise<void> {
     const editor = container.getByTestId(TestIds.common.schemaInputEditor);
-    await editor.getByTestId(TestIds.common.schemaRawMode).click();
-    const raw = editor.locator('textarea.runner-json');
+    const raw = await switchToRaw(editor);
     for (const fragment of fragments) await expect(raw).toHaveValue(new RegExp(escapeRegExp(fragment)));
     await editor.getByTestId(TestIds.common.schemaFormMode).click();
   }
@@ -352,7 +349,9 @@ export class SchemaDrivenSourcesPage {
     return workspaceId;
   }
 
-  private async scopeRef(): Promise<string> { return `/workspaces/${await this.workspaceId()}`; }
+  private async scopeRef(): Promise<string> {
+    return this.fixtureScopeRef ?? `/workspaces/${await this.workspaceId()}`;
+  }
 
   private async open(url: string, marker: string): Promise<void> {
     const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
@@ -375,6 +374,15 @@ async function selectContaining(select: Locator, text: string): Promise<void> {
   const value = await option.getAttribute('value');
   if (!value) throw new Error(`No selectable option contains '${text}'.`);
   await select.selectOption(value);
+}
+
+async function switchToRaw(editor: Locator): Promise<Locator> {
+  const raw = editor.locator('textarea.runner-json');
+  await expect(async () => {
+    await editor.getByTestId(TestIds.common.schemaRawMode).click();
+    await expect(raw).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
+  return raw;
 }
 
 async function expectApi(response: APIResponse, status: number, operation: string): Promise<void> {
