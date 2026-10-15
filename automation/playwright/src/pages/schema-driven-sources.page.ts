@@ -146,7 +146,19 @@ export class SchemaDrivenSourcesPage {
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeEnabled();
     await dataSourceEditor.getByTestId(TestIds.common.schemaFormMode).click();
     await expect(endpoint).toHaveValue('https://example.test/schema-inputs');
-    await field(persisted, '$.mode').locator('select').selectOption({ label: 'full' });
+    const modeField = field(persisted, '$.mode');
+    const modeRules = modeField.locator('[tabindex="0"]');
+    const mode = modeField.locator('select');
+    await endpoint.focus();
+    await expect(endpoint).toBeFocused();
+    await this.page.keyboard.press('ControlOrMeta+A');
+    await endpoint.pressSequentially('https://example.test/schema-inputs', { delay: 25 });
+    await expect(endpoint).toHaveValue('https://example.test/schema-inputs');
+    await this.page.keyboard.press('Tab');
+    await expect(modeRules).toBeFocused();
+    await this.page.keyboard.press('Tab');
+    await expect(mode).toBeFocused();
+    await mode.selectOption({ label: 'full' });
     await field(persisted, '$.options.retries').locator('input').fill('4');
     await this.assertRawRoundTrip(persisted, [
       '"endpoint": "https://example.test/schema-inputs"', '"mode": "full"', '"retries": 4',
