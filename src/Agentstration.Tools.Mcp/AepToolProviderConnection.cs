@@ -54,11 +54,11 @@ public sealed class ResourceAepExtensionRegistrationResolver(
             throw new ToolResolutionException("extension_registration_ambiguous", $"More than one enabled AEP extension registration for '{extensionId}' is visible from ToolProvider '{provider.Address}'.");
 
         var registration = matches[0].Value;
-        return new ResolvedAepExtension(registration, AepToolExtensionCredentials.Create(registration, secrets));
+        return new ResolvedAepExtension(registration, AepExtensionCredentials.Create(registration, secrets));
     }
 }
 
-internal static class AepToolExtensionCredentials
+public static class AepExtensionCredentials
 {
     public static IAepAccessTokenProvider? Create(
         ExtensionRegistrationResource registration,

@@ -47,10 +47,42 @@ public sealed class SchemaFormatRegistryTests
         Assert.AreEqual("schema_format_provider_unavailable", provider.Code);
     }
 
-    private sealed class StubHandler(string provider, bool unavailable) : ISchemaFormatHandler
+    [TestMethod]
+    public async Task DynamicProvidersParticipateWithoutReplacingTheBuiltinDefault()
+    {
+        var extension = new StubHandler("extension/json-schema", false, SchemaFormatIds.JsonSchema);
+        var registry = new SchemaFormatRegistry(
+            [new BuiltinJsonSchemaFormatHandler()],
+            [new StubSource(extension)]);
+
+        var listed = await registry.ListAsync();
+        var selected = await registry.ResolveAsync(
+            SchemaFormatIds.JsonSchema,
+            SchemaFormatCapabilities.ValidateDefinition);
+        var pinned = await registry.ResolveAsync(
+            SchemaFormatIds.JsonSchema,
+            SchemaFormatCapabilities.ValidateDefinition,
+            extension.Descriptor.Provider);
+
+        Assert.HasCount(2, listed);
+        Assert.AreEqual(BuiltinJsonSchemaFormatHandler.ProviderId, selected.Descriptor.Provider.Id);
+        Assert.AreSame(extension, pinned);
+    }
+
+    private sealed class StubSource(params ISchemaFormatHandler[] handlers) : ISchemaFormatHandlerSource
+    {
+        public ValueTask<IReadOnlyList<ISchemaFormatHandler>> ListAsync(
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult<IReadOnlyList<ISchemaFormatHandler>>(handlers);
+    }
+
+    private sealed class StubHandler(
+        string provider,
+        bool unavailable,
+        string format = "custom") : ISchemaFormatHandler
     {
         public SchemaFormatDescriptor Descriptor { get; } = new(
-            "custom", "Custom", new(provider, "1.0"), [], SchemaFormatCapabilities.ValidateDefinition,
+            format, "Custom", new(provider, "1.0"), [], SchemaFormatCapabilities.ValidateDefinition,
             IsDefault: false, IsAvailable: !unavailable, UnavailableReason: unavailable ? "Provider offline." : null);
 
         public ValueTask<SchemaFormatValidationResult> ValidateDefinitionAsync(JsonElement definition,
