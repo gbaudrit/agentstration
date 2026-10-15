@@ -313,6 +313,10 @@ public sealed class OpenApiExtensionTests
         Assert.IsTrue(bundle.ResourceManifests.Any(value => value.Contains("flow.contract: datasource.discovery/v1", StringComparison.Ordinal)));
         Assert.IsTrue(bundle.ResourceManifests.Any(value => value.Contains("flow.contract: datasource.acquisition/v1", StringComparison.Ordinal)));
         Assert.IsTrue(bundle.ResourceManifests.Any(value => value.Contains("kind: DataSourceProfile", StringComparison.Ordinal)));
+        Assert.IsTrue(bundle.ResourceManifests
+            .Where(value => value.Contains("kind: Flow", StringComparison.Ordinal))
+            .All(value => value.Contains("flowKind: workflow", StringComparison.Ordinal)));
+        Assert.IsFalse(bundle.ResourceManifests.Any(value => value.Contains("unused-graph-target", StringComparison.Ordinal)));
         Assert.IsFalse(manifest.Contributions.Tools!.Any(value => value.Id == "getOrder"));
     }
 

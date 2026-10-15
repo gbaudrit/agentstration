@@ -1,0 +1,19 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: openapi-testing
+definition:
+  displayName: OpenAPI testing resources
+  description: Temporarily installs the governed OpenAPI ToolSet, discovery and acquisition Flows, and Data Source Profile for an enrolled OpenAPI extension.
+  targetScope: workspace
+  bindings:
+    - name: openapi.contract.discover
+      targetKind: tool
+      displayName: OpenAPI contract discovery Tool
+      description: Select the openapi.contract.discover Tool provisioned for the enrolled OpenAPI extension.
+      required: true
+    - name: openapi.operation.invoke
+      targetKind: tool
+      displayName: OpenAPI operation invocation Tool
+      description: Select the openapi.operation.invoke Tool provisioned for the same enrolled OpenAPI extension.
+      required: true

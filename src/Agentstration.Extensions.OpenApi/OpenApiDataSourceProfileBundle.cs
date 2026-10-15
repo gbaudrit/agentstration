@@ -33,7 +33,11 @@ public static class OpenApiDataSourceProfileBundle
           version: 1.0.0
           enabled: true
           metadata: { flow.contract: datasource.discovery/v1 }
-          spec: { flowKind: direct, target: { kind: agent, id: unused-graph-target } }
+          spec:
+            flowKind: workflow
+            entryNodeId: input
+            nodes: [{ id: input, kind: input }]
+            edges: []
           graph:
             entryStep: input
             inputSchema:
@@ -87,7 +91,11 @@ public static class OpenApiDataSourceProfileBundle
           version: 1.0.0
           enabled: true
           metadata: { flow.contract: datasource.acquisition/v1 }
-          spec: { flowKind: direct, target: { kind: agent, id: unused-graph-target } }
+          spec:
+            flowKind: workflow
+            entryNodeId: input
+            nodes: [{ id: input, kind: input }]
+            edges: []
           graph:
             entryStep: input
             inputSchema:
