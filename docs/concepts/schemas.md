@@ -17,3 +17,9 @@ The standalone product registers a native `json-schema` provider and does not re
 The bounded handler validates object definitions and instances for `type`, `properties`, `required`, boolean `additionalProperties`, homogeneous `items`, `enum`, `default`, `examples`, descriptions and titles, numeric bounds, string and array length bounds, `pattern`, and the `uri` format. Unsupported keywords and dialects return path-specific diagnostics. This bounded behavior is deliberate: it is safer to report an unsupported construct than to claim validation while ignoring it.
 
 Format resolution is capability-based. A provider has a stable identity and version, lists its dialects and capabilities, and reports availability. Multiple capable providers require one explicit default or an exact caller pin; registration order is never used as an implicit selection policy.
+
+## AEP format contributions
+
+An enabled AEP Extension Registration may contribute one or more additional Schema format handlers through the `aep.schema-formats` capability. Each contribution maps definition and instance validation to private MCP operations. These operations reuse the registration's scope, expected extension identity and credential, but they are not Agent Tools and never appear in the Tool catalog.
+
+The adapter validates bounded structured results and enforces an operation timeout. If an extension that was discovered previously becomes unreachable, its providers remain inspectable as unavailable rather than disappearing silently. The built-in JSON Schema provider remains independent and the default; an AEP implementation for the same format must be selected by the registry's explicit default or exact provider-pin rules.

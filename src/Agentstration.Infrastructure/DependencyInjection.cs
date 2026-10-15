@@ -42,6 +42,7 @@ using Agentstration.Runtime.Profiles;
 using Agentstration.Runtime.Storage.PostgreSql;
 using Agentstration.Runtime.Storage.Sqlite;
 using Agentstration.Schemas;
+using Agentstration.Schemas.Aep;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Secrets.Local;
@@ -289,6 +290,8 @@ public static class DependencyInjection
         services.AddSingleton<ToolCategoryService>();
         services.AddSingleton<ToolSetService>();
         services.AddSingleton<ISchemaFormatHandler, BuiltinJsonSchemaFormatHandler>();
+        services.AddSingleton(new AepSchemaFormatOptions());
+        services.AddSingleton<ISchemaFormatHandlerSource, AepSchemaFormatHandlerSource>();
         services.AddSingleton<ISchemaFormatRegistry, SchemaFormatRegistry>();
         services.AddSingleton<SchemaManagementService>();
         services.AddSingleton<ToolDefinitionService>();
