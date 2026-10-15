@@ -14,6 +14,7 @@ using Agentstration.Extensions.Git;
 using Agentstration.Extensions.LlamaCpp;
 using Agentstration.Extensions.LocalAI;
 using Agentstration.Extensions.Ollama;
+using Agentstration.Extensions.OpenApi;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
@@ -58,6 +59,28 @@ namespace Agentstration.ArchitectureTests;
 [TestClass]
 public sealed class DependencyTests
 {
+    [TestMethod]
+    public void OpenApiDependenciesStayInsideTheAutonomousExtension()
+    {
+        var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
+        var extensionProject = Path.Combine(sourceRoot, "Agentstration.Extensions.OpenApi", "Agentstration.Extensions.OpenApi.csproj");
+        Assert.IsTrue(File.Exists(extensionProject));
+        var project = File.ReadAllText(extensionProject);
+        Assert.Contains("<PackageReference Include=\"Microsoft.OpenApi\"", project);
+        Assert.Contains("<PackageReference Include=\"YamlDotNet\"", project);
+        CollectionAssert.DoesNotContain(typeof(OpenApiContractParser).Assembly.GetReferencedAssemblies()
+            .Select(value => value.Name).ToArray(), "Agentstration.DataSources.Contracts");
+        CollectionAssert.DoesNotContain(typeof(OpenApiContractParser).Assembly.GetReferencedAssemblies()
+            .Select(value => value.Name).ToArray(), "Agentstration.Knowledge.Contracts");
+
+        var violations = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !string.Equals(path, extensionProject, StringComparison.OrdinalIgnoreCase))
+            .Where(path => File.ReadAllText(path).Contains("Agentstration.Extensions.OpenApi", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(sourceRoot, path))
+            .ToArray();
+        Assert.IsEmpty(violations, $"OpenAPI extension must not enter product modules: {string.Join(", ", violations)}");
+    }
+
     [TestMethod]
     public void Crawl4AiDependenciesStayInsideTheAutonomousExtension()
     {
