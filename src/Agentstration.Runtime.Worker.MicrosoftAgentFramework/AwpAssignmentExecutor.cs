@@ -63,8 +63,9 @@ internal sealed class AwpAssignmentExecutor(
             ToolExecution: new ToolExecutionScope
             {
                 OwnerKind = ToolExecutionOwnerKind.RuntimeRun,
-                TenantId = session.Assignment.Scope.TenantId,
-                WorkspaceId = ParseWorkspace(session.Assignment.Scope.WorkspaceId),
+                ScopeRef = ExecutionScopeRef(session.Assignment.Scope),
+                TenantId = TenantId(session.Assignment.Scope),
+                WorkspaceId = WorkspaceId(session.Assignment.Scope),
                 ExecutionId = material.RunId,
                 AgentGeneration = material.Agent.Generation,
                 PersistArguments = material.Execution.PersistToolArguments
@@ -143,7 +144,7 @@ internal sealed class AwpAssignmentExecutor(
             material.Resume.RuntimeType, material.Resume.StateId, material.Resume.RespondedAt);
         var answered = material.Resume is null ? null : new InputRequest
         {
-            ScopeRef = ResourceScopeRef.Workspace(ParseWorkspace(session.Assignment.Scope.WorkspaceId).Value),
+            ScopeRef = ExecutionScopeRef(session.Assignment.Scope),
             Id = material.Resume.InputRequestId,
             RunId = material.RunId,
             RuntimeRequestId = material.Resume.RuntimeRequestId,
@@ -157,11 +158,10 @@ internal sealed class AwpAssignmentExecutor(
         };
         JsonElement? final = null;
         await foreach (var executionEvent in engine.ExecuteAsync(new(
-            ParseWorkspace(session.Assignment.Scope.WorkspaceId), material.RunId, orchestration,
+            WorkspaceId(session.Assignment.Scope) ?? default, material.RunId, orchestration,
             material.Input, session.Assignment.AssignmentId.Value.ToString("N"),
             RuntimeState: runtimeState, AnsweredInput: answered,
-            Scope: new(session.Assignment.Scope.TenantId,
-                ParseWorkspace(session.Assignment.Scope.WorkspaceId), material.PrincipalId)), cancellationToken))
+            Scope: FlowScope(session.Assignment.Scope, material.PrincipalId)), cancellationToken))
         {
             switch (executionEvent)
             {
@@ -649,8 +649,9 @@ internal sealed class AwpAssignmentExecutor(
             ToolExecution: new ToolExecutionScope
             {
                 OwnerKind = ToolExecutionOwnerKind.FlowRun,
-                TenantId = session.Assignment.Scope.TenantId,
-                WorkspaceId = ParseWorkspace(session.Assignment.Scope.WorkspaceId),
+                ScopeRef = ExecutionScopeRef(session.Assignment.Scope),
+                TenantId = TenantId(session.Assignment.Scope),
+                WorkspaceId = WorkspaceId(session.Assignment.Scope),
                 ExecutionId = material.RunId,
                 FlowStepId = step.StepExecutionId.Value.ToString("D"),
                 AgentGeneration = agent.Generation
@@ -919,6 +920,28 @@ internal sealed class AwpAssignmentExecutor(
     private static WorkspaceId ParseWorkspace(string value) => Guid.TryParse(value, out var id) && id != Guid.Empty
         ? new WorkspaceId(id)
         : throw new InvalidOperationException("The assignment Workspace identity is invalid.");
+
+    private static ResourceScopeRef ExecutionScopeRef(AwpWorkspaceScope scope) =>
+        string.IsNullOrWhiteSpace(scope.ScopeRef)
+            ? ResourceScopeRef.Workspace(ParseWorkspace(scope.WorkspaceId).Value)
+            : ResourceScopeRef.Parse(scope.ScopeRef);
+
+    private static WorkspaceId? WorkspaceId(AwpWorkspaceScope scope) =>
+        ExecutionScopeRef(scope) is { Kind: ResourceScopeKind.Workspace, TargetId: { } workspaceId }
+            ? new WorkspaceId(workspaceId)
+            : null;
+
+    private static Guid? TenantId(AwpWorkspaceScope scope) =>
+        ExecutionScopeRef(scope).Kind == ResourceScopeKind.Instance ? null : scope.TenantId;
+
+    private static FlowRunScope FlowScope(AwpWorkspaceScope scope, Guid principalId) =>
+        ExecutionScopeRef(scope).Kind switch
+        {
+            ResourceScopeKind.Instance => FlowRunScope.Instance(principalId),
+            ResourceScopeKind.Tenant => FlowRunScope.Tenant(scope.TenantId, principalId),
+            ResourceScopeKind.Workspace => FlowRunScope.Workspace(scope.TenantId, WorkspaceId(scope)!.Value, principalId),
+            _ => throw new InvalidOperationException("The assignment execution scope is invalid.")
+        };
 }
 
 internal class AwpExecutionNotSupportedException(string code, string message) : Exception(message)

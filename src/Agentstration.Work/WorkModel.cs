@@ -72,4 +72,5 @@ public sealed record WorkItemSnapshot(
     IReadOnlyList<WorkHistoryEvent> History,
     WorkResult? Result,
     WorkError? Error,
-    long Version);
+    long Version,
+    ResourceScopeRef? ScopeRef = null);

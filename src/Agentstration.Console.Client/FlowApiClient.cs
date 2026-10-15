@@ -123,13 +123,22 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
     public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<FlowRun>(httpClient, $"api/flowRuns/{Uri.EscapeDataString(runId)}", cancellationToken);
 
-    public async Task<FlowRunCausalityPageResponse> GetFlowRunCausalityAsync(string runId, CancellationToken cancellationToken)
+    public Task<FlowRun> GetFlowRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<FlowRun>(httpClient, $"api/flowRuns/{Uri.EscapeDataString(runId)}{ScopeQuery(scopeRef)}", cancellationToken);
+
+    public Task<FlowRunCausalityPageResponse> GetFlowRunCausalityAsync(string runId, CancellationToken cancellationToken) =>
+        GetFlowRunCausalityCoreAsync(runId, null, cancellationToken);
+
+    public Task<FlowRunCausalityPageResponse> GetFlowRunCausalityAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        GetFlowRunCausalityCoreAsync(runId, scopeRef, cancellationToken);
+
+    private async Task<FlowRunCausalityPageResponse> GetFlowRunCausalityCoreAsync(string runId, ResourceScopeRef? scopeRef, CancellationToken cancellationToken)
     {
         var values = new List<FlowRunCausalityNode>();
         FlowRunCausalityOrigin? origin = null;
         var totalCount = 0;
         var visited = new HashSet<string>(StringComparer.Ordinal);
-        string? path = $"api/flowRuns/{Uri.EscapeDataString(runId)}/causality?top=100";
+        string? path = $"api/flowRuns/{Uri.EscapeDataString(runId)}/causality?top=100{ScopeParameter(scopeRef)}";
         while (path is not null)
         {
             path = NormalizeFlowRunPageLink(path);
@@ -151,14 +160,27 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
     public async Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<FlowRunEvent[]>(httpClient, $"api/flowRuns/{Uri.EscapeDataString(runId)}/eventHistory?afterSequence={Math.Max(0, afterSequence)}", cancellationToken);
 
+    public async Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, ResourceScopeRef scopeRef, long afterSequence, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<FlowRunEvent[]>(httpClient, $"api/flowRuns/{Uri.EscapeDataString(runId)}/eventHistory?afterSequence={Math.Max(0, afterSequence)}{ScopeParameter(scopeRef)}", cancellationToken);
+
     public async Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<InputRequest[]>(httpClient,
             $"api/flowRuns/{Uri.EscapeDataString(runId)}/inputs?status={InputRequestStatus.Pending}", cancellationToken);
 
-    public async Task<InputRequest> RespondToFlowRunInputAsync(string runId, string inputId, JsonElement value, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<InputRequest[]>(httpClient,
+            $"api/flowRuns/{Uri.EscapeDataString(runId)}/inputs?status={InputRequestStatus.Pending}{ScopeParameter(scopeRef)}", cancellationToken);
+
+    public Task<InputRequest> RespondToFlowRunInputAsync(string runId, string inputId, JsonElement value, CancellationToken cancellationToken) =>
+        RespondToFlowRunInputCoreAsync(runId, inputId, null, value, cancellationToken);
+
+    public Task<InputRequest> RespondToFlowRunInputAsync(string runId, string inputId, ResourceScopeRef scopeRef, JsonElement value, CancellationToken cancellationToken) =>
+        RespondToFlowRunInputCoreAsync(runId, inputId, scopeRef, value, cancellationToken);
+
+    private async Task<InputRequest> RespondToFlowRunInputCoreAsync(string runId, string inputId, ResourceScopeRef? scopeRef, JsonElement value, CancellationToken cancellationToken)
     {
         using var response = await httpClient.PostAsJsonAsync(
-            $"api/flowRuns/{Uri.EscapeDataString(runId)}/inputs/{Uri.EscapeDataString(inputId)}/response",
+            $"api/flowRuns/{Uri.EscapeDataString(runId)}/inputs/{Uri.EscapeDataString(inputId)}/response{ScopeQuery(scopeRef)}",
             new SubmitInputResponseRequest(value), JsonOptions, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<InputRequest>(JsonOptions, cancellationToken)
@@ -192,9 +214,18 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
     private static string ScopeQuery(ResourceScopeRef? scopeRef) =>
         scopeRef is null ? string.Empty : $"?scopeRef={Uri.EscapeDataString(scopeRef.Value.Value)}";
 
-    public async Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken)
+    private static string ScopeParameter(ResourceScopeRef? scopeRef) =>
+        scopeRef is null ? string.Empty : $"&scopeRef={Uri.EscapeDataString(scopeRef.Value.Value)}";
+
+    public Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken) =>
+        CancelFlowRunCoreAsync(runId, null, cancellationToken);
+
+    public Task<FlowRun> CancelFlowRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        CancelFlowRunCoreAsync(runId, scopeRef, cancellationToken);
+
+    private async Task<FlowRun> CancelFlowRunCoreAsync(string runId, ResourceScopeRef? scopeRef, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsync($"api/flowRuns/{Uri.EscapeDataString(runId)}/cancel", null, cancellationToken);
+        using var response = await httpClient.PostAsync($"api/flowRuns/{Uri.EscapeDataString(runId)}/cancel{ScopeQuery(scopeRef)}", null, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<FlowRun>(JsonOptions, cancellationToken)
             ?? throw new AgentstrationApiException("Flow API returned an empty Run.", Guid.NewGuid().ToString("N"));
@@ -202,7 +233,17 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
 
     public async IAsyncEnumerable<FlowRun> ObserveFlowRunAsync(string runId, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/flowRuns/{Uri.EscapeDataString(runId)}/events");
+        await foreach (var run in ObserveFlowRunCoreAsync(runId, null, cancellationToken)) yield return run;
+    }
+
+    public async IAsyncEnumerable<FlowRun> ObserveFlowRunAsync(string runId, ResourceScopeRef scopeRef, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await foreach (var run in ObserveFlowRunCoreAsync(runId, scopeRef, cancellationToken)) yield return run;
+    }
+
+    private async IAsyncEnumerable<FlowRun> ObserveFlowRunCoreAsync(string runId, ResourceScopeRef? scopeRef, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/flowRuns/{Uri.EscapeDataString(runId)}/events{ScopeQuery(scopeRef)}");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
         using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);

@@ -189,8 +189,13 @@ public sealed class SqliteRuntimeRunStore(IDbContextFactory<RuntimeRunDbContext>
     public async Task<StoredRuntimeRun> UpdateAsync(RuntimeRun run, string expectedETag, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Runs.SingleOrDefaultAsync(value => value.ScopeRef == run.ExecutionScopeRef.Value && value.RunId == run.Id, cancellationToken)
-            ?? throw new RuntimeRunNotFoundException(run.Id);
+        var document = await context.Runs.SingleOrDefaultAsync(value => value.ScopeRef == run.ExecutionScopeRef.Value && value.RunId == run.Id, cancellationToken);
+        if (document is null)
+        {
+            if (await context.Runs.AnyAsync(value => value.RunId == run.Id && value.ETag == expectedETag, cancellationToken))
+                throw new RuntimeRunConcurrencyException("The Runtime Run execution scope is immutable.");
+            throw new RuntimeRunNotFoundException(run.Id);
+        }
         if (!string.Equals(document.ETag, expectedETag, StringComparison.Ordinal))
             throw new RuntimeRunConcurrencyException("The supplied ETag does not match the current runtime run version.");
         var current = Deserialize(document).Value;

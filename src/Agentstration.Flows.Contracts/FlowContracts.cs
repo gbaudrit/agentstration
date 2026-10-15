@@ -35,6 +35,7 @@ public sealed record FlowPageResponse(IReadOnlyList<FlowSummaryResponse> Value, 
 public sealed record CreateFlowRunRequest(JsonElement Input, string? Version = null, string? DeploymentResourceId = "local", FlowRunTrigger Trigger = FlowRunTrigger.Manual, string? CorrelationId = null, IReadOnlyDictionary<string, JsonElement>? Options = null)
 {
     public ResourceScopeRef? DefinitionScopeRef { get; init; }
+    public ResourceScopeRef? ExecutionScopeRef { get; init; }
 }
 public sealed record FlowRunPageResponse(IReadOnlyList<FlowRun> Value, string? NextLink);
 public sealed record FlowRunCausalityPageResponse(

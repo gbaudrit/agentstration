@@ -487,8 +487,10 @@ public static class DependencyInjection
         services.AddSingleton<DashboardAdministrationService>();
         services.AddSingleton<IFlowRunQueue, AwpFlowRunQueue>();
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
-        services.AddSingleton<IFlowRunExecutionScope, WorkspaceFlowRunExecutionScope>();
+        services.AddSingleton<WorkspaceFlowRunExecutionScope>();
+        services.AddSingleton<IFlowRunExecutionScope>(provider => provider.GetRequiredService<WorkspaceFlowRunExecutionScope>());
         services.AddSingleton<IWorkExecutionScopeAccessor, CurrentWorkExecutionScopeAccessor>();
+        services.AddSingleton<IWorkExecutionScopeAccessor>(provider => provider.GetRequiredService<WorkspaceFlowRunExecutionScope>());
         services.AddSingleton<IRootFlowTargetResolver, RootFlowTargetResolver>();
         services.AddSingleton<IRootFlowRunGateway, RootFlowRunGateway>();
         services.AddSingleton<IRootFlowSubmissionAuthorizer, RootFlowSubmissionAuthorizer>();

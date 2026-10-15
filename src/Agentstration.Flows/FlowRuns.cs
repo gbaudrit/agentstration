@@ -10,9 +10,11 @@ public sealed record FlowRunScope(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] WorkspaceId WorkspaceId,
     Guid PrincipalId)
 {
-    public ResourceScopeRef ScopeRef { get; init; } = WorkspaceId.Value == Guid.Empty
-        ? ResourceScopeRef.Instance
-        : ResourceScopeRef.Workspace(WorkspaceId.Value);
+    public ResourceScopeRef ScopeRef => WorkspaceId.Value != Guid.Empty
+        ? ResourceScopeRef.Workspace(WorkspaceId.Value)
+        : TenantId != Guid.Empty
+            ? ResourceScopeRef.Tenant(TenantId)
+            : ResourceScopeRef.Instance;
 
     [JsonIgnore]
     public ExactExecutionScope Exact => ExactExecutionScope.Create(
@@ -22,13 +24,13 @@ public sealed record FlowRunScope(
         WorkspaceId.Value == Guid.Empty ? null : WorkspaceId.Value);
 
     public static FlowRunScope Instance(Guid principalId) =>
-        new(Guid.Empty, default, principalId) { ScopeRef = ResourceScopeRef.Instance };
+        new(Guid.Empty, default, principalId);
 
     public static FlowRunScope Tenant(Guid tenantId, Guid principalId) =>
-        new(tenantId, default, principalId) { ScopeRef = ResourceScopeRef.Tenant(tenantId) };
+        new(tenantId, default, principalId);
 
     public static FlowRunScope Workspace(Guid tenantId, WorkspaceId workspaceId, Guid principalId) =>
-        new(tenantId, workspaceId, principalId) { ScopeRef = ResourceScopeRef.Workspace(workspaceId.Value) };
+        new(tenantId, workspaceId, principalId);
 }
 public readonly record struct FlowRunKey(ResourceScopeRef ScopeRef, string RunId)
 {
@@ -39,6 +41,7 @@ public readonly record struct FlowRunKey(ResourceScopeRef ScopeRef, string RunId
         ? new WorkspaceId(ScopeRef.TargetId!.Value)
         : default;
 }
+[method: JsonConstructor]
 public sealed record FlowRunEvent(ResourceScopeRef ScopeRef, string RunId, long Sequence, FlowRunEventType Type, string? StepId, JsonElement? Payload, DateTimeOffset Timestamp)
 {
     public FlowRunEvent(WorkspaceId workspaceId, string runId, long sequence, FlowRunEventType type, string? stepId,

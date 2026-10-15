@@ -23,7 +23,10 @@ public interface IWorkExecutionScopeAccessor
 
 public sealed record WorkExecutionAccepted(WorkExecutionId ExecutionId, string? SelectedAgentId, DateTimeOffset AcceptedAt, Guid EventId);
 
-public abstract record WorkExecutionEvent(Guid EventId, WorkspaceId WorkspaceId, WorkItemId WorkItemId, WorkExecutionId ExecutionId, DateTimeOffset OccurredAt);
+public abstract record WorkExecutionEvent(Guid EventId, WorkspaceId WorkspaceId, WorkItemId WorkItemId, WorkExecutionId ExecutionId, DateTimeOffset OccurredAt)
+{
+    public ResourceScopeRef ExecutionScopeRef { get; init; } = ResourceScopeRef.Workspace(WorkspaceId.Value);
+}
 public sealed record WorkExecutionStarted(Guid EventId, WorkspaceId WorkspaceId, WorkItemId WorkItemId, WorkExecutionId ExecutionId, DateTimeOffset OccurredAt, string SelectedAgentId) : WorkExecutionEvent(EventId, WorkspaceId, WorkItemId, ExecutionId, OccurredAt);
 public sealed record WorkExecutionProgressed(Guid EventId, WorkspaceId WorkspaceId, WorkItemId WorkItemId, WorkExecutionId ExecutionId, DateTimeOffset OccurredAt, double Progress, string? Message) : WorkExecutionEvent(EventId, WorkspaceId, WorkItemId, ExecutionId, OccurredAt);
 public sealed record WorkExecutionInputRequested(Guid EventId, WorkspaceId WorkspaceId, WorkItemId WorkItemId, WorkExecutionId ExecutionId, DateTimeOffset OccurredAt, string Message) : WorkExecutionEvent(EventId, WorkspaceId, WorkItemId, ExecutionId, OccurredAt);

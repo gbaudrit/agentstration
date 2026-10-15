@@ -11,13 +11,17 @@ internal sealed class ListRuntimeRunEventsEndpoint : IRuntimeEndpoint
 
     private static Task<IResult> HandleAsync(
         string runId,
+        string? scopeRef,
         long? afterSequence,
         RuntimeRunService service,
         ICurrentRequestContext requestContext,
         CancellationToken cancellationToken) =>
-        RuntimeHttp.ExecuteAsync(async () => Results.Ok(await service.ListEventsAsync(
-            new WorkspaceId(requestContext.Current.WorkspaceId),
-            runId,
-            Math.Max(0, afterSequence ?? 0),
-            cancellationToken)));
+        RuntimeHttp.ExecuteAsync(async () =>
+        {
+            var scope = RuntimeHttp.CurrentScope(requestContext,
+                string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef));
+            await service.AuthorizeAsync(scope, cancellationToken);
+            return Results.Ok(await service.ListEventsExactAsync(scope.ScopeRef, runId,
+                Math.Max(0, afterSequence ?? 0), cancellationToken));
+        });
 }

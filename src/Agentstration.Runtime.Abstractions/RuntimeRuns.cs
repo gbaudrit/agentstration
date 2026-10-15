@@ -39,9 +39,11 @@ public sealed record RuntimeRunScope(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] WorkspaceId WorkspaceId,
     Guid PrincipalId)
 {
-    public ResourceScopeRef ScopeRef { get; init; } = WorkspaceId.Value == Guid.Empty
-        ? ResourceScopeRef.Instance
-        : ResourceScopeRef.Workspace(WorkspaceId.Value);
+    public ResourceScopeRef ScopeRef => WorkspaceId.Value != Guid.Empty
+        ? ResourceScopeRef.Workspace(WorkspaceId.Value)
+        : TenantId != Guid.Empty
+            ? ResourceScopeRef.Tenant(TenantId)
+            : ResourceScopeRef.Instance;
     [JsonIgnore]
     public ExactExecutionScope Exact => ExactExecutionScope.Create(
         ScopeRef,
@@ -49,11 +51,11 @@ public sealed record RuntimeRunScope(
         TenantId == Guid.Empty ? null : TenantId,
         WorkspaceId.Value == Guid.Empty ? null : WorkspaceId.Value);
     public static RuntimeRunScope Instance(Guid principalId) =>
-        new(Guid.Empty, default, principalId) { ScopeRef = ResourceScopeRef.Instance };
+        new(Guid.Empty, default, principalId);
     public static RuntimeRunScope Tenant(Guid tenantId, Guid principalId) =>
-        new(tenantId, default, principalId) { ScopeRef = ResourceScopeRef.Tenant(tenantId) };
+        new(tenantId, default, principalId);
     public static RuntimeRunScope Workspace(Guid tenantId, WorkspaceId workspaceId, Guid principalId) =>
-        new(tenantId, workspaceId, principalId) { ScopeRef = ResourceScopeRef.Workspace(workspaceId.Value) };
+        new(tenantId, workspaceId, principalId);
 }
 public readonly record struct RuntimeRunKey(ResourceScopeRef ScopeRef, string RunId)
 {

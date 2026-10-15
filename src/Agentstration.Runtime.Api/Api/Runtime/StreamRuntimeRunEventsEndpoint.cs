@@ -14,8 +14,11 @@ internal sealed class StreamRuntimeRunEventsEndpoint : IRuntimeEndpoint
 
     private static async Task HandleAsync(string runId, HttpRequest request, HttpResponse response, RuntimeRunService service, ICurrentRequestContext requestContext, CancellationToken cancellationToken)
     {
-        var workspaceId = new WorkspaceId(requestContext.Current.WorkspaceId);
-        if (await service.GetAsync(workspaceId, runId, cancellationToken) is null)
+        var requestedScopeValue = request.Query["scopeRef"].FirstOrDefault();
+        var scope = RuntimeHttp.CurrentScope(requestContext,
+            string.IsNullOrWhiteSpace(requestedScopeValue) ? null : ResourceScopeRef.Parse(requestedScopeValue));
+        await service.AuthorizeAsync(scope, cancellationToken);
+        if (await service.GetExactAsync(scope.ScopeRef, runId, cancellationToken) is null)
         {
             response.StatusCode = StatusCodes.Status404NotFound;
             await response.WriteAsJsonAsync(new { title = "run_not_found", detail = $"Runtime run '{runId}' was not found.", status = 404 }, cancellationToken);
@@ -27,7 +30,7 @@ internal sealed class StreamRuntimeRunEventsEndpoint : IRuntimeEndpoint
         response.ContentType = "text/event-stream";
         response.Headers.CacheControl = "no-cache";
         response.Headers.Connection = "keep-alive";
-        await foreach (var runEvent in service.ObserveAsync(workspaceId, runId, afterSequence, cancellationToken))
+        await foreach (var runEvent in service.ObserveExactAsync(scope.ScopeRef, runId, afterSequence, cancellationToken))
         {
             await response.WriteAsync($"id: {runEvent.Sequence}\n", cancellationToken);
             await response.WriteAsync($"event: {runEvent.Kind}\n", cancellationToken);

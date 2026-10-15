@@ -106,7 +106,8 @@ public partial class InitialPostgreSql : Migration
             columns: table => new
             {
                 Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                WorkspaceId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                ScopeRef = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                WorkspaceId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                 OwnerPrincipalId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                 Type = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                 Status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
@@ -126,7 +127,7 @@ public partial class InitialPostgreSql : Migration
             },
             constraints: table =>
             {
-                table.PrimaryKey("PK_WorkItems", x => new { x.WorkspaceId, x.Id });
+                table.PrimaryKey("PK_WorkItems", x => new { x.ScopeRef, x.Id });
             });
 
         migrationBuilder.CreateTable(

@@ -624,7 +624,8 @@ public static class AwpRuntimeWorkerEndpoints
 
     private static RuntimeAssignmentOwnershipProof ToProof(AwpAssignmentCommandContext context) => new()
     {
-        WorkspaceId = new WorkspaceId(ParseWorkspaceId(context.Scope.WorkspaceId)),
+        WorkspaceId = WorkspaceId(context.Scope),
+        ScopeRef = ExecutionScopeRef(context.Scope),
         AssignmentId = new RuntimeAssignmentId(context.AssignmentId.Value),
         AttemptId = new RuntimeAssignmentAttemptId(context.AttemptId.Value),
         WorkerId = new RuntimeWorkerId(context.WorkerId.Value),
@@ -647,7 +648,10 @@ public static class AwpRuntimeWorkerEndpoints
         return new AwpRunAssignment(
             new(assignment.Id.Value),
             new(attempt.Id.Value),
-            new(tenantId, assignment.WorkspaceId.Value.ToString("D")),
+            new(tenantId, assignment.WorkspaceId.Value == Guid.Empty ? string.Empty : assignment.WorkspaceId.Value.ToString("D"))
+            {
+                ScopeRef = assignment.ExecutionScopeRef.Value
+            },
             assignment.TargetKind == RuntimeAssignmentTargetKind.FlowRun
                 ? new AwpRootFlowRunTarget(assignment.TargetRunId)
                 : new AwpDirectAgentRunTarget(assignment.TargetRunId),
@@ -657,6 +661,33 @@ public static class AwpRuntimeWorkerEndpoints
                 checked((int)claimed.HeartbeatInterval.TotalSeconds)),
             assignment.ExecutionEvents.LastOrDefault()?.AttemptEventSequence ?? 0);
     }
+
+    private static ResourceScopeRef ExecutionScopeRef(AwpWorkspaceScope scope)
+    {
+        if (string.IsNullOrWhiteSpace(scope.ScopeRef))
+            return ResourceScopeRef.Workspace(ParseWorkspaceId(scope.WorkspaceId));
+        var scopeRef = ResourceScopeRef.Parse(scope.ScopeRef);
+        var coordinatesMatch = scopeRef.Kind switch
+        {
+            ResourceScopeKind.Instance => string.IsNullOrWhiteSpace(scope.WorkspaceId),
+            ResourceScopeKind.Tenant => string.IsNullOrWhiteSpace(scope.WorkspaceId)
+                && scopeRef.TargetId == scope.TenantId,
+            ResourceScopeKind.Workspace => Guid.TryParseExact(scope.WorkspaceId, "D", out var workspaceId)
+                && workspaceId != Guid.Empty
+                && scopeRef.TargetId == workspaceId,
+            _ => false
+        };
+        if (!coordinatesMatch)
+            throw new RuntimeAssignmentException(
+                RuntimeAssignmentErrorCodes.NotOwned,
+                "The assignment scope reference does not match its Tenant and Workspace coordinates.");
+        return scopeRef;
+    }
+
+    private static WorkspaceId WorkspaceId(AwpWorkspaceScope scope) =>
+        ExecutionScopeRef(scope) is { Kind: ResourceScopeKind.Workspace, TargetId: { } workspaceId }
+            ? new WorkspaceId(workspaceId)
+            : default;
 
     private static AwpFlowStepLocation ToContract(RuntimeAssignmentStepExecution step) => new(
         step.FlowRunId,

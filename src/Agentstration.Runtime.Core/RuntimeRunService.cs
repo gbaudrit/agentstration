@@ -33,6 +33,9 @@ public sealed class RuntimeRunService(
         }
     }
 
+    public ValueTask AuthorizeAsync(RuntimeRunScope scope, CancellationToken cancellationToken) =>
+        executionScopes.ValidateAsync(scope, cancellationToken);
+
     public async Task<StoredRuntimeRun> CreateAsync(
         RuntimeRunScope scope,
         RuntimeAgentReference agentReference,

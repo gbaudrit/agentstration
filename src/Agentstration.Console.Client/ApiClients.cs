@@ -39,6 +39,8 @@ public interface IManagementApiClient
 public interface IAgentRunnerManagementClient
 {
     Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<AgentResource>> GetAgentAsync(ResourceNamespace @namespace, string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetAgentAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support exact scoped Agent lookup.");
 }
 
 public interface IRuntimeApiClient
@@ -46,11 +48,17 @@ public interface IRuntimeApiClient
     Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken);
     Task<RuntimeRun> CreateRunAsync(CreateRuntimeRunRequest request, CancellationToken cancellationToken);
     Task<RuntimeRun> GetRunAsync(string runId, CancellationToken cancellationToken);
+    Task<RuntimeRun> GetRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetRunAsync(runId, cancellationToken);
     Task<IReadOnlyList<RuntimeRun>> GetRunsAsync(string? agentResourceId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RuntimeRun>> GetRunsAsync(string? agentResourceId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetRunsAsync(agentResourceId, cancellationToken);
     Task<IReadOnlyList<RuntimeRunEvent>> GetRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RuntimeRunEvent>> GetRunEventsAsync(string runId, ResourceScopeRef scopeRef, long afterSequence, CancellationToken cancellationToken) => GetRunEventsAsync(runId, afterSequence, cancellationToken);
     IAsyncEnumerable<RuntimeRunEvent> ObserveRunAsync(string runId, long afterSequence, CancellationToken cancellationToken);
+    IAsyncEnumerable<RuntimeRunEvent> ObserveRunAsync(string runId, ResourceScopeRef scopeRef, long afterSequence, CancellationToken cancellationToken) => ObserveRunAsync(runId, afterSequence, cancellationToken);
     Task<RuntimeRun> CancelRunAsync(string runId, CancellationToken cancellationToken);
+    Task<RuntimeRun> CancelRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => CancelRunAsync(runId, cancellationToken);
     Task<RuntimeRun> RetryRunAsync(string runId, CancellationToken cancellationToken);
+    Task<RuntimeRun> RetryRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => RetryRunAsync(runId, cancellationToken);
     Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Agent instance observability.");
     Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> GetRuntimeWorkersAsync(CancellationToken cancellationToken) =>
@@ -59,6 +67,8 @@ public interface IRuntimeApiClient
         throw new NotSupportedException("This client does not support Runtime Worker details.");
     Task<RuntimeAssignmentPlacementResponse?> GetPlacementAsync(RuntimeAssignmentTargetKind targetKind, string runId, CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Runtime placement.");
+    Task<RuntimeAssignmentPlacementResponse?> GetPlacementAsync(RuntimeAssignmentTargetKind targetKind, string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        GetPlacementAsync(targetKind, runId, cancellationToken);
 }
 
 public interface IAgentRunnerRuntimeClient : IRuntimeApiClient
@@ -90,6 +100,7 @@ public interface IToolGovernanceAuditClient
     Task<ToolGovernanceAuditPage> GetAsync(
         ToolExecutionOwnerKind ownerKind,
         string runId,
+        ResourceScopeRef? scopeRef,
         long afterSequence,
         int limit,
         ToolGovernanceAuditFilters filters,
@@ -170,16 +181,23 @@ public interface IFlowApiClient
     Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef? definitionScopeRef, CancellationToken cancellationToken) =>
         GetFlowRunsAsync(@namespace, flowId, cancellationToken);
     Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken);
+    Task<FlowRun> GetFlowRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetFlowRunAsync(runId, cancellationToken);
     Task<FlowRunCausalityPageResponse> GetFlowRunCausalityAsync(string runId, CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Flow Run causality diagnostics.");
+    Task<FlowRunCausalityPageResponse> GetFlowRunCausalityAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetFlowRunCausalityAsync(runId, cancellationToken);
     Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, ResourceScopeRef scopeRef, long afterSequence, CancellationToken cancellationToken) => GetFlowRunEventsAsync(runId, afterSequence, cancellationToken);
     Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetFlowRunInputsAsync(runId, cancellationToken);
     Task<InputRequest> RespondToFlowRunInputAsync(string runId, string inputId, JsonElement value, CancellationToken cancellationToken);
+    Task<InputRequest> RespondToFlowRunInputAsync(string runId, string inputId, ResourceScopeRef scopeRef, JsonElement value, CancellationToken cancellationToken) => RespondToFlowRunInputAsync(runId, inputId, value, cancellationToken);
     Task<FlowRun> CreateFlowRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken);
     Task<FlowRun> CreateFlowRunAsync(ResourceNamespace @namespace, string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? CreateFlowRunAsync(flowId, request, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flows.");
     Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken);
+    Task<FlowRun> CancelFlowRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => CancelFlowRunAsync(runId, cancellationToken);
     IAsyncEnumerable<FlowRun> ObserveFlowRunAsync(string runId, CancellationToken cancellationToken);
+    IAsyncEnumerable<FlowRun> ObserveFlowRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => ObserveFlowRunAsync(runId, cancellationToken);
     Task<FlowDraftResponse> CreateDraftAsync(CreateFlowDraftRequest request, CancellationToken cancellationToken);
     Task<FlowDraftResponse> GetDraftAsync(string flowId, CancellationToken cancellationToken);
     Task<FlowDraftResponse> GetDraftAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>

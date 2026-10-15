@@ -21,8 +21,12 @@ public sealed class WorkspaceFlowRunExecutionScope(
     IIdentityStore identities,
     Agentstration.Identity.Contracts.IAuthorizationService authorization,
     IPlatformAuthorizationService platformAuthorization,
-    IRequestContextScopeFactory scopeFactory) : IFlowRunExecutionScope
+    IRequestContextScopeFactory scopeFactory) : IFlowRunExecutionScope, IWorkExecutionScopeAccessor
 {
+    private readonly AsyncLocal<FlowRunScope?> current = new();
+
+    public FlowRunScope? Current => current.Value;
+
     public async ValueTask ValidateAsync(FlowRunScope scope, CancellationToken cancellationToken)
     {
         var principal = await identities.GetPrincipalAsync(scope.PrincipalId, cancellationToken);
@@ -48,13 +52,19 @@ public sealed class WorkspaceFlowRunExecutionScope(
         catch (AuthorizationDeniedException) { throw Denied(); }
     }
 
-    public IDisposable Enter(FlowRunScope scope) => scope.ScopeRef.Kind switch
+    public IDisposable Enter(FlowRunScope scope)
     {
-        ResourceScopeKind.Instance => scopeFactory.PushSystem(),
-        ResourceScopeKind.Tenant => scopeFactory.PushTenant(scope.PrincipalId, scope.TenantId),
-        ResourceScopeKind.Workspace => scopeFactory.Push(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value)),
-        _ => throw Denied()
-    };
+        var previous = current.Value;
+        current.Value = scope;
+        var requestScope = scope.ScopeRef.Kind switch
+        {
+            ResourceScopeKind.Instance => scopeFactory.PushSystem(),
+            ResourceScopeKind.Tenant => scopeFactory.PushTenant(scope.PrincipalId, scope.TenantId),
+            ResourceScopeKind.Workspace => scopeFactory.Push(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value)),
+            _ => throw Denied()
+        };
+        return new ExecutionScopeLease(requestScope, () => current.Value = previous);
+    }
 
     private async Task<bool> HasTenantPermissionAsync(FlowRunScope scope, CancellationToken cancellationToken)
     {
@@ -69,6 +79,19 @@ public sealed class WorkspaceFlowRunExecutionScope(
 
     private static FlowValidationException Denied() =>
         new("flow_run_authorization_denied", "The Principal is no longer authorized to execute this Flow Run in its exact scope.");
+
+    private sealed class ExecutionScopeLease(IDisposable requestScope, Action restore) : IDisposable
+    {
+        private IDisposable? activeRequestScope = requestScope;
+
+        public void Dispose()
+        {
+            var active = Interlocked.Exchange(ref activeRequestScope, null);
+            if (active is null) return;
+            active.Dispose();
+            restore();
+        }
+    }
 }
 
 public sealed class CurrentWorkExecutionScopeAccessor(ICurrentRequestContext requestContext) : IWorkExecutionScopeAccessor

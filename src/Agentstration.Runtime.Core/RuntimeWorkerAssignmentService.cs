@@ -431,7 +431,9 @@ public sealed class RuntimeWorkerAssignmentService(
         {
             ResourceScopeKind.Instance => tenantId == Guid.Empty && workspaceId.Value == Guid.Empty,
             ResourceScopeKind.Tenant => scopeRef.TargetId == tenantId && workspaceId.Value == Guid.Empty,
-            ResourceScopeKind.Workspace => scopeRef.TargetId == workspaceId.Value && tenantId != Guid.Empty,
+            // TenantId was not persisted by the original Workspace-only assignment contract. Keep
+            // those records readable while exact-scope producers always supply the tenant coordinate.
+            ResourceScopeKind.Workspace => scopeRef.TargetId == workspaceId.Value,
             _ => false
         };
         if (!valid)

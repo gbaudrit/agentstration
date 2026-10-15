@@ -52,7 +52,7 @@ public sealed class FlowDetailsDesignerTests
         Assert.AreEqual(strings["Status"].Value, headers[2]);
         var link = rendered.Find("tbody .resource-name-link");
         Assert.AreEqual("multi-agent-review", link.TextContent.Trim());
-        Assert.AreEqual("/flow-runs/flowrun-review-1", link.GetAttribute("href"));
+        Assert.AreEqual($"/flow-runs/flowrun-review-1?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}", link.GetAttribute("href"));
         Assert.IsEmpty(rendered.FindAll("tbody .text-button"));
     }
 

@@ -72,7 +72,8 @@ public sealed class RuntimeObservabilityConsoleTests
             1, 0, now.AddMinutes(-2), now, [new("microsoft-agent-framework", "1.0", ["1.0"], "maf-1.0")]);
         var assignment = new RuntimeAssignmentPlacementResponse(Guid.NewGuid(), nameof(RuntimeAssignmentTargetKind.FlowRun),
             "flowrun-root-1", "Succeeded", "microsoft-agent-framework", "1.0", "1.0", now.AddMinutes(-1), now,
-            [new(Guid.NewGuid(), workerId, Guid.NewGuid(), 1, "Succeeded", now.AddMinutes(-1), now, now.AddSeconds(30), now, null)]);
+            [new(Guid.NewGuid(), workerId, Guid.NewGuid(), 1, "Succeeded", now.AddMinutes(-1), now, now.AddSeconds(30), now, null)],
+            ResourceScopeRef.Instance);
         using var context = CreateContext(new RuntimeClient { Details = new(worker, [assignment]) });
 
         var cut = context.Render<RuntimeWorkerDetails>(parameters => parameters.Add(component => component.WorkerId, workerId));
@@ -88,7 +89,7 @@ public sealed class RuntimeObservabilityConsoleTests
 
         Assert.AreEqual("true", cut.Find("#worker-assignments-tab").GetAttribute("aria-selected"));
         StringAssert.Contains(cut.Markup, "Durable assignments handled by this Worker");
-        StringAssert.Contains(cut.Markup, "/flow-runs/flowrun-root-1");
+        StringAssert.Contains(cut.Markup, "/flow-runs/flowrun-root-1?scopeRef=%2Finstance");
         Assert.IsFalse(cut.Markup.Contains("This Worker has no assignment history.", StringComparison.Ordinal));
     }
 
