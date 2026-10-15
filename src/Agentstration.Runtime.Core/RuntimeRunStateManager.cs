@@ -22,17 +22,20 @@ public sealed class RuntimeRunStateManager
         this.captureOptions = captureOptions;
     }
 
-    public async Task CompleteFailureAsync(WorkspaceId workspaceId, string runId, RuntimeRunState state, string error, CancellationToken cancellationToken)
+    public Task CompleteFailureAsync(WorkspaceId workspaceId, string runId, RuntimeRunState state, string error, CancellationToken cancellationToken) =>
+        CompleteFailureAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, state, error, cancellationToken);
+
+    public async Task CompleteFailureAsync(ResourceScopeRef scopeRef, string runId, RuntimeRunState state, string error, CancellationToken cancellationToken)
     {
         for (var attempt = 0; ; attempt++)
         {
-            var current = await RequiredAsync(workspaceId, runId, cancellationToken);
+            var current = await RequiredAsync(scopeRef, runId, cancellationToken);
             if (current.Value.Status.State.IsTerminal()) return;
             try
             {
                 await TransitionAsync(current, state, null, error, cancellationToken);
-                await AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.Error, error, state: state, cancellationToken: cancellationToken);
-                await AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.RunCompleted, error, state: state, cancellationToken: cancellationToken);
+                await AppendEventAsync(scopeRef, runId, RuntimeRunEventKind.Error, error, state: state, cancellationToken: cancellationToken);
+                await AppendEventAsync(scopeRef, runId, RuntimeRunEventKind.RunCompleted, error, state: state, cancellationToken: cancellationToken);
                 return;
             }
             catch (RuntimeRunConcurrencyException) when (attempt < 2)
@@ -68,10 +71,13 @@ public sealed class RuntimeRunStateManager
         return runs.UpdateAsync(stored.Value with { Status = status }, stored.ETag, cancellationToken);
     }
 
-    public async Task TraceStepAsync(WorkspaceId workspaceId, string runId, string step, CancellationToken cancellationToken)
+    public Task TraceStepAsync(WorkspaceId workspaceId, string runId, string step, CancellationToken cancellationToken) =>
+        TraceStepAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, step, cancellationToken);
+
+    public async Task TraceStepAsync(ResourceScopeRef scopeRef, string runId, string step, CancellationToken cancellationToken)
     {
-        await AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.StepStarted, step, step, cancellationToken: cancellationToken);
-        await AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.StepCompleted, step, step, cancellationToken: cancellationToken);
+        await AppendEventAsync(scopeRef, runId, RuntimeRunEventKind.StepStarted, step, step, cancellationToken: cancellationToken);
+        await AppendEventAsync(scopeRef, runId, RuntimeRunEventKind.StepCompleted, step, step, cancellationToken: cancellationToken);
     }
 
     public Task<RuntimeRunEvent> AppendEventAsync(
@@ -84,9 +90,21 @@ public sealed class RuntimeRunStateManager
         RuntimeRunState? state = null,
         RuntimeToolCall? toolCall = null,
         CancellationToken cancellationToken = default) =>
+        AppendEventAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, kind, message, step, content, state, toolCall, cancellationToken);
+
+    public Task<RuntimeRunEvent> AppendEventAsync(
+        ResourceScopeRef scopeRef,
+        string runId,
+        RuntimeRunEventKind kind,
+        string? message = null,
+        string? step = null,
+        string? content = null,
+        RuntimeRunState? state = null,
+        RuntimeToolCall? toolCall = null,
+        CancellationToken cancellationToken = default) =>
         runs.AppendEventAsync(new RuntimeRunEvent
         {
-            WorkspaceId = workspaceId,
+            ScopeRef = scopeRef,
             EventId = Guid.NewGuid(),
             RunId = runId,
             Kind = kind,
@@ -102,11 +120,18 @@ public sealed class RuntimeRunStateManager
         WorkspaceId workspaceId,
         string runId,
         ToolExecutionLifecycleEvent executionEvent,
+        CancellationToken cancellationToken) =>
+        await ProjectToolCallAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, executionEvent, cancellationToken);
+
+    public async Task<RuntimeToolCall> ProjectToolCallAsync(
+        ResourceScopeRef scopeRef,
+        string runId,
+        ToolExecutionLifecycleEvent executionEvent,
         CancellationToken cancellationToken)
     {
         for (var retry = 0; ; retry++)
         {
-            var current = await RequiredAsync(workspaceId, runId, cancellationToken);
+            var current = await RequiredAsync(scopeRef, runId, cancellationToken);
             var existing = current.Value.Status.ToolCalls.FirstOrDefault(call =>
                 string.Equals(call.Id, executionEvent.Context.ToolCallId, StringComparison.Ordinal));
             var projected = Project(existing, executionEvent);
@@ -121,7 +146,7 @@ public sealed class RuntimeRunStateManager
                     current.ETag,
                     cancellationToken);
                 await AppendEventAsync(
-                    workspaceId,
+                    scopeRef,
                     runId,
                     EventKind(executionEvent),
                     EventMessage(executionEvent),
@@ -244,6 +269,6 @@ public sealed class RuntimeRunStateManager
         _ => throw new ArgumentOutOfRangeException(nameof(executionEvent))
     };
 
-    private async Task<StoredRuntimeRun> RequiredAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken) =>
-        await runs.GetAsync(workspaceId, runId, cancellationToken) ?? throw new RuntimeRunNotFoundException(runId);
+    private async Task<StoredRuntimeRun> RequiredAsync(ResourceScopeRef scopeRef, string runId, CancellationToken cancellationToken) =>
+        await runs.GetExactAsync(scopeRef, runId, cancellationToken) ?? throw new RuntimeRunNotFoundException(runId);
 }

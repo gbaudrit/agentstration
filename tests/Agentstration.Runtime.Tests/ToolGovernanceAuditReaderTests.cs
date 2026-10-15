@@ -213,7 +213,7 @@ public sealed class ToolGovernanceAuditReaderTests
         string toolId,
         ToolExecutionHookEvaluation evaluation) => new()
         {
-            WorkspaceId = Workspace,
+            ScopeRef = ResourceScopeRef.Workspace(Workspace.Value),
             EventId = Guid.NewGuid(),
             RunId = "runtime-run",
             Kind = RuntimeRunEventKind.ToolCallGovernanceEvaluated,

@@ -277,7 +277,7 @@ public sealed class RuntimeRunTests
             };
             RuntimeRunEvent Event(Agentstration.Resources.WorkspaceId workspaceId) => new()
             {
-                WorkspaceId = workspaceId,
+                ScopeRef = ResourceScopeRef.Workspace(workspaceId.Value),
                 EventId = Guid.NewGuid(),
                 RunId = "shared-run",
                 Kind = RuntimeRunEventKind.RunCreated,

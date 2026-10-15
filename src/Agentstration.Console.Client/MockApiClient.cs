@@ -281,7 +281,7 @@ public sealed class MockApiClient(TimeProvider timeProvider, IReadOnlyList<FlowR
         var values = runEvents[runId];
         var runEvent = new RuntimeRunEvent
         {
-            WorkspaceId = MockWorkspaceId,
+            ScopeRef = ResourceScopeRef.Workspace(MockWorkspaceId.Value),
             Sequence = values.Count + 1,
             EventId = Guid.NewGuid(),
             RunId = runId,

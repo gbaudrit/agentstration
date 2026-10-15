@@ -37,9 +37,9 @@ public sealed class AwpAssignmentProjection(
         for (var skip = 0; ; skip += pageSize)
         {
             var keys = await flowRuns.ListRunKeysAsync(skip, pageSize, cancellationToken);
-            foreach (var key in keys.Where(value => value.WorkspaceId == result.Assignment.WorkspaceId))
+            foreach (var key in keys.Where(value => value.ScopeRef == result.Assignment.ExecutionScopeRef))
             {
-                var candidate = await flowRuns.GetRunAsync(key.WorkspaceId, key.RunId, cancellationToken);
+                var candidate = await flowRuns.GetRunExactAsync(key.ScopeRef, key.RunId, cancellationToken);
                 if (candidate?.Value.RootFlowRunId == result.Assignment.TargetRunId)
                     await ProjectFlowTerminalAsync(result.Assignment, candidate.Value.Id, result, cancellationToken);
             }
@@ -50,7 +50,7 @@ public sealed class AwpAssignmentProjection(
     private async Task ProjectFlowTerminalAsync(RuntimeWorkerAssignment assignment, string runId,
         RuntimeAssignmentTerminalResult result, CancellationToken cancellationToken)
     {
-        var stored = await flowRuns.GetRunAsync(result.Assignment.WorkspaceId,
+        var stored = await flowRuns.GetRunExactAsync(result.Assignment.ExecutionScopeRef,
             runId, cancellationToken);
         if (stored is null || stored.Value.Status.IsTerminal()
             || stored.Value.Status == FlowRunStatus.WaitingForInput) return;
@@ -129,7 +129,7 @@ public sealed class AwpAssignmentProjection(
             ? value.GetString() : null;
         await runtimeRuns.AppendEventAsync(new RuntimeRunEvent
         {
-            WorkspaceId = assignment.WorkspaceId,
+            ScopeRef = assignment.ExecutionScopeRef,
             EventId = executionEvent.EventId,
             RunId = executionEvent.RunId,
             Kind = kind.Value,
@@ -143,7 +143,7 @@ public sealed class AwpAssignmentProjection(
     private async Task ProjectFlowEventAsync(RuntimeWorkerAssignment assignment,
         RuntimeAssignmentExecutionEvent executionEvent, CancellationToken cancellationToken)
     {
-        var stored = await flowRuns.GetRunAsync(assignment.WorkspaceId, executionEvent.RunId, cancellationToken);
+        var stored = await flowRuns.GetRunExactAsync(assignment.ExecutionScopeRef, executionEvent.RunId, cancellationToken);
         if (stored is null) return;
         var step = executionEvent.StepExecutionId is { } stepId
             ? assignment.StepExecutions.SingleOrDefault(value => value.Id == stepId)
@@ -316,7 +316,7 @@ public sealed class AwpAssignmentProjection(
     private async Task AppendFlowEventAsync(FlowRun run, FlowRunEventType type, string? stepId,
         JsonElement? payload, DateTimeOffset occurredAt, CancellationToken cancellationToken)
     {
-        var appended = await flowRuns.AppendRunEventAsync(new FlowRunEvent(run.WorkspaceId, run.Id, 0,
+        var appended = await flowRuns.AppendRunEventAsync(new FlowRunEvent(run.ExecutionScopeRef, run.Id, 0,
             type, stepId, payload?.Clone(), occurredAt), cancellationToken);
         await flowEvents.PublishAsync(appended, cancellationToken);
     }

@@ -59,7 +59,12 @@ public abstract record RuntimeExecutionMaterial(
     WorkspaceId WorkspaceId,
     Guid TenantId,
     Guid PrincipalId,
-    string RunId);
+    string RunId)
+{
+    public ResourceScopeRef ScopeRef { get; init; } = WorkspaceId.Value == Guid.Empty
+        ? ResourceScopeRef.Instance
+        : ResourceScopeRef.Workspace(WorkspaceId.Value);
+}
 
 public sealed record RuntimeDirectAgentExecutionMaterial(
     string MaterialId,

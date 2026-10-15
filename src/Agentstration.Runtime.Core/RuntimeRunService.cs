@@ -25,7 +25,7 @@ public sealed class RuntimeRunService(
             var page = await runs.ListRecoverableAsync(skip, pageSize, cancellationToken);
             foreach (var key in page)
             {
-                var run = await runs.GetAsync(key.WorkspaceId, key.RunId, cancellationToken)
+                var run = await runs.GetExactAsync(key.ScopeRef, key.RunId, cancellationToken)
                     ?? throw new RuntimeRunNotFoundException(key.RunId);
                 await queue.EnqueueAsync(new RuntimeRunQueueItem(run.Value.Scope, key.RunId), cancellationToken);
             }
@@ -43,8 +43,8 @@ public sealed class RuntimeRunService(
         CancellationToken cancellationToken)
     {
         Validate(agentReference, input, execution, initiator);
-        if (scope.WorkspaceId.Value == Guid.Empty || scope.TenantId == Guid.Empty || scope.PrincipalId == Guid.Empty)
-            throw new RuntimeRunValidationException("execution_scope_invalid", "A complete Runtime execution scope is required.");
+        try { _ = scope.Exact; }
+        catch (ArgumentException exception) { throw new RuntimeRunValidationException("execution_scope_invalid", exception.Message); }
         ResolvedRuntimeAgent resolved;
         try
         {
@@ -80,14 +80,14 @@ public sealed class RuntimeRunService(
             }
         };
         var stored = await runs.CreateAsync(run, cancellationToken);
-        await stateManager.AppendEventAsync(scope.WorkspaceId, stored.Value.Id, RuntimeRunEventKind.RunCreated, "Run created", state: RuntimeRunState.Pending, cancellationToken: cancellationToken);
+        await stateManager.AppendEventAsync(scope.ScopeRef, stored.Value.Id, RuntimeRunEventKind.RunCreated, "Run created", state: RuntimeRunState.Pending, cancellationToken: cancellationToken);
         await queue.EnqueueAsync(new RuntimeRunQueueItem(scope, stored.Value.Id), cancellationToken);
         return stored;
     }
 
     public async Task<StoredRuntimeRun> RetryAsync(RuntimeRunScope scope, string runId, CancellationToken cancellationToken)
     {
-        var source = await GetRequiredAsync(scope.WorkspaceId, runId, cancellationToken);
+        var source = await GetRequiredAsync(scope.ScopeRef, runId, cancellationToken);
         return await CreateAsync(
             scope,
             source.Value.Properties.Agent,
@@ -100,14 +100,22 @@ public sealed class RuntimeRunService(
 
     public Task<StoredRuntimeRun?> GetAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken) => runs.GetAsync(workspaceId, runId, cancellationToken);
 
+    public Task<StoredRuntimeRun?> GetExactAsync(ResourceScopeRef scopeRef, string runId, CancellationToken cancellationToken) => runs.GetExactAsync(scopeRef, runId, cancellationToken);
+
     public Task<IReadOnlyList<StoredRuntimeRun>> ListAsync(WorkspaceId workspaceId, string? agentResourceId, int skip, int take, CancellationToken cancellationToken) =>
         runs.ListAsync(workspaceId, agentResourceId, skip, take, cancellationToken);
 
+    public Task<IReadOnlyList<StoredRuntimeRun>> ListExactAsync(ResourceScopeRef scopeRef, string? agentResourceId, int skip, int take, CancellationToken cancellationToken) =>
+        runs.ListExactAsync(scopeRef, agentResourceId, skip, take, cancellationToken);
+
     public async Task DeleteAsync(WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken)
+        => await DeleteExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, expectedETag, cancellationToken);
+
+    public async Task DeleteExactAsync(ResourceScopeRef scopeRef, string runId, string expectedETag, CancellationToken cancellationToken)
     {
-        var stored = await GetRequiredAsync(workspaceId, runId, cancellationToken);
+        var stored = await GetRequiredAsync(scopeRef, runId, cancellationToken);
         if (!stored.Value.Status.State.IsTerminal()) throw new RuntimeRunNotTerminalException(runId, stored.Value.Status.State);
-        await runs.DeleteAsync(workspaceId, runId, expectedETag, cancellationToken);
+        await runs.DeleteExactAsync(scopeRef, runId, expectedETag, cancellationToken);
     }
 
     public async Task<AgentRuntimeReadiness> GetReadinessAsync(string agentResourceId, long generation, CancellationToken cancellationToken)
@@ -140,8 +148,11 @@ public sealed class RuntimeRunService(
     }
 
     public async Task<StoredRuntimeRun> CancelAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken)
+        => await CancelExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, cancellationToken);
+
+    public async Task<StoredRuntimeRun> CancelExactAsync(ResourceScopeRef scopeRef, string runId, CancellationToken cancellationToken)
     {
-        var stored = await GetRequiredAsync(workspaceId, runId, cancellationToken);
+        var stored = await GetRequiredAsync(scopeRef, runId, cancellationToken);
         if (stored.Value.Status.State.IsTerminal()) return stored;
         await queue.RequestCancellationAsync(new RuntimeRunQueueItem(stored.Value.Scope, runId), cancellationToken);
         StoredRuntimeRun cancelled;
@@ -151,12 +162,12 @@ public sealed class RuntimeRunService(
         }
         catch (RuntimeRunConcurrencyException)
         {
-            var current = await GetRequiredAsync(workspaceId, runId, cancellationToken);
+            var current = await GetRequiredAsync(scopeRef, runId, cancellationToken);
             if (!current.Value.Status.State.IsTerminal()) throw;
             return current;
         }
-        await stateManager.AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.StatusChanged, "Run cancelled", state: RuntimeRunState.Cancelled, cancellationToken: cancellationToken);
-        await stateManager.AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.RunCompleted, "Run cancelled", state: RuntimeRunState.Cancelled, cancellationToken: cancellationToken);
+        await stateManager.AppendEventAsync(scopeRef, runId, RuntimeRunEventKind.StatusChanged, "Run cancelled", state: RuntimeRunState.Cancelled, cancellationToken: cancellationToken);
+        await stateManager.AppendEventAsync(scopeRef, runId, RuntimeRunEventKind.RunCompleted, "Run cancelled", state: RuntimeRunState.Cancelled, cancellationToken: cancellationToken);
         return cancelled;
     }
 
@@ -166,17 +177,27 @@ public sealed class RuntimeRunService(
         long afterSequence,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        _ = await GetRequiredAsync(workspaceId, runId, cancellationToken);
+        await foreach (var runEvent in ObserveExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, afterSequence, cancellationToken))
+            yield return runEvent;
+    }
+
+    public async IAsyncEnumerable<RuntimeRunEvent> ObserveExactAsync(
+        ResourceScopeRef scopeRef,
+        string runId,
+        long afterSequence,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        _ = await GetRequiredAsync(scopeRef, runId, cancellationToken);
         var cursor = afterSequence;
         while (!cancellationToken.IsCancellationRequested)
         {
-            var events = await runs.ListEventsAsync(workspaceId, runId, cursor, cancellationToken);
+            var events = await runs.ListEventsExactAsync(scopeRef, runId, cursor, cancellationToken);
             foreach (var runEvent in events)
             {
                 cursor = runEvent.Sequence;
                 yield return runEvent;
             }
-            var current = await GetRequiredAsync(workspaceId, runId, cancellationToken);
+            var current = await GetRequiredAsync(scopeRef, runId, cancellationToken);
             if (current.Value.Status.State.IsTerminal() && events.Count == 0) yield break;
             await Task.Delay(TimeSpan.FromMilliseconds(200), timeProvider, cancellationToken);
         }
@@ -186,14 +207,21 @@ public sealed class RuntimeRunService(
         WorkspaceId workspaceId,
         string runId,
         long afterSequence,
+        CancellationToken cancellationToken) =>
+        await ListEventsExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, afterSequence, cancellationToken);
+
+    public async Task<IReadOnlyList<RuntimeRunEvent>> ListEventsExactAsync(
+        ResourceScopeRef scopeRef,
+        string runId,
+        long afterSequence,
         CancellationToken cancellationToken)
     {
-        _ = await GetRequiredAsync(workspaceId, runId, cancellationToken);
-        return await runs.ListEventsAsync(workspaceId, runId, Math.Max(0, afterSequence), cancellationToken);
+        _ = await GetRequiredAsync(scopeRef, runId, cancellationToken);
+        return await runs.ListEventsExactAsync(scopeRef, runId, Math.Max(0, afterSequence), cancellationToken);
     }
 
-    private async Task<StoredRuntimeRun> GetRequiredAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken) =>
-        await runs.GetAsync(workspaceId, runId, cancellationToken) ?? throw new RuntimeRunNotFoundException(runId);
+    private async Task<StoredRuntimeRun> GetRequiredAsync(ResourceScopeRef scopeRef, string runId, CancellationToken cancellationToken) =>
+        await runs.GetExactAsync(scopeRef, runId, cancellationToken) ?? throw new RuntimeRunNotFoundException(runId);
 
     private static void Validate(RuntimeAgentReference agent, RuntimeRunInput input, RuntimeExecutionOptions execution, string initiator)
     {

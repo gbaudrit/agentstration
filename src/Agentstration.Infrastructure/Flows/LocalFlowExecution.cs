@@ -20,31 +20,55 @@ namespace Agentstration.Infrastructure.Flows;
 public sealed class WorkspaceFlowRunExecutionScope(
     IIdentityStore identities,
     Agentstration.Identity.Contracts.IAuthorizationService authorization,
+    IPlatformAuthorizationService platformAuthorization,
     IRequestContextScopeFactory scopeFactory) : IFlowRunExecutionScope
 {
     public async ValueTask ValidateAsync(FlowRunScope scope, CancellationToken cancellationToken)
     {
         var principal = await identities.GetPrincipalAsync(scope.PrincipalId, cancellationToken);
+        if (principal?.Status != PrincipalStatus.Active) throw Denied();
+        if (scope.ScopeRef.Kind == ResourceScopeKind.Instance)
+        {
+            if (!await platformAuthorization.IsPlatformAdministratorAsync(scope.PrincipalId, cancellationToken)) throw Denied();
+            return;
+        }
+        var tenant = scope.TenantId == Guid.Empty ? null : await identities.GetTenantAsync(scope.TenantId, cancellationToken);
+        if (tenant?.Status != TenantStatus.Active || scope.ScopeRef.TargetId != scope.TenantId && scope.ScopeRef.Kind == ResourceScopeKind.Tenant)
+            throw Denied();
+        if (scope.ScopeRef.Kind == ResourceScopeKind.Tenant)
+        {
+            if (await platformAuthorization.IsPlatformAdministratorAsync(scope.PrincipalId, cancellationToken)) return;
+            var membership = await identities.FindMembershipAsync(scope.TenantId, scope.PrincipalId, cancellationToken);
+            if (membership?.Status != MembershipStatus.Active || !await HasTenantPermissionAsync(scope, cancellationToken)) throw Denied();
+            return;
+        }
         var workspace = await identities.GetWorkspaceAsync(scope.TenantId, scope.WorkspaceId.Value, cancellationToken);
-        if (principal?.Status != PrincipalStatus.Active || workspace?.Status != WorkspaceStatus.Active)
-            throw Denied();
-
-        var requestContext = new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value);
-        try
-        {
-            await authorization.EnsurePermissionAsync(requestContext, AuthorizationPermissions.RunsExecute, cancellationToken);
-        }
-        catch (AuthorizationDeniedException)
-        {
-            throw Denied();
-        }
+        if (workspace?.Status != WorkspaceStatus.Active || scope.ScopeRef != ResourceScopeRef.Workspace(scope.WorkspaceId.Value)) throw Denied();
+        try { await authorization.EnsurePermissionAsync(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value), AuthorizationPermissions.RunsExecute, cancellationToken); }
+        catch (AuthorizationDeniedException) { throw Denied(); }
     }
 
-    public IDisposable Enter(FlowRunScope scope) =>
-        scopeFactory.Push(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value));
+    public IDisposable Enter(FlowRunScope scope) => scope.ScopeRef.Kind switch
+    {
+        ResourceScopeKind.Instance => scopeFactory.PushSystem(),
+        ResourceScopeKind.Tenant => scopeFactory.PushTenant(scope.PrincipalId, scope.TenantId),
+        ResourceScopeKind.Workspace => scopeFactory.Push(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value)),
+        _ => throw Denied()
+    };
+
+    private async Task<bool> HasTenantPermissionAsync(FlowRunScope scope, CancellationToken cancellationToken)
+    {
+        var assignments = await identities.ListRoleAssignmentsAsync(scope.TenantId, scope.PrincipalId, cancellationToken);
+        foreach (var assignment in assignments.Where(value => string.Equals(value.Scope, AuthorizationScopes.Tenant(scope.TenantId), StringComparison.Ordinal)))
+        {
+            var role = await identities.GetRoleDefinitionAsync(assignment.RoleDefinitionId, cancellationToken);
+            if (role?.Permissions.Contains(AuthorizationPermissions.RunsExecute) == true) return true;
+        }
+        return false;
+    }
 
     private static FlowValidationException Denied() =>
-        new("flow_run_authorization_denied", "The Principal is no longer authorized to execute this Flow Run in its Workspace.");
+        new("flow_run_authorization_denied", "The Principal is no longer authorized to execute this Flow Run in its exact scope.");
 }
 
 public sealed class CurrentWorkExecutionScopeAccessor(ICurrentRequestContext requestContext) : IWorkExecutionScopeAccessor
