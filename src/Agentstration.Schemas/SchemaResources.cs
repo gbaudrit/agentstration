@@ -44,9 +44,13 @@ public sealed record SchemaVersionResource : Resource, IImmutableResource
     public required DateTimeOffset PublishedAt { get; init; }
 }
 
-public sealed class SchemaValidationException(string code, string message) : Exception(message)
+public sealed class SchemaValidationException(
+    string code,
+    string message,
+    IReadOnlyList<SchemaFormatValidationIssue>? issues = null) : Exception(message)
 {
     public string Code { get; } = code;
+    public IReadOnlyList<SchemaFormatValidationIssue> Issues { get; } = issues ?? [];
 }
 
 public sealed class SchemaNotFoundException(ResourceNamespace @namespace, string name)

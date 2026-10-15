@@ -12,6 +12,7 @@ public sealed class SchemaManagementService(
     IResourceStore store,
     IResourceScopeOperations scopeOperations,
     DescendantResourceUseAuthorizer useAuthorizer,
+    ISchemaFormatRegistry formatRegistry,
     ISecurityAuditWriter audit,
     TimeProvider timeProvider)
 {
@@ -143,14 +144,26 @@ public sealed class SchemaManagementService(
         if (resource.Definition.Description?.Length > 2_000)
             throw new SchemaValidationException("schema_description_too_long",
                 "Schema descriptions cannot exceed 2000 characters.");
-        if (!string.Equals(resource.Definition.Format, SchemaFormatIds.JsonSchema, StringComparison.Ordinal))
-            throw new SchemaValidationException("schema_format_unsupported",
-                $"Schema format '{resource.Definition.Format}' is not available.");
         if (resource.Definition.Content.ValueKind == JsonValueKind.Undefined)
             throw new SchemaValidationException("schema_content_required", "Schema content is required.");
         if (Encoding.UTF8.GetByteCount(resource.Definition.Content.GetRawText()) > MaximumContentBytes)
             throw new SchemaValidationException("schema_content_too_large",
                 $"Schema content cannot exceed {MaximumContentBytes} UTF-8 bytes.");
+        ISchemaFormatHandler handler;
+        try
+        {
+            handler = formatRegistry.Resolve(resource.Definition.Format, SchemaFormatCapabilities.ValidateDefinition);
+        }
+        catch (SchemaFormatResolutionException exception)
+        {
+            throw new SchemaValidationException(exception.Code, exception.Message);
+        }
+        var validation = await handler.ValidateDefinitionAsync(resource.Definition.Content,
+            resource.Definition.Dialect, cancellationToken);
+        if (!validation.IsValid)
+            throw new SchemaValidationException("schema_definition_invalid",
+                $"Schema definition is invalid at '{validation.Issues[0].Path}': {validation.Issues[0].Message}",
+                validation.Issues);
         await useAuthorizer.ValidateAsync(RequireScope(resource), resource.Definition.UsePolicy, cancellationToken);
     }
 

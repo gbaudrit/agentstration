@@ -10,6 +10,11 @@ namespace Agentstration.Web.Console;
 public interface ISchemasClient
 {
     Task<IReadOnlyList<SchemaResource>> GetSchemasAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SchemaFormatDescriptor>> GetFormatsAsync(CancellationToken cancellationToken = default);
+    Task<SchemaFormatValidationResult> ValidateDefinitionAsync(ValidateSchemaDefinitionRequest request,
+        CancellationToken cancellationToken = default);
+    Task<SchemaFormatValidationResult> ValidateInstanceAsync(ValidateSchemaInstanceRequest request,
+        CancellationToken cancellationToken = default);
     Task<ResourceSnapshot<SchemaResource>> GetSchemaAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace,
         string name, CancellationToken cancellationToken = default);
     Task<ResourceSnapshot<SchemaResource>> CreateAsync(CreateSchemaRequest request,
@@ -28,6 +33,31 @@ public sealed class SchemasApiClient(HttpClient httpClient) : ISchemasClient
 {
     public async Task<IReadOnlyList<SchemaResource>> GetSchemasAsync(CancellationToken cancellationToken = default) =>
         (await ApiResponse.ReadAsync<ValueResponse<SchemaResource>>(httpClient, "api/schemas", cancellationToken)).Value;
+
+    public async Task<IReadOnlyList<SchemaFormatDescriptor>> GetFormatsAsync(
+        CancellationToken cancellationToken = default) =>
+        (await ApiResponse.ReadAsync<ValueResponse<SchemaFormatDescriptor>>(
+            httpClient, "api/schemas/formats", cancellationToken)).Value;
+
+    public async Task<SchemaFormatValidationResult> ValidateDefinitionAsync(ValidateSchemaDefinitionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            "api/schemas/formats/validate-definition", request, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<SchemaFormatValidationResult>(cancellationToken)
+            ?? throw new InvalidOperationException("The Schema definition validation response was empty.");
+    }
+
+    public async Task<SchemaFormatValidationResult> ValidateInstanceAsync(ValidateSchemaInstanceRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            "api/schemas/formats/validate-instance", request, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<SchemaFormatValidationResult>(cancellationToken)
+            ?? throw new InvalidOperationException("The Schema instance validation response was empty.");
+    }
 
     public async Task<ResourceSnapshot<SchemaResource>> GetSchemaAsync(ResourceScopeRef scopeRef,
         ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default)

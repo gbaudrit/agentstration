@@ -288,6 +288,8 @@ public static class DependencyInjection
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<ToolCategoryService>();
         services.AddSingleton<ToolSetService>();
+        services.AddSingleton<ISchemaFormatHandler, BuiltinJsonSchemaFormatHandler>();
+        services.AddSingleton<ISchemaFormatRegistry, SchemaFormatRegistry>();
         services.AddSingleton<SchemaManagementService>();
         services.AddSingleton<ToolDefinitionService>();
         services.AddSingleton<ToolExecutionHookManagementService>();

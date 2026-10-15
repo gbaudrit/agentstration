@@ -19,8 +19,8 @@ else if (Filtered.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T
 else
 {
     <DataGrid TItem="SchemaResource" Items="Filtered">
-        <Header><tr><th>@T("Schema")</th><th>@T("Format")</th><th>@T("Dialect")</th><th>@T("Scope")</th><th>@T("Generation")</th><th></th></tr></Header>
-        <Row Context="schema"><tr data-testid="schema-row"><td><a class="resource-name-link" href="@EditUrl(schema)" data-testid="schema-details-link"><strong>@schema.Definition.DisplayName</strong><span class="resource-secondary"><code>@schema.Namespace/@schema.Name</code></span></a></td><td><code>@schema.Definition.Format</code></td><td><code>@(schema.Definition.Dialect ?? "—")</code></td><td><ResourceScopeBadge ScopeRef="schema.ScopeRef" Compact /></td><td>@schema.Generation</td><td><a class="text-button" href="@EditUrl(schema)">@T("Open")</a></td></tr></Row>
+        <Header><tr><th>@T("Schema")</th><th>@T("Format")</th><th>@T("Dialect")</th><th>@T("Scope")</th><th>@T("Generation")</th></tr></Header>
+        <Row Context="schema"><tr data-testid="schema-row"><td><a class="resource-name-link" href="@EditUrl(schema)" data-testid="schema-details-link"><strong>@schema.Definition.DisplayName</strong><span class="resource-secondary"><code>@schema.Namespace/@schema.Name</code></span></a></td><td><code>@schema.Definition.Format</code></td><td><code>@(schema.Definition.Dialect ?? "—")</code></td><td><ResourceScopeBadge ScopeRef="schema.ScopeRef" Compact /></td><td>@schema.Generation</td></tr></Row>
     </DataGrid>
 }
 
