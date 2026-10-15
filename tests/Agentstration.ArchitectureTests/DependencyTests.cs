@@ -64,21 +64,42 @@ public sealed class DependencyTests
     {
         var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
         var extensionProject = Path.Combine(sourceRoot, "Agentstration.Extensions.OpenApi", "Agentstration.Extensions.OpenApi.csproj");
+        var appHostProject = Path.Combine(sourceRoot, "Agentstration.AppHost", "Agentstration.AppHost.csproj");
         Assert.IsTrue(File.Exists(extensionProject));
         var project = File.ReadAllText(extensionProject);
         Assert.Contains("<PackageReference Include=\"Microsoft.OpenApi\"", project);
         Assert.Contains("<PackageReference Include=\"YamlDotNet\"", project);
+        Assert.Contains("../Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj", File.ReadAllText(appHostProject));
         CollectionAssert.DoesNotContain(typeof(OpenApiContractParser).Assembly.GetReferencedAssemblies()
             .Select(value => value.Name).ToArray(), "Agentstration.DataSources.Contracts");
         CollectionAssert.DoesNotContain(typeof(OpenApiContractParser).Assembly.GetReferencedAssemblies()
             .Select(value => value.Name).ToArray(), "Agentstration.Knowledge.Contracts");
 
         var violations = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
-            .Where(path => !string.Equals(path, extensionProject, StringComparison.OrdinalIgnoreCase))
+            .Where(path => !string.Equals(path, extensionProject, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(path, appHostProject, StringComparison.OrdinalIgnoreCase))
             .Where(path => File.ReadAllText(path).Contains("Agentstration.Extensions.OpenApi", StringComparison.Ordinal))
             .Select(path => Path.GetRelativePath(sourceRoot, path))
             .ToArray();
         Assert.IsEmpty(violations, $"OpenAPI extension must not enter product modules: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
+    public void AspireOpenApiRegistrationIsOptInAndForwardsOnlyBoundedProviderPolicy()
+    {
+        var root = FindRepositoryRoot();
+        var appHost = File.ReadAllText(Path.Combine(root, "src", "Agentstration.AppHost", "Program.cs"));
+        var settings = File.ReadAllText(Path.Combine(root, "src", "Agentstration.AppHost", "appsettings.json"));
+
+        Assert.Contains("OpenApi:Enabled", appHost, StringComparison.Ordinal);
+        Assert.Contains("if (openApiEnabled)", appHost, StringComparison.Ordinal);
+        Assert.Contains("AddProject<Projects.Agentstration_Extensions_OpenApi>(\"openapi-extension\")", appHost, StringComparison.Ordinal);
+        Assert.Contains("OpenApi:AllowedDomains must contain at least one domain", appHost, StringComparison.Ordinal);
+        Assert.Contains("OpenApi__AllowedDomains__{index}", appHost, StringComparison.Ordinal);
+        Assert.Contains("Agentstration.Extensions.OpenApi\", \"openapi-extension", appHost, StringComparison.Ordinal);
+        Assert.Contains("\"OpenApi\"", settings, StringComparison.Ordinal);
+        Assert.Contains("\"Enabled\": false", settings, StringComparison.Ordinal);
+        Assert.DoesNotContain("OpenApi__Credentials", appHost, StringComparison.Ordinal);
     }
 
     [TestMethod]
