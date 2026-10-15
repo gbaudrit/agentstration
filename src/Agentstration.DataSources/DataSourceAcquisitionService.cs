@@ -36,6 +36,12 @@ public sealed record DataSourceFlowRunSnapshot(
 
 public interface IDataSourceAcquisitionCompositionResolver
 {
+    Task<ResolvedDataSourceFlowBinding> ResolveFlowAsync(
+        ResourceScopeRef executionScope,
+        ResourceNamespace ownerNamespace,
+        ResolvedDataSourceProfile profile,
+        CancellationToken cancellationToken);
+
     Task<ResolvedDataSourceAcquisitionComposition> ResolveAsync(
         ResourceScopeRef executionScope,
         ResourceNamespace ownerNamespace,

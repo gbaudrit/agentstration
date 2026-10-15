@@ -24,6 +24,8 @@ import { PlatformOverviewPage } from './platform-overview.page.js';
 import { ToolExecutionPage } from './tool-execution.page.js';
 import { RuntimeWorkerObservabilityPage } from './runtime-worker-observability.page.js';
 import { AgentInstanceObservabilityPage } from './agent-instance-observability.page.js';
+import { SchemaDrivenSourcesPage } from './schema-driven-sources.page.js';
+import { SchemaAdministrationPage } from './schema-administration.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -50,6 +52,8 @@ export class ProductPages {
   public readonly toolExecution: ToolExecutionPage;
   public readonly runtimeWorkerObservability: RuntimeWorkerObservabilityPage;
   public readonly agentInstanceObservability: AgentInstanceObservabilityPage;
+  public readonly schemaDrivenSources: SchemaDrivenSourcesPage;
+  public readonly schemaAdministration: SchemaAdministrationPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -76,6 +80,8 @@ export class ProductPages {
     this.toolExecution = new ToolExecutionPage(page);
     this.runtimeWorkerObservability = new RuntimeWorkerObservabilityPage(page);
     this.agentInstanceObservability = new AgentInstanceObservabilityPage(page);
+    this.schemaDrivenSources = new SchemaDrivenSourcesPage(page);
+    this.schemaAdministration = new SchemaAdministrationPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

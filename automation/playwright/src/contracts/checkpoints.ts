@@ -147,4 +147,10 @@ export const Checkpoints = {
     secretBound: 'foundry-secret-binding-secret-bound',
     secretUnavailable: 'foundry-secret-binding-secret-unavailable',
   },
+  schemaDrivenSources: {
+    completed: 'schema-driven-sources-completed',
+  },
+  schemaAdministration: {
+    completed: 'schema-administration-completed',
+  },
 } as const;

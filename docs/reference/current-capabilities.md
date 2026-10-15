@@ -383,6 +383,12 @@ Flow definitions are stored in `.agentstration/flow-plane.db`. Published version
 
 The Flow console at `/flows` provides creation templates, a four-zone visual designer, Designer/Definition/Split modes, YAML source editing, validation, optimistic draft saving, publication, published versions and per-Flow Runs. The specialized UI lives in the `Agentstration.Web.FlowDesigner` Razor Class Library: Z.Blazor.Diagrams owns canvas interaction and BlazorMonaco provides the locally served Monaco editor, while `Agentstration.Web` supplies backend and resource adapters. A Draft Run validates its JSON input and retains its exact draft revision, hash, and immutable definition snapshot. Run details receive differential SignalR events with replay from persisted history; `/flow-runs` provides the global searchable Run history. Flow data remains in the independent `.agentstration/flow-plane.db` store.
 
+### Reusable Schemas
+
+The Schema library at `/schemas` owns scoped format-neutral drafts and immutable published versions. The built-in `json-schema` handler supports the 2020-12 dialect without AEP and exposes governed definition and instance validation through `/api/schemas/formats`. Provider selection uses explicit identities, capabilities, availability and default designation; ambiguous providers are rejected instead of being selected by registration order.
+
+The reusable editor offers visual authoring for the bounded common JSON Schema subset, Monaco source editing and instance preview. Definitions using unsupported composition or reference constructs remain source-only and are preserved without a lossy visual round trip. See [Schemas](../concepts/schemas.md) and [ADR-0170](../decisions/0170-schema-format-resolution-is-explicit.md).
+
 ## MCP
 
 The official C# MCP SDK exposes Streamable HTTP at `http://localhost:5100/mcp`. Example VS Code `.vscode/mcp.json`:

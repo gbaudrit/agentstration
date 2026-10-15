@@ -75,7 +75,63 @@ public sealed class SchemaApiTests : ModelManagementApiTestBase
 
         var unsupported = await Assert.ThrowsAsync<SchemaValidationException>(() => service.CreateAsync(
             Resource(scopeRef, "protobuf", Definition("{}") with { Format = "protobuf" }), default));
-        Assert.AreEqual("schema_format_unsupported", unsupported.Code);
+        Assert.AreEqual("schema_format_unavailable", unsupported.Code);
+    }
+
+    [TestMethod]
+    public async Task BuiltinJsonSchemaValidationReturnsPathSpecificDefinitionAndInstanceIssues()
+    {
+        var handler = new BuiltinJsonSchemaFormatHandler();
+        var invalidDefinition = JsonDocument.Parse(
+            "{\"type\":\"object\",\"properties\":{\"age\":{\"type\":\"integer\",\"oneOf\":[]}}}").RootElement;
+
+        var definitionResult = await handler.ValidateDefinitionAsync(invalidDefinition,
+            BuiltinJsonSchemaFormatHandler.Draft202012, default);
+
+        Assert.IsFalse(definitionResult.IsValid);
+        Assert.IsTrue(definitionResult.Issues.Any(issue => issue.Code == "json_schema_keyword_unsupported"
+            && issue.Path == "$.properties.age.oneOf"));
+
+        var definition = JsonDocument.Parse(
+            "{\"type\":\"object\",\"properties\":{\"age\":{\"type\":\"integer\",\"minimum\":18}},\"required\":[\"age\"],\"additionalProperties\":false}").RootElement;
+        var instance = JsonDocument.Parse("{\"age\":16,\"hidden\":true}").RootElement;
+        var instanceResult = await handler.ValidateInstanceAsync(definition, instance,
+            BuiltinJsonSchemaFormatHandler.Draft202012, default);
+
+        Assert.IsFalse(instanceResult.IsValid);
+        Assert.IsTrue(instanceResult.Issues.Any(issue => issue.Code == "json_schema_instance_minimum"
+            && issue.Path == "$.age"));
+        Assert.IsTrue(instanceResult.Issues.Any(issue => issue.Code == "json_schema_instance_additional_property"
+            && issue.Path == "$.hidden"));
+    }
+
+    [TestMethod]
+    public async Task FormatRegistryAndValidationAreAvailableThroughTheManagementApi()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        using var client = factory.CreateClient();
+
+        var formats = await client.GetFromJsonAsync<Agentstration.Api.Contracts.ValueResponse<SchemaFormatDescriptor>>(
+            "/api/schemas/formats");
+        Assert.IsNotNull(formats);
+        var jsonSchema = formats.Value.Single(value => value.Format == SchemaFormatIds.JsonSchema);
+        Assert.AreEqual(BuiltinJsonSchemaFormatHandler.ProviderId, jsonSchema.Provider.Id);
+        Assert.IsTrue(jsonSchema.Capabilities.HasFlag(SchemaFormatCapabilities.ValidateInstance));
+
+        var definition = JsonDocument.Parse(
+            "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}").RootElement.Clone();
+        using var response = await client.PostAsJsonAsync("/api/schemas/formats/validate-instance",
+            new ValidateSchemaInstanceRequest(SchemaFormatIds.JsonSchema,
+                BuiltinJsonSchemaFormatHandler.Draft202012, definition,
+                JsonSerializer.SerializeToElement(new { })));
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        var validation = await response.Content.ReadFromJsonAsync<SchemaFormatValidationResult>();
+        Assert.IsNotNull(validation);
+        Assert.IsFalse(validation.IsValid);
+        Assert.IsTrue(validation.Issues.Any(issue => issue.Path == "$.name"
+            && issue.Code == "json_schema_instance_required"));
     }
 
     [TestMethod]
