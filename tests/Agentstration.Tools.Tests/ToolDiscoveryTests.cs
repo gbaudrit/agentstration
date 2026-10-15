@@ -45,6 +45,34 @@ public sealed class ToolDiscoveryTests
     }
 
     [TestMethod]
+    public async Task UnchangedDiscoveryPreservesProviderAndToolGenerations()
+    {
+        var store = new MemoryStore();
+        var provider = Provider() with { Generation = 1 };
+        await store.PutAsync(provider, null, true, default);
+        var descriptor = Descriptor("stable", "Stable");
+        var service = new ToolManagementService(
+            store,
+            new UnusedReferenceResolver(),
+            new TestScopeOperations(),
+            [new SequenceDiscovery([descriptor], [descriptor])],
+            new FixedTimeProvider());
+
+        _ = await service.RefreshDiscoveryExactAsync(WorkspaceScope, provider.Name, provider.Namespace, default);
+        var firstProvider = await service.GetProviderExactAsync(WorkspaceScope, provider.Name, provider.Namespace, default);
+        var firstTool = (await service.ListToolsAsync(default)).Single();
+
+        _ = await service.RefreshDiscoveryExactAsync(WorkspaceScope, provider.Name, provider.Namespace, default);
+        var secondProvider = await service.GetProviderExactAsync(WorkspaceScope, provider.Name, provider.Namespace, default);
+        var secondTool = (await service.ListToolsAsync(default)).Single();
+
+        Assert.AreEqual(firstProvider!.Value.Uid, secondProvider!.Value.Uid);
+        Assert.AreEqual(firstProvider.Value.Generation, secondProvider.Value.Generation);
+        Assert.AreEqual(firstTool.Value.Uid, secondTool.Value.Uid);
+        Assert.AreEqual(firstTool.Value.Generation, secondTool.Value.Generation);
+    }
+
+    [TestMethod]
     public void ProviderValidationSupportsStdioHttpAndAepWithoutPlaintextEnvironmentValues()
     {
         ToolManagementService.ValidateProvider(Provider());

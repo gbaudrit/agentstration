@@ -28,6 +28,14 @@ public interface IAepEnrollmentAnnouncementProvisioner
     Task<string> ProvisionAsync(AepEnrollmentAnnouncement announcement, ResourceScopeRef targetScopeRef, CancellationToken cancellationToken);
 }
 
+public interface IAepEnrollmentResourceProvisioner
+{
+    Task ProvisionAsync(
+        ExtensionRegistrationResource registration,
+        AepManifest? authenticatedManifest,
+        CancellationToken cancellationToken);
+}
+
 public sealed class AepEnrollmentService(
     IResourceStore store,
     IAuthorizationService authorization,
@@ -40,6 +48,7 @@ public sealed class AepEnrollmentService(
     ISecurityAuditWriter audit,
     AepEnrollmentSettingsService enrollmentSettings,
     IEnumerable<IAepEnrollmentAnnouncementProvisioner> announcementProvisioners,
+    IEnumerable<IAepEnrollmentResourceProvisioner> resourceProvisioners,
     TimeProvider timeProvider)
 {
     public const int MaximumAttempts = 5;
@@ -143,6 +152,26 @@ public sealed class AepEnrollmentService(
             if (stored.Value.Definition.EnrollmentMode != AepEnrollmentMode.SharedKeyFile) return null;
             return await ProvisionAnnouncementAsync(Announcement(stored.Value.Definition), targetScopeRef, token);
         }, cancellationToken);
+        if (registrationName is not null)
+        {
+            try
+            {
+                await ProvisionResourcesAsync(targetScopeRef, registrationName, null, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                using var failureScope = RequestScopes().PushSystem();
+                _ = await UpdateAsync(stored, stored.Value.Definition with
+                {
+                    TargetScopeRef = targetScopeRef,
+                    TargetTenantId = targetScopeRef.Kind == ResourceScopeKind.Instance ? null : context.TenantId,
+                    RegistrationName = registrationName,
+                    State = AepEnrollmentState.VerificationFailed,
+                    Outcome = "resource_provisioning_failed"
+                }, cancellationToken);
+                throw new AepEnrollmentException("resource_provisioning_failed", "The extension resources could not be provisioned.", 502);
+            }
+        }
         var definition = stored.Value.Definition with
         {
             TargetScopeRef = targetScopeRef,
@@ -289,8 +318,16 @@ public sealed class AepEnrollmentService(
             var token = await ReadTokenAsync(stored.Value, cancellationToken);
             using var http = httpClients.CreateClient("agentstration-aep");
             http.BaseAddress = definition.Endpoint;
-            _ = await new AepClient(http, new StaticAepAccessTokenProvider(token), transportOptions, definition.ExtensionId)
+            var manifest = await new AepClient(http, new StaticAepAccessTokenProvider(token), transportOptions, definition.ExtensionId)
                 .GetManifestAsync(cancellationToken);
+            try
+            {
+                await ProvisionResourcesAsync(stored.Value, manifest, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                throw new AepEnrollmentException("resource_provisioning_failed", "The extension resources could not be provisioned.", 502);
+            }
             _ = await UpdateAsync(stored, definition with
             {
                 State = AepEnrollmentState.Available,
@@ -302,9 +339,13 @@ public sealed class AepEnrollmentService(
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            try { _ = await UpdateAsync(stored, definition with { State = AepEnrollmentState.VerificationFailed, CompletionDigest = null, Outcome = "verification_failed" }, cancellationToken); }
+            var failureCode = exception is AepEnrollmentException enrollmentException
+                ? enrollmentException.Code
+                : "verification_failed";
+            try { _ = await UpdateAsync(stored, definition with { State = AepEnrollmentState.VerificationFailed, CompletionDigest = null, Outcome = failureCode }, cancellationToken); }
             catch (ResourceConcurrencyException) { }
-            await AuditAsync(SecurityAuditActions.AepEnrollmentFailed, stored.Value, "verification_failed", cancellationToken, SecurityAuditOutcome.Failed);
+            await AuditAsync(SecurityAuditActions.AepEnrollmentFailed, stored.Value, failureCode, cancellationToken, SecurityAuditOutcome.Failed);
+            if (exception is AepEnrollmentException) throw;
             throw new AepEnrollmentException("verification_failed", "The authenticated extension manifest could not be verified.", 502);
         }
     }
@@ -558,6 +599,34 @@ public sealed class AepEnrollmentService(
         {
             throw new AepEnrollmentException("verification_failed", "The rotated credential could not verify the extension identity.", 502);
         }
+    }
+
+    private Task ProvisionResourcesAsync(
+        AepEnrollmentRequestResource request,
+        AepManifest authenticatedManifest,
+        CancellationToken cancellationToken) =>
+        ProvisionResourcesAsync(
+            TargetScope(request.Definition),
+            request.Definition.RegistrationName
+                ?? throw new InvalidOperationException("The enrollment registration reference is unavailable."),
+            authenticatedManifest,
+            cancellationToken);
+
+    private async Task ProvisionResourcesAsync(
+        ResourceScopeRef scopeRef,
+        string registrationName,
+        AepManifest? authenticatedManifest,
+        CancellationToken cancellationToken)
+    {
+        var address = ScopedResourceAddress.Create(
+            scopeRef,
+            ResourceNamespace.Default,
+            ExtensionKinds.ExtensionRegistration,
+            registrationName);
+        var registration = await store.GetExactAsync<ExtensionRegistrationResource>(address, cancellationToken)
+            ?? throw new InvalidOperationException("The enrollment registration is unavailable.");
+        foreach (var provisioner in resourceProvisioners)
+            await provisioner.ProvisionAsync(registration.Value, authenticatedManifest, cancellationToken);
     }
 
     private async Task SendLifecycleAsync(
