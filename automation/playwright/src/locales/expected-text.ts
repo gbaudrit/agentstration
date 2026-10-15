@@ -44,6 +44,10 @@ export interface ExpectedText {
     runTool: string;
     input: string;
   };
+  schemaDrivenSources: {
+    formMode: string;
+    rawMode: string;
+  };
 }
 
 export const ExpectedTextByLocale = {
@@ -98,6 +102,10 @@ export const ExpectedTextByLocale = {
       runTool: 'Run this tool',
       input: 'Input',
     },
+    schemaDrivenSources: {
+      formMode: 'Form',
+      rawMode: 'Raw JSON',
+    },
   },
   'fr-FR': {
     navigation: {
@@ -149,6 +157,10 @@ export const ExpectedTextByLocale = {
       realExecution: 'Exécution réelle',
       runTool: 'Exécuter cet outil',
       input: 'Entrées',
+    },
+    schemaDrivenSources: {
+      formMode: 'Formulaire',
+      rawMode: 'JSON brut',
     },
   },
 } as const satisfies Record<SupportedTestLocale, ExpectedText>;

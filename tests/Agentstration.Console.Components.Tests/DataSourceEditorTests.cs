@@ -46,13 +46,15 @@ public sealed class DataSourceEditorTests
             Assert.IsTrue(enabled.ClassList.Contains("data-source-choice"));
             Assert.IsTrue(rendered.Markup.IndexOf("data-source-enabled-option", StringComparison.Ordinal)
                 < rendered.Markup.IndexOf("Configuration (JSON)", StringComparison.Ordinal));
+            Assert.AreEqual("https://docs.agentstration.io",
+                rendered.Find("[data-schema-path='$.url'] input").GetAttribute("value"));
         });
 
         rendered.FindAll("[role='tab']").Single(value => value.TextContent == "Acquisitions").Click();
         rendered.WaitForAssertion(() =>
         {
             Assert.HasCount(1, rendered.FindAll("[data-testid='data-source-acquisitions']"));
-            Assert.IsTrue(rendered.Find(".data-source-parameters").QuerySelector("textarea") is not null);
+            Assert.HasCount(1, rendered.FindAll("[data-schema-path='$.query'] input"));
             Assert.AreEqual("Réussie", rendered.Find(".status-badge").TextContent.Trim());
             Assert.AreEqual("flowrun-data-source", rendered.Find(".data-source-flow-run").GetAttribute("title"));
         });
@@ -66,12 +68,55 @@ public sealed class DataSourceEditorTests
         });
     }
 
+    [TestMethod]
+    public void AcquisitionSubmitsParametersProducedByTheResolvedFlowSchema()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new SourceClientStub();
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IDataSourcesClient>(client);
+        context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}&view=acquisitions");
+
+        var rendered = context.Render<DataSourceEditor>(parameters => parameters
+            .Add(component => component.Name, "documentation"));
+
+        rendered.WaitForElement("[data-schema-path='$.query'] input").Input("release notes");
+        rendered.Find("button.button-primary").Click();
+
+        rendered.WaitForAssertion(() => Assert.AreEqual("release notes",
+            client.StartedRequest?.Parameters.GetProperty("query").GetString()));
+    }
+
     private static DataSourceProfileProperties ProfileProperties => new()
     {
         DisplayName = "Web Builtin",
         Version = "1.0.1",
+        ConfigurationSchema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { url = new { type = "string", title = "URL" } },
+            required = new[] { "url" },
+            additionalProperties = false
+        }),
         AcquisitionFlow = new() { Name = "data-source-web-acquisition-builtin", Version = "1.0.1", UseActiveVersion = false }
     };
+
+    private static JsonElement AcquisitionInputSchema => JsonSerializer.SerializeToElement(new
+    {
+        type = "object",
+        properties = new
+        {
+            parameters = new
+            {
+                type = "object",
+                properties = new { query = new { type = "string", title = "Query" } },
+                additionalProperties = false
+            }
+        }
+    });
 
     private static DataSourceResource Source => new()
     {
@@ -132,14 +177,21 @@ public sealed class DataSourceEditorTests
 
     private sealed class SourceClientStub : IDataSourcesClient
     {
+        public StartDataSourceAcquisitionRequest? StartedRequest { get; private set; }
         public Task<IReadOnlyList<DataSourceResource>> GetAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceResource>>([Source]);
         public Task<ResourceSnapshot<DataSourceResource>> GetAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult(new ResourceSnapshot<DataSourceResource>(Source, "\"etag\""));
-        public Task<DataSourceReadiness> GetReadinessAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult(new DataSourceReadiness(true, true, ResolvedProfile, []));
+        public Task<DataSourceReadiness> GetReadinessAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult(new DataSourceReadiness(true, true, ResolvedProfile, [],
+            new ResolvedDataSourceFlowBinding("data-source-web-acquisition-builtin", ResourceNamespace.Default,
+                "1.0.1", false, AcquisitionInputSchema, null, DataSourceFlowContracts.Acquisition)));
         public Task<IReadOnlyList<DataSourceAcquisitionResource>> GetAcquisitionsAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceAcquisitionResource>>([Acquisition]);
         public Task<ResourceSnapshot<DataSourceResource>> CreateAsync(CreateDataSourceRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<DataSourceResource>> UpdateAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, PutDataSourceRequest request, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task DeleteAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<DataSourceAcquisitionResource>> StartAcquisitionAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, StartDataSourceAcquisitionRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<DataSourceAcquisitionResource>> StartAcquisitionAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, StartDataSourceAcquisitionRequest request, CancellationToken cancellationToken = default)
+        {
+            StartedRequest = request;
+            return Task.FromResult(new ResourceSnapshot<DataSourceAcquisitionResource>(Acquisition, "\"acquisition-etag\""));
+        }
     }
 
     private sealed class ProfileClientStub : IDataSourceProfilesClient
@@ -147,7 +199,21 @@ public sealed class DataSourceEditorTests
         private static readonly DataSourceProfileResource Profile = new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceProfile, Metadata = new() { Name = "web-builtin" }, ScopeRef = Scope, Definition = ProfileProperties, ActiveVersion = "1.0.1" };
         public Task<IReadOnlyList<DataSourceProfileResource>> GetAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceProfileResource>>([Profile]);
         public Task<ResourceSnapshot<DataSourceProfileResource>> GetAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<IReadOnlyList<DataSourceProfileRevisionResource>> GetRevisionsAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<DataSourceProfileRevisionResource>> GetRevisionsAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceProfileRevisionResource>>([new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = DataSourceResourceKinds.DataSourceProfileRevision,
+            Metadata = new() { Name = "web-builtin-1-0-1" },
+            ScopeRef = Scope,
+            ProfileUid = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+            ProfileName = "web-builtin",
+            ProfileGeneration = 1,
+            Version = "1.0.1",
+            DefinitionHash = "sha256:test",
+            PublishedAt = DateTimeOffset.UtcNow,
+            PublishedBy = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd"),
+            Definition = ProfileProperties
+        }]);
         public Task<ResourceSnapshot<DataSourceProfileResource>> CreateAsync(CreateDataSourceProfileRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<DataSourceProfileResource>> UpdateAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, PutDataSourceProfileRequest request, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<DataSourceProfileRevisionResource>> PublishAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, PublishDataSourceProfileRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();

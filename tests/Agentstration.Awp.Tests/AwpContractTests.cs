@@ -286,6 +286,37 @@ public sealed class AwpContractTests
     }
 
     [TestMethod]
+    public void GovernedModelStreamEventsPreserveTypedIncrementalContent()
+    {
+        var streamId = Guid.Parse("60000000-0000-0000-0000-000000000001");
+        var messageId = Guid.Parse("60000000-0000-0000-0000-000000000002");
+        var events = new AwpModelStreamEvent[]
+        {
+            new AwpModelStreamStarted(streamId, 0, At(minutes: 1)),
+            new AwpModelTextDelta(streamId, 1, At(minutes: 1), "hel", "model-1", "provider-1"),
+            new AwpModelToolCallStarted(streamId, 2, At(minutes: 1), "call-1", "weather"),
+            new AwpModelToolCallArgumentsDelta(streamId, 3, At(minutes: 1), "call-1", "{\"city\":"),
+            new AwpModelToolCallDone(streamId, 4, At(minutes: 1), "call-1"),
+            new AwpModelUsage(streamId, 5, At(minutes: 1), 12, 4),
+            new AwpModelStreamCompleted(streamId, 6, At(minutes: 1), "model-1", "provider-1", "stop")
+        };
+        var envelope = new AwpEnvelope<IReadOnlyList<AwpModelStreamEvent>>(
+            AwpProtocol.Version, messageId, At(minutes: 1), events);
+
+        var json = JsonSerializer.Serialize(envelope, AwpProtocol.JsonOptions);
+        var actual = JsonSerializer.Deserialize<AwpEnvelope<IReadOnlyList<AwpModelStreamEvent>>>(
+            json, AwpProtocol.JsonOptions)!;
+
+        Assert.HasCount(7, actual.Payload);
+        Assert.IsInstanceOfType<AwpModelTextDelta>(actual.Payload[1]);
+        Assert.AreEqual("hel", ((AwpModelTextDelta)actual.Payload[1]).Text);
+        Assert.IsInstanceOfType<AwpModelToolCallArgumentsDelta>(actual.Payload[3]);
+        Assert.AreEqual(3, actual.Payload[3].SequenceNumber);
+        StringAssert.Contains(json, "\"type\":\"model.output_text.delta\"");
+        StringAssert.Contains(json, "\"type\":\"model.response.completed\"");
+    }
+
+    [TestMethod]
     public void StableErrorCodesAreUniqueLowerSnakeCaseValues()
     {
         var values = typeof(AwpErrorCodes).GetFields()

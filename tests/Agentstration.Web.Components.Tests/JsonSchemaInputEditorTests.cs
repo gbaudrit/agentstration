@@ -9,6 +9,30 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class JsonSchemaInputEditorTests
 {
     [TestMethod]
+    public void ARenderableSchemaSelectedAfterFallbackOpensTheGeneratedForm()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var value = JsonSerializer.SerializeToElement(new { format = "markdown" });
+        var rendered = context.Render<JsonSchemaInputEditor>(parameters => parameters
+            .Add(component => component.Value, value));
+
+        Assert.HasCount(1, rendered.FindAll("textarea"));
+
+        var schema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { format = new { type = "string" } },
+            additionalProperties = false
+        });
+        rendered.Render(parameters => parameters
+            .Add(component => component.Schema, schema)
+            .Add(component => component.Value, value));
+
+        Assert.AreEqual("markdown", rendered.Find("[data-schema-path='$.format'] input").GetAttribute("value"));
+    }
+
+    [TestMethod]
     public void GeneratedFieldsValidateAndRoundTripThroughRawJson()
     {
         using var context = Context();

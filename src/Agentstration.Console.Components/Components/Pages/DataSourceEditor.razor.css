@@ -47,6 +47,24 @@
     gap: .25rem;
 }
 
+.schema-backed-input {
+    display: grid;
+    gap: .45rem;
+    min-width: 0;
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.form-field-wide {
+    min-width: 0;
+}
+
+.form-field-wide select {
+    min-width: 0;
+    max-width: 100%;
+}
+
 .data-source-choice small,
 .data-source-parameters small {
     color: var(--muted);

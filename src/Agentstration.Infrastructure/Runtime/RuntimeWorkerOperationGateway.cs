@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
@@ -33,18 +34,8 @@ public sealed class RuntimeWorkerOperationGateway(
         using var requestScope = EnterScope(request.TenantId, request.WorkspaceId, request.PrincipalId);
         var client = await chatClients.ResolveAsync(request.Agent.ModelProfileNamespace,
             request.Agent.ModelProfileName, cancellationToken);
-        var messages = request.Messages.Select(value => new ChatMessage(ToRole(value.Role),
-            value.Contents.Select(ToContent).ToList())).ToArray();
-        var options = new ChatOptions
-        {
-            Instructions = request.Agent.Instructions,
-            Tools = request.Agent.Tools.Select(tool => (AITool)AIFunctionFactory.CreateDeclaration(
-                tool.Name, tool.Description, tool.InputSchema)).ToList()
-        };
-        if (request.Options.Parameters.TryGetValue("temperature", out var temperature) && temperature.TryGetSingle(out var temperatureValue))
-            options.Temperature = temperatureValue;
-        if (request.Options.Parameters.TryGetValue("maxOutputTokens", out var tokens) && tokens.TryGetInt32(out var tokenValue))
-            options.MaxOutputTokens = tokenValue;
+        var messages = ToMessages(request.Messages);
+        var options = ToOptions(request);
         var response = await client.GetResponseAsync(messages, options, cancellationToken);
         var metadata = client.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
         var contents = response.Messages.SelectMany(value => value.Contents).Select(ToContent).OfType<RuntimeGovernedModelContent>().ToArray();
@@ -55,6 +46,29 @@ public sealed class RuntimeWorkerOperationGateway(
             ToInt32(response.Usage?.InputTokenCount),
             ToInt32(response.Usage?.OutputTokenCount),
             metadata?.ContributionId);
+    }
+
+    public async IAsyncEnumerable<RuntimeGovernedModelUpdate> StreamModelAsync(
+        RuntimeGovernedModelRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        using var requestScope = EnterScope(request.TenantId, request.WorkspaceId, request.PrincipalId);
+        var client = await chatClients.ResolveAsync(request.Agent.ModelProfileNamespace,
+            request.Agent.ModelProfileName, cancellationToken);
+        var metadata = client.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
+        await foreach (var update in client.GetStreamingResponseAsync(
+            ToMessages(request.Messages), ToOptions(request), cancellationToken))
+        {
+            var usage = update.Contents.OfType<UsageContent>().LastOrDefault()?.Details;
+            var contents = update.Contents.Select(ToContent).OfType<RuntimeGovernedModelContent>().ToArray();
+            yield return new RuntimeGovernedModelUpdate(
+                contents,
+                update.ModelId,
+                update.FinishReason?.ToString(),
+                ToInt32(usage?.InputTokenCount),
+                ToInt32(usage?.OutputTokenCount),
+                metadata?.ContributionId);
+        }
     }
 
     public async Task<JsonElement?> InvokeToolAsync(RuntimeGovernedToolRequest request, CancellationToken cancellationToken)
@@ -262,6 +276,27 @@ public sealed class RuntimeWorkerOperationGateway(
         RuntimeMessageRole.Tool => ChatRole.Tool,
         _ => ChatRole.User
     };
+
+    private static ChatMessage[] ToMessages(IEnumerable<RuntimeGovernedModelMessage> messages) => messages
+        .Select(value => new ChatMessage(ToRole(value.Role), value.Contents.Select(ToContent).ToList()))
+        .ToArray();
+
+    private static ChatOptions ToOptions(RuntimeGovernedModelRequest request)
+    {
+        var options = new ChatOptions
+        {
+            Instructions = request.Agent.Instructions,
+            Tools = request.Agent.Tools.Select(tool => (AITool)AIFunctionFactory.CreateDeclaration(
+                tool.Name, tool.Description, tool.InputSchema)).ToList()
+        };
+        if (request.Options.Parameters.TryGetValue("temperature", out var temperature)
+            && temperature.TryGetSingle(out var temperatureValue))
+            options.Temperature = temperatureValue;
+        if (request.Options.Parameters.TryGetValue("maxOutputTokens", out var tokens)
+            && tokens.TryGetInt32(out var tokenValue))
+            options.MaxOutputTokens = tokenValue;
+        return options;
+    }
 
     private static AIContent ToContent(RuntimeGovernedModelContent content) => content switch
     {

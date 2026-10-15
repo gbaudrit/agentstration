@@ -50,6 +50,9 @@ public static class AwpRuntimeWorkerEndpoints
         awp.MapPost("/assignments/model/invoke", InvokeModelAsync)
             .Produces<AwpEnvelope<AwpInvokeModelResponse>>()
             .WithSummary("Invoke the assigned Agent model through the governed server boundary");
+        awp.MapPost("/assignments/model/stream", StreamModelAsync)
+            .Produces<string>(StatusCodes.Status200OK, "text/event-stream")
+            .WithSummary("Stream the assigned Agent model through the governed server boundary");
         awp.MapPost("/assignments/tools/invoke", InvokeToolAsync)
             .Produces<AwpEnvelope<AwpInvokeToolResponse>>()
             .WithSummary("Invoke an assigned Agent Tool through governance and audit hooks");
@@ -348,6 +351,26 @@ public static class AwpRuntimeWorkerEndpoints
             response.FinishReason, response.InputTokens, response.OutputTokens, response.ProviderType));
     }, principal);
 
+    private static async Task<IResult> StreamModelAsync(
+        AwpEnvelope<AwpInvokeModelRequest> envelope,
+        ClaimsPrincipal principal,
+        RuntimeWorkerDispatchService dispatch,
+        RuntimeWorkerExecutionService execution,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken) => await ExecuteStreamAsync(async identity =>
+    {
+        ValidateEnvelope(envelope.ProtocolVersion, envelope.MessageId);
+        var request = envelope.Payload
+            ?? throw new RuntimeWorkerDispatchException(AwpErrorCodes.InvalidRequest,
+                "The model streaming request is required.");
+        ValidateCommand(identity, request.Context, dispatch);
+        var messages = request.Messages.Select(value => new RuntimeGovernedModelMessage(
+            ParseRole(value.Role), value.Contents.Select(ToRuntimeContent).ToArray())).ToArray();
+        var stream = await execution.StreamModelAsync(ToProof(request.Context), request.ParticipantId,
+            request.TurnId.Value, request.TurnAttemptId.Value, messages, cancellationToken);
+        return new AwpModelStreamResult(envelope.MessageId, stream, timeProvider);
+    }, principal);
+
     private static async Task<IResult> InvokeToolAsync(
         AwpEnvelope<AwpInvokeToolRequest> envelope,
         ClaimsPrincipal principal,
@@ -503,6 +526,40 @@ public static class AwpRuntimeWorkerEndpoints
     {
         if (!AwpWorkerAuthentication.TryGetIdentity(principal, out var identity)) return Results.Unauthorized();
         try { return Results.Ok(await action(identity)); }
+        catch (RuntimeWorkerDispatchException exception)
+        {
+            var status = exception.Code is AwpErrorCodes.WorkerNotRegistered or AwpErrorCodes.WorkerSessionSuperseded
+                ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest;
+            return Problem(status, exception.Code, exception.Message);
+        }
+        catch (RuntimeAssignmentException exception)
+        {
+            var code = exception.Code switch
+            {
+                RuntimeAssignmentErrorCodes.LeaseExpired => AwpErrorCodes.AssignmentLeaseExpired,
+                RuntimeAssignmentErrorCodes.FencingRejected => AwpErrorCodes.AssignmentFenced,
+                RuntimeAssignmentErrorCodes.TerminalConflict => AwpErrorCodes.TerminalConflict,
+                RuntimeAssignmentErrorCodes.InvalidCoordinate => AwpErrorCodes.ExecutionCoordinateInvalid,
+                RuntimeAssignmentErrorCodes.InvalidEventSequence => AwpErrorCodes.EventSequenceInvalid,
+                RuntimeAssignmentErrorCodes.ReplayConflict => AwpErrorCodes.ReplayConflict,
+                RuntimeAssignmentErrorCodes.LimitExceeded => AwpErrorCodes.LimitExceeded,
+                RuntimeAssignmentErrorCodes.LeaseTooShort => AwpErrorCodes.AssignmentLeaseTooShort,
+                _ => AwpErrorCodes.AssignmentNotOwned
+            };
+            return Problem(StatusCodes.Status409Conflict, code, exception.Message);
+        }
+        catch (RuntimeExecutionMaterialException exception)
+        {
+            return Problem(StatusCodes.Status409Conflict, exception.Code, exception.Message);
+        }
+    }
+
+    private static async Task<IResult> ExecuteStreamAsync(
+        Func<AwpWorkerRequestIdentity, Task<IResult>> action,
+        ClaimsPrincipal principal)
+    {
+        if (!AwpWorkerAuthentication.TryGetIdentity(principal, out var identity)) return Results.Unauthorized();
+        try { return await action(identity); }
         catch (RuntimeWorkerDispatchException exception)
         {
             var status = exception.Code is AwpErrorCodes.WorkerNotRegistered or AwpErrorCodes.WorkerSessionSuperseded

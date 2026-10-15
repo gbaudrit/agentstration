@@ -32,6 +32,10 @@ public sealed class MainLayoutNavigationTests
 
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/settings/profile']").Count);
         Assert.AreEqual("Profile", rendered.Find(".topbar-actions a[href='/settings/profile']").GetAttribute("aria-label"));
+        Assert.AreEqual("Resource plans", rendered.Find(".side-nav a[href='/resource-plans']").GetAttribute("data-nav-tooltip"));
+        Assert.IsTrue(rendered.Find(".side-nav a[href='/resource-plans']").Closest(".navigation-group")?.ClassList.Contains("navigation-group-design"));
+        Assert.IsTrue(rendered.Find(".side-nav a[href='/triggers']").Closest(".navigation-group")?.ClassList.Contains("navigation-group-automate"));
+        Assert.IsTrue(rendered.Find(".side-nav a[href='/flow-runs']").Closest(".navigation-group")?.ClassList.Contains("navigation-group-observe"));
     }
 
     [TestMethod]
@@ -52,6 +56,52 @@ public sealed class MainLayoutNavigationTests
         Assert.AreEqual("Sources de données", groups[6].QuerySelector("a[href='/data-sources']")?.TextContent.Trim());
         Assert.AreEqual("Schémas", groups[1].QuerySelector("a[href='/schemas']")?.TextContent.Trim());
         Assert.AreEqual("Profil", rendered.Find(".topbar-actions a[href='/settings/profile']").GetAttribute("aria-label"));
+    }
+
+    [TestMethod]
+    public void NavigationDistinguishesProfilesAndKnowledgeSourcesFromTheirRelatedResources()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(AllNavigationPermissions);
+
+        var rendered = RenderLayout(context);
+
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-adjustments",
+            rendered.Find(".side-nav a[href='/modelprofiles'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-database-cog",
+            rendered.Find(".side-nav a[href='/data-source-profiles'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-brain",
+            rendered.Find(".side-nav a[href='/knowledge-sources'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-plug-connected",
+            rendered.Find(".side-nav a[href='/sourceproviders'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-binary-tree",
+            rendered.Find(".side-nav a[href='/settings/resource-scopes'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-database-search",
+            rendered.Find(".side-nav a[href='/settings/source-registries'] use").GetAttribute("href"));
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/resource-plans'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/modelprofiles'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/data-sources'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/data-source-profiles'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/settings/sources'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/knowledge-sources'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/data-sources'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/sourceproviders'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/resource-plans'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/settings/resource-scopes'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/data-sources'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/settings/source-registries'] svg").InnerHtml);
     }
 
     [TestMethod]

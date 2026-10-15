@@ -64,7 +64,7 @@ public sealed class KnowledgeSourceEditorTests
         rendered.Find("[data-testid='knowledge-source-data-source-bindings'] select").Change(
             $"{DataSourceScope.Value}|default|documentation");
         rendered.Find("[data-testid='knowledge-source-data-source-bindings'] textarea")
-            .Change("{\"format\":\"markdown\"}");
+            .Input("{\"format\":\"markdown\"}");
         rendered.Find("[data-testid='knowledge-source-binding-maximum-age']").Change("25:30:45");
         rendered.Find("button[type='submit']").Click();
 
@@ -92,15 +92,52 @@ public sealed class KnowledgeSourceEditorTests
         rendered.Find("[data-testid='knowledge-source-display-name']").Change("Invalid source");
         rendered.Find("[data-testid='knowledge-source-data-source-bindings'] select").Change(
             $"{DataSourceScope.Value}|default|documentation");
-        rendered.Find("[data-testid='knowledge-source-data-source-bindings'] textarea").Change("[]");
-        rendered.Find("button[type='submit']").Click();
+        rendered.Find("[data-testid='knowledge-source-data-source-bindings'] textarea").Input("[]");
 
         rendered.WaitForAssertion(() =>
         {
             Assert.IsNull(client.CreatedRequest);
-            StringAssert.Contains(rendered.Find("[role='alert']").TextContent,
-                "Parameters must be a JSON object.");
+            Assert.IsTrue(rendered.Find("button[type='submit']").HasAttribute("disabled"));
+            StringAssert.Contains(rendered.Find("[role='alert']").TextContent, "valid JSON object");
         });
+    }
+
+    [TestMethod]
+    public void CreationUsesTheSelectedTransformationFlowConfigurationSchema()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new KnowledgeClientStub();
+        using var context = CreateContext(client);
+        var rendered = context.Render<KnowledgeSourceEditor>();
+
+        rendered.WaitForElement("[data-testid='knowledge-source-data-source-bindings']");
+        rendered.Find("[data-testid='knowledge-source-display-name']").Change("Transformed documentation");
+        rendered.FindAll("[data-testid='knowledge-source-data-source-bindings'] select")[0]
+            .Change($"{DataSourceScope.Value}|default|documentation");
+        rendered.FindAll("[data-testid='knowledge-source-data-source-bindings'] select")[1]
+            .Change($"{FlowClientStub.WorkspaceScope.Value}|default|artifact-transform-builtin|1.0.0");
+        rendered.WaitForElement("[data-schema-path='$.format'] input").Input("markdown");
+        rendered.Find("button[type='submit']").Click();
+
+        rendered.WaitForAssertion(() => Assert.AreEqual("markdown",
+            client.CreatedRequest?.Properties.DataSources[0].Configuration.GetProperty("format").GetString()));
+    }
+
+    [TestMethod]
+    public void ProjectionSubmitsParametersProducedByTheResolvedFlowSchema()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new KnowledgeClientStub(ProjectedSource());
+        using var context = CreateContext(client);
+        var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
+            .Add(component => component.Name, "agentstration-documentation"));
+
+        rendered.Find("[data-testid='knowledge-source-projections-tab']").Click();
+        rendered.WaitForElement("[data-schema-path='$.locale'] input").Input("fr-FR");
+        rendered.Find("[data-testid='knowledge-start-projection']").Click();
+
+        rendered.WaitForAssertion(() => Assert.AreEqual("fr-FR",
+            client.StartedProjectionRequest?.Parameters.GetProperty("locale").GetString()));
     }
 
     [TestMethod]
@@ -424,6 +461,32 @@ public sealed class KnowledgeSourceEditorTests
     }
 
     private static readonly ResourceScopeRef DataSourceScope = ResourceScopeRef.Workspace(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+    private static JsonElement ProjectionInputSchema => JsonSerializer.SerializeToElement(new
+    {
+        type = "object",
+        properties = new
+        {
+            parameters = new
+            {
+                type = "object",
+                properties = new { locale = new { type = "string", title = "Locale" } },
+                additionalProperties = false
+            }
+        }
+    });
+    private static JsonElement TransformationInputSchema => JsonSerializer.SerializeToElement(new
+    {
+        type = "object",
+        properties = new
+        {
+            configuration = new
+            {
+                type = "object",
+                properties = new { format = new { type = "string", title = "Format" } },
+                additionalProperties = false
+            }
+        }
+    });
     private static KnowledgeSourceResource ProjectedSource() => new()
     {
         ApiVersion = ResourceApiVersions.CoreV1,
@@ -526,6 +589,7 @@ public sealed class KnowledgeSourceEditorTests
         private readonly List<KnowledgeProjectionResource> projections = [];
         public CreateKnowledgeSourceRequest? CreatedRequest { get; private set; }
         public PutKnowledgeSourceRequest? UpdatedRequest { get; private set; }
+        public StartKnowledgeProjectionRequest? StartedProjectionRequest { get; private set; }
         public Task<IReadOnlyList<KnowledgeSourceResource>> GetAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<KnowledgeSourceResource>>(source is null ? [] : [source]);
         public Task<ResourceSnapshot<KnowledgeSourceResource>> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
@@ -556,7 +620,7 @@ public sealed class KnowledgeSourceEditorTests
             Task.FromResult(new KnowledgeSourceReadiness(true, true,
                 new ResolvedKnowledgeFlowBinding("knowledge-retrieval-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Retrieval),
                 [],
-                new ResolvedKnowledgeFlowBinding("knowledge-projection-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Projection),
+                new ResolvedKnowledgeFlowBinding("knowledge-projection-builtin", ResourceNamespace.Default, "1.0.0", true, ProjectionInputSchema, null, KnowledgeFlowContracts.Projection),
                 [new("documentation", DataSourceScope, Guid.NewGuid(), true, null, null)]));
         public Task<KnowledgeSourceToolExposureResource?> GetExposureAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(exposure);
         public Task<ResourceSnapshot<KnowledgeSourceToolExposureResource>> PublishExposureAsync(ResourceNamespace @namespace, string name, PublishKnowledgeSourceToolExposureRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -564,6 +628,7 @@ public sealed class KnowledgeSourceEditorTests
             Task.FromResult<IReadOnlyList<KnowledgeProjectionResource>>(projections);
         public Task<ResourceSnapshot<KnowledgeProjectionResource>> StartProjectionAsync(ResourceNamespace @namespace, string name, StartKnowledgeProjectionRequest request, CancellationToken cancellationToken = default)
         {
+            StartedProjectionRequest = request;
             var projection = new KnowledgeProjectionResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
@@ -599,18 +664,18 @@ public sealed class KnowledgeSourceEditorTests
 
     private sealed class FlowClientStub : IFlowApiClient
     {
-        private static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(
+        internal static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(
             Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
 
         public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FlowSummary>>(
         [
             new("knowledge-projection-builtin", "Knowledge projection", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0", ScopeRef = WorkspaceScope },
-            new("knowledge-retrieval-builtin", "Knowledge retrieval", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0", ScopeRef = WorkspaceScope }
+            new("knowledge-retrieval-builtin", "Knowledge retrieval", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0", ScopeRef = WorkspaceScope },
+            new("artifact-transform-builtin", "Artifact transform", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0", ScopeRef = WorkspaceScope }
         ]);
         public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken)
         {
-            var contract = flowId == "knowledge-projection-builtin"
-                ? KnowledgeFlowContracts.Projection : KnowledgeFlowContracts.Retrieval;
+            var contract = Contract(flowId);
             return Task.FromResult(new FlowResponse(flowId, flowId, null, "1.0.0", true, "1.0.0",
                 new WorkflowFlowDefinition("input", [], [], []),
                 new Dictionary<string, string> { [FlowMetadataKeys.Contract] = contract },
@@ -620,7 +685,26 @@ public sealed class KnowledgeSourceEditorTests
         public Task<FlowResourceSnapshot> CreateFlowAsync(CreateFlowRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowResourceSnapshot> UpdateFlowAsync(string flowId, UpdateFlowRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowVersionResponse> CreateFlowVersionAsync(string flowId, CreateFlowVersionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken)
+        {
+            var contract = Contract(flowId);
+            var inputSchema = flowId switch
+            {
+                "knowledge-projection-builtin" => ProjectionInputSchema,
+                "artifact-transform-builtin" => TransformationInputSchema,
+                _ => (JsonElement?)null
+            };
+            return Task.FromResult<IReadOnlyList<FlowVersionResponse>>([new(flowId, "1.0.0", null,
+                new WorkflowFlowDefinition("input", [], [], []),
+                new Dictionary<string, string> { [FlowMetadataKeys.Contract] = contract }, DateTimeOffset.UtcNow,
+                new FlowGraphDefinition { EntryStep = "input", InputSchema = inputSchema })]);
+        }
+        private static string Contract(string flowId) => flowId switch
+        {
+            "knowledge-projection-builtin" => KnowledgeFlowContracts.Projection,
+            "artifact-transform-builtin" => KnowledgeFlowContracts.ArtifactTransformation,
+            _ => KnowledgeFlowContracts.Retrieval
+        };
         public Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) => throw new NotSupportedException();

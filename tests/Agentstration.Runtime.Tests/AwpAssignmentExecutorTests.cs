@@ -588,7 +588,7 @@ public sealed class AwpAssignmentExecutorTests
                 .Select(value => value.Location.FlowStep?.StepDefinitionId).ToArray());
         Assert.AreEqual(2, handler.Events.Count(value => value.Kind == AwpExecutionEventKind.TurnStarted));
         Assert.AreEqual(2, handler.Events.Count(value => value.Kind == AwpExecutionEventKind.TurnCompleted));
-        Assert.AreEqual(2, handler.Events.Count(value => value.Kind == AwpExecutionEventKind.ResponseDelta));
+        Assert.AreEqual(4, handler.Events.Count(value => value.Kind == AwpExecutionEventKind.ResponseDelta));
         Assert.IsGreaterThan(0, handler.CheckpointRequests.Count);
     }
 
@@ -1254,11 +1254,15 @@ public sealed class AwpAssignmentExecutorTests
             CancellationToken cancellationToken)
         {
             var bytes = await request.Content!.ReadAsByteArrayAsync(cancellationToken);
-            if (StallModel && request.RequestUri!.AbsolutePath == AwpProtocol.InvokeModelPath)
+            var path = request.RequestUri!.AbsolutePath;
+            if (StallModel && path is AwpProtocol.InvokeModelPath
+                or AwpProtocol.StreamModelPath)
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             using var document = JsonDocument.Parse(bytes);
             var messageId = document.RootElement.GetProperty("messageId").GetGuid();
-            object payload = request.RequestUri!.AbsolutePath switch
+            if (path == AwpProtocol.StreamModelPath)
+                return StreamModel(bytes, messageId);
+            object payload = path switch
             {
                 AwpProtocol.OpenStepExecutionPath => OpenStep(bytes),
                 AwpProtocol.OpenTurnPath => OpenTurn(bytes),
@@ -1269,7 +1273,7 @@ public sealed class AwpAssignmentExecutorTests
                 AwpProtocol.CaptureFlowArtifactPath => Capture(bytes),
                 AwpProtocol.CleanupFlowArtifactPath => Cleanup(bytes),
                 AwpProtocol.CreateChildFlowPath => CreateChild(bytes),
-                _ => throw new AssertFailedException($"Unexpected AWP request '{request.RequestUri.AbsolutePath}'.")
+                _ => throw new AssertFailedException($"Unexpected AWP request '{path}'.")
             };
             var responseType = typeof(AwpEnvelope<>).MakeGenericType(payload.GetType());
             var envelope = Activator.CreateInstance(responseType, AwpProtocol.Version, messageId, now, payload)!;
@@ -1323,6 +1327,41 @@ public sealed class AwpAssignmentExecutorTests
             ModelRequests.Add(request);
             return new(now, [new AwpModelTextContent(ModelOutput)], "deterministic", "stop", 12, 4,
                 "Deterministic");
+        }
+
+        private HttpResponseMessage StreamModel(byte[] bytes, Guid messageId)
+        {
+            var request = Payload<AwpInvokeModelRequest>(bytes);
+            ModelRequests.Add(request);
+            var streamId = Guid.NewGuid();
+            var midpoint = Math.Max(1, ModelOutput.Length / 2);
+            var events = new List<AwpModelStreamEvent>
+            {
+                new AwpModelStreamStarted(streamId, 0, now)
+            };
+            if (ModelFailureMessage is not null)
+            {
+                events.Add(new AwpModelStreamFailed(streamId, 1, now, "model_failure", ModelFailureMessage));
+            }
+            else
+            {
+                events.Add(new AwpModelTextDelta(streamId, 1, now, ModelOutput[..midpoint],
+                    "deterministic", "Deterministic"));
+                if (midpoint < ModelOutput.Length)
+                    events.Add(new AwpModelTextDelta(streamId, events.Count, now, ModelOutput[midpoint..],
+                        "deterministic", "Deterministic"));
+                events.Add(new AwpModelUsage(streamId, events.Count, now, 12, 4));
+                events.Add(new AwpModelStreamCompleted(streamId, events.Count, now,
+                    "deterministic", "Deterministic", "stop"));
+            }
+
+            var frames = string.Concat(events.Select(streamEvent =>
+                $"data: {JsonSerializer.Serialize(new AwpEnvelope<AwpModelStreamEvent>(
+                    AwpProtocol.Version, messageId, now, streamEvent), AwpProtocol.JsonOptions)}\n\n"));
+            return new(HttpStatusCode.OK)
+            {
+                Content = new StringContent(frames, System.Text.Encoding.UTF8, "text/event-stream")
+            };
         }
 
         private AwpCaptureFlowArtifactResponse Capture(byte[] bytes)

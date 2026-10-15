@@ -181,7 +181,7 @@ public sealed class FlowDesignerReadOnlyTests
         Assert.AreEqual(@namespace, backend.LoadedTarget?.Namespace);
         Assert.AreEqual("Steps", rendered.Find("#palette-steps-heading").TextContent);
         Assert.AreEqual("View", rendered.Find("#palette-view-heading").TextContent);
-        Assert.HasCount(8, rendered.FindAll(".step-palette-group:first-child button .ui-icon"));
+        Assert.HasCount(8, rendered.FindAll(".step-palette-group:not(.palette-view) button .ui-icon"));
         Assert.HasCount(4, rendered.FindAll(".palette-view button .ui-icon"));
 
         var readOnlyCanvas = rendered.FindComponent<FlowCanvas>();
@@ -197,6 +197,57 @@ public sealed class FlowDesignerReadOnlyTests
         var applyYaml = rendered.FindAll("button").Single(button => button.TextContent.Trim() == "Apply and save");
         Assert.IsTrue(applyYaml.HasAttribute("disabled"));
         Assert.HasCount(0, rendered.FindAll(".source-editor .muted"));
+    }
+
+    [TestMethod]
+    public async Task DesignerWorkspaceControlsCollapsePanelsValidationAndEnterFocusMode()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var backend = new BackendStub(readOnly: false);
+        context.Services.AddSingleton<IFlowDesignerBackend>(backend);
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "sample"));
+
+        Assert.HasCount(0, rendered.FindAll(".validation-dock.expanded"));
+        Assert.HasCount(0, rendered.FindAll(".validation-dock .muted"));
+        rendered.Find(".validation-summary").Click();
+        Assert.HasCount(1, rendered.FindAll(".validation-dock.expanded"));
+        Assert.HasCount(1, rendered.FindAll(".validation-dock .muted"));
+        rendered.Find(".validation-summary").Click();
+        Assert.HasCount(0, rendered.FindAll(".validation-dock.expanded"));
+        await rendered.Find("[data-testid='flow-designer-validation-run']").ClickAsync(new());
+        Assert.AreEqual(1, backend.ValidationCount);
+        Assert.HasCount(1, rendered.FindAll(".validation-dock.expanded"));
+
+        rendered.Find("button[aria-label='Hide step palette']").Click();
+        StringAssert.Contains(rendered.Find(".flow-editor-shell").ClassName, "palette-closed");
+        rendered.Find("button[aria-label='Hide inspector']").Click();
+        StringAssert.Contains(rendered.Find(".flow-editor-shell").ClassName, "inspector-closed");
+
+        rendered.Find("button[aria-label='Enter full screen mode']").Click();
+        StringAssert.Contains(rendered.Find(".designer-toolbar").ClassName, "designer-focus");
+        StringAssert.Contains(rendered.Find(".flow-editor-shell").ClassName, "focus-mode");
+        StringAssert.Contains(rendered.Find(".flow-editor-shell").ClassName, "palette-closed");
+        StringAssert.Contains(rendered.Find(".flow-editor-shell").ClassName, "inspector-closed");
+        Assert.HasCount(1, rendered.FindAll(".designer-focus-toolbar button[aria-label='Exit']"));
+        Assert.HasCount(1, rendered.FindAll(".validation-dock"));
+
+        rendered.Find(".desktop-panel-toggle[aria-label='Show step palette']").Click();
+        Assert.IsFalse((rendered.Find(".flow-editor-shell").ClassName ?? string.Empty).Contains("palette-closed", StringComparison.Ordinal));
+        rendered.FindAll(".designer-focus-toolbar button").Single(button => button.TextContent.Trim() == "Definition").Click();
+        Assert.HasCount(1, rendered.FindAll(".flow-editor-shell.definition .source-editor"));
+        Assert.HasCount(1, rendered.FindAll(".designer-focus-toolbar button[aria-label='Exit']"));
+
+        await rendered.InvokeAsync(rendered.Instance.ExitFullScreenAsync);
+        Assert.HasCount(0, rendered.FindAll(".designer-focus-toolbar"));
     }
 
     [TestMethod]
@@ -835,7 +886,7 @@ public sealed class FlowDesignerReadOnlyTests
             Assert.HasCount(2, renderedNode.Outputs);
         });
 
-        rendered.Find("[data-testid='flow-designer-validate']").Click();
+        rendered.Find("[data-testid='flow-designer-validation-run']").Click();
         rendered.WaitForAssertion(() =>
         {
             var backend = context.Services.GetRequiredService<IFlowDesignerBackend>() as BackendStub;

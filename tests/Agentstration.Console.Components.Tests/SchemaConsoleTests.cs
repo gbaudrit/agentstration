@@ -4,6 +4,7 @@ using Agentstration.Resources;
 using Agentstration.Schemas;
 using Agentstration.Schemas.Contracts;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.Schemas;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +32,8 @@ public sealed class SchemaConsoleTests
             StringAssert.Contains(rendered.Markup, SchemaFormatIds.JsonSchema);
             StringAssert.Contains(rendered.Markup, Scope.Value);
             StringAssert.Contains(rendered.Find("[data-testid='schema-details-link']").GetAttribute("href"), "/schemas/contact");
+            Assert.HasCount(5, rendered.FindAll("[data-testid='schema-row'] td"));
+            Assert.HasCount(0, rendered.FindAll("[data-testid='schema-row'] .text-button"));
         });
     }
 
@@ -47,7 +50,7 @@ public sealed class SchemaConsoleTests
     }
 
     [TestMethod]
-    public void DetailsExposeOverviewDefinitionAndYamlTabs()
+    public void DetailsSeparateDefinitionDesignerAndYamlTabs()
     {
         using var context = Context(new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema)]));
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
@@ -59,11 +62,23 @@ public sealed class SchemaConsoleTests
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='schema-overview']")));
         Assert.HasCount(1, rendered.FindAll("[data-testid='schema-editor'] .resource-icon svg.ui-icon"));
         CollectionAssert.AreEqual(
-            new[] { strings["Tab.Overview"].Value, strings["Tab.Definition"].Value, strings["Tab.Versions"].Value, strings["Tab.Yaml"].Value },
+            new[] { strings["Tab.Overview"].Value, strings["Tab.Definition"].Value, strings["Tab.Designer"].Value, strings["Tab.Versions"].Value, strings["Tab.Yaml"].Value },
             rendered.FindAll("[role='tab']").Select(tab => tab.TextContent.Trim()).ToArray());
 
         rendered.Find("[data-testid='schema-tab-definition']").Click();
-        Assert.HasCount(1, rendered.FindAll("[data-testid='schema-source']"));
+        Assert.HasCount(1, rendered.FindAll("[data-testid='schema-definition']"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid='schema-visual-editor']"));
+
+        rendered.Find("[data-testid='schema-tab-designer']").Click();
+        Assert.HasCount(1, rendered.FindAll("[data-testid='schema-designer']"));
+        Assert.HasCount(1, rendered.FindAll("[data-testid='schema-visual-editor']"));
+        Assert.HasCount(1, rendered.FindAll("[data-testid='schema-preview-mode']"));
+
+        rendered.Find("[data-testid='schema-definition-source-mode']").Click();
+        Assert.HasCount(1, rendered.FindAll("[data-testid='schema-source-editor']"));
+        rendered.Find("[data-testid='schema-preview-mode']").Click();
+        Assert.HasCount(1, rendered.FindAll("[data-testid='schema-source-editor']"));
+        Assert.IsTrue(rendered.Find(".schema-definition-source").HasAttribute("hidden"));
 
         rendered.Find("[data-testid='schema-tab-yaml']").Click();
         var yamlEditor = rendered.Find("[data-testid='schema-yaml-source']");
@@ -94,7 +109,11 @@ public sealed class SchemaConsoleTests
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual("2.1.0", client.RequestedVersion);
-            StringAssert.Contains(rendered.Find("[data-testid='schema-version-content']").TextContent, "object");
+            var editor = rendered.FindComponent<SchemaDocumentEditor>();
+            Assert.IsTrue(editor.Instance.ReadOnly);
+            StringAssert.Contains(editor.Instance.Value.GetRawText(), "object");
+            Assert.HasCount(0, rendered.FindAll("[data-testid='schema-add-property']"));
+            Assert.IsTrue(rendered.Find("[data-testid='schema-publish-version']").GetAttribute("aria-describedby") == "schema-version-help");
         });
     }
 
@@ -133,19 +152,178 @@ public sealed class SchemaConsoleTests
         rendered.Find("[data-testid='schema-tab-definition']").Click();
         Assert.IsTrue(rendered.FindAll("input[disabled]")
             .Any(input => input.GetAttribute("value") == "application/protobuf"));
-        StringAssert.Contains(rendered.Find("[data-testid='schema-source']").GetAttribute("value") ?? string.Empty, "object");
+        rendered.Find("[data-testid='schema-tab-designer']").Click();
+        StringAssert.Contains(rendered.FindComponent<SchemaDocumentEditor>().Instance.Value.GetRawText(), "object");
+    }
+
+    [TestMethod]
+    public void DefinitionEditorAddsAPropertyAndPreservesItForDraftSave()
+    {
+        var client = new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema)]);
+        using var context = Context(client);
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
+        var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
+        rendered.Find("[data-testid='schema-add-property']").Click();
+        rendered.Find("[data-testid='schema-save']").Click();
+
+        rendered.WaitForAssertion(() => Assert.IsTrue(client.UpdatedProperties?.Content
+            .GetProperty("properties").TryGetProperty("field1", out _)));
+    }
+
+    [TestMethod]
+    public void DefinitionEditorRenamesAPropertyAndItsRequiredReference()
+    {
+        const string content = "{\"type\":\"object\",\"properties\":{\"field1\":{\"type\":\"string\"}},\"required\":[\"field1\"]}";
+        var client = new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema, content)]);
+        using var context = Context(client);
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
+        var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
+        rendered.Find("[data-testid='schema-property-name']").Change("customerName");
+        rendered.Find("[data-testid='schema-save']").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var updated = client.UpdatedProperties!.Content;
+            Assert.IsTrue(updated.GetProperty("properties").TryGetProperty("customerName", out _));
+            Assert.IsFalse(updated.GetProperty("properties").TryGetProperty("field1", out _));
+            CollectionAssert.AreEqual(new[] { "customerName" }, updated.GetProperty("required")
+                .EnumerateArray().Select(value => value.GetString()).ToArray());
+        });
+    }
+
+    [TestMethod]
+    public void DefinitionEditorRejectsDuplicatePropertyNamesAtTheSameLevel()
+    {
+        const string content = "{\"type\":\"object\",\"properties\":{\"first\":{\"type\":\"string\"},\"second\":{\"type\":\"string\"}}}";
+        using var context = Context(new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema, content)]));
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
+        var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
+        rendered.Find("[data-testid='schema-property-name']").Change("second");
+
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[role='alert']")));
+        var properties = rendered.FindComponent<SchemaDocumentEditor>().Instance.Value.GetProperty("properties");
+        Assert.IsTrue(properties.TryGetProperty("first", out _));
+        Assert.IsTrue(properties.TryGetProperty("second", out _));
+    }
+
+    [TestMethod]
+    public void DefinitionEditorBuildsNestedObjectProperties()
+    {
+        var client = new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema)]);
+        using var context = Context(client);
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
+        var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
+        rendered.Find("[data-testid='schema-add-property']").Click();
+        rendered.Find("[data-testid='schema-property-type']").Change("object");
+        rendered.Find("[data-testid='schema-property-name']").Change("address");
+        rendered.Find("[data-testid='schema-add-child-property']").Click();
+        rendered.Find("[data-testid='schema-property-name']").Change("city");
+        rendered.Find("[data-testid='schema-save']").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var address = client.UpdatedProperties!.Content.GetProperty("properties").GetProperty("address");
+            Assert.AreEqual("object", address.GetProperty("type").GetString());
+            Assert.AreEqual("string", address.GetProperty("properties").GetProperty("city").GetProperty("type").GetString());
+        });
+    }
+
+    [TestMethod]
+    public void DefinitionEditorReordersSiblingProperties()
+    {
+        const string content = "{\"type\":\"object\",\"properties\":{\"first\":{\"type\":\"string\"},\"second\":{\"type\":\"number\"}}}";
+        var client = new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema, content)]);
+        using var context = Context(client);
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
+        var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
+        rendered.FindAll("[data-testid='schema-property-node']")[1].Click();
+        rendered.Find("[data-testid='schema-property-move-up']").Click();
+        rendered.Find("[data-testid='schema-save']").Click();
+
+        rendered.WaitForAssertion(() => CollectionAssert.AreEqual(
+            new[] { "second", "first" },
+            client.UpdatedProperties!.Content.GetProperty("properties").EnumerateObject().Select(value => value.Name).ToArray()));
+    }
+
+    [TestMethod]
+    public void SourceEditorReceivesTheCurrentDefinition()
+    {
+        const string content = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}}}";
+        using var context = Context(new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema, content)]));
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
+        var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
+        rendered.Find("[data-testid='schema-definition-source-mode']").Click();
+
+        var source = rendered.FindComponent<SchemaSourceEditor>().Instance.Value;
+        StringAssert.Contains(source, "\"properties\"");
+        StringAssert.Contains(source, "\"name\"");
+    }
+
+    [TestMethod]
+    public void ComplexJsonSchemaUsesSourceOnlyWithoutChangingTheDocument()
+    {
+        const string advanced = "{\"type\":\"object\",\"oneOf\":[{\"required\":[\"email\"]},{\"required\":[\"phone\"]}]}";
+        using var context = Context(new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema, advanced)]));
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
+        var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
+
+        Assert.HasCount(1, rendered.FindAll("[data-testid='schema-source-only']"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid='schema-visual-mode']"));
+        Assert.IsTrue(JsonElement.DeepEquals(JsonDocument.Parse(advanced).RootElement,
+            rendered.FindComponent<SchemaDocumentEditor>().Instance.Value));
+    }
+
+    [TestMethod]
+    public async Task MalformedSourceShowsAnErrorWithoutReplacingTheCurrentDefinition()
+    {
+        using var context = Context(new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema)]));
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
+        var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+
+        rendered.WaitForElement("[data-testid='schema-tab-designer']").Click();
+        rendered.Find("[data-testid='schema-definition-source-mode']").Click();
+        var sourceEditor = rendered.FindComponent<SchemaSourceEditor>();
+        await rendered.InvokeAsync(() => sourceEditor.Instance.ValueChanged.InvokeAsync("not-json"));
+        rendered.Find("[data-testid='schema-apply-source']").Click();
+
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[role='alert']")));
+        Assert.AreEqual("object", rendered.FindComponent<SchemaDocumentEditor>().Instance.Value
+            .GetProperty("type").GetString());
     }
 
     private static BunitContext Context(ISchemasClient client)
     {
         var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(client);
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new ScopeInventoryClient());
         return context;
     }
 
-    private static SchemaResource Schema(string format) => new()
+    private static SchemaResource Schema(string format, string content = "{\"type\":\"object\"}") => new()
     {
         ApiVersion = ResourceApiVersions.CoreV1,
         Kind = SchemaResourceKinds.Schema,
@@ -157,7 +335,7 @@ public sealed class SchemaConsoleTests
             DisplayName = "Contact",
             Format = format,
             Dialect = format == SchemaFormatIds.JsonSchema ? "https://json-schema.org/draft/2020-12/schema" : null,
-            Content = JsonSerializer.SerializeToElement(new { type = "object" })
+            Content = JsonDocument.Parse(content).RootElement.Clone()
         }
     };
 
@@ -170,6 +348,20 @@ public sealed class SchemaConsoleTests
 
         public Task<IReadOnlyList<SchemaResource>> GetSchemasAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(schemas);
+        public Task<IReadOnlyList<SchemaFormatDescriptor>> GetFormatsAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<SchemaFormatDescriptor>>([
+                new(SchemaFormatIds.JsonSchema, "JSON Schema",
+                    new(BuiltinJsonSchemaFormatHandler.ProviderId, BuiltinJsonSchemaFormatHandler.ProviderVersion),
+                    [BuiltinJsonSchemaFormatHandler.Draft202012],
+                    SchemaFormatCapabilities.ValidateDefinition | SchemaFormatCapabilities.ValidateInstance
+                        | SchemaFormatCapabilities.VisualAuthoring | SchemaFormatCapabilities.InstancePreview,
+                    true)
+            ]);
+        public Task<SchemaFormatValidationResult> ValidateDefinitionAsync(ValidateSchemaDefinitionRequest request,
+            CancellationToken cancellationToken = default) => Task.FromResult(SchemaFormatValidationResult.Valid);
+        public Task<SchemaFormatValidationResult> ValidateInstanceAsync(ValidateSchemaInstanceRequest request,
+            CancellationToken cancellationToken = default) => Task.FromResult(SchemaFormatValidationResult.Valid);
         public Task<ResourceSnapshot<SchemaResource>> GetSchemaAsync(ResourceScopeRef scopeRef,
             ResourceNamespace ns, string name, CancellationToken cancellationToken = default) =>
             Task.FromResult(new ResourceSnapshot<SchemaResource>(schemas.Single(), "\"etag\""));

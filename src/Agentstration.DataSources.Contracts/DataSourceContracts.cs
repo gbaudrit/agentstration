@@ -137,7 +137,8 @@ public sealed record DataSourceReadiness(
     bool Ready,
     bool Enabled,
     ResolvedDataSourceProfile? Profile,
-    IReadOnlyList<string> Issues);
+    IReadOnlyList<string> Issues,
+    ResolvedDataSourceFlowBinding? Acquisition = null);
 
 public sealed record CreateDataSourceProfileRequest(
     string Name,

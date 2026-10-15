@@ -1,4 +1,4 @@
-# ADR-0171: Descendant resource access is a local administrative overlay
+# ADR-0172: Descendant resource access is a local administrative overlay
 
 Status: Accepted — 2026-10-13
 

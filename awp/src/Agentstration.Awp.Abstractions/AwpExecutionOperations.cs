@@ -145,6 +145,92 @@ public sealed record AwpInvokeModelResponse(
     int? OutputTokens,
     string? ProviderType = null);
 
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
+[JsonDerivedType(typeof(AwpModelStreamStarted), "model.response.started")]
+[JsonDerivedType(typeof(AwpModelTextDelta), "model.output_text.delta")]
+[JsonDerivedType(typeof(AwpModelToolCallStarted), "model.tool_call.started")]
+[JsonDerivedType(typeof(AwpModelToolCallArgumentsDelta), "model.tool_call.arguments.delta")]
+[JsonDerivedType(typeof(AwpModelToolCallDone), "model.tool_call.done")]
+[JsonDerivedType(typeof(AwpModelToolResult), "model.tool_result")]
+[JsonDerivedType(typeof(AwpModelUsage), "model.usage")]
+[JsonDerivedType(typeof(AwpModelStreamCompleted), "model.response.completed")]
+[JsonDerivedType(typeof(AwpModelStreamFailed), "model.response.failed")]
+public abstract record AwpModelStreamEvent(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt);
+
+public sealed record AwpModelStreamStarted(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelTextDelta(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    string Text,
+    string? ModelId = null,
+    string? ProviderType = null)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelToolCallStarted(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    string CallId,
+    string Name)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelToolCallArgumentsDelta(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    string CallId,
+    string Delta)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelToolCallDone(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    string CallId)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelToolResult(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    string CallId,
+    JsonElement Result)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelUsage(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    int? InputTokens,
+    int? OutputTokens)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelStreamCompleted(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    string? ModelId,
+    string? ProviderType,
+    string? FinishReason)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelStreamFailed(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    string Code,
+    string Message)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
 public sealed record AwpInvokeToolRequest(
     AwpAssignmentCommandContext Context,
     string ParticipantId,
