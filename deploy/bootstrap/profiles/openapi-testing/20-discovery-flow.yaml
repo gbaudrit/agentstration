@@ -4,7 +4,7 @@ metadata: { name: openapi-discovery }
 definition:
   displayName: Discover governed OpenAPI operations
   description: Discovers only configured same-origin contract candidates and returns bounded hierarchical choices.
-  version: 1.0.0
+  version: 1.0.1
   enabled: true
   metadata: { flow.contract: datasource.discovery/v1 }
   spec:

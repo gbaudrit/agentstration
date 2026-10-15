@@ -318,6 +318,7 @@ public sealed class OpenApiExtensionTests
             .All(value => value.Contains("flowKind: workflow", StringComparison.Ordinal)));
         var discoveryFlow = bundle.ResourceManifests.Single(value =>
             value.Contains("flow.contract: datasource.discovery/v1", StringComparison.Ordinal));
+        Assert.Contains("version: 1.0.1", discoveryFlow);
         Assert.Contains("structuredContent.diagnostics", discoveryFlow);
         Assert.Contains("diagnostics: { type: array", discoveryFlow);
         Assert.IsFalse(bundle.ResourceManifests.Any(value => value.Contains("unused-graph-target", StringComparison.Ordinal)));

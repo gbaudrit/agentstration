@@ -16,7 +16,7 @@ definition:
       fixedBindings: { type: object }
     required: [origin, candidatePaths, maximumPages]
     additionalProperties: false
-  discoveryFlow: { name: openapi-discovery, version: 1.0.0, useActiveVersion: false }
+  discoveryFlow: { name: openapi-discovery, version: 1.0.1, useActiveVersion: false }
   discoveryToolBindings:
     - { name: discover, capability: openapi.discover, tool: { binding: openapi.contract.discover } }
   acquisitionFlow: { name: openapi-acquisition, version: 1.0.0, useActiveVersion: false }
