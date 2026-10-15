@@ -96,6 +96,7 @@
   </Folder>
   <Folder Name="/src/Schemas/">
     <Project Path="src/Agentstration.Schemas/Agentstration.Schemas.csproj" />
+    <Project Path="src/Agentstration.Schemas.Aep/Agentstration.Schemas.Aep.csproj" />
     <Project Path="src/Agentstration.Schemas.Api/Agentstration.Schemas.Api.csproj" />
     <Project Path="src/Agentstration.Schemas.Contracts/Agentstration.Schemas.Contracts.csproj" />
   </Folder>

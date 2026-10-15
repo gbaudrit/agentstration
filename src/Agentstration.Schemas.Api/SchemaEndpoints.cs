@@ -32,20 +32,24 @@ internal static class SchemaEndpoints
         Results.Ok(new ValueResponse<SchemaResource>((await service.ListAsync(token))
             .Select(value => value.Value).ToArray()));
 
-    private static IResult ListFormatsAsync(ISchemaFormatRegistry registry) => Results.Ok(
-        new ValueResponse<SchemaFormatDescriptor>(registry.List()));
+    private static async Task<IResult> ListFormatsAsync(
+        ISchemaFormatRegistry registry,
+        CancellationToken token) => Results.Ok(
+        new ValueResponse<SchemaFormatDescriptor>(await registry.ListAsync(token)));
 
     private static Task<IResult> ValidateDefinitionAsync(ValidateSchemaDefinitionRequest body,
         ISchemaFormatRegistry registry, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var handler = registry.Resolve(body.Format, SchemaFormatCapabilities.ValidateDefinition, body.Provider);
+        var handler = await registry.ResolveAsync(body.Format, SchemaFormatCapabilities.ValidateDefinition,
+            body.Provider, token);
         return Results.Ok(await handler.ValidateDefinitionAsync(body.Definition, body.Dialect, token));
     });
 
     private static Task<IResult> ValidateInstanceAsync(ValidateSchemaInstanceRequest body,
         ISchemaFormatRegistry registry, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var handler = registry.Resolve(body.Format, SchemaFormatCapabilities.ValidateInstance, body.Provider);
+        var handler = await registry.ResolveAsync(body.Format, SchemaFormatCapabilities.ValidateInstance,
+            body.Provider, token);
         return Results.Ok(await handler.ValidateInstanceAsync(body.Definition, body.Instance, body.Dialect, token));
     });
 
@@ -117,6 +121,15 @@ internal static class SchemaEndpoints
         catch (SchemaFormatResolutionException exception)
         {
             return Results.Problem(statusCode: 422, title: "Schema format unavailable", detail: exception.Message,
+                extensions: new Dictionary<string, object?> { ["code"] = exception.Code });
+        }
+        catch (SchemaFormatOperationException exception)
+        {
+            var status = exception.Code == "schema_format_provider_timeout"
+                ? StatusCodes.Status504GatewayTimeout
+                : StatusCodes.Status502BadGateway;
+            return Results.Problem(statusCode: status, title: "Schema format provider failed",
+                detail: exception.Message,
                 extensions: new Dictionary<string, object?> { ["code"] = exception.Code });
         }
         catch (SchemaValidationException exception)
