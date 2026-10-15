@@ -5,9 +5,51 @@ using Agentstration.Resources;
 namespace Agentstration.Flows;
 
 public sealed record FlowRunError(string Code, string Message, string? Details = null);
-public sealed record FlowRunScope(Guid TenantId, WorkspaceId WorkspaceId, Guid PrincipalId);
-public readonly record struct FlowRunKey(WorkspaceId WorkspaceId, string RunId);
-public sealed record FlowRunEvent(WorkspaceId WorkspaceId, string RunId, long Sequence, FlowRunEventType Type, string? StepId, JsonElement? Payload, DateTimeOffset Timestamp);
+public sealed record FlowRunScope(
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] Guid TenantId,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] WorkspaceId WorkspaceId,
+    Guid PrincipalId)
+{
+    public ResourceScopeRef ScopeRef { get; init; } = WorkspaceId.Value == Guid.Empty
+        ? ResourceScopeRef.Instance
+        : ResourceScopeRef.Workspace(WorkspaceId.Value);
+
+    [JsonIgnore]
+    public ExactExecutionScope Exact => ExactExecutionScope.Create(
+        ScopeRef,
+        PrincipalId,
+        TenantId == Guid.Empty ? null : TenantId,
+        WorkspaceId.Value == Guid.Empty ? null : WorkspaceId.Value);
+
+    public static FlowRunScope Instance(Guid principalId) =>
+        new(Guid.Empty, default, principalId) { ScopeRef = ResourceScopeRef.Instance };
+
+    public static FlowRunScope Tenant(Guid tenantId, Guid principalId) =>
+        new(tenantId, default, principalId) { ScopeRef = ResourceScopeRef.Tenant(tenantId) };
+
+    public static FlowRunScope Workspace(Guid tenantId, WorkspaceId workspaceId, Guid principalId) =>
+        new(tenantId, workspaceId, principalId) { ScopeRef = ResourceScopeRef.Workspace(workspaceId.Value) };
+}
+public readonly record struct FlowRunKey(ResourceScopeRef ScopeRef, string RunId)
+{
+    public FlowRunKey(WorkspaceId workspaceId, string runId) : this(ResourceScopeRef.Workspace(workspaceId.Value), runId) { }
+
+    [JsonIgnore]
+    public WorkspaceId WorkspaceId => ScopeRef.Kind == ResourceScopeKind.Workspace
+        ? new WorkspaceId(ScopeRef.TargetId!.Value)
+        : default;
+}
+public sealed record FlowRunEvent(ResourceScopeRef ScopeRef, string RunId, long Sequence, FlowRunEventType Type, string? StepId, JsonElement? Payload, DateTimeOffset Timestamp)
+{
+    public FlowRunEvent(WorkspaceId workspaceId, string runId, long sequence, FlowRunEventType type, string? stepId,
+        JsonElement? payload, DateTimeOffset timestamp)
+        : this(ResourceScopeRef.Workspace(workspaceId.Value), runId, sequence, type, stepId, payload, timestamp) { }
+
+    [JsonIgnore]
+    public WorkspaceId WorkspaceId => ScopeRef.Kind == ResourceScopeKind.Workspace
+        ? new WorkspaceId(ScopeRef.TargetId!.Value)
+        : default;
+}
 public sealed record FlowStepRunUsage(int? InputTokens = null, int? OutputTokens = null);
 public sealed record FlowStepArtifactReference(
     string ArtifactId,
@@ -73,7 +115,8 @@ public sealed record FlowStepRun
 
 public sealed record FlowRun
 {
-    public required WorkspaceId WorkspaceId { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public WorkspaceId WorkspaceId { get; init; }
     public required string Id { get; init; }
     public required FlowId FlowId { get; init; }
     public required string FlowVersion { get; init; }
@@ -100,6 +143,7 @@ public sealed record FlowRun
     public string? WorkTaskId { get; init; }
     public string? TriggerMessageId { get; init; }
     public required FlowRunScope Scope { get; init; }
+    public ResourceScopeRef ExecutionScopeRef => Scope.ScopeRef;
     public required JsonElement Input { get; init; }
     public JsonElement? Output { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

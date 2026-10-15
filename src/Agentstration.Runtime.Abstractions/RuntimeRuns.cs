@@ -163,6 +163,10 @@ public interface IRuntimeExecutionStateStore
     Task<RuntimeExecutionState?> GetAsync(WorkspaceId workspaceId, string runId, string runtimeType, string stateId, CancellationToken cancellationToken);
     Task<IReadOnlyList<RuntimeExecutionState>> ListAsync(WorkspaceId workspaceId, string runId, string runtimeType, string? parentStateId, CancellationToken cancellationToken);
     Task DeleteAsync(WorkspaceId workspaceId, string runId, string? runtimeType, CancellationToken cancellationToken);
+    Task DeleteExactAsync(ResourceScopeRef scopeRef, string runId, string? runtimeType, CancellationToken cancellationToken) =>
+        scopeRef.Kind == ResourceScopeKind.Workspace && scopeRef.TargetId is { } workspaceId
+            ? DeleteAsync(new WorkspaceId(workspaceId), runId, runtimeType, cancellationToken)
+            : throw new RuntimeRunValidationException("execution_scope_not_supported", $"Execution scope '{scopeRef}' is not supported by this store.");
 }
 
 public interface IRuntimeRunQueue

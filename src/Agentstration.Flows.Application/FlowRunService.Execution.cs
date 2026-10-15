@@ -74,9 +74,9 @@ public sealed partial class FlowRunService
         }
     }
 
-    private async Task FailAsync(WorkspaceId workspaceId, string runId, FlowRunStatus status, string code, string message, CancellationToken token, string? details = null)
+    private async Task FailAsync(ResourceScopeRef executionScopeRef, string runId, FlowRunStatus status, string code, string message, CancellationToken token, string? details = null)
     {
-        var stored = await RequiredAsync(workspaceId, runId, token);
+        var stored = await RequiredExactAsync(executionScopeRef, runId, token);
         if (stored.Value.Status.IsTerminal()) return;
         var now = timeProvider.GetUtcNow();
         var error = new FlowRunError(code, message, details);
@@ -99,7 +99,7 @@ public sealed partial class FlowRunService
             FlowRunStatus.TimedOut => FlowRunEventType.FlowRunTimedOut,
             _ => FlowRunEventType.FlowRunFailed
         };
-        await EmitAsync(workspaceId, runId, eventType,
+        await EmitAsync(executionScopeRef, runId, eventType,
             steps.FirstOrDefault(step => step.Status == FlowStepRunStatus.Failed)?.StepName, JsonSerializer.SerializeToElement(error), token);
     }
 
@@ -135,9 +135,9 @@ public sealed partial class FlowRunService
         }
     }
 
-    private async Task EmitAsync(WorkspaceId workspaceId, string runId, FlowRunEventType type, string? stepId, JsonElement? payload, CancellationToken token)
+    private async Task EmitAsync(ResourceScopeRef executionScopeRef, string runId, FlowRunEventType type, string? stepId, JsonElement? payload, CancellationToken token)
     {
-        var runEvent = await repository.AppendRunEventAsync(new FlowRunEvent(workspaceId, runId, 0, type, stepId, payload?.Clone(), timeProvider.GetUtcNow()), token);
+        var runEvent = await repository.AppendRunEventAsync(new FlowRunEvent(executionScopeRef, runId, 0, type, stepId, payload?.Clone(), timeProvider.GetUtcNow()), token);
         try
         {
             await eventSink.PublishAsync(runEvent, token);
@@ -146,7 +146,7 @@ public sealed partial class FlowRunService
         {
             if (type is FlowRunEventType.FlowRunCompleted or FlowRunEventType.FlowRunFailed or FlowRunEventType.FlowRunCancelled or FlowRunEventType.FlowRunTimedOut)
             {
-                var terminal = await repository.GetRunAsync(workspaceId, runId, token);
+                var terminal = await repository.GetRunExactAsync(executionScopeRef, runId, token);
                 if (terminal is not null) await ResumeParentAfterChildAsync(terminal.Value, token);
             }
         }

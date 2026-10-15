@@ -18,7 +18,8 @@ public readonly record struct WorkspaceId(Guid Value)
 /// </summary>
 public sealed record ExactExecutionScope
 {
-    private ExactExecutionScope(
+    [JsonConstructor]
+    public ExactExecutionScope(
         ResourceScopeRef scopeRef,
         Guid principalId,
         Guid? tenantId,

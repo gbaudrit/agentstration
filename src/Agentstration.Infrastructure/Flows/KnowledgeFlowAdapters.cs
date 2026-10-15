@@ -357,14 +357,13 @@ public sealed class KnowledgeSnapshotFlowRunDeletionGuard(
     IResourceStore store,
     IRequestContextScopeFactory requestScopes) : IFlowRunDeletionGuard
 {
-    public async Task ValidateDeleteAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken)
+    public async Task ValidateDeleteAsync(ResourceScopeRef scopeRef, string runId, CancellationToken cancellationToken)
     {
         using var requestScope = requestScopes.PushSystem();
         var snapshots = await store.ListAllAsync<KnowledgeSnapshotResource>(
             KnowledgeResourceKinds.KnowledgeSnapshot, cancellationToken);
         var retained = snapshots.Select(value => value.Value).FirstOrDefault(value =>
-            value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
-            && targetId == workspaceId.Value
+            value.ScopeRef == scopeRef
             && (string.Equals(value.ProjectionFlowRunId, runId, StringComparison.Ordinal)
                 || value.ProjectionInputs.Any(input => string.Equals(input.AcquisitionFlowRunId, runId, StringComparison.Ordinal)
                     || string.Equals(input.TransformationFlowRunId, runId, StringComparison.Ordinal))

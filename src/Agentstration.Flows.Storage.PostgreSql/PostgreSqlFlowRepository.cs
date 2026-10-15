@@ -19,6 +19,7 @@ public sealed class FlowDbContext(DbContextOptions<FlowDbContext> options) : DbC
         document.ToTable("FlowResources");
         document.HasKey(value => value.Key);
         document.Property(value => value.WorkspaceId);
+        document.Property(value => value.ScopeRef).HasMaxLength(64);
         document.Property(value => value.Key).HasMaxLength(512);
         document.Property(value => value.FlowId).HasMaxLength(128);
         document.Property(value => value.Namespace).HasMaxLength(128);
@@ -26,7 +27,7 @@ public sealed class FlowDbContext(DbContextOptions<FlowDbContext> options) : DbC
         document.Property(value => value.Status);
         document.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
         document.Property(value => value.UpdatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
-        document.HasIndex(value => new { value.WorkspaceId, value.Namespace, value.Kind, value.FlowId, value.Version });
+        document.HasIndex(value => new { value.ScopeRef, value.Namespace, value.Kind, value.FlowId, value.Version });
         document.HasIndex(value => new { value.WorkspaceId, value.Kind, value.TenantId, value.PrincipalId, value.UpdatedAt, value.Key });
         document.HasIndex(value => new { value.WorkspaceId, value.Kind, value.TenantId, value.PrincipalId, value.Status, value.UpdatedAt, value.Key });
         document.HasIndex(value => new { value.WorkspaceId, value.Kind, value.TenantId, value.PrincipalId, value.Namespace, value.FlowId, value.UpdatedAt, value.Key });
@@ -37,6 +38,7 @@ public sealed class FlowDbContext(DbContextOptions<FlowDbContext> options) : DbC
 internal sealed class FlowDocument
 {
     public Guid WorkspaceId { get; set; }
+    public required string ScopeRef { get; set; }
     public required string Key { get; set; }
     public required string Kind { get; set; }
     public required string FlowId { get; set; }
@@ -71,7 +73,7 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
-        var document = Document(ScopeStorageId(definition.ScopeRef), DefinitionKey(definition.ScopeRef, definition.Id), DefinitionKind, definition.Id, null, definition, now);
+        var document = Document(definition.ScopeRef, DefinitionKey(definition.ScopeRef, definition.Id), DefinitionKind, definition.Id, null, definition, now);
         context.Documents.Add(document);
         await SaveCreateAsync(context, cancellationToken);
         return new StoredFlow(definition, document.ETag, now);
@@ -142,7 +144,7 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
-        var document = Document(ScopeStorageId(version.ScopeRef), VersionKey(version.ScopeRef, version.FlowId, version.Version), VersionKind, version.FlowId, version.Version, version, now);
+        var document = Document(version.ScopeRef, VersionKey(version.ScopeRef, version.FlowId, version.Version), VersionKind, version.FlowId, version.Version, version, now);
         context.Documents.Add(document);
         await SaveCreateAsync(context, cancellationToken);
         return new StoredFlowVersion(version, document.ETag, now);
@@ -168,7 +170,7 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
-        var document = Document(run.WorkspaceId, RunKey(run.WorkspaceId, run.Id), RunKind, run.FlowId, run.FlowVersion, run, now);
+        var document = Document(run.Scope.ScopeRef, RunKey(run.Scope.ScopeRef, run.Id), RunKind, run.FlowId, run.FlowVersion, run, now);
         document.TenantId = run.Scope.TenantId;
         document.PrincipalId = run.Scope.PrincipalId;
         document.Status = run.Status;
@@ -177,10 +179,10 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
         return new StoredFlowRun(run, document.ETag, now);
     }
 
-    public async Task<StoredFlowRun?> GetRunAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken)
+    public async Task<StoredFlowRun?> GetRunExactAsync(ResourceScopeRef executionScopeRef, string runId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.Key == RunKey(workspaceId, runId), cancellationToken);
+        var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.Key == RunKey(executionScopeRef, runId), cancellationToken);
         return document is null ? null : ToRun(document);
     }
 
@@ -188,7 +190,7 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value =>
-            value.Key == RunKey(scope.WorkspaceId, runId)
+            value.Key == RunKey(scope.ScopeRef, runId)
             && value.TenantId == scope.TenantId
             && value.PrincipalId == scope.PrincipalId,
             cancellationToken);
@@ -202,7 +204,7 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
         take = Math.Min(take, 200);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var query = context.Documents.AsNoTracking().Where(value =>
-            value.WorkspaceId == scope.WorkspaceId.Value
+            value.ScopeRef == scope.ScopeRef.Value
             && value.Kind == RunKind
             && value.TenantId == scope.TenantId
             && value.PrincipalId == scope.PrincipalId);
@@ -244,7 +246,7 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
         var documents = await context.Documents.AsNoTracking().Where(value => value.Kind == RunKind)
             .OrderBy(value => value.UpdatedAt).Skip(skip).Take(Math.Min(take, 1000)).ToArrayAsync(cancellationToken);
         return documents.Select(ToRun).Where(value => value.Value.Status is FlowRunStatus.Pending or FlowRunStatus.Running or FlowRunStatus.WaitingForInput or FlowRunStatus.WaitingForChild)
-            .Select(value => new FlowRunKey(value.Value.WorkspaceId, value.Value.Id)).ToArray();
+            .Select(value => new FlowRunKey(value.Value.Scope.ScopeRef, value.Value.Id)).ToArray();
     }
 
     public async Task<IReadOnlyList<FlowRunKey>> ListRunKeysAsync(int skip, int take, CancellationToken cancellationToken)
@@ -254,17 +256,17 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var documents = await context.Documents.AsNoTracking().Where(value => value.Kind == RunKind)
             .OrderBy(value => value.UpdatedAt).Skip(skip).Take(Math.Min(take, 1000)).ToArrayAsync(cancellationToken);
-        return documents.Select(ToRun).Select(value => new FlowRunKey(value.Value.WorkspaceId, value.Value.Id)).ToArray();
+        return documents.Select(ToRun).Select(value => new FlowRunKey(value.Value.Scope.ScopeRef, value.Value.Id)).ToArray();
     }
 
     public async Task<StoredFlowRun> UpdateRunAsync(FlowRun run, string expectedETag, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Documents.SingleOrDefaultAsync(value => value.Key == RunKey(run.WorkspaceId, run.Id), cancellationToken)
+        var document = await context.Documents.SingleOrDefaultAsync(value => value.Key == RunKey(run.Scope.ScopeRef, run.Id), cancellationToken)
             ?? throw new FlowRunNotFoundException(run.Id);
         if (!string.Equals(document.ETag, expectedETag, StringComparison.Ordinal)) throw new FlowConcurrencyException("The Flow Run was modified concurrently.");
         var existing = ToRun(document).Value;
-        if (existing.Scope != run.Scope || existing.WorkspaceId != run.WorkspaceId)
+        if (existing.Scope != run.Scope)
             throw new FlowConcurrencyException("The Flow Run execution scope is immutable.");
         var now = timeProvider.GetUtcNow();
         document.Payload = JsonSerializer.Serialize(run, JsonOptions);
@@ -274,12 +276,12 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
         return new StoredFlowRun(run, document.ETag, now);
     }
 
-    public async Task DeleteRunAsync(WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken)
+    public async Task DeleteRunExactAsync(ResourceScopeRef executionScopeRef, string runId, string expectedETag, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var documents = await context.Documents.Where(value =>
-            value.WorkspaceId == workspaceId.Value
-            && (value.Key == RunKey(workspaceId, runId)
+            value.ScopeRef == executionScopeRef.Value
+            && (value.Key == RunKey(executionScopeRef, runId)
                 || (value.FlowId == runId && (value.Kind == RunEventKind || value.Kind == InputRequestKind))))
             .ToArrayAsync(cancellationToken);
         var run = documents.SingleOrDefault(value => value.Kind == RunKind)
@@ -324,17 +326,17 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
     public async Task<FlowRunEvent> AppendRunEventAsync(FlowRunEvent runEvent, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var existing = await context.Documents.AsNoTracking().Where(value => value.WorkspaceId == runEvent.WorkspaceId.Value && value.Kind == RunEventKind && value.FlowId == runEvent.RunId).CountAsync(cancellationToken);
+        var existing = await context.Documents.AsNoTracking().Where(value => value.ScopeRef == runEvent.ScopeRef.Value && value.Kind == RunEventKind && value.FlowId == runEvent.RunId).CountAsync(cancellationToken);
         var sequenced = runEvent with { Sequence = existing + 1 };
-        context.Documents.Add(Document(runEvent.WorkspaceId, RunEventKey(runEvent.WorkspaceId, runEvent.RunId, sequenced.Sequence), RunEventKind, new FlowId(runEvent.RunId), sequenced.Sequence.ToString(System.Globalization.CultureInfo.InvariantCulture), sequenced, runEvent.Timestamp));
+        context.Documents.Add(Document(runEvent.ScopeRef, RunEventKey(runEvent.ScopeRef, runEvent.RunId, sequenced.Sequence), RunEventKind, new FlowId(runEvent.RunId), sequenced.Sequence.ToString(System.Globalization.CultureInfo.InvariantCulture), sequenced, runEvent.Timestamp));
         await SaveCreateAsync(context, cancellationToken);
         return sequenced;
     }
 
-    public async Task<IReadOnlyList<FlowRunEvent>> ListRunEventsAsync(WorkspaceId workspaceId, string runId, long afterSequence, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<FlowRunEvent>> ListRunEventsExactAsync(ResourceScopeRef executionScopeRef, string runId, long afterSequence, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var documents = await context.Documents.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.Kind == RunEventKind && value.FlowId == runId).OrderBy(value => value.Key).ToArrayAsync(cancellationToken);
+        var documents = await context.Documents.AsNoTracking().Where(value => value.ScopeRef == executionScopeRef.Value && value.Kind == RunEventKind && value.FlowId == runId).OrderBy(value => value.Key).ToArrayAsync(cancellationToken);
         return documents.Select(document => Deserialize<FlowRunEvent>(document)).Where(runEvent => runEvent.Sequence > afterSequence).ToArray();
     }
 
@@ -342,24 +344,24 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
-        var document = Document(request.WorkspaceId, InputRequestKey(request.WorkspaceId, request.RunId, request.Id), InputRequestKind, new FlowId(request.RunId), request.Id, request, now);
+        var document = Document(request.ScopeRef, InputRequestKey(request.ScopeRef, request.RunId, request.Id), InputRequestKind, new FlowId(request.RunId), request.Id, request, now);
         context.Documents.Add(document);
         await SaveCreateAsync(context, cancellationToken);
         return new StoredInputRequest(request, document.ETag, now);
     }
 
-    public async Task<StoredInputRequest?> GetInputRequestAsync(WorkspaceId workspaceId, string runId, string requestId, CancellationToken cancellationToken)
+    public async Task<StoredInputRequest?> GetInputRequestExactAsync(ResourceScopeRef executionScopeRef, string runId, string requestId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.Key == InputRequestKey(workspaceId, runId, requestId), cancellationToken);
+        var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.Key == InputRequestKey(executionScopeRef, runId, requestId), cancellationToken);
         return document is null ? null : ToInputRequest(document);
     }
 
-    public async Task<IReadOnlyList<StoredInputRequest>> ListInputRequestsAsync(WorkspaceId workspaceId, string runId, InputRequestStatus? status, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<StoredInputRequest>> ListInputRequestsExactAsync(ResourceScopeRef executionScopeRef, string runId, InputRequestStatus? status, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var documents = await context.Documents.AsNoTracking()
-            .Where(value => value.WorkspaceId == workspaceId.Value && value.Kind == InputRequestKind && value.FlowId == runId)
+            .Where(value => value.ScopeRef == executionScopeRef.Value && value.Kind == InputRequestKind && value.FlowId == runId)
             .OrderBy(value => value.UpdatedAt)
             .ToArrayAsync(cancellationToken);
         var requests = documents.Select(ToInputRequest);
@@ -370,7 +372,7 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
     public async Task<StoredInputRequest> UpdateInputRequestAsync(InputRequest request, string expectedETag, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Documents.SingleOrDefaultAsync(value => value.Key == InputRequestKey(request.WorkspaceId, request.RunId, request.Id), cancellationToken)
+        var document = await context.Documents.SingleOrDefaultAsync(value => value.Key == InputRequestKey(request.ScopeRef, request.RunId, request.Id), cancellationToken)
             ?? throw new FlowRunNotFoundException(request.RunId);
         if (!string.Equals(document.ETag, expectedETag, StringComparison.Ordinal))
             throw new FlowConcurrencyException("The Input Request was modified concurrently.");
@@ -382,9 +384,10 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
         return new StoredInputRequest(request, document.ETag, now);
     }
 
-    private static FlowDocument Document<T>(WorkspaceId workspaceId, string key, string kind, FlowId id, string? version, T value, DateTimeOffset now) => new()
+    private static FlowDocument Document<T>(ResourceScopeRef scopeRef, string key, string kind, FlowId id, string? version, T value, DateTimeOffset now) => new()
     {
-        WorkspaceId = workspaceId.Value,
+        WorkspaceId = scopeRef.Kind == ResourceScopeKind.Workspace ? scopeRef.TargetId!.Value : Guid.Empty,
+        ScopeRef = scopeRef.Value,
         Key = key,
         Kind = kind,
         FlowId = id.Value,
@@ -394,6 +397,8 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
         ETag = NewETag(),
         UpdatedAt = now
     };
+    private static FlowDocument Document<T>(WorkspaceId workspaceId, string key, string kind, FlowId id, string? version, T value, DateTimeOffset now) =>
+        Document(ResourceScopeRef.Workspace(workspaceId.Value), key, kind, id, version, value, now);
     private static StoredFlow ToFlow(FlowDocument document) => new(Deserialize<FlowResource>(document), document.ETag, document.UpdatedAt);
     private static StoredFlowVersion ToVersion(FlowDocument document) => new(Deserialize<FlowVersion>(document), document.ETag, document.UpdatedAt);
     private static StoredFlowRun ToRun(FlowDocument document) => new(Deserialize<FlowRun>(document), document.ETag, document.UpdatedAt);
@@ -420,6 +425,7 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
             return new FlowDocument
             {
                 WorkspaceId = document.WorkspaceId,
+                ScopeRef = scopeRef.Value,
                 Key = $"scope:{scopeRef.Value}:{document.Key[oldPrefix.Length..]}",
                 Kind = document.Kind,
                 FlowId = document.FlowId,
@@ -450,15 +456,14 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
         root["scopeRef"] = scopeRef.Value;
         return root.ToJsonString(JsonOptions);
     }
-    private static WorkspaceId ScopeStorageId(ResourceScopeRef scopeRef) => new(scopeRef.TargetId ?? Guid.Empty);
     private static string ScopePrefix(ResourceScopeRef scopeRef) => $"scope:{scopeRef.Value}:";
     private static string FlowPrefix(ResourceScopeRef scopeRef, FlowId id) => $"{ScopePrefix(scopeRef)}flow:{id.Namespace.Value}:{id.Value}";
     private static string DefinitionKey(ResourceScopeRef scopeRef, FlowId id) => FlowPrefix(scopeRef, id);
     private static string VersionKey(ResourceScopeRef scopeRef, FlowId id, string version) => $"{FlowPrefix(scopeRef, id)}:version:{version}";
-    private static string RunKey(WorkspaceId workspaceId, string id) => $"workspace:{workspaceId}:run:{id}";
+    private static string RunKey(ResourceScopeRef scopeRef, string id) => $"scope:{scopeRef.Value}:run:{id}";
     private static string DraftKey(WorkspaceId workspaceId, FlowId id) => $"workspace:{workspaceId}:flow:{id.Namespace.Value}:{id.Value}:draft";
-    private static string RunEventKey(WorkspaceId workspaceId, string runId, long sequence) => $"workspace:{workspaceId}:run:{runId}:event:{sequence:D12}";
-    private static string InputRequestKey(WorkspaceId workspaceId, string runId, string requestId) => $"workspace:{workspaceId}:run:{runId}:input:{requestId}";
+    private static string RunEventKey(ResourceScopeRef scopeRef, string runId, long sequence) => $"scope:{scopeRef.Value}:run:{runId}:event:{sequence:D12}";
+    private static string InputRequestKey(ResourceScopeRef scopeRef, string runId, string requestId) => $"scope:{scopeRef.Value}:run:{runId}:input:{requestId}";
     private static string NewETag() => $"\"{Guid.NewGuid():N}\"";
 
     private static async Task SaveCreateAsync(FlowDbContext context, CancellationToken cancellationToken)

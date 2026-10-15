@@ -233,12 +233,12 @@ public sealed class AwpAssignmentProjection(
             && string.Equals(value.CompatibilityKey, assignment.ExecutionMaterialDigest, StringComparison.Ordinal)))
             throw new RuntimeExecutionMaterialException("flow_checkpoint_incompatible",
                 "The Flow cannot suspend without a compatible checkpoint persisted by this assignment.");
-        var existing = (await flowRuns.ListInputRequestsAsync(stored.Value.WorkspaceId, stored.Value.Id,
+        var existing = (await flowRuns.ListInputRequestsExactAsync(stored.Value.ExecutionScopeRef, stored.Value.Id,
             null, cancellationToken)).FirstOrDefault(value => string.Equals(
                 value.Value.RuntimeRequestId, runtimeRequestId, StringComparison.Ordinal));
         var request = existing?.Value ?? new InputRequest
         {
-            WorkspaceId = stored.Value.WorkspaceId,
+            ScopeRef = stored.Value.ExecutionScopeRef,
             Id = $"input-{Guid.NewGuid():N}",
             RunId = stored.Value.Id,
             RuntimeRequestId = runtimeRequestId,

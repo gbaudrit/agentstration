@@ -34,14 +34,14 @@ public sealed partial class FlowRunService
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
-        var existing = await repository.GetRunAsync(command.Scope.WorkspaceId, command.RunId, cancellationToken);
+        var existing = await repository.GetRunExactAsync(command.Scope.ScopeRef, command.RunId, cancellationToken);
         if (existing is not null)
         {
             ValidateRootIdentity(existing.Value, command);
             return existing;
         }
 
-        var resolved = await ResolveVersionAsync(command.Scope.WorkspaceId, command.FlowId, command.Version, command.DefinitionScopeRef, cancellationToken);
+        var resolved = await ResolveVersionAsync(command.Scope.ScopeRef, command.FlowId, command.Version, command.DefinitionScopeRef, cancellationToken);
         ValidateInput(resolved.Graph?.InputSchema, command.Input);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun
@@ -82,7 +82,7 @@ public sealed partial class FlowRunService
         }
         catch (FlowConcurrencyException)
         {
-            var recovered = await repository.GetRunAsync(command.Scope.WorkspaceId, command.RunId, cancellationToken);
+            var recovered = await repository.GetRunExactAsync(command.Scope.ScopeRef, command.RunId, cancellationToken);
             if (recovered is null) throw;
             stored = recovered;
             ValidateRootIdentity(stored.Value, command);
@@ -90,7 +90,7 @@ public sealed partial class FlowRunService
         }
 
         RunsCreated.Add(1, new KeyValuePair<string, object?>("flow.definition.state", run.DefinitionState.ToString()));
-        await EmitAsync(run.WorkspaceId, run.Id, FlowRunEventType.FlowRunCreated, null,
+        await EmitAsync(run.Scope.ScopeRef, run.Id, FlowRunEventType.FlowRunCreated, null,
             JsonSerializer.SerializeToElement(new { run.Status, run.DefinitionState, run.InvocationOrigin, run.CausationId }), cancellationToken);
         await queue.EnqueueAsync(new(run.Id, run.Scope), cancellationToken);
         return stored;

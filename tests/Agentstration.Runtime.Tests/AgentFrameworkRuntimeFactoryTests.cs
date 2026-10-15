@@ -40,7 +40,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
 
         var input = new InputRequest
         {
-            WorkspaceId = TestWorkspaceId,
+            ScopeRef = ResourceScopeRef.Workspace(TestWorkspaceId.Value),
             Id = "input-1",
             RunId = "run-1",
             RuntimeRequestId = request.RequestId,
@@ -127,7 +127,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                     secondProvider.GetRequiredService<IRuntimeExecutionStateStore>());
                 var answer = new InputRequest
                 {
-                    WorkspaceId = TestWorkspaceId,
+                    ScopeRef = ResourceScopeRef.Workspace(TestWorkspaceId.Value),
                     Id = "input-1",
                     RunId = "run-maf-resume",
                     RuntimeRequestId = suspended.RuntimeRequestId,
@@ -221,7 +221,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
             var bindings = events.OfType<FlowRuntimeBindingsResolved>().Single().Bindings;
             var answer = new InputRequest
             {
-                WorkspaceId = TestWorkspaceId,
+                ScopeRef = ResourceScopeRef.Workspace(TestWorkspaceId.Value),
                 Id = "input-real-approval",
                 RunId = "run-real-approval",
                 RuntimeRequestId = requested.RuntimeRequestId,

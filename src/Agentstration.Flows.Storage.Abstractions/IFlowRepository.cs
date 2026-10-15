@@ -41,21 +41,31 @@ public interface IFlowRepository
     /// Retrieves a Flow Run for trusted system and runtime processing. User-facing callers must use the
     /// <see cref="GetRunAsync(FlowRunScope, string, CancellationToken)"/> overload.
     /// </summary>
-    Task<StoredFlowRun?> GetRunAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken);
+    Task<StoredFlowRun?> GetRunExactAsync(ResourceScopeRef executionScopeRef, string runId, CancellationToken cancellationToken);
+    Task<StoredFlowRun?> GetRunAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken) =>
+        GetRunExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, cancellationToken);
     Task<StoredFlowRun?> GetRunAsync(FlowRunScope scope, string runId, CancellationToken cancellationToken);
     Task<FlowRunPage> ListRunsAsync(FlowRunScope scope, FlowId? flowId, FlowRunStatus? status, int skip, int take, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowRunKey>> ListRunKeysAsync(int skip, int take, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowRunKey>> ListRecoverableRunsAsync(int skip, int take, CancellationToken cancellationToken);
     Task<StoredFlowRun> UpdateRunAsync(FlowRun run, string expectedETag, CancellationToken cancellationToken);
-    Task DeleteRunAsync(WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken);
+    Task DeleteRunExactAsync(ResourceScopeRef executionScopeRef, string runId, string expectedETag, CancellationToken cancellationToken);
+    Task DeleteRunAsync(WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken) =>
+        DeleteRunExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, expectedETag, cancellationToken);
     Task<StoredFlowDraft> CreateDraftAsync(FlowDraft draft, CancellationToken cancellationToken);
     Task<StoredFlowDraft?> GetDraftAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken);
     Task<StoredFlowDraft> UpdateDraftAsync(FlowDraft draft, string expectedETag, CancellationToken cancellationToken);
     Task<FlowRunEvent> AppendRunEventAsync(FlowRunEvent runEvent, CancellationToken cancellationToken);
-    Task<IReadOnlyList<FlowRunEvent>> ListRunEventsAsync(WorkspaceId workspaceId, string runId, long afterSequence, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FlowRunEvent>> ListRunEventsExactAsync(ResourceScopeRef executionScopeRef, string runId, long afterSequence, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FlowRunEvent>> ListRunEventsAsync(WorkspaceId workspaceId, string runId, long afterSequence, CancellationToken cancellationToken) =>
+        ListRunEventsExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, afterSequence, cancellationToken);
     Task<StoredInputRequest> CreateInputRequestAsync(InputRequest request, CancellationToken cancellationToken);
-    Task<StoredInputRequest?> GetInputRequestAsync(WorkspaceId workspaceId, string runId, string requestId, CancellationToken cancellationToken);
-    Task<IReadOnlyList<StoredInputRequest>> ListInputRequestsAsync(WorkspaceId workspaceId, string runId, InputRequestStatus? status, CancellationToken cancellationToken);
+    Task<StoredInputRequest?> GetInputRequestExactAsync(ResourceScopeRef executionScopeRef, string runId, string requestId, CancellationToken cancellationToken);
+    Task<StoredInputRequest?> GetInputRequestAsync(WorkspaceId workspaceId, string runId, string requestId, CancellationToken cancellationToken) =>
+        GetInputRequestExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, requestId, cancellationToken);
+    Task<IReadOnlyList<StoredInputRequest>> ListInputRequestsExactAsync(ResourceScopeRef executionScopeRef, string runId, InputRequestStatus? status, CancellationToken cancellationToken);
+    Task<IReadOnlyList<StoredInputRequest>> ListInputRequestsAsync(WorkspaceId workspaceId, string runId, InputRequestStatus? status, CancellationToken cancellationToken) =>
+        ListInputRequestsExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, status, cancellationToken);
     Task<StoredInputRequest> UpdateInputRequestAsync(InputRequest request, string expectedETag, CancellationToken cancellationToken);
 }
 

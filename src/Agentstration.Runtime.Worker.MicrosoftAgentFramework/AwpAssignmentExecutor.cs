@@ -143,7 +143,7 @@ internal sealed class AwpAssignmentExecutor(
             material.Resume.RuntimeType, material.Resume.StateId, material.Resume.RespondedAt);
         var answered = material.Resume is null ? null : new InputRequest
         {
-            WorkspaceId = ParseWorkspace(session.Assignment.Scope.WorkspaceId),
+            ScopeRef = ResourceScopeRef.Workspace(ParseWorkspace(session.Assignment.Scope.WorkspaceId).Value),
             Id = material.Resume.InputRequestId,
             RunId = material.RunId,
             RuntimeRequestId = material.Resume.RuntimeRequestId,

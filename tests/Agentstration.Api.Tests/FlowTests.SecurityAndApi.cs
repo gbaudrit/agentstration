@@ -178,7 +178,7 @@ public sealed partial class FlowTests
         async Task<StoredInputRequest> CreatePrivateInputAsync(StoredFlowRun run, string id) =>
             await fixture.Repository.CreateInputRequestAsync(new InputRequest
             {
-                WorkspaceId = run.Value.WorkspaceId,
+                ScopeRef = run.Value.ExecutionScopeRef,
                 Id = id,
                 RunId = run.Value.Id,
                 RuntimeRequestId = $"runtime-{id}",
