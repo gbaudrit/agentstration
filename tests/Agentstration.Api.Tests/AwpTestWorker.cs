@@ -86,6 +86,12 @@ internal sealed class AwpTestWorker : IAsyncDisposable
     public Task<AwpClaimResponse> ClaimAsync(int maximumWaitSeconds = 5, CancellationToken cancellationToken = default) =>
         client.ClaimAsync(new(client.WorkerId, client.SessionId, 1, maximumWaitSeconds), cancellationToken);
 
+    public Task RunAsync(
+        AwpRunAssignment assignment,
+        DateTimeOffset serverTime,
+        CancellationToken cancellationToken = default) =>
+        runner.RunAsync(client, assignment, serverTime, options, cancellationToken);
+
     private async Task ProcessAsync()
     {
         try

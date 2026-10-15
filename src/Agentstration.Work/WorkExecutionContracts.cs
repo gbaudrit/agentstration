@@ -25,7 +25,9 @@ public sealed record WorkExecutionAccepted(WorkExecutionId ExecutionId, string? 
 
 public abstract record WorkExecutionEvent(Guid EventId, WorkspaceId WorkspaceId, WorkItemId WorkItemId, WorkExecutionId ExecutionId, DateTimeOffset OccurredAt)
 {
-    public ResourceScopeRef ExecutionScopeRef { get; init; } = ResourceScopeRef.Workspace(WorkspaceId.Value);
+    public ResourceScopeRef ExecutionScopeRef { get; init; } = WorkspaceId.Value == Guid.Empty
+        ? ResourceScopeRef.Instance
+        : ResourceScopeRef.Workspace(WorkspaceId.Value);
 }
 public sealed record WorkExecutionStarted(Guid EventId, WorkspaceId WorkspaceId, WorkItemId WorkItemId, WorkExecutionId ExecutionId, DateTimeOffset OccurredAt, string SelectedAgentId) : WorkExecutionEvent(EventId, WorkspaceId, WorkItemId, ExecutionId, OccurredAt);
 public sealed record WorkExecutionProgressed(Guid EventId, WorkspaceId WorkspaceId, WorkItemId WorkItemId, WorkExecutionId ExecutionId, DateTimeOffset OccurredAt, double Progress, string? Message) : WorkExecutionEvent(EventId, WorkspaceId, WorkItemId, ExecutionId, OccurredAt);

@@ -409,6 +409,14 @@ public sealed class RuntimeRunTests
         Assert.AreEqual(ResourceScopeRef.Instance.Value, claim.Assignment.Scope.ScopeRef);
         Assert.AreEqual(Guid.Empty, claim.Assignment.Scope.TenantId);
         Assert.AreEqual(string.Empty, claim.Assignment.Scope.WorkspaceId);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await worker.RunAsync(claim.Assignment, claim.ServerTime, timeout.Token);
+        var run = await runResponse.Content.ReadFromJsonAsync<RuntimeRun>();
+        Assert.IsNotNull(run);
+        var completed = await client.GetFromJsonAsync<RuntimeRun>(
+            $"/api/runtime/runs/{run.Id}?scopeRef={Uri.EscapeDataString(ResourceScopeRef.Instance.Value)}");
+        Assert.IsNotNull(completed);
+        Assert.AreEqual(RuntimeRunState.Succeeded, completed.Status.State, completed.Status.Error);
     }
 
     [TestMethod]

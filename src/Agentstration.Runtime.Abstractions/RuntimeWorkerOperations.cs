@@ -17,7 +17,11 @@ public sealed record RuntimeGovernedModelRequest(
     WorkspaceId WorkspaceId,
     Guid PrincipalId)
 {
-    public ResourceScopeRef ExecutionScopeRef { get; init; } = ResourceScopeRef.Workspace(WorkspaceId.Value);
+    public ResourceScopeRef ExecutionScopeRef { get; init; } = WorkspaceId.Value != Guid.Empty
+        ? ResourceScopeRef.Workspace(WorkspaceId.Value)
+        : TenantId != Guid.Empty
+            ? ResourceScopeRef.Tenant(TenantId)
+            : ResourceScopeRef.Instance;
 }
 
 public sealed record RuntimeGovernedModelResponse(
@@ -50,7 +54,11 @@ public sealed record RuntimeGovernedToolRequest(
     JsonElement? Arguments,
     bool? PersistArguments)
 {
-    public ResourceScopeRef ExecutionScopeRef { get; init; } = ResourceScopeRef.Workspace(WorkspaceId.Value);
+    public ResourceScopeRef ExecutionScopeRef { get; init; } = WorkspaceId.Value != Guid.Empty
+        ? ResourceScopeRef.Workspace(WorkspaceId.Value)
+        : TenantId != Guid.Empty
+            ? ResourceScopeRef.Tenant(TenantId)
+            : ResourceScopeRef.Instance;
 }
 
 public sealed record RuntimeGovernedArtifact(

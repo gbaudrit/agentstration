@@ -30,7 +30,9 @@ public sealed record WorkItemQuery(
     DateTimeOffset? UpdatedFrom = null,
     DateTimeOffset? UpdatedTo = null)
 {
-    public ResourceScopeRef ScopeRef { get; init; } = ResourceScopeRef.Workspace(WorkspaceId.Value);
+    public ResourceScopeRef ScopeRef { get; init; } = WorkspaceId.Value == Guid.Empty
+        ? ResourceScopeRef.Instance
+        : ResourceScopeRef.Workspace(WorkspaceId.Value);
 }
 
 public sealed record StoredWorkItem(WorkItem Value, string ETag, DateTimeOffset UpdatedAt);
