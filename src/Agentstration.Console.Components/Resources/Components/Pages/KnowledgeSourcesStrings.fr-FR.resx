@@ -64,4 +64,6 @@
   <data name="Completed" xml:space="preserve"><value>Terminée</value></data>
   <data name="SynthesizedAnswer" xml:space="preserve"><value>Réponse synthétisée</value></data>
   <data name="UnknownMediaType" xml:space="preserve"><value>Type de média inconnu</value></data>
+  <data name="AcquisitionTarget" xml:space="preserve"><value>Cible d’acquisition</value></data>
+  <data name="SelectAcquisitionTarget" xml:space="preserve"><value>Sélectionner une cible d’acquisition</value></data>
 </root>
