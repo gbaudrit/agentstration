@@ -11,7 +11,7 @@ public enum McpToolProviderTransport { Stdio, StreamableHttp }
 
 public sealed record AepToolProviderConfiguration
 {
-    public required string ExtensionId { get; init; }
+    public required ResourceReference Extension { get; init; }
 }
 
 public sealed record McpToolProviderConfiguration

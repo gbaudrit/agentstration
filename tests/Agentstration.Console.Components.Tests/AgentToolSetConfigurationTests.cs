@@ -109,10 +109,14 @@ public sealed class AgentToolSetConfigurationTests
         Route = capability,
         ToolName = name,
         ToolNamespace = ResourceNamespace.Default,
+        ToolScopeRef = ResourceScopeRef.Instance,
         ToolUid = Guid.NewGuid(),
         ToolGeneration = 1,
         ProviderName = "documentation-provider",
         ProviderNamespace = ResourceNamespace.Default,
+        ProviderScopeRef = ResourceScopeRef.Instance,
+        ProviderUid = Guid.NewGuid(),
+        ProviderGeneration = 1,
         ExternalToolId = capability,
         InputSchema = JsonSerializer.SerializeToElement(new { type = "object" })
     };

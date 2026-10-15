@@ -86,16 +86,23 @@ public sealed class ArtifactPlatformResourceProvisioner(IResourceStore store, Fl
                 ?? throw new InvalidOperationException($"Built-in Artifact staging Tool '{toolName}' was not projected.");
             var provider = tool.Value.Definition.Provider?.Resolve(ResourceNamespace.Default, ToolResourceKinds.ToolProvider)
                 ?? throw new InvalidOperationException($"Built-in Artifact staging Tool '{toolName}' has no provider.");
+            var storedProvider = await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
+                scope, provider.Namespace, ToolResourceKinds.ToolProvider, provider.Name), cancellationToken)
+                ?? throw new InvalidOperationException($"Built-in Artifact staging Tool '{toolName}' references missing provider '{provider}'.");
             members.Add(new PublishedToolSetMember
             {
                 Capability = capability,
                 Route = "default",
                 ToolName = tool.Value.Name,
                 ToolNamespace = tool.Value.Namespace,
+                ToolScopeRef = scope,
                 ToolUid = tool.Value.Uid,
                 ToolGeneration = tool.Value.Generation,
                 ProviderName = provider.Name,
                 ProviderNamespace = provider.Namespace,
+                ProviderScopeRef = scope,
+                ProviderUid = storedProvider.Value.Uid,
+                ProviderGeneration = storedProvider.Value.Generation,
                 ExternalToolId = tool.Value.Definition.ExternalId!,
                 InputSchema = tool.Value.Definition.Schema!.Input.Clone(),
                 OutputSchema = tool.Value.Definition.Schema.Output?.Clone(),
@@ -235,16 +242,23 @@ public sealed class ArtifactPlatformResourceProvisioner(IResourceStore store, Fl
                 ?? throw new InvalidOperationException($"Built-in Tool '{toolName}' was not projected.");
             var provider = tool.Value.Definition.Provider?.Resolve(ResourceNamespace.Default, ToolResourceKinds.ToolProvider)
                 ?? throw new InvalidOperationException($"Built-in Tool '{toolName}' has no provider.");
+            var storedProvider = await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
+                scope, provider.Namespace, ToolResourceKinds.ToolProvider, provider.Name), cancellationToken)
+                ?? throw new InvalidOperationException($"Built-in Tool '{toolName}' references missing provider '{provider}'.");
             members.Add(new PublishedToolSetMember
             {
                 Capability = capability,
                 Route = "default",
                 ToolName = tool.Value.Name,
                 ToolNamespace = tool.Value.Namespace,
+                ToolScopeRef = scope,
                 ToolUid = tool.Value.Uid,
                 ToolGeneration = tool.Value.Generation,
                 ProviderName = provider.Name,
                 ProviderNamespace = provider.Namespace,
+                ProviderScopeRef = scope,
+                ProviderUid = storedProvider.Value.Uid,
+                ProviderGeneration = storedProvider.Value.Generation,
                 ExternalToolId = tool.Value.Definition.ExternalId!,
                 InputSchema = tool.Value.Definition.Schema!.Input.Clone(),
                 OutputSchema = tool.Value.Definition.Schema.Output?.Clone(),

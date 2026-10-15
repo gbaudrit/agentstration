@@ -49,7 +49,11 @@ public sealed class ToolSetApiTests : ModelManagementApiTestBase
         Assert.AreEqual("tool_route_ambiguous", ambiguous.Code);
         var selected = await service.ResolveRouteAsync(default, "documents", "1.0.0", "knowledge.retrieve", "search", default);
         Assert.AreEqual("documents.search", selected.Member.ToolName);
+        Assert.AreEqual(scopeRef, selected.Member.ToolScopeRef);
         Assert.AreEqual("test-provider", selected.Member.ProviderName);
+        Assert.AreEqual(scopeRef, selected.Member.ProviderScopeRef);
+        Assert.AreNotEqual(Guid.Empty, selected.Member.ProviderUid);
+        Assert.AreEqual(1L, selected.Member.ProviderGeneration);
 
         var current = await store.GetAsync<ToolResource>(new(ToolResourceKinds.Tool, "documents.search"), default);
         Assert.IsNotNull(current);
@@ -194,7 +198,7 @@ public sealed class ToolSetApiTests : ModelManagementApiTestBase
             Definition = new ToolResourceProperties
             {
                 DisplayName = name,
-                Provider = new ResourceReference("test-provider", ResourceScopeRef.Instance),
+                Provider = new ResourceReference("test-provider", scopeRef),
                 ExternalId = externalId,
                 Discovery = new ToolDiscoveryState { Available = true, FirstSeenAt = now, LastSeenAt = now },
                 Schema = new ToolSchema { Input = JsonSerializer.SerializeToElement(new { type = "object", properties = new { } }) }
