@@ -73,6 +73,36 @@ public sealed class ToolDiscoveryTests
     }
 
     [TestMethod]
+    public async Task ExactEnablementActivatesOnlyTheSelectedDiscoveredTool()
+    {
+        var store = new MemoryStore();
+        var provider = Provider();
+        await store.PutAsync(provider, null, true, default);
+        var service = new ToolManagementService(
+            store,
+            new UnusedReferenceResolver(),
+            new TestScopeOperations(),
+            [new SequenceDiscovery([Descriptor("discover", "Discover"), Descriptor("invoke", "Invoke")])],
+            new FixedTimeProvider());
+        _ = await service.RefreshDiscoveryExactAsync(WorkspaceScope, provider.Name, provider.Namespace, default);
+        var tools = await service.ListToolsAsync(default);
+        var discover = tools.Single(value => value.Value.Definition.ExternalId == "discover");
+
+        var enabled = await service.SetToolEnabledExactAsync(
+            WorkspaceScope,
+            discover.Value.Name,
+            discover.Value.Namespace,
+            true,
+            discover.ETag,
+            default);
+        tools = await service.ListToolsAsync(default);
+
+        Assert.IsTrue(enabled.Value.Definition.Enabled);
+        Assert.IsTrue(tools.Single(value => value.Value.Definition.ExternalId == "discover").Value.Definition.Enabled);
+        Assert.IsFalse(tools.Single(value => value.Value.Definition.ExternalId == "invoke").Value.Definition.Enabled);
+    }
+
+    [TestMethod]
     public void ProviderValidationSupportsStdioHttpAndAepWithoutPlaintextEnvironmentValues()
     {
         ToolManagementService.ValidateProvider(Provider());

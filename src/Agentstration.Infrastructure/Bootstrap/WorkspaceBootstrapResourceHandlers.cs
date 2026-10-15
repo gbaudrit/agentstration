@@ -245,8 +245,12 @@ public sealed class ModelProfileBootstrapResourceHandler(
         };
 }
 
-public sealed class ToolSetBootstrapResourceHandler(ToolSetService service) : IBootstrapResourceHandler
+public sealed class ToolSetBootstrapResourceHandler(
+    ToolSetService service,
+    ToolManagementService tools) : IBootstrapResourceHandler
 {
+    private const string TemporaryOpenApiTestingProfile = "openapi-testing";
+
     public string Kind => ToolResourceKinds.ToolSet;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
 
@@ -277,8 +281,41 @@ public sealed class ToolSetBootstrapResourceHandler(ToolSetService service) : IB
         };
         if (await service.GetExactAsync(value.ScopeRef.Value, value.Namespace, value.Name, cancellationToken) is not null)
             return BootstrapResourceApplyResult.Skipped;
+        // TEMPORARY #823 test bridge: remove with the openapi-testing profile when #696 owns
+        // explicit AEP bundle installation and governed Tool activation.
+        if (string.Equals(operation.ProfileName, TemporaryOpenApiTestingProfile, StringComparison.Ordinal))
+            await EnableTemporaryTestingMembersAsync(value, cancellationToken);
         _ = await service.CreateAsync(value, cancellationToken);
         return BootstrapResourceApplyResult.Created;
+    }
+
+    private async Task EnableTemporaryTestingMembersAsync(
+        ToolSetResource value,
+        CancellationToken cancellationToken)
+    {
+        var ownerScope = value.ScopeRef
+            ?? throw new ToolSetValidationException("tool_set_scope_invalid", "The temporary ToolSet has no ownership scope.");
+        foreach (var member in value.Definition.Members)
+        {
+            var toolNamespace = member.Tool.Namespace ?? value.Namespace;
+            var toolScope = member.Tool.ScopeRef ?? ownerScope;
+            var tool = await tools.GetToolExactAsync(toolScope, member.Tool.Name, toolNamespace, cancellationToken)
+                ?? throw new ToolSetValidationException(
+                    "tool_set_member_not_found",
+                    $"Tool member '{toolNamespace}/{member.Tool.Name}' was not found in scope '{toolScope}'.");
+            if (tool.Value.Definition.Discovery?.Available != true)
+                throw new ToolSetValidationException(
+                    "tool_set_member_unavailable",
+                    $"Tool member '{tool.Value.Address}' is unavailable.");
+            if (!tool.Value.Definition.Enabled)
+                _ = await tools.SetToolEnabledExactAsync(
+                    toolScope,
+                    tool.Value.Name,
+                    tool.Value.Namespace,
+                    true,
+                    tool.ETag,
+                    cancellationToken);
+        }
     }
 }
 
