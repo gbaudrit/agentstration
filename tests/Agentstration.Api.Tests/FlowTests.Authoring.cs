@@ -137,6 +137,21 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task GraphOnlyDraftPublishesAsWorkflowWithoutPlaceholderAgent()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var drafts = new FlowDraftService(fixture.Repository, fixture.Service, new AlwaysValidFlowValidator(), TimeProvider.System);
+        await drafts.CreateAsync(TestScope.WorkspaceId,
+            new CreateFlowDraftCommand("graph-only", "Graph only", null, null, "Empty"), default);
+
+        var published = await drafts.PublishAsync(TestScope.WorkspaceId, new FlowId("graph-only"), "1.0.0", null, true, default);
+
+        var workflow = Assert.IsInstanceOfType<WorkflowFlowDefinition>(published.Value.Definition);
+        Assert.AreEqual("input", workflow.EntryNodeId);
+        Assert.AreEqual(FlowNodeKind.Input, workflow.Nodes.Single().Kind);
+    }
+
+    [TestMethod]
     public async Task CreatesMissingDraftFromNamespacedPublishedVersion()
     {
         await using var fixture = await FlowFixture.CreateAsync();
