@@ -4,7 +4,7 @@ metadata: { name: openapi-discovery }
 definition:
   displayName: Discover governed OpenAPI operations
   description: Discovers only configured same-origin contract candidates and returns bounded hierarchical choices.
-  version: 1.0.1
+  version: 1.0.2
   enabled: true
   metadata: { flow.contract: datasource.discovery/v1 }
   spec:
@@ -36,7 +36,7 @@ definition:
         toolSet: { resourceId: openapi-governed, version: 1.0.0 }
         capability: openapi.discover
         route: default
-        argumentsMapping: { origin: "${input.sourceConfiguration.origin}", candidatePaths: "${input.sourceConfiguration.candidatePaths}", correlationId: "${input.correlationId}" }
+        argumentsMapping: { origin: "${input.sourceConfiguration.origin}", candidatePaths: "${input.sourceConfiguration.candidatePaths}", includeContracts: false, correlationId: "${input.correlationId}" }
       - type: output
         name: output
         displayName: Discovered operations

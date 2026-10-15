@@ -41,6 +41,8 @@ The contributed profile accepts:
 
 Run discovery from the generic Data Source page, inspect its bounded contract and operation hierarchy, and explicitly promote one eligible operation into a named acquisition target. Missing or duplicate `operationId` values are retained as diagnostics but cannot be promoted. Rediscovery never selects or updates a target automatically.
 
+The technical discovery Tool returns exact contract content by default. The contributed Data Source discovery Flow invokes it with `includeContracts: false`, retaining only choices, digests, and diagnostics in the Flow event so that large contracts do not exceed the AWP 64 KiB event-payload bound. Acquisition refetches the selected URI and verifies that retained digest before execution.
+
 Acquisition requires a current enabled target. The extension refetches the selected contract and verifies the exact SHA-256 digest before invoking the selected server, operation, method, and path. Knowledge Sources select the named target and consume only its durable acquisition Artifacts; they never call the external origin.
 
 ## Credentials
@@ -52,6 +54,8 @@ Data Source and acquisition inputs carry only `credentialId`. Operator configura
 The extension requires an explicit domain and port allowlist. Private destinations are disabled by default. Loopback, link-local, multicast, unspecified, documentation, benchmark, and reserved address ranges remain denied. Redirects are disabled. Every top-level contract, selected server, and pagination destination is checked independently.
 
 The initial `$ref` policy accepts only local references. Unresolved references, cycles, excessive depth or count, external references, unsupported schemes, oversized contracts, unsupported versions, disallowed methods or content types, timeouts, large responses, and excessive pagination fail with bounded `openapi_*` codes.
+
+For compatibility with otherwise usable OpenAPI 3 documents, the parser may validate a temporary copy with the non-standard schema declaration `type: any` removed when that is the only parser error. The retained document and digest remain unchanged, and discovery reports `openapi_compatibility_type_any`. Other invalid schema types remain rejected.
 
 Default ceilings are 8 candidates, 2 MiB per contract, 1,000 operations, 256 references, depth 16, 4 MiB per response, 10 pages, 8 connections per server, and 30 seconds per request. Operators may reduce these limits and can increase them only within the validator's hard ranges.
 

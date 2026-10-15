@@ -160,6 +160,19 @@ public sealed class OpenApiExtensionTests
     }
 
     [TestMethod]
+    public async Task DiscoveryCanOmitContractDescriptorsForBoundedFlowEvents()
+    {
+        var service = Service((_, _) => Task.FromResult(Response(JsonContract, "application/json")));
+
+        var result = await service.DiscoverAsync("https://origin.example.test", ["/openapi.json"],
+            includeContracts: false, "corr-compact", default);
+
+        Assert.IsEmpty(result.Contracts);
+        Assert.IsNotEmpty(result.Choices);
+        Assert.AreEqual("corr-compact", result.CorrelationId);
+    }
+
+    [TestMethod]
     public async Task DiscoveryRejectsCrossOriginAndExcessCandidates()
     {
         var service = Service((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)));
@@ -355,7 +368,8 @@ public sealed class OpenApiExtensionTests
             .All(value => value.Contains("flowKind: workflow", StringComparison.Ordinal)));
         var discoveryFlow = bundle.ResourceManifests.Single(value =>
             value.Contains("flow.contract: datasource.discovery/v1", StringComparison.Ordinal));
-        Assert.Contains("version: 1.0.1", discoveryFlow);
+        Assert.Contains("version: 1.0.2", discoveryFlow);
+        Assert.Contains("includeContracts: false", discoveryFlow);
         Assert.Contains("structuredContent.diagnostics", discoveryFlow);
         Assert.Contains("diagnostics: { type: array", discoveryFlow);
         Assert.IsFalse(bundle.ResourceManifests.Any(value => value.Contains("unused-graph-target", StringComparison.Ordinal)));
