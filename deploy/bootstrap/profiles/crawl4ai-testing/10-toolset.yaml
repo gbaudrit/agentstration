@@ -1,0 +1,14 @@
+apiVersion: agentstration.io/v1
+kind: ToolSet
+metadata:
+  name: crawl4ai-web-acquisition
+  tags: { agentstration.io/category: data-source }
+definition:
+  displayName: Crawl4AI Web acquisition
+  description: Exact Crawl4AI Tools used by the reusable Web Data Source Profile.
+  version: 1.0.0
+  publish: true
+  members:
+    - { tool: { binding: web.crawl }, capability: web.crawl, route: default }
+    - { tool: { binding: content.read }, capability: content.read, route: default }
+    - { tool: { binding: content.delete }, capability: content.delete, route: default }

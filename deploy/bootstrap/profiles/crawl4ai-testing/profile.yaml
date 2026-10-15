@@ -1,0 +1,24 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: crawl4ai-testing
+definition:
+  displayName: Crawl4AI testing resources
+  description: Temporarily installs the Crawl4AI ToolSet, chunk-transfer and acquisition Flows, and Data Source Profile for an enrolled Crawl4AI extension.
+  targetScope: workspace
+  bindings:
+    - name: web.crawl
+      targetKind: tool
+      displayName: Crawl4AI crawl Tool
+      description: Select the web.crawl Tool provisioned for the enrolled Crawl4AI extension.
+      required: true
+    - name: content.read
+      targetKind: tool
+      displayName: Crawl4AI content read Tool
+      description: Select the content.read Tool provisioned for the same enrolled Crawl4AI extension.
+      required: true
+    - name: content.delete
+      targetKind: tool
+      displayName: Crawl4AI content delete Tool
+      description: Select the content.delete Tool provisioned for the same enrolled Crawl4AI extension.
+      required: true
