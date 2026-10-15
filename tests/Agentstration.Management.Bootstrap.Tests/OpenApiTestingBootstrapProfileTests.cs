@@ -42,9 +42,11 @@ public sealed class OpenApiTestingBootstrapProfileTests
             .All(value => value.Definition.GetProperty("spec").GetProperty("flowKind").GetString() == "workflow"));
         var discovery = resources.Single(value => value.Kind == "Flow"
             && value.Metadata.Name == "openapi-discovery");
-        Assert.AreEqual("1.0.1", discovery.Definition.GetProperty("version").GetString());
+        Assert.AreEqual("1.0.2", discovery.Definition.GetProperty("version").GetString());
+        Assert.IsFalse(discovery.Definition.GetProperty("graph").GetProperty("steps")[1]
+            .GetProperty("argumentsMapping").GetProperty("includeContracts").GetBoolean());
         var dataSourceProfile = resources.Single(value => value.Kind == "DataSourceProfile");
-        Assert.AreEqual("1.0.1", dataSourceProfile.Definition.GetProperty("discoveryFlow")
+        Assert.AreEqual("1.0.2", dataSourceProfile.Definition.GetProperty("discoveryFlow")
             .GetProperty("version").GetString());
     }
 

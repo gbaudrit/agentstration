@@ -30,7 +30,7 @@ public static class OpenApiDataSourceProfileBundle
         definition:
           displayName: Discover governed OpenAPI operations
           description: Discovers only configured same-origin contract candidates and returns bounded hierarchical choices.
-          version: 1.0.1
+          version: 1.0.2
           enabled: true
           metadata: { flow.contract: datasource.discovery/v1 }
           spec:
@@ -62,7 +62,7 @@ public static class OpenApiDataSourceProfileBundle
                 toolSet: { resourceId: openapi-governed, version: 1.0.0 }
                 capability: openapi.discover
                 route: default
-                argumentsMapping: { origin: "${input.sourceConfiguration.origin}", candidatePaths: "${input.sourceConfiguration.candidatePaths}", correlationId: "${input.correlationId}" }
+                argumentsMapping: { origin: "${input.sourceConfiguration.origin}", candidatePaths: "${input.sourceConfiguration.candidatePaths}", includeContracts: false, correlationId: "${input.correlationId}" }
               - type: output
                 name: output
                 displayName: Discovered operations
@@ -195,7 +195,7 @@ public static class OpenApiDataSourceProfileBundle
               fixedBindings: { type: object }
             required: [origin, candidatePaths, maximumPages]
             additionalProperties: false
-          discoveryFlow: { name: openapi-discovery, version: 1.0.1, useActiveVersion: false }
+          discoveryFlow: { name: openapi-discovery, version: 1.0.2, useActiveVersion: false }
           discoveryToolBindings:
             - { name: discover, capability: openapi.discover, tool: { binding: openapi.contract.discover } }
           acquisitionFlow: { name: openapi-acquisition, version: 1.0.0, useActiveVersion: false }

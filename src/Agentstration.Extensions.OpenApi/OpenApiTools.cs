@@ -37,9 +37,10 @@ public sealed class OpenApiTools(OpenApiService service, OpenApiContractParser p
     public Task<OpenApiDiscoveryResult> DiscoverAsync(
         [Description("Configured credential-free absolute HTTP(S) origin or contract URL.")] string origin,
         [Description("Explicit bounded same-origin contract candidate paths.")] string[]? candidatePaths = null,
+        [Description("Return exact contract content and descriptors. Data Source Flows should disable this to remain within event payload bounds.")] bool includeContracts = true,
         [Description("Optional caller correlation identifier.")] string? correlationId = null,
         CancellationToken cancellationToken = default) =>
-        service.DiscoverAsync(origin, candidatePaths, correlationId, cancellationToken);
+        service.DiscoverAsync(origin, candidatePaths, includeContracts, correlationId, cancellationToken);
 
     [McpServerTool(Name = "openapi_invoke", UseStructuredContent = true),
      Description("Invoke exactly one eligible operation selected by contract digest, server, operationId, method and path.")]

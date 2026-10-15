@@ -19,6 +19,11 @@ public sealed class OpenApiService(
 
     public async Task<OpenApiDiscoveryResult> DiscoverAsync(
         string origin, IReadOnlyList<string>? candidatePaths, string? correlationId, CancellationToken cancellationToken)
+        => await DiscoverAsync(origin, candidatePaths, includeContracts: true, correlationId, cancellationToken);
+
+    public async Task<OpenApiDiscoveryResult> DiscoverAsync(
+        string origin, IReadOnlyList<string>? candidatePaths, bool includeContracts,
+        string? correlationId, CancellationToken cancellationToken)
     {
         var id = Correlation(correlationId);
         var originUri = await destinations.ValidateAsync(origin, cancellationToken);
@@ -45,7 +50,7 @@ public sealed class OpenApiService(
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation("OpenAPI discovery {CorrelationId} checked {CandidateCount} candidates and found {ContractCount} contracts with {ChoiceCount} choices.",
                 id, candidates.Count, contracts.Count, choices.Length);
-        return new(id, contracts, choices, diagnostics);
+        return new(id, includeContracts ? contracts : [], choices, diagnostics);
     }
 
     public async Task<OpenApiInvocationResult> InvokeAsync(
