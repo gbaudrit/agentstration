@@ -104,6 +104,8 @@ public sealed class DataSourceAcquisitionService(
     {
         var context = RequireContext();
         ValidateRequest(parameters, idempotencyKey);
+        if (sourceScope is { } requestedScope)
+            EnsureVisible(requestedScope, context);
         var source = await sources.GetAsync(sourceNamespace, sourceName, sourceScope, cancellationToken)
             ?? throw Error("data_source_not_found", $"Data Source '{sourceNamespace}/{sourceName}' was not found.");
         var sourceOwnerScope = source.Value.ScopeRef
@@ -282,6 +284,8 @@ public sealed class DataSourceAcquisitionService(
         IEnumerable<StoredResource<DataSourceAcquisitionResource>> selected = stored;
         if (sourceName is not null)
         {
+            if (sourceScope is { } requestedScope)
+                EnsureVisible(requestedScope, context);
             var source = await sources.GetAsync(sourceNamespace ?? ResourceNamespace.Default, sourceName,
                 sourceScope, cancellationToken)
                 ?? throw Error("data_source_not_found",

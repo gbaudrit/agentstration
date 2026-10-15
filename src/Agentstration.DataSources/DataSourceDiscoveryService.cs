@@ -34,6 +34,8 @@ public sealed class DataSourceDiscoveryService(
     {
         var context = RequireContext();
         DataSourceAcquisitionService.ValidateBoundedRequest(parameters, idempotencyKey, "Discovery");
+        if (sourceScope is { } requestedScope)
+            DataSourceAcquisitionService.EnsureVisible(requestedScope, context);
         var source = await sources.GetAsync(sourceNamespace, sourceName, sourceScope, cancellationToken)
             ?? throw Error("data_source_not_found", $"Data Source '{sourceNamespace}/{sourceName}' was not found.");
         var ownerScope = source.Value.ScopeRef ?? throw Error("data_source_scope_required", "The Data Source has no ownership scope.");
@@ -127,6 +129,8 @@ public sealed class DataSourceDiscoveryService(
     {
         var context = RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsRead, cancellationToken);
+        if (sourceScope is { } requestedScope)
+            DataSourceAcquisitionService.EnsureVisible(requestedScope, context);
         var source = await sources.GetAsync(sourceNamespace, sourceName, sourceScope, cancellationToken)
             ?? throw Error("data_source_not_found", $"Data Source '{sourceNamespace}/{sourceName}' was not found.");
         DataSourceAcquisitionService.EnsureVisible(source.Value.ScopeRef!.Value, context);
@@ -339,6 +343,8 @@ public sealed class DataSourceAcquisitionTargetService(
     {
         var context = RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.ResourcesRead, cancellationToken);
+        if (sourceScope is { } requestedScope)
+            DataSourceAcquisitionService.EnsureVisible(requestedScope, context);
         var source = await sources.GetAsync(sourceNamespace, sourceName, sourceScope, cancellationToken)
             ?? throw Error("data_source_not_found", $"Data Source '{sourceNamespace}/{sourceName}' was not found.");
         DataSourceAcquisitionService.EnsureVisible(source.Value.ScopeRef!.Value, context);
