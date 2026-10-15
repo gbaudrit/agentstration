@@ -8,6 +8,8 @@ using Agentstration.Aep.Client;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
+using Agentstration.Schemas;
+using Agentstration.Schemas.Aep;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Tools.Mcp;
 using Microsoft.AspNetCore.Hosting;
@@ -24,6 +26,93 @@ namespace Agentstration.Web.Tests;
 public sealed class McpToolCatalogTests
 {
     private static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+
+    [TestMethod]
+    public async Task AepSchemaFormatContributionValidatesThroughGovernedMcpWithoutBecomingAnAgentTool()
+    {
+        await using var host = new WebApplicationFactory<UtilitiesExtension::Program>();
+        const string token = "schema-format-extension-token";
+        var registration = Registration(
+            "utilities-extension",
+            "Agentstration.Extensions.Utilities",
+            AepTransportAuthenticationMode.StaticBearer,
+            new ResourceReference("utilities-token", WorkspaceScope));
+        var recorder = new AuthorizationRecorder(token);
+        var secrets = new TestSecretResolver(token);
+        var extensionUnavailable = false;
+        var httpHandlers = new TestHttpMessageHandlerFactory(() =>
+            extensionUnavailable
+                ? new AuthenticationFailureHandler()
+                : new RecordingAuthorizationHandler(host.Server.CreateHandler(), recorder));
+        var transport = new AepMcpTransport(httpHandlers, NullLoggerFactory.Instance);
+        var source = new AepSchemaFormatHandlerSource(
+            new FakeStore(registration),
+            transport,
+            new AepSchemaFormatOptions { OperationTimeout = TimeSpan.FromSeconds(5) },
+            secrets);
+        var registry = new SchemaFormatRegistry([new BuiltinJsonSchemaFormatHandler()], [source]);
+
+        var formats = await registry.ListAsync();
+        var contributed = formats.Single(value =>
+            value.Provider.Id == "Agentstration.Extensions.Utilities/json-schema.validation");
+        var handler = await registry.ResolveAsync(
+            SchemaFormatIds.JsonSchema,
+            SchemaFormatCapabilities.ValidateDefinition,
+            contributed.Provider);
+        var valid = await handler.ValidateDefinitionAsync(
+            JsonSerializer.SerializeToElement(new { type = "object" }),
+            BuiltinJsonSchemaFormatHandler.Draft202012,
+            default);
+        var invalid = await handler.ValidateInstanceAsync(
+            JsonSerializer.SerializeToElement(new { type = "string" }),
+            JsonSerializer.SerializeToElement(42),
+            BuiltinJsonSchemaFormatHandler.Draft202012,
+            default);
+
+        Assert.IsTrue(valid.IsValid);
+        Assert.IsFalse(invalid.IsValid);
+        Assert.AreEqual("instance_type", invalid.Issues.Single().Code);
+        Assert.IsTrue(formats.Single(value =>
+            value.Provider.Id == BuiltinJsonSchemaFormatHandler.ProviderId).IsDefault);
+        Assert.IsTrue(recorder.Paths.Contains("/.well-known/aep", StringComparer.Ordinal));
+        Assert.IsTrue(recorder.Paths.Contains("/mcp", StringComparer.Ordinal));
+        Assert.IsTrue(recorder.AllRequestsAuthenticated);
+        Assert.IsGreaterThanOrEqualTo(2, secrets.ResolutionCount);
+
+        extensionUnavailable = true;
+        var retained = await source.ListAsync();
+        var unavailable = retained.Single(value => value.Descriptor.Provider == contributed.Provider);
+        Assert.IsFalse(unavailable.Descriptor.IsAvailable);
+        Assert.IsNotNull(unavailable.Descriptor.UnavailableReason);
+        extensionUnavailable = false;
+
+        var provider = AepProvider();
+        var discovery = await new ToolProviderAdapter(
+            new ResourceAepExtensionRegistrationResolver(new FakeStore(provider, registration), secrets),
+            new ConfigurationToolProviderEnvironmentResolver(new ConfigurationBuilder().Build()),
+            httpHandlers,
+            NullLoggerFactory.Instance,
+            transport).DiscoverAsync(provider, default);
+        Assert.IsFalse(discovery.Tools.Any(value => value.ExternalId.StartsWith("schema_", StringComparison.Ordinal)));
+        Assert.HasCount(3, discovery.Tools);
+
+        var timeoutSource = new AepSchemaFormatHandlerSource(
+            new FakeStore(registration),
+            transport,
+            new AepSchemaFormatOptions { OperationTimeout = TimeSpan.FromTicks(1) },
+            secrets);
+        var timeoutRegistry = new SchemaFormatRegistry([], [timeoutSource]);
+        var timeoutHandler = await timeoutRegistry.ResolveAsync(
+            SchemaFormatIds.JsonSchema,
+            SchemaFormatCapabilities.ValidateDefinition,
+            contributed.Provider);
+        var timeout = await Assert.ThrowsAsync<SchemaFormatOperationException>(async () =>
+            await timeoutHandler.ValidateDefinitionAsync(
+                JsonSerializer.SerializeToElement(new { type = "object" }),
+                BuiltinJsonSchemaFormatHandler.Draft202012,
+                default));
+        Assert.AreEqual("schema_format_provider_timeout", timeout.Code);
+    }
 
     [TestMethod]
     public void ServerMcpEndpointRemainsAvailableWithoutLegacyPlatformTools()

@@ -457,6 +457,43 @@ public sealed class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
+    public async Task ToolFailurePreservesAuthorityErrorInResolvedFailureDetails()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "fetch",
+            Steps =
+            [
+                new ToolFlowStepDefinition { Name = "fetch", Tool = new("rest.get") },
+                new FailureFlowStepDefinition
+                {
+                    Name = "failure",
+                    Code = "acquisition_failed",
+                    Message = "Data Source acquisition failed.",
+                    DetailsExpression = "${transition.output}"
+                }
+            ],
+            Transitions = [new("fetch-failure", "fetch", "error", "failure")]
+        };
+        var handler = new GraphHandler(TestNow)
+        {
+            FlowToolFailureCode = "http_media_type_invalid",
+            FlowToolFailureMessage = "Media type 'text/html' is not allowed for this profile."
+        };
+
+        var (result, _) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }), handler);
+
+        Assert.AreEqual("error", result.Outcome);
+        Assert.AreEqual("acquisition_failed", result.ErrorCode);
+        Assert.AreEqual("Media type 'text/html' is not allowed for this profile.", result.ErrorDetails);
+        var failed = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.StepCompleted
+            && value.Location.FlowStep?.StepDefinitionId == "fetch");
+        Assert.AreEqual("http_media_type_invalid", failed.Payload?.GetProperty("errorCode").GetString());
+        Assert.AreEqual("Media type 'text/html' is not allowed for this profile.",
+            failed.Payload?.GetProperty("error").GetString());
+    }
+
+    [TestMethod]
     public async Task AgentArtifactCapturesTheExactMaterialGeneration()
     {
         var graph = new FlowGraphDefinition
@@ -1248,6 +1285,8 @@ public sealed class AwpAssignmentExecutorTests
         public Action? OnChildCreated { get; init; }
         public string ModelOutput { get; init; } = "agent-result";
         public string? ModelFailureMessage { get; init; }
+        public string? FlowToolFailureCode { get; init; }
+        public string? FlowToolFailureMessage { get; init; }
         public bool StallModel { get; init; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
@@ -1262,6 +1301,15 @@ public sealed class AwpAssignmentExecutorTests
             var messageId = document.RootElement.GetProperty("messageId").GetGuid();
             if (path == AwpProtocol.StreamModelPath)
                 return StreamModel(bytes, messageId);
+            if (path == AwpProtocol.InvokeFlowToolPath && FlowToolFailureMessage is not null)
+                return new(HttpStatusCode.UnprocessableEntity)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        title = FlowToolFailureMessage,
+                        code = FlowToolFailureCode ?? "tool_step_failed"
+                    })
+                };
             object payload = path switch
             {
                 AwpProtocol.OpenStepExecutionPath => OpenStep(bytes),

@@ -152,7 +152,8 @@ public sealed class SchemaManagementService(
         ISchemaFormatHandler handler;
         try
         {
-            handler = formatRegistry.Resolve(resource.Definition.Format, SchemaFormatCapabilities.ValidateDefinition);
+            handler = await formatRegistry.ResolveAsync(resource.Definition.Format,
+                SchemaFormatCapabilities.ValidateDefinition, cancellationToken: cancellationToken);
         }
         catch (SchemaFormatResolutionException exception)
         {

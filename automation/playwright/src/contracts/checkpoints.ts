@@ -150,4 +150,7 @@ export const Checkpoints = {
   schemaDrivenSources: {
     completed: 'schema-driven-sources-completed',
   },
+  schemaAdministration: {
+    completed: 'schema-administration-completed',
+  },
 } as const;

@@ -16,6 +16,7 @@ public enum FlowTopologyEdgeState
 {
     Declared,
     Observed,
+    Failed,
     Inactive
 }
 
@@ -182,6 +183,10 @@ public static class FlowTopologyProjector
             .Where(step => step.Status is not FlowStepRunStatus.NotStarted and not FlowStepRunStatus.Skipped)
             .Select(step => step.StepName)
             .ToHashSet(StringComparer.Ordinal) ?? [];
+        var failedSources = run?.Steps
+            .Where(step => step.Status == FlowStepRunStatus.Failed)
+            .Select(step => step.StepName)
+            .ToHashSet(StringComparer.Ordinal) ?? [];
         var edges = graph.Transitions.Select(transition => new FlowTopologyEdge(
             transition.Id,
             $"step:{transition.FromStep}",
@@ -189,11 +194,22 @@ public static class FlowTopologyProjector
             transition.Condition is null ? transition.Event : $"{transition.Event} · {transition.Condition}",
             transition.Event is "true" or "false" || transition.Condition is not null ? FlowTopologyEdgeKind.Conditional : FlowTopologyEdgeKind.Standard,
             run is null ? FlowTopologyEdgeState.Declared
-                : selectedTransitions.Contains(transition.Id) ? FlowTopologyEdgeState.Observed
+                : selectedTransitions.Contains(transition.Id)
+                    ? failedSources.Contains(transition.FromStep) || IsFailureTransition(graph, transition)
+                        ? FlowTopologyEdgeState.Failed
+                        : FlowTopologyEdgeState.Observed
                 : executedSources.Contains(transition.FromStep) ? FlowTopologyEdgeState.Inactive
                 : FlowTopologyEdgeState.Declared)).ToArray();
         return new(positions, edges, graph.Designer.PreferredLayout ?? "custom", "Workflow graph with declared transitions");
     }
+
+    private static bool IsFailureTransition(FlowGraphDefinition graph, FlowTransitionDefinition transition) =>
+        transition.Event is "error" or "failed" or "timedOut"
+        || graph.Steps.Single(step => step.Name == transition.ToStep) is FailureFlowStepDefinition
+        || graph.Steps.Single(step => step.Name == transition.ToStep) is OutputFlowStepDefinition
+        {
+            Outcome: FlowOutputOutcome.Error
+        };
 
     private static FlowTopologyGraph ProjectWorkflow(WorkflowFlowDefinition definition, FlowRun? run)
     {

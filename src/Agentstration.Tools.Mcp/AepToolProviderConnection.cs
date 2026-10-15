@@ -47,11 +47,11 @@ public sealed class ResourceAepExtensionRegistrationResolver(
             throw new ToolResolutionException("extension_disabled", $"Extension Registration '{registration.Address}' is disabled.");
         if (string.IsNullOrWhiteSpace(registration.Definition.ExpectedExtensionId))
             throw new ToolResolutionException("extension_identity_required", $"Extension Registration '{registration.Address}' does not declare its expected AEP identity.");
-        return new ResolvedAepExtension(registration, AepToolExtensionCredentials.Create(registration, secrets));
+        return new ResolvedAepExtension(registration, AepExtensionCredentials.Create(registration, secrets));
     }
 }
 
-internal static class AepToolExtensionCredentials
+public static class AepExtensionCredentials
 {
     public static IAepAccessTokenProvider? Create(
         ExtensionRegistrationResource registration,
