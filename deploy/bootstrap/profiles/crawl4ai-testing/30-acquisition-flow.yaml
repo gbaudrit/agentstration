@@ -1,0 +1,100 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata: { name: crawl4ai-web-acquisition }
+definition:
+  displayName: Acquire a Web origin with Crawl4AI
+  description: Crawls one configured Web origin and persists one bounded normalized corpus.
+  version: 1.0.0
+  enabled: true
+  metadata: { flow.contract: datasource.acquisition/v1 }
+  spec:
+    flowKind: workflow
+    entryNodeId: input
+    nodes: [{ id: input, kind: input }]
+    edges: []
+  graph:
+    entryStep: input
+    inputSchema:
+      type: object
+      properties:
+        dataSourceId: { type: string }
+        dataSourceUid: { type: string }
+        dataSourceGeneration: { type: integer }
+        profile: { type: object }
+        sourceConfiguration: { type: object }
+        parameters: { type: object }
+        caller: { type: object }
+        correlationId: { type: string }
+        acquisitionId: { type: string }
+      required: [dataSourceId, dataSourceUid, dataSourceGeneration, profile, sourceConfiguration, parameters, caller, correlationId, acquisitionId]
+      additionalProperties: false
+    steps:
+      - { type: input, name: input, displayName: Acquisition request }
+      - type: toolRoute
+        name: crawl
+        displayName: Crawl configured Web origin
+        toolSet: { resourceId: crawl4ai-web-acquisition, version: 1.0.0 }
+        capability: web.crawl
+        route: default
+        argumentsMapping: { startUrl: "${input.sourceConfiguration.url}", maximumDepth: "${input.sourceConfiguration.maximumDepth}", maximumPages: "${input.sourceConfiguration.maximumPages}", correlationId: "${input.correlationId}" }
+      - type: toolRoute
+        name: create
+        displayName: Create staged corpus
+        toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0 }
+        capability: staged-artifact.create
+        route: default
+        argumentsMapping: { fileName: crawl4ai-content.md, mediaType: "${steps.crawl.output.structuredContent.corpus.mediaType}" }
+      - type: repeat
+        name: transfer
+        displayName: Transfer bounded content chunks
+        flow: { resourceId: crawl4ai-web-transfer-chunk, versionStrategy: exact, version: 1.0.0 }
+        inputMapping: { contentReference: "${steps.crawl.output.structuredContent.corpus.reference}", stagedArtifactId: "${steps.create.output.artifactReference}", offset: 0 }
+        nextInputMapping: { contentReference: "${steps.transfer.output.contentReference}", stagedArtifactId: "${steps.transfer.output.stagedArtifactId}", offset: "${steps.transfer.output.nextOffset}" }
+        until: "${steps.transfer.output.endOfContent == true}"
+        maximumIterations: 1000
+      - type: toolRoute
+        name: seal
+        displayName: Seal staged corpus
+        toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0 }
+        capability: staged-artifact.seal
+        route: default
+        argumentsMapping: { artifactId: "${steps.create.output.artifactReference}" }
+      - type: flow
+        name: persist
+        displayName: Persist acquired corpus
+        flow: { resourceId: artifact-storage-filesystem-write-builtin, versionStrategy: active }
+        inputMapping: { stagedArtifactId: "${steps.create.output.artifactReference}", producerFlowRunId: "${execution.flowRunId}", producerFlowStepId: seal }
+      - type: toolRoute
+        name: cleanup
+        displayName: Delete temporary Crawl4AI content
+        toolSet: { resourceId: crawl4ai-web-acquisition, version: 1.0.0 }
+        capability: content.delete
+        route: default
+        argumentsMapping: { contentReference: "${steps.crawl.output.structuredContent.corpus.reference}" }
+      - type: output
+        name: output
+        displayName: Publishable acquired Artifact
+        outputMapping:
+          artifacts:
+            - { artifactId: "${steps.persist.output.flowRunArtifactId}", kind: durable, disposition: publishable, name: "${input.dataSourceId}", mediaType: "${steps.seal.output.MediaType}", digest: "${steps.seal.output.Sha256}" }
+      - { type: failure, name: failure, displayName: Acquisition failed }
+    transitions:
+      - { id: input-crawl, fromStep: input, event: completed, toStep: crawl }
+      - { id: crawl-create, fromStep: crawl, event: success, toStep: create }
+      - { id: crawl-failure, fromStep: crawl, event: error, toStep: failure }
+      - { id: create-transfer, fromStep: create, event: success, toStep: transfer }
+      - { id: create-failure, fromStep: create, event: error, toStep: failure }
+      - { id: transfer-seal, fromStep: transfer, event: completed, toStep: seal }
+      - { id: seal-persist, fromStep: seal, event: success, toStep: persist }
+      - { id: seal-failure, fromStep: seal, event: error, toStep: failure }
+      - { id: persist-cleanup, fromStep: persist, event: completed, toStep: cleanup }
+      - { id: persist-failure, fromStep: persist, event: error, toStep: failure }
+      - { id: cleanup-output, fromStep: cleanup, event: success, toStep: output }
+      - { id: cleanup-failure, fromStep: cleanup, event: error, toStep: failure }
+    outputSchema:
+      type: object
+      properties: { artifacts: { type: array, items: { type: object } } }
+      required: [artifacts]
+      additionalProperties: false
+  publish: true
+  activate: true
