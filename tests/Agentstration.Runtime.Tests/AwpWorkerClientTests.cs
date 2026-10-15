@@ -121,6 +121,25 @@ public sealed class AwpWorkerClientTests
     }
 
     [TestMethod]
+    public async Task GovernedOperationFailurePreservesAuthorityCodeAndMessage()
+    {
+        using var credential = Credential();
+        using var client = new AwpClient(new Uri("https://authority.test"), credential,
+            new(Guid.NewGuid()), TimeProvider.System, 0, new GovernedOperationFailureHandler());
+        var context = new AwpAssignmentCommandContext(client.WorkerId, client.SessionId,
+            new(Guid.NewGuid(), Guid.NewGuid().ToString("D")), new(Guid.NewGuid()),
+            new(Guid.NewGuid()), "ownership-token", 1);
+
+        var exception = await Assert.ThrowsExactlyAsync<AwpClientException>(() => client.InvokeFlowToolAsync(
+            new(context, new(Guid.NewGuid()), JsonSerializer.SerializeToElement(new { })),
+            CancellationToken.None));
+
+        Assert.AreEqual("http_media_type_invalid", exception.Code);
+        Assert.AreEqual("Media type 'text/html' is not allowed for this profile.", exception.Message);
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, exception.StatusCode);
+    }
+
+    [TestMethod]
     public async Task ModelStreamPreservesOrderedTypedEvents()
     {
         using var credential = Credential();
@@ -253,6 +272,20 @@ public sealed class AwpWorkerClientTests
                     options: AwpProtocol.JsonOptions)
             };
         }
+    }
+
+    private sealed class GovernedOperationFailureHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken) => Task.FromResult(new HttpResponseMessage(
+                HttpStatusCode.UnprocessableEntity)
+            {
+                Content = JsonContent.Create(new
+                {
+                    title = "Media type 'text/html' is not allowed for this profile.",
+                    code = "http_media_type_invalid"
+                })
+            });
     }
 
     private sealed class ModelStreamHandler(bool includeTerminal) : HttpMessageHandler

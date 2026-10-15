@@ -59,10 +59,10 @@
   <data name="ZoomOut"><value>Dézoomer</value></data><data name="ZoomIn"><value>Zoomer</value></data><data name="Fit"><value>Ajuster</value></data>
   <data name="YamlDefinition"><value>Définition du Flow (YAML)</value></data><data name="ApplyAndSaveYaml"><value>Appliquer et enregistrer</value></data><data name="ApplyingYaml"><value>Application et enregistrement…</value></data>
   <data name="SourceEditorHelp"><value>Appliquez pour actualiser le graphe et enregistrer le brouillon. En cas d’erreur, le texte est conservé et le graphe reste inchangé.</value></data>
-  <data name="Declared"><value>Déclaré</value></data><data name="Observed"><value>Observé</value></data><data name="NotSelected"><value>Non sélectionné</value></data>
+  <data name="Declared"><value>Déclaré</value></data><data name="Observed"><value>Observé</value></data><data name="ObservedFailure"><value>Erreur</value></data><data name="NotSelected"><value>Non sélectionné</value></data>
   <data name="TopologyZoomControls"><value>Contrôles de zoom de la topologie</value></data><data name="NoTopology"><value>Aucune topologie n’est disponible pour ce Flow.</value></data>
   <data name="TurnCount.One"><value>{0} tour</value></data><data name="TurnCount.Many"><value>{0} tours</value></data><data name="InitialParticipant"><value>participant initial</value></data>
-  <data name="EdgeDescription"><value>{0} vers {1}{2}, {3}</value></data><data name="EdgeState.Declared"><value>déclaré</value></data><data name="EdgeState.Observed"><value>observé</value></data><data name="EdgeState.Inactive"><value>non sélectionné</value></data>
+  <data name="EdgeDescription"><value>{0} vers {1}{2}, {3}</value></data><data name="EdgeState.Declared"><value>déclaré</value></data><data name="EdgeState.Observed"><value>observé</value></data><data name="EdgeState.Failed"><value>erreur observée</value></data><data name="EdgeState.Inactive"><value>non sélectionné</value></data>
   <data name="ExpandTopology"><value>Agrandir</value></data><data name="ReduceTopology"><value>Réduire</value></data><data name="ShowInfo"><value>Infos</value></data><data name="HideInfo"><value>Masquer les infos</value></data>
   <data name="Replay"><value>Revoir</value></data><data name="Replaying"><value>Lecture…</value></data><data name="ReplaySequence"><value>Revoir la séquence d’exécution</value></data><data name="ReplayInProgress"><value>Relecture de la séquence d’exécution en cours</value></data><data name="ReplayElapsedCounter"><value>Temps écoulé de l’exécution originale</value></data>
 </root>

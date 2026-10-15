@@ -7,7 +7,7 @@
         <div class="topology-toolbar-actions">
             @if (ShowStateLegend)
             {
-                <span class="topology-legend"><i class="declared"></i>@Localizer["Declared"] <i class="observed"></i>@Localizer["Observed"] <i class="inactive"></i>@Localizer["NotSelected"]</span>
+                <span class="topology-legend"><i class="declared"></i>@Localizer["Declared"] <i class="observed"></i>@Localizer["Observed"] <i class="failed"></i>@Localizer["ObservedFailure"] <i class="inactive"></i>@Localizer["NotSelected"]</span>
             }
             @if (ReplayInProgress && ReplayElapsed is not null)
             {
@@ -48,6 +48,7 @@
                 <defs>
                     <marker id="@DeclaredMarker" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" /></marker>
                     <marker id="@ObservedMarker" class="observed-marker" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" /></marker>
+                    <marker id="@FailedMarker" class="failed-marker" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" /></marker>
                     <marker id="@InactiveMarker" class="inactive-marker" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" /></marker>
                 </defs>
                 <g class="topology-edges">
@@ -130,6 +131,7 @@
 
     private string DeclaredMarker => $"{markerPrefix}-declared";
     private string ObservedMarker => $"{markerPrefix}-observed";
+    private string FailedMarker => $"{markerPrefix}-failed";
     private string InactiveMarker => $"{markerPrefix}-inactive";
 
     protected override void OnParametersSet()
@@ -177,6 +179,7 @@
     private string Marker(FlowTopologyEdgeState state) => state switch
     {
         FlowTopologyEdgeState.Observed => ObservedMarker,
+        FlowTopologyEdgeState.Failed => FailedMarker,
         FlowTopologyEdgeState.Inactive => InactiveMarker,
         _ => DeclaredMarker
     };

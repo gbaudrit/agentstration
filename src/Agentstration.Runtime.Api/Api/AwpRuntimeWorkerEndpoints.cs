@@ -552,6 +552,10 @@ public static class AwpRuntimeWorkerEndpoints
         {
             return Problem(StatusCodes.Status409Conflict, exception.Code, exception.Message);
         }
+        catch (RuntimeGovernedOperationException exception)
+        {
+            return Problem(StatusCodes.Status422UnprocessableEntity, exception.Code, exception.Message);
+        }
     }
 
     private static async Task<IResult> ExecuteStreamAsync(

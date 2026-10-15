@@ -155,6 +155,39 @@ public sealed class FlowTopologyProjectorTests
     }
 
     [TestMethod]
+    public void SelectedErrorTransitionIsProjectedAsFailedInsteadOfObserved()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "fetch",
+            Steps =
+            [
+                new ToolFlowStepDefinition { Name = "fetch", Tool = new("rest.get") },
+                new FailureFlowStepDefinition { Name = "failure" }
+            ],
+            Transitions = [new("fetch-failure", "fetch", "error", "failure")]
+        };
+        var run = Run(WorkflowDefinition(), graph) with
+        {
+            Steps =
+            [
+                new FlowStepRun
+                {
+                    StepName = "fetch",
+                    StepType = "tool",
+                    Status = FlowStepRunStatus.Failed,
+                    SelectedTransition = "fetch-failure"
+                },
+                new FlowStepRun { StepName = "failure", StepType = "failure", Status = FlowStepRunStatus.Failed }
+            ]
+        };
+
+        var topology = FlowTopologyProjector.ProjectPreview(run);
+
+        Assert.AreEqual(FlowTopologyEdgeState.Failed, topology.Edges.Single().State);
+    }
+
+    [TestMethod]
     public void WorkflowProjectionPreservesBranchesPositionsAndConditions()
     {
         var graph = new FlowGraphDefinition

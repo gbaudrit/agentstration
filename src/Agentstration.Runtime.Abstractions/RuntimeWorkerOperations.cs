@@ -87,6 +87,12 @@ public sealed record RuntimeGovernedChildFlow(
     JsonElement? Output,
     RuntimeRootFlowExecutionMaterial? Material = null);
 
+public sealed class RuntimeGovernedOperationException(string code, string message, Exception? innerException = null)
+    : Exception(message, innerException)
+{
+    public string Code { get; } = code;
+}
+
 public interface IRuntimeWorkerOperationGateway
 {
     Task<RuntimeGovernedModelResponse> InvokeModelAsync(RuntimeGovernedModelRequest request, CancellationToken cancellationToken);
