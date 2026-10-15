@@ -87,7 +87,9 @@ public sealed class ToolSetArtifactStagingExecutor(ToolSetService toolSets, IToo
 
     private Task<ToolSetRouteSelection> ResolveAsync(ArtifactStagingBindingResource binding, string capability, CancellationToken cancellationToken) =>
         toolSets.ResolveRouteExactAsync(
-            binding.ScopeRef ?? throw Error("artifact_staging_binding_scope_invalid", "The Artifact staging binding has no Workspace scope."),
+            binding.Definition.ToolSet.ScopeRef
+                ?? binding.ScopeRef
+                ?? throw Error("artifact_staging_binding_scope_invalid", "The Artifact staging binding and ToolSet reference have no scope."),
             binding.Definition.ToolSet.Namespace ?? binding.Namespace, binding.Definition.ToolSet.Name,
             binding.Definition.ToolSetVersion, capability, "default", cancellationToken);
 

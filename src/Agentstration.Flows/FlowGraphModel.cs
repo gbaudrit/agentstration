@@ -190,7 +190,8 @@ public sealed record ToolFlowStepDefinition : FlowStepDefinition
 public sealed record FlowToolSetReference(
     string ResourceId,
     string Version,
-    ResourceNamespace? Namespace = null)
+    ResourceNamespace? Namespace = null,
+    ResourceScopeRef? ScopeRef = null)
 {
     public ResourceNamespace ResolveNamespace(ResourceNamespace ownerNamespace) => Namespace ?? ownerNamespace;
 }

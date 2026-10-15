@@ -20,12 +20,13 @@ Acquisition uses only the pins stored in the active immutable profile revision. 
 
 Pre-release databases containing profile revisions without dependency pins must be reseeded. No compatibility fallback may resolve those revisions from the execution Workspace.
 
-The core Web, REST, and Artifact-import profiles and their complete acquisition composition are reconciled at instance scope. Agentstration grants each tenant propagated `discover` and `use` access to those profiles, while acquisition records, Flow Runs, staging, and durable Artifacts remain owned by the invoking Workspace. This avoids duplicating platform-owned definitions in every Workspace without weakening execution-state isolation.
+The core Web, REST, and Artifact-import profiles and their complete acquisition composition are reconciled at instance scope. This includes the built-in Artifact ToolSets and read/write Storage Flows. Each Workspace retains only its staging binding and operational state; the binding points explicitly to the instance ToolSet. `ToolRoute` references may carry an exact ToolSet scope, and packaged Workspace Flows must declare `/instance` when they consume these shared built-ins instead of resolving the name again from their own scope. Agentstration grants each tenant propagated `discover` and `use` access to the profiles, while acquisition records, Flow Runs, staging, and durable Artifacts remain owned by the invoking Workspace. This avoids duplicating platform-owned definitions in every Workspace without weakening execution-state isolation.
 
 ## Consequences
 
 - A Workspace-local resource cannot shadow or rebind any dependency of an inherited Data Source or profile.
 - Core built-in profiles have one instance-owned identity and revision graph instead of one mutable copy per Workspace.
+- Built-in Artifact ToolSets and Storage Flow definitions have one instance-owned identity; Workspace reconciliation still owns the per-Workspace staging binding and execution state. This supersedes ADR-0156 only for the ownership of those shared definitions.
 - Publishing a profile fails until its Flow, Tools, providers, contracts, and required descendant grants are valid; ancestor Flows remain denied until #751 supplies their exact access-policy identity.
 - Changing a Tool or provider generation makes revisions that pinned the prior generation explicitly stale; authors publish a new profile revision after reviewing the new graph.
 - Activating another already-published profile revision continues to affect only future acquisitions.

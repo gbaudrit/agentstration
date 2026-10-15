@@ -193,8 +193,11 @@ public sealed class ManagementFlowResourceReferenceResolver(
         try
         {
             var toolSetNamespace = step.ToolSet.ResolveNamespace(ownerNamespace);
-            var selected = await toolSets.ResolveRouteAsync(toolSetNamespace, step.ToolSet.ResourceId,
-                step.ToolSet.Version, step.Capability, step.Route, cancellationToken);
+            var selected = step.ToolSet.ScopeRef is { } scopeRef
+                ? await toolSets.ResolveRouteExactAsync(scopeRef, toolSetNamespace, step.ToolSet.ResourceId,
+                    step.ToolSet.Version, step.Capability, step.Route, cancellationToken)
+                : await toolSets.ResolveRouteAsync(toolSetNamespace, step.ToolSet.ResourceId,
+                    step.ToolSet.Version, step.Capability, step.Route, cancellationToken);
             var member = selected.Member;
             return new ResolvedFlowToolRoute(
                 new FlowToolReference(member.ToolName, member.ToolNamespace),
@@ -270,7 +273,8 @@ public sealed class ManagementFlowToolSetResolver(ToolSetService toolSets) : IFl
         try
         {
             var toolSetNamespace = step.ToolSet.ResolveNamespace(ownerNamespace);
-            var selected = await toolSets.ResolveRouteExactAsync(ownerScopeRef, toolSetNamespace, step.ToolSet.ResourceId,
+            var selected = await toolSets.ResolveRouteExactAsync(step.ToolSet.ScopeRef ?? ownerScopeRef,
+                toolSetNamespace, step.ToolSet.ResourceId,
                 step.ToolSet.Version, step.Capability, step.Route, cancellationToken);
             var member = selected.Member;
             return new ResolvedFlowToolRoute(

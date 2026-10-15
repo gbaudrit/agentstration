@@ -35,7 +35,7 @@ public sealed class ArtifactContentMaterializationGateway(
             ? ArtifactPlatformResourceProvisioner.StorageReadFlowName
             : request.FlowName.Trim();
         var flowScopeRef = string.IsNullOrWhiteSpace(request.FlowName)
-            ? ResourceScopeRef.Workspace(current.WorkspaceId)
+            ? ResourceScopeRef.Instance
             : (ResourceScopeRef?)null;
         var flowNamespace = ResourceNamespace.Parse(request.FlowNamespace);
         var input = JsonSerializer.SerializeToElement(new { flowRunArtifactId = artifactId.ToString() });

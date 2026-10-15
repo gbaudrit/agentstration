@@ -26,13 +26,18 @@ public sealed class ArtifactPlatformResourceProvisioner(IResourceStore store, Fl
     {
         if (scope.Kind is not ResourceScopeKind.Instance and not ResourceScopeKind.Workspace)
             throw new InvalidOperationException("Built-in Artifact resources require an Instance or Workspace scope.");
-        var toolSet = await EnsureToolSetAsync(scope, cancellationToken);
-        await EnsureVersionAsync(scope, toolSet, cancellationToken);
-        var broker = await EnsureBrokerToolSetAsync(scope, cancellationToken);
-        await EnsureBrokerVersionAsync(scope, broker, cancellationToken);
+        if (scope.Kind == ResourceScopeKind.Instance)
+        {
+            var toolSet = await EnsureToolSetAsync(scope, cancellationToken);
+            await EnsureVersionAsync(scope, toolSet, cancellationToken);
+            var broker = await EnsureBrokerToolSetAsync(scope, cancellationToken);
+            await EnsureBrokerVersionAsync(scope, broker, cancellationToken);
+            await EnsureStorageFlowsAsync(scope, cancellationToken);
+            return;
+        }
+
         await DemoteLegacyDefaultBindingAsync(scope, cancellationToken);
         await EnsureBindingAsync(scope, cancellationToken);
-        await EnsureStorageFlowsAsync(scope, cancellationToken);
     }
 
     private async Task<ToolSetResource> EnsureToolSetAsync(ResourceScopeRef scope, CancellationToken cancellationToken)
@@ -144,11 +149,17 @@ public sealed class ArtifactPlatformResourceProvisioner(IResourceStore store, Fl
         if (existing is not null)
         {
             var shouldBeDefault = !otherDefault;
-            if (existing.Value.Definition.IsDefault == shouldBeDefault) return;
+            var desiredDefinition = existing.Value.Definition with
+            {
+                IsDefault = shouldBeDefault,
+                ToolSet = new ResourceReference(DefaultToolSetName, ResourceScopeRef.Instance, ResourceNamespace.Default),
+                ToolSetVersion = DefaultToolSetVersion
+            };
+            if (existing.Value.Definition == desiredDefinition) return;
             _ = await store.PutExactAsync(scope, existing.Value with
             {
                 Generation = checked(existing.Value.Generation + 1),
-                Definition = existing.Value.Definition with { IsDefault = shouldBeDefault }
+                Definition = desiredDefinition
             }, existing.ETag, false, cancellationToken);
             return;
         }
@@ -169,7 +180,7 @@ public sealed class ArtifactPlatformResourceProvisioner(IResourceStore store, Fl
                 DisplayName = "Local filesystem",
                 Description = "Default local-first temporary artifact staging.",
                 IsDefault = !otherDefault,
-                ToolSet = new ResourceReference(DefaultToolSetName, scope, ResourceNamespace.Default),
+                ToolSet = new ResourceReference(DefaultToolSetName, ResourceScopeRef.Instance, ResourceNamespace.Default),
                 ToolSetVersion = DefaultToolSetVersion
             }
         }, scope, cancellationToken);

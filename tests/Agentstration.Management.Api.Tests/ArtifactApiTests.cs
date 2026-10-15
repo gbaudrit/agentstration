@@ -266,15 +266,18 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         Assert.IsTrue(history[0].StagedArtifactAvailable);
 
         var flows = factory.Services.GetRequiredService<FlowService>();
-        var workspaceId = new WorkspaceId(context.WorkspaceId);
-        var writeFlow = await flows.GetAsync(workspaceId, new(ArtifactPlatformResourceProvisioner.StorageWriteFlowName), default);
-        var readFlow = await flows.GetAsync(workspaceId, new(ArtifactPlatformResourceProvisioner.StorageReadFlowName), default);
+        var writeFlow = await flows.GetExactAsync(ResourceScopeRef.Instance,
+            new(ArtifactPlatformResourceProvisioner.StorageWriteFlowName), default);
+        var readFlow = await flows.GetExactAsync(ResourceScopeRef.Instance,
+            new(ArtifactPlatformResourceProvisioner.StorageReadFlowName), default);
         Assert.AreEqual("1.0.0", writeFlow?.Value.ActiveVersion);
         Assert.AreEqual("1.0.0", readFlow?.Value.ActiveVersion);
         Assert.AreEqual(ArtifactFlowContracts.StorageWrite, writeFlow?.Value.Metadata[FlowMetadataKeys.Contract]);
         Assert.AreEqual(ArtifactFlowContracts.StorageRead, readFlow?.Value.Metadata[FlowMetadataKeys.Contract]);
         Assert.AreEqual("true", writeFlow?.Value.Metadata[ResourceProvenanceAnnotations.BuiltIn]);
         Assert.AreEqual("true", readFlow?.Value.Metadata[ResourceProvenanceAnnotations.BuiltIn]);
+        Assert.AreEqual(ResourceScopeRef.Instance, writeFlow?.Value.ScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Instance, readFlow?.Value.ScopeRef);
     }
 
     [TestMethod]
@@ -291,12 +294,16 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         await factory.Services.GetRequiredService<IWorkspaceProvisioner>().ProvisionAsync(workspace, default);
 
         var flows = factory.Services.GetRequiredService<FlowService>();
-        var write = await flows.GetAsync(new WorkspaceId(workspaceId),
+        var write = await flows.GetExactAsync(ResourceScopeRef.Instance,
             new(ArtifactPlatformResourceProvisioner.StorageWriteFlowName), default);
-        var read = await flows.GetAsync(new WorkspaceId(workspaceId),
+        var read = await flows.GetExactAsync(ResourceScopeRef.Instance,
             new(ArtifactPlatformResourceProvisioner.StorageReadFlowName), default);
         Assert.AreEqual(ArtifactPlatformResourceProvisioner.DefaultToolSetVersion, write?.Value.ActiveVersion);
         Assert.AreEqual(ArtifactPlatformResourceProvisioner.DefaultToolSetVersion, read?.Value.ActiveVersion);
+        Assert.IsNull(await flows.GetExactAsync(ResourceScopeRef.Workspace(workspaceId),
+            new(ArtifactPlatformResourceProvisioner.StorageWriteFlowName), default));
+        Assert.IsNull(await flows.GetExactAsync(ResourceScopeRef.Workspace(workspaceId),
+            new(ArtifactPlatformResourceProvisioner.StorageReadFlowName), default));
 
         var store = factory.Services.GetRequiredService<IResourceStore>();
         using var systemScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
@@ -305,14 +312,21 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
             scope, ResourceNamespace.Default, ArtifactResourceKinds.ArtifactStagingBinding,
             ArtifactPlatformResourceProvisioner.DefaultBindingName), default);
         var staging = await store.GetExactAsync<ToolSetResource>(ScopedResourceAddress.Create(
-            scope, ResourceNamespace.Default, ToolResourceKinds.ToolSet,
+            ResourceScopeRef.Instance, ResourceNamespace.Default, ToolResourceKinds.ToolSet,
             ArtifactPlatformResourceProvisioner.DefaultToolSetName), default);
         var broker = await store.GetExactAsync<ToolSetResource>(ScopedResourceAddress.Create(
-            scope, ResourceNamespace.Default, ToolResourceKinds.ToolSet,
+            ResourceScopeRef.Instance, ResourceNamespace.Default, ToolResourceKinds.ToolSet,
             ArtifactPlatformResourceProvisioner.BrokerToolSetName), default);
         Assert.IsTrue(binding?.Value.Definition.IsDefault);
+        Assert.AreEqual(ResourceScopeRef.Instance, binding?.Value.Definition.ToolSet.ScopeRef);
         Assert.AreEqual("true", staging?.Value.Metadata.Annotations[ResourceProvenanceAnnotations.BuiltIn]);
         Assert.AreEqual("true", broker?.Value.Metadata.Annotations[ResourceProvenanceAnnotations.BuiltIn]);
+        Assert.IsNull(await store.GetExactAsync<ToolSetResource>(ScopedResourceAddress.Create(
+            scope, ResourceNamespace.Default, ToolResourceKinds.ToolSet,
+            ArtifactPlatformResourceProvisioner.DefaultToolSetName), default));
+        Assert.IsNull(await store.GetExactAsync<ToolSetResource>(ScopedResourceAddress.Create(
+            scope, ResourceNamespace.Default, ToolResourceKinds.ToolSet,
+            ArtifactPlatformResourceProvisioner.BrokerToolSetName), default));
     }
 
     [TestMethod]
@@ -366,7 +380,7 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         _ = await service.CreateBindingAsync(ResourceNamespace.Default, "filesystem-secondary", new ArtifactStagingBindingProperties
         {
             DisplayName = "Secondary filesystem route",
-            ToolSet = new ResourceReference(ArtifactPlatformResourceProvisioner.DefaultToolSetName),
+            ToolSet = new ResourceReference(ArtifactPlatformResourceProvisioner.DefaultToolSetName, ResourceScopeRef.Instance),
             ToolSetVersion = ArtifactPlatformResourceProvisioner.DefaultToolSetVersion
         }, default);
         var source = await service.CreateStagedAsync(new("handoff.bin", "application/octet-stream",
