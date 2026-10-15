@@ -11,6 +11,8 @@ public sealed class RuntimeWorkerExecutionService(
     RuntimeWorkerLeaseOptions leaseOptions,
     RuntimeAssignmentLeaseGuardRegistry leaseGuards)
 {
+    private const int MaximumToolArgumentsLength = 2 * 1024 * 1024;
+
     public async Task<RuntimeExecutionMaterial> GetMaterialAsync(
         RuntimeAssignmentOwnershipProof proof,
         CancellationToken cancellationToken)
@@ -169,8 +171,8 @@ public sealed class RuntimeWorkerExecutionService(
         JsonElement? arguments,
         CancellationToken cancellationToken)
     {
-        if (arguments?.GetRawText().Length > 1_048_576)
-            throw new RuntimeExecutionMaterialException("tool_arguments_too_large", "Tool arguments cannot exceed 1 MiB.");
+        if (arguments?.GetRawText().Length > MaximumToolArgumentsLength)
+            throw new RuntimeExecutionMaterialException("tool_arguments_too_large", "Tool arguments cannot exceed 2 MiB.");
         var (authorization, material, agent) = await AuthorizeParticipantSideEffectAsync(proof, participantId, turnId, cancellationToken);
         var turn = authorization.Assignment.Turns.SingleOrDefault(value => value.Id == turnId
             && value.AttemptId == turnAttemptId && string.Equals(value.ParticipantId, participantId, StringComparison.Ordinal))
@@ -202,8 +204,8 @@ public sealed class RuntimeWorkerExecutionService(
         JsonElement arguments,
         CancellationToken cancellationToken)
     {
-        if (arguments.GetRawText().Length > 1_048_576)
-            throw new RuntimeExecutionMaterialException("tool_arguments_too_large", "Tool arguments cannot exceed 1 MiB.");
+        if (arguments.GetRawText().Length > MaximumToolArgumentsLength)
+            throw new RuntimeExecutionMaterialException("tool_arguments_too_large", "Tool arguments cannot exceed 2 MiB.");
         var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
         if (authorization.Assignment.TargetKind != RuntimeAssignmentTargetKind.FlowRun)
             throw new RuntimeExecutionMaterialException("flow_tool_not_allowed", "Only a Flow assignment can invoke a Flow Tool.");
