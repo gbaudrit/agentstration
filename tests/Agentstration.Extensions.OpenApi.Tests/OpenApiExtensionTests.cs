@@ -84,6 +84,43 @@ public sealed class OpenApiExtensionTests
     }
 
     [TestMethod]
+    public async Task ParserNormalizesLegacyAnyTypeOnlyForValidationAndReportsCompatibilityDiagnostic()
+    {
+        const string contract = """
+            {"openapi":"3.0.3","info":{"title":"Legacy","version":"1"},"paths":{
+              "/records":{"get":{"operationId":"getRecords","responses":{"200":{"description":"ok","content":{
+                "application/json":{"schema":{"type":"object","additionalProperties":{"type":"any"}}}
+              }}}}}
+            }}
+            """;
+
+        var parsed = Parser().Parse(contract, "application/json", new("https://origin.example.test/openapi.json"));
+
+        Assert.AreEqual(contract, parsed.Descriptor.Content);
+        Assert.AreEqual("any", parsed.Document["paths"]?["/records"]?["get"]?["responses"]?["200"]?
+            ["content"]?["application/json"]?["schema"]?["additionalProperties"]?["type"]?.GetValue<string>());
+        Assert.IsTrue(parsed.Descriptor.Operations.Single().Eligible);
+        Assert.HasCount(1, parsed.Descriptor.Diagnostics);
+        Assert.AreEqual("openapi_compatibility_type_any", parsed.Descriptor.Diagnostics[0].Code);
+
+        var discovery = await Service((_, _) => Task.FromResult(Response(contract, "application/json")))
+            .DiscoverAsync("https://origin.example.test", ["/openapi.json"], null, default);
+        Assert.IsNotEmpty(discovery.Choices);
+        Assert.IsTrue(discovery.Diagnostics.Any(value => value.Code == "openapi_compatibility_type_any"));
+    }
+
+    [TestMethod]
+    public void ParserDoesNotNormalizeOtherInvalidSchemaTypes()
+    {
+        const string contract = """
+            {"openapi":"3.0.3","info":{"title":"Invalid","version":"1"},"paths":{},
+             "components":{"schemas":{"Value":{"type":"something-else"}}}}
+            """;
+
+        AssertCode("openapi_contract_invalid", contract);
+    }
+
+    [TestMethod]
     public void ParserEnforcesReferencePolicyAndVersion()
     {
         AssertCode("openapi_version_unsupported", """{"openapi":"2.0","info":{"title":"x","version":"1"},"paths":{}}""");

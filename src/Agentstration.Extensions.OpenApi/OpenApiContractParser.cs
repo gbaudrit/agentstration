@@ -26,9 +26,14 @@ public sealed class OpenApiContractParser(IOptions<OpenApiOptions> options)
         var version = RequiredVersion(root);
         ValidateReferences(root);
 
-        var read = OpenApiDocument.Parse(root.ToJsonString(), "json", new OpenApiReaderSettings { LoadExternalRefs = false });
-        var parseIssues = (read.Diagnostic?.Errors ?? []).Select(error =>
-            new OpenApiDiagnostic(error.Pointer ?? "$", "openapi_invalid", error.Message)).ToArray();
+        var parseIssues = Issues(root);
+        IReadOnlyList<OpenApiDiagnostic> compatibilityIssues = [];
+        if (parseIssues.Length > 0 && parseIssues.All(IsLegacyAnyTypeIssue))
+        {
+            var validationDocument = (JsonObject)root.DeepClone();
+            compatibilityIssues = NormalizeLegacyAnyTypes(validationDocument);
+            parseIssues = Issues(validationDocument);
+        }
         if (parseIssues.Length > 0)
             throw Error("openapi_contract_invalid", string.Join(' ', parseIssues.Select(value => $"{value.Path}: {value.Message}")));
 
@@ -54,8 +59,47 @@ public sealed class OpenApiContractParser(IOptions<OpenApiOptions> options)
         var info = root["info"] as JsonObject;
         var descriptor = new OpenApiContractDescriptor(
             documentUri.AbsoluteUri, version, Text(info, "title"), Text(info, "description"), NormalizeMediaType(contentType),
-            content, digest, ExtractServers(root, documentUri), finalized, parseIssues);
+            content, digest, ExtractServers(root, documentUri), finalized, compatibilityIssues);
         return new(descriptor, root);
+    }
+
+    private static OpenApiDiagnostic[] Issues(JsonObject document)
+    {
+        var read = OpenApiDocument.Parse(document.ToJsonString(), "json",
+            new OpenApiReaderSettings { LoadExternalRefs = false });
+        return (read.Diagnostic?.Errors ?? []).Select(error =>
+            new OpenApiDiagnostic(error.Pointer ?? "$", "openapi_invalid", error.Message)).ToArray();
+    }
+
+    private static bool IsLegacyAnyTypeIssue(OpenApiDiagnostic issue) =>
+        issue.Message.Contains("Invalid schema type identifier: any", StringComparison.Ordinal);
+
+    private static IReadOnlyList<OpenApiDiagnostic> NormalizeLegacyAnyTypes(JsonNode node, string path = "$")
+    {
+        var diagnostics = new List<OpenApiDiagnostic>();
+        Visit(node, path, diagnostics);
+        return diagnostics;
+
+        static void Visit(JsonNode current, string currentPath, List<OpenApiDiagnostic> diagnostics)
+        {
+            if (current is JsonObject obj)
+            {
+                if (obj["type"] is JsonValue value && value.TryGetValue<string>(out var type)
+                    && string.Equals(type, "any", StringComparison.OrdinalIgnoreCase))
+                {
+                    obj.Remove("type");
+                    diagnostics.Add(new($"{currentPath}.type", "openapi_compatibility_type_any",
+                        "Non-standard schema type 'any' was interpreted as an unconstrained schema for validation."));
+                }
+                foreach (var property in obj.ToArray())
+                    if (property.Value is not null)
+                        Visit(property.Value, $"{currentPath}.{property.Key}", diagnostics);
+            }
+            else if (current is JsonArray array)
+                for (var index = 0; index < array.Count; index++)
+                    if (array[index] is { } child)
+                        Visit(child, $"{currentPath}[{index}]", diagnostics);
+        }
     }
 
     private static JsonObject Normalize(string content, string contentType)

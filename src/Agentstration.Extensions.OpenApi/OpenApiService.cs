@@ -32,7 +32,9 @@ public sealed class OpenApiService(
                 var fetched = await FetchAsync(candidate, options.MaximumDocumentBytes, options.AllowedContractMediaTypes,
                     "openapi_contract", cancellationToken);
                 if (fetched is null) continue;
-                contracts.Add(parser.Parse(Encoding.UTF8.GetString(fetched.Value.Content), fetched.Value.MediaType, candidate).Descriptor);
+                var parsed = parser.Parse(Encoding.UTF8.GetString(fetched.Value.Content), fetched.Value.MediaType, candidate).Descriptor;
+                contracts.Add(parsed);
+                diagnostics.AddRange(parsed.Diagnostics);
             }
             catch (OpenApiExtensionException exception)
             {
