@@ -290,11 +290,17 @@ public sealed class RuntimeWorkerOperationGateway(
 
     private static ChatOptions ToOptions(RuntimeGovernedModelRequest request)
     {
+        var tools = request.Agent.Tools.Select(tool => (AITool)AIFunctionFactory.CreateDeclaration(
+            tool.Name, tool.Description, tool.InputSchema)).ToList();
+        var names = request.Agent.Tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
+        tools.AddRange(request.Tools
+            .Where(tool => names.Add(tool.Name))
+            .Select(tool => (AITool)AIFunctionFactory.CreateDeclaration(
+                tool.Name, tool.Description, tool.Parameters)));
         var options = new ChatOptions
         {
             Instructions = request.Agent.Instructions,
-            Tools = request.Agent.Tools.Select(tool => (AITool)AIFunctionFactory.CreateDeclaration(
-                tool.Name, tool.Description, tool.InputSchema)).ToList()
+            Tools = tools
         };
         if (request.Options.Parameters.TryGetValue("temperature", out var temperature)
             && temperature.TryGetSingle(out var temperatureValue))

@@ -272,13 +272,17 @@ public sealed class AwpContractTests
                     JsonSerializer.SerializeToElement(new { city = "Paris" }))]),
                 new("tool", [new AwpModelToolResultContent("provider-call-1",
                     JsonSerializer.SerializeToElement(new { temperature = 21 }))])
-            ]);
+            ],
+            [new("handoff_to_reviewer", "Transfer to the reviewer.",
+                JsonSerializer.SerializeToElement(new { type = "object" }))]);
 
         var json = JsonSerializer.Serialize(request, AwpProtocol.JsonOptions);
         var actual = JsonSerializer.Deserialize<AwpInvokeModelRequest>(json, AwpProtocol.JsonOptions)!;
 
         Assert.IsInstanceOfType<AwpModelToolCallContent>(actual.Messages[0].Contents.Single());
         Assert.IsInstanceOfType<AwpModelToolResultContent>(actual.Messages[1].Contents.Single());
+        Assert.AreEqual("handoff_to_reviewer", actual.Tools?.Single().Name);
+        Assert.AreEqual(JsonValueKind.Object, actual.Tools?.Single().Parameters.ValueKind);
     }
 
     [TestMethod]

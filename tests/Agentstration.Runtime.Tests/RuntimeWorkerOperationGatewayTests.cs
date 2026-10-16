@@ -24,12 +24,16 @@ public sealed class RuntimeWorkerOperationGatewayTests
         var response = await gateway.InvokeModelAsync(new RuntimeGovernedModelRequest(
             Agent(),
             [new(RuntimeMessageRole.User, [new RuntimeGovernedModelText("Hello")])],
+            [new("handoff_to_reviewer", "Transfer to the reviewer.",
+                System.Text.Json.JsonSerializer.SerializeToElement(new { type = "object" }))],
             new RuntimeExecutionOptions(),
             tenantId,
             workspaceId,
             principalId), default);
 
         Assert.AreEqual("OK", Assert.IsInstanceOfType<RuntimeGovernedModelText>(response.Contents.Single()).Text);
+        Assert.AreEqual("handoff_to_reviewer",
+            Assert.IsInstanceOfType<AIFunctionDeclaration>(resolver.LastOptions?.Tools?.Single()).Name);
         Assert.AreEqual(ControlPlaneAccessMode.Unavailable, scopes.AccessMode);
     }
 
@@ -48,6 +52,7 @@ public sealed class RuntimeWorkerOperationGatewayTests
         await foreach (var update in gateway.StreamModelAsync(new RuntimeGovernedModelRequest(
             Agent(),
             [new(RuntimeMessageRole.User, [new RuntimeGovernedModelText("Hello")])],
+            [],
             new RuntimeExecutionOptions(),
             tenantId,
             workspaceId,
@@ -74,6 +79,8 @@ public sealed class RuntimeWorkerOperationGatewayTests
         Guid workspaceId,
         Guid principalId) : IChatClientResolver
     {
+        public ChatOptions? LastOptions { get; private set; }
+
         public ValueTask<IChatClient> ResolveAsync(string modelProfileName, CancellationToken cancellationToken = default) =>
             ResolveAsync(ResourceNamespace.Default, modelProfileName, cancellationToken);
 
@@ -86,23 +93,27 @@ public sealed class RuntimeWorkerOperationGatewayTests
             Assert.AreEqual(tenantId, context.Current.TenantId);
             Assert.AreEqual(workspaceId, context.Current.WorkspaceId);
             Assert.AreEqual(principalId, context.Current.PrincipalId);
-            return ValueTask.FromResult<IChatClient>(new StubChatClient());
+            return ValueTask.FromResult<IChatClient>(new StubChatClient(options => LastOptions = options));
         }
     }
 
-    private sealed class StubChatClient : IChatClient
+    private sealed class StubChatClient(Action<ChatOptions?> captureOptions) : IChatClient
     {
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "OK")));
+            CancellationToken cancellationToken = default)
+        {
+            captureOptions(options);
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "OK")));
+        }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
+            captureOptions(options);
             yield return new ChatResponseUpdate(ChatRole.Assistant, [new TextContent("O")])
             {
                 ModelId = "model"

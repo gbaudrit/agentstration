@@ -98,6 +98,7 @@ public sealed record AwpModelTextContent(string Text) : AwpModelContent;
 public sealed record AwpModelToolCallContent(string CallId, string Name, JsonElement Arguments) : AwpModelContent;
 public sealed record AwpModelToolResultContent(string CallId, JsonElement Result) : AwpModelContent;
 public sealed record AwpModelMessage(string Role, IReadOnlyList<AwpModelContent> Contents);
+public sealed record AwpModelTool(string Name, string? Description, JsonElement Parameters);
 
 public sealed record AwpExecutionOptions(
     int TimeoutSeconds,
@@ -131,7 +132,8 @@ public sealed record AwpInvokeModelRequest(
     string ParticipantId,
     AwpTurnId TurnId,
     AwpTurnAttemptId TurnAttemptId,
-    IReadOnlyList<AwpModelMessage> Messages);
+    IReadOnlyList<AwpModelMessage> Messages,
+    IReadOnlyList<AwpModelTool>? Tools = null);
 
 public sealed record AwpInvokeModelResponse(
     DateTimeOffset ServerTime,
