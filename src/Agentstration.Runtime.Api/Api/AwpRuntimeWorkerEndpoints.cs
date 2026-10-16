@@ -343,8 +343,10 @@ public static class AwpRuntimeWorkerEndpoints
         ValidateCommand(identity, request.Context, dispatch);
         var messages = request.Messages.Select(value => new RuntimeGovernedModelMessage(
             ParseRole(value.Role), value.Contents.Select(ToRuntimeContent).ToArray())).ToArray();
+        var tools = (request.Tools ?? []).Select(value => new RuntimeGovernedModelTool(
+            value.Name, value.Description, value.Parameters.Clone())).ToArray();
         var response = await execution.InvokeModelAsync(ToProof(request.Context), request.ParticipantId,
-            request.TurnId.Value, request.TurnAttemptId.Value, messages, cancellationToken);
+            request.TurnId.Value, request.TurnAttemptId.Value, messages, tools, cancellationToken);
         var now = timeProvider.GetUtcNow();
         return Envelope(envelope.MessageId, now, new AwpInvokeModelResponse(now,
             response.Contents.Select(ToContract).ToArray(), response.ModelId,
@@ -366,8 +368,10 @@ public static class AwpRuntimeWorkerEndpoints
         ValidateCommand(identity, request.Context, dispatch);
         var messages = request.Messages.Select(value => new RuntimeGovernedModelMessage(
             ParseRole(value.Role), value.Contents.Select(ToRuntimeContent).ToArray())).ToArray();
+        var tools = (request.Tools ?? []).Select(value => new RuntimeGovernedModelTool(
+            value.Name, value.Description, value.Parameters.Clone())).ToArray();
         var stream = await execution.StreamModelAsync(ToProof(request.Context), request.ParticipantId,
-            request.TurnId.Value, request.TurnAttemptId.Value, messages, cancellationToken);
+            request.TurnId.Value, request.TurnAttemptId.Value, messages, tools, cancellationToken);
         return new AwpModelStreamResult(envelope.MessageId, stream, timeProvider);
     }, principal);
 

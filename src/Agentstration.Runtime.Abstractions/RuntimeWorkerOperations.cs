@@ -8,10 +8,12 @@ public sealed record RuntimeGovernedModelText(string Text) : RuntimeGovernedMode
 public sealed record RuntimeGovernedModelToolCall(string CallId, string Name, JsonElement Arguments) : RuntimeGovernedModelContent;
 public sealed record RuntimeGovernedModelToolResult(string CallId, JsonElement Result) : RuntimeGovernedModelContent;
 public sealed record RuntimeGovernedModelMessage(RuntimeMessageRole Role, IReadOnlyList<RuntimeGovernedModelContent> Contents);
+public sealed record RuntimeGovernedModelTool(string Name, string? Description, JsonElement Parameters);
 
 public sealed record RuntimeGovernedModelRequest(
     RuntimeExecutionAgentMaterial Agent,
     IReadOnlyList<RuntimeGovernedModelMessage> Messages,
+    IReadOnlyList<RuntimeGovernedModelTool> Tools,
     RuntimeExecutionOptions Options,
     Guid TenantId,
     WorkspaceId WorkspaceId,
