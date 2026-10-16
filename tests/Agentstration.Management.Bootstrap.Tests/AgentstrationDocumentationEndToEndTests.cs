@@ -15,6 +15,7 @@ using Agentstration.Infrastructure.Assistant;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
+using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets.Abstractions;
@@ -109,6 +110,10 @@ public sealed class AgentstrationDocumentationEndToEndTests
         Assert.IsNotNull(projection.Value.SnapshotName);
         _ = await services.GetRequiredService<KnowledgeSourceToolExposureService>().PublishAsync(
             new("agentstration-documentation"), "1.0.0", false, default);
+        var resourceStore = services.GetRequiredService<IResourceStore>();
+        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.search", "query");
+        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.query", "question");
+        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.read", "artifactId");
 
         var toolExecution = services.GetRequiredService<IToolDefinitionExecutor>().ExecuteAsync(
             new ToolDefinitionInvocation(
@@ -138,6 +143,23 @@ public sealed class AgentstrationDocumentationEndToEndTests
         var legacy = await worker.AwaitAsync(legacyExecution);
         Assert.AreEqual("available", legacy!.Value.GetProperty("availability").GetString());
         StringAssert.Contains(legacy.Value.GetRawText(), "governed ownership");
+    }
+
+    private static async Task AssertKnowledgeToolRequestSchemaAsync(
+        IResourceStore store,
+        string toolName,
+        string requiredRequestProperty)
+    {
+        var stored = await store.GetAsync<ToolDefinitionResource>(
+            new(ToolResourceKinds.ToolDefinition, toolName), default);
+        Assert.IsNotNull(stored);
+        var schema = stored.Value.Definition.InputSchema;
+        var request = schema.GetProperty("properties").GetProperty("request");
+        Assert.IsTrue(request.GetProperty("properties").TryGetProperty(requiredRequestProperty, out _));
+        CollectionAssert.Contains(
+            request.GetProperty("required").EnumerateArray().Select(value => value.GetString()).ToArray(),
+            requiredRequestProperty);
+        Assert.IsFalse(request.GetProperty("additionalProperties").GetBoolean());
     }
 
     private sealed class AwpTestWorker : IDisposable

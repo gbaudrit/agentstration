@@ -64,7 +64,6 @@ public sealed class KnowledgeSourceToolExposureService(
                     $"ToolDefinition '{source.Value.Namespace}/{definitionName}' is not owned by this KnowledgeSource.");
             currentDefinitions.Add(operation, current);
         }
-        var publicSchema = PublicSchema(retrieval.InputSchema);
         var operations = new List<KnowledgeSourceToolOperationExposure>(supportedOperations.Length);
         var members = new List<ToolSetMember>(supportedOperations.Length);
         foreach (var operation in supportedOperations)
@@ -94,7 +93,7 @@ public sealed class KnowledgeSourceToolExposureService(
                     DisplayName = $"{source.Value.Definition.DisplayName} {route}",
                     Description = $"{route} operation for KnowledgeSource '{source.Value.Name}'.",
                     RequiresApproval = requiresApproval,
-                    InputSchema = publicSchema.Clone(),
+                    InputSchema = PublicSchema(retrieval.InputSchema, operation),
                     FixedArguments = JsonSerializer.SerializeToElement(new
                     {
                         knowledgeSourceId = ToolResourceIdentity.CatalogId(source.Value.Namespace, source.Value.Name),
@@ -196,7 +195,7 @@ public sealed class KnowledgeSourceToolExposureService(
         && Guid.TryParse(owner, out var ownerUid)
         && ownerUid == sourceUid;
 
-    private static JsonElement PublicSchema(JsonElement? inputSchema)
+    private static JsonElement PublicSchema(JsonElement? inputSchema, KnowledgeSourceOperation operation)
     {
         if (inputSchema is not { ValueKind: JsonValueKind.Object } schema)
             throw new KnowledgeSourceValidationException("knowledge_source_retrieval_input_schema_invalid", "The retrieval Flow requires an object input schema.");
@@ -214,10 +213,64 @@ public sealed class KnowledgeSourceToolExposureService(
             "snapshot", "caller", "correlationId", "retrievalId"
         ];
         foreach (var name in fixedNames) properties.Remove(name);
+        properties["request"] = JsonNode.Parse(RequestSchema(operation).GetRawText());
         if (root["required"] is JsonArray required)
             for (var index = required.Count - 1; index >= 0; index--)
                 if (required[index]?.GetValue<string>() is { } name && fixedNames.Contains(name, StringComparer.Ordinal))
                     required.RemoveAt(index);
         return JsonSerializer.SerializeToElement(root);
     }
+
+    private static JsonElement RequestSchema(KnowledgeSourceOperation operation) => operation switch
+    {
+        KnowledgeSourceOperation.Search => JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new
+            {
+                query = new { type = "string", minLength = 1, maxLength = KnowledgeRetrievalService.MaximumSearchQueryCharacters },
+                filters = new
+                {
+                    type = "object",
+                    maxProperties = KnowledgeRetrievalService.MaximumFilters,
+                    additionalProperties = new { type = "string", maxLength = 1_000 }
+                },
+                limit = new { type = "integer", minimum = 1, maximum = KnowledgeRetrievalService.MaximumResults },
+                continuationToken = new { type = "string", maxLength = KnowledgeRetrievalService.MaximumContinuationCharacters },
+                snapshotName = new { type = "string" },
+                correlationId = new { type = "string", maxLength = 200 }
+            },
+            required = new[] { "query" },
+            additionalProperties = false
+        }),
+        KnowledgeSourceOperation.Query => JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new
+            {
+                question = new { type = "string", minLength = 1, maxLength = KnowledgeRetrievalService.MaximumQuestionCharacters },
+                maximumItems = new { type = "integer", minimum = 1, maximum = KnowledgeRetrievalService.MaximumResults },
+                maximumOutputCharacters = new { type = "integer", minimum = 1, maximum = KnowledgeRetrievalService.MaximumOutputCharacters },
+                snapshotName = new { type = "string" },
+                correlationId = new { type = "string", maxLength = 200 }
+            },
+            required = new[] { "question" },
+            additionalProperties = false
+        }),
+        KnowledgeSourceOperation.Read => JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new
+            {
+                artifactId = new { type = "string", minLength = 1, maxLength = 200 },
+                offset = new { type = "integer", minimum = 0 },
+                length = new { type = "integer", minimum = 1, maximum = KnowledgeRetrievalService.MaximumReadBytes },
+                snapshotName = new { type = "string" },
+                correlationId = new { type = "string", maxLength = 200 }
+            },
+            required = new[] { "artifactId" },
+            additionalProperties = false
+        }),
+        _ => throw new ArgumentOutOfRangeException(nameof(operation))
+    };
 }

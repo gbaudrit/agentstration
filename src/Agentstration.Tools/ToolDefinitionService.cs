@@ -102,12 +102,28 @@ public sealed class ToolDefinitionService(
         var flowByName = flowProperties.EnumerateObject().ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal);
         if (publicNames.Concat(fixedNames).Any(name => !flowByName.ContainsKey(name))) return false;
         if (flowByName.Keys.Any(name => !publicNames.Contains(name) && !fixedNames.Contains(name))) return false;
-        if (publicProperties.EnumerateObject().Any(property => !SameSchema(property.Value, flowByName[property.Name]))) return false;
+        if (publicProperties.EnumerateObject().Any(property => !CompatiblePublicPropertySchema(property.Value, flowByName[property.Name]))) return false;
         if (fixedArguments.EnumerateObject().Any(property => !MatchesType(property.Value, flowByName[property.Name]))) return false;
         if (full.TryGetProperty("required", out var required) && required.ValueKind == JsonValueKind.Array
             && required.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String)
                 .Select(item => item.GetString()!).Any(name => !publicNames.Contains(name) && !fixedNames.Contains(name))) return false;
         return true;
+    }
+
+    private static bool CompatiblePublicPropertySchema(JsonElement publicSchema, JsonElement flowSchema)
+    {
+        if (SameSchema(publicSchema, flowSchema)) return true;
+        // A type-only Flow property deliberately leaves its public shape open. A Tool may narrow
+        // that shape, but it may not change the accepted JSON type or override any Flow constraint.
+        if (publicSchema.ValueKind != JsonValueKind.Object
+            || flowSchema.ValueKind != JsonValueKind.Object
+            || flowSchema.EnumerateObject().Count() != 1
+            || !flowSchema.TryGetProperty("type", out var flowType)
+            || flowType.ValueKind != JsonValueKind.String
+            || !publicSchema.TryGetProperty("type", out var publicType)
+            || publicType.ValueKind != JsonValueKind.String)
+            return false;
+        return string.Equals(publicType.GetString(), flowType.GetString(), StringComparison.Ordinal);
     }
 
     private static bool MatchesType(JsonElement value, JsonElement schema)
