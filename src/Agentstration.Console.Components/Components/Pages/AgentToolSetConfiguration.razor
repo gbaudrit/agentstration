@@ -12,7 +12,7 @@
         @foreach (var version in Versions.OrderBy(value => value.ToolSetName, StringComparer.CurrentCultureIgnoreCase).ThenByDescending(value => value.PublishedAt))
         {
             var assignment = Assignment(version);
-            <article class="agent-toolset-card @(assignment is not null ? "selected" : null)" data-toolset="@version.ToolSetName" data-version="@version.Version">
+            <article class="agent-toolset-card @(assignment is not null ? "selected" : null)" data-toolset="@version.ToolSetName" data-version="@version.Version" data-scope="@version.ScopeRef?.Value">
                 <header class="agent-toolset-header">
                     <div class="agent-toolset-identity"><span class="agent-toolset-icon" aria-hidden="true"><TablerIcon Name="layers" /></span><div><span class="agent-toolset-kind">@T("PublishedToolSet")</span><h3>@version.ToolSetName</h3><code>@version.Namespace/@version.ToolSetName:@version.Version</code></div></div>
                     <a class="text-button" href="@ToolSetUrl(version)">@T("InspectToolSet") →</a>
@@ -51,6 +51,7 @@
     private AgentToolSetSelection? Assignment(ToolSetVersionResource version) => Selected.SingleOrDefault(value =>
         string.Equals(value.ToolSet.Name, version.ToolSetName, StringComparison.Ordinal)
         && (value.ToolSet.Namespace ?? ResourceNamespace.Default) == version.Namespace
+        && (value.ToolSet.ScopeRef is null || value.ToolSet.ScopeRef == version.ScopeRef)
         && string.Equals(value.Version, version.Version, StringComparison.Ordinal));
     private async Task ToggleFullAsync(ToolSetVersionResource version, bool selected)
     {
@@ -72,14 +73,20 @@
     }
     private List<AgentToolSetSelection> WithoutToolSet(ToolSetVersionResource version) => Selected.Where(value =>
         !string.Equals(value.ToolSet.Name, version.ToolSetName, StringComparison.Ordinal)
-        || (value.ToolSet.Namespace ?? ResourceNamespace.Default) != version.Namespace).ToList();
+        || (value.ToolSet.Namespace ?? ResourceNamespace.Default) != version.Namespace
+        || value.ToolSet.ScopeRef != version.ScopeRef).ToList();
     private static AgentToolSetSelection Create(ToolSetVersionResource version, IReadOnlyList<string> members) => new()
     {
-        ToolSet = new ResourceReference(version.ToolSetName, @namespace: version.Namespace), Version = version.Version, Members = members
+        ToolSet = new ResourceReference(version.ToolSetName, version.ScopeRef, version.Namespace), Version = version.Version, Members = members
     };
-    private static string ToolSetUrl(ToolSetVersionResource version) => version.Namespace.IsDefault
-        ? $"/tools/sets/{Uri.EscapeDataString(version.ToolSetName)}"
-        : $"/tools/sets/{Uri.EscapeDataString(version.ToolSetName)}?namespace={Uri.EscapeDataString(version.Namespace.Value)}";
-    private static string FullInputId(ToolSetVersionResource version) => $"agent-toolset-{version.ToolSetName}-{version.Version}";
+    private static string ToolSetUrl(ToolSetVersionResource version)
+    {
+        var query = new List<string>();
+        if (!version.Namespace.IsDefault) query.Add($"namespace={Uri.EscapeDataString(version.Namespace.Value)}");
+        if (version.ScopeRef is { } scopeRef) query.Add($"scopeRef={Uri.EscapeDataString(scopeRef.Value)}");
+        var path = $"/tools/sets/{Uri.EscapeDataString(version.ToolSetName)}";
+        return query.Count == 0 ? path : $"{path}?{string.Join('&', query)}";
+    }
+    private static string FullInputId(ToolSetVersionResource version) => $"agent-toolset-{version.Uid:N}-{version.Version}";
     private static string MemberInputId(ToolSetVersionResource version, PublishedToolSetMember member) => $"{FullInputId(version)}-{member.ToolName}";
 }
