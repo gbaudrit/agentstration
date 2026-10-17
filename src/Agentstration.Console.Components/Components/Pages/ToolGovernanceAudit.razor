@@ -88,6 +88,7 @@ else
 @code {
     [Parameter] public string Owner { get; set; } = string.Empty;
     [Parameter] public string RunId { get; set; } = string.Empty;
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? RequestedScopeRef { get; set; }
     [SupplyParameterFromQuery(Name = "toolCallId")] public string? RequestedToolCallId { get; set; }
     [SupplyParameterFromQuery(Name = "invocationId")] public string? RequestedInvocationId { get; set; }
     [SupplyParameterFromQuery(Name = "toolId")] public string? RequestedToolId { get; set; }
@@ -111,9 +112,16 @@ else
     private string DecisionLabel(ToolExecutionHookEvaluationKind value) => Localizer[$"Decision.{value}"];
     private string SourceLabel(ToolExecutionHookSource value) => Localizer[$"Source.{value}"];
     private string OwnerLabel => ownerKind == ToolExecutionOwnerKind.FlowRun ? T("FlowRun") : T("RuntimeRun");
+    private ResourceScopeRef? ScopeRef => string.IsNullOrWhiteSpace(RequestedScopeRef)
+        ? null
+        : ResourceScopeRef.Parse(RequestedScopeRef);
     private string BackUrl => ownerKind == ToolExecutionOwnerKind.FlowRun
-        ? $"/flow-runs/{Uri.EscapeDataString(RunId)}"
-        : $"/runs/{Uri.EscapeDataString(RunId)}";
+        ? RunUrl("flow-runs")
+        : RunUrl("runs");
+
+    private string RunUrl(string segment) => ScopeRef is { } scopeRef
+        ? $"/{segment}/{Uri.EscapeDataString(RunId)}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}"
+        : $"/{segment}/{Uri.EscapeDataString(RunId)}";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -169,6 +177,7 @@ else
             var page = await Client.GetAsync(
                 ownerKind,
                 RunId,
+                ScopeRef,
                 append ? nextSequence ?? 0 : 0,
                 50,
                 new ToolGovernanceAuditFilters

@@ -15,9 +15,20 @@ public sealed partial class FlowRunService
         JsonElement input,
         string purpose,
         int? iteration,
+        CancellationToken cancellationToken) => await CreateOrGetAssignedChildExactAsync(
+            ResourceScopeRef.Workspace(workspaceId.Value), parentRunId, stepDefinitionId, input, purpose, iteration,
+            cancellationToken);
+
+    public async Task<StoredFlowRun> CreateOrGetAssignedChildExactAsync(
+        ResourceScopeRef executionScopeRef,
+        string parentRunId,
+        string stepDefinitionId,
+        JsonElement input,
+        string purpose,
+        int? iteration,
         CancellationToken cancellationToken)
     {
-        var parent = await repository.GetRunAsync(workspaceId, parentRunId, cancellationToken)
+        var parent = await repository.GetRunExactAsync(executionScopeRef, parentRunId, cancellationToken)
             ?? throw new FlowRunNotFoundException(parentRunId);
         var step = parent.Value.DefinitionSnapshot.Graph?.Steps.SingleOrDefault(value =>
             string.Equals(value.Name, stepDefinitionId, StringComparison.Ordinal))
@@ -59,8 +70,8 @@ public sealed partial class FlowRunService
     private static string ChildFlowRunId(FlowRun parent, string stepName, int attempt, int? iteration = null)
     {
         var identity = iteration is null
-            ? $"{parent.WorkspaceId}:{parent.Id}:{stepName}:{attempt}"
-            : $"{parent.WorkspaceId}:{parent.Id}:{stepName}:{attempt}:{iteration.Value}";
+            ? $"{parent.Scope.ScopeRef.Value}:{parent.Id}:{stepName}:{attempt}"
+            : $"{parent.Scope.ScopeRef.Value}:{parent.Id}:{stepName}:{attempt}:{iteration.Value}";
         var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
         return $"flowrun-child-{hash[..32]}";
     }
@@ -92,7 +103,7 @@ public sealed partial class FlowRunService
             ExecutionLeaseExpiresAt = null
         }, cancellationToken);
         await EmitAsync(
-            suspended.Value.WorkspaceId,
+            suspended.Value.Scope.ScopeRef,
             suspended.Value.Id,
             FlowRunEventType.FlowRunWaitingForChild,
             stepName,
@@ -108,7 +119,7 @@ public sealed partial class FlowRunService
         string childRunId,
         CancellationToken cancellationToken)
     {
-        var existing = await repository.GetRunAsync(parent.WorkspaceId, childRunId, cancellationToken);
+        var existing = await repository.GetRunExactAsync(parent.Scope.ScopeRef, childRunId, cancellationToken);
         if (existing is not null)
         {
             ValidateChildIdentity(parent, call, existing.Value, childRunId);
@@ -124,7 +135,7 @@ public sealed partial class FlowRunService
 
         var targetId = call.Flow.Resolve(parent.FlowId.Namespace);
         var requestedVersion = call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact ? call.Flow.Version : null;
-        var resolved = await ResolveVersionAsync(parent.WorkspaceId, targetId, requestedVersion,
+        var resolved = await ResolveVersionAsync(parent.Scope.ScopeRef, targetId, requestedVersion,
             call.Flow.ScopeRef ?? parent.DefinitionScopeRef, cancellationToken);
         ValidateInput(resolved.Graph?.InputSchema, input);
         var now = timeProvider.GetUtcNow();
@@ -163,7 +174,7 @@ public sealed partial class FlowRunService
         }
         catch (FlowConcurrencyException)
         {
-            var recovered = await repository.GetRunAsync(parent.WorkspaceId, childRunId, cancellationToken);
+            var recovered = await repository.GetRunExactAsync(parent.Scope.ScopeRef, childRunId, cancellationToken);
             if (recovered is null) throw;
             created = recovered;
             ValidateChildIdentity(parent, call, created.Value, childRunId);
@@ -173,9 +184,9 @@ public sealed partial class FlowRunService
         RunsCreated.Add(1, new KeyValuePair<string, object?>("flow.definition.state", child.DefinitionState.ToString()));
         try
         {
-            await EmitAsync(child.WorkspaceId, child.Id, FlowRunEventType.FlowRunCreated, null,
+            await EmitAsync(child.Scope.ScopeRef, child.Id, FlowRunEventType.FlowRunCreated, null,
                 JsonSerializer.SerializeToElement(new { child.Status, child.DefinitionState, child.ParentFlowRunId, child.RootFlowRunId, child.NestingDepth }), cancellationToken);
-            await EmitAsync(parent.WorkspaceId, parent.Id, FlowRunEventType.ChildFlowRunCreated, call.Name,
+            await EmitAsync(parent.Scope.ScopeRef, parent.Id, FlowRunEventType.ChildFlowRunCreated, call.Name,
                 JsonSerializer.SerializeToElement(new { childFlowRunId = child.Id, flowId = child.FlowId.Value, flowNamespace = child.FlowId.Namespace.Value, flowVersion = child.FlowVersion }), cancellationToken);
         }
         finally
@@ -195,9 +206,9 @@ public sealed partial class FlowRunService
         for (var skip = 0; ; skip += pageSize)
         {
             var keys = await repository.ListRunKeysAsync(skip, pageSize, cancellationToken);
-            foreach (var key in keys.Where(key => key.WorkspaceId == parent.WorkspaceId))
+            foreach (var key in keys.Where(key => key.ScopeRef == parent.Scope.ScopeRef))
             {
-                var run = await repository.GetRunAsync(parent.WorkspaceId, key.RunId, cancellationToken);
+                var run = await repository.GetRunExactAsync(parent.Scope.ScopeRef, key.RunId, cancellationToken);
                 if (run?.Value.RootFlowRunId == rootRunId
                     && run.Value.Scope == parent.Scope
                     && ++count >= executionOptions.MaximumDescendantRuns)
@@ -216,15 +227,14 @@ public sealed partial class FlowRunService
             || child.NestingDepth != parent.NestingDepth + 1
             || child.FlowId != expectedFlowId
             || child.Trigger != FlowRunTrigger.Flow
-            || child.Scope != parent.Scope
-            || child.WorkspaceId != parent.WorkspaceId)
+            || child.Scope != parent.Scope)
             throw new FlowValidationException("child_flow_identity_mismatch", $"Persisted child Flow Run for step '{call.Name}' does not match the declared target and parent execution scope.");
     }
 
     private async Task ResumeParentAfterChildAsync(FlowRun child, CancellationToken cancellationToken)
     {
         if (child.ParentFlowRunId is null) return;
-        var parent = await repository.GetRunAsync(child.WorkspaceId, child.ParentFlowRunId, cancellationToken);
+        var parent = await repository.GetRunExactAsync(child.Scope.ScopeRef, child.ParentFlowRunId, cancellationToken);
         if (parent is null
             || parent.Value.Status != FlowRunStatus.WaitingForChild
             || parent.Value.Scope != child.Scope
@@ -248,7 +258,7 @@ public sealed partial class FlowRunService
         }
         try
         {
-            await EmitAsync(resumed.Value.WorkspaceId, resumed.Value.Id, FlowRunEventType.FlowRunResumedFromChild,
+            await EmitAsync(resumed.Value.Scope.ScopeRef, resumed.Value.Id, FlowRunEventType.FlowRunResumedFromChild,
                 resumed.Value.Steps.Single(step => step.ChildFlowRunId == child.Id
                     || step.ArtifactStorageFlowRunId == child.Id).StepName,
                 JsonSerializer.SerializeToElement(new { childFlowRunId = child.Id, childStatus = child.Status }), cancellationToken);
@@ -269,9 +279,9 @@ public sealed partial class FlowRunService
         for (var skip = 0; ; skip += pageSize)
         {
             var keys = await repository.ListRunKeysAsync(skip, pageSize, cancellationToken);
-            foreach (var key in keys.Where(key => key.WorkspaceId == parent.WorkspaceId))
+            foreach (var key in keys.Where(key => key.ScopeRef == parent.Scope.ScopeRef))
             {
-                var run = await repository.GetRunAsync(parent.WorkspaceId, key.RunId, cancellationToken);
+                var run = await repository.GetRunExactAsync(parent.Scope.ScopeRef, key.RunId, cancellationToken);
                 if (run is not null && run.Value.Scope == parent.Scope && run.Value.RootFlowRunId == rootRunId) all.Add(run);
             }
             if (keys.Count < pageSize) break;

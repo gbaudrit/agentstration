@@ -162,10 +162,11 @@
         try
         {
             submitting = true; error = null;
+            var ownerScope = selectedScope ?? throw new InvalidOperationException(T("Scope"));
             if (model.Kind == "Workflow")
             {
-                var draft = await Client.CreateDraftAsync(new CreateFlowDraftRequest(model.Name, model.DisplayName, model.Description, Template: model.Template), cancellation.Token);
-                Navigation.NavigateTo($"/flows/{draft.Value.FlowId.Value}/designer", forceLoad: true);
+                var draft = await Client.CreateDraftAsync(new CreateFlowDraftRequest(model.Name, model.DisplayName, model.Description, Template: model.Template) { ScopeRef = ownerScope }, cancellation.Token);
+                Navigation.NavigateTo($"/flows/{draft.Value.FlowId.Value}/designer?scopeRef={Uri.EscapeDataString(ownerScope.Value)}", forceLoad: true);
                 return;
             }
 
@@ -176,8 +177,8 @@
                 model.Description,
                 orchestration.Version,
                 orchestration.Enabled,
-                orchestration.CreateDefinition()) { DisplayName = model.DisplayName }, cancellation.Token);
-            Navigation.NavigateTo($"/flows/{created.Value.Id}?view=definition");
+                orchestration.CreateDefinition()) { DisplayName = model.DisplayName, ScopeRef = ownerScope }, cancellation.Token);
+            Navigation.NavigateTo($"/flows/{created.Value.Id}?scopeRef={Uri.EscapeDataString(ownerScope.Value)}&view=definition");
         }
         catch (Exception exception) { error = exception.Message; }
         finally { submitting = false; }

@@ -52,7 +52,7 @@ public sealed class FlowDetailsDesignerTests
         Assert.AreEqual(strings["Status"].Value, headers[2]);
         var link = rendered.Find("tbody .resource-name-link");
         Assert.AreEqual("multi-agent-review", link.TextContent.Trim());
-        Assert.AreEqual("/flow-runs/flowrun-review-1", link.GetAttribute("href"));
+        Assert.AreEqual($"/flow-runs/flowrun-review-1?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}", link.GetAttribute("href"));
         Assert.IsEmpty(rendered.FindAll("tbody .text-button"));
     }
 
@@ -157,7 +157,9 @@ public sealed class FlowDetailsDesignerTests
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
 
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
-        Assert.AreEqual("/flows/sample/designer", rendered.Find(".page-header .flow-header-designer").GetAttribute("href"));
+        Assert.AreEqual(
+            "/flows/sample/designer?scopeRef=%2Fworkspaces%2F11111111-1111-1111-1111-111111111111",
+            rendered.Find(".page-header .flow-header-designer").GetAttribute("href"));
         rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
 
         Assert.HasCount(0, rendered.FindAll(".flow-definition-sheet .topology-shell"));

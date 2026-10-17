@@ -133,9 +133,10 @@ else
         get
         {
             var suffix = IsOrchestration ? "orchestration" : "designer";
-            return FlowResourceNamespace.IsDefault
+            var path = FlowResourceNamespace.IsDefault
                 ? $"/flows/{Uri.EscapeDataString(FlowId)}/{suffix}"
                 : $"/namespaces/{Uri.EscapeDataString(FlowResourceNamespace.Value)}/flows/{Uri.EscapeDataString(FlowId)}/{suffix}";
+            return $"{path}?scopeRef={Uri.EscapeDataString(FlowScopeRef.Value)}";
         }
     }
     private string EditorLabel => IsOrchestration ? T("OpenOrchestrationEditor") : T("OpenFlowDesigner");
@@ -246,7 +247,7 @@ else
     private void OpenRun(){activeTab="Runs";showRun=true;error=null;runInputValid=true;runInput=ParseInput(flow?.Metadata.TryGetValue("agentstration.io/sample-input",out var sampleInput)==true?sampleInput:"{}");}
     private void ChangeRunVersion(ChangeEventArgs arguments){runVersion=arguments.Value?.ToString()??string.Empty;error=null;}
     private Task UpdateRunInputValidation(JsonSchemaInputValidationState value){runInputValid=value.IsValid;return Task.CompletedTask;}
-    private async Task SubmitRunAsync(){if(!runInputValid)return;try{submitting=true;error=null;var request=new CreateFlowRunRequest(runInput.Clone(),runVersion,"local",FlowRunTrigger.Manual){DefinitionScopeRef=flow?.ScopeRef};var run=await Client.CreateFlowRunAsync(FlowResourceNamespace,FlowId,request,cancellation.Token);Navigation.NavigateTo($"/flow-runs/{run.Id}");}catch(Exception exception){error=exception.Message;}finally{submitting=false;}}
+    private async Task SubmitRunAsync(){if(!runInputValid)return;try{submitting=true;error=null;var request=new CreateFlowRunRequest(runInput.Clone(),runVersion,"local",FlowRunTrigger.Manual){DefinitionScopeRef=flow?.ScopeRef,ExecutionScopeRef=flow?.ScopeRef};var run=await Client.CreateFlowRunAsync(FlowResourceNamespace,FlowId,request,cancellation.Token);Navigation.NavigateTo($"/flow-runs/{run.Id}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}");}catch(Exception exception){error=exception.Message;}finally{submitting=false;}}
     private static JsonElement ParseInput(string value){try{using var document=JsonDocument.Parse(value);return document.RootElement.ValueKind==JsonValueKind.Object?document.RootElement.Clone():JsonSerializer.SerializeToElement(new{});}catch(JsonException){return JsonSerializer.SerializeToElement(new{});}}
     public void Dispose(){cancellation.Cancel();cancellation.Dispose();}
 }

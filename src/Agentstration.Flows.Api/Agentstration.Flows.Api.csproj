@@ -9,6 +9,7 @@
     <ProjectReference Include="../Agentstration.Flows.Contracts/Agentstration.Flows.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Flows.Storage.Abstractions/Agentstration.Flows.Storage.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
     <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />
     <ProjectReference Include="../Agentstration.Work/Agentstration.Work.csproj" />
   </ItemGroup>

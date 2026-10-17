@@ -105,7 +105,7 @@ public sealed partial class ApiClientTests
 
     private static RuntimeRunEvent RunEvent(long sequence, RuntimeRunEventKind kind, string? content = null, RuntimeRunState? state = null) => new()
     {
-        WorkspaceId = TestWorkspaceId,
+        ScopeRef = ResourceScopeRef.Workspace(TestWorkspaceId.Value),
         Sequence = sequence,
         EventId = Guid.NewGuid(),
         RunId = "run-test",

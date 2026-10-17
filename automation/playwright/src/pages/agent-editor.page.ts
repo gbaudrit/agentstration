@@ -32,6 +32,12 @@ export class AgentEditorPage {
     await this.page.getByTestId(TestIds.agentEditor.saveDraft).click();
   }
 
+  public async openTools(): Promise<void> {
+    await this.page.getByTestId(TestIds.agentEditor.toolsTab).click();
+    await this.page.getByTestId(TestIds.agentEditor.toolSetConfiguration).waitFor({ state: 'visible' });
+    await this.page.getByTestId(TestIds.agentEditor.toolConfiguration).waitFor({ state: 'visible' });
+  }
+
   public async fillIdentity(agent: Pick<AgentDefinition, 'name' | 'displayName' | 'description'>): Promise<void> {
     await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.name), agent.name);
     await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.displayName), agent.displayName);

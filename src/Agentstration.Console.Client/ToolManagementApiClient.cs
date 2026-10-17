@@ -20,6 +20,8 @@ public interface IToolsClient
     Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(string name, bool enabled, string? etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ToolResource>> GetToolAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetToolAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Tools.");
+    Task<ResourceSnapshot<ToolResource>> GetToolAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        GetToolAsync(@namespace, name, cancellationToken);
     Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(ResourceNamespace @namespace, string name, bool enabled, string? etag, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? SetEnabledAsync(name, enabled, etag, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Tools.");
     Task<RunToolResponse> RunToolAsync(ResourceNamespace @namespace, string name, RunToolRequest request, CancellationToken cancellationToken) =>
@@ -64,12 +66,18 @@ public sealed class ToolsApiClient(HttpClient httpClient) : IToolsClient
         return await ReadToolAsync(response, cancellationToken);
     }
 
+    public async Task<ResourceSnapshot<ToolResource>> GetToolAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(ToolPath(@namespace, name, scopeRef), cancellationToken);
+        return await ReadToolAsync(response, cancellationToken);
+    }
+
     public async Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(string name, bool enabled, string? etag, CancellationToken cancellationToken)
         => await SetEnabledAsync(ResourceNamespace.Default, name, enabled, etag, cancellationToken);
 
     public async Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(ResourceNamespace @namespace, string name, bool enabled, string? etag, CancellationToken cancellationToken)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Put, ToolPath(@namespace, name, "enabled")) { Content = JsonContent.Create(new SetToolEnabledRequest(enabled)) };
+        using var message = new HttpRequestMessage(HttpMethod.Put, ToolPath(@namespace, name, child: "enabled")) { Content = JsonContent.Create(new SetToolEnabledRequest(enabled)) };
         if (!string.IsNullOrWhiteSpace(etag)) message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
         using var response = await httpClient.SendAsync(message, cancellationToken);
         return await ReadToolAsync(response, cancellationToken);
@@ -77,7 +85,7 @@ public sealed class ToolsApiClient(HttpClient httpClient) : IToolsClient
 
     public async Task<RunToolResponse> RunToolAsync(ResourceNamespace @namespace, string name, RunToolRequest request, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsJsonAsync(ToolPath(@namespace, name, "run"), request, cancellationToken);
+        using var response = await httpClient.PostAsJsonAsync(ToolPath(@namespace, name, child: "run"), request, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return (await response.Content.ReadFromJsonAsync<RunToolResponse>(cancellationToken))!;
     }
@@ -99,10 +107,13 @@ public sealed class ToolsApiClient(HttpClient httpClient) : IToolsClient
 
     private static string ProviderPath(string name) => $"api/toolproviders/{Uri.EscapeDataString(name)}";
     private static string ProviderChildPath(string name, string child) => $"api/toolproviders/{Uri.EscapeDataString(name)}/{child}";
-    private static string ToolPath(ResourceNamespace @namespace, string name, string? child = null)
+    private static string ToolPath(ResourceNamespace @namespace, string name, ResourceScopeRef? scopeRef = null, string? child = null)
     {
         var path = $"api/tools/{Uri.EscapeDataString(name)}";
         if (!string.IsNullOrWhiteSpace(child)) path += $"/{child}";
-        return @namespace.IsDefault ? path : $"{path}?namespace={Uri.EscapeDataString(@namespace.Value)}";
+        var query = new List<string>();
+        if (!@namespace.IsDefault) query.Add($"namespace={Uri.EscapeDataString(@namespace.Value)}");
+        if (scopeRef is { } scope) query.Add($"scopeRef={Uri.EscapeDataString(scope.Value)}");
+        return query.Count == 0 ? path : $"{path}?{string.Join('&', query)}";
     }
 }

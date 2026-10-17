@@ -4,7 +4,7 @@ using Agentstration.Resources;
 
 namespace Agentstration.Web.FlowDesigner.Backend;
 
-public sealed record FlowDesignerTarget(ResourceNamespace Namespace, string ResourceId);
+public sealed record FlowDesignerTarget(ResourceNamespace Namespace, string ResourceId, ResourceScopeRef? ScopeRef = null);
 
 public sealed record FlowDesignerResource(FlowId FlowId, string DisplayName, string? Description, IReadOnlyDictionary<string, string> Tags, FlowGraphDefinition Definition, long? DraftRevision = null);
 

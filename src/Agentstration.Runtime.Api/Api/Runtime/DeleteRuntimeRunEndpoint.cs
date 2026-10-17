@@ -12,6 +12,7 @@ internal sealed class DeleteRuntimeRunEndpoint : IRuntimeEndpoint
 
     private static Task<IResult> HandleAsync(
         string runId,
+        string? scopeRef,
         HttpRequest request,
         RuntimeRunService service,
         ICurrentRequestContext requestContext,
@@ -20,7 +21,10 @@ internal sealed class DeleteRuntimeRunEndpoint : IRuntimeEndpoint
         {
             var expectedETag = request.Headers.IfMatch.FirstOrDefault()
                 ?? throw new RuntimeRunValidationException("if_match_required", "Deleting a Runtime Run requires an If-Match ETag.");
-            await service.DeleteAsync(new WorkspaceId(requestContext.Current.WorkspaceId), runId, expectedETag, cancellationToken);
+            var scope = RuntimeHttp.CurrentScope(requestContext,
+                string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef));
+            await service.AuthorizeAsync(scope, cancellationToken);
+            await service.DeleteExactAsync(scope.ScopeRef, runId, expectedETag, cancellationToken);
             return Results.NoContent();
         });
 }

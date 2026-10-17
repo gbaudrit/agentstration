@@ -10,6 +10,7 @@ namespace Agentstration.Runtime.Storage.PostgreSql;
 
 internal sealed class RuntimeWorkerAssignmentDocument
 {
+    public required string ScopeRef { get; set; }
     public Guid WorkspaceId { get; set; }
     public Guid AssignmentId { get; set; }
     public required string TargetKind { get; set; }
@@ -35,7 +36,8 @@ internal static class RuntimeWorkerAssignmentModel
     {
         var assignment = modelBuilder.Entity<RuntimeWorkerAssignmentDocument>();
         assignment.ToTable("RuntimeWorkerAssignments");
-        assignment.HasKey(value => new { value.WorkspaceId, value.AssignmentId });
+        assignment.HasKey(value => new { value.ScopeRef, value.AssignmentId });
+        assignment.Property(value => value.ScopeRef).HasMaxLength(64);
         assignment.Property(value => value.TargetKind).HasMaxLength(32);
         assignment.Property(value => value.TargetRunId).HasMaxLength(64);
         assignment.Property(value => value.RuntimeCapability).HasMaxLength(128);
@@ -44,7 +46,7 @@ internal static class RuntimeWorkerAssignmentModel
         assignment.Property(value => value.State).HasMaxLength(32);
         assignment.Property(value => value.OwnershipTokenDigest).HasMaxLength(64);
         assignment.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
-        assignment.HasIndex(value => new { value.WorkspaceId, value.TargetKind, value.TargetRunId }).IsUnique();
+        assignment.HasIndex(value => new { value.ScopeRef, value.TargetKind, value.TargetRunId }).IsUnique();
         assignment.HasIndex(value => new { value.State, value.RuntimeCapability, value.CreatedAt });
         assignment.HasIndex(value => new { value.State, value.LeaseExpiresAt });
         assignment.HasIndex(value => new { value.State, value.ActiveWorkerId, value.ActiveWorkerSessionId });
@@ -67,7 +69,7 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun
-            && !await context.Runs.AnyAsync(value => value.WorkspaceId == assignment.WorkspaceId.Value
+            && !await context.Runs.AnyAsync(value => value.ScopeRef == assignment.ExecutionScopeRef.Value
                 && value.RunId == assignment.TargetRunId, cancellationToken))
             throw new RuntimeRunNotFoundException(assignment.TargetRunId);
         var etag = NewETag();
@@ -78,21 +80,29 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
     }
 
     public async Task<StoredRuntimeWorkerAssignment?> GetAsync(WorkspaceId workspaceId, RuntimeAssignmentId assignmentId, CancellationToken cancellationToken)
+        => await GetExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), assignmentId, cancellationToken);
+
+    public async Task<StoredRuntimeWorkerAssignment?> GetExactAsync(ResourceScopeRef scopeRef, RuntimeAssignmentId assignmentId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var document = await context.WorkerAssignments.AsNoTracking().SingleOrDefaultAsync(value =>
-            value.WorkspaceId == workspaceId.Value && value.AssignmentId == assignmentId.Value, cancellationToken);
+            value.ScopeRef == scopeRef.Value && value.AssignmentId == assignmentId.Value, cancellationToken);
         return document is null ? null : Deserialize(document);
     }
 
     public async Task<StoredRuntimeWorkerAssignment?> GetByTargetAsync(
         WorkspaceId workspaceId, RuntimeAssignmentTargetKind targetKind, string targetRunId,
+        CancellationToken cancellationToken) =>
+        await GetByTargetExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), targetKind, targetRunId, cancellationToken);
+
+    public async Task<StoredRuntimeWorkerAssignment?> GetByTargetExactAsync(
+        ResourceScopeRef scopeRef, RuntimeAssignmentTargetKind targetKind, string targetRunId,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var kind = targetKind.ToString();
         var document = await context.WorkerAssignments.AsNoTracking().SingleOrDefaultAsync(value =>
-            value.WorkspaceId == workspaceId.Value && value.TargetKind == kind
+            value.ScopeRef == scopeRef.Value && value.TargetKind == kind
             && value.TargetRunId == targetRunId, cancellationToken);
         return document is null ? null : Deserialize(document);
     }
@@ -105,7 +115,9 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
             throw new ArgumentOutOfRangeException(nameof(query), "Assignment query paging is invalid.");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var documents = context.WorkerAssignments.AsNoTracking().AsQueryable();
-        if (query.WorkspaceId is { } workspaceId)
+        if (query.ScopeRef is { } scopeRef)
+            documents = documents.Where(value => value.ScopeRef == scopeRef.Value);
+        else if (query.WorkspaceId is { } workspaceId)
             documents = documents.Where(value => value.WorkspaceId == workspaceId.Value);
         if (query.WorkerId is { } workerId)
         {
@@ -192,7 +204,7 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var document = await RequiredAsync(context, proof.ExecutionScopeRef, proof.AssignmentId, cancellationToken);
         var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, renewedAt);
         var current = assignment.CurrentAttempt! with { LastHeartbeatAt = renewedAt, LeaseExpiresAt = leaseExpiresAt };
         assignment = assignment with
@@ -212,7 +224,7 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var document = await RequiredAsync(context, proof.ExecutionScopeRef, proof.AssignmentId, cancellationToken);
         var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, observedAt);
         return new RuntimeAssignmentAuthorization(
             assignment,
@@ -228,7 +240,7 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var document = await RequiredAsync(context, proof.ExecutionScopeRef, proof.AssignmentId, cancellationToken);
         var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, observedAt);
         var replay = assignment.StepExecutions.SingleOrDefault(value => value.CommandId == step.CommandId);
         if (replay is not null)
@@ -258,7 +270,7 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var document = await RequiredAsync(context, proof.ExecutionScopeRef, proof.AssignmentId, cancellationToken);
         var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, observedAt);
         var replay = assignment.Turns.SingleOrDefault(value => value.CommandId == turn.CommandId);
         if (replay is not null)
@@ -281,7 +293,7 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         string childFlowRunId, DateTimeOffset observedAt, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var document = await RequiredAsync(context, proof.ExecutionScopeRef, proof.AssignmentId, cancellationToken);
         var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, observedAt);
         if (assignment.ChildFlowRunIds.Contains(childFlowRunId, StringComparer.Ordinal)) return;
         assignment = assignment with
@@ -303,7 +315,7 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         if (events.Count is < 1 or > 256)
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.LimitExceeded, "An event batch must contain between 1 and 256 events.");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var document = await RequiredAsync(context, proof.ExecutionScopeRef, proof.AssignmentId, cancellationToken);
         var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, observedAt);
         var accepted = assignment.ExecutionEvents.ToList();
         var duplicates = new List<Guid>();
@@ -340,7 +352,7 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var document = await RequiredAsync(context, proof.ExecutionScopeRef, proof.AssignmentId, cancellationToken);
         var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, observedAt);
         var existing = assignment.Checkpoints.SingleOrDefault(value => value.CheckpointId == checkpoint.CheckpointId);
         if (existing is not null && (!string.Equals(existing.SchemaVersion, checkpoint.SchemaVersion, StringComparison.Ordinal)
@@ -362,7 +374,7 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var document = await RequiredAsync(context, proof.ExecutionScopeRef, proof.AssignmentId, cancellationToken);
         var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, observedAt);
         return assignment.Checkpoints.SingleOrDefault(value => value.CheckpointId == checkpointId);
     }
@@ -371,11 +383,18 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         WorkspaceId workspaceId,
         RuntimeAssignmentId assignmentId,
         DateTimeOffset requestedAt,
+        CancellationToken cancellationToken) =>
+        await RequestCancellationExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), assignmentId, requestedAt, cancellationToken);
+
+    public async Task<StoredRuntimeWorkerAssignment> RequestCancellationExactAsync(
+        ResourceScopeRef scopeRef,
+        RuntimeAssignmentId assignmentId,
+        DateTimeOffset requestedAt,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var document = await RequiredAsync(context, workspaceId, assignmentId, cancellationToken);
+        var document = await RequiredAsync(context, scopeRef, assignmentId, cancellationToken);
         var assignment = Deserialize(document).Value;
         if (assignment.State is RuntimeAssignmentState.Succeeded or RuntimeAssignmentState.Failed or RuntimeAssignmentState.Cancelled)
             return Deserialize(document);
@@ -394,10 +413,17 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         WorkspaceId workspaceId,
         RuntimeAssignmentId assignmentId,
         DateTimeOffset requestedAt,
+        CancellationToken cancellationToken) =>
+        await RequeueExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), assignmentId, requestedAt, cancellationToken);
+
+    public async Task<StoredRuntimeWorkerAssignment> RequeueExactAsync(
+        ResourceScopeRef scopeRef,
+        RuntimeAssignmentId assignmentId,
+        DateTimeOffset requestedAt,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await RequiredAsync(context, workspaceId, assignmentId, cancellationToken);
+        var document = await RequiredAsync(context, scopeRef, assignmentId, cancellationToken);
         var assignment = Deserialize(document).Value;
         if (assignment.State != RuntimeAssignmentState.Succeeded
             || assignment.CurrentAttempt?.State != RuntimeAssignmentAttemptState.Succeeded)
@@ -423,7 +449,7 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var document = await RequiredAsync(context, proof.WorkspaceId, proof.AssignmentId, cancellationToken);
+        var document = await RequiredAsync(context, proof.ExecutionScopeRef, proof.AssignmentId, cancellationToken);
         var existing = Deserialize(document).Value;
         if (existing.CurrentAttempt?.TerminalEventId == command.EventId)
         {
@@ -653,10 +679,10 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
 
     private static async Task<RuntimeWorkerAssignmentDocument> RequiredAsync(
         RuntimeRunDbContext context,
-        WorkspaceId workspaceId,
+        ResourceScopeRef scopeRef,
         RuntimeAssignmentId assignmentId,
         CancellationToken cancellationToken) =>
-        await context.WorkerAssignments.SingleOrDefaultAsync(value => value.WorkspaceId == workspaceId.Value
+        await context.WorkerAssignments.SingleOrDefaultAsync(value => value.ScopeRef == scopeRef.Value
             && value.AssignmentId == assignmentId.Value, cancellationToken)
         ?? throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.NotOwned, "The assignment was not found.");
 
@@ -664,7 +690,7 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         RuntimeRunDbContext context,
         RuntimeWorkerAssignment assignment,
         CancellationToken cancellationToken) =>
-        await context.Runs.SingleOrDefaultAsync(value => value.WorkspaceId == assignment.WorkspaceId.Value
+        await context.Runs.SingleOrDefaultAsync(value => value.ScopeRef == assignment.ExecutionScopeRef.Value
             && value.RunId == assignment.TargetRunId, cancellationToken)
         ?? throw new RuntimeRunNotFoundException(assignment.TargetRunId);
 
@@ -707,11 +733,11 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         string message,
         CancellationToken cancellationToken)
     {
-        var sequence = (await context.Events.Where(value => value.WorkspaceId == assignment.WorkspaceId.Value
+        var sequence = (await context.Events.Where(value => value.ScopeRef == assignment.ExecutionScopeRef.Value
             && value.RunId == assignment.TargetRunId).MaxAsync(value => (long?)value.Sequence, cancellationToken) ?? 0) + 1;
         var runEvent = new RuntimeRunEvent
         {
-            WorkspaceId = assignment.WorkspaceId,
+            ScopeRef = assignment.ExecutionScopeRef,
             Sequence = sequence,
             EventId = eventId,
             RunId = assignment.TargetRunId,
@@ -722,6 +748,7 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         };
         context.Events.Add(new RuntimeRunEventDocument
         {
+            ScopeRef = assignment.ExecutionScopeRef.Value,
             WorkspaceId = assignment.WorkspaceId.Value,
             RunId = assignment.TargetRunId,
             Sequence = sequence,
@@ -747,6 +774,7 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
 
     private static RuntimeWorkerAssignmentDocument ToDocument(RuntimeWorkerAssignment assignment, string etag, string? digest) => new()
     {
+        ScopeRef = assignment.ExecutionScopeRef.Value,
         WorkspaceId = assignment.WorkspaceId.Value,
         AssignmentId = assignment.Id.Value,
         TargetKind = assignment.TargetKind.ToString(),

@@ -52,6 +52,7 @@ public sealed class AgentRunnerModel
         }
         return new CreateRuntimeRunRequest
         {
+            ExecutionScopeRef = agent.ScopeRef,
             Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation)
             {
                 Namespace = agent.Namespace,

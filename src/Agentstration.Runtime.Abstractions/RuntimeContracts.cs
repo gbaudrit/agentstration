@@ -302,6 +302,7 @@ public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun, ArtifactS
 
 public sealed record ToolExecutionScope
 {
+    public ResourceScopeRef? ScopeRef { get; init; }
     public ToolExecutionOwnerKind OwnerKind { get; init; }
     public Guid? TenantId { get; init; }
     public WorkspaceId? WorkspaceId { get; init; }

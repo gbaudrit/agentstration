@@ -6,7 +6,7 @@ namespace Agentstration.Runtime.Abstractions;
 public sealed record ToolGovernanceAuditQuery
 {
     public required ToolExecutionOwnerKind OwnerKind { get; init; }
-    public required WorkspaceId WorkspaceId { get; init; }
+    public required ResourceScopeRef ScopeRef { get; init; }
     public required string RunId { get; init; }
     public long AfterSequence { get; init; }
     public int Limit { get; init; } = 100;

@@ -33,7 +33,11 @@ public sealed record InputResponse(
 
 public sealed record InputRequest
 {
-    public required WorkspaceId WorkspaceId { get; init; }
+    public required ResourceScopeRef ScopeRef { get; init; }
+    [JsonIgnore]
+    public WorkspaceId WorkspaceId => ScopeRef.Kind == ResourceScopeKind.Workspace
+        ? new WorkspaceId(ScopeRef.TargetId!.Value)
+        : default;
     public required string Id { get; init; }
     public required string RunId { get; init; }
     public string? Source { get; init; }

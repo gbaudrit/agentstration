@@ -3,6 +3,8 @@ using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Web.Security;
+using Agentstration.Runtime.Core;
+using Agentstration.Web.Api.Runtime;
 
 namespace Agentstration.Runtime.Api.Api;
 
@@ -28,20 +30,26 @@ internal static class RuntimeObservabilityEndpoints
 
         var runtime = endpoints.MapGroup("/api/runtime")
             .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
-        runtime.MapGet("/agent-instances", async (IRuntimeObservabilityQueryService service,
-                ICurrentRequestContext requestContext, CancellationToken token) =>
-            Results.Ok(await service.ListAgentInstancesAsync(
-                new WorkspaceId(requestContext.Current.WorkspaceId), token)))
+        runtime.MapGet("/agent-instances", async (string? scopeRef, IRuntimeObservabilityQueryService service,
+                RuntimeRunService runs, ICurrentRequestContext requestContext, CancellationToken token) =>
+            {
+                var scope = RuntimeHttp.CurrentScope(requestContext,
+                    string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef));
+                await runs.AuthorizeReadAsync(scope, token);
+                return Results.Ok(await service.ListAgentInstancesExactAsync(scope.ScopeRef, token));
+            })
             .Produces<AgentInstanceResponse[]>()
             .WithSummary("List active Agent instances observed in the current Workspace");
-        runtime.MapGet("/placements/{targetKind}/{runId}", async (string targetKind, string runId,
-                IRuntimeObservabilityQueryService service, ICurrentRequestContext requestContext,
+        runtime.MapGet("/placements/{targetKind}/{runId}", async (string targetKind, string runId, string? scopeRef,
+                IRuntimeObservabilityQueryService service, RuntimeRunService runs, ICurrentRequestContext requestContext,
                 CancellationToken token) =>
             {
                 if (!Enum.TryParse<RuntimeAssignmentTargetKind>(targetKind, true, out var kind))
                     return Results.BadRequest();
-                var placement = await service.GetPlacementAsync(
-                    new WorkspaceId(requestContext.Current.WorkspaceId), kind, runId, token);
+                var scope = RuntimeHttp.CurrentScope(requestContext,
+                    string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef));
+                await runs.AuthorizeReadAsync(scope, token);
+                var placement = await service.GetPlacementExactAsync(scope.ScopeRef, kind, runId, token);
                 return placement is null ? Results.NotFound() : Results.Ok(placement);
             })
             .Produces<RuntimeAssignmentPlacementResponse>()
