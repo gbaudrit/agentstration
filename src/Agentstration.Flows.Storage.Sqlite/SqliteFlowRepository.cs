@@ -279,23 +279,24 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
-        var document = Document(draft.WorkspaceId, DraftKey(draft.WorkspaceId, draft.FlowId), DraftKind, draft.FlowId, null, draft, now);
+        var ownerScopeRef = DraftOwnerScope(draft);
+        var document = Document(ownerScopeRef, DraftKey(draft.WorkspaceId, ownerScopeRef, draft.FlowId), DraftKind, draft.FlowId, null, draft, now);
         context.Documents.Add(document);
         await SaveCreateAsync(context, cancellationToken);
         return new StoredFlowDraft(draft, document.ETag, now);
     }
 
-    public async Task<StoredFlowDraft?> GetDraftAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken)
+    public async Task<StoredFlowDraft?> GetDraftExactAsync(WorkspaceId workspaceId, ResourceScopeRef ownerScopeRef, FlowId flowId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.Key == DraftKey(workspaceId, flowId), cancellationToken);
+        var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.Key == DraftKey(workspaceId, ownerScopeRef, flowId), cancellationToken);
         return document is null ? null : ToDraft(document);
     }
 
     public async Task<StoredFlowDraft> UpdateDraftAsync(FlowDraft draft, string expectedETag, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Documents.SingleOrDefaultAsync(value => value.Key == DraftKey(draft.WorkspaceId, draft.FlowId), cancellationToken)
+        var document = await context.Documents.SingleOrDefaultAsync(value => value.Key == DraftKey(draft.WorkspaceId, DraftOwnerScope(draft), draft.FlowId), cancellationToken)
             ?? throw new FlowNotFoundException(draft.FlowId);
         if (!string.Equals(document.ETag, expectedETag, StringComparison.Ordinal)) throw new FlowConcurrencyException("The supplied ETag does not match the current Flow Draft revision.");
         var now = timeProvider.GetUtcNow();
@@ -444,7 +445,9 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     private static string DefinitionKey(ResourceScopeRef scopeRef, FlowId id) => FlowPrefix(scopeRef, id);
     private static string VersionKey(ResourceScopeRef scopeRef, FlowId id, string version) => $"{FlowPrefix(scopeRef, id)}:version:{version}";
     private static string RunKey(ResourceScopeRef scopeRef, string id) => $"scope:{scopeRef.Value}:run:{id}";
-    private static string DraftKey(WorkspaceId workspaceId, FlowId id) => $"workspace:{workspaceId}:flow:{id.Namespace.Value}:{id.Value}:draft";
+    private static string DraftKey(WorkspaceId workspaceId, ResourceScopeRef ownerScopeRef, FlowId id) =>
+        $"workspace:{workspaceId}:owner:{ownerScopeRef.Value}:flow:{id.Namespace.Value}:{id.Value}:draft";
+    private static ResourceScopeRef DraftOwnerScope(FlowDraft draft) => draft.ScopeRef ?? ResourceScopeRef.Workspace(draft.WorkspaceId.Value);
     private static string RunEventKey(ResourceScopeRef scopeRef, string runId, long sequence) => $"scope:{scopeRef.Value}:run:{runId}:event:{sequence:D12}";
     private static string InputRequestKey(ResourceScopeRef scopeRef, string runId, string requestId) => $"scope:{scopeRef.Value}:run:{runId}:input:{requestId}";
     private static string NewETag() => $"\"{Guid.NewGuid():N}\"";

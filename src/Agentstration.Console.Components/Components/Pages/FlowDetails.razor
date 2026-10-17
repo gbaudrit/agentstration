@@ -133,9 +133,10 @@ else
         get
         {
             var suffix = IsOrchestration ? "orchestration" : "designer";
-            return FlowResourceNamespace.IsDefault
+            var path = FlowResourceNamespace.IsDefault
                 ? $"/flows/{Uri.EscapeDataString(FlowId)}/{suffix}"
                 : $"/namespaces/{Uri.EscapeDataString(FlowResourceNamespace.Value)}/flows/{Uri.EscapeDataString(FlowId)}/{suffix}";
+            return $"{path}?scopeRef={Uri.EscapeDataString(FlowScopeRef.Value)}";
         }
     }
     private string EditorLabel => IsOrchestration ? T("OpenOrchestrationEditor") : T("OpenFlowDesigner");

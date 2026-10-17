@@ -462,12 +462,13 @@ else
             || item.Namespace.Value.Contains(toolSearch, StringComparison.OrdinalIgnoreCase));
     private string SaveText => T($"SaveState.{Editor.State.SaveState}");
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
-    private FlowDesignerTarget Target => new(Namespace, ResourceId);
+    [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
+    private FlowDesignerTarget Target => new(Namespace, ResourceId, ScopeRef);
     private bool ReadOnly => IsReadOnly || Editor.State.IsReadOnly;
 
     protected override async Task OnParametersSetAsync()
     {
-        var targetKey = $"{Namespace.Value}/{ResourceId}";
+        var targetKey = $"{ScopeRef?.Value}/{Namespace.Value}/{ResourceId}";
         if (loadedResource == targetKey) return;
         loadedResource = targetKey;
         Editor.StateChanged += EditorChanged;

@@ -7,6 +7,7 @@ namespace Agentstration.Flows.Contracts;
 public sealed record CreateFlowRequest(string Name, string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
     public string? DisplayName { get; init; }
 }
 public sealed record UpdateFlowRequest(string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null)
@@ -44,7 +45,10 @@ public sealed record FlowRunCausalityPageResponse(
     int TotalCount,
     string? NextLink);
 public sealed record SubmitInputResponseRequest(JsonElement Value);
-public sealed record CreateFlowDraftRequest(string Name, string DisplayName, string? Description = null, IReadOnlyDictionary<string, string>? Tags = null, string Template = "AgentRouting");
+public sealed record CreateFlowDraftRequest(string Name, string DisplayName, string? Description = null, IReadOnlyDictionary<string, string>? Tags = null, string Template = "AgentRouting")
+{
+    public ResourceScopeRef? ScopeRef { get; init; }
+}
 public sealed record UpdateFlowDraftRequest(string DisplayName, string? Description, IReadOnlyDictionary<string, string>? Tags, FlowGraphDefinition Definition, string UpdatedBy = "local-user");
 public sealed record PublishFlowDraftRequest(string Version, string? ReleaseNotes = null, bool Activate = true);
 public sealed record FlowDraftResponse(FlowDraft Value, string ETag);

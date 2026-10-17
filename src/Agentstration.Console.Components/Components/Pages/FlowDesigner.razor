@@ -6,11 +6,13 @@
 
 <PageTitle>@Localizer["PageTitle"] · Agentstration</PageTitle>
 <div class="flow-designer-page" data-testid="flow-observability-designer">
-    <Agentstration.Web.FlowDesigner.Components.FlowDesigner ResourceId="@FlowId" Namespace="@DesignerNamespace" />
+    <Agentstration.Web.FlowDesigner.Components.FlowDesigner ResourceId="@FlowId" Namespace="@DesignerNamespace" ScopeRef="@DesignerScope" />
 </div>
 
 @code {
     [Parameter] public string FlowId { get; set; } = string.Empty;
     [Parameter] public string? FlowNamespace { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     private ResourceNamespace DesignerNamespace => string.IsNullOrWhiteSpace(FlowNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(FlowNamespace);
+    private ResourceScopeRef? DesignerScope => string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
 }

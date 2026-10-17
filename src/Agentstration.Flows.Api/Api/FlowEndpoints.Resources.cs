@@ -4,6 +4,7 @@ using Agentstration.Flows.Application;
 using Agentstration.Flows.Contracts;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Web.Security;
 
@@ -11,19 +12,21 @@ namespace Agentstration.Web;
 
 public static partial class FlowEndpoints
 {
-    private static Task<IResult> CreateAsync(CreateFlowRequest body, HttpResponse response, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> CreateAsync(CreateFlowRequest body, HttpResponse response, FlowService service, IResourceScopeOperations scopes, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var stored = await service.CreateAsync(CurrentWorkspace(requestContext), new CreateFlowCommand(body.Name, body.Description, body.Version, body.Enabled, body.Definition, body.Metadata, DisplayName: body.DisplayName), body.Namespace, token);
+        var ownerScope = RequestedOwnerScope(body.ScopeRef, requestContext);
+        var stored = await WriteFlowAsync(scopes, ownerScope, operationToken => service.CreateExactAsync(ownerScope, new CreateFlowCommand(body.Name, body.Description, body.Version, body.Enabled, body.Definition, body.Metadata, DisplayName: body.DisplayName), body.Namespace, operationToken), token);
         response.Headers.ETag = stored.ETag;
         response.Headers.Location = $"/api/flows/{stored.Value.Id}";
         return Results.Json(ToResponse(stored.Value), statusCode: StatusCodes.Status201Created);
     });
 
-    private static Task<IResult> CreateNamespacedAsync(string @namespace, CreateFlowRequest body, HttpResponse response, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> CreateNamespacedAsync(string @namespace, CreateFlowRequest body, HttpResponse response, FlowService service, IResourceScopeOperations scopes, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
         var parsed = ResourceNamespace.Parse(@namespace);
         if (body.Namespace != parsed) throw new FlowValidationException("route_namespace_mismatch", "The Flow namespace must match the route namespace.");
-        var stored = await service.CreateAsync(CurrentWorkspace(requestContext), new CreateFlowCommand(body.Name, body.Description, body.Version, body.Enabled, body.Definition, body.Metadata, DisplayName: body.DisplayName), parsed, token);
+        var ownerScope = RequestedOwnerScope(body.ScopeRef, requestContext);
+        var stored = await WriteFlowAsync(scopes, ownerScope, operationToken => service.CreateExactAsync(ownerScope, new CreateFlowCommand(body.Name, body.Description, body.Version, body.Enabled, body.Definition, body.Metadata, DisplayName: body.DisplayName), parsed, operationToken), token);
         response.Headers.ETag = stored.ETag;
         response.Headers.Location = $"/api/namespaces/{parsed.Value}/flows/{stored.Value.Id.Value}";
         return Results.Json(ToResponse(stored.Value), statusCode: StatusCodes.Status201Created);
