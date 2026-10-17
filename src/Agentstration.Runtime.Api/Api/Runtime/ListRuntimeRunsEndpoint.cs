@@ -16,7 +16,7 @@ internal sealed class ListRuntimeRunsEndpoint : IRuntimeEndpoint
             var actualTop = Math.Clamp(top ?? 100, 1, 1000);
             var executionScope = RuntimeHttp.CurrentScope(requestContext,
                 string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef));
-            await service.AuthorizeAsync(executionScope, cancellationToken);
+            await service.AuthorizeReadAsync(executionScope, cancellationToken);
             var executionScopeRef = executionScope.ScopeRef;
             var values = await service.ListExactAsync(executionScopeRef, agentResourceId, actualSkip, actualTop, cancellationToken);
             var agentFilter = string.IsNullOrWhiteSpace(agentResourceId) ? string.Empty : $"&agentResourceId={Uri.EscapeDataString(agentResourceId)}";

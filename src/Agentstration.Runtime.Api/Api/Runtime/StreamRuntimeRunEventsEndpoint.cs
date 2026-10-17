@@ -17,7 +17,7 @@ internal sealed class StreamRuntimeRunEventsEndpoint : IRuntimeEndpoint
         var requestedScopeValue = request.Query["scopeRef"].FirstOrDefault();
         var scope = RuntimeHttp.CurrentScope(requestContext,
             string.IsNullOrWhiteSpace(requestedScopeValue) ? null : ResourceScopeRef.Parse(requestedScopeValue));
-        await service.AuthorizeAsync(scope, cancellationToken);
+        await service.AuthorizeReadAsync(scope, cancellationToken);
         if (await service.GetExactAsync(scope.ScopeRef, runId, cancellationToken) is null)
         {
             response.StatusCode = StatusCodes.Status404NotFound;

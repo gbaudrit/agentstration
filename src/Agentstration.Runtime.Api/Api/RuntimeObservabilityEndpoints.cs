@@ -35,7 +35,7 @@ internal static class RuntimeObservabilityEndpoints
             {
                 var scope = RuntimeHttp.CurrentScope(requestContext,
                     string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef));
-                await runs.AuthorizeAsync(scope, token);
+                await runs.AuthorizeReadAsync(scope, token);
                 return Results.Ok(await service.ListAgentInstancesExactAsync(scope.ScopeRef, token));
             })
             .Produces<AgentInstanceResponse[]>()
@@ -48,7 +48,7 @@ internal static class RuntimeObservabilityEndpoints
                     return Results.BadRequest();
                 var scope = RuntimeHttp.CurrentScope(requestContext,
                     string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef));
-                await runs.AuthorizeAsync(scope, token);
+                await runs.AuthorizeReadAsync(scope, token);
                 var placement = await service.GetPlacementExactAsync(scope.ScopeRef, kind, runId, token);
                 return placement is null ? Results.NotFound() : Results.Ok(placement);
             })

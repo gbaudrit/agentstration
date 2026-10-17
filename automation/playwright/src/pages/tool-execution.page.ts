@@ -24,7 +24,16 @@ export class ToolExecutionPage {
   public get result(): Locator { return this.page.getByTestId(TestIds.toolExecution.result); }
 
   public async open(consoleUrl: string, name: string, namespace?: string): Promise<void> {
-    const query = namespace ? `?namespace=${encodeURIComponent(namespace)}` : '';
+    const catalogResponse = await this.page.request.get(`${consoleUrl}/api/tools`);
+    await expectApi(catalogResponse, 200, 'list Tools');
+    const catalog = await catalogResponse.json() as { value?: Array<{ metadata?: { name?: string; namespace?: string }; scopeRef?: string }> };
+    const candidates = (catalog.value ?? []).filter(tool => tool.metadata?.name === name && (tool.metadata.namespace ?? 'default') === (namespace ?? 'default'));
+    const selected = candidates.find(tool => tool.scopeRef?.startsWith('/workspaces/')) ?? candidates[0];
+    if (!selected?.scopeRef) throw new Error(`Tool '${name}' did not expose an ownership scope.`);
+    const queryValues = new URLSearchParams();
+    if (namespace) queryValues.set('namespace', namespace);
+    queryValues.set('scopeRef', selected.scopeRef);
+    const query = `?${queryValues.toString()}`;
     const resource = await this.page.request.get(`${consoleUrl}/api/tools/${encodeURIComponent(name)}${query}`);
     await expectApi(resource, 200, `read Tool '${name}'`);
     const body = await resource.json() as { definition?: { displayName?: string } };

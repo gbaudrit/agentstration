@@ -250,6 +250,8 @@ public interface IRuntimeRunQueue
 public interface IRuntimeRunExecutionScope
 {
     ValueTask ValidateAsync(RuntimeRunScope scope, CancellationToken cancellationToken);
+    ValueTask ValidateReadAsync(RuntimeRunScope scope, CancellationToken cancellationToken) =>
+        ValidateAsync(scope, cancellationToken);
     IDisposable Enter(RuntimeRunScope scope);
 }
 

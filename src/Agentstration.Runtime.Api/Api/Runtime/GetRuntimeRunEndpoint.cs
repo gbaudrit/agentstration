@@ -14,7 +14,7 @@ internal sealed class GetRuntimeRunEndpoint : IRuntimeEndpoint
         {
             var scope = RuntimeHttp.CurrentScope(requestContext,
                 string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef));
-            await service.AuthorizeAsync(scope, cancellationToken);
+            await service.AuthorizeReadAsync(scope, cancellationToken);
             var stored = await service.GetExactAsync(scope.ScopeRef, runId, cancellationToken) ?? throw new RuntimeRunNotFoundException(runId);
             return RuntimeHttp.RunResult(stored, response, StatusCodes.Status200OK);
         });

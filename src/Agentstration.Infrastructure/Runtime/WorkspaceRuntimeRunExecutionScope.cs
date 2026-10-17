@@ -11,6 +11,15 @@ public sealed class WorkspaceRuntimeRunExecutionScope(
     IRequestContextScopeFactory scopeFactory) : IRuntimeRunExecutionScope
 {
     public async ValueTask ValidateAsync(RuntimeRunScope scope, CancellationToken cancellationToken)
+        => await ValidateAsync(scope, AuthorizationPermissions.RunsExecute, cancellationToken);
+
+    public async ValueTask ValidateReadAsync(RuntimeRunScope scope, CancellationToken cancellationToken)
+        => await ValidateAsync(scope, AuthorizationPermissions.RunsRead, cancellationToken);
+
+    private async ValueTask ValidateAsync(
+        RuntimeRunScope scope,
+        string permission,
+        CancellationToken cancellationToken)
     {
         var principal = await identities.GetPrincipalAsync(scope.PrincipalId, cancellationToken);
         if (principal?.Status != PrincipalStatus.Active) throw Denied();
@@ -26,12 +35,12 @@ public sealed class WorkspaceRuntimeRunExecutionScope(
         {
             if (await platformAuthorization.IsPlatformAdministratorAsync(scope.PrincipalId, cancellationToken)) return;
             var membership = await identities.FindMembershipAsync(scope.TenantId, scope.PrincipalId, cancellationToken);
-            if (membership?.Status != MembershipStatus.Active || !await HasTenantPermissionAsync(scope, cancellationToken)) throw Denied();
+            if (membership?.Status != MembershipStatus.Active || !await HasTenantPermissionAsync(scope, permission, cancellationToken)) throw Denied();
             return;
         }
         var workspace = await identities.GetWorkspaceAsync(scope.TenantId, scope.WorkspaceId.Value, cancellationToken);
         if (workspace?.Status != WorkspaceStatus.Active || scope.ScopeRef != ResourceScopeRef.Workspace(scope.WorkspaceId.Value)) throw Denied();
-        try { await authorization.EnsurePermissionAsync(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value), AuthorizationPermissions.RunsExecute, cancellationToken); }
+        try { await authorization.EnsurePermissionAsync(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value), permission, cancellationToken); }
         catch (AuthorizationDeniedException) { throw Denied(); }
     }
 
@@ -43,13 +52,13 @@ public sealed class WorkspaceRuntimeRunExecutionScope(
         _ => throw Denied()
     };
 
-    private async Task<bool> HasTenantPermissionAsync(RuntimeRunScope scope, CancellationToken cancellationToken)
+    private async Task<bool> HasTenantPermissionAsync(RuntimeRunScope scope, string permission, CancellationToken cancellationToken)
     {
         var assignments = await identities.ListRoleAssignmentsAsync(scope.TenantId, scope.PrincipalId, cancellationToken);
         foreach (var assignment in assignments.Where(value => string.Equals(value.Scope, AuthorizationScopes.Tenant(scope.TenantId), StringComparison.Ordinal)))
         {
             var role = await identities.GetRoleDefinitionAsync(assignment.RoleDefinitionId, cancellationToken);
-            if (role?.Permissions.Contains(AuthorizationPermissions.RunsExecute) == true) return true;
+            if (role?.Permissions.Contains(permission) == true) return true;
         }
         return false;
     }

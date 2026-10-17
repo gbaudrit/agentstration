@@ -20,7 +20,7 @@ internal sealed class ListRuntimeRunEventsEndpoint : IRuntimeEndpoint
         {
             var scope = RuntimeHttp.CurrentScope(requestContext,
                 string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef));
-            await service.AuthorizeAsync(scope, cancellationToken);
+            await service.AuthorizeReadAsync(scope, cancellationToken);
             return Results.Ok(await service.ListEventsExactAsync(scope.ScopeRef, runId,
                 Math.Max(0, afterSequence ?? 0), cancellationToken));
         });
