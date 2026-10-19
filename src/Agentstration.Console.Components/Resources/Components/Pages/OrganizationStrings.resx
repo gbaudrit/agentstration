@@ -129,4 +129,9 @@
 <data name="ExternalIdentityLinked"><value>External identity linked.</value></data>
 <data name="ExternalIdentityUnlinked"><value>External identity unlinked.</value></data>
 <data name="PlatformAdministrator"><value>Platform administrator</value></data>
+<data name="AuditAction.knowledge-source.created"><value>Knowledge Source created</value></data>
+<data name="AuditAction.knowledge-source.updated"><value>Knowledge Source updated</value></data>
+<data name="AuditAction.knowledge-source.enabled"><value>Knowledge Source enabled</value></data>
+<data name="AuditAction.knowledge-source.disabled"><value>Knowledge Source disabled</value></data>
+<data name="AuditAction.knowledge-source.deleted"><value>Knowledge Source deleted</value></data>
 </root>

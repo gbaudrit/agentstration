@@ -1,15 +1,19 @@
 using Agentstration.Agents.Api;
+using Agentstration.Artifacts.Api;
 using Agentstration.Bootstrap.Api;
+using Agentstration.DataSources.Api;
 using Agentstration.Extensions.Api;
 using Agentstration.Flows.Api;
 using Agentstration.Identity.Api;
 using Agentstration.Infrastructure;
+using Agentstration.Knowledge.Api;
 using Agentstration.Models.Api;
 using Agentstration.Packs.Api;
 using Agentstration.Parameters.Api;
 using Agentstration.ResourcePlanning.Api;
 using Agentstration.Resources.Api;
 using Agentstration.Runtime.Api;
+using Agentstration.Schemas.Api;
 using Agentstration.Secrets.Api;
 using Agentstration.Sources.Api;
 using Agentstration.Tools.Api;
@@ -33,6 +37,9 @@ public static class ApiTransportEndpointRouteBuilderExtensions
             ? Results.Ok(new { status = "ready" })
             : Results.StatusCode(StatusCodes.Status503ServiceUnavailable)).AllowAnonymous();
         app.MapIdentityApi();
+        app.MapArtifactsApi();
+        app.MapKnowledgeApi();
+        app.MapDataSourcesApi();
         app.MapBootstrapApi();
         app.MapAgentsApi();
         app.MapTriggersApi();
@@ -40,6 +47,7 @@ public static class ApiTransportEndpointRouteBuilderExtensions
         app.MapModelsApi();
         app.MapPacksApi();
         app.MapParametersApi();
+        app.MapSchemasApi();
         app.MapSecretsApi();
         app.MapToolsApi();
         app.MapResourcesApi();

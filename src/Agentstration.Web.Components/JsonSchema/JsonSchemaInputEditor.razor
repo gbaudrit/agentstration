@@ -52,6 +52,7 @@
         lockedValuesKey = nextLockedValuesKey;
         lockedPaths = LockedValues?.Keys.Select(name => $"$.{name}").ToHashSet(StringComparer.Ordinal)
             ?? new HashSet<string>(StringComparer.Ordinal);
+        var previousCanRender = analysis.CanRender;
         analysis = JsonSchemaInputModel.Analyze(Schema);
         if (!TryObject(nextValueKey, out var nextDocument)) nextDocument = [];
         document = nextDocument;
@@ -63,6 +64,7 @@
         rawText = EditableDocument(document).ToJsonString(new JsonSerializerOptions { WriteIndented = true });
         valueKey = document.ToJsonString();
         if (!analysis.CanRender) rawMode = true;
+        else if (!previousCanRender) rawMode = false;
         initialized = true;
         await PublishAsync(initializeEmpty);
     }

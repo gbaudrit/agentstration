@@ -19,6 +19,11 @@
     }
     else
     {
+        <div class="agent-tool-access-summary" aria-label="@T("EffectiveToolAccess")" data-testid="agent-tool-access-summary">
+            <span><strong>@EffectiveToolCount</strong>@T("EffectiveTools")</span>
+            <span><strong>@InheritedToolCount</strong>@T("ViaToolSets")</span>
+            <span><strong>@IndividualToolCount</strong>@T("IndividualTools")</span>
+        </div>
         @if (CategoryGroups.Count > 0)
         {
             <section class="agent-tool-categories" aria-labelledby="agent-tool-categories-title">
@@ -50,7 +55,7 @@
                         </div>
                         <div class="agent-tool-group-actions">
                             <div class="agent-tool-group-summary">
-                                <strong>@T("SelectedTools", SelectedCount(group))</strong>
+                                <strong>@T("EffectiveSelectedTools", SelectedCount(group))</strong>
                                 <span>@T("ToolCount", group.Tools.Count)</span>
                             </div>
                             @if (group.HasProvider)
@@ -63,14 +68,23 @@
                         @foreach (var tool in group.Tools)
                         {
                             var assigned = IsAssigned(tool.Metadata.Name);
+                            var inherited = IsInherited(tool.Metadata.Name);
+                            var effective = assigned || inherited;
                             var usable = tool.Definition.Enabled && tool.Definition.Discovery?.Available == true;
                             var inputId = ToolInputId(tool.Metadata.Name);
-                            <div class="agent-tool-option">
-                                <input id="@inputId" type="checkbox" aria-label="@tool.Definition.DisplayName" checked="@assigned" disabled="@(!usable && !assigned)" @onchange="args => ToggleAsync(tool.Metadata.Name, (bool)args.Value!)" />
+                            <div class="agent-tool-option @(inherited ? "inherited" : null)">
+                                <input id="@inputId" type="checkbox" aria-label="@tool.Definition.DisplayName" checked="@effective" disabled="@(inherited || (!usable && !assigned))" @onchange="args => ToggleAsync(tool.Metadata.Name, (bool)args.Value!)" />
                                 <label class="agent-tool-card-icon" for="@inputId" aria-hidden="true"><TablerIcon Name="tool" /></label>
                                 <span class="agent-tool-copy">
                                     <strong><a class="agent-tool-name" href="@ToolUrl(tool.Metadata.Name)">@tool.Definition.DisplayName</a>@if (!string.IsNullOrWhiteSpace(tool.Definition.Description)) { <HelpTooltip Text="@tool.Definition.Description" /> }</strong>
-                                    <label class="@ToolStatusClass(usable, assigned)" for="@inputId"><i></i>@(usable ? T("Available") : assigned ? T("AssignedUnavailable") : T("NotUsable"))</label>
+                                    @if (inherited)
+                                    {
+                                        <span class="tool-status inherited"><i></i>@T("GrantedViaToolSet", ToolSetSources(tool.Metadata.Name))</span>
+                                    }
+                                    else
+                                    {
+                                        <label class="@ToolStatusClass(usable, assigned)" for="@inputId"><i></i>@(usable ? T("Available") : assigned ? T("AssignedUnavailable") : T("NotUsable"))</label>
+                                    }
                                 </span>
                             </div>
                         }
@@ -86,15 +100,22 @@
     [Parameter] public IReadOnlyList<ToolProviderResource> Providers { get; set; } = [];
     [Parameter] public IReadOnlyList<ToolCategoryResource> Categories { get; set; } = [];
     [Parameter] public IReadOnlyList<string> SelectedToolIds { get; set; } = [];
+    [Parameter] public IReadOnlyDictionary<string, IReadOnlyList<string>> ToolSetGrantedTools { get; set; } = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
     [Parameter] public EventCallback<IReadOnlyList<string>> SelectedToolIdsChanged { get; set; }
 
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private IReadOnlyList<AgentToolProviderGroup> Groups => AgentToolProviderGroup.Create(Tools, Providers, T("UnknownMcp"));
     private IReadOnlyList<AgentToolCategoryGroup> CategoryGroups => AgentToolCategoryGroup.Create(Categories, Tools);
     private bool IsAssigned(string id) => SelectedToolIds.Contains(id, StringComparer.Ordinal);
-    private int SelectedCount(AgentToolProviderGroup group) => group.Tools.Count(tool => IsAssigned(tool.Metadata.Name));
+    private bool IsInherited(string id) => ToolSetGrantedTools.ContainsKey(id);
+    private bool IsEffective(string id) => IsAssigned(id) || IsInherited(id);
+    private int EffectiveToolCount => Tools.Count(tool => IsEffective(tool.Metadata.Name));
+    private int InheritedToolCount => Tools.Count(tool => IsInherited(tool.Metadata.Name));
+    private int IndividualToolCount => Tools.Count(tool => IsAssigned(tool.Metadata.Name) && !IsInherited(tool.Metadata.Name));
+    private int SelectedCount(AgentToolProviderGroup group) => group.Tools.Count(tool => IsEffective(tool.Metadata.Name));
+    private string ToolSetSources(string id) => string.Join(", ", ToolSetGrantedTools[id]);
     private static string ToolStatusClass(bool usable, bool assigned) => usable ? "tool-status available" : assigned ? "tool-status warning" : "tool-status unavailable";
-    private int CategorySelectedCount(AgentToolCategoryGroup category) => category.AssignableTools.Count(tool => IsAssigned(tool.Name));
+    private int CategorySelectedCount(AgentToolCategoryGroup category) => category.AssignableTools.Count(tool => IsEffective(tool.Name));
     private string CategoryState(AgentToolCategoryGroup category)
     {
         var selected = CategorySelectedCount(category);
@@ -106,6 +127,7 @@
 
     private async Task ToggleAsync(string id, bool selected)
     {
+        if (IsInherited(id)) return;
         var values = SelectedToolIds.Distinct(StringComparer.Ordinal).ToList();
         if (selected && !values.Contains(id, StringComparer.Ordinal)) values.Add(id);
         else if (!selected) values.RemoveAll(value => string.Equals(value, id, StringComparison.Ordinal));
@@ -115,15 +137,16 @@
     private async Task ToggleCategoryAsync(AgentToolCategoryGroup category)
     {
         var values = SelectedToolIds.Distinct(StringComparer.Ordinal).ToList();
-        var select = category.AssignableTools.Any(tool => !values.Contains(tool.Name, StringComparer.Ordinal));
+        var mutableTools = category.AssignableTools.Where(tool => !IsInherited(tool.Name)).ToArray();
+        var select = mutableTools.Any(tool => !values.Contains(tool.Name, StringComparer.Ordinal));
         if (select)
         {
-            foreach (var tool in category.AssignableTools)
+            foreach (var tool in mutableTools)
                 if (!values.Contains(tool.Name, StringComparer.Ordinal)) values.Add(tool.Name);
         }
         else
         {
-            var members = category.Tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
+            var members = mutableTools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
             values.RemoveAll(members.Contains);
         }
         await SelectedToolIdsChanged.InvokeAsync(values);

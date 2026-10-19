@@ -11,6 +11,7 @@ public sealed class RuntimeRunDbContext(DbContextOptions<RuntimeRunDbContext> op
     internal DbSet<RuntimeRunDocument> Runs => Set<RuntimeRunDocument>();
     internal DbSet<RuntimeRunEventDocument> Events => Set<RuntimeRunEventDocument>();
     internal DbSet<RuntimeExecutionStateDocument> ExecutionStates => Set<RuntimeExecutionStateDocument>();
+    internal DbSet<RuntimeWorkerAssignmentDocument> WorkerAssignments => Set<RuntimeWorkerAssignmentDocument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -41,6 +42,8 @@ public sealed class RuntimeRunDbContext(DbContextOptions<RuntimeRunDbContext> op
         executionState.Property(value => value.StateId).HasMaxLength(256);
         executionState.Property(value => value.ParentStateId).HasMaxLength(256);
         executionState.HasIndex(value => new { value.WorkspaceId, value.RunId, value.RuntimeType, value.CreatedAt });
+
+        RuntimeWorkerAssignmentModel.Configure(modelBuilder);
     }
 }
 
@@ -161,6 +164,7 @@ public sealed class PostgreSqlRuntimeRunStore(IDbContextFactory<RuntimeRunDbCont
             throw new RuntimeRunConcurrencyException("The supplied ETag does not match the current Runtime Run version.");
         context.Events.RemoveRange(await context.Events.Where(value => value.WorkspaceId == workspaceId.Value && value.RunId == runId).ToArrayAsync(cancellationToken));
         context.ExecutionStates.RemoveRange(await context.ExecutionStates.Where(value => value.WorkspaceId == workspaceId.Value && value.RunId == runId).ToArrayAsync(cancellationToken));
+        context.WorkerAssignments.RemoveRange(await context.WorkerAssignments.Where(value => value.WorkspaceId == workspaceId.Value && value.TargetRunId == runId).ToArrayAsync(cancellationToken));
         context.Runs.Remove(run);
         try { await context.SaveChangesAsync(cancellationToken); }
         catch (DbUpdateConcurrencyException exception) { throw new RuntimeRunConcurrencyException(exception.Message); }
@@ -295,6 +299,7 @@ public static class PostgreSqlRuntimeRunServiceCollectionExtensions
         services.AddDbContextFactory<RuntimeRunDbContext>(options => options.UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "runtime").EnableRetryOnFailure()).AddInterceptors(new UtcDateTimeOffsetInterceptor()));
         services.AddSingleton<IRuntimeRunStore, PostgreSqlRuntimeRunStore>();
         services.AddSingleton<IRuntimeExecutionStateStore, PostgreSqlRuntimeExecutionStateStore>();
+        services.AddSingleton<IRuntimeWorkerAssignmentStore, PostgreSqlRuntimeWorkerAssignmentStore>();
         return services;
     }
 }

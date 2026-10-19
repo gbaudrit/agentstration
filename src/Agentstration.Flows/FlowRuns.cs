@@ -8,7 +8,33 @@ public sealed record FlowRunError(string Code, string Message, string? Details =
 public sealed record FlowRunScope(Guid TenantId, WorkspaceId WorkspaceId, Guid PrincipalId);
 public readonly record struct FlowRunKey(WorkspaceId WorkspaceId, string RunId);
 public sealed record FlowRunEvent(WorkspaceId WorkspaceId, string RunId, long Sequence, FlowRunEventType Type, string? StepId, JsonElement? Payload, DateTimeOffset Timestamp);
-public sealed record FlowStepRunUsage(int? InputTokens = null, int? OutputTokens = null);
+public sealed record FlowStepRunUsage(int? InputTokens = null, int? OutputTokens = null, int? TotalTokens = null);
+public enum FlowRunTokenUsageState { Collecting, Final }
+public enum FlowRunTokenUsageCoverage { Complete, Partial, Unavailable }
+public sealed record FlowRunTokenUsageTotal(
+    long? InputTokens,
+    long? OutputTokens,
+    long? TotalTokens,
+    FlowRunTokenUsageCoverage Coverage,
+    int ReportedInvocationCount,
+    int InvocationCount);
+public sealed record FlowRunTokenUsage(
+    FlowRunTokenUsageState State,
+    FlowRunTokenUsageTotal Direct,
+    FlowRunTokenUsageTotal Inclusive)
+{
+    private static readonly FlowRunTokenUsageTotal Empty = new(null, null, null,
+        FlowRunTokenUsageCoverage.Unavailable, 0, 0);
+
+    public static FlowRunTokenUsage Initial { get; } = new(FlowRunTokenUsageState.Collecting, Empty, Empty);
+}
+public sealed record FlowStepArtifactReference(
+    string ArtifactId,
+    string FileName,
+    string MediaType,
+    string Kind = "staged",
+    string? StorageFlowRunId = null,
+    string? LocalArtifactId = null);
 public sealed record FlowParticipantTurnResult(int Turn, string Content);
 public sealed record FlowParticipantResult(
     string ParticipantId,
@@ -24,6 +50,18 @@ public sealed record FlowOrchestrationResult(
     FlowOrchestrationStrategy Strategy,
     JsonElement FinalOutput,
     IReadOnlyList<FlowParticipantResult> Participants);
+public sealed record FlowToolRouteResolution(
+    string ToolSetName,
+    ResourceNamespace ToolSetNamespace,
+    string ToolSetVersion,
+    string Capability,
+    string Route,
+    string ToolName,
+    ResourceNamespace ToolNamespace,
+    Guid ToolUid,
+    long ToolGeneration,
+    string ProviderName,
+    ResourceNamespace ProviderNamespace);
 public sealed record FlowStepRun
 {
     public required string StepName { get; init; }
@@ -45,6 +83,11 @@ public sealed record FlowStepRun
     public FlowStepRunUsage? Usage { get; init; }
     public FlowRunError? Error { get; init; }
     public string? ChildFlowRunId { get; init; }
+    public IReadOnlyList<string> ChildFlowRunIds { get; init; } = [];
+    public int? RepeatIteration { get; init; }
+    public FlowToolRouteResolution? ToolRoute { get; init; }
+    public IReadOnlyList<FlowStepArtifactReference> Artifacts { get; init; } = [];
+    public string? ArtifactStorageFlowRunId { get; init; }
 }
 
 public sealed record FlowRun
@@ -77,12 +120,17 @@ public sealed record FlowRun
     public required FlowRunScope Scope { get; init; }
     public required JsonElement Input { get; init; }
     public JsonElement? Output { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? OutputName { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public FlowOutputOutcome? OutputOutcome { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }
     public FlowRunError? Error { get; init; }
     public required FlowVersion DefinitionSnapshot { get; init; }
     public IReadOnlyList<FlowStepRun> Steps { get; init; } = [];
+    public FlowRunTokenUsage TokenUsage { get; init; } = FlowRunTokenUsage.Initial;
     public IReadOnlyList<RuntimeExecutionBinding> RuntimeBindings { get; init; } = [];
     public DurableRuntimeStateReference? RuntimeState { get; init; }
     public string? ExecutionLeaseId { get; init; }

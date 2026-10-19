@@ -49,7 +49,7 @@ export class FlowObservabilityPage {
     const split = this.page.locator('.flow-editor-shell.split');
     await expect(split).toBeVisible();
     await expect(split.locator('.flow-canvas-wrap')).toBeVisible();
-    await expect(split.locator('.flow-node')).toHaveCount(2);
+    await expect(split.locator('.flow-node')).toHaveCount(3);
     await expect(split.locator('.source-editor')).toBeVisible();
 
     if (!checkInvalidYaml) return;
@@ -60,7 +60,7 @@ export class FlowObservabilityPage {
     await split.getByRole('button', { name: 'Apply and save' }).click();
     await expect(split.locator('.source-editor .error-panel')).toBeVisible();
     await expect(split.locator('.view-lines')).toContainText('entryStep: [');
-    await expect(split.locator('.flow-node')).toHaveCount(2);
+    await expect(split.locator('.flow-node')).toHaveCount(3);
   }
 
   public async openManualRunDialog(consoleUrl: string, expectWide: boolean): Promise<void> {

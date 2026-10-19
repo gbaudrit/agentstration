@@ -5,9 +5,11 @@ using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Agents;
 using Agentstration.Agents.Contracts;
 using Agentstration.Application.Work;
+using Agentstration.Awp.Abstractions;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
+using Agentstration.Extensions.Crawl4AI;
 using Agentstration.Extensions.Git;
 using Agentstration.Extensions.LlamaCpp;
 using Agentstration.Extensions.LocalAI;
@@ -17,6 +19,8 @@ using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
+using Agentstration.Knowledge;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Packs;
@@ -26,10 +30,11 @@ using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
+using Agentstration.Runtime.MicrosoftAgentFramework;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Runtime.Storage.Sqlite;
+using Agentstration.Runtime.Worker.MicrosoftAgentFramework;
 using Agentstration.Secrets;
 using Agentstration.Security.Contracts;
 using Agentstration.Sources;
@@ -53,6 +58,53 @@ namespace Agentstration.ArchitectureTests;
 [TestClass]
 public sealed class DependencyTests
 {
+    [TestMethod]
+    public void Crawl4AiDependenciesStayInsideTheAutonomousExtension()
+    {
+        var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
+        var extensionProject = Path.Combine(sourceRoot, "Agentstration.Extensions.Crawl4AI", "Agentstration.Extensions.Crawl4AI.csproj");
+        var appHostProject = Path.Combine(sourceRoot, "Agentstration.AppHost", "Agentstration.AppHost.csproj");
+        Assert.IsTrue(File.Exists(extensionProject));
+        Assert.Contains("../Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj", File.ReadAllText(appHostProject));
+        Assert.IsFalse(typeof(Crawl4AiClient).Assembly.GetReferencedAssemblies().Any(reference =>
+            reference.Name is "Agentstration.Knowledge" or "Agentstration.Knowledge.Contracts"));
+
+        var violations = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !string.Equals(path, extensionProject, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(path, appHostProject, StringComparison.OrdinalIgnoreCase))
+            .Where(path => File.ReadAllText(path).Contains("Agentstration.Extensions.Crawl4AI", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(sourceRoot, path))
+            .ToArray();
+
+        Assert.IsEmpty(violations, $"Crawl4AI must not enter product modules: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
+    public void AspireCrawl4AiRegistrationKeepsManagedProvisioningOptionalAndHardened()
+    {
+        var appHost = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Agentstration.AppHost", "Program.cs"));
+        var settings = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Agentstration.AppHost", "appsettings.json"));
+
+        Assert.Contains("if (crawl4AiEnabled)", appHost, StringComparison.Ordinal);
+        Assert.Contains("Crawl4AI:Provisioning", appHost, StringComparison.Ordinal);
+        Assert.Contains("builder.AddContainer(", appHost, StringComparison.Ordinal);
+        Assert.Contains("unclecode/crawl4ai", appHost, StringComparison.Ordinal);
+        Assert.Contains("new GenerateParameterDefault()", appHost, StringComparison.Ordinal);
+        Assert.Contains("secret: true", appHost, StringComparison.Ordinal);
+        Assert.Contains(".WithEnvironment(\"CRAWL4AI_API_TOKEN\", crawl4AiToken)", appHost, StringComparison.Ordinal);
+        Assert.Contains(".WithEnvironment(\"Crawl4AI__ApiToken\", crawl4AiToken)", appHost, StringComparison.Ordinal);
+        Assert.Contains("DeveloperCertificateDefaultHttpsTerminationEnabled = false", appHost, StringComparison.Ordinal);
+        Assert.Contains(".WithDeveloperCertificateTrust(false)", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain(".WithBindMount(crawl4AiTokenFile", appHost, StringComparison.Ordinal);
+        Assert.Contains("--cap-drop=ALL", appHost, StringComparison.Ordinal);
+        Assert.Contains("--security-opt=no-new-privileges", appHost, StringComparison.Ordinal);
+        Assert.Contains("--read-only", appHost, StringComparison.Ordinal);
+        Assert.Contains(".WaitFor(crawl4AiService)", appHost, StringComparison.Ordinal);
+        Assert.Contains("\"Provisioning\": \"Managed\"", settings, StringComparison.Ordinal);
+        Assert.Contains("\"ImageTag\": \"0.9.4\"", settings, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"ImageTag\": \"latest\"", settings, StringComparison.OrdinalIgnoreCase);
+    }
+
     [TestMethod]
     public void FoundryDependenciesStayInsideTheAutonomousExtension()
     {
@@ -134,7 +186,7 @@ public sealed class DependencyTests
             "Agentstration.Infrastructure",
             "Agentstration.Management.Core",
             "Agentstration.ModelProviders",
-            "Agentstration.Runtime.AgentFramework",
+            "Agentstration.Runtime.MicrosoftAgentFramework",
             "Agentstration.Runtime.Core",
             "Agentstration.Security.AspNetCoreIdentity",
             "Agentstration.Tools.Mcp",
@@ -178,7 +230,7 @@ public sealed class DependencyTests
             "Agentstration.Infrastructure",
             "Agentstration.Management.Core",
             "Agentstration.ModelProviders",
-            "Agentstration.Runtime.AgentFramework",
+            "Agentstration.Runtime.MicrosoftAgentFramework",
             "Agentstration.Runtime.Core",
             "Agentstration.Security.AspNetCoreIdentity",
             "Agentstration.Tools.Mcp",
@@ -240,6 +292,23 @@ public sealed class DependencyTests
         Assert.IsFalse(signer.Contains("PersonalAccessToken", StringComparison.Ordinal));
         Assert.IsFalse(signer.Contains("Aep", StringComparison.Ordinal));
         Assert.IsFalse(signer.Contains("Cookie", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void AwpWorkerTrustIsSeparateFromConsoleAndHumanAuthority()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var endpoint = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Agentstration.Identity.Api", "Api", "AwpWorkerEndpoints.cs"));
+        var authentication = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Agentstration.Identity.Contracts", "AwpWorkerAuthentication.cs"));
+        var bffAuthentication = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Agentstration.Identity.Contracts", "BffWorkloadAuthentication.cs"));
+
+        StringAssert.Contains(endpoint, "/api/awp/v1/");
+        StringAssert.Contains(endpoint, "RequireAuthorization(AgentstrationPolicies.AwpWorker)");
+        StringAssert.Contains(authentication, "agentstration:awp:worker");
+        StringAssert.Contains(authentication, "agentstration:awp:session");
+        Assert.IsFalse(authentication.Contains("BffWorkload", StringComparison.Ordinal));
+        Assert.IsFalse(authentication.Contains("PersonalAccessToken", StringComparison.Ordinal));
+        Assert.IsFalse(bffAuthentication.Contains("AwpWorker", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -360,16 +429,15 @@ public sealed class DependencyTests
         Assert.AreEqual(1, CountOccurrences(composition, "MapAgentstrationApi("));
         foreach (var worker in new[]
                  {
-                     "AgentDeploymentReconciliationWorker",
                      "LocalWorkExecutionWorker",
-                     "RuntimeRunExecutionWorker",
-                     "FlowRunExecutionWorker",
                      "FlowRunRecoveryWorker",
                      "SourceRefreshWorker"
                  })
         {
             Assert.AreEqual(1, CountOccurrences(composition, $"AddHostedService<{worker}>"), worker);
         }
+        Assert.DoesNotContain("AddHostedService<RuntimeRunExecutionWorker>", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddHostedService<FlowRunExecutionWorker>", composition, StringComparison.Ordinal);
 
         Assert.AreEqual(1, CountOccurrences(apiTransport, "AddSignalR("));
         Assert.AreEqual(1, CountOccurrences(apiTransport, "AddMcpServer("));
@@ -466,15 +534,29 @@ public sealed class DependencyTests
     {
         var references = typeof(WorkplaceService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Storage.Sqlite", StringComparison.Ordinal)
-            || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
+            || name.Contains("Runtime.MicrosoftAgentFramework", StringComparison.Ordinal)
             || name.Contains("Runtime.Local", StringComparison.Ordinal)));
     }
 
     [TestMethod]
     public void RuntimeAbstractionsDoNotReferenceMicrosoftAgentFramework()
     {
-        var references = typeof(IRuntimeRegistry).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        var references = typeof(IRuntimeAgentResolver).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void AuthoritativeServerHasNoInProcessRuntimeExecutionFallback()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var composition = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Agentstration.Infrastructure", "DependencyInjection.cs"));
+        var hostedServices = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Agentstration.Web", "Hosting", "StandaloneHostComposition.cs"));
+
+        Assert.DoesNotContain("AgentFrameworkRuntimeFactory", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("IRuntimeRegistry", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("LocalAgentDeploymentReconciler", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("AgentDeploymentReconciliationWorker", hostedServices, StringComparison.Ordinal);
+        Assert.IsNull(typeof(RuntimeRunService).GetMethod("ExecuteAsync"));
     }
 
     [TestMethod]
@@ -486,7 +568,7 @@ public sealed class DependencyTests
             || name.Contains("LocalAI", StringComparison.Ordinal)
             || name.Contains("Extensions.Git", StringComparison.Ordinal)
             || name.Contains("Aspire", StringComparison.Ordinal)
-            || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
+            || name.Contains("Runtime.MicrosoftAgentFramework", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
     }
 
@@ -501,6 +583,86 @@ public sealed class DependencyTests
             || reference.Name.Contains("LlamaCpp", StringComparison.Ordinal)
             || reference.Name.Contains("LocalAI", StringComparison.Ordinal)
             || reference.Name.Contains("Extensions.Git", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void AwpAbstractionsDoNotReferenceAgentstrationMafStorageOrHostingImplementations()
+    {
+        var references = typeof(AwpProtocol).Assembly.GetReferencedAssemblies()
+            .Select(reference => reference.Name ?? "")
+            .ToArray();
+
+        Assert.IsFalse(references.Any(reference =>
+            reference.StartsWith("Agentstration.", StringComparison.Ordinal)
+            || reference.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
+            || reference.Contains("EntityFramework", StringComparison.Ordinal)
+            || reference.Contains("Sqlite", StringComparison.Ordinal)
+            || reference.Contains("Npgsql", StringComparison.Ordinal)
+            || reference.Contains("Aspire.Hosting", StringComparison.Ordinal)
+            || reference.Contains("Kubernetes", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void MicrosoftAgentFrameworkWorkerHasNoServerStorageOrInfrastructureDependency()
+    {
+        var references = typeof(RuntimeWorkerOptions).Assembly.GetReferencedAssemblies()
+            .Select(reference => reference.Name ?? string.Empty)
+            .ToArray();
+        var forbidden = new[]
+        {
+            "Agentstration.Infrastructure",
+            "Agentstration.Runtime.Core",
+            "Agentstration.Runtime.Api",
+            "Agentstration.Web",
+            "Storage.Sqlite",
+            "Storage.PostgreSql",
+            "EntityFrameworkCore",
+            "Npgsql"
+        };
+        Assert.IsFalse(references.Any(reference =>
+            forbidden.Any(value => reference.Contains(value, StringComparison.Ordinal))));
+
+        var project = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src",
+            "Agentstration.Runtime.Worker.MicrosoftAgentFramework",
+            "Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj"));
+        Assert.DoesNotContain("Agentstration.Infrastructure", project, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Storage.", project, StringComparison.Ordinal);
+        Assert.DoesNotContain("EntityFrameworkCore", project, StringComparison.Ordinal);
+        Assert.Contains("Agentstration.Runtime.MicrosoftAgentFramework", project, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public void AspireAndComposeHostRuntimeWorkersAsSeparateProcesses()
+    {
+        var root = FindRepositoryRoot();
+        var appHost = File.ReadAllText(Path.Combine(root, "src", "Agentstration.AppHost", "Program.cs"));
+        var compose = File.ReadAllText(Path.Combine(root, "deploy", "compose", "base.yml"));
+        Assert.Contains("Agentstration:RuntimeWorkers:Count", appHost, StringComparison.Ordinal);
+        Assert.Contains("AddProject<Projects.Agentstration_Runtime_Worker_MicrosoftAgentFramework>", appHost, StringComparison.Ordinal);
+        Assert.Contains("runtime-worker-1:", compose, StringComparison.Ordinal);
+        Assert.Contains("dockerfile: Dockerfile.worker", compose, StringComparison.Ordinal);
+        Assert.DoesNotContain("Agentstration.Runtime.Worker.MicrosoftAgentFramework",
+            File.ReadAllText(Path.Combine(root, "src", "Agentstration.Web", "Agentstration.Web.csproj")),
+            StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public void ServerFlowGatewaysObserveAwpAssignmentsWithoutExecutingFlowsInProcess()
+    {
+        var flows = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Infrastructure", "Flows");
+        var gateways = new[]
+        {
+            "KnowledgeProjectionAdapters.cs",
+            "KnowledgeFlowAdapters.cs",
+            "ToolDefinitionFlowAdapters.cs"
+        };
+
+        foreach (var gateway in gateways)
+        {
+            var source = File.ReadAllText(Path.Combine(flows, gateway));
+            Assert.DoesNotContain("runs.ExecuteAsync(", source, StringComparison.Ordinal,
+                $"{gateway} must submit through the configured AWP queue and only observe durable Flow Run state.");
+        }
     }
 
     [TestMethod]
@@ -554,7 +716,16 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void AgentFrameworkRuntimeDoesNotReferenceConcreteModelProviders()
+    public void MicrosoftAgentFrameworkRuntimeUsesExplicitBoundaryName()
+    {
+        var runtimeType = typeof(AgentFrameworkRuntimeFactory);
+
+        Assert.AreEqual("Agentstration.Runtime.MicrosoftAgentFramework", runtimeType.Assembly.GetName().Name);
+        Assert.AreEqual("Agentstration.Runtime.MicrosoftAgentFramework", runtimeType.Namespace);
+    }
+
+    [TestMethod]
+    public void MicrosoftAgentFrameworkRuntimeDoesNotReferenceConcreteModelProviders()
     {
         var references = typeof(AgentFrameworkRuntimeFactory).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Ollama", StringComparison.Ordinal)
@@ -564,7 +735,7 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void RuntimeCoreDoesNotReferenceManagementWebWorkConcreteStorageOrAgentFramework()
+    public void RuntimeCoreDoesNotReferenceManagementWebWorkConcreteStorageOrMicrosoftAgentFramework()
     {
         var references = typeof(RuntimeRunService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Management", StringComparison.Ordinal)
@@ -572,12 +743,12 @@ public sealed class DependencyTests
             || name.Contains("Agentstration.Work", StringComparison.Ordinal)
             || name.Contains("Storage.Sqlite", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
-            || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
+            || name.Contains("Runtime.MicrosoftAgentFramework", StringComparison.Ordinal)
             || name.Contains("Runtime.Local", StringComparison.Ordinal)));
     }
 
     [TestMethod]
-    public void RuntimeSqliteStorageDoesNotReferenceWebWorkOrAgentFramework()
+    public void RuntimeSqliteStorageDoesNotReferenceWebWorkOrMicrosoftAgentFramework()
     {
         var references = typeof(SqliteRuntimeRunStore).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Web", StringComparison.Ordinal)
@@ -690,7 +861,7 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void ResourceFamilyApplicationModulesDoNotReferenceHostsConcreteStorageOrAgentFramework()
+    public void ResourceFamilyApplicationModulesDoNotReferenceHostsConcreteStorageOrMicrosoftAgentFramework()
     {
         var assemblies = new[]
         {
@@ -699,6 +870,7 @@ public sealed class DependencyTests
             typeof(AepEnrollmentService).Assembly,
             typeof(ExternalIdentityAdministrationService).Assembly,
             typeof(ModelProviderManagementService).Assembly,
+            typeof(KnowledgeSourceManagementService).Assembly,
             typeof(PackManagementService).Assembly,
             typeof(SourceManagementService).Assembly,
             typeof(RuntimeProfileManagementService).Assembly,
@@ -713,7 +885,7 @@ public sealed class DependencyTests
             || name.Contains(".Storage.", StringComparison.Ordinal)
             || name.Contains("EntityFramework", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
-            || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
+            || name.Contains("Runtime.MicrosoftAgentFramework", StringComparison.Ordinal)
             || name.Contains("Runtime.Local", StringComparison.Ordinal)));
     }
 
@@ -790,15 +962,15 @@ public sealed class DependencyTests
     {
         var expected = new[]
         {
-            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "ModelProvider", "ModelProfile", "RuntimeProfile", "Parameter",
-            "Secret", "Vault", "Tool", "ToolDefinition", "ToolProvider", "ToolExecutionHook", "Trigger", "Source", "SourceVersion", "SourceProvider"
+            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "KnowledgeSource", "KnowledgeSourceToolExposure", "ModelProvider", "ModelProfile", "RuntimeProfile", "Parameter",
+            "Secret", "Vault", "Tool", "ToolDefinition", "ToolProvider", "ToolExecutionHook", "ToolSet", "ToolSetVersion", "Trigger", "Source", "SourceVersion", "SourceProvider"
         };
         var actual = new[]
         {
             AgentResourceKinds.Agent, AgentResourceKinds.AgentRevision, AgentResourceKinds.AgentDeployment, FlowResourceKinds.Flow,
-            EntryResourceKinds.Entry, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile, ParameterResourceKinds.Parameter,
+            EntryResourceKinds.Entry, KnowledgeResourceKinds.KnowledgeSource, KnowledgeResourceKinds.KnowledgeSourceToolExposure, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile, ParameterResourceKinds.Parameter,
             SecretResourceKinds.Secret, SecretResourceKinds.Vault, ToolResourceKinds.Tool, ToolResourceKinds.ToolDefinition,
-            ToolResourceKinds.ToolProvider, ToolResourceKinds.ToolExecutionHook, TriggerResourceKinds.Trigger, SourceResourceKinds.Source,
+            ToolResourceKinds.ToolProvider, ToolResourceKinds.ToolExecutionHook, ToolResourceKinds.ToolSet, ToolResourceKinds.ToolSetVersion, TriggerResourceKinds.Trigger, SourceResourceKinds.Source,
             SourceResourceKinds.SourceVersion, SourceResourceKinds.SourceProvider
         };
 
@@ -815,6 +987,7 @@ public sealed class DependencyTests
             typeof(Agentstration.Bootstrap.Contracts.BootstrapApplicationResource).Assembly,
             typeof(Agentstration.Extensions.Contracts.ExtensionResponse).Assembly,
             typeof(Agentstration.Identity.Contracts.IdentityConsoleContextResponse).Assembly,
+            typeof(KnowledgeSourceResource).Assembly,
             typeof(Agentstration.Models.Contracts.ModelProviderResponse).Assembly,
             typeof(Agentstration.Parameters.Contracts.CreateParameterRequest).Assembly,
             typeof(Agentstration.ResourceManagement.Contracts.ResourceDeclaration<>).Assembly,
@@ -1292,6 +1465,29 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void AwpContractsDoNotReferenceServerRuntimeStorageOrMicrosoftAgentFramework()
+    {
+        var references = typeof(Agentstration.Awp.Abstractions.AwpProtocol).Assembly
+            .GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .ToArray();
+        var forbidden = new[]
+        {
+            "Agentstration.Infrastructure",
+            "Agentstration.Runtime",
+            "Agentstration.Flows",
+            "Agentstration.ResourceManagement",
+            "Storage.Sqlite",
+            "Storage.PostgreSql",
+            "EntityFrameworkCore",
+            "Microsoft.Agents.AI"
+        };
+
+        Assert.IsFalse(references.Any(reference =>
+            forbidden.Any(value => reference!.Contains(value, StringComparison.Ordinal))));
+    }
+
+    [TestMethod]
     public void AspireDoesNotOverrideTheManagedAiProvider()
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -1363,7 +1559,7 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void FlowCoreDoesNotReferenceInfrastructureRuntimeOrAgentFramework()
+    public void FlowCoreDoesNotReferenceInfrastructureRuntimeOrMicrosoftAgentFramework()
     {
         var references = typeof(FlowDefinition).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("EntityFramework", StringComparison.Ordinal)

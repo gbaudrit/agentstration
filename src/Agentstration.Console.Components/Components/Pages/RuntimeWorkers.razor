@@ -1,0 +1,40 @@
+@page "/settings/runtime-workers"
+@implements IDisposable
+@inject IRuntimeApiClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimeWorkerStrings> Localizer
+
+<PageTitle>@T("RuntimeWorkers") · Agentstration</PageTitle>
+<PageHeader Title="@T("RuntimeWorkers")" Description="@T("Description")" TestId="runtime-workers" />
+@if (items is null) { <LoadingState Message="@T("Loading")" /> }
+else if (items.Count == 0) { <EmptyState Title="@T("Empty")" Message="@T("EmptyMessage")" /> }
+else
+{
+    <section class="runtime-workers-grid">
+    <DataGrid TItem="RuntimeWorkerSummaryResponse" Items="items">
+        <Header><tr><th>@T("Worker")</th><th>@T("Presence")</th><th>@T("Session")</th><th>@T("Version")</th><th>@T("Capacity")</th><th>@T("Capabilities")</th><th>@T("LastSeen")</th></tr></Header>
+        <Row Context="item"><tr data-testid="runtime-worker-row" data-worker-id="@item.WorkerId.ToString("D")" data-presence="@item.Presence" data-session-id="@item.SessionId?.ToString("D")">
+            <td data-label="@T("Worker")"><a class="resource-name-link runtime-primary" href="@WorkerUrl(item)">@item.DisplayName</a><small><code class="runtime-token" title="@item.WorkerId.ToString("D")">@item.WorkerId</code></small></td>
+            <td data-label="@T("Presence")"><StatusBadge Text="@T($"Presence.{item.Presence}")" Status="@PlatformDashboardService.ToStatus(item.Presence.ToString())" /><small>@T($"Enrollment.{item.EnrollmentState}")</small></td>
+            <td data-label="@T("Session")"><code class="runtime-token" title="@item.SessionId?.ToString("D")">@(item.SessionId?.ToString("D") ?? "—")</code></td>
+            <td data-label="@T("Version")"><span class="runtime-primary">@SoftwareVersion(item.SoftwareVersion)</span>@if (SoftwareBuild(item.SoftwareVersion) is { } build) { <small class="runtime-token" title="@item.SoftwareVersion">+@build</small> }</td>
+            <td data-label="@T("Capacity")"><span class="runtime-primary">@(item.MaximumConcurrentAssignments?.ToString() ?? "—")</span><small>@T("ActiveAssignments", item.ActiveAssignments)</small></td>
+            <td data-label="@T("Capabilities")" class="runtime-capabilities">@string.Join(", ", item.Capabilities.Select(FormatCapability))</td>
+            <td data-label="@T("LastSeen")">@(item.LastSeenAt?.LocalDateTime.ToString("g") ?? "—")</td>
+        </tr></Row>
+    </DataGrid>
+    </section>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<RuntimeWorkerSummaryResponse>? items;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    protected override async Task OnInitializedAsync() => items = await Client.GetRuntimeWorkersAsync(cancellation.Token);
+    private static string FormatCapability(RuntimeWorkerCapabilityResponse capability) =>
+        $"{capability.RuntimeKind} {capability.CapabilityVersion} · material {string.Join('/', capability.ExecutionMaterialVersions)}"
+        + (string.IsNullOrWhiteSpace(capability.RuntimeImplementationVersion) ? string.Empty : $" · {capability.RuntimeImplementationVersion}");
+    private static string SoftwareVersion(string? version) => string.IsNullOrWhiteSpace(version) ? "—" : version.Split('+', 2)[0];
+    private static string? SoftwareBuild(string? version) => version?.Split('+', 2) is [_, var build] ? build : null;
+    private static string WorkerUrl(RuntimeWorkerSummaryResponse worker) => $"/settings/runtime-workers/{worker.WorkerId:D}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

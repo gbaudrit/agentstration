@@ -1,3 +1,4 @@
+import { expect } from '@playwright/test';
 import { Checkpoints } from '../contracts/checkpoints.js';
 import { TestIds } from '../contracts/test-ids.js';
 import type { Journey } from './journey.js';
@@ -27,6 +28,7 @@ export const inspectFlowObservability: Journey<InspectFlowObservabilityInput> = 
   await context.checkpoint({ name: Checkpoints.flowObservability.taskRun, page: context.pages.page, target: context.pages.page.getByTestId(TestIds.flowObservability.taskRunDetails) });
   await observability.open(context.consoleUrl, '/flow-runs', 'runs');
   await observability.openFirstFlowRun();
+  await expect(context.pages.page.getByTestId(TestIds.flowObservability.runTokenUsage)).toBeVisible();
   await context.checkpoint({ name: Checkpoints.flowObservability.globalRun, page: context.pages.page, target: context.pages.page.getByTestId(TestIds.flowObservability.runDetails) });
   await observability.createAgentRun(context.consoleUrl, 'dotnet-expert', 'Return a deterministic Agent Run for browser observability.');
   await observability.open(context.consoleUrl, '/agent-runs', 'agentRuns');

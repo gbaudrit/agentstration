@@ -15,10 +15,19 @@ test('Flow definitions, immutable views, designer, and direct runner render from
   await pages.flowObservability.open(product.consoleUrl, '/namespaces/default/flows/universal-router', 'flowDetails');
   await pages.flowObservability.open(product.consoleUrl, '/flows/universal-router/designer', 'designer');
   await pages.flowObservability.open(product.consoleUrl, '/namespaces/default/flows/universal-router/designer', 'designer');
+  await pages.flowDesigner.createDraftAndOpen(product.consoleUrl);
+  await pages.flowDesigner.expectExistingLinksVisible();
+  await pages.flowDesigner.expectCanvasFitsViewportAndWheelZoomContract();
+  await pages.flowDesigner.selectFirstInspectorTransition();
   await pages.flowObservability.open(product.consoleUrl, '/agents/dotnet-expert/run', 'agentRunner');
 });
 
 test('a completed Workplace task is traceable through Flow, Agent, task, and event observability @smoke', async ({ page, product }) => {
+  const pages = new ProductPages(page);
+  await inspectFlowObservability({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
+});
+
+test('Flow Run token usage remains visible at mobile width @responsive @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   await inspectFlowObservability({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
 });

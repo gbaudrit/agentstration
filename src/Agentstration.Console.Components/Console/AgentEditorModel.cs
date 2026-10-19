@@ -20,6 +20,7 @@ public sealed class AgentEditorModel
     [Required] public string RuntimeProfileName { get; set; } = string.Empty;
     [Required] public string RuntimeProfileNamespace { get; set; } = ResourceNamespace.Default.Value;
     public string ToolNames { get; set; } = string.Empty;
+    public IReadOnlyList<AgentToolSetSelection> ToolSets { get; set; } = [];
     public string Tags { get; set; } = string.Empty;
     public string Annotations { get; set; } = string.Empty;
     public AgentProperties? SourceDefinition { get; set; }
@@ -58,7 +59,8 @@ public sealed class AgentEditorModel
                 Instructions = Instructions.Trim(),
                 ModelProfile = new ResourceReference(ModelProfileName.Trim(), @namespace: ResourceNamespace.Parse(ModelProfileNamespace)),
                 RuntimeProfile = new ResourceReference(RuntimeProfileName.Trim(), @namespace: ResourceNamespace.Parse(RuntimeProfileNamespace)),
-                Tools = tools
+                Tools = tools,
+                ToolSets = ToolSets
             }
         };
     }
@@ -76,6 +78,7 @@ public sealed class AgentEditorModel
         RuntimeProfileName = resource.Definition.RuntimeProfile.Name,
         RuntimeProfileNamespace = (resource.Definition.RuntimeProfile.Namespace ?? resource.Namespace).Value,
         ToolNames = string.Join(Environment.NewLine, resource.Definition.Tools.Select(tool => tool.Name)),
+        ToolSets = resource.Definition.ToolSets,
         Tags = Format(resource.Metadata.Tags),
         Annotations = Format(resource.Metadata.Annotations),
         SourceDefinition = resource.Definition
@@ -94,6 +97,7 @@ public sealed class AgentEditorModel
         RuntimeProfileName = request.Definition.RuntimeProfile.Name,
         RuntimeProfileNamespace = (request.Definition.RuntimeProfile.Namespace ?? ResourceNamespace.Default).Value,
         ToolNames = string.Join(Environment.NewLine, request.Definition.Tools.Select(tool => tool.Name)),
+        ToolSets = request.Definition.ToolSets,
         Tags = Format(request.Metadata.Tags),
         Annotations = Format(request.Metadata.Annotations),
         SourceDefinition = request.Definition

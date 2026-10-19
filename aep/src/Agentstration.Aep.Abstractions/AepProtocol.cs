@@ -41,6 +41,7 @@ public static class AepCapabilityNames
     public const string ValueRequirements = "aep.value-requirements";
     public const string BoundValues = "aep.bound-values";
     public const string SecretAccess = "aep.secret-access";
+    public const string SchemaFormats = "aep.schema-formats";
 }
 
 public sealed record AepExtensionIdentity(string Id, string Name, string Version, string? Description = null);
@@ -55,6 +56,8 @@ public static class AepContributionKinds
     public const string ModelProvider = "model-provider";
     public const string SourceProvider = "source-provider";
     public const string Tool = "tool";
+    public const string DataSourceProfileBundle = "data-source-profile-bundle";
+    public const string SchemaFormat = "schema-format";
 }
 
 public static class AepOptionScopes
@@ -402,7 +405,43 @@ public sealed record AepHealth(string Status, string? Details = null);
 public sealed record AepContributions(
     IReadOnlyList<AepModelProviderDescriptor> ModelProviders,
     IReadOnlyList<AepToolContribution>? Tools = null,
-    IReadOnlyList<AepSourceProviderDescriptor>? SourceProviders = null);
+    IReadOnlyList<AepSourceProviderDescriptor>? SourceProviders = null,
+    IReadOnlyList<AepDataSourceProfileBundleContribution>? DataSourceProfileBundles = null,
+    IReadOnlyList<AepSchemaFormatContribution>? SchemaFormats = null);
+
+public sealed record AepSchemaFormatOperations(
+    AepMcpToolMapping ValidateDefinition,
+    AepMcpToolMapping ValidateInstance);
+
+public sealed record AepSchemaFormatContribution(
+    string Id,
+    string Format,
+    string DisplayName,
+    string Version,
+    IReadOnlyList<string> Dialects,
+    AepSchemaFormatOperations Operations,
+    bool IsDefault = false,
+    string? Description = null,
+    IReadOnlyDictionary<string, JsonElement>? Metadata = null);
+
+public sealed record AepSchemaDefinitionValidationRequest(JsonElement Definition, string? Dialect = null);
+
+public sealed record AepSchemaInstanceValidationRequest(
+    JsonElement Definition,
+    JsonElement Instance,
+    string? Dialect = null);
+
+public sealed record AepSchemaValidationIssue(string Path, string Code, string Message);
+
+public sealed record AepSchemaValidationResult(IReadOnlyList<AepSchemaValidationIssue> Issues);
+
+public sealed record AepDataSourceProfileBundleContribution(
+    string Id,
+    string DisplayName,
+    string Version,
+    IReadOnlyList<string> ResourceManifests,
+    string? Description = null,
+    IReadOnlyList<string>? RequiredTools = null);
 
 public sealed record AepSourceProviderDescriptor(
     string Id,
@@ -482,12 +521,58 @@ public static class AepDescriptorValidator
             if (string.IsNullOrWhiteSpace(tool.Mcp.Server) || !servers.Contains(tool.Mcp.Server))
                 errors.Add($"Tool contribution '{tool.Id}' references unknown MCP server '{tool.Mcp.Server}'.");
         }
+        var schemaFormats = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var format in descriptor.Contributions.SchemaFormats ?? [])
+        {
+            if (format is null)
+            {
+                errors.Add("A Schema format contribution cannot be null.");
+                continue;
+            }
+            if (string.IsNullOrWhiteSpace(format.Id)) errors.Add("Schema format contribution id is required.");
+            else if (!schemaFormats.Add(format.Id)) errors.Add($"Schema format contribution '{format.Id}' is duplicated.");
+            if (string.IsNullOrWhiteSpace(format.Format)) errors.Add($"Schema format contribution '{format.Id}' format is required.");
+            if (string.IsNullOrWhiteSpace(format.DisplayName)) errors.Add($"Schema format contribution '{format.Id}' displayName is required.");
+            if (string.IsNullOrWhiteSpace(format.Version)) errors.Add($"Schema format contribution '{format.Id}' version is required.");
+            if (format.Dialects is null || format.Dialects.Any(string.IsNullOrWhiteSpace)
+                || format.Dialects.Distinct(StringComparer.Ordinal).Count() != format.Dialects.Count)
+                errors.Add($"Schema format contribution '{format.Id}' must declare distinct non-empty dialects.");
+            if (format.Operations is null)
+                errors.Add($"Schema format contribution '{format.Id}' operations are required.");
+            else
+            {
+                ValidateSchemaOperation(format.Id, "validateDefinition", format.Operations.ValidateDefinition, servers, errors);
+                ValidateSchemaOperation(format.Id, "validateInstance", format.Operations.ValidateInstance, servers, errors);
+            }
+        }
+        var hasSchemaFormats = schemaFormats.Count > 0;
+        var hasSchemaCapability = descriptor.Capabilities.TryGetValue(AepCapabilityNames.SchemaFormats,
+            out var schemaCapability);
+        if (hasSchemaFormats && !hasSchemaCapability)
+            errors.Add("Schema format contributions need the aep.schema-formats capability.");
+        if (hasSchemaCapability && !string.Equals(schemaCapability!.Version, "1.0", StringComparison.Ordinal))
+            errors.Add($"Schema formats capability version '{schemaCapability.Version}' is not supported.");
+        if (hasSchemaCapability && !hasSchemaFormats)
+            errors.Add("The aep.schema-formats capability needs at least one Schema format contribution.");
         var sourceProviders = new HashSet<string>(StringComparer.Ordinal);
         foreach (var provider in descriptor.Contributions.SourceProviders ?? [])
         {
             if (string.IsNullOrWhiteSpace(provider.Id)) errors.Add("Source provider contribution id is required.");
             else if (!sourceProviders.Add(provider.Id)) errors.Add($"Source provider contribution '{provider.Id}' is duplicated.");
             if (string.IsNullOrWhiteSpace(provider.DisplayName)) errors.Add($"Source provider contribution '{provider.Id}' displayName is required.");
+        }
+        var profileBundles = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var bundle in descriptor.Contributions.DataSourceProfileBundles ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(bundle.Id)) errors.Add("Data Source Profile bundle contribution id is required.");
+            else if (!profileBundles.Add(bundle.Id)) errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' is duplicated.");
+            if (string.IsNullOrWhiteSpace(bundle.DisplayName)) errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' displayName is required.");
+            if (string.IsNullOrWhiteSpace(bundle.Version)) errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' version is required.");
+            if (bundle.ResourceManifests.Count == 0) errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' requires resource manifests.");
+            if (bundle.ResourceManifests.Count > 32 || bundle.ResourceManifests.Any(value => value.Length > 256 * 1024))
+                errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' exceeds resource manifest limits.");
+            if (bundle.RequiredTools?.Any(string.IsNullOrWhiteSpace) == true)
+                errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' contains an invalid required Tool id.");
         }
         var requirements = descriptor.ValueRequirements ?? [];
         var hasCapability = descriptor.Capabilities.TryGetValue(AepCapabilityNames.ValueRequirements, out var valueCapability);
@@ -574,7 +659,29 @@ public static class AepDescriptorValidator
         || string.Equals(kind, AepContributionKinds.SourceProvider, StringComparison.Ordinal)
             && (contributions.SourceProviders ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
         || string.Equals(kind, AepContributionKinds.Tool, StringComparison.Ordinal)
-            && (contributions.Tools ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase));
+            && (contributions.Tools ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
+        || string.Equals(kind, AepContributionKinds.DataSourceProfileBundle, StringComparison.Ordinal)
+            && (contributions.DataSourceProfileBundles ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
+        || string.Equals(kind, AepContributionKinds.SchemaFormat, StringComparison.Ordinal)
+            && (contributions.SchemaFormats ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase));
+
+    private static void ValidateSchemaOperation(
+        string contributionId,
+        string operation,
+        AepMcpToolMapping? mapping,
+        HashSet<string> servers,
+        List<string> errors)
+    {
+        if (mapping is null)
+        {
+            errors.Add($"Schema format contribution '{contributionId}' {operation} MCP mapping is required.");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(mapping.Tool))
+            errors.Add($"Schema format contribution '{contributionId}' {operation} MCP tool name is required.");
+        if (string.IsNullOrWhiteSpace(mapping.Server) || !servers.Contains(mapping.Server))
+            errors.Add($"Schema format contribution '{contributionId}' {operation} references unknown MCP server '{mapping.Server}'.");
+    }
 
     private static bool IsValidValueRequirementId(string? id) =>
         id is { Length: >= 1 and <= 64 }

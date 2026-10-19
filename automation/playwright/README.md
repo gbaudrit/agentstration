@@ -66,6 +66,22 @@ npm run capture -- --plan examples/inspect-flow-observability.capture-plan.json 
 
 The local plan uses the seeded `prepare-report` Entry. An external target must provide that Entry and a compatible published Flow in the selected Workspace.
 
+Runtime Worker observability can be exercised with real successful assignments, a deliberately interrupted Worker lease, retained placement history, and Worker reconnection:
+
+```powershell
+npm run capture -- --plan examples/inspect-runtime-worker-observability.capture-plan.json --output .work/runtime-worker-observability
+```
+
+This journey requires the managed local fixture because it controls the independently hosted Worker process without changing product state through a test-only API. The Playwright specification additionally runs the Platform-administrator and cross-Workspace authorization assertions under local authentication.
+
+Agent instance observability covers the empty state, active direct and multi-Agent Flow executions, concurrent Runs of the same Agent, effective Run and Worker navigation, terminal cleanup, and Worker-loss cleanup:
+
+```powershell
+npm run capture -- --plan examples/inspect-agent-instance-observability.capture-plan.json --output .work/agent-instance-observability
+```
+
+This journey also requires the managed local fixture. It blocks deterministic model calls at the Worker authority proxy so the Console observes real active instances without a test-only product endpoint or timing sleeps.
+
 Console identity and administration can be captured across organization context, member access, profile preferences, personal access token lifecycle, and shell navigation:
 
 ```powershell

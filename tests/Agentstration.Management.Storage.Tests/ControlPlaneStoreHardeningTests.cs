@@ -250,7 +250,7 @@ public sealed class ControlPlaneStoreHardeningTests
     }
 
     [TestMethod]
-    public async Task RuntimeResolverReturnsOnlyExecutableRuntimeViewForExactGeneration()
+    public async Task RuntimeResolverReturnsWorkerExecutionMaterialForExactGeneration()
     {
         await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
         var packNamespace = new ResourceNamespace("agentstration.sample-pack");
@@ -280,28 +280,11 @@ public sealed class ControlPlaneStoreHardeningTests
             ProvisioningState = ProvisioningState.Succeeded,
             Definition = Definition(agent.Value.Uid)
         }, default);
-        var deployment = await fixture.Store.PutAsync(new AgentDeployment
-        {
-            ApiVersion = ResourceApiVersions.CoreV1,
-            Kind = AgentResourceKinds.AgentDeployment,
-            Metadata = new ResourceMetadata { Name = "sql-expert--g000003", Namespace = packNamespace },
-            RevisionName = revision.Value.Metadata.Name,
-            AgentName = "sql-expert",
-            ModelProfileName = "reasoning-default",
-            RuntimeProfileName = "maf-builtin",
-            Environment = "local",
-            HostingMode = AgentHostingMode.InProcess,
-            DesiredState = DesiredAgentState.Running,
-            ProvisioningState = ProvisioningState.Succeeded,
-            OperationalState = OperationalState.Ready,
-            UpdatedAt = DateTimeOffset.UtcNow
-        }, null, true, default);
-
         var resolver = new ResourceRuntimeAgentResolver(fixture.Store, fixture.Queries);
         var resolved = await resolver.ResolveAsync(new RuntimeAgentReference("sql-expert", 3) { Namespace = packNamespace }, default);
 
         Assert.AreEqual(agent.Value.Uid, resolved.AgentId);
-        Assert.AreEqual(deployment.Value.Uid.ToString("N"), resolved.DeploymentId);
+        Assert.AreEqual(string.Empty, resolved.DeploymentId);
         Assert.AreEqual("reasoning-default", resolved.ModelProfileName);
         Assert.AreEqual(packNamespace, resolved.ModelProfileNamespace);
         Assert.IsTrue(resolved.Ready);
@@ -325,9 +308,12 @@ public sealed class ControlPlaneStoreHardeningTests
             ProvisioningState = ProvisioningState.Succeeded,
             Definition = Definition(agent.Value.Uid) with { AgentVersion = 4 }
         }, default);
-        var missingDeployment = await Assert.ThrowsExactlyAsync<RuntimeAgentResolutionException>(() =>
-            resolver.ResolveAsync(new RuntimeAgentReference("sql-expert", 4) { Namespace = packNamespace }, default));
-        Assert.AreEqual("deployment_not_found", missingDeployment.Code);
+        var undeployedRevision = await resolver.ResolveAsync(
+            new RuntimeAgentReference("sql-expert", 4) { Namespace = packNamespace }, default);
+        Assert.AreEqual(string.Empty, undeployedRevision.DeploymentId);
+        Assert.AreEqual(packNamespace, undeployedRevision.AgentNamespace);
+        Assert.AreEqual(4, undeployedRevision.Generation);
+        Assert.IsTrue(undeployedRevision.Ready);
     }
 
     [TestMethod]
