@@ -384,6 +384,48 @@ public sealed class FlowDetailsDesignerTests
     }
 
     [TestMethod]
+    public void FlowRunSummaryShowsDirectAndInclusiveTokenUsageWithoutSelectingAStep()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var flowId = new FlowId("token-summary");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "flowrun-token-summary",
+            FlowId = flowId,
+            FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Succeeded,
+            Trigger = FlowRunTrigger.Manual,
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition,
+                new Dictionary<string, string>(), FlowClientStub.Now),
+            TokenUsage = new(
+                FlowRunTokenUsageState.Final,
+                new(20, 5, 25, FlowRunTokenUsageCoverage.Complete, 1, 1),
+                new(27, 8, 35, FlowRunTokenUsageCoverage.Partial, 2, 3))
+        };
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
+        context.Services.AddSingleton(TimeProvider.System);
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
+
+        var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+
+        var summary = rendered.Find("[data-testid=flow-run-token-usage]");
+        StringAssert.Contains(summary.TextContent, strings["DirectUsage"].Value);
+        StringAssert.Contains(summary.TextContent, strings["InclusiveUsage"].Value);
+        StringAssert.Contains(summary.TextContent, "25");
+        StringAssert.Contains(summary.TextContent, "35");
+        StringAssert.Contains(summary.TextContent, strings["UsageCoverage.Partial"].Value);
+        Assert.IsTrue(rendered.Find("#flow-run-tab-summary").ClassList.Contains("active"));
+    }
+
+    [TestMethod]
     public void FlowRunShowsWorkerPlacementInsideTheWorkerTab()
     {
         using var culture = new TestCultureScope("en-US");

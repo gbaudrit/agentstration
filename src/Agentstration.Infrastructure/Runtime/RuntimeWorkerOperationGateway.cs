@@ -46,7 +46,8 @@ public sealed class RuntimeWorkerOperationGateway(
             response.FinishReason?.ToString(),
             ToInt32(response.Usage?.InputTokenCount),
             ToInt32(response.Usage?.OutputTokenCount),
-            metadata?.ContributionId);
+            metadata?.ContributionId,
+            ToInt32(response.Usage?.TotalTokenCount));
     }
 
     public async IAsyncEnumerable<RuntimeGovernedModelUpdate> StreamModelAsync(
@@ -68,7 +69,8 @@ public sealed class RuntimeWorkerOperationGateway(
                 update.FinishReason?.ToString(),
                 ToInt32(usage?.InputTokenCount),
                 ToInt32(usage?.OutputTokenCount),
-                metadata?.ContributionId);
+                metadata?.ContributionId,
+                ToInt32(usage?.TotalTokenCount));
         }
     }
 

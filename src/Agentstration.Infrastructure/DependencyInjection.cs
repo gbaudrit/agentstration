@@ -351,6 +351,7 @@ public static class DependencyInjection
         services.TryAddSingleton(runtimeWorkerDispatchOptions ?? new RuntimeWorkerDispatchOptions());
         services.AddSingleton<RuntimeAssignmentAvailabilitySignal>();
         services.AddSingleton<RuntimeAssignmentLeaseGuardRegistry>();
+        services.AddSingleton<FlowRunTokenUsageConsolidator>();
         services.AddSingleton<IRuntimeAssignmentProjection, AwpAssignmentProjection>();
         services.AddSingleton<RuntimeWorkerAssignmentService>();
         services.AddSingleton<IRuntimeExecutionMaterialResolver, RuntimeExecutionMaterialResolver>();

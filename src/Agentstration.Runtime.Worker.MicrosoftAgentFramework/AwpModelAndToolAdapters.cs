@@ -42,10 +42,11 @@ internal sealed class AwpModelChatClient(
         return new ChatResponse(new ChatMessage(ChatRole.Assistant, contents))
         {
             ModelId = response.ModelId,
-            Usage = response.InputTokens is null && response.OutputTokens is null ? null : new UsageDetails
+            Usage = response.InputTokens is null && response.OutputTokens is null && response.TotalTokens is null ? null : new UsageDetails
             {
                 InputTokenCount = response.InputTokens,
-                OutputTokenCount = response.OutputTokens
+                OutputTokenCount = response.OutputTokens,
+                TotalTokenCount = response.TotalTokens
             }
         };
     }
@@ -93,7 +94,8 @@ internal sealed class AwpModelChatClient(
                         [new UsageContent(new UsageDetails
                         {
                             InputTokenCount = usage.InputTokens,
-                            OutputTokenCount = usage.OutputTokens
+                            OutputTokenCount = usage.OutputTokens,
+                            TotalTokenCount = usage.TotalTokens
                         })]);
                     break;
                 case AwpModelStreamCompleted completed:
