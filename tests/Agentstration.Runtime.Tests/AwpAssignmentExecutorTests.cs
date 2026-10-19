@@ -776,6 +776,7 @@ public sealed class AwpAssignmentExecutorTests
         Assert.AreEqual("Deterministic", completed.Payload?.GetProperty("provider").GetString());
         Assert.AreEqual(12, completed.Payload?.GetProperty("usage").GetProperty("inputTokens").GetInt32());
         Assert.AreEqual(4, completed.Payload?.GetProperty("usage").GetProperty("outputTokens").GetInt32());
+        Assert.AreEqual(16, completed.Payload?.GetProperty("usage").GetProperty("totalTokens").GetInt32());
         var diagnostic = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.Diagnostic
             && value.Location.FlowStep?.StepDefinitionId == "Agent");
         Assert.AreEqual("deterministic", diagnostic.Payload?.GetProperty("model").GetString());
@@ -1386,7 +1387,7 @@ public sealed class AwpAssignmentExecutorTests
             var request = Payload<AwpInvokeModelRequest>(bytes);
             ModelRequests.Add(request);
             return new(now, [new AwpModelTextContent(ModelOutput)], "deterministic", "stop", 12, 4,
-                "Deterministic");
+                "Deterministic", 16);
         }
 
         private HttpResponseMessage StreamModel(byte[] bytes, Guid messageId)
@@ -1410,7 +1411,7 @@ public sealed class AwpAssignmentExecutorTests
                 if (midpoint < ModelOutput.Length)
                     events.Add(new AwpModelTextDelta(streamId, events.Count, now, ModelOutput[midpoint..],
                         "deterministic", "Deterministic"));
-                events.Add(new AwpModelUsage(streamId, events.Count, now, 12, 4));
+                events.Add(new AwpModelUsage(streamId, events.Count, now, 12, 4, 16));
                 events.Add(new AwpModelStreamCompleted(streamId, events.Count, now,
                     "deterministic", "Deterministic", "stop"));
             }

@@ -52,6 +52,7 @@ public sealed class AwpAssignmentProjectionTests
             var version = new FlowVersion(workspaceId, new("flow", ResourceNamespace.Default), "1.0", null,
                 new DirectFlowDefinition(new(FlowTargetKind.Agent, "unused")),
                 new Dictionary<string, string>(), now, graph, "sha256:flow");
+            var scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid());
             await repository.CreateRunAsync(new FlowRun
             {
                 WorkspaceId = workspaceId,
@@ -61,7 +62,7 @@ public sealed class AwpAssignmentProjectionTests
                 DefinitionHash = version.DefinitionHash,
                 DefinitionSnapshot = version,
                 Status = FlowRunStatus.Running,
-                Scope = new(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+                Scope = scope,
                 Input = JsonSerializer.SerializeToElement(new { query = "hello" }),
                 CreatedAt = now,
                 StartedAt = now,
@@ -78,6 +79,25 @@ public sealed class AwpAssignmentProjectionTests
                     new FlowStepRun { StepName = "agent", StepType = "agent" },
                     new FlowStepRun { StepName = "completed", StepType = "output" }
                 ]
+            }, default);
+            var emptyUsage = new FlowRunTokenUsageTotal(null, null, null,
+                FlowRunTokenUsageCoverage.Unavailable, 0, 0);
+            await repository.CreateRunAsync(new FlowRun
+            {
+                WorkspaceId = workspaceId,
+                Id = storageRunId,
+                FlowId = version.FlowId,
+                FlowVersion = version.Version,
+                DefinitionSnapshot = version,
+                Status = FlowRunStatus.Succeeded,
+                ParentFlowRunId = runId,
+                RootFlowRunId = runId,
+                NestingDepth = 1,
+                Scope = scope,
+                Input = JsonSerializer.SerializeToElement(new { }),
+                CreatedAt = now,
+                CompletedAt = now,
+                TokenUsage = new(FlowRunTokenUsageState.Final, emptyUsage, emptyUsage)
             }, default);
             var stepExecutionId = Guid.NewGuid();
             var agentStepExecutionId = Guid.NewGuid();
@@ -181,7 +201,7 @@ public sealed class AwpAssignmentProjectionTests
                         agentVersion = 3L,
                         modelProfileResourceId = "default-reasoning",
                         provider = "Deterministic",
-                        usage = new { inputTokens = 12, outputTokens = 4 }
+                        usage = new { inputTokens = 12, outputTokens = 4, totalTokens = 16 }
                     })
                 }
             ], default);
@@ -207,6 +227,7 @@ public sealed class AwpAssignmentProjectionTests
             Assert.AreEqual("Deterministic", projectedAgent.Provider);
             Assert.AreEqual(12, projectedAgent.Usage?.InputTokens);
             Assert.AreEqual(4, projectedAgent.Usage?.OutputTokens);
+            Assert.AreEqual(16, projectedAgent.Usage?.TotalTokens);
 
             var timedOutAssignment = assignment with
             {
@@ -233,6 +254,11 @@ public sealed class AwpAssignmentProjectionTests
             var timedOut = (await repository.GetRunAsync(workspaceId, runId, default))!.Value;
             Assert.AreEqual(FlowRunStatus.TimedOut, timedOut.Status);
             Assert.AreEqual("flow_run_timed_out", timedOut.Error?.Code);
+            Assert.AreEqual(FlowRunTokenUsageState.Final, timedOut.TokenUsage.State);
+            Assert.AreEqual(12, timedOut.TokenUsage.Direct.InputTokens);
+            Assert.AreEqual(4, timedOut.TokenUsage.Direct.OutputTokens);
+            Assert.AreEqual(16, timedOut.TokenUsage.Direct.TotalTokens);
+            Assert.AreEqual(FlowRunTokenUsageCoverage.Complete, timedOut.TokenUsage.Direct.Coverage);
             Assert.AreEqual(FlowStepRunStatus.Skipped,
                 timedOut.Steps.Single(value => value.StepName == "completed").Status);
             Assert.IsTrue((await repository.ListRunEventsAsync(workspaceId, runId, 0, default))

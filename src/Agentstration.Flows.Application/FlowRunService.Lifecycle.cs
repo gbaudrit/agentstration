@@ -256,17 +256,18 @@ public sealed partial class FlowRunService
     public async Task<FlowRevisionUsage> ForceTerminateRevisionRunsAsync(string revisionId, CancellationToken cancellationToken)
         => await RevisionRetention().ForceTerminateAsync(revisionId, cancellationToken);
 
-    private FlowRevisionRetentionService RevisionRetention() => new(repository, cancellations, eventSink, timeProvider);
+    private FlowRevisionRetentionService RevisionRetention() => new(repository, cancellations, eventSink, timeProvider, tokenUsageConsolidator);
 
     public async Task<StoredFlowRun> CancelAsync(string runId, FlowRunScope scope, CancellationToken cancellationToken)
     {
         var stored = await RequiredAsync(runId, scope, cancellationToken);
         if (stored.Value.Status.IsTerminal()) return stored;
         await queue.RequestCancellationAsync(new(stored.Value.Id, stored.Value.Scope), cancellationToken);
-        var cancelled = await CancelSingleAsync(stored, cancellationToken);
-        foreach (var descendant in await ListActiveDescendantsAsync(cancelled.Value, cancellationToken))
+        cancellations.Cancel(new FlowRunKey(stored.Value.WorkspaceId, stored.Value.Id));
+        foreach (var descendant in (await ListActiveDescendantsAsync(stored.Value, cancellationToken))
+            .OrderByDescending(value => value.Value.NestingDepth))
             await CancelSingleAsync(descendant, cancellationToken);
-        return cancelled;
+        return await CancelSingleAsync(await RequiredAsync(runId, scope, cancellationToken), cancellationToken);
     }
 
     private async Task<StoredFlowRun> CancelSingleAsync(StoredFlowRun stored, CancellationToken cancellationToken)
@@ -277,7 +278,7 @@ public sealed partial class FlowRunService
         var steps = stored.Value.Steps.Select(step => step.Status is FlowStepRunStatus.NotStarted or FlowStepRunStatus.Running
             ? step with { Status = FlowStepRunStatus.Cancelled, CompletedAt = now }
             : step).ToArray();
-        var cancelled = await repository.UpdateRunAsync(stored.Value with
+        var value = stored.Value with
         {
             Status = FlowRunStatus.Cancelled,
             CompletedAt = now,
@@ -285,7 +286,9 @@ public sealed partial class FlowRunService
             Steps = steps,
             ExecutionLeaseId = null,
             ExecutionLeaseExpiresAt = null
-        }, stored.ETag, cancellationToken);
+        };
+        value = value with { TokenUsage = await tokenUsageConsolidator.FinalizeAsync(value, cancellationToken) };
+        var cancelled = await repository.UpdateRunAsync(value, stored.ETag, cancellationToken);
         await TryCleanupStepArtifactsAsync(cancelled.Value, cancellationToken);
         foreach (var input in await repository.ListInputRequestsAsync(stored.Value.WorkspaceId, stored.Value.Id, InputRequestStatus.Pending, cancellationToken))
             await repository.UpdateInputRequestAsync(input.Value with { Status = InputRequestStatus.Cancelled }, input.ETag, cancellationToken);

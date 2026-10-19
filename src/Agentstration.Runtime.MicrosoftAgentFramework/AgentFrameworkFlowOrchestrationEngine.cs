@@ -98,8 +98,12 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine(
         public void MergeUsage(UsageDetails? usage)
         {
             if (usage is null || Active is null) return;
-            Active.InputTokens = Math.Max(Active.InputTokens ?? 0, usage.InputTokenCount ?? 0);
-            Active.OutputTokens = Math.Max(Active.OutputTokens ?? 0, usage.OutputTokenCount ?? 0);
+            if (usage.InputTokenCount is { } inputTokens)
+                Active.InputTokens = Math.Max(Active.InputTokens ?? 0, inputTokens);
+            if (usage.OutputTokenCount is { } outputTokens)
+                Active.OutputTokens = Math.Max(Active.OutputTokens ?? 0, outputTokens);
+            if (usage.TotalTokenCount is { } totalTokens)
+                Active.TotalTokens = Math.Max(Active.TotalTokens ?? 0, totalTokens);
         }
 
         public CompletedTurn CompleteActive()
@@ -118,11 +122,12 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine(
         public FlowParticipantResult ToResult()
         {
             var turns = Turns.Select(turn => new FlowParticipantTurnResult(turn.Turn, turn.Content.ToString())).ToArray();
-            var inputTokens = Turns.Sum(turn => turn.InputTokens ?? 0);
-            var outputTokens = Turns.Sum(turn => turn.OutputTokens ?? 0);
-            var usage = inputTokens == 0 && outputTokens == 0
+            var inputTokens = Sum(Turns.Select(turn => turn.InputTokens));
+            var outputTokens = Sum(Turns.Select(turn => turn.OutputTokens));
+            var totalTokens = Sum(Turns.Select(turn => turn.TotalTokens));
+            var usage = inputTokens is null && outputTokens is null && totalTokens is null
                 ? null
-                : new FlowStepRunUsage(ToInt32(inputTokens), ToInt32(outputTokens));
+                : new FlowStepRunUsage(ToInt32(inputTokens), ToInt32(outputTokens), ToInt32(totalTokens));
             return new FlowParticipantResult(
                 Participant.Id,
                 turns,
@@ -135,7 +140,14 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine(
                 usage);
         }
 
-        private static int ToInt32(long value) => value > int.MaxValue ? int.MaxValue : checked((int)value);
+        private static long? Sum(IEnumerable<long?> values)
+        {
+            var known = values.Where(value => value is not null).Select(value => value!.Value).ToArray();
+            return known.Length == 0 ? null : known.Sum();
+        }
+
+        private static int? ToInt32(long? value) => value is null ? null
+            : value > int.MaxValue ? int.MaxValue : checked((int)value.Value);
     }
 
     private sealed record CompletedTurn(MutableTurn Turn, string Delta);
@@ -152,6 +164,7 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine(
         public StringBuilder Content { get; } = new();
         public long? InputTokens { get; set; }
         public long? OutputTokens { get; set; }
+        public long? TotalTokens { get; set; }
         public bool IsTerminationMarkerOnly => terminationFilter?.Matched == true && Content.Length == 0;
 
         public string Append(string content)
