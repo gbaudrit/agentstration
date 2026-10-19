@@ -35,9 +35,11 @@ The Flow returns a bounded Artifact manifest. Acquisition Tools remain generic: 
 
 ## Project one or more Data Sources
 
-A Workspace-owned Knowledge Source binds between one and thirty-two visible Data Sources. Each named binding can use its latest successful acquisition or an explicitly selected successful acquisition. It may also select a published `artifact.transform/v1` Flow. Omitting that Flow is an identity transformation: the acquired Artifact references pass through unchanged.
+An Instance-, Tenant-, or Workspace-owned Knowledge Source binds between one and thirty-two visible Data Sources. The definition pins the exact Data Source and active profile identity plus the exact projection, retrieval, and optional transformation Flow versions and integrity hashes from its owner scope. Protected ancestor dependencies require explicit descendant-use authorization; ambiguous or stale references fail closed. Each named binding can use its latest successful Workspace acquisition or an explicitly selected successful acquisition. Omitting the transformation Flow is an identity transformation: the acquired Artifact references pass through unchanged.
 
 The Knowledge Source invokes one `knowledge.projection/v1` Flow with all prepared inputs. The projection decides which durable, publishable Artifacts become the new Snapshot. Inputs remain provenance unless the projection emits them.
+
+An authorized descendant Workspace can use an inherited Knowledge Source, but its acquisitions, projections, Artifacts, Snapshots, active state, retrieval runs, indexes, and sessions stay in that Workspace. Another Workspace using the same definition has a separate operational history.
 
 The built-in `knowledge-projection-builtin` Flow performs identity aggregation. It deliberately preserves heterogeneous media such as JSON, HTML, text, or spreadsheets. If a Snapshot must be homogeneous, select a transformation on a binding or a specialized projection Flow that normalizes the prepared artifacts. There is no built-in transformation Flow.
 

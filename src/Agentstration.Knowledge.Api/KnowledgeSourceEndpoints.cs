@@ -61,11 +61,12 @@ internal static class KnowledgeSourceEndpoints
     private static Task<IResult> GetAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         HttpResponse response,
         KnowledgeSourceManagementService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
         {
-            var id = new KnowledgeSourceId(name, ResourceNamespace.Parse(@namespace));
+            var id = new KnowledgeSourceId(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef));
             var stored = await service.GetAsync(id, cancellationToken) ?? throw new KnowledgeSourceNotFoundException(id);
             return Resource(stored, response, 200);
         });
@@ -73,19 +74,23 @@ internal static class KnowledgeSourceEndpoints
     private static Task<IResult> GetReadinessAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         KnowledgeSourceManagementService service,
+        ICurrentRequestContext context,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
-            Results.Ok(await service.GetReadinessAsync(
-                new(name, ResourceNamespace.Parse(@namespace)), cancellationToken)));
+            Results.Ok(await service.GetReadinessForUseAsync(
+                new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)),
+                ResourceScopeRef.Workspace(context.Current.WorkspaceId), cancellationToken)));
 
     private static Task<IResult> GetToolExposureAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         HttpResponse response,
         KnowledgeSourceToolExposureService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
         {
-            var id = new KnowledgeSourceId(name, ResourceNamespace.Parse(@namespace));
+            var id = new KnowledgeSourceId(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef));
             var stored = await service.GetAsync(id, cancellationToken)
                 ?? throw new KnowledgeSourceValidationException("knowledge_source_tool_exposure_not_found", $"KnowledgeSource '{id}' has no Tool exposure.");
             return Resource(stored, response, 200);
@@ -95,7 +100,6 @@ internal static class KnowledgeSourceEndpoints
         CreateKnowledgeSourceRequest body,
         HttpResponse response,
         KnowledgeSourceManagementService service,
-        ICurrentRequestContext context,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
         {
             var ns = ResourceNamespace.Parse(body.Namespace);
@@ -104,54 +108,66 @@ internal static class KnowledgeSourceEndpoints
                 ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = KnowledgeResourceKinds.KnowledgeSource,
                 Metadata = new ResourceMetadata { Name = body.Name, Namespace = ns },
-                ScopeRef = ResourceScopeRef.Workspace(context.Current.WorkspaceId),
+                ScopeRef = body.ScopeRef,
                 Definition = body.Properties
             }, cancellationToken);
-            response.Headers.Location = $"/api/knowledgesources/{Uri.EscapeDataString(body.Name)}?namespace={Uri.EscapeDataString(ns.Value)}";
+            response.Headers.Location = Path(stored.Value);
             return Resource(stored, response, 201);
         });
 
     private static Task<IResult> PutAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         PutKnowledgeSourceRequest body,
         HttpRequest request,
         HttpResponse response,
         KnowledgeSourceManagementService service,
-        CancellationToken cancellationToken) => ExecuteAsync(async () => Resource(
-            await service.PutAsync(new(name, ResourceNamespace.Parse(@namespace)), body.Properties,
-                request.Headers.IfMatch.FirstOrDefault(), cancellationToken), response, 200));
+        CancellationToken cancellationToken) => ExecuteAsync(async () =>
+        {
+            var id = new KnowledgeSourceId(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef));
+            var stored = id.ScopeRef is { } exact
+                ? await service.PutExactAsync(exact, id, body.Properties, request.Headers.IfMatch.FirstOrDefault(), cancellationToken)
+                : await service.PutAsync(id, body.Properties, request.Headers.IfMatch.FirstOrDefault(), cancellationToken);
+            return Resource(stored, response, 200);
+        });
 
     private static Task<IResult> SetEnabledAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         SetKnowledgeSourceEnabledRequest body,
         HttpRequest request,
         HttpResponse response,
         KnowledgeSourceManagementService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () => Resource(
-            await service.SetEnabledAsync(new(name, ResourceNamespace.Parse(@namespace)), body.Enabled,
+            await service.SetEnabledAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), body.Enabled,
                 request.Headers.IfMatch.FirstOrDefault(), cancellationToken), response, 200));
 
     private static Task<IResult> PublishToolExposureAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         PublishKnowledgeSourceToolExposureRequest body,
         HttpResponse response,
         KnowledgeSourceToolExposureService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () => Resource(
-            await service.PublishAsync(new(name, ResourceNamespace.Parse(@namespace)), body.Version,
+            await service.PublishAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), body.Version,
                 body.RequiresApproval, cancellationToken), response, 201));
 
     private static Task<IResult> DeleteAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         HttpRequest request,
         KnowledgeSourceManagementService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
         {
-            await service.DeleteAsync(new(name, ResourceNamespace.Parse(@namespace)),
-                request.Headers.IfMatch.FirstOrDefault(), cancellationToken);
+            var id = new KnowledgeSourceId(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef));
+            if (id.ScopeRef is { } exact)
+                await service.DeleteExactAsync(exact, id, request.Headers.IfMatch.FirstOrDefault(), cancellationToken);
+            else
+                await service.DeleteAsync(id, request.Headers.IfMatch.FirstOrDefault(), cancellationToken);
             return Results.NoContent();
         });
 
@@ -179,6 +195,9 @@ internal static class KnowledgeSourceEndpoints
         { return Problem(exception.Code, "Invalid KnowledgeSource Tool exposure", 422, exception.Message); }
         catch (ToolSetValidationException exception)
         { return Problem(exception.Code, "Invalid KnowledgeSource Tool exposure", 422, exception.Message); }
+        catch (Exception exception) when (exception is ResourceScopePolicyException
+            or ResourceReferenceAmbiguousException or ResourceReferenceOutsideScopeException)
+        { return Problem("knowledge-source-scope-invalid", "Invalid KnowledgeSource scope", 422, exception.Message); }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or FormatException)
         { return Problem("knowledge-source-operation-invalid", "Invalid KnowledgeSource operation", 422, exception.Message); }
     }
@@ -190,4 +209,11 @@ internal static class KnowledgeSourceEndpoints
         Status = status,
         Detail = detail
     });
+
+    private static ResourceScopeRef? ParseScope(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : ResourceScopeRef.Parse(value);
+
+    private static string Path(KnowledgeSourceResource value) =>
+        $"/api/knowledgesources/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString(value.Namespace.Value)}"
+        + $"&scopeRef={Uri.EscapeDataString(value.ScopeRef!.Value.Value)}";
 }

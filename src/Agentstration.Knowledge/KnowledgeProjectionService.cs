@@ -19,16 +19,24 @@ public sealed class KnowledgeProjectionException(string code, string message, Ex
 
 public interface IKnowledgeProjectionInputResolver
 {
+    Task<ResolvedKnowledgeDataSourceBinding> ResolveDependencyAsync(
+        ResourceScopeRef ownerScope,
+        ResourceNamespace ownerNamespace,
+        KnowledgeDataSourceBinding binding,
+        CancellationToken cancellationToken);
+
     Task<KnowledgeDataSourceBindingReadiness> GetReadinessAsync(
         ResourceScopeRef executionScope,
         ResourceNamespace ownerNamespace,
         KnowledgeDataSourceBinding binding,
+        ResolvedKnowledgeDataSourceBinding dependency,
         CancellationToken cancellationToken);
 
     Task<KnowledgeProjectionInputEvidence> ResolveAsync(
         ResourceScopeRef executionScope,
         ResourceNamespace ownerNamespace,
         KnowledgeDataSourceBinding binding,
+        ResolvedKnowledgeDataSourceBinding dependency,
         string? acquisitionId,
         CancellationToken cancellationToken);
 }
@@ -95,8 +103,13 @@ public sealed class KnowledgeProjectionService(
         var context = RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsExecute, cancellationToken);
         ValidateParameters(request.Parameters);
-        var source = await sources.GetAsync(sourceId, cancellationToken)
-            ?? throw Error("knowledge_projection_source_not_found", $"KnowledgeSource '{sourceId}' was not found.");
+        var executionScope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        StoredResource<KnowledgeSourceResource> source;
+        try { source = await sources.ResolveForUseAsync(sourceId, executionScope, cancellationToken); }
+        catch (KnowledgeSourceNotFoundException)
+        { throw Error("knowledge_projection_source_not_found", $"KnowledgeSource '{sourceId}' was not found."); }
+        catch (KnowledgeSourceValidationException exception)
+        { throw Error(exception.Code, exception.Message, exception); }
         if (!source.Value.Definition.Enabled)
             throw Error("knowledge_projection_source_disabled", $"KnowledgeSource '{source.Value.Address}' is disabled.");
         if (source.Value.Definition.DataSources.Count is < 1 or > MaximumInputs)
@@ -110,10 +123,13 @@ public sealed class KnowledgeProjectionService(
         await gate.WaitAsync(cancellationToken);
         try
         {
-            var scopeRef = ResourceScopeRef.Workspace(context.WorkspaceId);
-            var projectionFlow = await ResolveFlowAsync(source.Value, source.Value.Definition.ProjectionFlow,
+            var scopeRef = executionScope;
+            var composition = source.Value.Composition
+                ?? throw Error("knowledge_source_composition_missing",
+                    "The KnowledgeSource does not retain an exact dependency composition and must be recreated.");
+            var projectionFlow = await ResolveFlowAsync(composition.ProjectionFlow,
                 KnowledgeFlowContracts.Projection, "projection", cancellationToken);
-            var retrievalFlow = await ResolveFlowAsync(source.Value, source.Value.Definition.RetrievalFlow,
+            var retrievalFlow = await ResolveFlowAsync(composition.RetrievalFlow,
                 KnowledgeFlowContracts.Retrieval, "retrieval", cancellationToken);
             var projectionId = $"projection-{Guid.NewGuid():N}";
             var correlationId = string.IsNullOrWhiteSpace(request.CorrelationId) ? projectionId : request.CorrelationId.Trim();
@@ -122,10 +138,14 @@ public sealed class KnowledgeProjectionService(
             foreach (var binding in source.Value.Definition.DataSources)
             {
                 request.AcquisitionIds.TryGetValue(binding.Name, out var acquisitionId);
+                var dependency = composition.DataSources.SingleOrDefault(value =>
+                    string.Equals(value.BindingName, binding.Name, StringComparison.Ordinal))
+                    ?? throw Error("knowledge_projection_dependency_missing",
+                        $"Binding '{binding.Name}' has no exact Data Source dependency pin.");
                 try
                 {
                     resolvedInputs.Add(await inputs.ResolveAsync(scopeRef, source.Value.Namespace, binding,
-                        acquisitionId, cancellationToken));
+                        dependency, acquisitionId, cancellationToken));
                 }
                 catch (KnowledgeProjectionException exception) when (!binding.Required)
                 {
@@ -144,6 +164,7 @@ public sealed class KnowledgeProjectionService(
                 Generation = 1,
                 Status = new() { ProvisioningState = ProvisioningState.Accepted },
                 KnowledgeSourceUid = source.Value.Uid,
+                KnowledgeSourceScopeRef = source.Value.ScopeRef,
                 KnowledgeSourceName = source.Value.Name,
                 KnowledgeSourceNamespace = source.Value.Namespace,
                 KnowledgeSourceGeneration = source.Value.Generation,
@@ -242,11 +263,18 @@ public sealed class KnowledgeProjectionService(
     {
         var context = RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsRead, cancellationToken);
-        var values = await store.ListExactAsync<KnowledgeProjectionResource>(ResourceScopeRef.Workspace(context.WorkspaceId),
+        var scopeRef = ResourceScopeRef.Workspace(context.WorkspaceId);
+        Guid? sourceUid = null;
+        if (sourceId is { } requested)
+        {
+            try { sourceUid = (await sources.ResolveForUseAsync(requested, scopeRef, cancellationToken)).Value.Uid; }
+            catch (KnowledgeSourceNotFoundException)
+            { throw Error("knowledge_projection_source_not_found", $"KnowledgeSource '{requested}' was not found."); }
+        }
+        var values = await store.ListExactAsync<KnowledgeProjectionResource>(scopeRef,
             KnowledgeResourceKinds.KnowledgeProjection, 0, 1000, cancellationToken);
         return values.Select(value => value.Value)
-            .Where(value => sourceId is null || value.KnowledgeSourceName == sourceId.Value.Value
-                && value.KnowledgeSourceNamespace == sourceId.Value.Namespace)
+            .Where(value => sourceUid is null || value.KnowledgeSourceUid == sourceUid)
             .OrderByDescending(value => value.CreatedAt).ToArray();
     }
 
@@ -281,7 +309,10 @@ public sealed class KnowledgeProjectionService(
             }
             try
             {
-                var flow = await ResolveFlowAsync(source, binding.TransformationFlow,
+                var pinned = source.Composition?.TransformationFlows.GetValueOrDefault(binding.Name)
+                    ?? throw Error("knowledge_projection_dependency_missing",
+                        $"Binding '{binding.Name}' has no exact transformation Flow pin.");
+                var flow = await ResolveFlowAsync(pinned,
                     KnowledgeFlowContracts.ArtifactTransformation, "transformation", cancellationToken);
                 var runId = $"flowrun-transform-{Guid.NewGuid():N}";
                 var input = JsonSerializer.SerializeToElement(new KnowledgeArtifactTransformationInput
@@ -317,13 +348,14 @@ public sealed class KnowledgeProjectionService(
     }
 
     private async Task<ResolvedKnowledgeFlowBinding> ResolveFlowAsync(
-        KnowledgeSourceResource source,
-        KnowledgeFlowTarget target,
+        ResolvedKnowledgeFlowBinding resolved,
         string requiredContract,
         string role,
         CancellationToken cancellationToken)
     {
-        var resolved = await flows.ResolveAsync(source.ScopeRef!.Value, source.Namespace, target, cancellationToken);
+        try { await flows.ValidatePinnedAsync(resolved, cancellationToken); }
+        catch (KnowledgeSourceValidationException exception)
+        { throw Error(exception.Code, exception.Message, exception); }
         if (!string.Equals(resolved.Contract, requiredContract, StringComparison.Ordinal))
             throw Error($"knowledge_projection_{role}_contract_invalid",
                 $"Flow '{resolved.Namespace}/{resolved.Name}:{resolved.Version}' must declare flow.contract '{requiredContract}'.");
@@ -381,6 +413,7 @@ public sealed class KnowledgeProjectionService(
             Generation = 1,
             Status = new() { ProvisioningState = ProvisioningState.Succeeded },
             KnowledgeSourceUid = source.Uid,
+            KnowledgeSourceScopeRef = source.ScopeRef,
             KnowledgeSourceName = source.Name,
             KnowledgeSourceNamespace = source.Namespace,
             KnowledgeSourceGeneration = source.Generation,
