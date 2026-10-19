@@ -7,11 +7,24 @@ namespace Agentstration.Web.Api.Runtime;
 
 internal static class RuntimeHttp
 {
-    public static RuntimeRunScope CurrentScope(ICurrentRequestContext context)
+    public static RuntimeRunScope CurrentScope(ICurrentRequestContext context, ResourceScopeRef? requestedScopeRef = null)
     {
         var current = context.Current;
-        return new RuntimeRunScope(current.TenantId, new WorkspaceId(current.WorkspaceId), current.PrincipalId);
+        var requested = requestedScopeRef ?? ResourceScopeRef.Workspace(current.WorkspaceId);
+        return requested.Kind switch
+        {
+            ResourceScopeKind.Instance => RuntimeRunScope.Instance(current.PrincipalId),
+            ResourceScopeKind.Tenant when requested.TargetId == current.TenantId =>
+                RuntimeRunScope.Tenant(current.TenantId, current.PrincipalId),
+            ResourceScopeKind.Workspace when requested.TargetId == current.WorkspaceId =>
+                RuntimeRunScope.Workspace(current.TenantId, new WorkspaceId(current.WorkspaceId), current.PrincipalId),
+            _ => throw new RuntimeRunValidationException("execution_scope_not_authorized",
+                "The requested execution scope is not the current Instance, Tenant, or Workspace context.")
+        };
     }
+
+    public static ResourceScopeRef RequestedScope(ICurrentRequestContext context, string? scopeRef) =>
+        CurrentScope(context, string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef)).ScopeRef;
 
     public static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {

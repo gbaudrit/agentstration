@@ -50,10 +50,43 @@ public sealed class RuntimeWorkerAssignmentService(
         string executionMaterialId,
         string executionMaterialDigest,
         CancellationToken cancellationToken)
-        => CreateAsync(workspaceId, Guid.Empty, RuntimeAssignmentTargetKind.RuntimeRun, runId, runtimeCapability,
+        => CreateAsync(ResourceScopeRef.Workspace(workspaceId.Value), workspaceId, Guid.Empty, RuntimeAssignmentTargetKind.RuntimeRun, runId, runtimeCapability,
             runtimeCapabilityVersion, executionMaterialVersion, executionMaterialId, executionMaterialDigest, cancellationToken);
 
     public Task<StoredRuntimeWorkerAssignment> CreateAsync(
+        WorkspaceId workspaceId,
+        Guid tenantId,
+        RuntimeAssignmentTargetKind targetKind,
+        string runId,
+        string runtimeCapability,
+        string runtimeCapabilityVersion,
+        string executionMaterialVersion,
+        string executionMaterialId,
+        string executionMaterialDigest,
+        CancellationToken cancellationToken)
+        => CreateAsync(ResourceScopeRef.Workspace(workspaceId.Value), workspaceId, tenantId, targetKind, runId,
+            runtimeCapability, runtimeCapabilityVersion, executionMaterialVersion, executionMaterialId,
+            executionMaterialDigest, cancellationToken);
+
+    public Task<StoredRuntimeWorkerAssignment> CreateExactAsync(
+        ResourceScopeRef scopeRef,
+        Guid? tenantId,
+        RuntimeAssignmentTargetKind targetKind,
+        string runId,
+        string runtimeCapability,
+        string runtimeCapabilityVersion,
+        string executionMaterialVersion,
+        string executionMaterialId,
+        string executionMaterialDigest,
+        CancellationToken cancellationToken) =>
+        CreateAsync(scopeRef,
+            scopeRef.Kind == ResourceScopeKind.Workspace && scopeRef.TargetId is { } workspaceId ? new WorkspaceId(workspaceId) : default,
+            tenantId ?? Guid.Empty,
+            targetKind, runId, runtimeCapability, runtimeCapabilityVersion, executionMaterialVersion,
+            executionMaterialId, executionMaterialDigest, cancellationToken);
+
+    private Task<StoredRuntimeWorkerAssignment> CreateAsync(
+        ResourceScopeRef scopeRef,
         WorkspaceId workspaceId,
         Guid tenantId,
         RuntimeAssignmentTargetKind targetKind,
@@ -71,12 +104,12 @@ public sealed class RuntimeWorkerAssignmentService(
         ArgumentException.ThrowIfNullOrWhiteSpace(executionMaterialVersion);
         ArgumentException.ThrowIfNullOrWhiteSpace(executionMaterialId);
         ArgumentException.ThrowIfNullOrWhiteSpace(executionMaterialDigest);
-        if (targetKind == RuntimeAssignmentTargetKind.FlowRun && tenantId == Guid.Empty)
-            throw new ArgumentException("A Flow assignment requires its Tenant identity.", nameof(tenantId));
+        ValidateExecutionCoordinates(scopeRef, tenantId, workspaceId);
         var now = timeProvider.GetUtcNow();
         return CreateAndSignalAsync(new RuntimeWorkerAssignment
         {
             WorkspaceId = workspaceId,
+            ScopeRef = scopeRef,
             TenantId = tenantId,
             Id = new RuntimeAssignmentId(Guid.NewGuid()),
             TargetKind = targetKind,
@@ -127,6 +160,7 @@ public sealed class RuntimeWorkerAssignmentService(
             new RuntimeAssignmentOwnershipProof
             {
                 WorkspaceId = claimed.Value.WorkspaceId,
+                ScopeRef = claimed.Value.ExecutionScopeRef,
                 AssignmentId = claimed.Value.Id,
                 AttemptId = attempt.Id,
                 WorkerId = attempt.WorkerId,
@@ -251,7 +285,7 @@ public sealed class RuntimeWorkerAssignmentService(
                 "Event kinds are limited to 128 characters and individual payloads to 64 KiB.");
         var result = await assignments.AppendEventsAsync(proof, Digest(proof.OwnershipToken), events,
             timeProvider.GetUtcNow(), cancellationToken);
-        var assignment = (await assignments.GetAsync(proof.WorkspaceId, proof.AssignmentId, cancellationToken))!.Value;
+        var assignment = (await assignments.GetExactAsync(proof.ExecutionScopeRef, proof.AssignmentId, cancellationToken))!.Value;
         await projection.ProjectEventsAsync(assignment, events, cancellationToken);
         return result;
     }
@@ -296,6 +330,18 @@ public sealed class RuntimeWorkerAssignmentService(
         return result;
     }
 
+    public async Task<StoredRuntimeWorkerAssignment> RequestCancellationExactAsync(
+        ResourceScopeRef scopeRef,
+        RuntimeAssignmentId assignmentId,
+        CancellationToken cancellationToken)
+    {
+        var result = await assignments.RequestCancellationExactAsync(
+            scopeRef, assignmentId, timeProvider.GetUtcNow(), cancellationToken);
+        if (scopeRef.Kind == ResourceScopeKind.Workspace && scopeRef.TargetId is { } workspaceId)
+            leaseGuards.Revoke(new WorkspaceId(workspaceId), assignmentId);
+        return result;
+    }
+
     public async Task<RuntimeAssignmentTerminalResult> CompleteAsync(
         RuntimeAssignmentOwnershipProof proof,
         RuntimeAssignmentTerminalCommand command,
@@ -334,12 +380,29 @@ public sealed class RuntimeWorkerAssignmentService(
         CancellationToken cancellationToken) =>
         assignments.GetByTargetAsync(workspaceId, targetKind, targetRunId, cancellationToken);
 
+    public Task<StoredRuntimeWorkerAssignment?> GetByTargetExactAsync(
+        ResourceScopeRef scopeRef,
+        RuntimeAssignmentTargetKind targetKind,
+        string targetRunId,
+        CancellationToken cancellationToken) =>
+        assignments.GetByTargetExactAsync(scopeRef, targetKind, targetRunId, cancellationToken);
+
     public async Task<StoredRuntimeWorkerAssignment> RequeueAsync(
         WorkspaceId workspaceId,
         RuntimeAssignmentId assignmentId,
         CancellationToken cancellationToken)
     {
         var stored = await assignments.RequeueAsync(workspaceId, assignmentId, timeProvider.GetUtcNow(), cancellationToken);
+        availability.Pulse();
+        return stored;
+    }
+
+    public async Task<StoredRuntimeWorkerAssignment> RequeueExactAsync(
+        ResourceScopeRef scopeRef,
+        RuntimeAssignmentId assignmentId,
+        CancellationToken cancellationToken)
+    {
+        var stored = await assignments.RequeueExactAsync(scopeRef, assignmentId, timeProvider.GetUtcNow(), cancellationToken);
         availability.Pulse();
         return stored;
     }
@@ -360,5 +423,21 @@ public sealed class RuntimeWorkerAssignmentService(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(token);
         return SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
+    }
+
+    private static void ValidateExecutionCoordinates(ResourceScopeRef scopeRef, Guid tenantId, WorkspaceId workspaceId)
+    {
+        var valid = scopeRef.Kind switch
+        {
+            ResourceScopeKind.Instance => tenantId == Guid.Empty && workspaceId.Value == Guid.Empty,
+            ResourceScopeKind.Tenant => scopeRef.TargetId == tenantId && workspaceId.Value == Guid.Empty,
+            // TenantId was not persisted by the original Workspace-only assignment contract. Keep
+            // those records readable while exact-scope producers always supply the tenant coordinate.
+            ResourceScopeKind.Workspace => scopeRef.TargetId == workspaceId.Value,
+            _ => false
+        };
+        if (!valid)
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.InvalidCoordinate,
+                "The assignment coordinates do not match the exact execution scope.");
     }
 }

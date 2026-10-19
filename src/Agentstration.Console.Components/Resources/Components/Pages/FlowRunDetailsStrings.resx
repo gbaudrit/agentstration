@@ -13,6 +13,7 @@
   <data name="FlowDefinition"><value>Flow definition</value></data>
   <data name="Status"><value>Status</value></data>
   <data name="FlowAndVersion"><value>Flow / version</value></data>
+  <data name="ExecutionScope"><value>Execution scope</value></data>
   <data name="Deployment"><value>Deployment</value></data>
   <data name="TriggerAndStartedBy"><value>Trigger / started by</value></data>
   <data name="CorrelationId"><value>Correlation ID</value></data>

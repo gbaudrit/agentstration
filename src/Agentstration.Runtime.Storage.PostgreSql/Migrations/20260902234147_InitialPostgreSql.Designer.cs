@@ -28,6 +28,11 @@ namespace Agentstration.Runtime.Storage.PostgreSql.Migrations
 
             modelBuilder.Entity("Agentstration.Runtime.Storage.PostgreSql.RuntimeExecutionStateDocument", b =>
                 {
+                    b.Property<string>("ScopeRef")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid");
 
@@ -54,15 +59,20 @@ namespace Agentstration.Runtime.Storage.PostgreSql.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.HasKey("WorkspaceId", "RunId", "RuntimeType", "StateId");
+                    b.HasKey("ScopeRef", "RunId", "RuntimeType", "StateId");
 
-                    b.HasIndex("WorkspaceId", "RunId", "RuntimeType", "CreatedAt");
+                    b.HasIndex("ScopeRef", "RunId", "RuntimeType", "CreatedAt");
 
                     b.ToTable("RuntimeExecutionStates", "runtime");
                 });
 
             modelBuilder.Entity("Agentstration.Runtime.Storage.PostgreSql.RuntimeRunDocument", b =>
                 {
+                    b.Property<string>("ScopeRef")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid");
 
@@ -96,15 +106,20 @@ namespace Agentstration.Runtime.Storage.PostgreSql.Migrations
                     b.Property<long>("UpdatedAt")
                         .HasColumnType("bigint");
 
-                    b.HasKey("WorkspaceId", "RunId");
+                    b.HasKey("ScopeRef", "RunId");
 
-                    b.HasIndex("WorkspaceId", "AgentResourceId", "CreatedAt");
+                    b.HasIndex("ScopeRef", "AgentResourceId", "CreatedAt");
 
                     b.ToTable("RuntimeRuns", "runtime");
                 });
 
             modelBuilder.Entity("Agentstration.Runtime.Storage.PostgreSql.RuntimeRunEventDocument", b =>
                 {
+                    b.Property<string>("ScopeRef")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid");
 
@@ -122,15 +137,20 @@ namespace Agentstration.Runtime.Storage.PostgreSql.Migrations
                     b.Property<DateTimeOffset>("Timestamp")
                         .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("WorkspaceId", "RunId", "Sequence");
+                    b.HasKey("ScopeRef", "RunId", "Sequence");
 
-                    b.HasIndex("WorkspaceId", "RunId", "Sequence");
+                    b.HasIndex("ScopeRef", "RunId", "Sequence");
 
                     b.ToTable("RuntimeRunEvents", "runtime");
                 });
 
             modelBuilder.Entity("Agentstration.Runtime.Storage.PostgreSql.RuntimeWorkerAssignmentDocument", b =>
                 {
+                    b.Property<string>("ScopeRef")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid");
 
@@ -199,7 +219,7 @@ namespace Agentstration.Runtime.Storage.PostgreSql.Migrations
                     b.Property<long>("UpdatedAt")
                         .HasColumnType("bigint");
 
-                    b.HasKey("WorkspaceId", "AssignmentId");
+                    b.HasKey("ScopeRef", "AssignmentId");
 
                     b.HasIndex("State", "LeaseExpiresAt");
 
@@ -207,7 +227,7 @@ namespace Agentstration.Runtime.Storage.PostgreSql.Migrations
 
                     b.HasIndex("State", "RuntimeCapability", "CreatedAt");
 
-                    b.HasIndex("WorkspaceId", "TargetKind", "TargetRunId")
+                    b.HasIndex("ScopeRef", "TargetKind", "TargetRunId")
                         .IsUnique();
 
                     b.ToTable("RuntimeWorkerAssignments", "runtime");

@@ -52,7 +52,7 @@ public sealed class FlowDetailsDesignerTests
         Assert.AreEqual(strings["Status"].Value, headers[2]);
         var link = rendered.Find("tbody .resource-name-link");
         Assert.AreEqual("multi-agent-review", link.TextContent.Trim());
-        Assert.AreEqual("/flow-runs/flowrun-review-1", link.GetAttribute("href"));
+        Assert.AreEqual($"/flow-runs/flowrun-review-1?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}", link.GetAttribute("href"));
         Assert.IsEmpty(rendered.FindAll("tbody .text-button"));
     }
 
@@ -109,12 +109,12 @@ public sealed class FlowDetailsDesignerTests
     }
 
     [TestMethod]
-    public void InheritedNamespacedFlowOrdersDefinitionSecondAndExposesReadOnlyYamlLast()
+    public void PackManagedNamespacedFlowOrdersDefinitionSecondAndExposesReadOnlyYamlLast()
     {
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var inheritedScope = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
-        var client = new FlowClientStub(scopeRef: inheritedScope);
+        var client = new FlowClientStub(scopeRef: inheritedScope, managed: true);
         context.Services.AddSingleton<IFlowApiClient>(client);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
@@ -124,7 +124,6 @@ public sealed class FlowDetailsDesignerTests
             .Add(component => component.FlowId, "sample")
             .Add(component => component.FlowNamespace, "pack.sample"));
 
-        StringAssert.Contains(rendered.Markup, strings["InheritedReadOnlyHelp"].Value);
         Assert.HasCount(0, rendered.FindAll(".page-header .flow-header-designer"));
         CollectionAssert.AreEqual(
             new[] { strings["Tab.Overview"].Value, strings["Tab.Definition"].Value, strings["Tab.Runs"].Value, strings["Tab.Deployments"].Value, strings["Tab.YAML"].Value },
@@ -157,7 +156,9 @@ public sealed class FlowDetailsDesignerTests
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
 
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
-        Assert.AreEqual("/flows/sample/designer", rendered.Find(".page-header .flow-header-designer").GetAttribute("href"));
+        Assert.AreEqual(
+            "/flows/sample/designer?scopeRef=%2Fworkspaces%2F11111111-1111-1111-1111-111111111111",
+            rendered.Find(".page-header .flow-header-designer").GetAttribute("href"));
         rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
 
         Assert.HasCount(0, rendered.FindAll(".flow-definition-sheet .topology-shell"));
@@ -174,6 +175,27 @@ public sealed class FlowDetailsDesignerTests
         Assert.AreEqual("platform", client.LastDraftUpdate?.Tags?["owner"]);
         Assert.AreEqual("\"etag-1\"", client.LastDraftETag);
         StringAssert.Contains(rendered.Find("[role=status]").TextContent, strings["DefinitionSaved"].Value);
+    }
+
+    [TestMethod]
+    public void InstanceFlowIsEditableAndIsNotPresentedAsInheritedReadOnly()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FlowClientStub(scopeRef: ResourceScopeRef.Instance);
+        context.Services.AddSingleton<IFlowApiClient>(client);
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
+            .NavigateTo($"?scopeRef={Uri.EscapeDataString(ResourceScopeRef.Instance.Value)}");
+
+        var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "instance-flow"));
+
+        Assert.HasCount(1, rendered.FindAll(".page-header .flow-header-designer"));
+        Assert.IsFalse(rendered.Markup.Contains(strings["InheritedReadOnlyHelp"].Value, StringComparison.Ordinal));
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
+        Assert.IsFalse(rendered.Find("[data-testid='flow-definition-display-name']").HasAttribute("disabled"));
+        Assert.HasCount(1, rendered.FindAll(".flow-definition-form button[type=submit]"));
+        Assert.AreEqual(1, client.DraftLoadCount);
     }
 
     [TestMethod]
@@ -217,7 +239,7 @@ public sealed class FlowDetailsDesignerTests
     {
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
-        var client = new FlowClientStub(orchestration: true);
+        var client = new FlowClientStub(orchestration: true, managed: true);
         context.Services.AddSingleton<IFlowApiClient>(client);
         context.Services.AddSingleton<IManagementApiClient>(new ManagementClientStub());
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowOrchestrationEditorStrings>>();
@@ -436,9 +458,10 @@ public sealed class FlowDetailsDesignerTests
         private readonly FlowDefinition definition;
         private readonly ResourceScopeRef scopeRef;
         private readonly FlowRun? run;
+        private readonly bool managed;
         private readonly FlowRunCausalityPageResponse? causality;
         private FlowDraftResponse? storedDraft;
-        public FlowClientStub(bool orchestration = false, FlowRun? run = null, FlowRunCausalityPageResponse? causality = null, ResourceScopeRef? scopeRef = null)
+        public FlowClientStub(bool orchestration = false, FlowRun? run = null, FlowRunCausalityPageResponse? causality = null, ResourceScopeRef? scopeRef = null, bool managed = false)
         {
             definition = orchestration
                 ? new OrchestrationFlowDefinition([new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")], new SequentialOrchestrationPattern())
@@ -446,6 +469,7 @@ public sealed class FlowDetailsDesignerTests
             this.run = run;
             this.causality = causality;
             this.scopeRef = scopeRef ?? ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+            this.managed = managed;
         }
         public ResourceScopeRef ScopeRef => scopeRef;
         public ResourceNamespace RequestedNamespace { get; private set; }
@@ -460,7 +484,8 @@ public sealed class FlowDetailsDesignerTests
         public Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken)
         {
             RequestedNamespace = @namespace;
-            return Task.FromResult(new FlowResponse(flowId, "Sample", null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string>(), Now, Now, Graph) { Namespace = @namespace, ScopeRef = scopeRef });
+            var metadata = managed ? new Dictionary<string, string> { ["agentstration.io/pack.name"] = "sample" } : new Dictionary<string, string>();
+            return Task.FromResult(new FlowResponse(flowId, "Sample", null, "1.0.0", true, "1.0.0", definition, metadata, Now, Now, Graph) { Namespace = @namespace, ScopeRef = scopeRef });
         }
         public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<FlowVersionResponse>>([new FlowVersionResponse(flowId, "1.0.0", null, definition, new Dictionary<string, string>(), Now, Graph) { Namespace = @namespace, ScopeRef = scopeRef }]);

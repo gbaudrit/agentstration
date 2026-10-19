@@ -15,7 +15,14 @@ public sealed record RuntimeGovernedModelRequest(
     RuntimeExecutionOptions Options,
     Guid TenantId,
     WorkspaceId WorkspaceId,
-    Guid PrincipalId);
+    Guid PrincipalId)
+{
+    public ResourceScopeRef ExecutionScopeRef { get; init; } = WorkspaceId.Value != Guid.Empty
+        ? ResourceScopeRef.Workspace(WorkspaceId.Value)
+        : TenantId != Guid.Empty
+            ? ResourceScopeRef.Tenant(TenantId)
+            : ResourceScopeRef.Instance;
+}
 
 public sealed record RuntimeGovernedModelResponse(
     IReadOnlyList<RuntimeGovernedModelContent> Contents,
@@ -45,7 +52,14 @@ public sealed record RuntimeGovernedToolRequest(
     Guid PrincipalId,
     string RunId,
     JsonElement? Arguments,
-    bool? PersistArguments);
+    bool? PersistArguments)
+{
+    public ResourceScopeRef ExecutionScopeRef { get; init; } = WorkspaceId.Value != Guid.Empty
+        ? ResourceScopeRef.Workspace(WorkspaceId.Value)
+        : TenantId != Guid.Empty
+            ? ResourceScopeRef.Tenant(TenantId)
+            : ResourceScopeRef.Instance;
+}
 
 public sealed record RuntimeGovernedArtifact(
     Guid ArtifactId,
@@ -101,12 +115,14 @@ public interface IRuntimeWorkerOperationGateway
         CancellationToken cancellationToken);
     Task<JsonElement?> InvokeToolAsync(RuntimeGovernedToolRequest request, CancellationToken cancellationToken);
     Task<RuntimeGovernedFlowToolResult> InvokeFlowToolAsync(
+        ResourceScopeRef executionScopeRef,
         WorkspaceId workspaceId,
         string flowRunId,
         string stepDefinitionId,
         JsonElement arguments,
         CancellationToken cancellationToken);
     Task<RuntimeGovernedFlowArtifact> CaptureFlowArtifactAsync(
+        ResourceScopeRef executionScopeRef,
         WorkspaceId workspaceId,
         string flowRunId,
         string stepDefinitionId,
@@ -116,6 +132,7 @@ public interface IRuntimeWorkerOperationGateway
         IReadOnlyDictionary<string, string> provenance,
         CancellationToken cancellationToken);
     Task CleanupFlowArtifactAsync(
+        ResourceScopeRef executionScopeRef,
         WorkspaceId workspaceId,
         string flowRunId,
         string stepDefinitionId,
@@ -125,7 +142,8 @@ public interface IRuntimeWorkerOperationGateway
         string name, string contentType, byte[] content, CancellationToken cancellationToken);
     Task<RuntimeGovernedArtifact?> GetArtifactAsync(WorkspaceId workspaceId, RuntimeAssignmentId assignmentId,
         Guid artifactId, CancellationToken cancellationToken);
-    Task<RuntimeGovernedChildFlow> CreateOrGetChildFlowAsync(WorkspaceId workspaceId, string parentRunId,
+    Task<RuntimeGovernedChildFlow> CreateOrGetChildFlowAsync(ResourceScopeRef executionScopeRef,
+        WorkspaceId workspaceId, string parentRunId,
         string stepDefinitionId, JsonElement input, string purpose, int? iteration,
         CancellationToken cancellationToken);
 }

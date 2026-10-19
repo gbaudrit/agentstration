@@ -143,6 +143,7 @@ else
 
 @code {
     [Parameter] public string Name { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
     private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
     private static readonly IReadOnlyDictionary<string, JsonElement> DryRunEnabled = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
@@ -188,7 +189,9 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        var value = await Client.GetToolAsync(ToolNamespace, Name, default);
+        var value = ScopeRefValue is { Length: > 0 } requestedScope
+            ? await Client.GetToolAsync(ResourceScopeRef.Parse(requestedScope), ToolNamespace, Name, default)
+            : await Client.GetToolAsync(ToolNamespace, Name, default);
         tool = value.Value;
         etag = value.ETag;
         activeTab = ToolDetailTab.Overview;

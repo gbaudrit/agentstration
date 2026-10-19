@@ -100,7 +100,9 @@ export class FlowEditorPage {
 
   public async create(name: string): Promise<void> {
     await Promise.all([
-      this.page.waitForURL(url => url.pathname === `/flows/${encodeURIComponent(name)}` && url.searchParams.get('view') === 'definition'),
+      this.page.waitForURL(url => url.pathname === `/flows/${encodeURIComponent(name)}`
+        && url.searchParams.get('view') === 'definition'
+        && url.searchParams.has('scopeRef')),
       this.page.getByTestId(TestIds.flowEditor.create).click(),
     ]);
     await this.orchestrationEditor.waitFor({ state: 'visible' });

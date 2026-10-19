@@ -152,8 +152,8 @@
     .flow-editor-shell.palette-open .designer-view-controls{left:calc(var(--palette-drawer-width) + 12px)}
     .flow-editor-shell.inspector-open>.flow-inspector{right:0;border-left:1px solid var(--border)}
     .flow-editor-shell.split{grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr)}
-    .flow-editor-shell.split>.flow-canvas-wrap{grid-column:1}
-    .flow-editor-shell.split>.source-editor{grid-column:2;min-height:420px}
+    .flow-designer-page .flow-editor-shell.split>.flow-canvas-wrap{grid-column:1}
+    .flow-designer-page .flow-editor-shell.split>.source-editor{grid-column:2;min-height:420px}
     .designer-view-controls .desktop-panel-toggle{display:none}
     .designer-view-controls .compact-panel-toggle{display:grid}
     .designer-focus-toolbar .focus-workspace-controls .desktop-panel-toggle{display:none}
@@ -177,8 +177,8 @@
 @container flow-designer (max-width:620px){
     .flow-editor-shell{--palette-drawer-width:min(210px,56%)}
     .flow-editor-shell.split{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(460px,1fr) minmax(420px,auto)}
-    .flow-editor-shell.split>.flow-canvas-wrap{grid-column:1;grid-row:1}
-    .flow-editor-shell.split>.source-editor{grid-column:1;grid-row:2}
+    .flow-designer-page .flow-editor-shell.split>.flow-canvas-wrap{grid-column:1;grid-row:1}
+    .flow-designer-page .flow-editor-shell.split>.source-editor{grid-column:1;grid-row:2}
     .designer-focus-toolbar{right:10px;left:10px;justify-content:flex-start;max-width:none;overflow-x:auto;transform:none}
     .designer-focus-toolbar .focus-exit span{display:none}
     .flow-designer-page .designer-toolbar{padding:12px}

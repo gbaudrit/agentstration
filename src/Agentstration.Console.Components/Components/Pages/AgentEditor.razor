@@ -82,8 +82,8 @@ else
 
         @if (toolsMode)
         {
-            <AgentToolSetConfiguration Versions="catalogToolSetVersions" Selected="SelectedToolSets" SelectedChanged="UpdateSelectedToolSets" />
-            <AgentToolConfiguration Tools="catalogTools" Providers="catalogProviders" Categories="catalogCategories" SelectedToolIds="SelectedToolIds" ToolSetGrantedTools="ToolSetGrantedTools" SelectedToolIdsChanged="UpdateSelectedTools" />
+            <AgentToolSetConfiguration Versions="VisibleToolSetVersions" Selected="SelectedToolSets" SelectedChanged="UpdateSelectedToolSets" />
+            <AgentToolConfiguration Tools="VisibleTools" Providers="VisibleProviders" Categories="VisibleCategories" SelectedToolIds="SelectedToolIds" ToolSetGrantedTools="ToolSetGrantedTools" SelectedToolIdsChanged="UpdateSelectedTools" />
         }
         else
         {
@@ -323,6 +323,16 @@ else
     }
     private IReadOnlyList<string> SelectedToolIds => model?.ToolNames.Split(['\r','\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
     private IReadOnlyList<AgentToolSetSelection> SelectedToolSets => model?.ToolSets ?? [];
+    private IReadOnlyList<ToolResource> VisibleTools => VisibleFromAgentScope(catalogTools);
+    private IReadOnlyList<ToolProviderResource> VisibleProviders => VisibleFromAgentScope(catalogProviders);
+    private IReadOnlyList<ToolCategoryResource> VisibleCategories => VisibleFromAgentScope(catalogCategories);
+    private IReadOnlyList<ToolSetVersionResource> VisibleToolSetVersions => VisibleFromAgentScope(catalogToolSetVersions);
+    private IReadOnlyList<T> VisibleFromAgentScope<T>(IReadOnlyList<T> resources) where T : Resource
+    {
+        if (selectedScope is not { } consumerScope) return resources;
+        return resources.Where(resource => resource.ScopeRef is { } ownerScope
+            && (ownerScope == consumerScope || ownerScope.Kind < consumerScope.Kind)).ToArray();
+    }
     private IReadOnlyDictionary<string, IReadOnlyList<string>> ToolSetGrantedTools
     {
         get
@@ -331,10 +341,14 @@ else
             foreach (var selection in SelectedToolSets)
             {
                 var selectedNamespace = selection.ToolSet.Namespace ?? ResourceNamespace.Default;
-                var version = catalogToolSetVersions.SingleOrDefault(value =>
+                var matchingVersions = catalogToolSetVersions.Where(value =>
                     value.Namespace == selectedNamespace
                     && string.Equals(value.ToolSetName, selection.ToolSet.Name, StringComparison.Ordinal)
-                    && string.Equals(value.Version, selection.Version, StringComparison.Ordinal));
+                    && (selection.ToolSet.ScopeRef is null || value.ScopeRef == selection.ToolSet.ScopeRef)
+                    && string.Equals(value.Version, selection.Version, StringComparison.Ordinal)).ToArray();
+                var version = matchingVersions.FirstOrDefault(value => value.ScopeRef == selection.ToolSet.ScopeRef)
+                    ?? matchingVersions.FirstOrDefault(value => value.ScopeRef == selectedScope)
+                    ?? matchingVersions.FirstOrDefault();
                 if (version is null) continue;
 
                 var selectedMembers = selection.Members.Count == 0

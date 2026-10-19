@@ -276,6 +276,55 @@ public sealed partial class FlowTests
         StringAssert.StartsWith(run.Value.DefinitionSnapshotId, $"{ResourceScopeRef.Instance.Value}:");
     }
 
+    [TestMethod]
+    public async Task RunsPersistAndQueryTheExactInvocationScopeIndependentlyFromDefinitionOwnership()
+    {
+        var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var principalId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        await using var fixture = await FlowFixture.CreateAsync(scopeHierarchy: new TestFlowScopeHierarchy(tenantId));
+        var flowId = new FlowId("shared-execution-scope");
+        await fixture.Service.CreateExactAsync(
+            ResourceScopeRef.Instance,
+            new CreateFlowCommand(
+                flowId.Value,
+                null,
+                "1.0.0",
+                true,
+                new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"))),
+            ResourceNamespace.Default,
+            default);
+        await fixture.Service.PublishVersionExactAsync(ResourceScopeRef.Instance, flowId, "1.0.0", true, default);
+        var runs = new FlowRunService(
+            fixture.Repository,
+            new TestFlowRunQueue(),
+            new TestCancellationRegistry(),
+            new NullFlowRunEventSink(),
+            TimeProvider.System,
+            flowDefinitions: fixture.Service);
+        using var input = JsonDocument.Parse("""{"prompt":"test"}""");
+        var scopes = new[]
+        {
+            FlowRunScope.Instance(principalId),
+            FlowRunScope.Tenant(tenantId, principalId),
+            FlowRunScope.Workspace(tenantId, TestScope.WorkspaceId, principalId)
+        };
+
+        foreach (var scope in scopes)
+        {
+            var created = await runs.CreateAsync(
+                flowId, "1.0.0", null, FlowRunTrigger.Manual, "principal", null,
+                input.RootElement, scope, default);
+            var exact = await fixture.Repository.GetRunExactAsync(scope.ScopeRef, created.Value.Id, default);
+
+            Assert.IsNotNull(exact);
+            Assert.AreEqual(scope.ScopeRef, exact.Value.ExecutionScopeRef);
+            Assert.AreEqual(ResourceScopeRef.Instance, exact.Value.DefinitionScopeRef);
+            Assert.AreEqual(principalId, exact.Value.Scope.PrincipalId);
+            foreach (var other in scopes.Where(value => value.ScopeRef != scope.ScopeRef))
+                Assert.IsNull(await fixture.Repository.GetRunExactAsync(other.ScopeRef, created.Value.Id, default));
+        }
+    }
+
     private static async Task RewriteAsLegacyAsync(
         FlowDbContext context,
         string currentKey,

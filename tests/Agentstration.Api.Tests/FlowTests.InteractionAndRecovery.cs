@@ -170,7 +170,7 @@ public sealed partial class FlowTests
         await repository.UpdateRunAsync(waiting, pending.ETag, default);
         await repository.CreateInputRequestAsync(new InputRequest
         {
-            WorkspaceId = waiting.WorkspaceId,
+            ScopeRef = waiting.ExecutionScopeRef,
             Id = $"input-{Guid.NewGuid():N}",
             RunId = waiting.Id,
             RuntimeRequestId = "runtime-request-1",

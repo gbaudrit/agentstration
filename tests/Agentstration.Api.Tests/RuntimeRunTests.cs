@@ -277,7 +277,7 @@ public sealed class RuntimeRunTests
             };
             RuntimeRunEvent Event(Agentstration.Resources.WorkspaceId workspaceId) => new()
             {
-                WorkspaceId = workspaceId,
+                ScopeRef = ResourceScopeRef.Workspace(workspaceId.Value),
                 EventId = Guid.NewGuid(),
                 RunId = "shared-run",
                 Kind = RuntimeRunEventKind.RunCreated,
@@ -361,6 +361,62 @@ public sealed class RuntimeRunTests
         Assert.AreEqual(claim.Ownership.WorkerId.Value, activeInstances[0].WorkerId);
         Assert.IsFalse(eventHistory.Any(item => item.Kind is RuntimeRunEventKind.ResponseDelta or RuntimeRunEventKind.RunCompleted));
         Assert.AreEqual(workBefore!.Value.Count, workAfter!.Value.Count);
+    }
+
+    [TestMethod]
+    public async Task AwpWorkerCanClaimAnInstanceScopedRuntimeRun()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+            builder.UseSetting("Agentstration:Authentication:DevelopmentGrantPlatformAdministrator", "true");
+            AwpTestWorker.Configure(builder);
+        });
+        using var client = factory.CreateClient();
+        var template = await client.GetFromJsonAsync<AgentResource>("/api/agents/sql-expert");
+        Assert.IsNotNull(template);
+        var agentRequest = new AgentResourceRequest
+        {
+            ApiVersion = template.ApiVersion,
+            Kind = template.Kind,
+            Metadata = new ResourceMetadata { Name = "awp-instance-claim" },
+            Definition = template.Definition with { DisplayName = "AWP instance claim" },
+            ScopeRef = ResourceScopeRef.Instance
+        };
+        using var agentResponse = await client.PutAsJsonAsync("/api/agents/awp-instance-claim", agentRequest);
+        Assert.AreEqual(HttpStatusCode.OK, agentResponse.StatusCode, await agentResponse.Content.ReadAsStringAsync());
+        var agent = await agentResponse.Content.ReadFromJsonAsync<AgentResource>();
+        Assert.IsNotNull(agent);
+
+        using var runResponse = await client.PostAsJsonAsync("/api/runtime/runs", new CreateRuntimeRunRequest
+        {
+            Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation)
+            {
+                ScopeRef = ResourceScopeRef.Instance,
+                ResourceUid = agent.Uid
+            },
+            ExecutionScopeRef = ResourceScopeRef.Instance,
+            Input = Input("instance claim"),
+            Origin = RuntimeRunOrigin.Api
+        });
+        Assert.AreEqual(HttpStatusCode.Accepted, runResponse.StatusCode, await runResponse.Content.ReadAsStringAsync());
+
+        await using var worker = await AwpTestWorker.StartAsync(factory, processAssignments: false);
+        var claim = await worker.ClaimAsync();
+
+        Assert.IsNotNull(claim.Assignment);
+        Assert.AreEqual(ResourceScopeRef.Instance.Value, claim.Assignment.Scope.ScopeRef);
+        Assert.AreEqual(Guid.Empty, claim.Assignment.Scope.TenantId);
+        Assert.AreEqual(string.Empty, claim.Assignment.Scope.WorkspaceId);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await worker.RunAsync(claim.Assignment, claim.ServerTime, timeout.Token);
+        var run = await runResponse.Content.ReadFromJsonAsync<RuntimeRun>();
+        Assert.IsNotNull(run);
+        var completed = await client.GetFromJsonAsync<RuntimeRun>(
+            $"/api/runtime/runs/{run.Id}?scopeRef={Uri.EscapeDataString(ResourceScopeRef.Instance.Value)}");
+        Assert.IsNotNull(completed);
+        Assert.AreEqual(RuntimeRunState.Succeeded, completed.Status.State, completed.Status.Error);
     }
 
     [TestMethod]

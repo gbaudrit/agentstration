@@ -40,7 +40,7 @@ public sealed class RuntimeExecutionMaterialResolver(
     {
         if (assignment.TargetKind != RuntimeAssignmentTargetKind.FlowRun)
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Flow Run does not belong to this assignment.");
-        var stored = await flowRuns.GetRunAsync(assignment.WorkspaceId, flowRunId, cancellationToken)
+        var stored = await flowRuns.GetRunExactAsync(assignment.ExecutionScopeRef, flowRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
         if (!BelongsToAssignment(assignment, run))
@@ -71,7 +71,7 @@ public sealed class RuntimeExecutionMaterialResolver(
         RuntimeWorkerAssignment assignment,
         CancellationToken cancellationToken)
     {
-        var stored = await runtimeRuns.GetAsync(assignment.WorkspaceId, assignment.TargetRunId, cancellationToken)
+        var stored = await runtimeRuns.GetExactAsync(assignment.ExecutionScopeRef, assignment.TargetRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Runtime Run was not found.");
         await runtimeScopes.ValidateAsync(stored.Value.Scope, cancellationToken);
         using var scope = runtimeScopes.Enter(stored.Value.Scope);
@@ -86,7 +86,10 @@ public sealed class RuntimeExecutionMaterialResolver(
             assignment.TargetRunId,
             stored.Value.Properties.Input,
             stored.Value.Properties.Execution,
-            agent);
+            agent)
+        {
+            ScopeRef = stored.Value.ExecutionScopeRef
+        };
     }
 
     public async Task<RuntimeRootFlowExecutionMaterial> ResolveFlowRunAsync(
@@ -96,7 +99,7 @@ public sealed class RuntimeExecutionMaterialResolver(
     {
         if (assignment.TargetKind != RuntimeAssignmentTargetKind.FlowRun)
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "Only a Flow assignment can resolve Flow material.");
-        var stored = await flowRuns.GetRunAsync(assignment.WorkspaceId, flowRunId, cancellationToken)
+        var stored = await flowRuns.GetRunExactAsync(assignment.ExecutionScopeRef, flowRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
         if (!BelongsToAssignment(assignment, run))
@@ -139,7 +142,7 @@ public sealed class RuntimeExecutionMaterialResolver(
         RuntimeFlowResumeMaterial? resume = null;
         if (run.RuntimeState is not null)
         {
-            var answered = (await flowRuns.ListInputRequestsAsync(run.WorkspaceId, run.Id,
+            var answered = (await flowRuns.ListInputRequestsExactAsync(run.ExecutionScopeRef, run.Id,
                 InputRequestStatus.Answered, cancellationToken)).LastOrDefault();
             if (answered?.Value.Response is { } response)
                 resume = new(run.RuntimeState.RuntimeType, run.RuntimeState.StateId,
@@ -170,6 +173,7 @@ public sealed class RuntimeExecutionMaterialResolver(
             run.CorrelationId,
             flowOptions.Value.OrchestrationTimeout)
         {
+            ScopeRef = run.ExecutionScopeRef,
             FlowScopeRef = (run.DefinitionScopeRef ?? run.DefinitionSnapshot.ScopeRef).Value
         };
     }

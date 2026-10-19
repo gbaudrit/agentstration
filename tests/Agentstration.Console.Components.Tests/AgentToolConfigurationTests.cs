@@ -10,6 +10,33 @@ namespace Agentstration.Web.Tests;
 public sealed class AgentToolConfigurationTests
 {
     [TestMethod]
+    public void ScopedProviderAndToolNamesRenderWithoutCatalogCollision()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceScope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var instanceProvider = Provider("paired", "Instance extension", ResourceScopeRef.Instance);
+        var workspaceProvider = Provider("paired", "Workspace extension", workspaceScope);
+        var instanceTool = Tool("content.read", "Instance read", "paired", scopeRef: ResourceScopeRef.Instance);
+        var workspaceTool = Tool("content.read", "Workspace read", "paired", scopeRef: workspaceScope);
+
+        var rendered = context.Render<AgentToolConfiguration>(parameters => parameters
+            .Add(component => component.Providers, [instanceProvider, workspaceProvider])
+            .Add(component => component.Tools, [instanceTool, workspaceTool])
+            .Add(component => component.Categories,
+            [
+                Category("content", "Content", ["content.read"], ResourceScopeRef.Instance),
+                Category("content", "Content", ["content.read"], workspaceScope)
+            ]));
+
+        Assert.AreEqual(2, rendered.FindAll(".agent-tool-group").Count);
+        Assert.AreEqual(2, rendered.FindAll(".agent-tool-option").Count);
+        Assert.AreEqual(2, rendered.FindAll(".agent-tool-name").Select(link => link.GetAttribute("href")).Distinct(StringComparer.Ordinal).Count());
+        StringAssert.Contains(rendered.Markup, Uri.EscapeDataString(ResourceScopeRef.Instance.Value));
+        StringAssert.Contains(rendered.Markup, Uri.EscapeDataString(workspaceScope.Value));
+    }
+
+    [TestMethod]
     public void ToolsAreGroupedByMcpWithCatalogAndProviderNavigation()
     {
         using var context = new BunitContext();
@@ -152,11 +179,13 @@ public sealed class AgentToolConfigurationTests
         CollectionAssert.AreEqual(new[] { "documentation.read" }, selected?.ToArray());
     }
 
-    private static ToolProviderResource Provider(string name, string displayName) => new()
+    private static ToolProviderResource Provider(string name, string displayName, ResourceScopeRef? scopeRef = null) => new()
     {
+        Uid = Guid.NewGuid(),
         ApiVersion = "agentstration.io/v1",
         Kind = ToolResourceKinds.ToolProvider,
         Metadata = new ResourceMetadata { Name = name },
+        ScopeRef = scopeRef,
         Definition = new ToolProviderProperties
         {
             DisplayName = displayName,
@@ -165,16 +194,18 @@ public sealed class AgentToolConfigurationTests
         }
     };
 
-    private static ToolResource Tool(string name, string displayName, string provider, string? description = null) => new()
+    private static ToolResource Tool(string name, string displayName, string provider, string? description = null, ResourceScopeRef? scopeRef = null) => new()
     {
+        Uid = Guid.NewGuid(),
         ApiVersion = "agentstration.io/v1",
         Kind = ToolResourceKinds.Tool,
         Metadata = new ResourceMetadata { Name = name },
+        ScopeRef = scopeRef,
         Definition = new ToolResourceProperties
         {
             DisplayName = displayName,
             Description = description,
-            Provider = new ResourceReference(provider),
+            Provider = new ResourceReference(provider, scopeRef),
             Enabled = true,
             Discovery = new ToolDiscoveryState
             {
@@ -185,15 +216,17 @@ public sealed class AgentToolConfigurationTests
         }
     };
 
-    private static ToolCategoryResource Category(string name, string displayName, IReadOnlyList<string> tools) => new()
+    private static ToolCategoryResource Category(string name, string displayName, IReadOnlyList<string> tools, ResourceScopeRef? scopeRef = null) => new()
     {
+        Uid = Guid.NewGuid(),
         ApiVersion = ResourceApiVersions.CoreV1,
         Kind = ToolResourceKinds.ToolCategory,
         Metadata = new ResourceMetadata { Name = name },
+        ScopeRef = scopeRef,
         Definition = new ToolCategoryProperties
         {
             DisplayName = displayName,
-            Tools = tools.Select(tool => new ResourceReference(tool)).ToArray()
+            Tools = tools.Select(tool => new ResourceReference(tool, scopeRef)).ToArray()
         }
     };
 }

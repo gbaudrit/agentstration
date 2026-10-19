@@ -127,7 +127,7 @@ public interface IFlowRunCancellationRegistry
 
 public interface IFlowRunDeletionGuard
 {
-    Task ValidateDeleteAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken);
+    Task ValidateDeleteAsync(ResourceScopeRef executionScopeRef, string runId, CancellationToken cancellationToken);
 }
 
 public interface IFlowRunEventSink
@@ -172,7 +172,7 @@ public sealed record FlowRevisionUsage(
     IReadOnlyList<FlowRevisionRunImpact> ActiveRuns);
 
 public sealed record FlowRevisionRunImpact(
-    WorkspaceId WorkspaceId,
+    ResourceScopeRef ScopeRef,
     string RunId,
     FlowRunStatus Status,
     int PendingInputRequestCount);

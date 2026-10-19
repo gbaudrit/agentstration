@@ -235,6 +235,49 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task FlowAuthoringClientPreservesExactOwnerScope()
+    {
+        var now = new DateTimeOffset(2026, 10, 17, 12, 0, 0, TimeSpan.Zero);
+        var @namespace = new ResourceNamespace("platform");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "reviewer"));
+        var flow = new FlowResponse("review", "review", null, "1.0.0", true, null, definition, new Dictionary<string, string>(), now, now)
+        {
+            Namespace = @namespace,
+            ScopeRef = ResourceScopeRef.Instance
+        };
+        var version = new FlowVersionResponse("review", "1.0.0", null, definition, new Dictionary<string, string>(), now)
+        {
+            Namespace = @namespace,
+            ScopeRef = ResourceScopeRef.Instance
+        };
+        var requests = new List<(HttpMethod Method, string PathAndQuery, string? IfMatch)>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add((request.Method, request.RequestUri!.PathAndQuery, request.Headers.IfMatch.FirstOrDefault()?.ToString()));
+            if (request.RequestUri.AbsolutePath.EndsWith("/versions", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.Created) { Content = JsonContent.Create(version) };
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) };
+            response.Headers.ETag = new EntityTagHeaderValue(request.Method == HttpMethod.Put ? "\"v2\"" : "\"v1\"");
+            return response;
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new FlowApiClient(httpClient);
+
+        var snapshot = await client.GetFlowSnapshotAsync(@namespace, "review", ResourceScopeRef.Instance, default);
+        _ = await client.UpdateFlowAsync(@namespace, "review", ResourceScopeRef.Instance,
+            new UpdateFlowRequest(null, "1.0.0", true, definition), snapshot.ETag, default);
+        _ = await client.CreateFlowVersionAsync(@namespace, "review", ResourceScopeRef.Instance,
+            new CreateFlowVersionRequest("1.0.0"), default);
+
+        CollectionAssert.AreEqual(new[]
+        {
+            (HttpMethod.Get, "/api/namespaces/platform/flows/review?scopeRef=%2Finstance", (string?)null),
+            (HttpMethod.Put, "/api/namespaces/platform/flows/review?scopeRef=%2Finstance", "\"v1\""),
+            (HttpMethod.Post, "/api/namespaces/platform/flows/review/versions?scopeRef=%2Finstance", (string?)null)
+        }, requests);
+    }
+
+    [TestMethod]
     public async Task FlowClientListsAndLoadsNamespacedFlows()
     {
         var now = new DateTimeOffset(2026, 8, 15, 10, 0, 0, TimeSpan.Zero);
