@@ -33,7 +33,7 @@ public sealed record AgentExecutionResult(
     ModelExecutionOptions? EffectiveOptions = null,
     AgentExecutionUsage? Usage = null);
 
-public sealed record AgentExecutionUsage(int? InputTokens = null, int? OutputTokens = null);
+public sealed record AgentExecutionUsage(int? InputTokens = null, int? OutputTokens = null, int? TotalTokens = null);
 public sealed record AgentExecutionError(string Code, string Message, bool Retryable = false);
 
 public abstract record AgentExecutionEvent;

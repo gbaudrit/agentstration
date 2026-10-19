@@ -350,7 +350,8 @@ public static class AwpRuntimeWorkerEndpoints
         var now = timeProvider.GetUtcNow();
         return Envelope(envelope.MessageId, now, new AwpInvokeModelResponse(now,
             response.Contents.Select(ToContract).ToArray(), response.ModelId,
-            response.FinishReason, response.InputTokens, response.OutputTokens, response.ProviderType));
+            response.FinishReason, response.InputTokens, response.OutputTokens, response.ProviderType,
+            response.TotalTokens));
     }, principal);
 
     private static async Task<IResult> StreamModelAsync(

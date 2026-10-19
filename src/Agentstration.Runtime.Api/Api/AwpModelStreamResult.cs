@@ -48,10 +48,10 @@ internal sealed class AwpModelStreamResult(
                 foreach (var content in update.Contents)
                     await WriteContentAsync(content, streamId, writer, httpContext.RequestAborted);
 
-                if (update.InputTokens is not null || update.OutputTokens is not null)
+                if (update.InputTokens is not null || update.OutputTokens is not null || update.TotalTokens is not null)
                     await writer.WriteAsync(new AwpModelUsage(
                         streamId, writer.NextSequence, timeProvider.GetUtcNow(),
-                        update.InputTokens, update.OutputTokens), terminal: false,
+                        update.InputTokens, update.OutputTokens, update.TotalTokens), terminal: false,
                         httpContext.RequestAborted);
             }
 

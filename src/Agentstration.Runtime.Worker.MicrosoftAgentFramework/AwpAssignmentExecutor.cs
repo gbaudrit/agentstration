@@ -78,7 +78,8 @@ internal sealed class AwpAssignmentExecutor(
             {
                 model = result.ModelName,
                 inputTokens = result.Usage?.InputTokens,
-                outputTokens = result.Usage?.OutputTokens
+                outputTokens = result.Usage?.OutputTokens,
+                totalTokens = result.Usage?.TotalTokens
             }), null, cancellationToken);
         return JsonSerializer.SerializeToElement(result.Output);
     }
@@ -238,7 +239,8 @@ internal sealed class AwpAssignmentExecutor(
                 usage = execution.Usage is null ? null : new
                 {
                     inputTokens = execution.Usage.InputTokens,
-                    outputTokens = execution.Usage.OutputTokens
+                    outputTokens = execution.Usage.OutputTokens,
+                    totalTokens = execution.Usage.TotalTokens
                 }
             }), null, cancellationToken);
         await CompleteStepAsync(session, material, "Output", output, null, cancellationToken);
@@ -521,7 +523,8 @@ internal sealed class AwpAssignmentExecutor(
                         usage = executedAgentResult?.Usage is null ? null : new
                         {
                             inputTokens = executedAgentResult.Usage.InputTokens,
-                            outputTokens = executedAgentResult.Usage.OutputTokens
+                            outputTokens = executedAgentResult.Usage.OutputTokens,
+                            totalTokens = executedAgentResult.Usage.TotalTokens
                         },
                         tool = executedTool is null ? null : new
                         {
@@ -671,7 +674,8 @@ internal sealed class AwpAssignmentExecutor(
                 model = effective.ModelName,
                 provider = effective.ProviderType,
                 inputTokens = effective.Usage?.InputTokens,
-                outputTokens = effective.Usage?.OutputTokens
+                outputTokens = effective.Usage?.OutputTokens,
+                totalTokens = effective.Usage?.TotalTokens
             }), null, cancellationToken);
         return effective;
     }

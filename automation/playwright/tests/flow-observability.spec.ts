@@ -27,6 +27,11 @@ test('a completed Workplace task is traceable through Flow, Agent, task, and eve
   await inspectFlowObservability({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
 });
 
+test('Flow Run token usage remains visible at mobile width @responsive @smoke', async ({ page, product }) => {
+  const pages = new ProductPages(page);
+  await inspectFlowObservability({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
+});
+
 test('Flow draft Definition and Split keep a usable YAML editor at desktop width @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   await authenticateConsole({ ...product, pages, checkpoint: ignoreCheckpoints }, {});

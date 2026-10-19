@@ -103,7 +103,12 @@ public sealed partial class FlowRunService
             steps.FirstOrDefault(step => step.Status == FlowStepRunStatus.Failed)?.StepName, JsonSerializer.SerializeToElement(error), token);
     }
 
-    private Task<StoredFlowRun> SaveAsync(StoredFlowRun stored, FlowRun value, CancellationToken token) => repository.UpdateRunAsync(value, stored.ETag, token);
+    private async Task<StoredFlowRun> SaveAsync(StoredFlowRun stored, FlowRun value, CancellationToken token)
+    {
+        if (value.Status.IsTerminal())
+            value = value with { TokenUsage = await tokenUsageConsolidator.FinalizeAsync(value, token) };
+        return await repository.UpdateRunAsync(value, stored.ETag, token);
+    }
 
     private async Task CleanupStepArtifactsAsync(FlowRun run, FlowGraphDefinition graph, CancellationToken cancellationToken)
     {
